@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -171,6 +172,13 @@ type config struct {
 	// pass once this many names in a row have failed (0 = never). A dead or
 	// erroring Scryfall then costs N requests, not one per deck name.
 	prewarmArtMaxConsecutiveFailures int
+	// pprof is the -pprof flag: serve Go runtime profiles at /debug/pprof/
+	// on the main listener. It is opt-in because the profiles expose process
+	// internals (cmdline, heap, goroutine stacks) and /profile and /trace
+	// burn CPU on demand. serve refuses it on a non-loopback listener; note
+	// that loopback is not private when a reverse proxy or tunnel forwards
+	// public traffic to that port, as the demo's does.
+	pprof bool
 	// manabrew is the -manabrew flag: mount host/manabrewhttp's routes
 	// (manabrew.go). Off by default so an unmounted server is byte-identical
 	// to today (scoping spec §5.4). A non-empty manabrewAddr implies this
@@ -302,6 +310,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.BoolVar(&c.prewarmArtOnly, "prewarm-art-only", false, "fill the card-art cache from -decks (into -art-dir) and exit; no server is started. Exits non-zero if any name failed")
 	fs.DurationVar(&c.prewarmArtBudget, "prewarm-art-budget", 0, "with -prewarm-art-only: stop the fill after this much wall-clock time and exit non-zero (0 = no limit)")
 	fs.IntVar(&c.prewarmArtMaxConsecutiveFailures, "prewarm-art-max-consecutive-failures", 0, "with -prewarm-art-only: stop the fill once this many names in a row have failed and exit non-zero (0 = no limit)")
+	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")
@@ -312,6 +321,9 @@ func serveFlags() (*flag.FlagSet, *config) {
 // the server down. Split from main so a test can drive it on a random
 // port.
 func serve(ctx context.Context, c config, ln net.Listener) error {
+	if c.pprof && !isLoopbackListener(ln) {
+		return fmt.Errorf("-pprof requires a loopback listener (got %s)", ln.Addr())
+	}
 	vis, err := view.ParseVisibility(c.spectator)
 	if err != nil {
 		return err
@@ -455,6 +467,19 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	topMux.HandleFunc("GET /art/named", ac.named)
 	topMux.HandleFunc("GET /art/blob/{key}", ac.blob)
 	topMux.HandleFunc("GET /cards/named", ac.text)
+	// net/http/pprof's init registers its handlers on http.DefaultServeMux,
+	// which gorged never serves (both listeners use their own mux), so the
+	// import alone publishes nothing. The routes exist only when -pprof
+	// mounts them on topMux here. scripts/deploy-demo.sh passes it only when
+	// the operator sets PPROF=true for that deploy.
+	if c.pprof {
+		topMux.HandleFunc("GET /debug/pprof/", pprof.Index)
+		topMux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+		topMux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+		topMux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+		topMux.HandleFunc("POST /debug/pprof/symbol", pprof.Symbol)
+		topMux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+	}
 	// An empty -feedback disarms the endpoint entirely, the same opt-in shape
 	// Options.Seat and CreateGame use. That is what a config built in a test
 	// gets (the flag default only applies to the real binary), so a test
@@ -542,6 +567,13 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		_ = mbSrv.Shutdown(shutdown)
 	}
 	return r.Close()
+}
+
+// isLoopbackListener reports whether ln is a TCP listener bound to a
+// loopback address. A wildcard bind (0.0.0.0, ::) is not loopback.
+func isLoopbackListener(ln net.Listener) bool {
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	return ok && addr.IP.IsLoopback()
 }
 
 // applyHumans parses the -humans flag into c.humans and rejects the

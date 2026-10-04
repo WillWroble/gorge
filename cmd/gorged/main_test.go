@@ -124,6 +124,92 @@ func TestServesTablesOverHTTP(t *testing.T) {
 	}
 }
 
+// TestPprofIsOptIn drives a real server on a loopback listener: without
+// -pprof /debug/pprof/ is not mounted, with it the goroutine profile is
+// served from topMux.
+func TestPprofIsOptIn(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		pprof     bool
+		available bool
+	}{
+		{name: "off"},
+		{name: "on", pprof: true, available: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			url, cancel, done := startServe(t, config{tables: 1, seats: 2, pace: 0, pprof: tc.pprof})
+			defer cancel()
+			waitTables(t, url, 1)
+			resp, err := http.Get(url + "/debug/pprof/goroutine?debug=1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := resp.StatusCode == http.StatusOK && strings.HasPrefix(string(body), "goroutine profile:"); got != tc.available {
+				t.Fatalf("pprof availability = %t (status %d), want %t", got, resp.StatusCode, tc.available)
+			}
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+		})
+	}
+}
+
+// TestPprofRefusesNonLoopbackListener: serve fails up front, before any
+// table is built, when -pprof meets a wildcard bind.
+func TestPprofRefusesNonLoopbackListener(t *testing.T) {
+	ln := &fakeListener{addr: &net.TCPAddr{IP: net.IPv4zero, Port: 1}}
+	err := serve(context.Background(), config{pprof: true}, ln)
+	if err == nil || !strings.Contains(err.Error(), "-pprof requires a loopback listener") {
+		t.Fatalf("serve = %v, want the loopback refusal", err)
+	}
+}
+
+func TestServeFlagPprofDefaultsOff(t *testing.T) {
+	fs, c := serveFlags()
+	if c.pprof {
+		t.Fatal("-pprof default enabled")
+	}
+	if err := fs.Parse([]string{"-pprof"}); err != nil {
+		t.Fatal(err)
+	}
+	if !c.pprof {
+		t.Fatal("-pprof did not enable runtime profiles")
+	}
+}
+
+func TestPprofRequiresLoopbackListener(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ip   net.IP
+		want bool
+	}{
+		{name: "IPv4 loopback", ip: net.IPv4(127, 0, 0, 1), want: true},
+		{name: "IPv6 loopback", ip: net.IPv6loopback, want: true},
+		{name: "wildcard", ip: net.IPv4zero},
+		{name: "public", ip: net.IPv4(192, 0, 2, 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ln := &fakeListener{addr: &net.TCPAddr{IP: tc.ip}}
+			if got := isLoopbackListener(ln); got != tc.want {
+				t.Fatalf("isLoopbackListener(%v) = %t, want %t", tc.ip, got, tc.want)
+			}
+		})
+	}
+}
+
+type fakeListener struct{ addr net.Addr }
+
+func (l *fakeListener) Accept() (net.Conn, error) { return nil, nil }
+func (l *fakeListener) Close() error              { return nil }
+func (l *fakeListener) Addr() net.Addr            { return l.addr }
+
 // TestHostThreadsCorpusTokens is the FL-40 required proof that gorged
 // populates host.Options.Tokens from the opened corpus. A hosted table that
 // does not get the token corpus mints no tokens and every token card is
