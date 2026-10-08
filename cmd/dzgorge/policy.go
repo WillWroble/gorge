@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/sbtactical"
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
@@ -16,6 +18,13 @@ import (
 //
 //	random                       uniform over the legal options, mana paid automatically (sb-uniform)
 //	bot                          gorge's production heuristic, no search
+//	sbtactical                   sb-tactical (bots/sbtactical, internal/spellbench/builtins.NewTactical):
+//	                             the SpellBench scored heuristic, gorge's strongest no-search bot. Mana is
+//	                             always auto-paid (builtins.AutoPay, the mode botbench's sb-tactical arm
+//	                             and the hosted seat use), and the game runner hands it the engine as its
+//	                             potential-play payment planner, as botbench does. Its keep/mulligan and
+//	                             bottoming asks go to gorge's default policy, so :mull, :keep7 and
+//	                             -mull-heuristic act on it exactly as on bot; other keys are ignored
 //	az:sims=100                  AlphaZero-style PUCT search over the seat's own decisions
 //	                             (internal/azmcts), honest worlds: each simulation re-deals the
 //	                             cards the seat cannot see. Generation 0 without net=: a uniform
@@ -53,7 +62,7 @@ import (
 //	   :mull                     the London mulligan by land count (botpolicy/mulligan.go): keep 2-5 lands
 //	                             of 7 (also after one mulligan), after two keep unless 0 or 7, and
 //	                             bottom toward ceil(K/2) lands, highest mana value spells first. Any
-//	                             bot, az or prior seat; play -mull-heuristic sets it on every seat.
+//	                             bot, sbtactical, az or prior seat; play -mull-heuristic sets it on every seat.
 //	                             Without it the seat mulligans on gorge's 1/3 coin
 //	   :keep7                    never mulligan (the control for :mull in a game with -mulligans N)
 //	   :morekinds                the fuller search (gorge/patches/0007): besides priority, attackers,
@@ -98,6 +107,16 @@ type policySpec struct {
 	SkipPass  int
 	OppFull   bool         // :oppfull
 	Kinds     azmcts.Kinds // :kinds= / :morekinds; zero is azmcts.AllKinds
+	// lookup resolves card names for sbtactical (setLookup); nil reads View facts only.
+	lookup builtins.CardLookup
+}
+
+// setLookup gives an sbtactical seat its card lookup over the game's corpus (the
+// registry is loaded after the specs are parsed).
+func (p *policySpec) setLookup(reg *cards.Registry) {
+	if p.Kind == "sbtactical" {
+		p.lookup = builtins.NewRegistryLookup(reg)
+	}
 }
 
 func parsePolicy(s string) (*policySpec, error) {
@@ -109,9 +128,9 @@ func parsePolicy(s string) (*policySpec, error) {
 	parts := strings.Split(s, ":")
 	p := &policySpec{Raw: s, Kind: parts[0], Sims: azmcts.DefaultOptions().Sims, CPUCT: -1, FPU: -1, Cands: -1}
 	switch p.Kind {
-	case "random", "bot", "az", "prior":
+	case "random", "bot", "sbtactical", "az", "prior":
 	default:
-		return nil, fmt.Errorf("policy %q: want random, bot, az or prior", s)
+		return nil, fmt.Errorf("policy %q: want random, bot, sbtactical, az or prior", s)
 	}
 	for _, kv := range parts[1:] {
 		k, v, _ := strings.Cut(kv, "=")
@@ -267,6 +286,10 @@ func (p *policySpec) seat(seed uint64) (seat.Seat, error) {
 			b = b.WithMulligan(p.Mull)
 		}
 		return b, nil
+	case "sbtactical":
+		t := builtins.NewTactical(builtins.AutoPay, seed, p.lookup, sbtactical.Hosted())
+		t.SetMulligan(p.Mull)
+		return t, nil
 	default:
 		return azmcts.NewSeat(seed, p.model, p.azConfig())
 	}

@@ -100,7 +100,7 @@ func runPlay(args []string) int {
 	// whatever the hand holds (botpolicy/policy.go), and every seat here delegates that ask to it.
 	// -mull-heuristic (or a seat's :mull key) replaces the coin with a land-count rule.
 	mulligans := fs.Int("mulligans", 0, "London mulligans each player may take (0 skips the round)")
-	mullHeur := fs.Bool("mull-heuristic", false, "every bot, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
+	mullHeur := fs.Bool("mull-heuristic", false, "every bot, sbtactical, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
 	progress := fs.Int("progress", 0, "print progress every N games (0 = about 20 times)")
 	fs.IntVar(&recordEvery, "record-every", 1, "write one searched decision in K to -corpus (cheap games for the value)")
 	recFeat := fs.String("record-features", "mz", "encoding of the -corpus records: mz, or entity for dzg's networks (dzgorge pack)")
@@ -148,6 +148,9 @@ func runPlay(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	for _, p := range specs {
+		p.setLookup(reg)
 	}
 	pool, err := readPool(*poolPath, *split)
 	if err != nil {
