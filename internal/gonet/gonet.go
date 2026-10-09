@@ -207,7 +207,8 @@ func Load(path string) (*Net, error) {
 		return nil, fmt.Errorf("gonet %s: not a .dzgw file (python -m dzg.export)", path)
 	}
 	hl := int64(binary.LittleEndian.Uint64(raw[8:16]))
-	if hl <= 0 || 16+hl > int64(len(raw)) {
+	// Compared as len-16 so a header length near MaxInt64 cannot wrap the sum.
+	if hl <= 0 || hl > int64(len(raw))-16 {
 		return nil, fmt.Errorf("gonet %s: bad header length %d", path, hl)
 	}
 	var h gnHeader
@@ -233,9 +234,17 @@ func Load(path string) (*Net, error) {
 	for _, t := range h.Tensors {
 		n := int64(1)
 		for _, d := range t.Shape {
+			if d < 0 || d > 1<<30 {
+				return nil, fmt.Errorf("gonet %s: tensor %s: bad shape %v", path, t.Name, t.Shape)
+			}
 			n *= int64(d)
+			if n > 1<<31 {
+				return nil, fmt.Errorf("gonet %s: tensor %s: shape %v is too large", path, t.Name, t.Shape)
+			}
 		}
-		if t.NBytes != 4*n || start+t.Offset+t.NBytes > int64(len(raw)) || t.Offset < 0 {
+		// Extents are compared against the room left after start, never summed,
+		// so a hostile Offset or NBytes cannot wrap past the file's end.
+		if t.Offset < 0 || t.NBytes != 4*n || t.Offset > int64(len(raw))-start-t.NBytes {
 			return nil, fmt.Errorf("gonet %s: tensor %s: bad extent", path, t.Name)
 		}
 		b := raw[start+t.Offset : start+t.Offset+t.NBytes]
