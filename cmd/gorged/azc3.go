@@ -68,6 +68,11 @@ func (c config) azc3Pool(reg *cards.Registry, cmdPool, conPool []string) ([]stri
 	}
 	for i := range catalogue {
 		catalogue[i].Pool = azc3.Policy
+		// The picker shows "name - archetype": without one these decks look like
+		// ids among the hand-named ones, and they sort after them.
+		if catalogue[i].Archetype == "" {
+			catalogue[i].Archetype = "FDN limited, plays vs az-c3"
+		}
 	}
 	return constructed, catalogue, nil
 }

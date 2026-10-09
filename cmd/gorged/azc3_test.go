@@ -220,6 +220,15 @@ func TestAZC3PoolLoading(t *testing.T) {
 		dir := t.TempDir()
 		writeDeck(t, dir, "FDN_b", "")
 		writeDeck(t, dir, "FDN_a", "")
+		// A 17lands deck carries no archetype: it gets the label, so the picker
+		// shows what it is. A deck that has one keeps it.
+		raw, err := os.ReadFile(filepath.Join(dir, "FDN_a.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "FDN_a.json"), []byte(strings.Replace(string(raw), `"archetype":"test",`, "", 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
 		c := config{az3Decks: dir}
 		ids, cat, err := c.azc3Pool(reg, nil, []string{"other"})
 		if err != nil {
@@ -228,7 +237,8 @@ func TestAZC3PoolLoading(t *testing.T) {
 		if !reflect.DeepEqual(ids, []string{"FDN_a", "FDN_b"}) {
 			t.Errorf("pool %v", ids)
 		}
-		if len(cat) != 2 || cat[0].Pool != azc3.Policy || cat[1].Pool != azc3.Policy || cat[0].Format != "constructed" {
+		if len(cat) != 2 || cat[0].Pool != azc3.Policy || cat[1].Pool != azc3.Policy || cat[0].Format != "constructed" ||
+			!strings.Contains(cat[0].Archetype, "az-c3") || cat[1].Archetype != "test" {
 			t.Errorf("catalogue %+v", cat)
 		}
 	})
