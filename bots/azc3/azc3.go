@@ -90,8 +90,9 @@ func info() bots.Info {
 			},
 		},
 		Cost: bots.Cost{
-			MeanMS: 314, Scope: "per searched decision",
-			Note:   "mean of the c3-vs-sb-tactical evaluation, 24 workers in parallel (202-344 ms across the three evaluations); p95 not measured",
+			MeanMS: 185, P95MS: 259, Scope: "per bot-turn response",
+			Note: "hosted smoke: 4 games against a human who only passes, the 32 waits that included bot search (a small sample); " +
+				"the training loop's evaluations measured 202-344 ms mean per searched decision with 24 workers in parallel",
 			Source: "docs/superpowers/reports/2026-10-09-az-c3-hosted.md",
 		},
 		Env: true, Search: true,

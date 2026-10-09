@@ -20,6 +20,7 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
+	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/host"
@@ -121,6 +122,11 @@ type config struct {
 	// A bounded refusal preserves each existing game's credentials, feedback
 	// capture and replay routes; it never evicts a game behind a live URL.
 	maxOnDemandTables int
+	// az3Net and az3Decks are -az-c3-net and -az-c3-decks (azc3.go): the az-c3
+	// bot's network and the only decks it may play. policyPools maps a bot
+	// policy to the deck ids reserved for it; serve fills it from -az-c3-decks.
+	az3Net, az3Decks string
+	policyPools      map[string][]string
 	// seatToken is the -seat-token flag: a fixed bearer token for the first
 	// human slot instead of a random per-slot one. Tests and local use only
 	// (R-E3-3) — production runs mint random tokens.
@@ -311,6 +317,8 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.DurationVar(&c.prewarmArtBudget, "prewarm-art-budget", 0, "with -prewarm-art-only: stop the fill after this much wall-clock time and exit non-zero (0 = no limit)")
 	fs.IntVar(&c.prewarmArtMaxConsecutiveFailures, "prewarm-art-max-consecutive-failures", 0, "with -prewarm-art-only: stop the fill once this many names in a row have failed and exit non-zero (0 = no limit)")
 	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
+	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -vsbot, -auto-mana and -bot-auto-mana)")
+	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")
@@ -340,6 +348,11 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	}
 	if vsbotVis == view.Seat {
 		return fmt.Errorf("-vsbot-spectator must be public or omniscient")
+	}
+	// az-c3 registers only when asked, and the offered set below is resolved
+	// from the registry, so this comes first (azc3.go).
+	if err := c.enableAZC3(); err != nil {
+		return err
 	}
 	// -bot-policy and -bot-policies are validated together (BP-18, spec
 	// §9.4): a default that is not offered, or an offered set missing a
@@ -391,6 +404,14 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if len(cmdPool)+len(conPool) == 0 {
 		return fmt.Errorf("no deck files in %s", c.decks)
 	}
+	az3Pool, az3Catalogue, err := c.azc3Pool(reg, cmdPool, conPool)
+	if err != nil {
+		return err
+	}
+	if len(az3Pool) > 0 {
+		deckCatalogue = append(deckCatalogue, az3Catalogue...)
+		c.policyPools = map[string][]string{azc3.Policy: az3Pool}
+	}
 	// A format with no deck to deal is a configuration error, not a table
 	// that fills its seats with the wrong pool: name the gap so a misbuild
 	// is fixed, not guessed.
@@ -401,7 +422,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return fmt.Errorf("-format includes constructed but no deck in %s is a constructed deck", c.decks)
 	}
 
-	load := deckLoader(reg, c.decks)
+	load := deckLoaders(reg, c.decks, c.az3Decks, az3Pool)
 	r, err := host.New(c.hostOptions(reg, load))
 	if err != nil {
 		return err

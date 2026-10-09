@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -246,6 +247,51 @@ func TestDecksReturnsConfiguredCatalogue(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK || len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("status %d decks %+v, want %+v", resp.StatusCode, got, want)
+	}
+}
+
+// A deck reserved for a bot policy (DeckInfo.Pool) is invisible to a client
+// that does not ask for that policy, so the catalogue every existing client
+// reads is unchanged; ?policy=NAME lists what a game against NAME may use.
+func TestDecksFiltersReservedPoolsByPolicy(t *testing.T) {
+	r, err := host.New(host.Options{LoadDeck: loader(t), Sleep: func(time.Duration, <-chan struct{}) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	catalogue := []DeckInfo{
+		{ID: "burn", Name: "Burn", Format: "constructed"},
+		{ID: "fdn1", Name: "FDN 1", Format: "constructed", Pool: "az-c3"},
+		{ID: "fdn2", Name: "FDN 2", Format: "constructed", Pool: "az-c3"},
+		{ID: "tron", Name: "Tron", Format: "constructed"},
+	}
+	srv := httptest.NewServer(NewHandler(r, Options{Decks: catalogue}))
+	t.Cleanup(srv.Close)
+	ids := func(query string) []string {
+		resp, err := http.Get(srv.URL + "/api/decks" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var got []DeckInfo
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		out := []string{}
+		for _, d := range got {
+			out = append(out, d.ID)
+		}
+		return out
+	}
+	for query, want := range map[string][]string{
+		"":                        {"burn", "tron"},
+		"?policy=bot":             {"burn", "tron"},
+		"?policy=az-c3":           {"fdn1", "fdn2"},
+		"?policy=lethal-pressure": {"burn", "tron"},
+	} {
+		if got := ids(query); !reflect.DeepEqual(got, want) {
+			t.Errorf("GET /api/decks%s = %v, want %v", query, got, want)
+		}
 	}
 }
 
