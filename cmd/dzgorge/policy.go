@@ -9,6 +9,7 @@ import (
 	"github.com/adams-shaun/gorge/bots/sbtactical"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/internal/azmcts"
+	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
 	"github.com/adams-shaun/gorge/seat"
@@ -202,7 +203,7 @@ func parsePolicy(s string) (*policySpec, error) {
 		return nil, fmt.Errorf("policy %q: net=, remote= and gonet= are exclusive", s)
 	}
 	if p.GoNet != "" {
-		m, err := gonetModel(p.GoNet)
+		m, err := gonet.Model(p.GoNet)
 		if err != nil {
 			return nil, fmt.Errorf("policy %q: %w", s, err)
 		}
@@ -293,4 +294,11 @@ func (p *policySpec) seat(seed uint64) (seat.Seat, error) {
 	default:
 		return azmcts.NewSeat(seed, p.model, p.azConfig())
 	}
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
