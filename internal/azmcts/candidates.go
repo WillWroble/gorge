@@ -172,28 +172,41 @@ func enumerateCutInto(obs *searchprobe.Collector, e *rules.Engine, d *decision.D
 	return cands, kind, why, ok, false
 }
 
-func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision, bot decision.Intent, kinds Kinds, limit int, autoPayment bool, scratch *boardScratch) ([]cand, string, SkipReason, bool) {
-	var kind string
+// kindOf names the kind of decision d that kinds searches, "" when it searches
+// none: the one predicate enumerateLimit and Kinds.Searches share, so a driver
+// that asks "would the seat search this?" cannot disagree with the seat.
+func kindOf(d *decision.Decision, kinds Kinds) string {
 	switch {
 	case d == nil:
-		return nil, "", 0, false
+		return ""
 	case d.Kind == decision.KAttackers && kinds.Attackers:
-		kind = "attackers"
+		return "attackers"
 	case d.Kind == decision.KBlockers && kinds.Blockers:
-		kind = "blockers"
+		return "blockers"
 	case kinds.Target && searchprobe.SingleTarget(d):
-		kind = "target"
+		return "target"
 	case d.Kind == decision.KPriority && kinds.Priority:
-		kind = "priority"
+		return "priority"
 	case d.Kind == decision.KTarget && kinds.MultiTarget && multiTarget(d):
-		kind = "multitarget"
+		return "multitarget"
 	case d.Kind == decision.KModes && kinds.Modes:
-		kind = "modes"
+		return "modes"
 	case d.Kind == decision.KTriggerOptional && kinds.Optional:
-		kind = "optional"
+		return "optional"
 	case d.Kind == decision.KChoose && kinds.Choose && smallChoose(d, kinds.chooseLimit()):
-		kind = "choose"
-	default:
+		return "choose"
+	}
+	return ""
+}
+
+// Searches reports whether a seat with these kinds searches decision d: the
+// predicate the seat itself applies before it enumerates candidates. A host
+// that builds an honest root only for decisions the seat will search asks it.
+func (k Kinds) Searches(d *decision.Decision) bool { return kindOf(d, k) != "" }
+
+func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision, bot decision.Intent, kinds Kinds, limit int, autoPayment bool, scratch *boardScratch) ([]cand, string, SkipReason, bool) {
+	kind := kindOf(d, kinds)
+	if kind == "" {
 		return nil, "", 0, false
 	}
 	// Payment actions are atomic engine-provided cast witnesses. They are not

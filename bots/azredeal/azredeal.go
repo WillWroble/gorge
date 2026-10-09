@@ -89,10 +89,18 @@ func newAZRedeal(o bots.Options) (seat.Seat, error) {
 // New builds the adapter over an explicit config overlay. It is botbench's
 // entry point (spec §4.3): botbench overlays its -az-* flags on Hosted() and
 // calls this; the host goes through the registry factory above. net is
-// always nil here — the hosted entry is generation 0 (heuristic leaf,
-// uniform prior); a checkpoint would be a different bot.
+// nil here — the az-redeal entry is generation 0 (heuristic leaf, uniform
+// prior); a checkpoint is a different bot, built with NewWithModel.
 func New(o bots.Options, cfg azmcts.SeatConfig) (seat.Seat, error) {
-	s, err := azmcts.NewSeat(o.Seed, nil, cfg)
+	return NewWithModel(o, cfg, nil)
+}
+
+// NewWithModel is New with the search's network: its prior ranks the
+// candidates and its value head scores the leaves, as cfg says. The model is
+// shared and read-only (a gonet network is one per path across every game in
+// the process), so one model serves every seat the factory builds.
+func NewWithModel(o bots.Options, cfg azmcts.SeatConfig, model *policynet.Model) (seat.Seat, error) {
+	s, err := azmcts.NewSeat(o.Seed, model, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -175,9 +183,12 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 	case decision.KBlockers:
 		return k.Blockers
 	case decision.KTarget:
-		return k.Target
+		return k.Target || k.Searches(d)
 	default:
-		return false
+		// The fuller kinds (modes, optional triggers, small choices) when the
+		// config enables them; the four-kind default config enables none, so
+		// az-redeal's answer is unchanged.
+		return k.Searches(d)
 	}
 }
 
