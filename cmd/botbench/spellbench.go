@@ -104,6 +104,10 @@ type sbOpts struct {
 	// trace names a directory where every sb-tactical seat writes its
 	// scored decisions, one file per game and seat (debugging).
 	trace string
+	// azC3Net registers the az-c3 policy over this .dzgw network; decksDir
+	// replaces the catalog's pool with the decks in a directory
+	// (spellbench_c3.go).
+	azC3Net, decksDir string
 }
 
 var sbFlags sbOpts
@@ -121,6 +125,8 @@ func registerSpellbenchFlags(fs *flag.FlagSet) {
 	fs.StringVar(&sbFlags.tacticalAlt, "spellbench-tactical-alt-weights", "", "spellbench: comma list of JSON files of builtins.TacticalWeights for sb-tactical-alt, -alt2 ... -alt8 (weight-tuning A/B)")
 	fs.StringVar(&sbFlags.trace, "spellbench-trace", "", "spellbench: directory for sb-tactical decision traces (one file per game and seat)")
 	fs.StringVar(&sbFlags.engineVersion, "spellbench-engine-version", "dev", "spellbench: engine_version recorded in the ledger (e.g. the git commit)")
+	fs.StringVar(&sbFlags.azC3Net, "spellbench-az-c3-net", "", "spellbench: path of the c3 .dzgw network; registers the az-c3 policy (bots/azc3)")
+	fs.StringVar(&sbFlags.decksDir, "spellbench-decks-dir", "", "spellbench: play the decks in this directory instead of the catalog's pool (the catalog still names the ledger format)")
 	fs.IntVar(&sbFlags.mulligans, "spellbench-mulligans", 0, "spellbench: London mulligans per player per game (0 = none posed, the benchmark default; 0..6 as host/httpapi clamps it)")
 }
 
@@ -539,6 +545,11 @@ func spellbenchExit(o sbOpts, dir string, workers, maxTurns, maxIntents int, che
 		fmt.Fprintln(stderr, "botbench -spellbench:", err)
 		return 1
 	}
+	if o.azC3Net != "" {
+		if err := registerAZC3(o.azC3Net); err != nil {
+			return fail(err)
+		}
+	}
 	bots := sbSplit(o.bots)
 	if len(bots) < 2 {
 		return fail(fmt.Errorf("need at least two policies, got %q", o.bots))
@@ -635,7 +646,10 @@ func spellbenchExit(o sbOpts, dir string, workers, maxTurns, maxIntents int, che
 	if err := azFrontDoor(azA, azB, ckModel, azSeatsFromSpellbench); err != nil {
 		return fail(err)
 	}
-	if azSide {
+	// az-c3 is not one of the az names azSide tracks, but its seats feed the
+	// same cost report (search counts and ms per searched decision).
+	azC3Side := seen["az-c3"]
+	if azSide || azC3Side {
 		installAZCostStats()
 	}
 	sbSearchSide := false
@@ -655,12 +669,19 @@ func spellbenchExit(o sbOpts, dir string, workers, maxTurns, maxIntents int, che
 		pool = sbSplit(o.decks)
 	}
 	files := make([]deck.File, len(pool))
-	for i, id := range pool {
-		f, err := spellbench.File(cat.Dir, id)
-		if err != nil {
+	if o.decksDir != "" {
+		var err error
+		if pool, files, err = loadDeckDir(o.decksDir); err != nil {
 			return fail(err)
 		}
-		files[i] = f
+	} else {
+		for i, id := range pool {
+			f, err := spellbench.File(cat.Dir, id)
+			if err != nil {
+				return fail(err)
+			}
+			files[i] = f
+		}
 	}
 	reg, err := openCorpusForDecks(dir, files, stderr)
 	if err != nil {
@@ -740,10 +761,10 @@ func spellbenchExit(o sbOpts, dir string, workers, maxTurns, maxIntents int, che
 		return fail(err)
 	}
 	sbWriteSummary(stdout, bots, sched, results, elapsed)
-	if azSide {
-		// Both az policies feed one cost report; its game count is the
-		// games either seated.
-		fmt.Fprint(stdout, azCostReport(sbCountBase(sched, "az")+sbCountBase(sched, "az-redeal")))
+	if azSide || azC3Side {
+		// Every az policy feeds one cost report; its game count is the
+		// games any of them seated.
+		fmt.Fprint(stdout, azCostReport(sbCountBase(sched, "az")+sbCountBase(sched, "az-redeal")+sbCountBase(sched, "az-c3")))
 	}
 	if sbSearchSide {
 		var ps []string
