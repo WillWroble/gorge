@@ -250,9 +250,9 @@ func TestDecksReturnsConfiguredCatalogue(t *testing.T) {
 	}
 }
 
-// A deck reserved for a bot policy (DeckInfo.Pool) is invisible to a client
-// that does not ask for that policy, so the catalogue every existing client
-// reads is unchanged; ?policy=NAME lists what a game against NAME may use.
+// GET /api/decks lists every deck, reserved ones included (DeckInfo.Pool tags
+// them), so a client with no notion of pools offers the whole catalogue;
+// ?policy=NAME lists what a game against NAME may use.
 func TestDecksFiltersReservedPoolsByPolicy(t *testing.T) {
 	r, err := host.New(host.Options{LoadDeck: loader(t), Sleep: func(time.Duration, <-chan struct{}) {}})
 	if err != nil {
@@ -284,7 +284,7 @@ func TestDecksFiltersReservedPoolsByPolicy(t *testing.T) {
 		return out
 	}
 	for query, want := range map[string][]string{
-		"":                        {"burn", "tron"},
+		"":                        {"burn", "fdn1", "fdn2", "tron"},
 		"?policy=bot":             {"burn", "tron"},
 		"?policy=az-c3":           {"fdn1", "fdn2"},
 		"?policy=lethal-pressure": {"burn", "tron"},

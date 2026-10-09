@@ -269,3 +269,71 @@ func TestAZC3PoolLoading(t *testing.T) {
 		}
 	})
 }
+
+// The web client names no bot policy, so a deck reserved for one picks it:
+// choose an FDN deck and the opponent is az-c3, dealt from the same pool.
+func TestCreateGameChoosesAZC3FromAPooledDeck(t *testing.T) {
+	enableAZ(t)
+	r, gate := freshGameLock(t)
+	c := azConfig()
+	c.botPolicy = host.BotPolicy
+	create := c.createGame(r, gate, nil, []string{"c", "d"}, view.Omniscient)
+
+	for _, req := range []httpapi.CreateGameOptions{
+		{Format: host.FormatConstructed, HumanDeck: "a"},
+		{Format: host.FormatConstructed, BotDeck: "b"},
+		{Format: host.FormatConstructed, HumanDeck: "b", BotDeck: "a"},
+	} {
+		resp, err := create(req)
+		if err != nil {
+			t.Fatalf("%+v: %v", req, err)
+		}
+		if resp.BotPolicy != azc3.Policy {
+			t.Errorf("%+v: opponent %q, want az-c3", req, resp.BotPolicy)
+		}
+		for _, d := range waitSeatDecks(t, r, resp.Table) {
+			if d != "a" && d != "b" {
+				t.Errorf("%+v dealt %q, outside the pool", req, d)
+			}
+		}
+	}
+	// No decks named: the server's own default, from the ordinary pool.
+	resp, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.BotPolicy != host.BotPolicy {
+		t.Errorf("no decks named: opponent %q, want the server default %q", resp.BotPolicy, host.BotPolicy)
+	}
+	// A pooled deck beside an ordinary one is refused, naming the pool.
+	if _, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, HumanDeck: "a", BotDeck: "c"}); err == nil ||
+		!strings.Contains(err.Error(), "not in the az-c3 pool") {
+		t.Errorf("mixed pooled and ordinary decks: error %v", err)
+	}
+}
+
+func TestAZC3DemoTable(t *testing.T) {
+	pool := []string{"FDN_a", "FDN_b"}
+	c := config{az3Net: "n", az3DemoTable: true, tables: 4, seed: 10, perpetual: true, autoMana: true, botAutoPayMana: true, mulligans: 2}
+	got := c.azc3Table(pool, view.Public)
+	if got == nil {
+		t.Fatal("no demo table")
+	}
+	if got.ID != "t5" || got.Seats != 2 || got.BotPolicy != azc3.Policy || got.Format != host.FormatConstructed ||
+		!reflect.DeepEqual(got.Decks, pool) || len(got.Humans) != 0 || !got.Perpetual || !got.AutoMana || !got.BotAutoPayMana {
+		t.Errorf("demo table %+v", got)
+	}
+	for name, mut := range map[string]func(*config){
+		"switched off": func(c *config) { c.az3DemoTable = false },
+		"no network":   func(c *config) { c.az3Net = "" },
+	} {
+		cc := c
+		mut(&cc)
+		if cc.azc3Table(pool, view.Public) != nil {
+			t.Errorf("%s: a demo table was still built", name)
+		}
+	}
+	if c.azc3Table(nil, view.Public) != nil {
+		t.Error("an empty pool built a demo table")
+	}
+}

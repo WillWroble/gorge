@@ -40,7 +40,16 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 		// vocabulary's own default, so a demo can change who you play.
 		name := req.BotPolicy
 		if name == "" {
+			// The client names no policy (the web client never does), so a deck
+			// reserved for one is what picks it: choose an FDN deck and you
+			// play az-c3. Both decks omitted keeps the server's default.
 			name = c.botPolicy
+			for _, id := range []string{req.HumanDeck, req.BotDeck} {
+				if owner := c.reservedFor(id); id != "" && owner != "" {
+					name = owner
+					break
+				}
+			}
 		}
 		policy, err := host.NormalizeBotPolicy(name)
 		if err != nil {

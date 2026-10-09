@@ -126,6 +126,7 @@ type config struct {
 	// bot's network and the only decks it may play. policyPools maps a bot
 	// policy to the deck ids reserved for it; serve fills it from -az-c3-decks.
 	az3Net, az3Decks string
+	az3DemoTable     bool
 	policyPools      map[string][]string
 	// seatToken is the -seat-token flag: a fixed bearer token for the first
 	// human slot instead of a random per-slot one. Tests and local use only
@@ -318,6 +319,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.IntVar(&c.prewarmArtMaxConsecutiveFailures, "prewarm-art-max-consecutive-failures", 0, "with -prewarm-art-only: stop the fill once this many names in a row have failed and exit non-zero (0 = no limit)")
 	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
 	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -vsbot, -auto-mana and -bot-auto-mana)")
+	fs.BoolVar(&c.az3DemoTable, "az-c3-demo-table", true, "with -az-c3-net: add one two-seat az-c3 vs az-c3 table, dealt from -az-c3-decks, for spectators")
 	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
@@ -428,7 +430,11 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return err
 	}
 	if len(r.Tables()) == 0 {
-		for _, cfg := range c.tableConfigs(cmdPool, conPool, vis) {
+		cfgs := c.tableConfigs(cmdPool, conPool, vis)
+		if t := c.azc3Table(az3Pool, vis); t != nil {
+			cfgs = append(cfgs, *t)
+		}
+		for _, cfg := range cfgs {
 			if err := r.AddTable(cfg); err != nil {
 				return err
 			}

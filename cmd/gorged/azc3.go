@@ -16,6 +16,7 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
+	"github.com/adams-shaun/gorge/view"
 )
 
 // enableAZC3 validates the az-c3 flags and registers the policy. It runs
@@ -95,4 +96,20 @@ func (c config) reservedFor(id string) string {
 		}
 	}
 	return ""
+}
+
+// azc3Table is the demo's az-c3 bot-versus-bot table: two seats, both az-c3,
+// dealt from the az-c3 pool, playing match after match for anyone watching.
+// Its id follows the numbered tables. Nil when az-c3 is off or the demo table
+// is switched off (-az-c3-demo-table=false).
+func (c config) azc3Table(pool []string, vis view.Visibility) *host.TableConfig {
+	if c.az3Net == "" || !c.az3DemoTable || len(pool) == 0 {
+		return nil
+	}
+	return &host.TableConfig{
+		ID: host.TableID(fmt.Sprintf("t%d", c.tables+1)), Name: "az-c3 vs az-c3 (FDN)", Seats: 2, Decks: pool,
+		Seed: c.seed + uint64(c.tables), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
+		Mulligans: c.mulligans, Format: host.FormatConstructed, BotPolicy: azc3.Policy,
+		BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana,
+	}
 }
