@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/protocol"
 	"github.com/adams-shaun/gorge/view"
@@ -208,6 +209,12 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 		return TableConfig{}, fmt.Errorf("host: table %s: %w", c.ID, err)
 	}
 	c.BotPolicy = policy
+	// A policy with no manual-tap mode (az-c3) cannot be built on a table
+	// without payment plans: the factory refuses, and a refusal at the first
+	// seat would crash the match. Refuse the table instead.
+	if e, ok := bots.Lookup(policy); ok && e.NeedsAutoPay && !c.autoPayManaEnabled() {
+		return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q needs automatic mana payment (auto_mana and bot_auto_pay_mana both on)", c.ID, policy)
+	}
 	switch {
 	case c.ID == "":
 		return TableConfig{}, fmt.Errorf("host: table has no id")

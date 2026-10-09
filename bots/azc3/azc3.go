@@ -95,9 +95,10 @@ func info() bots.Info {
 			Source: "docs/superpowers/reports/2026-10-09-az-c3-hosted.md",
 		},
 		Env: true, Search: true,
-		Formats:   []string{"constructed"},
-		MaxSeats:  2,
-		Caretaker: "bot",
+		Formats:      []string{"constructed"},
+		MaxSeats:     2,
+		Caretaker:    "bot",
+		NeedsAutoPay: true,
 	}
 }
 
