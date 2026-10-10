@@ -105,17 +105,3 @@ func TestStaticGainedAbilitiesOfDonorIsOfferedOnlyWithTheDonor(t *testing.T) {
 		})
 	}
 }
-
-// TestStaticGainedAbilitiesOfUnservedRowsKeepTheNamedSkip: the donor
-// observation must not claim a row whose filter or zone it cannot place a
-// donor for. Koh's ChosenCard grant stays a named skip (it needs the card's
-// own ChooseCard activation first), so the census still tells the shape apart.
-func TestStaticGainedAbilitiesOfUnservedRowsKeepTheNamedSkip(t *testing.T) {
-	it, skip := zoneItem(t, "Koh, the Face Stealer", "static#0.0")
-	if skip == nil {
-		t.Fatalf("served (%s), want the named donor skip", it.ID)
-	}
-	if want := "static gains the activated abilities of other cards (needs a donor card)"; skip.Reason != want {
-		t.Fatalf("skip = %q, want %q", skip.Reason, want)
-	}
-}

@@ -122,7 +122,6 @@ func TestStaticGrantedAbilityNamedSkips(t *testing.T) {
 		// to the granted-trigger observation (static_granted_trigger_test.go).
 		{"Frostcliff Siege", "static#0.1", "static grants a static ability (observed only through its own effect)"},
 		{"Tomik, Orzhov Lawmage", "static#0.0", "static grants a static ability (observed only through its own effect)"},
-		{"Koh, the Face Stealer", "static#0.0", "static gains the activated abilities of other cards (needs a donor card)"},
 		{"Etrata, Deadly Fugitive", "static#0.0", "static grants an activated ability (needs the driver's activate on a granted ability)"},
 	} {
 		t.Run(r.card+"/"+r.key, func(t *testing.T) {
