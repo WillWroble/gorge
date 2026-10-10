@@ -59,18 +59,25 @@ func (s *HumanSeat) configure(timeout time.Duration, caretaker seat.Seat) {
 	s.mu.Unlock()
 }
 
+// slotAnswer is what a submit sends down the slot's channel: the accepted
+// intent together with HD-2's client-autopilot bit. The flag rides the
+// channel — the send the receiving await happens-before — so the accepted
+// answer's own mark is what the play loop records, and a stale duplicate
+// submit racing the receive can never overwrite it in place.
+type slotAnswer struct {
+	in   decision.Intent
+	auto bool
+}
+
 // pendingSlot binds one decision to the recv channel that answers it. Keep
 // dec by value so a mechanical copy has its own decision instance, and keep
 // recv per-call (capacity 1) so a racing submit is never silently dropped.
-// auto is HD-2's client-autopilot bit: submitAdmitted sets it for the one
-// submit it sends, and the parking's await copies it out on receive, so the
-// play loop can record it in the match's provenance ledger
-// (host/divergence_ledger.go). It never enters decision.Intent — the flag
+// The channel carries the submit's auto flag beside the intent (HD-2,
+// host/divergence_ledger.go); it never enters decision.Intent — the flag
 // must stay out of replay input.
 type pendingSlot struct {
 	dec  decision.Decision
-	recv chan decision.Intent
-	auto bool
+	recv chan slotAnswer
 }
 
 // NewHumanSeat returns a HumanSeat with no decision pending.
@@ -140,7 +147,7 @@ type parking struct {
 // a nil channel never fires.
 func (s *HumanSeat) park(ctx context.Context, v view.View, d decision.Decision, undo <-chan state.PlayerID) *parking {
 	owned := *d.Clone()
-	slot := &pendingSlot{dec: owned, recv: make(chan decision.Intent, 1)}
+	slot := &pendingSlot{dec: owned, recv: make(chan slotAnswer, 1)}
 	s.mu.Lock()
 	s.slot = slot
 	timeout := s.timeout
@@ -194,9 +201,9 @@ func (p *parking) await() (decision.Intent, error) {
 		timer := time.NewTimer(p.timeout)
 		defer timer.Stop()
 		select {
-		case in := <-p.slot.recv:
-			p.auto = p.slot.auto
-			return in, nil
+		case ans := <-p.slot.recv:
+			p.auto = ans.auto
+			return ans.in, nil
 		case <-p.ctx.Done():
 			if p.caretaker != nil {
 				return s.viaCaretaker(p.ctx, p.v, p.d, p.caretaker)
@@ -218,9 +225,9 @@ func (p *parking) await() (decision.Intent, error) {
 		}
 	}
 	select {
-	case in := <-p.slot.recv:
-		p.auto = p.slot.auto
-		return in, nil
+	case ans := <-p.slot.recv:
+		p.auto = ans.auto
+		return ans.in, nil
 	case <-p.ctx.Done():
 		if p.caretaker != nil {
 			return s.viaCaretaker(p.ctx, p.v, p.d, p.caretaker)
@@ -292,10 +299,10 @@ func (s *HumanSeat) submit(in decision.Intent) error {
 // The channel send remains outside s.mu: a receiver may be delayed and must
 // never block Pending or another stale-answer rejection while holding the seat
 // mutex.  Clone before admission so the exact value admitted is the one sent.
-// auto is HD-2's client-autopilot bit: it is stamped on the slot together with
-// the send, so the receiving parking's await copies it out after the receive
-// that the send happens-before — the play loop reads it only there, and it
-// never reaches decision.Intent or the log.
+// auto is HD-2's client-autopilot bit: it rides the channel beside the
+// intent, so the receiving parking's await reads the accepted answer's own
+// mark after the receive that the send happens-before — the play loop reads
+// it only there, and it never reaches decision.Intent or the log.
 func (s *HumanSeat) submitAdmitted(in decision.Intent, admit func(decision.Decision, decision.Intent) error, auto bool) error {
 	in = decision.CloneIntent(in)
 	s.mu.Lock()
@@ -314,8 +321,7 @@ func (s *HumanSeat) submitAdmitted(in decision.Intent, admit func(decision.Decis
 			return err
 		}
 	}
-	slot.auto = auto
 	s.mu.Unlock()
-	slot.recv <- in
+	slot.recv <- slotAnswer{in: in, auto: auto}
 	return nil
 }
