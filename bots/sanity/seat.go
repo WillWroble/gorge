@@ -10,12 +10,39 @@ import (
 	"github.com/adams-shaun/gorge/view"
 )
 
+// Mulligan is the London-mulligan rule the guard answers keep/mulligan and
+// bottoming asks with (botpolicy.MulliganConstructed, measured in the
+// 2026-10-09 evaluation, "Mulligan" section). The coin the unwrapped `bot`
+// and `sb-tactical` fall back to mulligans a third of all hands whatever
+// they hold, and loses about two points to this rule. The guard answers the
+// ask itself and does not consult the wrapped seat, so no rng is drawn.
+const Mulligan = botpolicy.MulliganConstructed
+
+// answerMulligan answers a KMulligan ask under Mulligan from the deciding
+// seat's own board; ok is false for any other decision or a shape the rule
+// leaves to the wrapped seat.
+func answerMulligan(b func() botpolicy.Board, d *decision.Decision) (decision.Intent, bool) {
+	if d.Kind != decision.KMulligan {
+		return decision.Intent{}, false
+	}
+	c, ok := botpolicy.MulliganAnswer(b(), Mulligan, d)
+	if !ok {
+		return decision.Intent{}, false
+	}
+	in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: c}
+	if d.Validate(in) != nil {
+		return decision.Intent{}, false
+	}
+	return in, true
+}
+
 // Wrap decorates inner with the guard. The wrapper keeps inner's surfaces: a
 // BoardSeat inner stays a BoardSeat (the host still hands it the Board, never a
 // View), an EnvSeat inner stays an EnvSeat and RefusalAnswerer, and the payment
 // opt-in is delegated. It also opts the seat into the engine's target hints.
 // The wrapped seat is asked exactly once per decision, about the filtered
-// option list.
+// option list, except a London mulligan ask, which the guard answers itself
+// (Mulligan).
 func Wrap(inner seat.Seat) seat.Seat {
 	base := guarded{inner: inner}
 	if _, ok := inner.(seat.BoardSeat); ok {
@@ -44,6 +71,9 @@ func (s guarded) WantsPaymentActions() bool {
 }
 
 func (s guarded) Decide(ctx context.Context, v view.View, d decision.Decision) (decision.Intent, error) {
+	if in, ok := answerMulligan(func() botpolicy.Board { return seat.BoardFromView(v) }, &d); ok {
+		return in, nil
+	}
 	f := Filter(d)
 	in, err := s.inner.Decide(ctx, v, f.D)
 	if err != nil {
@@ -55,6 +85,9 @@ func (s guarded) Decide(ctx context.Context, v view.View, d decision.Decision) (
 type guardedBoard struct{ guarded }
 
 func (s guardedBoard) DecideBoard(ctx context.Context, b botpolicy.Board, d decision.Decision) (decision.Intent, error) {
+	if in, ok := answerMulligan(func() botpolicy.Board { return b }, &d); ok {
+		return in, nil
+	}
 	f := Filter(d)
 	in, err := s.inner.(seat.BoardSeat).DecideBoard(ctx, b, f.D)
 	if err != nil {
@@ -72,6 +105,9 @@ type guardedEnv struct {
 func (s guardedEnv) WantsEnv(d *decision.Decision) bool { return s.es.WantsEnv(d) }
 
 func (s guardedEnv) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
+	if in, ok := answerMulligan(func() botpolicy.Board { return seat.BoardFromView(env.View) }, &d); ok {
+		return in, nil
+	}
 	f := Filter(d)
 	in, err := s.es.DecideEnv(ctx, env, f.D)
 	if err != nil {

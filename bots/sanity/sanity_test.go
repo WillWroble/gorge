@@ -8,6 +8,7 @@ import (
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
 )
 
@@ -194,5 +195,42 @@ func TestWrapAsksOnceAndMapsBack(t *testing.T) {
 	}
 	if u, ok := wb.(interface{ UnwrapSeat() seat.Seat }); !ok || u.UnwrapSeat() != seat.Seat(b) {
 		t.Fatal("UnwrapSeat must expose the wrapped seat")
+	}
+}
+
+// TestWrapAnswersMulliganItself pins that a keep/mulligan ask never reaches
+// the wrapped seat (its rng is not touched) and that a Board with a
+// no-land seven is answered "mulligan" while a seven with three lands keeps.
+func TestWrapAnswersMulliganItself(t *testing.T) {
+	land := func() botpolicy.Card {
+		return botpolicy.Card{Basic: true, ManaCost: "no cost", Castable: true}
+	}
+	spell := func() botpolicy.Card {
+		return botpolicy.Card{Creature: true, CMC: 2, ManaCost: "2", Castable: true}
+	}
+	hand := func(lands int) botpolicy.Board {
+		m := map[state.ObjID]botpolicy.Card{}
+		for i := 0; i < 7; i++ {
+			if i < lands {
+				m[state.ObjID(i+1)] = land()
+			} else {
+				m[state.ObjID(i+1)] = spell()
+			}
+		}
+		return botpolicy.Board{Cards: botpolicy.TableOf(m), HandSize: 7}
+	}
+	ask := decision.Decision{Kind: decision.KMulligan, Seq: 4, Min: 1, Max: 1,
+		Prompt:  "p0 plays first. Keep your hand (put 0 cards on the bottom of your library) or take a mulligan?",
+		Options: []decision.Option{{Index: 0, Kind: "keep"}, {Index: 1, Kind: "mulligan"}}}
+	inner := &recBoard{recSeat{pick: "never"}}
+	bs := Wrap(inner).(seat.BoardSeat)
+	for lands, want := range map[int]int{0: 1, 1: 1, 2: 0, 3: 0, 5: 0, 6: 1, 7: 1} {
+		in, err := bs.DecideBoard(context.Background(), hand(lands), ask)
+		if err != nil || len(in.Choices) != 1 || in.Choices[0] != want || in.Seq != 4 {
+			t.Errorf("%d lands: answer %+v err %v, want option %d", lands, in, err, want)
+		}
+	}
+	if inner.got.Kind != "" {
+		t.Fatal("the wrapped seat was consulted for a mulligan ask")
 	}
 }

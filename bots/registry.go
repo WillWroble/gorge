@@ -65,7 +65,9 @@ type Options struct {
 	// CommonSense opts the `bot` and `sb-tactical` factories into the
 	// bots/sanity guard (sanity.Wrap): hostile removal the engine says can
 	// only hit the seat's own permanents or player is dropped from the
-	// option list the policy sees. Default false: the returned seat is then
+	// option list the policy sees, and the London mulligan ask is answered
+	// by botpolicy.MulliganConstructed instead of the policy's 1/3 coin.
+	// Default false: the returned seat is then
 	// exactly the unwrapped policy, so no head, name or training run moves.
 	// No other policy reads it.
 	CommonSense bool
