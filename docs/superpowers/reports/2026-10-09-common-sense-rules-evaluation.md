@@ -236,7 +236,104 @@ fixed that. The full 3,360-game A/B per policy is deferred until after
 consolidation. Harness: `/mnt/sata/gorge-training/bot-sanity/sanityab_hints_test.go.txt`
 (drop into `internal/bench/`; `SAN_MODE=ab|census SAN_BOT=bot SAN_SEEDS=n`).
 
-**Ready to wire.** One line per factory (`sanity.Wrap(seat)`) in `bots/bot`,
+## Implementation, part 2 (2026-10-09): optional guard, measured
+
+Operator decision: the guard is OPTIONAL, default OFF everywhere, for the
+bootstrap-trainer use (the default bot is the fallback and the opponent model
+for search/AZ training). Nothing existing changes unless a caller opts in.
+
+**How to opt in.**
+
+- Library: `bots.Options{CommonSense: true}` through `bots.New`. Only the `bot`
+  factory and `sbtactical.New` (so also the registry entry) read it; they return
+  `sanity.Wrap(seat)`. `lethal-pressure`, `sb-heuristic`, `sb-uniform/first`
+  and every search/AZ policy ignore it. With the field false the returned seat
+  is the same concrete type as before (`*seat.Bot`, `*hostedSeat`;
+  `TestCommonSenseOff...`). The wrapper keeps `BoardSeat`, `EnvSeat`,
+  `RefusalAnswerer`, `PaymentPlanConsumer` (delegated) and
+  `TargetHintConsumer` (tests in `bots/bot`, `bots/sbtactical`).
+- `host`: `newCaretakerSeat` now arms `SkipLifePlans` through `UnwrapSeat()`
+  (`skipLifePlans`, tested). Host paths do not set `CommonSense` yet, so a
+  hosted table is unchanged.
+- `cmd/botbench`: `-common-sense` rebinds `bot`, `bot-auto-pay` and
+  `sb-tactical` to the guarded form on both sides; per-side policy names
+  `bot+sanity`, `bot-auto-pay+sanity`, `sb-tactical+sanity` give an A/B
+  (`-a bot+sanity -b bot`). No other name has the suffix.
+- Not wired, by design: `internal/azmcts` builds its fallback/rollout bot with
+  `seat.NewBot` / `seat.NewBotOn(...).EnableAutoPayMana()` (`seat.go:157`,
+  `env.go:236`, `nodecache.go:418`), and `cmd/dzgorge/policy.go:234` uses
+  `seat.NewBot`, all outside `bots.New`, so `CommonSense` does not reach them.
+  A trainer opts in by wrapping where it builds that bot (`sanity.Wrap`) and
+  letting its driver call `EnsureTargetHints` for the wrapper
+  (`seat.TargetHintConsumer`); for an AZ rollout that has no hint-pass this
+  needs a separate change. `aztrain` as an opponent via `bots.New`/botbench
+  can use the flag or the `+sanity` name today.
+
+**Gain** (harness: `/mnt/sata/gorge-training/bot-sanity/sanityab2_test.go.txt`,
+copied into `internal/bench/` only to run; 15 constructed decks, every ordered
+pair, both seat orders, 24 seeds = 10,080 games per row, auto-pay mana unless
+stated, allow-list on; win rate is over decided games, Wilson 95%; "self-hit"
+= a hostile target decision whose chosen target is the deciding seat's own
+permanent or player).
+
+| arm A vs arm B | A wins - B wins (draws/stalls) | A win rate | self-hit A | self-hit B |
+|---|---|---|---|---|
+| bot guarded vs bot plain | 5012 - 4636 (432) | 51.95% [50.95, 52.94] | 0.65% (116/17854) | 16.75% (3400/20304) |
+| bot guarded vs bot plain, MANUAL mana | 5000 - 4747 (333) | 51.30% [50.31, 52.29] | 0.66% | 15.02% |
+| sb-tactical guarded vs sb-tactical plain | 4922 - 4924 (234) | 49.99% [49.00, 50.98] | 0.87% | 12.02% |
+| sb-tactical plain vs bot plain | 5672 - 4088 (320) | 58.11% [57.13, 59.09] | 12.17% | 17.25% |
+| sb-tactical plain vs bot guarded | 5460 - 4319 (301) | 55.83% [54.85, 56.82] | 11.94% | 0.64% |
+| sb-tactical guarded vs bot plain | 5518 - 4264 (298) | 56.41% [55.42, 57.39] | 0.91% | 17.58% |
+| sb-tactical guarded vs bot guarded | 5324 - 4485 (271) | 54.28% [53.29, 55.26] | 0.89% | 0.63% |
+
+Reading: for `bot` the guard is a real but small gain, about +2.0 points on
+auto-pay (about 3.8 standard errors, outside noise) and +1.3 on manual (about
+2.6 standard errors). For `sb-tactical` the guard buys NOTHING in win rate
+(49.99%, dead even) although it removes 12% to 0.9% of hostile self-hits; the
+tactical heuristic's self-hits are evidently not costly. The gap sb-tactical
+over bot shrinks from 58.1% to 54.3% when both are guarded, i.e. the guard
+helps the bot fallback more than it helps the stronger heuristic; a guarded bot
+is a modestly harder, more sensible opponent. The residual 0.6-0.9% self-hits
+are cases the hint does not cover (modal, alternative, chained shapes, and
+Ghost Quarter allow-list picks).
+
+**Cost** (same machine, sequential single-goroutine loop, `bench.PlayGame`,
+GOMAXPROCS 4 on 4 cores, 420 games x 3 rounds per arm (210 for sb-tactical),
+the same seeds and decks per arm after a discarded warm-up, wall and process
+CPU via getrusage; the box is shared, so treat differences under about 3% as
+noise. "hintonly" requests the target hints but never filters, and plays
+exactly the plain games, so it isolates `EnsureTargetHints`):
+
+| policy | arm | wall us/game | cpu us/game | decisions/game | vs plain (wall) |
+|---|---|---|---|---|---|
+| bot, auto-pay | plain | 10,291 | 12,658 | 434.0 | |
+| | hintonly | 10,729 | 13,245 | 434.0 | +4.3% |
+| | guarded | 10,850 | 13,339 | 421.6 | +5.4% |
+| bot, manual | plain | 7,564 | 8,946 | 462.4 | |
+| | hintonly | 7,514 | 8,966 | 462.4 | -0.7% |
+| | guarded | 7,449 | 8,937 | 453.5 | -1.5% |
+| sb-tactical | plain | 25,173 | 36,401 | 395.9 | |
+| | hintonly | 25,224 | 35,842 | 395.9 | +0.2% |
+| | guarded | 24,369 | 34,760 | 390.0 | -3.2% |
+
+`Filter` + `MapBack` alone over 8,029 real decisions: 57 ns per decision, 30
+us per game (0.3% of a bot game). So the cost is about +4-5% on auto-pay bot
+(the census pass runs when the seat asks for payment actions), indistinguishable
+from zero on manual mana and on sb-tactical. The guarded arms play slightly
+fewer decisions per game (they skip removed options), which can make the
+guarded arm cheaper than the hint-only arm; that is trajectory, not savings.
+Timing came from a clean timed loop in the harness, not `cmd/enginebench`.
+
+**Not covered.** Commander and 4-seat/multiplayer tables (only 2-seat
+constructed measured; the hostile-vs-own counts are per deciding seat, so
+multiplayer semantics are unverified); SpellBench registry parity (no `sanity`
+decorator beside `passguard` in `internal/spellbench/registry`); `sb-heuristic`
+and `lethal-pressure` (deliberately not wired); search/AZ policies and the
+az/dzgorge internal fallback bots (built outside `bots.New`); hosted tables
+(no host option sets `CommonSense`); a persisted policy name (the suffix
+exists only in botbench).
+
+**Wiring notes (superseded by part 2 above).** One line per factory (`sanity.Wrap(seat)`) in `bots/bot`,
 `bots/lethalpressure`, `bots/sbtactical`, `bots/sbheuristic`. Two things to
 handle then: `host/bot_policy.go`'s `newCaretakerSeat` type-asserts `*seat.Bot`
 (the wrapper exposes `UnwrapSeat()` for it), and an `Options` switch to build
