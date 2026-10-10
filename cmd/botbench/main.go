@@ -461,6 +461,7 @@ func init() {
 		}
 		return s
 	}
+	registerSanityPolicies()
 }
 
 // castProfileOverride is the weights -profile names: nil (the zero value)
@@ -691,6 +692,7 @@ func writePaymentStats(w io.Writer) error {
 }
 
 func isAutoPayPolicy(name string) bool {
+	name = basePolicyName(name)
 	return name == "bot-auto-pay" || name == "cast-profile-auto-pay" || name == "attack-sim-auto-pay"
 }
 
@@ -2541,7 +2543,11 @@ func main() {
 	memprofile := flag.String("memprofile", "", "write a heap profile to this pprof file after the last game finishes (pprof reads both alloc_space and inuse_space from it; empty = off)")
 	registerAZFlags(flag.CommandLine)
 	registerSpellbenchFlags(flag.CommandLine)
+	commonSense := flag.Bool("common-sense", false, "play the plain bot, bot-auto-pay and sb-tactical policies behind the bots/sanity guard (drops hostile removal that can only hit the seat's own side, via the engine's target hints); default off. A per-side alternative is the policy name bot+sanity / bot-auto-pay+sanity / sb-tactical+sanity")
 	flag.Parse()
+	if *commonSense {
+		applyCommonSense()
+	}
 	applyGCFlags()
 	startPprof()
 	flag.Visit(func(f *flag.Flag) {

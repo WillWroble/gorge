@@ -352,3 +352,36 @@ func TestSBTacticalPlannerIsReadAtPriorityOnly(t *testing.T) {
 		t.Logf("seat %d planner reads by kind: %v (asks by kind: %v)", i, counters[i].calls, kindAsks[i])
 	}
 }
+
+func TestCommonSenseWrapsTacticalAndKeepsEnvSurfaces(t *testing.T) {
+	reg := sampleRegistry(t)
+	plain, err := bots.New(Policy, testOptions(1, reg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := plain.(*hostedSeat); !ok {
+		t.Fatalf("plain = %T, want *hostedSeat", plain)
+	}
+	o := testOptions(1, reg)
+	o.CommonSense = true
+	s, err := bots.New(Policy, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, ok := s.(interface{ UnwrapSeat() seat.Seat })
+	if !ok {
+		t.Fatalf("%T is not wrapped", s)
+	}
+	if _, ok := u.UnwrapSeat().(*hostedSeat); !ok {
+		t.Fatalf("inner = %T", u.UnwrapSeat())
+	}
+	if _, ok := s.(bots.EnvSeat); !ok {
+		t.Fatal("wrapper lost EnvSeat")
+	}
+	if _, ok := s.(bots.RefusalAnswerer); !ok {
+		t.Fatal("wrapper lost RefusalAnswerer")
+	}
+	if c, ok := s.(seat.TargetHintConsumer); !ok || !c.WantsTargetHints() {
+		t.Fatal("wrapper does not request target hints")
+	}
+}

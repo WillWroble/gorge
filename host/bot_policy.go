@@ -31,10 +31,23 @@ func newCaretakerSeat(name string, seed uint64, autoPayMana bool, deps bots.Deps
 	if err != nil {
 		return nil, err
 	}
+	skipLifePlans(s, autoPayMana)
+	return s, nil
+}
+
+// skipLifePlans arms the caretaker's SkipLifePlans on the *seat.Bot under s,
+// seeing through decorators that expose UnwrapSeat (the bots/sanity guard).
+func skipLifePlans(s seat.Seat, autoPayMana bool) {
+	for {
+		u, ok := s.(interface{ UnwrapSeat() seat.Seat })
+		if !ok {
+			break
+		}
+		s = u.UnwrapSeat()
+	}
 	if b, ok := s.(*seat.Bot); ok && autoPayMana {
 		b.SkipLifePlans()
 	}
-	return s, nil
 }
 
 // NewBotPolicySeatWithAutoPayMana builds a named hosted bot. Its public
