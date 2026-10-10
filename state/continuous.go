@@ -504,6 +504,17 @@ type ContinuousEffect struct {
 	// granted-Dethrone precedent); it contributes no CR 613 characteristic
 	// and the layer sorter ignores it. Nil on every effect that grants none.
 	AddTrigger *cards.Trigger
+	// AddRepl is a static-grant's replacement effect (AddReplacementEffect$ on
+	// a Mode$ Continuous static, e.g. DFT Far Fortune, End Boss' max-speed
+	// "a source you control ... deals that much damage plus 1 instead"):
+	// the SVar-parsed replacement (cards.ParseReplacementLine off the
+	// granting face's own SVar table, its ReplaceWith$ body resolved there
+	// too) the objects the static's Affected$ matches gain while the static
+	// is live. Written only by rules/layers.go's static scan and collected by
+	// rules/replacement_granted.go's scan; like AddTrigger it contributes no
+	// CR 613 characteristic and the layer sorter ignores it. Nil on every
+	// effect that grants none.
+	AddRepl *cards.Repl
 	// TriggerGrantor is the object whose SVar table resolves an AddTrigger
 	// grant's Execute$ body when that is NOT the effect's own Source: the
 	// Animate route (effects/combatfx.go) registers the grant with Source =

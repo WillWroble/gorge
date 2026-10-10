@@ -105,6 +105,11 @@ import (
 // keeps main's renamed exiled skip (an opponent-owned exiled card) and this
 // branch's served Tomik, so FRA is 36 served; DFT keeps 61 (main's 60 predates
 // the granted-static Racers' Scoreboard row).
+// Re-pinned by agent-20261009T094023Z-cd4b2f74 (levelb-granted-replacement):
+// the AddReplacementEffect$ observation serves both DFT replacement-grant rows
+// (Far Fortune, End Boss and Vnwxt, Verbose Host), so the two
+// "grants a replacement effect" skips leave and DFT's served count rises by
+// two (61->63).
 // It fails in both directions.
 var wantStaticContinuousCensus = map[string]map[string]int{
 	"BIG": {
@@ -136,10 +141,9 @@ var wantStaticContinuousCensus = map[string]map[string]int{
 	// 20261009T055718Z-17e92d7b) is the generic-observability row the
 	// advanced-scenario path serves.
 	"DFT": {
-		"served": 61,
+		"served": 63,
 		"skip:static characteristic-defining P/T of a non-creature (the snapshot omits its P/T)": 1,
 		"skip:static gated self grant is not offered in the gate-on fixture":                     1,
-		"skip:static grants a replacement effect (needs an event the replacement can change)":    2,
 	},
 }
 

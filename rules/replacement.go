@@ -302,6 +302,12 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 	if ev.Kind == events.Damage {
 		matches = append(matches, e.grantedPreventMatches(ev)...)
 	}
+	// A GRANTED static replacement (AddReplacementEffect$ on a Mode$
+	// Continuous static, rules/replacement_granted.go): appended after the
+	// printed and granted-keyword scans for the same deterministic
+	// composition reason bloodthirst/sunburst are, so a card's own lines
+	// always precede the ones it grants.
+	matches = append(matches, e.grantedStaticReplacementMatches(ev, event)...)
 	matches = e.dropAppliedReplacements(matches)
 	if ev.Kind == events.ManaAdd {
 		return e.continueManaReplacements(ev, manaCandidates, nil, false, e.manaFromTap, e.manaProducer)

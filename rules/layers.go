@@ -679,6 +679,44 @@ func (e *Engine) staticEffectsWalk(dst []ContinuousEffect, skip bool) []Continuo
 								}
 							}
 						}
+						// A replacement-effect grant (DFT Far Fortune, End Boss'
+						// max-speed damage-plus-one, Vnwxt, Verbose Host's
+						// draw-two): AddReplacementEffect$ names an SVar on the
+						// granting face whose body is an R:-shaped replacement
+						// (cards.ParseReplacementLine, the same pipe grammar a
+						// printed R: line uses). The objects the static's
+						// Affected$ matches gain it while the static is live;
+						// rules/replacement_granted.go collects it onto the
+						// replacement path. The ReplaceWith$ body is resolved
+						// HERE (cards.ResolveSVar off the granting face's own
+						// table), because a granted Repl never passes through
+						// face link, which is the only other place With is set.
+						// Fail closed: a body that does not parse, a missing
+						// With, or a ReplaceWith$ whose body does not resolve
+						// grants NOTHING -- never a With-less Repl, which the
+						// engine matches as a bodyless "stop the event"
+						// replacement (the CantHappen shape). The value may name
+						// several SVars joined by " & " (master_chef), split
+						// through the one shared grammar helper the AddTrigger
+						// arm above uses.
+						if raw := strings.TrimSpace(st.ParamStr(cards.PKAddReplacementEffect)); raw != "" {
+							for _, name := range cards.SplitGrantNames(raw) {
+								r, ok := cards.ParseReplacementLine(fc.SVars[name])
+								if !ok {
+									continue
+								}
+								withName := strings.TrimSpace(r.ParamStr(cards.PKReplaceWith))
+								if withName == "" {
+									continue
+								}
+								if with := cards.ResolveSVar(fc.SVars, withName); with != nil {
+									r.With = with
+									gr := base
+									gr.AddRepl = &r
+									out = append(out, gr)
+								}
+							}
+						}
 						// A named-variable grant (Sword of Fire and Ice): AddSVar$ names an SVar
 						// on the granting face whose body is Forge's
 						// "SVar:<Name>:<Value>" grant shape -- the affected object GAINS

@@ -778,6 +778,9 @@ const (
 	// Mode$ AttackerBlocked's "blocked by two or more creatures" comparator
 	// (Seifer, Balamb Rival; append-only).
 	PKValidBlockerAmount
+	// A Mode$ Continuous static's AddReplacementEffect$ grant (DFT Far
+	// Fortune, End Boss; Vnwxt, Verbose Host; append-only).
+	PKAddReplacementEffect
 	paramKeyCount
 )
 
@@ -1542,6 +1545,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKTriggeredOwnAbility:              "TriggeredOwnAbility",
 	PKValidDestination:                 "ValidDestination",
 	PKValidSpellAbility:                "ValidSpellAbility",
+	PKAddReplacementEffect:             "AddReplacementEffect",
 }
 
 // String is the key's Forge text.

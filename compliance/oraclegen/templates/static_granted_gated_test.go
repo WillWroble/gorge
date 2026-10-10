@@ -58,7 +58,12 @@ func TestStaticGatedGrantFallsThroughToNamedGap(t *testing.T) {
 		// (TestStaticCounterGatesServed): the cast-path gap it pinned is gone.
 		// Dawnsire's trigger grant moved to the granted-trigger observation
 		// (static_granted_trigger_test.go pins its served row).
-		{"Far Fortune, End Boss", "static#0.0", staticGrantReplacementReason},
+		// Far Fortune, End Boss left this table when the granted-replacement
+		// observation served its row (static_granted_replacement_test.go pins
+		// it); the replacement-grant reason stays for the out-of-census
+		// AddReplacementEffect$ carriers, whose bodies that template does not
+		// observe (its own fail-closed test pins Scion of Halaster).
+		{"Slick Imitator", "static#0.0", staticGatedNotOfferedReason},
 	} {
 		t.Run(tc.card, func(t *testing.T) {
 			req := counterReq(t, reg, tc.card, tc.key)
