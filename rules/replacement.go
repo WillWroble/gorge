@@ -558,6 +558,15 @@ type replMatch struct {
 	// granting ability; later source control changes cannot redefine You.
 	controller       state.PlayerID
 	frozenController bool
+	// svars is the SVar table that resolves a GRANTED static replacement's
+	// body (state.ContinuousEffect.SVars, the GRANTING face's table). replCtx
+	// prefers it over the host object's own face: a cross-object grant
+	// (Scion of Halaster's "first draw each turn" body lives on Scion, the
+	// host is the commander it affects) would otherwise resolve the body's
+	// SVars -- and its ReplaceWith$ SubAbility$ chain -- from the host. Nil
+	// on every printed, keyword and Effect-created match, whose table comes
+	// from the match's face or the source object's face as before.
+	svars map[string]string
 }
 
 // rememberedSpecContext builds the match context a ValidCard$/ValidLKI$
@@ -913,7 +922,12 @@ func (e *Engine) replCtx(m replMatch, ev events.Event) *effects.Ctx {
 		ctx.Repl.Player = state.Target{Player: ev.Player, IsPlayer: true}
 		ctx.Remembered, ctx.Captured = nil, nil
 	}
-	if f != nil {
+	if m.svars != nil {
+		// A GRANTED static replacement: the granting face's table, not the
+		// host's (replMatch.svars). Preferred over f, whose fallback is the
+		// host object's own face for a cross-object grant.
+		effects.SetSVars(ctx, m.svars)
+	} else if f != nil {
 		effects.SetSVars(ctx, f.SVars)
 	}
 	if o != nil && m.repl != nil && m.repl.ParamStr(cards.PKKeyword) == "ETBReplacement" && m.repl.With != nil && m.repl.With.API == "Clone" {

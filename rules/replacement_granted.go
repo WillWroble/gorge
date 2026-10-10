@@ -30,8 +30,19 @@ import (
 // replacementMatchesEffectCreated*, whose ActiveZones$ skip is right for an
 // Effect's own lifetime but wrong for a source-zone-scoped granted static.
 // key is "" so the match is durable across re-collections (printed-style,
-// replIdentity); face is nil, the granted Repl carrying its own resolved With.
+// replIdentity); face is nil, the granted Repl carrying its own resolved With,
+// and the match carries the GRANTING face's SVar table (grantedReplSVars(ce))
+// so a CheckSVar$ gate and the ReplaceWith$ body resolve there, not from the
+// host (the granting and host faces differ for a cross-object grant).
 func (e *Engine) grantedStaticReplacementMatches(ev events.Event, event string) []replMatch {
+	// The grant-free proof: while no object's faces carry an
+	// AddReplacementEffect$ static (nor an AddStaticAbility$ grant that could
+	// parse to one), no active() entry can carry AddRepl, so skip the layer
+	// build entirely -- the same shape trigGrantsPossible gives the trigger
+	// walk. An engine that has not proven it (a fixture-built one) scans.
+	if !e.replGrantsPossible() {
+		return nil
+	}
 	// Read the active() list ONCE into a local: the host walk below must not
 	// re-enter active()'s build (its depth bracket in activeBuild).
 	act := e.active()
@@ -46,6 +57,13 @@ func (e *Engine) grantedStaticReplacementMatches(ev events.Event, event string) 
 		if !replacementEventNameMatches(ce.AddRepl.Event, event) {
 			continue
 		}
+		// The GRANTING face's SVar table: the granted R: body's CheckSVar$
+		// gate and ReplaceWith$ body resolve here, NOT from the host object's
+		// face. A cross-object grant (Scion of Halaster's "first draw each
+		// turn" body lives on Scion; the host is the commander it affects)
+		// would otherwise read the host's own missing SVar and mis-evaluate
+		// the gate. See grantedReplSVars.
+		svars := e.grantedReplSVars(ce)
 		for _, hp := range e.G.AliveFrom(0) {
 			for _, hid := range e.G.Zone(state.ZBattlefield, hp) {
 				ho := e.G.Obj(hid)
@@ -55,11 +73,29 @@ func (e *Engine) grantedStaticReplacementMatches(ev events.Event, event string) 
 				if !e.matchesSpecFrom(ce.Affects, hid, ce.Controller, ce.Source) {
 					continue
 				}
-				if e.replacementMatches(*ce.AddRepl, hid, ev) {
-					out = append(out, replMatch{id: hid, repl: ce.AddRepl})
+				if e.replacementMatchesGranted(*ce.AddRepl, hid, ev, svars) {
+					out = append(out, replMatch{id: hid, repl: ce.AddRepl, svars: svars})
 				}
 			}
 		}
 	}
 	return out
+}
+
+// grantedReplSVars resolves the SVar table a granted static replacement's
+// CheckSVar$ gate and ReplaceWith$ body read: the GRANTING face's own table.
+// ContinuousEffect.SVars carries it only for a merged under-card face (the
+// one case where it is not the source's o.Face() table); everywhere else the
+// static scan's other SVar readers fall back to the source object's face, and
+// this does the same. A nil result keeps replCtx's host-face fallback.
+func (e *Engine) grantedReplSVars(ce *ContinuousEffect) map[string]string {
+	if ce.SVars != nil {
+		return ce.SVars
+	}
+	if o := e.G.Obj(ce.Source); o != nil {
+		if f := o.Face(); f != nil {
+			return f.SVars
+		}
+	}
+	return nil
 }
