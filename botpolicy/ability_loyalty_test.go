@@ -56,6 +56,10 @@ func TestLoyaltyRanking(t *testing.T) {
 	if got := loyaltyPick(t, empty, x, draw, decision.Loyalty{Delta: -1}); got != 2 {
 		t.Errorf("minuses only: picked %d, want the smallest minus (2)", got)
 	}
+	// A game restart (a draw in this engine) is never taken, even over pass.
+	if got := loyaltyPick(t, foe, decision.Loyalty{Delta: -14, Ultimate: true, Restart: true}); got != 1 {
+		t.Errorf("restart ultimate alone: picked %d, want pass (1)", got)
+	}
 	// A removal that kills the walker ranks below a plus.
 	if got := loyaltyPick(t, foe, decision.Loyalty{Delta: -3, Removal: true, Dies: true}, plus); got != 1 {
 		t.Errorf("walker-killing removal vs plus: picked %d, want the plus (1)", got)

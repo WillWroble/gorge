@@ -18,6 +18,7 @@ func TestLoyaltyOptionFacts(t *testing.T) {
 		"A:AB$ GainLife | Cost$ AddCounter<1/LOYALTY> | LifeAmount$ 2 | Planeswalker$ True | SpellDescription$ Gain 2.\n"+
 		"A:AB$ Destroy | Cost$ SubCounter<2/LOYALTY> | ValidTgts$ Creature | TgtPrompt$ Select target creature | Planeswalker$ True | SpellDescription$ Destroy target creature.\n"+
 		"A:AB$ GainLife | Cost$ SubCounter<4/LOYALTY> | LifeAmount$ 20 | Planeswalker$ True | Ultimate$ True | SpellDescription$ Gain 20.\n"+
+		"A:AB$ RestartGame | Cost$ SubCounter<3/LOYALTY> | Planeswalker$ True | Ultimate$ True | SpellDescription$ Restart.\n"+
 		"Oracle:x\n")
 	victim := card(t, "Name:Fact Victim\nTypes:Creature Bear\nPT:2/2\nOracle:x\n")
 	e, _ := tokenReplGameSeats(t, 301, []*cards.Card{walker}, []*cards.Card{victim})
@@ -30,6 +31,10 @@ func TestLoyaltyOptionFacts(t *testing.T) {
 	plus := abilityOption(t, e, id, 0).Loyalty
 	minus := abilityOption(t, e, id, 1).Loyalty
 	ult := abilityOption(t, e, id, 2).Loyalty
+	restart := abilityOption(t, e, id, 3).Loyalty
+	if restart == nil || !restart.Restart || minus.Restart || ult.Restart {
+		t.Errorf("RestartGame fact = %+v (minus %+v, ult %+v), want Restart only on the restart option", restart, minus, ult)
+	}
 	if plus == nil || minus == nil || ult == nil {
 		t.Fatalf("loyalty options lack the fact: plus=%v minus=%v ult=%v", plus, minus, ult)
 	}

@@ -98,6 +98,11 @@ func (b Board) abilityScore(o decision.Option, me state.PlayerID) (score int32, 
 	if o.SelfSkipTurns > 0 && !b.turnSkipWorthIt(o) {
 		return 0, false // A6: a skipped turn costs more than the ability gains.
 	}
+	if o.Loyalty != nil && o.Loyalty.Restart {
+		// A7: a game restart ends the engine's game as a draw (Karn
+		// Liberated's ultimate); the old label-tie rule never took it either.
+		return 0, false
+	}
 	if o.Loyalty != nil {
 		// A7: a planeswalker loyalty ability carries no digit in its label, so
 		// A2's label read tied every one of a walker's abilities and only the

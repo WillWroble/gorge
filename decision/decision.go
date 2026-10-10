@@ -518,6 +518,9 @@ type Loyalty struct {
 	Removal bool
 	// Dies is true when paying the cost leaves the walker with no loyalty.
 	Dies bool
+	// Restart marks a RestartGame effect (Karn Liberated's ultimate). The
+	// engine ends such a game as a draw, so the bot never takes it.
+	Restart bool
 }
 
 // Grant describes the idempotent keyword grant of one "ability" option

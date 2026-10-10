@@ -34,6 +34,7 @@ func abilityLoyaltyFact(o *state.Object, ab *cards.SA, c *Cost, loyal bool) *dec
 	f := &decision.Loyalty{
 		Ultimate: strings.EqualFold(strings.TrimSpace(ab.ParamStr(cards.PKUltimate)), "True"),
 		Removal:  abilityRemovesPermanent(ab),
+		Restart:  abilityRestartsGame(ab),
 	}
 	for _, part := range c.AddCounter {
 		if strings.EqualFold(part.Spec, "LOYALTY") {
@@ -70,6 +71,17 @@ func abilityRemovesPermanent(ab *cards.SA) bool {
 			continue
 		}
 		if z, ok := effects.DestinationOf(sa.ParamStr(cards.PKDestination)).SoleZone(); ok && z != state.ZBattlefield {
+			return true
+		}
+	}
+	return false
+}
+
+// abilityRestartsGame reports whether any link of ab's Sub chain restarts the
+// game (api:RestartGame).
+func abilityRestartsGame(ab *cards.SA) bool {
+	for sa, depth := ab, 0; sa != nil && depth < 32; sa, depth = sa.Sub, depth+1 {
+		if sa.API == "RestartGame" {
 			return true
 		}
 	}
