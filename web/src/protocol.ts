@@ -1059,6 +1059,14 @@ export interface Option {
    * budget (Decision.MaxSum2).
    */
   value2?: number;
+  /**
+   * TargetHints is the engine's opt-in hint for a cast or activation whose
+   * first targeting step is a hostile effect: own and opponent legal-target
+   * counts (see TargetHints). Information only; built by
+   * Engine.EnsureTargetHints for seats that ask. omitempty: absent for every
+   * option otherwise, so existing option lists serialise byte-identically.
+   */
+  target_hints?: number;
 }
 
   /**

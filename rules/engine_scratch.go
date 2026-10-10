@@ -51,6 +51,9 @@ type engineScratch struct {
 	derivedMemoStack derivedMemoTable `clone:"reset,pool=memoStack,release=.release"`
 	derivedMemoDepth int              `clone:"reset"`
 	derivedMemoGen   uint64           `clone:"reset"`
+	// targetHintsSeq is d.Seq+1 of the pending decision EnsureTargetHints last
+	// filled (rules/target_hints.go); a clone starts unbuilt.
+	targetHintsSeq uint64 `clone:"reset"`
 	// derivedMemoTail / derivedMemoAlias* carry the priority walk's memo
 	// across the decision boundary into a BeginDerivedReads scope
 	// (rules/derivedmemo.go). Validated on every use; Clone copies none.

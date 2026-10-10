@@ -501,6 +501,12 @@ type Option struct {
 	// Value2 is the option's price under the decision's second cumulative
 	// budget (Decision.MaxSum2).
 	Value2 int `json:"value2,omitempty"`
+	// TargetHints is the engine's opt-in hint for a cast or activation whose
+	// first targeting step is a hostile effect: own and opponent legal-target
+	// counts (see TargetHints). Information only; built by
+	// Engine.EnsureTargetHints for seats that ask. omitempty: absent for every
+	// option otherwise, so existing option lists serialise byte-identically.
+	TargetHints TargetHints `json:"target_hints,omitempty"`
 }
 
 // Loyalty describes one planeswalker loyalty ability option
