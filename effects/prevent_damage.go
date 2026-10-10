@@ -64,10 +64,11 @@ const shieldBody = "DB$ ReplaceDamage | Amount$ Count$ChosenNumber"
 // Unread, loud (each emits one Note naming the parameter and installs no
 // shield): the random-recipient shape (whimsy's Random$ True |
 // CardChoices$/PlayerChoices$ — this engine forbids ambient randomness), and
-// a PreventionSubAbility$ whose ShieldEffectTarget$ is not the corpus's
-// ParentTarget. A resolvable-but-zero Amount$ installs nothing (a shield
-// that prevents nothing is no decision); an amount the numeric grammar
-// cannot resolve is loud rather than silent.
+// a PreventionSubAbility$ whose ShieldEffectTarget$ scope is not one the
+// shared shape home binds (cards.PreventionShieldTargetBound — the corpus's
+// ParentTarget, Targeted and You are all bound). A resolvable-but-zero
+// Amount$ installs nothing (a shield that prevents nothing is no decision);
+// an amount the numeric grammar cannot resolve is loud rather than silent.
 func effPreventDamage(h Host, c *Ctx, sa *cards.SA) {
 	if strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRandom)), "True") {
 		h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
@@ -87,32 +88,25 @@ func effPreventDamage(h Host, c *Ctx, sa *cards.SA) {
 	if total <= 0 {
 		return
 	}
-	// The rider binding (Acolyte's Reward, Vengeful Archon): the registered
-	// shield deals what it prevents, to the PARENT SA's targets
-	// (ShieldEffectTarget$ ParentTarget — the redirect target the enclosing
-	// Pump chose), once per application, when the prevention happens.
+	// The rider binding (Acolyte's Reward, Vengeful Archon, Test of Faith,
+	// Candles' Glow): the registered shield runs its PreventionSubAbility$
+	// once per application, with the amount this application prevented bound
+	// as its numeric parameter. The scope names whose targets the rider acts
+	// on (cards.PreventionShieldTargetBound is the shared shape home):
+	// ParentTarget — the PARENT SA's chosen targets (the enclosing Pump's
+	// redirect target), Targeted — the shield's own recipients (the
+	// prevented creature), You — the shield's controller. An unbound scope
+	// is loud and installs the prevention alone; the per-application API
+	// gate is rules' (rules/replacement_damage.go), which resolves the rider
+	// from the source's face.
 	rider := ""
+	scope := strings.TrimSpace(sa.ParamStr(cards.PKShieldEffectTarget))
 	if rn := strings.TrimSpace(sa.ParamStr(cards.PKPreventionSubAbility)); rn != "" {
-		if !strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKShieldEffectTarget)), "ParentTarget") {
+		if !cards.PreventionShieldTargetBound(scope) {
 			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
 				Text: "unimplemented PreventDamage ShieldEffectTarget$ " + sa.ParamStr(cards.PKShieldEffectTarget)})
 		} else {
 			rider = rn
-		}
-	}
-	var riderObjs []state.ObjID
-	var riderPlayers []state.PlayerID
-	if rider != "" {
-		// c.Targets at this sub's dispatch are the PARENT SA's chosen targets
-		// (resolveAbility binds them to the whole chain); the shield's own
-		// recipients arrive through the generic pre-ask's PickedTargets — the
-		// two lists are deliberately distinct.
-		for _, t := range c.Targets {
-			if t.IsPlayer {
-				riderPlayers = append(riderPlayers, t.Player)
-			} else {
-				riderObjs = append(riderObjs, t.Obj)
-			}
 		}
 	}
 	// Eligible recipients, in Defined/answer order: a player still in the
@@ -139,6 +133,37 @@ func effPreventDamage(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		recs = append(recs, recipient{obj: t.Obj})
+	}
+	// The rider's targets, by scope. c.Targets at this sub's dispatch are
+	// the PARENT SA's chosen targets (resolveAbility binds them to the whole
+	// chain); the shield's own recipients arrive through the generic
+	// pre-ask's PickedTargets via Defined above — the two lists are
+	// deliberately distinct, and the scope chooses between them. This block
+	// emits nothing, so binding after the recipient walk cannot reorder any
+	// event or ask.
+	var riderObjs []state.ObjID
+	var riderPlayers []state.PlayerID
+	if rider != "" {
+		switch scope {
+		case "ParentTarget":
+			for _, t := range c.Targets {
+				if t.IsPlayer {
+					riderPlayers = append(riderPlayers, t.Player)
+				} else {
+					riderObjs = append(riderObjs, t.Obj)
+				}
+			}
+		case "Targeted":
+			for _, rec := range recs {
+				if rec.isPlayer {
+					riderPlayers = append(riderPlayers, rec.player)
+				} else {
+					riderObjs = append(riderObjs, rec.obj)
+				}
+			}
+		case "You":
+			riderPlayers = append(riderPlayers, c.Controller)
+		}
 	}
 	if len(recs) == 0 {
 		return
