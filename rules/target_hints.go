@@ -49,20 +49,40 @@ func (e *Engine) EnsureTargetHints() {
 		default:
 			continue
 		}
-		if sa == nil || !hostileTargetSA(sa) || !effects.TargetsOf(sa).Targeted() {
+		opt.TargetHints = e.targetHintFor(p, opt.Obj, excludeSelf, sa)
+	}
+	// A payment action with no base option (a plan that needs floating mana
+	// first) has no Option to carry the hint; hint its card's plain spell.
+	for i := range d.PaymentActions {
+		pa := &d.PaymentActions[i]
+		if pa.BaseOptionIndex != nil {
+			if b := *pa.BaseOptionIndex; b >= 0 && b < len(d.Options) {
+				pa.TargetHints = d.Options[b].TargetHints
+			}
 			continue
 		}
-		own, opp := 0, 0
-		for _, c := range e.legalTargetCandidates(p, opt.Obj, excludeSelf, sa) {
-			if c.player == p {
-				own++
-			} else {
-				opp++
-			}
+		if o := e.G.Obj(pa.Cast.Object); o != nil && o.Face() != nil && int(o.FaceIdx) == pa.Cast.Face {
+			pa.TargetHints = e.targetHintFor(p, pa.Cast.Object, pa.Cast.Object, o.Face().SpellAbility())
 		}
-		opt.TargetHints = decision.MakeTargetHints(own, opp, true)
 	}
 	e.EndDerivedReads()
+}
+
+// targetHintFor is the hint for one spell or ability root: zero unless it is a
+// targeted hostile effect.
+func (e *Engine) targetHintFor(p state.PlayerID, source, excludeSelf state.ObjID, sa *cards.SA) decision.TargetHints {
+	if sa == nil || !hostileTargetSA(sa) || !effects.TargetsOf(sa).Targeted() {
+		return 0
+	}
+	own, opp := 0, 0
+	for _, c := range e.legalTargetCandidates(p, source, excludeSelf, sa) {
+		if c.player == p {
+			own++
+		} else {
+			opp++
+		}
+	}
+	return decision.MakeTargetHints(own, opp, true)
 }
 
 // hostileTargetSA is the hint's hostility test, the same classification the

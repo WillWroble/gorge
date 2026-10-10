@@ -212,6 +212,11 @@ type PaymentAction struct {
 	BaseOptionIndex *int          `json:"base_option_index,omitempty"`
 	Label           string        `json:"label"`
 	Plans           []PaymentPlan `json:"plans"`
+	// TargetHints is the same opt-in hint Option.TargetHints carries, for the
+	// action's card: set by Engine.EnsureTargetHints, including for an action
+	// with no base option (a floating-mana plan) that no Option can carry it
+	// for. omitempty: absent unless the seat asked for hints.
+	TargetHints TargetHints `json:"target_hints,omitempty"`
 }
 
 // PaymentSelection is the exclusive intent selector for an offered action and

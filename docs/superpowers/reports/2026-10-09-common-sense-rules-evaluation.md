@@ -161,3 +161,84 @@ The harness is two Go test files (`census_selfhit_test.go.txt`,
 over the per-test budget (about 25 s and 330 s at 16 vCPU). Drop either into
 `internal/bench/` and run with `-run TestCensusSelfHits` or
 `PF_SEEDS=8 go test -run TestPrefilterABv3`.
+
+## Implementation (2026-10-09, engine hints and guard package; guard not wired)
+
+Operator rulings applied: the engine filters nothing; the guard drops options
+only inside a seat decorator; a per-card allow-list exempts deliberate
+self-targets; consolidation of the bots comes before wiring, so no factory or
+registry entry uses the guard yet.
+
+**Engine hints.** `decision.Option.TargetHints` (and the same field on
+`PaymentAction`, for floating-mana plans that have no base option) is a packed
+`uint32`, omitted when zero: present and hostile bits plus the count of legal
+targets under the deciding seat's control (a player target being that seat) and
+under opponents. It is set only for a cast with the card's own cost or a
+printed activated ability whose root `SpellAbility` is targeted and hostile
+(direct damage; destroy, exile, graveyard or sacrifice). Modal, alternative,
+adventure, granted and chained-sub-target shapes carry no hint (fail open).
+
+The offer path could not supply the counts: `targetSAAvailable` runs a LIMITED
+census that stops at the mandatory minimum (an any-target spell stops at the
+first player), so the counts need the full census (`legalTargetCandidates`, the
+census the target ask itself uses). It is therefore a separate, opt-in pass,
+`Engine.EnsureTargetHints()` (the `EnsurePaymentActions` pattern): a seat
+implements `seat.TargetHintConsumer`; `host.projectNextData` and
+`internal/bench` call it for such seats only. The offered option list, every
+event and every chain head are untouched; hints are built after the walk on
+the posed decision, so the prio memo and quiet-serve caches never see them.
+
+Cost (`go test ./rules -bench 'PriorityOffer|EnsureTargetHints' -benchtime 2000x`,
+a mid-game position with the most hinted options in 6 repo-deck games):
+
+| | ns/op | allocs/op |
+|---|---|---|
+| priority offer walk (unchanged; hints are not on this path) | 220,144 | 72 |
+| `EnsureTargetHints`, seat opted in, position with hinted options | 15,681 | 10 |
+| `EnsureTargetHints`, a priority decision with no hostile target step | 10.7 | 0 |
+
+A seat that does not opt in pays nothing (no code on its path). I did not build
+a second binary to time a before/after of the walk; it is unchanged by
+construction, not measured.
+
+**Verification.** `TestTargetHintsStoneRain` (own only, opposing only, both,
+each checked against the KTarget decision it poses), the Any-target, pump and
+ability cases, and `TestTargetHintsMatchTargetDecisionInGames` (6 repo-deck
+games, 75 hinted options, every one equal to the split of the target decision
+it poses on a clone) pass. `TestHeads`, `TestRepoDeckGamesReplayExactly`, the
+clone audits, `./decision`, `./seat`, `./view`, `./internal/archtest` and the
+host bot tests pass; no head moved and no fixture JSON changes (the field is
+omitted unless a seat opts in). `web/src/protocol.ts` was regenerated.
+Leak check: the counts are over legal targets that are public (battlefield
+permanents, players, graveyard and exile cards, stack objects), the same set
+the seat's own KTarget decision would list.
+
+**Guard package.** `bots/sanity`: `Filter(decision)` drops cast/ability
+options with `hostile && opp == 0 && own > 0` unless the card name is in a
+sorted allow-list, renumbers `Option.Index`, remaps each payment action's
+`BaseOptionIndex`, drops actions linked to a dropped option and floating-mana
+actions whose own hint says drop, never touches pass, and `MapBack` restores the
+original numbering. `Wrap(seat)` is the decorator (keeps BoardSeat, EnvSeat and
+RefusalAnswerer surfaces, delegates the payment opt-in, requests hints, asks the
+wrapped seat once). Allow-list seed: Ghost Quarter (land thinning); the other
+census hits (Wasteland, Swords, Path, Fatal Push, Hero's Downfall, Doom Blade,
+Karn) stay guarded. The card name is read from the option label (`Cast X`,
+`X: ...`), which is the only name the decision carries.
+
+**Smoke A/B (plumbing only, not a verdict).** `bot`, guarded vs plain, 420
+games (every ordered pair of the 15 constructed decks, one seed, both seat
+orders), allow-list on: guarded 205 - plain 200 (15 draws or stalls), 50.6%
+[45.8, 55.5] of decided games, which is indistinguishable from even at this
+size. Hostile target decisions aimed at the seat's own permanent or player:
+guarded 5 of 740 (0.7%), plain 152 of 832 (18.3%). The first run missed the
+floating-mana payment actions (self-hits 53 of 778); the payment-action hint
+fixed that. The full 3,360-game A/B per policy is deferred until after
+consolidation. Harness: `/mnt/sata/gorge-training/bot-sanity/sanityab_hints_test.go.txt`
+(drop into `internal/bench/`; `SAN_MODE=ab|census SAN_BOT=bot SAN_SEEDS=n`).
+
+**Ready to wire.** One line per factory (`sanity.Wrap(seat)`) in `bots/bot`,
+`bots/lethalpressure`, `bots/sbtactical`, `bots/sbheuristic`. Two things to
+handle then: `host/bot_policy.go`'s `newCaretakerSeat` type-asserts `*seat.Bot`
+(the wrapper exposes `UnwrapSeat()` for it), and an `Options` switch to build
+the plain policy for A/B arms. SpellBench registry parity (a `sanity` decorator
+beside `passguard`) is not done.
