@@ -505,8 +505,8 @@ and `lands` were within noise of it and would have been equally defensible.
 
 Not timed separately. The rule is O(7) per ask with no allocation beyond two
 small slices in the early-play test, and at most about three asks per seat per
-game (Mulligans = 2). Whole-run wall time per game (harness, 8 workers) was
-indistinguishable between arms. The guard otherwise changes nothing about the
+game (Mulligans = 2). No timing was taken for it; the cost is inferred from
+that shape, not measured. The guard otherwise changes nothing about the
 priority path.
 
 ### Not covered
