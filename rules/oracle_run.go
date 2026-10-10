@@ -635,35 +635,7 @@ func (r *oracleRun) build(sc oracleScenario) error {
 				if backFace && pl.zone == state.ZBattlefield {
 					e.emit(events.Event{Kind: events.FlipFace, Obj: id, Amount: 1, Text: "Transformed"})
 				}
-				pendingBefore := len(e.pendingTriggers)
-				e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: from, To: pl.zone})
-				if sc.xmageFixture && pl.zone == state.ZBattlefield {
-					// XMage fixture setup places battlefield cards with addCard,
-					// which does not queue entry triggers; drop exactly the
-					// entry-shaped triggers this placement queued and keep every
-					// other trigger, including the CounterAdded triggers a
-					// planeswalker's entry loyalty counters fire on an already-
-					// placed permanent (setupPlacementDropsTrigger).
-					kept := e.pendingTriggers[:pendingBefore]
-					ordered := min(e.orderedTriggers, pendingBefore)
-					// Copy the tail first: appending to kept writes back into
-					// e.pendingTriggers[pendingBefore:], the very slice this loop
-					// reads, and a dropped trigger would shift later entries down
-					// under the iteration.
-					tail := append([]pendingTrigger(nil), e.pendingTriggers[pendingBefore:]...)
-					// A back-face chapter is dropped only when the entering
-					// face is not itself a Saga (setupBackFaceDropsChapter).
-					dropChapter := setupBackFaceDropsChapter(e.G.Obj(id), backFace)
-					for _, pt := range tail {
-						t, _ := e.triggerOf(pt)
-						if setupPlacementDropsTrigger(t, pt.Chapter && dropChapter) {
-							continue
-						}
-						kept = append(kept, pt)
-					}
-					e.pendingTriggers = kept
-					e.orderedTriggers = ordered
-				}
+				r.placeSetupCard(id, from, pl.zone, sc.xmageFixture, backFace)
 			}
 			if pl.zone == state.ZBattlefield && backFace {
 				// A back-face PLANESWALKER whose entering face prints no
