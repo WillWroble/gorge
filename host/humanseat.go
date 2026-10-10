@@ -62,9 +62,15 @@ func (s *HumanSeat) configure(timeout time.Duration, caretaker seat.Seat) {
 // pendingSlot binds one decision to the recv channel that answers it. Keep
 // dec by value so a mechanical copy has its own decision instance, and keep
 // recv per-call (capacity 1) so a racing submit is never silently dropped.
+// auto is HD-2's client-autopilot bit: submitAdmitted sets it for the one
+// submit it sends, and the parking's await copies it out on receive, so the
+// play loop can record it in the match's provenance ledger
+// (host/divergence_ledger.go). It never enters decision.Intent — the flag
+// must stay out of replay input.
 type pendingSlot struct {
 	dec  decision.Decision
 	recv chan decision.Intent
+	auto bool
 }
 
 // NewHumanSeat returns a HumanSeat with no decision pending.
@@ -114,6 +120,15 @@ type parking struct {
 	// it fires, so an undo can interrupt a parked human exactly as a
 	// submitted intent would.
 	undo <-chan state.PlayerID
+	// fires0 is the caretakerFires count at park time (HD-2): await's
+	// caretaker path is the only writer of that counter, so a count above
+	// fires0 after await returns means THIS decision was answered by the
+	// caretaker — the provenance ledger's caretaker bit.
+	fires0 uint64
+	// auto is HD-2's client-autopilot bit, copied out of the slot on
+	// receive (host/divergence_ledger.go). False for a caretaker answer,
+	// which never rides the channel.
+	auto bool
 }
 
 // park installs d as the seat's pending decision without blocking, returning
@@ -130,8 +145,9 @@ func (s *HumanSeat) park(ctx context.Context, v view.View, d decision.Decision, 
 	s.slot = slot
 	timeout := s.timeout
 	caretaker := s.caretaker
+	fires0 := s.caretakerFires
 	s.mu.Unlock()
-	return &parking{s: s, slot: slot, ctx: ctx, v: v, d: owned, timeout: timeout, caretaker: caretaker, undo: undo}
+	return &parking{s: s, slot: slot, ctx: ctx, v: v, d: owned, timeout: timeout, caretaker: caretaker, undo: undo, fires0: fires0}
 }
 
 // Decide records d as the pending decision and blocks until a matching intent
@@ -179,6 +195,7 @@ func (p *parking) await() (decision.Intent, error) {
 		defer timer.Stop()
 		select {
 		case in := <-p.slot.recv:
+			p.auto = p.slot.auto
 			return in, nil
 		case <-p.ctx.Done():
 			if p.caretaker != nil {
@@ -202,6 +219,7 @@ func (p *parking) await() (decision.Intent, error) {
 	}
 	select {
 	case in := <-p.slot.recv:
+		p.auto = p.slot.auto
 		return in, nil
 	case <-p.ctx.Done():
 		if p.caretaker != nil {
@@ -262,7 +280,7 @@ func (s *HumanSeat) pending() (bool, *decision.Decision) {
 // so a send can never block a holder of s.mu (a leaked per-decision send would
 // otherwise deadlock pending() and the next Decide).
 func (s *HumanSeat) submit(in decision.Intent) error {
-	return s.submitAdmitted(in, nil)
+	return s.submitAdmitted(in, nil, false)
 }
 
 // submitAdmitted is submit with an optional host admission check.  The check
@@ -274,7 +292,11 @@ func (s *HumanSeat) submit(in decision.Intent) error {
 // The channel send remains outside s.mu: a receiver may be delayed and must
 // never block Pending or another stale-answer rejection while holding the seat
 // mutex.  Clone before admission so the exact value admitted is the one sent.
-func (s *HumanSeat) submitAdmitted(in decision.Intent, admit func(decision.Decision, decision.Intent) error) error {
+// auto is HD-2's client-autopilot bit: it is stamped on the slot together with
+// the send, so the receiving parking's await copies it out after the receive
+// that the send happens-before — the play loop reads it only there, and it
+// never reaches decision.Intent or the log.
+func (s *HumanSeat) submitAdmitted(in decision.Intent, admit func(decision.Decision, decision.Intent) error, auto bool) error {
 	in = decision.CloneIntent(in)
 	s.mu.Lock()
 	if s.slot == nil {
@@ -292,6 +314,7 @@ func (s *HumanSeat) submitAdmitted(in decision.Intent, admit func(decision.Decis
 			return err
 		}
 	}
+	slot.auto = auto
 	s.mu.Unlock()
 	slot.recv <- in
 	return nil

@@ -71,12 +71,23 @@ func (r *Registry) Pending(id TableID, k int, player state.PlayerID) (*decision.
 // caller who sends on SubmitIntent can never race the log. A rejected intent
 // leaves the seat parked and the game exactly where it was.
 func (r *Registry) SubmitIntent(id TableID, k int, player state.PlayerID, in decision.Intent) error {
+	return r.SubmitIntentFrom(id, k, player, in, false)
+}
+
+// SubmitIntentFrom is SubmitIntent with HD-2's client-autopilot bit: auto
+// marks the answer as produced by the client's autopilot rather than a
+// deliberate human choice (docs/superpowers/specs/2026-10-10-human-divergence-design.md
+// §5.2). The flag travels to the parked slot — never into decision.Intent,
+// whose values are replay input — and the play loop records it in the match's
+// provenance ledger (host/divergence_ledger.go), so the divergence capture can
+// exclude it. SubmitIntent is the auto=false form.
+func (r *Registry) SubmitIntentFrom(id TableID, k int, player state.PlayerID, in decision.Intent, auto bool) error {
 	hs, err := r.humanSeat(id, k, player)
 	if err != nil {
 		return err
 	}
 	if in.Payment == nil && in.Announce == nil {
-		return hs.submit(in)
+		return hs.submitAdmitted(in, nil, auto)
 	}
 	_, m, err := r.lookup(id, k)
 	if err != nil {
@@ -107,7 +118,7 @@ func (r *Registry) SubmitIntent(id TableID, k int, player state.PlayerID, in dec
 				}
 				return nil
 			})
-		})
+		}, auto)
 	}
 	return hs.submitAdmitted(in, func(d decision.Decision, admitted decision.Intent) error {
 		// Decision.Validate above proves this selector names an offered action
@@ -134,5 +145,5 @@ func (r *Registry) SubmitIntent(id TableID, k int, player state.PlayerID, in dec
 			}
 			return nil
 		})
-	})
+	}, auto)
 }
