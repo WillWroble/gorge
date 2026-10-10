@@ -1,0 +1,45 @@
+package rules
+
+import (
+	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/state"
+)
+
+// TestLoyaltyOptionFacts pins decision.Option.Loyalty: a planeswalker's
+// offered abilities carry the net loyalty change, the ultimate marker and the
+// removal classification read from the compiled cost/ability, and an
+// ordinary activated ability carries none.
+func TestLoyaltyOptionFacts(t *testing.T) {
+	t.Parallel()
+	walker := card(t, "Name:Fact Walker\nTypes:Planeswalker Test\nLoyalty:4\n"+
+		"A:AB$ GainLife | Cost$ AddCounter<1/LOYALTY> | LifeAmount$ 2 | Planeswalker$ True | SpellDescription$ Gain 2.\n"+
+		"A:AB$ Destroy | Cost$ SubCounter<2/LOYALTY> | ValidTgts$ Creature | TgtPrompt$ Select target creature | Planeswalker$ True | SpellDescription$ Destroy target creature.\n"+
+		"A:AB$ GainLife | Cost$ SubCounter<4/LOYALTY> | LifeAmount$ 20 | Planeswalker$ True | Ultimate$ True | SpellDescription$ Gain 20.\n"+
+		"Oracle:x\n")
+	victim := card(t, "Name:Fact Victim\nTypes:Creature Bear\nPT:2/2\nOracle:x\n")
+	e, _ := tokenReplGameSeats(t, 301, []*cards.Card{walker}, []*cards.Card{victim})
+	id := moveSeededCard(t, e, 0, walker, state.ZBattlefield)
+	moveSeededCard(t, e, 1, victim, state.ZBattlefield)
+	if got := e.G.Obj(id).Counter("LOYALTY"); got != 4 {
+		t.Fatalf("precondition: walker loyalty = %d, want 4", got)
+	}
+	addMana(t, e, 0, "")
+	plus := abilityOption(t, e, id, 0).Loyalty
+	minus := abilityOption(t, e, id, 1).Loyalty
+	ult := abilityOption(t, e, id, 2).Loyalty
+	if plus == nil || minus == nil || ult == nil {
+		t.Fatalf("loyalty options lack the fact: plus=%v minus=%v ult=%v", plus, minus, ult)
+	}
+	if *plus != (decision.Loyalty{Delta: 1}) {
+		t.Errorf("[+1] fact = %+v, want Delta 1 only", *plus)
+	}
+	if *minus != (decision.Loyalty{Delta: -2, Removal: true}) {
+		t.Errorf("[-2] Destroy fact = %+v, want Delta -2 Removal", *minus)
+	}
+	if *ult != (decision.Loyalty{Delta: -4, Ultimate: true, Dies: true}) {
+		t.Errorf("[-4] ultimate fact = %+v, want Delta -4 Ultimate Dies", *ult)
+	}
+}
