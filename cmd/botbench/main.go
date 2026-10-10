@@ -2543,7 +2543,7 @@ func main() {
 	memprofile := flag.String("memprofile", "", "write a heap profile to this pprof file after the last game finishes (pprof reads both alloc_space and inuse_space from it; empty = off)")
 	registerAZFlags(flag.CommandLine)
 	registerSpellbenchFlags(flag.CommandLine)
-	commonSense := flag.Bool("common-sense", false, "play the plain bot, bot-auto-pay and sb-tactical policies behind the bots/sanity guard (drops hostile removal that can only hit the seat's own side, via the engine's target hints); default off. A per-side alternative is the policy name bot+sanity / bot-auto-pay+sanity / sb-tactical+sanity")
+	commonSense := flag.Bool("common-sense", false, "play the plain bot, bot-auto-pay and sb-tactical policies behind the bots/sanity guard (drops hostile removal that can only hit the seat's own side, via the engine's target hints, and answers the London mulligan with the land-window rule instead of the 1/3 coin); default off. A per-side alternative is the policy name bot+sanity / bot-auto-pay+sanity / sb-tactical+sanity")
 	flag.Parse()
 	if *commonSense {
 		applyCommonSense()

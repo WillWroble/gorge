@@ -339,3 +339,185 @@ handle then: `host/bot_policy.go`'s `newCaretakerSeat` type-asserts `*seat.Bot`
 (the wrapper exposes `UnwrapSeat()` for it), and an `Options` switch to build
 the plain policy for A/B arms. SpellBench registry parity (a `sanity` decorator
 beside `passguard`) is not done.
+
+## Mulligan (2026-10-10)
+
+Operator request: add a mulligan strategy to the optional `Options.CommonSense`
+layer (default OFF; the engine filters nothing; AI/search/trained bots get no
+hand-coded guard).
+
+### Today's behaviour, per policy
+
+The London round only exists when `rules.Config.Mulligans > 0`
+(`rules/mulligan.go`: it is the permitted count per seat, not the multiplayer
+free mulligan; a seat that has used its allowance is offered `keep` only).
+`gorged` serves 1 (`cmd/gorged/main.go:276`), `host.TableConfig` defaults to 0
+(`host/table.go:163`), and `cmd/botbench` runs the round only in `-spellbench`
+mode (`-spellbench-mulligans`, `cmd/botbench/spellbench.go:325`); its ordinary
+matrix mode and the earlier sanity A/B harness (`rules.Config` without
+`Mulligans`) never ask a mulligan, so no earlier measurement here says anything
+about mulligans.
+
+| policy | keep/mulligan rule | where | rng |
+|---|---|---|---|
+| `bot`, `bot-auto-pay`, `lethal-pressure` (the `seat.Bot` family) | `MulliganCoin`: mulligan with probability 1/3 whatever the hand holds; bottoming is `chooseDiscard` | `botpolicy/policy.go:1110-1135` (`r.IntN(3)`, line 1128); the zero value of `Board.Mulligan` (`botpolicy/mulligan.go`) | one `IntN(3)` per keep/mulligan ask that offers a mulligan |
+| `sb-tactical` | the same coin: the tactical seat sends every kind it does not score to `botpolicy.Decide` with its own rng (`tactical.fallback`, `internal/spellbench/builtins/tactical.go:328`); NOT separately configurable | as above | its own PCG, one `IntN(3)` per ask |
+| `sb-heuristic`, `sb-first` | always keep (`builtins.go:567-572`; `sequential` takes option 0) | `internal/spellbench/builtins/builtins.go` | none |
+| `sb-uniform` | uniform over the offered options | `selectSeq` | one draw per ask |
+| search / AZ (`az-c3`, `az-redeal`) | `botpolicy.Board.Mulligan` from their config (`MulliganLands` for az-c3) | `internal/azmcts/seat.go:135` | none under a rule |
+| SpellBench decorator | keep if 2..5 lands and a turn-3 castable spell and a needed colour | `internal/spellbench/registry/mull.go` | none |
+
+Opt-in rules that existed: `MulliganLands` (2..5 lands among the seven, tuned
+for 40-card limited), `MulliganNever`.
+
+### Candidate rules
+
+All are deterministic functions of the deciding seat's own hand (and, for the
+new one, its own deck list), consume no rng, and are answered only under an
+opt-in.
+
+| arm | rule |
+|---|---|
+| coin | baseline above |
+| never | `MulliganNever`: always keep |
+| lands | `MulliganLands` as shipped (K = kept cards: K>=6 keep 2..5 lands, K==5 keep unless no land or no spell, K<=4 keep) |
+| constructed | NEW `botpolicy.MulliganConstructed`: for K>=6 keep iff lands in 2..hi AND a spell castable by turn 3 with the hand's lands (mana value <= min(lands,3), every coloured pip covered by a producing land) AND the lands produce a colour some spell needs; K==5 and K<=4 as `lands`. `hi = clamp(ceil(7*landShare)+2, 4, 5)` from `Board.OwnDeck` (the seat's own manifest; 24/60 gives 5, 16/60 gives 4), fixed 2..5 without a manifest. Bottoming is `landBottoming`. |
+
+`MulliganConstructed` is a new enum value after `MulliganNever`; `Board.Mulligan`'s
+zero value, `MulliganLands` and `MulliganNever` are untouched, so az-c3,
+az-redeal and dzgorge behave byte-for-byte as before (their tests,
+`./internal/azmcts`, `./bots/azredeal` and `TestHeads$` pass). The registry
+decorator's logic was not moved; the turn-3 test is re-implemented in
+`botpolicy/mulligan_constructed.go` on `Board.Cards`.
+
+### Measurement
+
+Harness `/mnt/sata/gorge-training/bot-sanity/mull_ab_test.go.txt` (copied into
+`internal/bench/` only to run, deleted after; `MUL_MODE=ab MUL_POL=bot|tact
+MUL_ARMS=... MUL_B=... MUL_LIMIT=n MUL_SEEDS=n [MUL_DECKDIR=...]`). 2 seats,
+auto-pay mana, same policy on both seats, only the mulligan rule differs;
+seat A plays the arm, seat B the baseline (the coin unless stated); both seat
+orders; the 15 constructed repo decks, every ordered pair; `Config.Mulligans =
+2` (a seat may take two mulligans; London draws seven each time and bottoms one
+card per mulligan taken, so it is the usual rule truncated at 5 cards);
+24 seeds = 10,080 games per arm (>= 3,360 required). Win rate over decided
+games, Wilson 95%. "mull rate" = share of seat-games with at least one
+mulligan; "kept lands" = lands in the final kept hand after bottoming
+(per seat-game that kept).
+
+`bot` (arm vs coin), Mulligans = 2:
+
+| arm A (vs coin) | A - B (draws/stalls) | A win rate | A mull rate (per game) | A kept lands | B (coin) mull rate | B kept lands |
+|---|---|---|---|---|---|---|
+| coin (control) | 4799 - 4771 (510) | 50.15% [49.14, 51.15] | 32.3% (0.428) | 2.413 | 32.3% | 2.381 |
+| never | 5000 - 4572 (508) | 52.24% [51.23, 53.24] | 0.0% | 2.399 | 32.3% | 2.386 |
+| lands | 4940 - 4619 (521) | 51.68% [50.68, 52.68] | 25.4% (0.319) | 2.778 | 32.3% | 2.375 |
+| constructed | 4937 - 4626 (517) | 51.63% [50.62, 52.63] | 26.4% (0.334) | 2.773 | 32.3% | 2.375 |
+
+`sb-tactical` (arm vs its own coin; the arm is a harness decorator calling
+`botpolicy.MulliganAnswer`, exactly the call the guard makes), Mulligans = 2:
+
+| arm A (vs coin) | A - B (draws/stalls) | A win rate | A mull rate | A kept lands |
+|---|---|---|---|---|
+| coin (control) | 4967 - 4848 (265) | 50.61% [49.62, 51.59] | 34.2% | 2.417 |
+| never | 5218 - 4587 (275) | 53.22% [52.23, 54.20] | 0.0% | 2.399 |
+| lands | 5209 - 4591 (280) | 53.15% [52.16, 54.14] | 25.4% | 2.787 |
+| constructed | 5229 - 4579 (272) | 53.31% [52.33, 54.30] | 26.4% | 2.782 |
+
+Do the rules beat never? Head to head (A = rule, B = never), `Mulligans = 2`:
+
+| policy | A | games | A - B (draws/stalls) | A win rate |
+|---|---|---|---|---|
+| bot | constructed | 40,320 (96 seeds) | 19069 - 19340 (1911) | 49.65% [49.15, 50.15] |
+| bot | lands | 40,320 | 19062 - 19355 (1903) | 49.62% [49.12, 50.12] |
+| bot | constructed vs lands | 10,080 | 4750 - 4860 (470) | 49.43% [48.43, 50.43] |
+| sb-tactical | constructed | 40,320 (96 seeds) | 19702 - 19581 (1037) | 50.15% [49.66, 50.65] |
+| sb-tactical | constructed vs lands | 10,080 | 4958 - 4863 (259) | 50.48% [49.49, 51.47] |
+
+Controls and variants:
+
+- `Mulligans = 0` (no round is posed, so the rule cannot act): constructed and
+  never both give 4775 - 4837 (468), 49.68% [48.68, 50.68], i.e. no effect and a
+  harness asymmetry of about -0.3 points (the A seat's seed differs from B's),
+  which is inside the interval. Read all rows above with that in mind.
+- `Mulligans = 6` vs coin (bot): never 52.70% [51.70, 53.70], lands 52.02%
+  [51.02, 53.02], constructed 51.96% [50.96, 52.96]; the coin seat then mulligans
+  0.49 times per game.
+- 40-card Limited pool (16 of the 36 decks in
+  `/mnt/sata/gorge-training/az-c3/decks`, 17lands FDN decks resolved through
+  `deck.Parse`/`Resolve`; 11,520 games per arm, 24 seeds, bot vs bot,
+  Mulligans = 2): coin 50.18% [49.27, 51.10]; never 55.30% [54.39, 56.21];
+  lands 55.65% [54.74, 56.56] (mull rate 13.0%, kept lands 3.09); constructed
+  55.28% [54.36, 56.18] (mull rate 19.9%, kept lands 3.07). Coin seat there
+  mulligans 32.2% of games.
+
+Win rate split by whether a mulligan happened, `bot` arm A, from the table
+above's runs: coin 44.6% when it mulliganed (3,089 games) vs 52.8% when not;
+lands 45.6% (2,440) vs 53.8%; constructed 45.1% (2,529) vs 54.0%. This is
+selection (a mulliganed seat has a worse hand and one card fewer), not the
+effect of the decision, and is reported only because it was asked for.
+
+### Reading
+
+- The coin is the loser. Any hand-agnostic or hand-aware rule beats it by
+  about 1.6 to 2.2 points on `bot` (about 3 to 4 standard errors), 2.5 to 2.7 on
+  `sb-tactical`, and about 5 points on 40-card Limited. The coin mulligans a
+  third of all hands including good ones.
+- Almost all of that gain is "stop the random mulligans". The land-window
+  rules are NOT distinguishable from never mulliganing: against `never` they
+  are -0.35 points on `bot` (constructed 49.65% [49.15, 50.15], lands 49.62%) and
+  +0.15 on `sb-tactical` (50.15% [49.66, 50.65]), all intervals touching 50%,
+  and `constructed` vs `lands` is within noise (49.43%, 50.48%). Said plainly:
+  in this engine, with these bots, a mulligan on a 0, 1, 6 or 7 land hand costs
+  a card and buys back about what it costs. The land-aware rules do change what
+  is kept (kept lands 2.77 vs 2.40, and fewer extreme hands), which is what a
+  human reader would call sane, but not who wins.
+- `constructed` and `lands` are equal within noise; `constructed` mulligans
+  slightly more (26.4% vs 25.4% on 60-card, 19.9% vs 13.0% on Limited, because
+  of the early-play test) with the same win rate.
+
+### Wired
+
+Chosen: `MulliganConstructed`, behind `Options.CommonSense` only, for `bot` and
+`sb-tactical`. Rationale (a tie-break, not a measured win): it ties `never`
+and `lands` on win rate, and it is the one whose behaviour matches the
+"common sense" the option exists for (no keeping a hand with no lands, no
+keeping seven lands), derived from the deck's own land share. Both `never`
+and `lands` were within noise of it and would have been equally defensible.
+
+- `bots/sanity.Mulligan = botpolicy.MulliganConstructed`; the wrapper answers a
+  `KMulligan` ask itself (board path for `seat.BoardSeat`, `seat.BoardFromView`
+  for the view and env paths) through the exported
+  `botpolicy.MulliganAnswer(board, rule, decision)` and does not consult the
+  wrapped seat, so `bot` draws no coin and `sb-tactical` neither. This is the
+  same call the measured `sb-tactical` arm used, and the same `Board.Mulligan`
+  rule the measured `bot` arm used (`WithMulligan`), so the wired behaviour
+  is the measured behaviour; it was not itself A/B'd as a full wrapped game
+  because the wrapper also carries the target guard (confounded).
+- Off (`CommonSense` false): the factories return the same concrete types and
+  the mulligan answer is the coin (`TestCommonSenseOffMulliganIsTheCoin`).
+- `cmd/botbench -common-sense` and the `+sanity` names already select the
+  wrapper, so they pick this up; botbench only runs a mulligan round in
+  `-spellbench` mode. `gorged` tables (Mulligans = 1) do not set
+  `CommonSense`, so hosted play is unchanged.
+
+### Cost
+
+Not timed separately. The rule is O(7) per ask with no allocation beyond two
+small slices in the early-play test, and at most about three asks per seat per
+game (Mulligans = 2). Whole-run wall time per game (harness, 8 workers) was
+indistinguishable between arms. The guard otherwise changes nothing about the
+priority path.
+
+### Not covered
+
+Commander (the free-mulligan rule in `rules/mulligan.go` shifts the bottoming
+count; `keepBottomCount` reads the penalty from the prompt, so a free first
+mulligan reads as 0 bottom and the rule treats it as an opening seven) and
+4-seat tables were not measured; the harness is 2-seat. Limited was measured
+only for `bot`, 16 decks, as a sanity check, not for `sb-tactical`. The
+`Mulligans = 2` allowance is the only value run in full (6 and 0 as variants on
+`bot`); a hosted table's allowance of 1 truncates the round further and was
+not run. The bottoming half was not measured in isolation (all arms bottom with
+`landBottoming` or `chooseDiscard` as noted). Win-rate gains are small against
+the harness's own asymmetry (about -0.3 points at Mulligans = 0).
