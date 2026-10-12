@@ -122,11 +122,9 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/bots/sbfirst"
-	"github.com/adams-shaun/gorge/bots/sbheuristic"
+	"github.com/adams-shaun/gorge/bots/sbbuiltin"
 	hostedsbsearch "github.com/adams-shaun/gorge/bots/sbsearch"
 	"github.com/adams-shaun/gorge/bots/sbtactical"
-	"github.com/adams-shaun/gorge/bots/sbuniform"
 	"github.com/adams-shaun/gorge/bots/search"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
@@ -383,9 +381,9 @@ func setTacticalRegistry(reg *cards.Registry) {
 // set, so hostedPolicy sets it for exactly these names. The explicit Manual
 // arms stay available as the separate sb-*-manual registry entries.
 var benchAutoPayHosted = map[string]bool{
-	sbuniform.Policy:   true,
-	sbfirst.Policy:     true,
-	sbheuristic.Policy: true,
+	sbbuiltin.UniformPolicy:   true,
+	sbbuiltin.FirstPolicy:     true,
+	sbbuiltin.HeuristicPolicy: true,
 }
 
 // hostedPolicy resolves a hosted name through bots.New, preserving the bench

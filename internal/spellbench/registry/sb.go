@@ -11,22 +11,20 @@ package registry
 // as the benchmark configures seed 11 for the uniform bot.
 
 import (
-	"github.com/adams-shaun/gorge/bots/sbfirst"
-	"github.com/adams-shaun/gorge/bots/sbheuristic"
-	"github.com/adams-shaun/gorge/bots/sbuniform"
+	"github.com/adams-shaun/gorge/bots/sbbuiltin"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
 	"github.com/adams-shaun/gorge/seat"
 )
 
 func init() {
 	Register("sb-uniform", func(seed uint64, mana builtins.ManaMode) seat.Seat {
-		return sbuniform.NewWithMode(seed, mana)
+		return sbbuiltin.NewUniform(seed, mana)
 	})
 	Register("sb-heuristic", func(seed uint64, mana builtins.ManaMode) seat.Seat {
-		return sbheuristic.NewWithMode(seed, mana)
+		return sbbuiltin.NewHeuristic(seed, mana)
 	})
 	Register("sb-first", func(seed uint64, mana builtins.ManaMode) seat.Seat {
-		return sbfirst.NewWithMode(seed, mana)
+		return sbbuiltin.NewFirst(seed, mana)
 	})
 	Register("sb-uniform-manual", func(seed uint64, _ builtins.ManaMode) seat.Seat {
 		return builtins.New(builtins.Uniform, builtins.Manual, seed^builtins.UniformSeed)

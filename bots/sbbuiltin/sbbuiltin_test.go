@@ -1,4 +1,4 @@
-package sbheuristic
+package sbbuiltin
 
 import (
 	"testing"
@@ -9,12 +9,26 @@ import (
 	"github.com/adams-shaun/gorge/view"
 )
 
-func TestSBHeuristicRegistrationAndSharedConstructor(t *testing.T) {
-	entry, ok := bots.Lookup(Policy)
+func TestSBBuiltinRegistrationAndSharedConstructors(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		policy builtins.Policy
+		ctor   func(uint64, builtins.ManaMode) *builtins.Seat
+	}{
+		{FirstPolicy, builtins.First, NewFirst},
+		{UniformPolicy, builtins.Uniform, NewUniform},
+		{HeuristicPolicy, builtins.Heuristic, NewHeuristic},
+	} {
+		t.Run(c.name, func(t *testing.T) { checkBuiltin(t, c.name, c.policy, c.ctor) })
+	}
+}
+
+func checkBuiltin(t *testing.T, name string, want builtins.Policy, ctor func(uint64, builtins.ManaMode) *builtins.Seat) {
+	entry, ok := bots.Lookup(name)
 	if !ok || !entry.Env || entry.Search || entry.Caretaker != "bot" {
 		t.Fatalf("entry = %+v, registered=%v; want Env non-search policy with bot caretaker", entry, ok)
 	}
-	seat, err := bots.New(Policy, bots.Options{Seed: 17, AutoPayMana: true})
+	seat, err := bots.New(name, bots.Options{Seed: 17, AutoPayMana: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +53,8 @@ func TestSBHeuristicRegistrationAndSharedConstructor(t *testing.T) {
 		}
 	}
 
-	shared := NewWithMode(23, builtins.AutoPay)
-	if shared.Policy() != builtins.Heuristic || !shared.WantsPaymentActions() {
+	shared := ctor(23, builtins.AutoPay)
+	if shared.Policy() != want || !shared.WantsPaymentActions() {
 		t.Fatalf("NewWithMode returned policy %v, wants payment actions %v", shared.Policy(), shared.WantsPaymentActions())
 	}
 	// Calling the adapter's refusal rung reaches the wrapped builtin handler.
