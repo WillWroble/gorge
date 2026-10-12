@@ -661,17 +661,46 @@ func CostStaticParamsReadable(params map[string]string) bool {
 // CanAttackDefenderParamsReadable is the parameter whitelist a FACE
 // CanAttackDefender static must pass before rules' attacker-legality read
 // (rules/combat/defender.go AttackAllowedThroughDefender) enforces it. It is
-// the grant list above PLUS the gate family (IsPresent$/IsPresent2$/
-// CheckSVar$/SVarCompare$/Condition$), which the face read evaluates through
-// the shared continuousGateHolds grammar — the same shape
-// cantAttackUnlessParamsReadable carries for CantAttackUnless. A static
-// carrying any other parameter names a scoping this build does not evaluate;
-// skipping it is the conservative direction for a permission (the creature
-// stays walled, today's behaviour), never the wrong-wide one.
+// the grant list above PLUS the gate family (IsPresent$/IsPresent2$ with
+// their PresentZone$/PresentCompare$ modifiers, CheckSVar$/SVarCompare$/
+// Condition$), which the face read evaluates through the shared
+// continuousGateHolds grammar (rules presentGate reads PresentZone$ and
+// PresentCompare$) — the same shape cantAttackUnlessParamsReadable carries
+// for CantAttackUnless. Platypus-Bear's `IsPresent$ Lesson.YouOwn |
+// PresentZone$ Graveyard` is the corpus row that needs the zone key. A
+// static carrying any other parameter names a scoping this build does not
+// evaluate; skipping it is the conservative direction for a permission (the
+// creature stays walled, today's behaviour), never the wrong-wide one.
+//
+// PresentCompare$ can invert the gate (EQ0: "as long as there is NO ..."),
+// so a compare is admitted only over a non-blank present spec whose
+// predicates the matcher recognises: an unread spec counts 0 and an EQ0
+// compare would then lift the wall unconditionally, the wrong-wide
+// direction. The same guard CantAttackParamsReadableForRules keeps.
 func CanAttackDefenderParamsReadable(params map[string]string) bool {
-	for k := range params {
+	var spec1, spec2 string
+	hasCmp := false
+	for k, v := range params {
 		if !canAttackDefenderParamsReadableKeys.Has(k) {
 			return false
+		}
+		switch cantAttackPresentKeyCodes.Code(k) {
+		case cantAttackPresentKeyPresentCompare:
+			hasCmp = true
+		case cantAttackPresentKeyIsPresent:
+			spec1 = strings.TrimSpace(v)
+		case cantAttackPresentKeyIsPresent2:
+			spec2 = strings.TrimSpace(v)
+		}
+	}
+	if hasCmp {
+		if spec1 == "" && spec2 == "" {
+			return false
+		}
+		for _, spec := range [2]string{spec1, spec2} {
+			if spec != "" && len(UnknownPredicates(spec)) != 0 {
+				return false
+			}
 		}
 	}
 	return true
@@ -1122,7 +1151,7 @@ var manaConvertParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "Valid
 
 var costStaticParamsReadableKeys = state.NewNameSet("Mode", "Type", "ValidCard", "ValidSA", "ValidPlayer", "ValidSpell", "ValidTarget", "Activator", "Caster", "Amount", "Cost", "Announce", "Color", "MinMana", "IgnoreGeneric", "RaiseTo", "OnlyFirstSpell", "IsPresent", "PresentZone", "PresentCompare", "CheckSVar", "SVarCompare", "CheckSecondSVar", "SecondSVarCompare", "Condition", "EffectZone", "AffectedZone", "Secondary", "Relative", "ClassBand", "UnlessValidTarget", "PlayerTurn", "Phases", "Description", "SpellDescription")
 
-var canAttackDefenderParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "ValidCards", "ValidTarget", "ValidAttacked", "Description", "Secondary", "IsPresent", "IsPresent2", "CheckSVar", "SVarCompare", "Condition")
+var canAttackDefenderParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "ValidCards", "ValidTarget", "ValidAttacked", "Description", "Secondary", "IsPresent", "IsPresent2", "PresentZone", "PresentCompare", "CheckSVar", "SVarCompare", "Condition")
 
 var absentDurationMeansThisTurnSet = state.NewNameSet(
 	"CantPutCounter",
