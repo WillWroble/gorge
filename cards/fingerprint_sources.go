@@ -23,6 +23,9 @@ import "embed"
 //go:embed affected_defined.go
 //go:embed breakdown.go
 //go:embed cache_canon.go
+//go:embed cache_lock.go
+//go:embed cache_lock_flock.go
+//go:embed cache_lock_noflock.go
 //go:embed card_probes.go
 //go:embed compiled_catalog.go
 //go:embed compiled_codes.go
