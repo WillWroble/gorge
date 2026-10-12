@@ -1,4 +1,4 @@
-package sbheuristic
+package sbbuiltin
 
 import (
 	"testing"
