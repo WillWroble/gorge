@@ -636,6 +636,7 @@ const (
 	PKDamageSource
 	PKDefinedName
 	PKDestAltSVarCompare
+	PKEach
 	PKEachFromSource
 	PKEffectOwner
 	PKExactly
@@ -1425,6 +1426,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKDamageSource:                     "DamageSource",
 	PKDefinedName:                      "DefinedName",
 	PKDestAltSVarCompare:               "DestAltSVarCompare",
+	PKEach:                             "Each",
 	PKEachFromSource:                   "EachFromSource",
 	PKEffectOwner:                      "EffectOwner",
 	PKExactly:                          "Exactly",
