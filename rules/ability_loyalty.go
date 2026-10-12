@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -65,14 +66,19 @@ func abilityRemovesPermanent(ab *cards.SA) bool {
 		if _, ok := loyaltyRemovalAPIs[sa.API]; ok {
 			return true
 		}
-		if sa.API != "ChangeZone" && sa.API != "ChangeZoneAll" {
-			continue
-		}
-		if !effects.ZoneListOf(sa.ParamStr(cards.PKOrigin)).Has(state.ZBattlefield) {
-			continue
-		}
-		if z, ok := effects.DestinationOf(sa.ParamStr(cards.PKDestination)).SoleZone(); ok && z != state.ZBattlefield {
-			return true
+		switch sa.API {
+		case "ChangeZone":
+			// The compiled record, not a raw Origin$/Destination$ read: a
+			// raw read here would be attributed to every head API's census.
+			cz := effects.ChangeZoneOf(sa)
+			if cz.OriginMask.Has(state.ZBattlefield) && cz.DestinationKnown && cz.Destination != state.ZBattlefield {
+				return true
+			}
+		case "ChangeZoneAll":
+			cza := effects.ChangeZoneAllOf(sa)
+			if slices.Contains(cza.Origin, state.ZBattlefield) && cza.Destination != state.ZBattlefield {
+				return true
+			}
 		}
 	}
 	return false

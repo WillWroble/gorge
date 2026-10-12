@@ -52,6 +52,11 @@ import (
 // Monument through Urza's Workshop's metalcraft ability; its pin is seq 0 --
 // the whole game is still replayed and every planned cast must mirror, but
 // no named cast is required.
+// cov-loyaltyrank (the bot now ranks planeswalker loyalty abilities by their
+// cost/effect facts instead of always taking the first one) moves seed 6191
+// the same way: its Roaming Throne cast at seq 9987 is no longer reached, so
+// it is pinned at seq 0 like 4038. The float-trigger-order shape stays
+// covered by TestFloatTrimmedTriggerOrderAllowsOnlyFloatTriggers.
 func TestRoundSevenFindingsMirror(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -68,7 +73,7 @@ func TestRoundSevenFindingsMirror(t *testing.T) {
 	}{
 		{4038, []string{"ulalek-eldrazi", "rakdos-muscle-scam-exe", "vivi-ornitier-cedh", "foundations-calling-all-angels"}, true, 0, ""},
 		{6085, []string{"vivi-ornitier-cedh", "ulalek-eldrazi", "deadly-disguise", "rakdos-muscle-scam-exe"}, true, 173, "expected:float_then_cast:float_removed_every_target"},
-		{6191, []string{"foundations-wretched-ranks", "avengers-assemble", "ulalek-eldrazi", "hearthhull-worldseed-landfall"}, true, 9987, "expected:float_then_cast:float_trigger_precedes_cast"},
+		{6191, []string{"foundations-wretched-ranks", "avengers-assemble", "ulalek-eldrazi", "hearthhull-worldseed-landfall"}, true, 0, ""},
 		{5108, []string{"eldrazi-stompy", "mono-red-prowess"}, false, 0, ""},
 	} {
 		reports := round6Game(t, d, GameSpec{Seed: tc.seed, Decks: tc.decks, Commander: tc.commander, Policy: "bot"})
