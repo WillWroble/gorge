@@ -11,6 +11,7 @@ so it can stay out of every turn's context.
 | [do-not.md](do-not.md) | Before you touch git, run a server, or merge. Every entry has happened here. |
 | [heads-history.md](heads-history.md) | Frozen: why the acceptance chain heads moved before 2026-10-03. New head-move rationale goes in the commit message. |
 | [runtime-behavior.md](runtime-behavior.md) | When changing trigger-relative filters, cast provenance, host observer hooks, or seat privacy/session handling. |
+| [test-throughput-2026-10-12.md](test-throughput-2026-10-12.md) | Changing the gate, post-merge suite or test budgets: the 2026-10-12 audit of where test wall time goes, with ranked fixes. |
 | [README § Bot player training and adoption](../../README.md#bot-player-training-and-adoption-guidelines) | Building, training or evaluating a bot policy. |
 | `docs/superpowers/specs/2026-09-22-engine-contracts.md` | Behaviour that looks like a bug but is a deliberate contract. |
 
