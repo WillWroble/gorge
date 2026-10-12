@@ -244,7 +244,7 @@ func TestServePrewarmsTheDealtDecks(t *testing.T) {
 	}
 	t.Cleanup(func() { newServeArtCache = orig })
 
-	cfg := config{cards: "../../.cards", decks: decks, tables: 0, pace: 0, cooldown: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: decks, tables: 0, pace: 0, cooldown: 0,
 		dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false,
 		prewarm: true, artDir: artDir}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestConditionCorpusCensus is the corpus-wide ratchet over Condition* shapes.
@@ -23,10 +26,7 @@ import (
 // It skips when the corpus is absent (a clean clone), exactly as the other
 // corpus-backed tests do.
 func TestConditionCorpusCensus(t *testing.T) {
-	dir := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("effects: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	var (
 		keyRe     = regexp.MustCompile(`(?:^|[^A-Za-z])(Condition[A-Za-z0-9]+)\$`)
 		definedRe = regexp.MustCompile(`ConditionDefined\$ ([^ |\n\r]*)`)

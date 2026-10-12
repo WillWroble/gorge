@@ -2,7 +2,6 @@ package cards
 
 import (
 	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 )
@@ -17,7 +16,11 @@ var (
 
 func benchmarkRegistryPath(b *testing.B) string {
 	b.Helper()
-	path := CachePath(filepath.Join("..", ".cards"))
+	dir, ok := sharedCorpusDir(".")
+	if !ok {
+		b.Skip("could not resolve the repo root")
+	}
+	path := CachePath(dir)
 	if _, err := os.Stat(path); err != nil {
 		b.Skipf("stat corpus cache: %v", err)
 	}
