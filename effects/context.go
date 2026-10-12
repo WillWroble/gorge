@@ -481,6 +481,18 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return out, true
 	}
+	// The DOTTED `<Triggered-card referent> <qualifier>` selector (Aunt May's
+	// `Defined$ TriggeredCardLKICopy.Spider` -- "if it's a Spider, put a
+	// +1/+1 counter on it"): the subset of the referent's objects the
+	// qualifier admits, through the same dotted-qualifier grammar
+	// Targeted./ExiledWith. use. Before this the whole value missed the code
+	// table and the caller's source default put the counter on Aunt May
+	// herself. Any base the table maps to the Triggered-card family takes the
+	// qualifier, so the next spelling of that family is covered too; a
+	// non-matching object is known-empty (fail closed to nobody, never Self).
+	if ts, ok := triggeredCardQualified(h, c, spec); ok {
+		return ts, true
+	}
 	switch definedSpecCodes.Code(string(spec)) {
 	case definedSpecEmpty:
 		return nil, false
@@ -1237,8 +1249,23 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// The corpus spells this three ways depending on whether the source
 		// is Equipment, an Aura, or a generic script; all three name the
 		// same field (Task 14 wires its producer).
-		if o := g.Obj(c.Source); o != nil && o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
-			return []state.Target{{Obj: o.AttachedTo}}, true
+		if o := g.Obj(c.Source); o != nil {
+			if o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
+				return []state.Target{{Obj: o.AttachedTo}}, true
+			}
+			// The source left the battlefield as a cost ("{5}, Sacrifice
+			// this Aura: Exile enchanted creature"): the move fold cleared
+			// AttachedTo but kept the pre-clear bearer as LastBearer, which
+			// is the last-known-information read CR 608.2h asks for. The
+			// fallback is only for a source that is OFF the battlefield: a
+			// source still on the battlefield that is merely unattached (a
+			// bearer that died, an Equipment returned unattached) has no
+			// "enchanted/equipped creature" and must resolve to nothing,
+			// never to a stale LastBearer (CR 400.7: the returned permanent
+			// is a new object).
+			if o.Zone != state.ZBattlefield && o.LastBearer != 0 && g.Obj(o.LastBearer) != nil {
+				return []state.Target{{Obj: o.LastBearer}}, true
+			}
 		}
 		return nil, true
 	case definedSpecOpponent:
@@ -2501,3 +2528,24 @@ var exiledWithSourceKeyCodes = state.NewStrCodes(
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "AffectedZone", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Description", Val: exiledWithSourceKeyFilterOrText},
 )
+
+// triggeredCardQualified resolves `<base>.<qualifier>` when base is one of the
+// Triggered-card family spellings (definedSpecTriggeredCard): the base's
+// objects filtered by definedCardQualifierMatches. A compound (" & ") value
+// is not this shape and is left to the callers that split it.
+func triggeredCardQualified(h Host, c *Ctx, spec string) ([]state.Target, bool) {
+	base, qual, dotted := strings.Cut(spec, ".")
+	if !dotted || strings.Contains(spec, " & ") || definedSpecCodes.Code(base) != definedSpecTriggeredCard {
+		return nil, false
+	}
+	ts, _ := definedSpec(h, c, base)
+	g := h.Game()
+	qual = strings.TrimSpace(qual)
+	var out []state.Target
+	for _, t := range ts {
+		if o := g.Obj(t.Obj); o != nil && definedCardQualifierMatches(h, g, c, qual, o) {
+			out = append(out, t)
+		}
+	}
+	return out, true
+}

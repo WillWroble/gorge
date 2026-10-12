@@ -601,6 +601,9 @@ func (e *Engine) targetSpecContext(source, stack state.ObjID, you state.PlayerID
 		srcLKI: srcLKI, srcLKIValid: srcLKIValid, resolveFn: env.resolveFn}
 	sc := effects.NewSpecContext(you, source)
 	sc.TriggerContext, sc.Remembered, sc.Resolve = tcx, remembered, env.resolveFn
+	if srcLKIValid {
+		sc.SourceLKIValid, sc.SourceChosenType, sc.SourceChosenColor = true, srcLKI.chosenType, srcLKI.chosenColor
+	}
 	// The stack object's Remembered and fire-time LKI are bound above, beside
 	// TriggerContext, so placement-time numeric SVars read the same captured
 	// referents the resolving Ctx receives later.

@@ -10,10 +10,7 @@ func chosenColorMatches(g *state.Game, o *state.Object, sc SpecContext) bool {
 	if sc.Source == 0 {
 		return false
 	}
-	src := g.Obj(sc.Source)
-	if src == nil {
-		return false
-	}
-	chosen := colourLetter(src.ChosenColor)
+	_, col := sourceChosen(g, sc)
+	chosen := colourLetter(col)
 	return chosen != 0 && strings.Contains(colorsCtx(o, &sc), string(chosen))
 }

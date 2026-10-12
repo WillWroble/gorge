@@ -52,10 +52,11 @@ pause_pipeline() {
   echo "postmerge_batch RED $1 $(date -u +%FT%TZ): main->origin full suite failed; bisecting (see $LOG)" >"$PAUSE"
   say "PAUSED pipeline: RED ${1:0:9}"
 }
+# resume_pipeline <sha> [why]: lift our own pause; why defaults to "GREEN <sha>".
 resume_pipeline() {
   if [ -e "$PAUSE" ] && /usr/bin/grep -q '^postmerge_batch ' "$PAUSE"; then
     rm -f "$PAUSE"
-    say "RESUMED pipeline: GREEN ${1:0:9}"
+    say "RESUMED pipeline: ${2:-GREEN ${1:0:9}}"
   fi
 }
 
@@ -165,11 +166,15 @@ while true; do
         # waiting for main to move -- main cannot move while paused, so the
         # old wait deadlocked (2026-10-10 11:18 -> 10-12, 47h, 8 FLAKY).
         # Bounded: after FLAKY_RERUNS_MAX flaky reruns it stays paused.
+        # Dispatch resumes now rather than after the confirming rerun (18
+        # idle minutes on 2026-10-12, 3c23860d2); a RED rerun re-pauses via
+        # pause_pipeline, which writes the marker whenever it is absent.
         if [ -n "$red_fails" ] && [ -z "$real_fails" ]; then
           if [ "$flaky_reruns" -lt "$FLAKY_RERUNS_MAX" ]; then
             flaky_reruns=$((flaky_reruns + 1))
             last_tested=""
             say "ALL FLAKY ${head:0:9}: full rerun $flaky_reruns/$FLAKY_RERUNS_MAX"
+            resume_pipeline "$head" "ALL FLAKY ${head:0:9} (confirming full rerun running)"
           else
             say "ALL FLAKY ${head:0:9} again after $FLAKY_RERUNS_MAX reruns: staying paused; operator needed"
           fi
