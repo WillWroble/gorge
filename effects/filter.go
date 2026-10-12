@@ -1319,7 +1319,10 @@ func positiveRecognised(p string) bool {
 	if strings.HasPrefix(p, "greatestCMC_") || strings.HasPrefix(p, "lowestCMC") {
 		return true
 	}
-	if p == "TriggeredNewCard" || p == "TriggeredCard" || p == "TriggeredCards" || p == "TriggeredTarget" || p == "NotDefinedTriggeredTarget" || strings.HasPrefix(p, "ChosenMode") && len(p) > len("ChosenMode") {
+	if p == "TriggeredNewCard" || p == "TriggeredCard" || p == "TriggeredCards" || p == "TriggeredTarget" || strings.HasPrefix(p, "ChosenMode") && len(p) > len("ChosenMode") {
+		return true
+	}
+	if _, ok := notDefinedTriggerReferent(p); ok {
 		return true
 	}
 	// Forge's base-qualified `SharesColorWith <referent>` predicate (C.A.M.P.'s
@@ -1936,9 +1939,22 @@ func sharesNameWithObject(o, src *state.Object, sc SpecContext) bool {
 	return false
 }
 
-// matchTriggeredTarget evaluates Forge's bare TriggeredTarget /
-// NotDefinedTriggeredTarget property ("the object the triggering event
-// targeted") inside an ordinary filter spec -- Blade of Shared Souls'
+// notDefinedTriggerReferent classifies Forge's NotDefined<referent> spelling
+// of "other than that object" for the single-object trigger referents
+// (Pawpatch Recruit's NotDefinedTriggeredTarget, Jackdaw Savior's and Puca's
+// Covenant's NotDefinedTriggeredCard -- "another target ... card"). It returns
+// the positive twin, which matchPositive evaluates and negates in ONE place:
+// the twin's unbound fail-closed (ok=false) propagates, so the negation can
+// never invert an absent referent into a match. A NotDefined<X> whose twin is
+// not listed here stays unrecognised (TestNotDefinedPredicateCensus pins
+// which).
+func notDefinedTriggerReferent(p string) (base string, ok bool) {
+	base, ok = strings.CutPrefix(p, "NotDefined")
+	return base, ok && (base == "TriggeredCard" || base == "TriggeredTarget")
+}
+
+// matchTriggeredTarget evaluates Forge's bare TriggeredTarget property ("the
+// object the triggering event targeted") inside an ordinary filter spec -- Blade of Shared Souls'
 // `Creature.YouCtrl+!TriggeredTarget` ("another target creature you
 // control"), Toralf, God of Fury's
 // `Creature.!TriggeredTarget,Player,Planeswalker.!TriggeredTarget` ("any
@@ -1952,17 +1968,12 @@ func sharesNameWithObject(o, src *state.Object, sc SpecContext) bool {
 // causing event captured. A player-valued or absent binding fails CLOSED
 // (ok=false) -- the spec matches nothing, never an invented referent, and the
 // leading-'!' spelling cannot invert the absence into a match.
-// NotDefinedTriggeredTarget is the corpus's one positive-evaluation spelling
-// of the same exclusion, so negated=true inverts in place.
-func matchTriggeredTarget(o *state.Object, sc SpecContext, negated bool) (result, ok bool) {
+// NotDefinedTriggeredTarget negates it through notDefinedTriggerReferent.
+func matchTriggeredTarget(o *state.Object, sc SpecContext) (result, ok bool) {
 	if sc.TriggerTarget.IsPlayer || sc.TriggerTarget.Obj == 0 {
 		return false, false
 	}
-	match := o.ID == sc.TriggerTarget.Obj
-	if negated {
-		match = !match
-	}
-	return match, true
+	return o.ID == sc.TriggerTarget.Obj, true
 }
 
 // matchPositive evaluates a recognised positive-evaluation predicate token p
@@ -2078,6 +2089,13 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		return MatchesSpecCtx(g, TargetsOf(sa).ValidTgts, o.ID,
 			NewSpecContext(spell.Controller, spell.ID)), true
 	}
+	if base, ok := notDefinedTriggerReferent(p); ok {
+		match, bound := matchPositive(g, base, o, sc)
+		if !bound {
+			return false, false
+		}
+		return !match, true
+	}
 	if p == "TriggeredNewCard" || p == "TriggeredCard" {
 		// Forge's bare TriggeredNewCard / TriggeredCard property
 		// (CardProperty "the card that triggered this ability") inside an
@@ -2097,8 +2115,8 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		}
 		return o.ID == sc.TriggerCard, true
 	}
-	if p == "TriggeredTarget" || p == "NotDefinedTriggeredTarget" {
-		return matchTriggeredTarget(o, sc, p == "NotDefinedTriggeredTarget")
+	if p == "TriggeredTarget" {
+		return matchTriggeredTarget(o, sc)
 	}
 	if p == "TriggeredCards" {
 		// Forge's Card.TriggeredCards set property inside an ordinary filter
