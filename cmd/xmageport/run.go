@@ -58,21 +58,81 @@ func placementFailSteps(fails []string) map[int]bool {
 
 var verbose bool
 
-func runOne(reg *cards.Registry, sc *portScenario) ([]string, error) {
+func runOne(reg *cards.Registry, sc *portScenario) ([]string, []string, error) {
 	raw, err := json.Marshal(scenarioBody(sc))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	res, err := rules.RunOracleScenarioJSON(reg, raw)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if verbose {
 		fmt.Println(string(raw))
 		fmt.Println(strings.Join(res.Transcript, "\n"))
 		fmt.Println(strings.Join(res.Fails, "\n"))
 	}
-	return res.Fails, nil
+	return res.Fails, res.Transcript, nil
+}
+
+var reFallback = regexp.MustCompile(`\[\w+ fallback\] p\d (\w+) ->`)
+
+// aiChoiceFallback returns the first decision kind the runner answered by
+// its fallback that is a real game choice (not an empty attack/block
+// declaration, which the test states with attack/block calls).
+func aiChoiceFallback(transcript []string) string {
+	for _, l := range transcript {
+		if m := reFallback.FindStringSubmatch(l); m != nil && m[1] != "attackers" && m[1] != "blockers" {
+			return m[1]
+		}
+	}
+	return ""
+}
+
+var reCountMismatch = regexp.MustCompile(`harness: submit \w+ \[\d+\]: expected (\d+)\.\.\d+ choices, got 1`)
+
+// mergePicks folds n consecutive single-pick answers of g into one n-pick
+// answer: XMage answers "choose two" with one setChoice per object, gorge
+// asks it once. Reports whether it merged.
+func mergePicks(g *group, n int) bool {
+	single := func(a answer) bool {
+		p := strings.ToLower(a.Pick[0])
+		return len(a.Pick) == 1 && p != "yes" && p != "no" && a.Kind != "modes"
+	}
+	for i := 0; i+n <= len(g.answers); i++ {
+		ok := true
+		for j := i; j < i+n; j++ {
+			ok = ok && single(g.answers[j])
+		}
+		if !ok {
+			continue
+		}
+		var picks []string
+		for j := i; j < i+n; j++ {
+			picks = append(picks, g.answers[j].Pick[0])
+		}
+		g.answers[i] = answer{Kind: "choose", Pick: picks}
+		g.answers = append(g.answers[:i+1], g.answers[i+n:]...)
+		g.kinds = append(g.kinds[:i+1], g.kinds[i+n:]...)
+		g.kinds[i] = 0
+		return true
+	}
+	return false
+}
+
+// skipEmptyDeclaration turns an empty attack/block step gorge never poses
+// (no creature that can attack, or nothing able to block an unblockable
+// attacker) into a plain walk to that step. Reports whether it changed.
+func skipEmptyDeclaration(s *step, line string) bool {
+	switch {
+	case s.Op == "block" && len(s.Blocks) == 0 && strings.Contains(line, "no blockers decision pending"):
+		*s = step{Op: "pass_to", Step: stepNames[sDeclareBlockers], Active: pref(1 - s.Seat), Expect: s.Expect, Answers: s.Answers, Targets: s.Targets}
+		return true
+	case s.Op == "attack" && len(s.Attackers) == 0 && strings.Contains(line, "passed declare-attackers without being asked"):
+		*s = step{Op: "pass_to", Step: stepNames[sDeclareAttackers], Active: pref(s.Seat), Expect: s.Expect, Answers: s.Answers, Targets: s.Targets}
+		return true
+	}
+	return false
 }
 
 // scenarioBody drops the wrapper fields rules' strict decoder does not know.
@@ -116,6 +176,11 @@ func (g *group) placed() []answer {
 		k := 0
 		if i < len(g.kinds) && g.kinds[i] < len(ks) {
 			k = g.kinds[i]
+		}
+		if g.tail && ks[k] == "any" && k+1 < len(ks) {
+			// an unbound choice answers a game choice, never the attack
+			// or block declaration the walk passes first
+			k++
 		}
 		out[i] = answer{Kind: ks[k], Pick: a.Pick}
 	}
@@ -175,10 +240,11 @@ func runResult(reg *cards.Registry, r *result) {
 	for _, g := range r.Groups {
 		g.kinds = make([]int, len(g.answers))
 	}
-	var fails []string
+	var fails, transcript []string
 	for iter := 0; iter < 40; iter++ {
 		cur := materialize(sc, r.Groups)
-		f, err := runOne(reg, cur)
+		f, tr, err := runOne(reg, cur)
+		transcript = tr
 		ngroups := len(r.Groups)
 		if err != nil {
 			fails = []string{"decode: " + err.Error()}
@@ -203,6 +269,10 @@ func runResult(reg *cards.Registry, r *result) {
 				continue
 			}
 			n, _ := strconv.Atoi(m[1])
+			if n < len(sc.Steps) && skipEmptyDeclaration(sc.Steps[n], line) {
+				progress = true
+				continue
+			}
 			var at []*group
 			for _, g := range r.Groups[:ngroups] {
 				if g.at+g.offset == n {
@@ -210,6 +280,16 @@ func runResult(reg *cards.Registry, r *result) {
 				}
 			}
 			if len(at) == 0 {
+				continue
+			}
+			if cm := reCountMismatch.FindStringSubmatch(line); cm != nil {
+				want, _ := strconv.Atoi(cm[1])
+				for _, g := range at {
+					if want > 1 && mergePicks(g, want) {
+						progress = true
+						break
+					}
+				}
 				continue
 			}
 			if nm := reNotOffered.FindStringSubmatch(line); nm != nil {
@@ -227,8 +307,13 @@ func runResult(reg *cards.Registry, r *result) {
 						if k < len(ks) {
 							g.kinds[i] = k
 							progress = true
-						} else {
-							bump(g)
+						} else if !bump(g) && g.tail {
+							// a choice of a method with no action that no
+							// step can place: drop it, as before it had a
+							// home (the asserts still judge the game)
+							r.Dropped += len(g.answers)
+							g.answers, g.kinds = nil, nil
+							progress = true
 						}
 						done = true
 					}
@@ -279,6 +364,15 @@ func runResult(reg *cards.Registry, r *result) {
 	r.Fails = fails
 	if r.Dropped > 0 {
 		r.Scenario.Why += fmt.Sprintf(" %d XMage choice(s) gorge never asks were dropped.", r.Dropped)
+	}
+	if k := aiChoiceFallback(transcript); len(fails) > 0 && !r.Strict && k != "" && knownBugs[sc.XMage] == "" {
+		// Without setStrictChooseMode(true) XMage's AI answered what the
+		// test does not state; the runner's fallback is not that AI, so
+		// the failure says nothing about gorge -- unless triage traced it
+		// to a gorge bug (known_bugs.tsv), which keeps it as a known_bug.
+		r.Code, r.Detail, r.Status = "nonstrict-ai-choice", "unstated "+k+" answered by the runner's fallback", "refused"
+		r.Scenario = nil
+		return
 	}
 	switch {
 	case len(fails) == 0:
