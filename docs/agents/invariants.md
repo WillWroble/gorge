@@ -266,7 +266,8 @@ by millions.
 resource budget (4 GB RSS, 4 vCPU, 1 min wall; doubled 2026-10-09) is enforced by `cmd/testbudget`
 in `scripts/postmerge_full.sh`: any test over budget that
 `internal/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
-shrink-only) do not list fails the post-merge batch.
+shrink-only) do not list fails the post-merge batch. Peak RSS is measured per test binary by
+`go test -exec "testbudget exec"`; a new test package needs no TestMain for it.
 
 ## Contributor guidelines
 

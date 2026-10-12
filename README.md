@@ -34,7 +34,8 @@ names every top-level test over 60 s and every test binary whose peak RSS is
 over 2 GB, and fails the batch on any that the shrink-only inventories
 `internal/testutil/testdata/wall_exceptions.txt` and `rss_exceptions.txt` do
 not already list. Fix an offender by splitting it into chunk tests; never add a
-row. Run tests focused and capped (see `docs/agents/`), one package at a time.
+row. Peak RSS is measured per test binary by `go test -exec "testbudget exec"`
+(wait4's rusage), so a test package needs no TestMain for it. Run tests focused and capped (see `docs/agents/`), one package at a time.
 
 ## Package layout
 

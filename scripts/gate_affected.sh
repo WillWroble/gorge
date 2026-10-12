@@ -150,7 +150,8 @@ templates_shard_patterns() {
 # Most post-merge RED culprits on .ds4/postmerge-culprits.log (2026-10-05..12)
 # were cheap tests in packages this gate never selected: structural censuses
 # that read the TREE, not Go imports (a new test package without the
-# testbudget TestMain shim, a package missing from the pkgmap/archtest
+# testbudget TestMain shim -- that census is gone: postmerge_full.sh now
+# measures RSS with go test -exec -- a package missing from the pkgmap/archtest
 # classification, a stale web/src/protocol.ts), and corpus/engine censuses in
 # reverse dependencies of what the branch touched. Three mechanisms close
 # them; each package's cost is measured (2026-10-12, this worktree, test
@@ -160,8 +161,7 @@ templates_shard_patterns() {
 # 1. gate_structural_pkgs, ALWAYS run (whole package, the batch line). A tree
 #    census is invisible to an import-based selection, and the go test result
 #    cache already re-runs only the ones whose inputs moved:
-#      internal/testbudget  0.98 s /  1.0 cpu-s  (TestEveryTestPackageRecordsRSS)
-#      cmd/testbudget       <0.1 s /  0.0 cpu-s  (TestRunCheckExitCodes)
+#      cmd/testbudget       ~4 s   /  ~5 cpu-s  (exec cache guard: two nested go test runs)
 #      cmd/pkgmap           0.40 s /  0.5 cpu-s  (TestClassificationIsComplete)
 #      cmd/gentypes         6.6 s  / 10.0 cpu-s  (protocol.ts freshness)
 #      compliance/levelb    6.0 s  /  7.6 cpu-s  (TestLevelBRequirementCensus)
@@ -187,7 +187,7 @@ templates_shard_patterns() {
 #      remainder test). It is the exact h4 invocation of the tpl=1 path, so it
 #      shares that path's result-cache entry.
 gate_structural_pkgs() {
-  printf '%s\n' ./internal/testbudget ./cmd/testbudget ./cmd/pkgmap \
+  printf '%s\n' ./cmd/testbudget ./cmd/pkgmap \
     ./cmd/gentypes ./compliance/levelb ./internal/policynet
 }
 
