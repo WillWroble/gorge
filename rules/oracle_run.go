@@ -277,17 +277,24 @@ func harnessf(format string, a ...any) error {
 }
 
 type oracleRun struct {
-	cfg        Config
-	reg        *cards.Registry
-	e          *Engine
-	refs       map[string]state.ObjID
-	targets    []string
-	answers    []oracleAnswer
-	log        []string
-	extraFails []string
-	snaps      []OracleSnapshot
-	decisions  []OracleDecision
-	noSnapshot bool // runOracleScenarioWith's switch
+	cfg     Config
+	reg     *cards.Registry
+	e       *Engine
+	refs    map[string]state.ObjID
+	targets []string
+	answers []oracleAnswer
+	// borrowed holds, per step index, the answers of that step the previous
+	// checkpoint's settleTriggerAsks already consumed (what is left of them).
+	borrowed map[int][]oracleAnswer
+	// askedAtCheckpoint counts checkpoints (setup excluded) taken while a
+	// trigger-order or triggered-cost ask was still pending: what
+	// settleTriggerAsks exists to keep at zero. OracleResult reports it.
+	askedAtCheckpoint int
+	log               []string
+	extraFails        []string
+	snaps             []OracleSnapshot
+	decisions         []OracleDecision
+	noSnapshot        bool // runOracleScenarioWith's switch
 	// xmageFixture mirrors sc.xmageFixture: this run replays a GENERATED
 	// compliance scenario, where XMage is the reference engine. The
 	// hand-authored audit fixtures are gorge-internal (no XMage snapshot to
@@ -1645,6 +1652,11 @@ func (r *oracleRun) do(st oracleStep) error {
 	e := r.e
 	r.targets = append([]string(nil), st.Targets...)
 	r.answers = append([]oracleAnswer(nil), st.Answers...)
+	if rest, ok := r.borrowed[r.step]; ok {
+		// settleTriggerAsks answered the head of this step's script one
+		// checkpoint early; only the remainder is still owed.
+		r.answers = rest
+	}
 	seat := state.PlayerID(st.Seat)
 	r.logf("step %s %s", st.Op, st.Card)
 	op := oracleOpCodes.Code(string(st.Op))
@@ -2242,6 +2254,12 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 		if err := r.do(st); err != nil {
 			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
 		}
+		if err := r.settleTriggerAsks(sc.Steps, i); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		if r.pendingTriggerAsk() {
+			r.askedAtCheckpoint++
+		}
 		if !r.noSnapshot {
 			r.snaps = append(r.snaps, r.snapshot(fmt.Sprintf("step %d (%s)", i, st.Op)))
 		}
@@ -2281,6 +2299,75 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 		fails = append(fails, r.check(x)...)
 	}
 	return fails, r.log, r
+}
+
+// pendingTriggerAsk reports whether the pending decision is one XMage has
+// already answered by the time its checkpoint is taken: the CR 603.3b order
+// ask for several triggers put on the stack at once, or the payment window
+// of a "you may pay" triggered cost (CR 603.5, e.choosing == chooseTriggeredCost,
+// including its mana-source taps).
+func (r *oracleRun) pendingTriggerAsk() bool {
+	d := r.e.Pending()
+	if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+		return false
+	}
+	return d.Kind == decision.KTriggerOrder || r.e.choosing == chooseTriggeredCost
+}
+
+// settleTriggerAsks answers a trigger-order or triggered-cost ask still
+// pending when step i finishes, BEFORE the step's checkpoint. XMage poses
+// both asks inside the pass that put the trigger on the stack and consumes its
+// scripted answer there, so its checkpoint already shows the ordered stack /
+// the paid cost; gorge, which left the ask pending until the next step drove
+// it, showed an empty stack or an unpaid cost (Twinflame Travelers, Katara,
+// Brigid, Trystan: final states agreed, the mid-step diverged). The answers are
+// the ones the scenario scripts on the NEXT step that has any -- the generator
+// writes them on the following resolve/pass_to step -- and what is left of
+// them stays owed to that step (r.borrowed); with none scripted the ask takes
+// the harness's own fallback, exactly as that later step would have. Both the
+// answers and the fallback are the same ones the later step would have used,
+// so only WHEN the ask is answered moves, never its outcome.
+func (r *oracleRun) settleTriggerAsks(steps []oracleStep, i int) error {
+	if !r.xmageFixture || !r.pendingTriggerAsk() {
+		return nil
+	}
+	next := -1
+	for j := i + 1; j < len(steps); j++ {
+		if len(steps[j].Answers) > 0 {
+			next = j
+			break
+		}
+	}
+	saved := r.answers
+	r.answers = nil
+	if next >= 0 {
+		r.answers = append([]oracleAnswer(nil), steps[next].Answers...)
+	}
+	defer func() {
+		if next >= 0 {
+			if r.borrowed == nil {
+				r.borrowed = map[int][]oracleAnswer{}
+			}
+			r.borrowed[next] = r.answers
+		}
+		r.answers = saved
+	}()
+	for n := 0; n < 100; n++ {
+		d := r.e.Pending()
+		if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+			return nil
+		}
+		// A scripted answer keeps the chain going through the ask's own
+		// sub-asks (the mana-ability colour pick between two taps); with
+		// none left, only a trigger ask itself is settled.
+		if len(r.answers) == 0 && !r.pendingTriggerAsk() {
+			return nil
+		}
+		if err := r.answer(d, "settle"); err != nil {
+			return err
+		}
+	}
+	return harnessf("settle: trigger ask never resolved")
 }
 
 // seatZeroStart lives here, not in a test file, because runOracleScenario

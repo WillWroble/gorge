@@ -1762,7 +1762,18 @@ const (
 // so the face shape is the authority.
 func modeNumbers(f *cards.Face) map[string]int {
 	out := map[string]int{}
-	addCharm := func(choices string) {
+	// A ChoiceRestriction$ Charm (Zuko, Conflicted's "choose one that hasn't
+	// been chosen") is offered WITHOUT the modes already used, by gorge and
+	// by XMage alike, and XMage's scripted mode number indexes the modes still
+	// on offer, not Choices$: Zuko's second ask offers three modes and XMage
+	// resolved the scripted absolute "2" as the second REMAINING mode (Add
+	// {R}), not the second printed one. Such a charm's labels stay out of the
+	// map, so the answer falls to the pick's 1-based position in the offered
+	// list -- the number XMage's chooseMode reads.
+	addCharm := func(choices, restriction string) {
+		if restriction != "" {
+			return
+		}
 		for i, name := range strings.Split(choices, ",") {
 			name = strings.TrimSpace(name)
 			if name == "" {
@@ -1805,13 +1816,13 @@ func modeNumbers(f *cards.Face) map[string]int {
 	}
 	for _, sa := range f.Abilities {
 		if sa.API == "Charm" {
-			addCharm(sa.Params["Choices"])
+			addCharm(sa.Params["Choices"], sa.Params["ChoiceRestriction"])
 		}
 	}
 	for _, body := range f.SVars {
 		if strings.Contains(body, "Charm") {
 			if c := svarParams(body)["Choices"]; c != "" {
-				addCharm(c)
+				addCharm(c, svarParams(body)["ChoiceRestriction"])
 			}
 		}
 	}
