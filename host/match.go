@@ -106,6 +106,12 @@ type match struct {
 	// each rewind until the queue is empty. Created at match build, never
 	// reassigned, and dies with the match.
 	undo *undoQueue
+	// ledger is HD-2's per-intent provenance ledger (host/divergence_ledger.go):
+	// one byte per accepted intent, bit 0 caretaker, bit 1 client-auto. Host
+	// metadata like m.snaps — never replay input, never an event. Appended in
+	// attempt's exclusive section, truncated beside the other per-intent
+	// bookkeeping on undo; its length always equals m.intents. Guarded by m.mu.
+	ledger []uint8
 	// feeds owns the live observation feed of every non-human bots.EnvSeat on
 	// this match (host/botenv.go, spec §5.2 Create/Observe/Record). Nil when
 	// no seat implements bots.EnvSeat — the allocation-free fast path every
@@ -367,6 +373,22 @@ func (pd *parkedDecision) answer() (decision.Intent, error) {
 		return decision.CloneIntent(in), err
 	}
 	return decision.CloneIntent(pd.in), pd.err
+}
+
+// provenance reports HD-2's provenance bits for the decision this parking
+// just answered (host/divergence_ledger.go): the caretaker bit is the seat's
+// caretakerFires delta across the await — the counter's only writer is the
+// await's own caretaker path, whose increment happens before it returns —
+// and the auto bit is the ?auto flag the accepted submit stamped on the
+// slot, copied out by await on receive. A bot seat (hs nil) is never a
+// caretaker or an autopilot: both bits false. Call after answer() returned
+// an intent the loop is about to submit; on the undo/error paths the loop
+// never reads it and appends nothing.
+func (pd *parkedDecision) provenance() (caretaker, auto bool) {
+	if pd.hs == nil {
+		return false, false
+	}
+	return pd.hs.s.caretakerCount() > pd.hs.fires0, pd.hs.auto
 }
 
 // parkedData is the projected shape of one pending decision, split out of the
@@ -805,6 +827,13 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 		}
 		var next *parkedDecision
 		var nextData *parkedData
+		// HD-2's provenance bits for the intent the seat just gave (the doc
+		// on parkedDecision.provenance). They mark THIS seat's own answer;
+		// the refusal ladder's rungs below are bots.RefusalAnswerer
+		// fallbacks — a HumanSeat is never one, so a human's caretaker/auto
+		// bits can never ride a rung, and for a bot seat both bits are false
+		// — so the same flags append on every rung the ladder submits.
+		caretaker, auto := parked.provenance()
 		// attempt runs one Submit attempt as its own exclusive section and
 		// reports whether the ENGINE refused it (a submission error) as
 		// opposed to a post-Submit failure (persistence). A refused Submit
@@ -831,6 +860,10 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 					return e
 				}
 				m.afterSubmit(before)
+				// HD-2: the accepted intent's provenance byte, appended in
+				// the same exclusive section (a refused submit appends
+				// nothing). host/divergence_ledger.go holds the shape.
+				m.ledgerAppend(caretaker, auto)
 				// Record the ACCEPTED intent (which may be a refusal-ladder
 				// rung, not the seat's first answer) on the actor's feed, after
 				// the Submit that took it (§5.2 Record).

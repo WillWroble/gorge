@@ -269,6 +269,12 @@ func (h *handler) pending(w http.ResponseWriter, r *http.Request) {
 // can never answer a decision asked of another seat. Every rejection becomes
 // an HTTP status plus the registry's reason body (audit item 17); a 204 means
 // the intent was accepted and the parked seat is free.
+//
+// The ?auto=1 query flag (HD-2, docs/superpowers/specs/2026-10-10-human-divergence-design.md
+// §5.2) marks the answer as produced by the client's autopilot rather than a
+// deliberate human choice: the handler forwards it as a boolean into
+// SubmitIntentFrom, which records it in the match's provenance ledger. It
+// never enters the intent body or the log.
 func (h *handler) intent(w http.ResponseWriter, r *http.Request) {
 	t, k, ok := matchKey(w, r)
 	if !ok {
@@ -282,7 +288,8 @@ func (h *handler) intent(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	if err := h.reg.SubmitIntent(t, k, claim.Seat, in); err != nil {
+	auto := r.URL.Query().Get("auto") == "1"
+	if err := h.reg.SubmitIntentFrom(t, k, claim.Seat, in, auto); err != nil {
 		writeSeatError(w, err)
 		return
 	}

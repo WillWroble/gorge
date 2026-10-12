@@ -207,6 +207,13 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 		for _, z := range zones {
 			for _, p := range probes {
 				if t, ok := offerTryFor(reg, p, z, free, self); ok {
+					// A land is played, never cast (CR 305.1), so a
+					// ValidAfterStack$ spell qualifier does not gate it: it
+					// would be offered whatever the qualifier says and
+					// observe nothing of the gate. Probe with a spell.
+					if t.kind != offerKindCast && st.Params["ValidAfterStack"] != "" {
+						continue
+					}
 					t.extraGY, t.prelude, t.extraHand = evidence, died, diedHand
 					tries = append(tries, t)
 				}

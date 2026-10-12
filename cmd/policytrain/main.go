@@ -79,6 +79,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&grid.maxGameIndex, "max-game-index", 0, "pn12: train only on games whose per-pair game index is below this (nested subsets for the data axis; 0 = every game)")
 	fs.StringVar(&grid.evalCorpus, "eval-corpus", "", "pn12: comma-separated held-out label corpora (a disjoint seed block) to score the trained model on, with the override-only readout")
 	fs.StringVar(&grid.evalJSON, "eval-json", "", "pn12: write the -eval-corpus readout as JSON to this path")
+	fs.BoolVar(&grid.keepExplore, "keep-explore", false, "keep label rows flagged explore:true (forced coverage exploration, not the teacher's choice); by default policy imitation drops them, and -loss value keeps them")
 	fs.StringVar(&grid.arm, "arm", "", "pn12: arm name recorded in the -eval-json report")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -91,6 +92,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if *upgradeEntity > 0 {
 		return runUpgradeEntity(*initCkpt, *out, *upgradeEntity, *seed, stdout, stderr)
 	}
+	// Value-only loss learns from the outcome, which a forced exploration
+	// answer still has; every loss with a policy term drops those rows.
+	grid.keepExplore = grid.keepExplore || *lossMode == "value"
 	lo, gridLoad, err := grid.loadOptions()
 	if err != nil {
 		fmt.Fprintf(stderr, "policytrain: %v\n", err)
@@ -165,6 +169,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "corpus %s: %d records, %d skipped (no candidates), %d loaded (%d with outcome)\n",
 			path, stats.Records, stats.Skipped, len(exs), stats.WithOutcome)
+		if stats.Explored > 0 {
+			fmt.Fprintf(stdout, "corpus %s: %d explore-flagged records dropped (not the teacher's choice)\n", path, stats.Explored)
+		}
 		examples = append(examples, exs...)
 	}
 	if len(examples) == 0 {

@@ -271,6 +271,9 @@ func (r *Registry) rewindToLastIntent(t *table, m *match, seats []seat.Seat, brd
 	e.L.Reserve(defaultExpectedEvents)
 	m.e = e
 	m.intents = n
+	// HD-2's provenance ledger (host/divergence_ledger.go) describes exactly
+	// the intents the log holds: drop every entry the rewind discarded.
+	m.ledgerTruncate(n)
 	m.bounds = append([]uint64(nil), m.bounds[:n+1]...)
 	m.turnStarts = turnStartsBefore(m.turnStarts, uint64(len(e.L.Events)))
 	m.snaps = snapsBefore(m.snaps, n)
