@@ -3,6 +3,7 @@ package effects
 import (
 	"strings"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -41,4 +42,49 @@ func CloneETBSelectorMatches(g *state.Game, spec string, id state.ObjID, sc Spec
 		}
 	}
 	return MatchesSpecCtx(g, spec, id, sc)
+}
+
+// CloneETBOffered reports whether a DB$ Clone ETB-replacement body is inside
+// the supported as-enters scope, so the cast offers the copy election instead
+// of taking the loud "unimplemented API Clone" fallback. The key whitelist and
+// the text-only value checks are compiled once (CloneParams.ETBShapeOK); a
+// supported KEY is not a supported VALUE: only Mockingbird's cast-spend Y
+// selector has a resolver on this route, multi-word AddKeywords$ heads and
+// non-True IntoPlayTapped$ values stay withheld, and every named grant
+// (AddStaticAbilities$, AddTriggers$, AddSVars$) must resolve in the carrier's
+// SVar table so an unreadable grant fails closed before the election.
+func CloneETBOffered(sa *cards.SA, svars map[string]string) bool {
+	cp := CloneOf(sa)
+	if !cp.ETBShapeOK || (SpecNeedsResolver(cp.Choices) && !CloneETBSpendSelector(cp.Choices, svars)) {
+		return false
+	}
+	for _, name := range cp.StaticNames {
+		if !CloneStaticGrantReadable(svars, name) {
+			return false
+		}
+	}
+	return CloneNamedGrantsReadable(svars, cp)
+}
+
+// ETBCopyShapeGate is cards.Registry.ShapeGate for the coverage report: one
+// "shape:ETBReplacement Clone" entry per face whose ETBReplacement:Copy DB$
+// Clone body CloneETBOffered declines. Such a card is counted by primitive
+// ("api:Clone" is registered) but, cast, takes the loud unimplemented-API
+// fallback and enters as itself (usually a 0/0 that dies), so it is not
+// playable as printed.
+func ETBCopyShapeGate(c *cards.Card) []string {
+	var out []string
+	for _, f := range c.Faces {
+		for i := range f.Repls {
+			r := &f.Repls[i]
+			if r.Params["Keyword"] != "ETBReplacement" || r.With == nil || r.With.API != "Clone" {
+				continue
+			}
+			if !CloneETBOffered(r.With, f.SVars) {
+				out = append(out, "shape:ETBReplacement Clone")
+				break
+			}
+		}
+	}
+	return out
 }
