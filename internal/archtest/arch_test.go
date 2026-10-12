@@ -167,6 +167,12 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// seats a non-bench opponent may link it. The honest azmcts core
 		// never pulls the clone back in, and neither do the hosted search
 		// packages or any bots/ entry.
+		// The shadow answer (HD-3, human-divergence design §5.4) is computed by
+		// a package the host calls and the offline triage tool recomputes
+		// through: it may not depend on the host that calls it, nor on test
+		// scaffolding.
+		{module + "/internal/divergence/shadow", module + "/host"},
+		{module + "/internal/divergence/shadow", module + "/internal/testutil"},
 		{module + "/host", module + "/internal/azmcts/clairvoyant"},
 		{module + "/host/httpapi", module + "/internal/azmcts/clairvoyant"},
 		{module + "/cmd/gorged", module + "/internal/azmcts/clairvoyant"},
