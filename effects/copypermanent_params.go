@@ -51,8 +51,11 @@ type CopyPermanentParams struct {
 	AtEOTTrig string
 
 	// The characteristic modifications.
-	AddTypes            ParamText
-	SetColor            ParamText
+	AddTypes ParamText
+	SetColor ParamText
+	// AddColors is AddColors$: colours added to the copy's own (CR 707.9b
+	// "in addition to its other colors"), never an overwrite.
+	AddColors           ParamText
 	SetPower            ParamText
 	SetToughness        ParamText
 	SetCreatureTypes    ParamText
@@ -122,7 +125,7 @@ var copyPermanentKnownKeys = [...]string{
 	"AILifeThreshold", "AILogic", "AINoRecursiveCheck", "AIPhyrexianPayment",
 	"AITgts", "Activation", "ActivationAfterBlockers", "ActivationFirstCombat",
 	"ActivationGameTypes", "ActivationLimit", "ActivationPhases", "ActivationZone",
-	"Activator", "AddAbilities", "AddKeywords", "AddSVars", "AddStaticAbilities",
+	"Activator", "AddAbilities", "AddColors", "AddKeywords", "AddSVars", "AddStaticAbilities",
 	"AddTriggers", "AddType", "AddTypes", "AdditionalDesc", "AdditionalDescription",
 	"Affected", "AlternateCost", "AlternativeCost", "Announce", "AnnounceTitle",
 	"AtEOT", "AtEOTTrig", "AttachedTo", "Boast", "ChangeTypeDesc",
@@ -257,6 +260,8 @@ func compileCopyPermanent(sa *cards.SA, dp *DefinedParams) *CopyPermanentParams 
 	p.AddTypes = ParamText{Text: addTypes, Present: ok}
 	setColor, ok := sa.Param(cards.PKSetColor)
 	p.SetColor = ParamText{Text: setColor, Present: ok}
+	addColors, ok := sa.Param(cards.PKAddColors)
+	p.AddColors = ParamText{Text: addColors, Present: ok}
 	setPower, ok := sa.Param(cards.PKSetPower)
 	p.SetPower = ParamText{Text: setPower, Present: ok}
 	setToughness, ok := sa.Param(cards.PKSetToughness)

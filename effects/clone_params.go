@@ -90,6 +90,10 @@ type CloneParams struct {
 	SetColor   string
 	SetColors  []string
 	SetColorOK bool
+	// AddColors is AddColors$ (additive, CR 707.9b); AddColorsOK its parse.
+	AddColors   string
+	AddColorsL  []string
+	AddColorsOK bool
 	// IntoPlayTapped is IntoPlayTapped$ as the script spells it (the
 	// no-entry Note quotes it); IntoPlayTappedSet reports a non-blank value
 	// and IntoPlayTappedTrue the exact True spelling.
@@ -123,7 +127,7 @@ type CloneParams struct {
 var cloneKnownKeys = [...]string{
 	"AILifeThreshold", "AILogic", "AINoRecursiveCheck", "AIPhyrexianPayment", "AITgts",
 	"Activation", "ActivationAfterBlockers", "ActivationFirstCombat", "ActivationGameTypes",
-	"ActivationLimit", "ActivationPhases", "ActivationZone", "Activator", "AddAbilities",
+	"ActivationLimit", "ActivationPhases", "ActivationZone", "Activator", "AddAbilities", "AddColors",
 	"AddKeywords", "AddSVars", "AddStaticAbilities", "AddTriggers", "AddType", "AddTypes",
 	"AdditionalDesc", "AdditionalDescription", "Affected", "AlternateCost",
 	"AlternativeCost", "Announce", "AnnounceTitle", "AttachedTo", "Boast", "ChangeTypeDesc",
@@ -233,6 +237,10 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.SetColor = strings.TrimSpace(sa.ParamStr(cards.PKSetColor))
 	if p.SetColor != "" {
 		p.SetColors, p.SetColorOK = colorLetters(p.SetColor)
+	}
+	p.AddColors = strings.TrimSpace(sa.ParamStr(cards.PKAddColors))
+	if p.AddColors != "" {
+		p.AddColorsL, p.AddColorsOK = colorLetters(p.AddColors)
 	}
 	p.IntoPlayTapped = sa.ParamStr(cards.PKIntoPlayTapped)
 	p.IntoPlayTappedSet = strings.TrimSpace(p.IntoPlayTapped) != ""
