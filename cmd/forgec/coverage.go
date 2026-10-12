@@ -82,7 +82,7 @@ func byCountThenKey(g []cards.CoverageGroup) []cards.CoverageGroup {
 
 func measureCoverage(r *cards.Registry, dir string) coverageData {
 	sup := effects.Supported()
-	r.ShapeGate = effects.ETBCopyShapeGate
+	r.ShapeGate = etbCopyShapeGate
 	cv := r.Coverage(sup)
 	d := coverageData{
 		Cards:     cv.Cards,

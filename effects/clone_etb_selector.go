@@ -65,26 +65,3 @@ func CloneETBOffered(sa *cards.SA, svars map[string]string) bool {
 	}
 	return CloneNamedGrantsReadable(svars, cp)
 }
-
-// ETBCopyShapeGate is cards.Registry.ShapeGate for the coverage report: one
-// "shape:ETBReplacement Clone" entry per face whose ETBReplacement:Copy DB$
-// Clone body CloneETBOffered declines. Such a card is counted by primitive
-// ("api:Clone" is registered) but, cast, takes the loud unimplemented-API
-// fallback and enters as itself (usually a 0/0 that dies), so it is not
-// playable as printed.
-func ETBCopyShapeGate(c *cards.Card) []string {
-	var out []string
-	for _, f := range c.Faces {
-		for i := range f.Repls {
-			r := &f.Repls[i]
-			if r.Params["Keyword"] != "ETBReplacement" || r.With == nil || r.With.API != "Clone" {
-				continue
-			}
-			if !CloneETBOffered(r.With, f.SVars) {
-				out = append(out, "shape:ETBReplacement Clone")
-				break
-			}
-		}
-	}
-	return out
-}

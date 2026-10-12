@@ -63,7 +63,14 @@ func TestReproCorpusCachedTokenPathsReadable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no repo root: %v", err)
 	}
-	tokenscripts := filepath.Join(root, ".cards", "tokenscripts")
+	// The corpus testutil.CorpusRegistry opened: the main checkout's, via
+	// the git common dir (SharedCorpusDir), not this worktree's .cards
+	// symlink to it.
+	corpus, ok := testutil.SharedCorpusDir(root)
+	if !ok {
+		t.Fatalf("no shared corpus under %s", root)
+	}
+	tokenscripts := filepath.Join(corpus, "tokenscripts")
 	info, err := os.Stat(tokenscripts)
 	if err != nil || !info.IsDir() {
 		t.Fatalf("no tokenscripts directory under the opened corpus %s: %v", tokenscripts, err)

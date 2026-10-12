@@ -25,13 +25,13 @@ func TestETBCopyShapeGateCountsLoudNoteCarriersUnsupported(t *testing.T) {
 	if m := r.Unsupported(mirror, sup); len(m) != 0 {
 		t.Fatalf("Cursed Mirror unexpectedly unsupported by primitive: %v", m)
 	}
-	if len(effects.ETBCopyShapeGate(mirror)) == 0 {
+	if len(etbCopyShapeGate(mirror)) == 0 {
 		t.Fatal("Cursed Mirror's declined ETB Clone body is not gated")
 	}
-	if g := effects.ETBCopyShapeGate(image); len(g) != 0 {
+	if g := etbCopyShapeGate(image); len(g) != 0 {
 		t.Fatalf("Phantasmal Image gated: %v", g)
 	}
-	r.ShapeGate = effects.ETBCopyShapeGate
+	r.ShapeGate = etbCopyShapeGate
 	defer func() { r.ShapeGate = nil }()
 	if len(r.Unsupported(mirror, sup)) == 0 {
 		t.Error("Cursed Mirror counted playable with the gate set")
