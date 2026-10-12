@@ -355,6 +355,42 @@ var predicates = map[string]predFn{
 	"attackedThisTurn": func(g *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
 		return o != nil && o.AttackedCombat != 0 && o.AttackedTurn == g.Turn
 	},
+	// blockedByThisTurn and its Forge synonym gotBlockedThisTurn are "was
+	// blocked this turn" (attacker side, CR 509.1): Heat Stroke's "each
+	// creature that ... was blocked this turn" and Fyndhorn Druid's "if it
+	// was blocked this turn". They read the event-folded
+	// state.Object.BlockedByThisTurn history, which survives the
+	// end-of-combat BlockedBy reset, so an end-of-combat trigger still sees
+	// it; it is cleared on a battlefield exit (CR 400.7) like the attack
+	// stamp, so a re-entering creature reads false.
+	"blockedByThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && len(o.BlockedByThisTurn) != 0
+	},
+	"gotBlockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && len(o.BlockedByThisTurn) != 0
+	},
+	// blockedThisTurn is the blocker side: the creature blocked at least one
+	// attacker this turn (CR 509.1). Heat Stroke's "each creature that
+	// blocked ... this turn", Gideon's Triumph, Hezrou // Demonic Stench,
+	// Sizzling Barrage and the Lurker/Inferno Hellion `!blockedThisTurn`
+	// negations read it. Same event-folded history and same
+	// survive-end-of-combat / clear-on-turn-and-exit lifetimes as
+	// blockedByThisTurn above.
+	"blockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && o.BlockedThisTurn
+	},
+	// blockedBySourceThisTurn is the this-turn twin of blockedBySource (the
+	// word-predicate at effects/filter_word.go): the object was blocked by
+	// the source at some point this turn. It is source-relative, so it reads
+	// sc.Source through this map's src parameter rather than the object
+	// alone; an unbound source (id 0) matches nothing, the same
+	// fail-closed direction blockedBySource keeps. Defiant Vanguard's
+	// end-of-combat delayed trigger is the corpus carrier: it destroys
+	// Card.Self plus every creature it blocked this turn, and the live
+	// BlockedBy list has already been cleared by then.
+	"blockedBySourceThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, src state.ObjID) bool {
+		return o != nil && src != 0 && slices.Contains(o.BlockedByThisTurn, src)
+	},
 	// IsSaddled is CR 702.171b's until-end-of-turn designation. The turn
 	// stamp makes it expire without a cleanup event and is preserved by
 	// controller changes.
