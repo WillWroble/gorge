@@ -1284,9 +1284,7 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 			// leg ran), which must not suppress the persistent write a later
 			// Remembered$ count/condition reads.
 			tgt := state.Target{Obj: o.ID}
-			if !targetIn(c.Remembered, tgt) {
-				c.Remembered = append(c.Remembered, tgt)
-			}
+			rememberCtxOnce(h, c, tgt)
 			if src := h.Game().Obj(c.Source); src == nil || !targetIn(src.Remembered, tgt) {
 				eventRemember(h, c, o.ID)
 			}
