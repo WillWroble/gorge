@@ -364,8 +364,11 @@ type HostReplacements interface {
 	CascadeReplacement(source state.ObjID, controller state.PlayerID, batch []state.ObjID, residue *cards.SA) bool
 	// CountReplacementProposed holds one synthetic count-bearing action
 	// proposal through the replacement registry and returns the rewritten
-	// proposal. It is used for the Mill instruction count and ordinary dice
-	// roll count; the test double returns it unchanged.
+	// proposal. It is used for the Mill instruction count, ordinary dice
+	// roll count and the draw instruction's DrawBatchProposal (events.
+	// DrawBatchProposal, the DrawCards class's held batch; a consumed batch
+	// reports Amount 0, so the caller draws nothing for it). The test double
+	// returns it unchanged.
 	CountReplacementProposed(ev events.Event) events.Event
 	// ReplaceEvent applies a ReplaceEffect body's requested change to the
 	// event currently being replaced. It is inert outside replacement

@@ -167,6 +167,24 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		// ReplaceEffect body changed the amount): the returned event is what
 		// gets logged, not the emit caller's copy.
 		ev = replaced
+	} else if ev.Kind == events.Draw && len(e.replDrawChain) > 0 {
+		// CR 616.1e/614.5: a Draw a draw-replacement body emits is the
+		// modified draw of the one that replacement replaced. It gets its
+		// own replacement pass -- Thought Reflection's two cards still meet
+		// Notion Thief, Asmodeus or a second Blood Scrivener -- with every
+		// replacement already applied to this draw's lineage excluded, this
+		// body's own included, so the chain terminates (CR 614.5: a
+		// replacement effect gets one opportunity per event). The applied
+		// set is empty outside a draw-replacement body, so an unrelated
+		// draw's emit is untouched.
+		savedExclude := e.replExclude
+		e.replExclude = e.replDrawChain
+		replaced, handled := e.applyReplacements(ev)
+		e.replExclude = savedExclude
+		if handled {
+			return replaced
+		}
+		ev = replaced
 	} else if e.redirectRecheck(ev) {
 		replaced, handled := e.applyRedirectReplacements(ev)
 		if handled {
