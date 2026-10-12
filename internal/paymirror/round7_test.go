@@ -52,6 +52,12 @@ import (
 // Monument through Urza's Workshop's metalcraft ability; its pin is seq 0 --
 // the whole game is still replayed and every planned cast must mirror, but
 // no named cast is required.
+// xp-b6-gaincontrol (CR 110.2a/603.3a: a card put onto the battlefield "under
+// your control" enters under the new controller, not its owner with a late
+// ControlChange) moves seed 6191's trajectory: Oblivion Sower's exiled lands
+// now enter under the caster, so the seq-9987 Roaming Throne float-trigger
+// finding is no longer reached. Its pin is seq 0 -- the whole game is still
+// replayed and every planned cast must mirror, but no named cast is required.
 func TestRoundSevenFindingsMirror(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -68,7 +74,7 @@ func TestRoundSevenFindingsMirror(t *testing.T) {
 	}{
 		{4038, []string{"ulalek-eldrazi", "rakdos-muscle-scam-exe", "vivi-ornitier-cedh", "foundations-calling-all-angels"}, true, 0, ""},
 		{6085, []string{"vivi-ornitier-cedh", "ulalek-eldrazi", "deadly-disguise", "rakdos-muscle-scam-exe"}, true, 173, "expected:float_then_cast:float_removed_every_target"},
-		{6191, []string{"foundations-wretched-ranks", "avengers-assemble", "ulalek-eldrazi", "hearthhull-worldseed-landfall"}, true, 9987, "expected:float_then_cast:float_trigger_precedes_cast"},
+		{6191, []string{"foundations-wretched-ranks", "avengers-assemble", "ulalek-eldrazi", "hearthhull-worldseed-landfall"}, true, 0, ""},
 		{5108, []string{"eldrazi-stompy", "mono-red-prowess"}, false, 0, ""},
 	} {
 		reports := round6Game(t, d, GameSpec{Seed: tc.seed, Decks: tc.decks, Commander: tc.commander, Policy: "bot"})
