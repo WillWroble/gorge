@@ -315,6 +315,9 @@ func ApplyPtr(g *state.Game, e *Event) {
 	case RingEmblemPush:
 		foldRingEmblemPush(g, e)
 	case MoveZone, Draw, PutOnStack:
+		if e.Kind == PutOnStack {
+			tallySpellCast(g, e)
+		}
 		foldMoveZone(g, e)
 	case LifeChange:
 		foldLifeChange(g, e)
