@@ -39,6 +39,7 @@ run "forge_oracle_pin_smoke.sh" bash "$ROOT/scripts/tests/forge_oracle_pin_smoke
 run "park_branch_registry_only_smoke.sh" bash "$ROOT/scripts/tests/park_branch_registry_only_smoke.sh"
 run "park_idle_scheduled_smoke.sh" bash "$ROOT/scripts/tests/park_idle_scheduled_smoke.sh"
 run "seed_brief_premise.sh" bash "$ROOT/scripts/tests/seed_brief_premise.sh"
+run "postmerge_batch_smoke.sh" bash "$ROOT/scripts/tests/postmerge_batch_smoke.sh"
 run "seed_reap_smoke.sh" bash "$ROOT/scripts/tests/seed_reap_smoke.sh"
 run "storm_brief_asserts_endpoint.sh" bash "$ROOT/scripts/tests/storm_brief_asserts_endpoint.sh"
 
