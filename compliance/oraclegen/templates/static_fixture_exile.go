@@ -397,14 +397,10 @@ func staticExileWithGap(f *cards.Face, st cards.Static) string {
 			// permission from a cost-carrying static, and mayPlayAltCosts
 			// delivers the alternative only on the ordinary hand cast.
 			return "a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"
-		case strings.Contains(all, "db$ dig"):
-			// Maralen, Fae Ascendant: the trigger's Dig exile goes through
-			// moveZoneEvent without the exiled-with association.
-			return "cards exiled by the source's Dig carry no exiled-with association (engine gap)"
 		case !strings.Contains(st.ParamStr(cards.PKAffected), "YouOwn"):
-			// Azula, Cunning Usurper / Null Summoner: the exiled card is
-			// owned by the opponent, and the may-play spell walk covers only
-			// the caster's own cards.
+			// Azula, Cunning Usurper / Null Summoner / Maralen, Fae
+			// Ascendant: the exiled card is owned by the opponent, and the
+			// may-play spell walk covers only the caster's own cards.
 			return "an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)"
 		}
 	}
@@ -413,7 +409,7 @@ func staticExileWithGap(f *cards.Face, st cards.Static) string {
 
 // faceSVarBodies is every SVar body on the face, lowercased and in sorted
 // key order (map order never reaches the classifier's boolean result): the
-// exile-move classifier needs the trigger's body (a Dig) even when the
+// classifier needs a count body (ExiledWith$Amount) even when the
 // static's own params reach no SVar.
 func faceSVarBodies(f *cards.Face) []string {
 	keys := make([]string, 0, len(f.SVars))

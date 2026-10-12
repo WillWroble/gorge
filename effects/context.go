@@ -2019,10 +2019,12 @@ func exileProvenanceNeeded(c *Ctx) bool {
 		}
 	}
 	// The A: spelling (Mimeoplasm, Revered One's `ValidTgts$
-	// Creature.ExiledWithSource`) names it on the source face's own ability
-	// lines, which no SVar carries. Ctx.Host is bound by effects.Resolve; a
-	// Ctx that never entered Resolve has no host and keeps the SVar-only read.
-	return c.Host != nil && faceAbilitiesNameExiledWithSource(c.Host, c.Source)
+	// Creature.ExiledWithSource`) and the S: spelling (Maralen, Fae
+	// Ascendant's MayPlay `Affected$ ...ExiledWithSource`, exiled by a Dig)
+	// name it on the source face's own ability or static lines, which no SVar
+	// carries. Ctx.Host is bound by effects.Resolve; a Ctx that never entered
+	// Resolve has no host and keeps the SVar-only read.
+	return c.Host != nil && faceNamesExiledWithSource(c.Host, c.Source)
 }
 
 // faceAbilitiesNameExiledWithSource reports whether the source CARD's own
@@ -2500,4 +2502,11 @@ var exiledWithSourceKeyCodes = state.NewStrCodes(
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Affected", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "AffectedZone", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Description", Val: exiledWithSourceKeyFilterOrText},
+	// The card-filter keys the other static modes name the exiled set by:
+	// Agatha's Soul Cauldron's GainsAbilitiesOf$, Circu, Dimir Lobotomist's
+	// CantBeCast ValidCard$, Ashiok's Erasure's SharedRestrictions$.
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsAbilitiesOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsTriggerAbsOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "SharedRestrictions", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "ValidCard", Val: exiledWithSourceKeyFilterOrText},
 )
