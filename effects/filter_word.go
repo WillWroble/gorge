@@ -30,6 +30,10 @@ const (
 	wordInZone
 	wordActivePlayerCtrl
 	wordTopLibrary
+	// Forge's BottomLibrary: the last card of its owner's library (Jace,
+	// Reality Sculptor's !BottomLibrary ultimate, The Heron Moon, Mind
+	// Flayer, the Shadow).
+	wordBottomLibrary
 	wordHasCounters
 	// Mjölnir's Worthy equip qualifier (CR 702.6): a legendary creature that
 	// is red or white and is not a Villain.
@@ -470,6 +474,8 @@ func wordPredicate(p string) (wordKind, string) {
 		return wordActivePlayerCtrl, ""
 	case wordPredicateWordTopLibrary:
 		return wordTopLibrary, ""
+	case wordPredicateWordBottomLibrary:
+		return wordBottomLibrary, ""
 	case wordPredicateWordFaceDown:
 		return wordFaceDown, ""
 	case wordPredicateWordCanBeTurnedFaceUp:
@@ -836,6 +842,15 @@ func wordMatches(kind wordKind, key string, g *state.Game, o *state.Object, sc S
 		}
 		ids := g.Zone(state.ZLibrary, o.Owner)
 		return len(ids) > 0 && ids[0] == o.ID
+	case wordBottomLibrary:
+		// Forge's BottomLibrary: the object is the bottom card of its
+		// library -- the last index of the owner's library slice, the
+		// mirror of wordTopLibrary.
+		if o.Zone != state.ZLibrary {
+			return false
+		}
+		ids := g.Zone(state.ZLibrary, o.Owner)
+		return len(ids) > 0 && ids[len(ids)-1] == o.ID
 	case wordHasCounters:
 		// Forge's HasCounters: the object has at least one counter of any
 		// kind on it. Test the COUNT, not the slice length -- state's
@@ -1422,6 +1437,7 @@ const (
 	wordPredicateWordRememberedPlayerOwn
 	wordPredicateWordDealtDamageToAny
 	wordPredicateWordDealtCombatDamageToAny
+	wordPredicateWordBottomLibrary
 )
 
 var wordPredicateWordCodes = state.NewStrCodes(
@@ -1449,6 +1465,7 @@ var wordPredicateWordCodes = state.NewStrCodes(
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.MayPlaySource", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "ActivePlayerCtrl", Val: wordPredicateWordActivePlayerCtrl},
 	state.StrEntry[wordPredicateWordCode]{Key: "TopLibrary", Val: wordPredicateWordTopLibrary},
+	state.StrEntry[wordPredicateWordCode]{Key: "BottomLibrary", Val: wordPredicateWordBottomLibrary},
 	state.StrEntry[wordPredicateWordCode]{Key: "faceDown", Val: wordPredicateWordFaceDown},
 	state.StrEntry[wordPredicateWordCode]{Key: "canBeTurnedFaceUp", Val: wordPredicateWordCanBeTurnedFaceUp},
 	state.StrEntry[wordPredicateWordCode]{Key: "IsRingbearer", Val: wordPredicateWordIsRingbearer},
