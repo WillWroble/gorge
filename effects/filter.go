@@ -2423,8 +2423,7 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 			return false, false
 		}
 		if kind == wordChosenColor {
-			src := g.Obj(sc.Source)
-			if src == nil || colourLetter(src.ChosenColor) == 0 {
+			if _, col := sourceChosen(g, sc); colourLetter(col) == 0 {
 				return false, false
 			}
 		}
@@ -2557,6 +2556,15 @@ type SpecContext struct {
 	// resolution-time predicates that refer to damage dealt by Source.
 	CombatDamageHits []CombatDamageHit
 	Resolve          func(name string) (int32, bool)
+	// SourceLKIValid binds SourceChosenType/SourceChosenColor: the source's
+	// "as this enters" choices as they were when it last stood on the
+	// battlefield (CR 113.7a/608.2h). rules sets it for an ability whose
+	// source has since left (Dawn-Blessed Pennant, sacrificed as a cost); the
+	// live object has had its choices cleared by then. Read through
+	// sourceChosen only.
+	SourceLKIValid    bool
+	SourceChosenType  string
+	SourceChosenColor string
 	// PredicatePrograms is an optional immutable compiled-text sidecar. A nil
 	// value keeps the textual matcher authoritative for synthetic fixtures and
 	// dynamic source strings.
