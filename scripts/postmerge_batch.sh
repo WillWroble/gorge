@@ -13,6 +13,11 @@
 # red, a new head first re-checks just those failing tests; the full suite
 # runs again only once they pass.
 #
+# The suite and its bisect steps run GATE class (`gorge_heavy_run -g`): they
+# hold a heavy lane but are never parked or deferred by a ticket gate's broker
+# bracket. This loop is what pushes main, so parking it stalls every landing's
+# push behind the gates of later tickets.
+#
 # A red run also PAUSES the agentctl pipeline (writes $PAUSE, the file the
 # daemon checks every tick) so nothing else lands on a red main while the
 # operator bisects and fixes. The pause is ours only if the file was absent:
@@ -24,13 +29,6 @@
 #   scripts/postmerge_batch.sh --parse-fails <go-test-output>   # self-test aid
 set -uo pipefail
 repo=$(git rev-parse --show-toplevel)
-# Yield to a gate bracket by CPU WEIGHT, never by SIGSTOP: every package here
-# runs under `go test`'s wall-clock -timeout, so a STOPped package times out
-# ("test timed out after 10m") and reads FLAKY/RED. That pinned the pipeline
-# from 029087326 (2f3ba9c27) on -- suite wall ~200-500 s became 1,400-1,800 s
-# and a timeout RED on 2026-10-10 held it paused 47 h. Pinned here, not left to
-# the default, so an exported GORGE_HEAVY_YIELD=stop cannot reach the suite.
-export GORGE_HEAVY_YIELD=weight
 . "$(dirname "$0")/heavy_lock.sh"  # the one HEAVY lock definition
 LOCK=${LOCK:-$GORGE_HEAVY_LOCK}
 LOG=${LOG:-$repo/.ds4/postmerge-batch.log}
@@ -82,7 +80,7 @@ if [ "${1:-}" = "--parse-fails" ]; then parse_fails "$2"; exit 0; fi
 # fails_at <sha> <pkg> <regex>: 0 if the tests FAIL at sha, 1 if they pass.
 fails_at() {
   git -C "$wt" switch -q --detach "$1" || return 2
-  ! (cd "$wt" && gorge_heavy_run "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
+  ! (cd "$wt" && gorge_heavy_run -g "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
 }
 
 # bisect <good> <bad> <pkg> <regex>: first first-parent commit in good..bad
@@ -122,7 +120,7 @@ while true; do
       red_fails=""
       say "FULL start ${head:0:9} ($(git rev-list --first-parent --count "$last_green..$head") since last green ${last_green:0:9})"
       s=$(date +%s)
-      if gorge_heavy_run "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
+      if gorge_heavy_run -g "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
         last_tested=$head
         if git push -q origin "$head:refs/heads/main"; then
           last_green=$head; flaky_reruns=0

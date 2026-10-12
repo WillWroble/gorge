@@ -34,11 +34,20 @@
 # Executed:
 #   scripts/heavy_lock.sh path              # print the pool's base path
 #   scripts/heavy_lock.sh lanes             # print every lane file, lane 1 first
-#   scripts/heavy_lock.sh run [-w SECS] [-s] -- <cmd> [args...]
+#   scripts/heavy_lock.sh run [-w SECS] [-s] [-g] -- <cmd> [args...]
 #       run <cmd> holding one lane (the lane fd never reaches <cmd>).
 #       -w SECS  wait at most SECS for a lane (default: wait forever)
 #       -s       if the lane WAIT runs out, log it and exit 0 (the work is
 #                regenerable, e.g. make ledger) instead of exiting 75
+#       -g       GATE class: the job still takes a lane, but the broker's gate
+#                bracket neither defers its start nor parks it. For work that
+#                gates a landing or a push (postmerge_batch.sh's full suite and
+#                bisect steps), never for preemptible heavy work. The broker's
+#                own contract (broker.sh:5-7) is that gate-class work is never
+#                paused; parking the post-merge suite froze every push while
+#                any ticket gate ran (2026-10-12: the bracket was open 90% of
+#                an hour, a 6-minute suite ran 50+ minutes, and a parked test
+#                binary's 10-minute wall timeout fired as a false RED).
 #       exit 75 = no lane was free in time; <cmd> never ran.
 #       <cmd> sees GORGE_HEAVY_LOCK_HELD=<base path>; a nested `run` (or any
 #       script that checks it, e.g. ledger-lane.sh) then runs without locking
@@ -54,8 +63,9 @@
 #   gorge_heavy_acquire [-w S] take a free lane on fd 9 of THIS shell; on
 #                              success GORGE_HEAVY_LANE names it and it is
 #                              flocked; on timeout exit 75 (stderr note)
-#   gorge_heavy_run [-w S] [-s] -- cmd...
+#   gorge_heavy_run [-w S] [-s] [-g] -- cmd...
 #                              run cmd holding one lane (as `run` above);
+#                              -g = GATE class (see below);
 #                              for sourced callers like m1b-distill.sh's
 #                              heavy() wrapper, where exec would kill the
 #                              caller, cmd runs as a child instead
@@ -322,8 +332,10 @@ _hl_weight_restore() {
 # again. Every command is `|| true`: this runs inside a trap under set -e.
 gorge_heavy_forward() {
 	local sig=$1 job=$2 supervisor=$3
-	kill -TERM "$supervisor" 2>/dev/null || true
-	wait "$supervisor" 2>/dev/null || true
+	if [ -n "$supervisor" ]; then
+		kill -TERM "$supervisor" 2>/dev/null || true
+		wait "$supervisor" 2>/dev/null || true
+	fi
 	kill "-$sig" -- "-$job" 2>/dev/null || kill "-$sig" "$job" 2>/dev/null || true
 	kill -CONT -- "-$job" 2>/dev/null || kill -CONT "$job" 2>/dev/null || true
 	return 0
@@ -354,8 +366,11 @@ gorge_heavy_exec() {
 	GORGE_HEAVY_LOCK_HELD=$GORGE_HEAVY_LOCK "$@" 9>&- &
 	job=$!
 	[ "$had_m" = 1 ] || set +m
-	gorge_heavy_supervise "$job" &
-	supervisor=$!
+	# A gate-class job (`-g`) is never parked, so it gets no supervisor.
+	if [ "${_hl_gate_class:-0}" != 1 ]; then
+		gorge_heavy_supervise "$job" &
+		supervisor=$!
+	fi
 	[ -z "$pending" ] || gorge_heavy_forward "$pending" "$job" "$supervisor"
 	# A trapped signal interrupts `wait`, so loop until the child is reaped.
 	# `if wait` keeps a failing child from tripping a set -e caller.
@@ -365,8 +380,10 @@ gorge_heavy_exec() {
 	done
 	# The job is done: stop the supervisor NOW (it holds the lane's open file
 	# description, so the lane is not free until it is gone), then release.
-	kill -TERM "$supervisor" 2>/dev/null || true
-	wait "$supervisor" 2>/dev/null || true
+	if [ -n "$supervisor" ]; then
+		kill -TERM "$supervisor" 2>/dev/null || true
+		wait "$supervisor" 2>/dev/null || true
+	fi
 	trap - INT TERM HUP
 	[ -z "$old_traps" ] || eval "$old_traps"
 	exec 9>&-
@@ -404,7 +421,8 @@ gorge_heavy_acquire() { # [-w SECS]: one free lane on fd 9, or exit 75
 		# gate's own command is the INLINE acquisition in
 		# .agentctl/config.toml, never this helper, so deferring here can never
 		# deadlock the gate -- do NOT move the gate onto this helper.
-		if ! gorge_heavy_gate_active; then
+		# A gate-class caller (`-g`, _hl_gate_class) is not deferred.
+		if [ "${_hl_gate_class:-0}" = 1 ] || ! gorge_heavy_gate_active; then
 			while read -r lane; do
 				# `: >>` first: a plain command's redirection failure is catchable,
 				# where a failed `exec 9>` would exit this shell outright.
@@ -421,8 +439,10 @@ gorge_heavy_acquire() { # [-w SECS]: one free lane on fd 9, or exit 75
 	done
 }
 
-gorge_heavy_run() { # [-w SECS] [-s] -- cmd...: run cmd holding one lane
-	local wait_s="" skip=0
+gorge_heavy_run() { # [-w SECS] [-s] [-g] -- cmd...: run cmd holding one lane
+	# _hl_gate_class is local, so it reaches gorge_heavy_acquire/_exec through
+	# bash's dynamic scope and is never exported to the command.
+	local wait_s="" skip=0 _hl_gate_class=0
 	while [ $# -gt 0 ]; do
 		case $1 in
 		-w)
@@ -431,6 +451,10 @@ gorge_heavy_run() { # [-w SECS] [-s] -- cmd...: run cmd holding one lane
 			;;
 		-s)
 			skip=1
+			shift
+			;;
+		-g)
+			_hl_gate_class=1
 			shift
 			;;
 		--)
@@ -475,6 +499,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 		shift
 		wait_s=""
 		skip=0
+		_hl_gate_class=0
 		while [ $# -gt 0 ]; do
 			case $1 in
 			-w)
@@ -483,6 +508,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 				;;
 			-s)
 				skip=1
+				shift
+				;;
+			-g)
+				_hl_gate_class=1
 				shift
 				;;
 			--)
@@ -516,7 +545,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 		exit 75
 		;;
 	*)
-		printf 'usage: heavy_lock.sh {path | lanes | run [-w SECS] [-s] -- cmd...}\n' >&2
+		printf 'usage: heavy_lock.sh {path | lanes | run [-w SECS] [-s] [-g] -- cmd...}\n' >&2
 		exit 2
 		;;
 	esac
