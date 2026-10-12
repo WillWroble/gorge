@@ -684,7 +684,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			applyTransformed(h, c, cz.Riders.Transformed, o.ID)
 		}
 		markChangeZoneAttach(h, c, sa, cz, &ev)
-		h.Emit(ev)
+		emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 		moved = append(moved, o.ID)
 		exiledWithAssociation(h, c, o.ID, to)
 		if to == state.ZExile {
@@ -715,7 +715,6 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		// unconditional on the move landing on the battlefield, the same as
 		// settleChangeZoneMoveAs's own tail call.
 		if to == state.ZBattlefield {
-			applyGainControlFor(h, c, cz.Riders.GainControl, o.ID)
 			changeZoneAttachedTo(h, c, sa, cz, o.ID)
 		}
 		// Tapped$ True (CR 110.5's entry state): the moved permanent enters
@@ -1257,15 +1256,52 @@ func gainControlOf(h Host, c *Ctx, gc ParamText) (state.PlayerID, bool, bool) {
 	return 0, false, true
 }
 
-// applyGainControlFor is applyGainControl over a compiled GainControl$.
-func applyGainControlFor(h Host, c *Ctx, gc ParamText, id state.ObjID) {
-	p, ok, present := gainControlOf(h, c, gc)
-	if !present || !ok {
+// digGainControl is the GainControl$ selector a Dig/DigUntil bool stands for:
+// those two compile the rider to "under your control" only.
+func digGainControl(on bool) ParamText {
+	if !on {
+		return ParamText{}
+	}
+	return ParamText{Text: "True", Present: true}
+}
+
+// emitEntryMove emits a MoveZone and settles the GainControl$ rider of the
+// move that carries it ("put onto the battlefield under your control", CR
+// 110.2a: a permanent enters under the control of the player an effect names).
+// The new controller is folded onto the card BEFORE the battlefield entry, so
+// the entry's replacement effects, ETB triggers (CR 603.3a: controlled by the
+// permanent's controller as it enters) and "enters under your control" matchers
+// all see the right seat. A move to any other zone is emitted unchanged: only a
+// battlefield entry can carry a control change (CR 701.22a).
+//
+// A card that was already a permanent keeps the post-move ControlChange, and a
+// pre-move change the move did not turn into a battlefield entry (a prevented
+// or redirected move) is handed back to the owner, so no off-battlefield card
+// is left under a foreign controller.
+func emitEntryMove(h Host, c *Ctx, gc ParamText, to state.Zone, ev events.Event) {
+	if to != state.ZBattlefield {
+		h.Emit(ev)
 		return
 	}
-	if o := h.Game().Obj(id); o != nil && o.Controller != p {
-		h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: p,
-			Text: "GainControl"})
+	p, ok, present := gainControlOf(h, c, gc)
+	if !present || !ok {
+		h.Emit(ev)
+		return
+	}
+	g := h.Game()
+	pre := false
+	if o := g.Obj(ev.Obj); o != nil && o.Zone != state.ZBattlefield && o.Controller != p {
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: p, Text: "GainControl"})
+		pre = true
+	}
+	h.Emit(ev)
+	o := g.Obj(ev.Obj)
+	switch {
+	case o == nil:
+	case o.Zone == state.ZBattlefield && o.Controller != p:
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: p, Text: "GainControl"})
+	case pre && o.Zone != state.ZBattlefield && o.Controller != o.Owner:
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: o.Owner, Text: "GainControl"})
 	}
 }
 
@@ -1430,7 +1466,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 		applyTransformed(h, c, cz.Riders.Transformed, id)
 	}
 	markChangeZoneAttach(h, c, sa, cz, &ev)
-	h.Emit(ev)
+	emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 	if to == state.ZExile {
 		recordExileReturnFor(h, c, cz.Riders.Duration, id, from, to)
 	}
@@ -1478,7 +1514,6 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 	// permanents); a card moved to a hidden or public non-battlefield zone
 	// keeps its owner.
 	if to == state.ZBattlefield {
-		applyGainControlFor(h, c, cz.Riders.GainControl, id)
 		// Tapped$ True (CR 110.5's entry state) for the hand-origin movers:
 		// the same "entered tapped" Tap the object path, the library search's
 		// library-origin branch and the Dig windows emit. Gated on the hand
