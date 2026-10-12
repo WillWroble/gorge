@@ -38,6 +38,9 @@ func (f *Face) Primitives() []string {
 			// resolver cannot bind to a single attacker and a mandatory target.
 			set["api:MustBlock.OtherShape"] = struct{}{}
 		}
+		if v := strings.TrimSpace(sa.ParamStr(PKAtEOT)); v != "" && !AtEOTValueSupported(v) {
+			set["api:AtEOT."+v] = struct{}{}
+		}
 		walk(sa.Sub, depth+1)
 	}
 	for _, a := range f.Abilities {

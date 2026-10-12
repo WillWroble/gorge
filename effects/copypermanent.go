@@ -131,7 +131,7 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 	// still mints and simply stays (one Note per call, never a silent
 	// mislaid expiry).
 	atEOT := cp.AtEOT
-	if atEOT != "" && atEOT != "Exile" && atEOT != "Sacrifice" && atEOT != "ExileCombat" {
+	if atEOT != "" && !cards.AtEOTValueSupported(atEOT) {
 		emitNote(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
 			Text: "AtEOT$ " + atEOT + " is not implemented; the copy stays on the battlefield"})
 	}
@@ -717,24 +717,10 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 			c.Remembered = append(c.Remembered, state.Target{Obj: want})
 			eventRemember(h, c, want)
 		}
-		switch copyPermanentAtEOTCodes.Code(string(atEOT)) {
-		case copyPermanentAtEOTExile:
-			// The registration's source IS the token, so the builtin
-			// body's Defined$ Self resolves to it -- the dash/warp
-			// precedent. TrackSource rides the __kwWarp prefix, so a copy
-			// that left the battlefield and returned as a new incarnation
-			// is not exiled by a stale promise (the same one-shot consume
-			// warp's end-step exile already had).
-			h.Emit(events.Event{Kind: events.DelayedRegister, Obj: want,
-				Player: owner, Step: state.StepEnd, Counter: "__kwWarpExile"})
-		case copyPermanentAtEOTSacrifice:
-			// __kwEncoreSacrifice is exactly the body this needs
-			// ("DB$ Sacrifice | Defined$ Self"); the token is its own
-			// registration source. Untracked: a sacrificed-then-returned
-			// copy keeps the promise, the same semantics encore's group
-			// registration holds.
-			h.Emit(events.Event{Kind: events.DelayedRegister, Obj: want,
-				Player: owner, Step: state.StepEnd, Counter: "__kwEncoreSacrifice"})
+		// ExileCombat rode the mint (IsMyriad cleanup, above); every other
+		// value is the shared one-shot rider, the token its own source.
+		if r, ok := atEOTRiders.Get(string(atEOT)); ok && atEOT != "ExileCombat" {
+			scheduleAtEOTRider(h, owner, r, []state.ObjID{want})
 		}
 	}
 	targetObjs := make([]state.ObjID, 0, len(targets))
@@ -992,18 +978,6 @@ var copyPermanentControllerCodes = state.NewStrCodes(
 	state.StrEntry[copyPermanentControllerCode]{Key: "Opponent", Val: copyPermanentControllerOpponent},
 	state.StrEntry[copyPermanentControllerCode]{Key: "NonRememberedController", Val: copyPermanentControllerNonRememberedController},
 	state.StrEntry[copyPermanentControllerCode]{Key: "OppNonRememberedController", Val: copyPermanentControllerNonRememberedController},
-)
-
-type copyPermanentAtEOTCode uint16
-
-const (
-	copyPermanentAtEOTExile copyPermanentAtEOTCode = iota + 1
-	copyPermanentAtEOTSacrifice
-)
-
-var copyPermanentAtEOTCodes = state.NewStrCodes(
-	state.StrEntry[copyPermanentAtEOTCode]{Key: "Exile", Val: copyPermanentAtEOTExile},
-	state.StrEntry[copyPermanentAtEOTCode]{Key: "Sacrifice", Val: copyPermanentAtEOTSacrifice},
 )
 
 type copyPermanentAtEOTTrigCode uint16
