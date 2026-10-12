@@ -1,0 +1,44 @@
+# gorge nightly tier (T3, docs/agents/test-throughput-2026-10-12.md §4): make
+# fuzz, make conformance, make test-manabrew, make test-spellbench-bridge, a
+# -race pass, and (PERF_NIGHTLY=1) a perf record, against a fresh detached
+# worktree of origin/main. See scripts/nightly.sh for the steps and knobs.
+#
+# NOT installed by scripts/seed-install.sh. To install by hand (user units, no
+# root; gorge-heavy.slice must already be installed -- seed-install.sh does it,
+# and a transient --slice= without a unit file gets no limits):
+#
+#   install -m 0644 deploy/gorge-nightly.service deploy/gorge-nightly.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gorge-nightly.timer
+#   systemctl --user list-timers gorge-nightly.timer      # next firing
+#
+# Run once now / follow / remove:
+#   systemctl --user start --no-block gorge-nightly.service
+#   journalctl --user -u gorge-nightly.service -f        # tail .ds4/nightly.log too
+#   systemctl --user disable --now gorge-nightly.timer && rm ~/.config/systemd/user/gorge-nightly.*
+[Unit]
+Description=gorge nightly tier (fuzz, conformance, manabrew, spellbench bridge, race, perf)
+Documentation=file:///home/sadams/projects/gorge/docs/agents/test-throughput-2026-10-12.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/sadams/projects/gorge
+# A user unit does not get a login shell's PATH: go lives in /usr/local/go/bin.
+Environment=PATH=/usr/local/go/bin:/home/sadams/go/bin:/usr/local/bin:/usr/bin:/bin
+# The perf step is opt-in. Uncomment to record perf nightly (it SKIPs with a
+# note until the tag perf-anchor-1 exists); PERF_PUSH=1 also pushes perf-data,
+# which needs push credentials the unit's environment can reach.
+#Environment=PERF_NIGHTLY=1 PERF_PUSH=1 REPS=4 BUDGET=600
+ExecStart=/home/sadams/projects/gorge/scripts/nightly.sh
+# The script itself is shell: every heavy step runs in its own capped
+# systemd-run scope under gorge-heavy.slice, holding a heavy lane, so this
+# unit needs no slice or memory cap of its own. Each step has its own wall cap
+# plus up to NIGHTLY_LANE_WAIT (2 h) for a lane and NIGHTLY_PM_WAIT (1 h) for a
+# running post-merge suite; 14 h bounds the pathological case so the next
+# firing always gets a clean start.
+TimeoutStartSec=14h
+Nice=10
+# The journal, NOT append:<path> (gorge-seed.service: systemd does not create
+# an append: target's parent). The script keeps .ds4/nightly.log itself.
+StandardOutput=journal
+StandardError=journal

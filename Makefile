@@ -87,6 +87,7 @@ help:
 	@echo "  make smoke          — headless-browser smoke gate vs two real gorged servers (public+omniscient); fails on any browser error or a hung loading state"
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
+	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; scripts/nightly.sh)"
 	@echo "  make oracle-audit   — run the Oracle-text card audit (rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
 	@echo "  make clean-seats    — delete finished pi-agent seat dirs (~/.cache/pi-agent); dry run unless APPLY=1"
 	@echo "  make clean-worktrees — remove merged, clean .worktrees/* and their branches; dry run unless APPLY=1"
@@ -381,6 +382,15 @@ enginebench-verify:
 .PHONY: smoke-perf
 smoke-perf: $(BIN_DIR)/botbench
 	BASE=$(BASE) CAND=$(CAND) scripts/smoke-perf.sh
+
+# nightly is the T3 tier (docs/agents/test-throughput-2026-10-12.md §4):
+# fuzz, conformance, test-manabrew, test-spellbench-bridge, a -race pass and
+# an opt-in perf record (PERF_NIGHTLY=1), each in its own capped scope holding
+# a heavy lane, against a fresh detached worktree of origin/main. Heavy: the
+# deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.
+.PHONY: nightly
+nightly:
+	scripts/nightly.sh
 
 COVER_OUT  ?= coverage.out
 COVER_HTML ?= coverage.html
