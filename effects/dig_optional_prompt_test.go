@@ -33,7 +33,7 @@ func TestExplorersScopeDigPosesOptionalTake(t *testing.T) {
 	id := h.g.AddObject(land, 0).ID
 	h.g.SetZone(state.ZLibrary, 0, []state.ObjID{id})
 	Resolve(h, &Ctx{Controller: 0, SVars: svars}, effect)
-	if h.asked == nil || h.asked.Kind != decision.KChoose || h.asked.Min != 0 {
-		t.Fatalf("Explorer's Scope decision = %+v, want optional take election", h.asked)
+	if h.asked == nil || h.asked.Kind != decision.KChoose || h.asked.ResumeKind != "dig_all" || len(h.asked.Options) != 2 || h.asked.Options[0].Kind != "yes" {
+		t.Fatalf("Explorer's Scope decision = %+v, want the all-or-nothing yes/no election (ChangeNum$ All)", h.asked)
 	}
 }
