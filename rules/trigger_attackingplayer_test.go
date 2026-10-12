@@ -26,7 +26,11 @@ func TestDamageDoneTriggerBindsAttackingPlayer(t *testing.T) {
 		t.Fatal("precondition: attacker setup")
 	}
 	e.damaging = atk
-	for _, mode := range []string{"DamageDone", "DamageDoneOnce", "DamageDealtOnce"} {
+	// Every damage-family mode the arm covers, by name: DamageDone,
+	// DamageDoneOnce and DamageDealtOnce (single) and the batch modes
+	// DamageAll and ExcessDamageAll (Kediss-style DamageSource$ overrides)
+	// route through the same case arm, so all five bind the role.
+	for _, mode := range []string{"DamageDone", "DamageDoneOnce", "DamageDealtOnce", "DamageAll", "ExcessDamageAll"} {
 		c := e.triggerReferents(cards.Trigger{Mode: mode}, source, events.Event{Kind: events.Damage, Player: 0, Amount: 2}, nil)
 		if want := (state.Target{IsPlayer: true, Player: 1}); c.AttackingPlayer != want {
 			t.Errorf("%s: AttackingPlayer = %+v, want %+v", mode, c.AttackingPlayer, want)
@@ -86,10 +90,14 @@ func TestDamageTriggerAttackingPlayerCensus(t *testing.T) {
 			if !reads {
 				continue
 			}
+			seen := map[cards.TriggerMode]bool{}
 			for _, tr := range f.Triggers {
 				switch tr.ModeKind() {
 				case cards.TriggerDamageDone, cards.TriggerDamageDealtOnce, cards.TriggerDamageDoneOnce, cards.TriggerDamageAll, cards.TriggerExcessDamageAll:
-					got = append(got, f.Name)
+					if !seen[tr.ModeKind()] {
+						seen[tr.ModeKind()] = true
+						got = append(got, f.Name)
+					}
 				}
 			}
 		}
