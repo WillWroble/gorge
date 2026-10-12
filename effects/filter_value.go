@@ -330,6 +330,9 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		// disagree.
 		if lhs, lhsOK := fieldValue(field); lhsOK {
 			if rhs, rhsOK := fieldValue(numStr); rhsOK {
+				if lacksPT(o, sc) {
+					return false, true
+				}
 				return applyCmp(cmp, lhs, rhs)
 			}
 		}
@@ -343,6 +346,9 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		}
 		f := o.Face()
 		if f == nil {
+			return false, true
+		}
+		if field != "cmc" && lacksPT(o, sc) {
 			return false, true
 		}
 		var have int
@@ -548,3 +554,16 @@ var numericFieldCodes = state.NewStrCodes(
 	state.StrEntry[numericFieldCode]{Key: "baseToughness", Val: numericFieldBaseToughness},
 	state.StrEntry[numericFieldCode]{Key: "cmc", Val: numericFieldCmc},
 )
+
+// lacksPT reports an object that has no power or toughness characteristic at
+// all (CR 208.3: only creatures and Vehicle-like objects with a printed P/T
+// have one), so no power/toughness comparison can hold: a noncreature spell
+// is not "power equal to the chosen number 0" (Talion, the Kindly Lord). A
+// context that bound layer-derived P/T already decided the object has one.
+func lacksPT(o *state.Object, sc SpecContext) bool {
+	if sc.HasDerivedPT || sc.HasBasePT {
+		return false
+	}
+	f := o.Face()
+	return f != nil && f.PT == ""
+}
