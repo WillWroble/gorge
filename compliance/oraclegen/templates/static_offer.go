@@ -168,6 +168,9 @@ func staticOfferItem(reg *cards.Registry, c *cards.Card, f *cards.Face, name str
 	if it, ok := staticExileOfferItem(reg, f, name, req, st); ok {
 		return it, true
 	}
+	if it, ok := staticExileOpponentOfferItem(reg, f, name, req, st); ok {
+		return it, true
+	}
 	return oraclegen.Item{}, false
 }
 
