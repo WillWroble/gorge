@@ -5,6 +5,10 @@
 # $BENCH_DIR/src/<sha> and built there, so no checkout or worktree is touched.
 # Extra arguments go to go build (for example -tags enginebench_az, or
 # -ldflags "-X github.com/adams-shaun/gorge/rules.derivedMemoVerifyFlag=1").
+# A git-archive build has no .git, so the toolchain cannot stamp vcs.revision;
+# it is built with -X main.commit=<sha> instead (merged into any -ldflags the
+# caller passed), which enginebench reports as "commit". A revision older than
+# that variable ignores the -X (the linker skips an undefined symbol).
 set -euo pipefail
 . "$(dirname "$0")/enginebench-lib.sh"
 rev=${1:?usage: enginebench-build.sh REV [GO_BUILD_ARGS...]}
@@ -32,7 +36,28 @@ else
 			git -C "$REPO" archive "$sha" | tar -x -C "$src.tmp"
 			mv "$src.tmp" "$src"
 		fi
-		(cd "$src" && go build "$@" -o "$out" ./cmd/enginebench)
+		# Merge the commit stamp into a caller's -ldflags (go build keeps
+		# only the last -ldflags), or add one.
+		stamp="-X main.commit=$sha"
+		args=()
+		stamped=""
+		while [ $# -gt 0 ]; do
+			case $1 in
+			-ldflags=* | --ldflags=*)
+				args+=("${1} $stamp")
+				stamped=1
+				;;
+			-ldflags | --ldflags)
+				args+=("$1" "${2:-} $stamp")
+				stamped=1
+				shift
+				;;
+			*) args+=("$1") ;;
+			esac
+			shift
+		done
+		[ -n "$stamped" ] || args+=(-ldflags "$stamp")
+		(cd "$src" && go build "${args[@]}" -o "$out" ./cmd/enginebench)
 	fi
 fi
 echo "$out"
