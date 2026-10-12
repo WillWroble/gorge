@@ -64,6 +64,12 @@ type Encoder struct {
 	vec           map[int32]struct{}
 	UseFeatureMap bool
 	fm            *FeatureMap
+	// Hook, when non-nil, observes every emitted feature: origin is the node
+	// the walker called AddFeature on (before passToParent propagation), at
+	// the node that hashed this copy. Research only (cmd/encablate); nil on
+	// every production path, and it never changes an id.
+	Hook   func(origin, at *Node, key string)
+	origin *Node
 }
 
 func NewEncoder(table int64) *Encoder {
@@ -87,6 +93,9 @@ func (e *Encoder) FeatureMap() *FeatureMap { return e.fm }
 func (e *Encoder) addIndex(h uint64, key string, n *Node) {
 	idx := indexFor(h, e.table)
 	e.vec[idx] = struct{}{}
+	if e.Hook != nil {
+		e.Hook(e.origin, n, key)
+	}
 	if e.UseFeatureMap {
 		ns := int32(-1)
 		if n.parent != nil {
@@ -121,6 +130,10 @@ func newChild(p *Node, name string) *Node {
 func (n *Node) AddFeature(name string) { n.AddFeatureCall(name, true) }
 
 func (n *Node) AddFeatureCall(name string, callParent bool) {
+	if n.enc.Hook != nil && n.enc.origin == nil {
+		n.enc.origin = n
+		defer func() { n.enc.origin = nil }()
+	}
 	if n.parent != nil && callParent && n.passToParent {
 		n.parent.AddFeatureCall(name, true)
 	}
@@ -165,3 +178,8 @@ func (n *Node) StateRefresh() {
 		c.StateRefresh()
 	}
 }
+
+// Name is the node's namespace key (e.g. "Battlefield#1"); Parent is nil at
+// the root. Research accessors for Encoder.Hook.
+func (n *Node) Name() string  { return n.name }
+func (n *Node) Parent() *Node { return n.parent }
