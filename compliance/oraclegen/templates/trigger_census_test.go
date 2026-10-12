@@ -75,7 +75,7 @@ var wantTriggerCensus = map[string]map[string]int{
 		"served:trigger.life-gained":                            8,
 		"served:trigger.noncombat-damage":                       1,
 		"served:trigger.phase":                                  27,
-		"served:trigger.spell-cast":                             19,
+		"served:trigger.spell-cast":                             20, // Kykar, Zephyr Awakener: lb-modaltgt withholds the untargetable blink mode
 		"served:trigger.spell-cast-opponent":                    4,
 		"served:trigger.spell-cast-opponent-turn":               1, // Dreams, an opponent's-turn cast cause now serves it.
 		"skip:trigger.attacks: trigger did not fire":            0,
@@ -86,7 +86,7 @@ var wantTriggerCensus = map[string]map[string]int{
 		"skip:trigger.phase: trigger condition: board presence": 0,
 		"skip:trigger.phase: trigger condition: turn history (Count$LifeOppsLostThisTurn)": 0,
 		"skip:trigger.phase: trigger did not fire":                                         0,
-		"skip:trigger.spell-cast: trigger did not fire":                                    2,
+		"skip:trigger.spell-cast: trigger did not fire":                                    1, // Consuming Aberration; Kykar serves since lb-modaltgt
 		"skip:trigger.spell-cast: trigger spell-cast opponent-turn condition":              0, // now the served:trigger.spell-cast-opponent-turn cause
 		"skip:trigger.etb-other: trigger no recipe: etb filter OppCtrl (Creature.OppCtrl)": 0,
 		"skip:trigger.dies: trigger condition: counters":                                   0,
