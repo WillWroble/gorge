@@ -371,6 +371,10 @@
       "tier": "bots",
       "status": "EXT (linked into seat)"
     },
+    "internal/policynet/v2front": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
     "internal/searchbench": {
       "tier": "bots",
       "status": "EXT"
