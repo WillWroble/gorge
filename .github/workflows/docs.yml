@@ -18,8 +18,11 @@ on:
       - docs/site/**
       - mkdocs.yml
       - scripts/docs_sets.py
-      - compliance/verdicts/**
       - .github/workflows/docs.yml
+  # Verdicts and the perf-data branch change many times a day; a daily
+  # rebuild picks both up without a 7.5-minute oraclediff run per push.
+  schedule:
+    - cron: '17 9 * * *'
   workflow_dispatch:
 
 permissions:
