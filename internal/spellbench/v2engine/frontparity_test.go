@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // The S0 front-end parity test (P§3.9): both front ends run over the same
 // gorge-engine transcript, and the resulting entity tables — and the two
 // candidate encodings' pointer resolutions — must agree. The transcript is

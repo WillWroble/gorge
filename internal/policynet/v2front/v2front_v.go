@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Front end V (P§3.3, S0): the spellbench protocol-v2 Observation the agent
 // role receives -> the same v2 entity table front end G builds from gorge's
 // view.View. Extends v2agent's typed observation (the wire is the source of
@@ -7,9 +9,6 @@
 // Every S0 convention front end G applies has its mirror here; the parity
 // test (P§3.9) holds the two to byte-identity over real transcripts.
 
-// Package v2front is front end V. It lives outside policynet so that only
-// the SpellBench bridge tools, which import it, link the protocol-v2 wire
-// types; seat and gorged link policynet without them.
 package v2front
 
 import (

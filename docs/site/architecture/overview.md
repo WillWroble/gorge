@@ -86,7 +86,6 @@ flowchart TB
     cmds["cmd/*"]
   end
   seat -. back-edge .-> policynet
-  policynet -. back-edge .-> v2agent["spellbench/v2agent"]
   host -. back-edge .-> searchseat
   host -. back-edge .-> searchprobe
   gorged -. links .-> bots
@@ -111,10 +110,12 @@ roughly 249k / 494k of that; the `rules` package alone is 124.5k non-test and
    search seat uses it as the opponent and environment model.
 3. **The production server links research code.** `cmd/gorged` links 41
    in-repo packages, including the MCTS, PIMC, learned-policy and SpellBench
-   stacks, through two back-edges: `seat/policynet.go` →
-   `internal/policynet` → `internal/spellbench/v2agent`, and `host/botenv.go`
-   → `internal/searchseat`. Decoupling these is on the
-   [cleanup roadmap](cleanup.md).
+   stacks, through two back-edges: `seat/policynet.go` → `internal/policynet`,
+   and `host/botenv.go` → `internal/searchseat`. Decoupling these is on the
+   [cleanup roadmap](cleanup.md). (The former `internal/policynet` →
+   `internal/spellbench/v2agent` edge is cut: front end V moved to
+   `internal/policynet/v2front`, and the SpellBench v1/v2 bridge builds only
+   with `-tags spellbench_bridge`.)
 
 ## Further reading
 

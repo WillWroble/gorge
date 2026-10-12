@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // The G-side candidate projection (P§3.5, S0): gorge's posed decision
 // surface, projected to v2 candidate semantics and handed to policynet's
 // shared candidate encoder. The projection itself is the D§6 mapping the
