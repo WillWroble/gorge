@@ -303,6 +303,15 @@ public final class ScenarioReplayDriverContractTest {
         check(names(a2).equals(Arrays.asList("step 0 (pass)", ScenarioReplay.CMD_YIELD_PRIORITY)),
                 "priority must be yielded before the opponent's cast checkpoint; got " + names(a2));
 
+        // pass_to choose then pass_to priority: the second resolves the top
+        // object (a mid-resolution ask gorge answers there); nothing else does.
+        JsonArray mid = steps("[{op:'cast',seat:0},{op:'pass_to',decision:'choose',seat:0},"
+                + "{op:'pass_to',decision:'priority',seat:0},{op:'pass_to',decision:'priority',seat:0}]");
+        check(!ScenarioReplay.passToResolvesTop(mid, 0), "a cast step must not resolve");
+        check(!ScenarioReplay.passToResolvesTop(mid, 1), "the choose pass_to must not resolve");
+        check(ScenarioReplay.passToResolvesTop(mid, 2), "a priority pass_to after a choose pass_to resolves the top object");
+        check(!ScenarioReplay.passToResolvesTop(mid, 3), "a priority pass_to after a priority pass_to must not resolve");
+
         // Passes need seat 0 to be the active player.
         JsonArray turn2 = steps("[{op:'pass',seat:0},{op:'pass',seat:1}]");
         boolean threw = false;
