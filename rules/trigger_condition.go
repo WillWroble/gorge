@@ -340,58 +340,73 @@ func (e *Engine) triggerConditionHoldsWithSVars(t cards.Trigger, source state.Ob
 			return false
 		}
 	}
-	if spec, ok := t.Param(cards.PKCheckDefinedPlayer); ok {
-		holds, supported := e.checkDefinedPlayerHolds(spec, you)
-		// A supported predicate is evaluated for every mode. An unsupported
-		// one fails closed only for actionTriggerModes; other modes keep
-		// firing as they did before the predicate was read at all.
-		if (supported && !holds) || (!supported && actionTriggerModes[t.Mode]) {
-			return false
-		}
+	if spec, ok := t.Param(cards.PKCheckDefinedPlayer); ok && !e.checkDefinedPlayerHolds(spec, source, you) {
+		// CR 603.4 intervening-if (Servant of the Stinger's "if you've
+		// committed a crime this turn"). Evaluated for EVERY trigger mode,
+		// and a predicate this build cannot read fails closed.
+		return false
 	}
 	return true
 }
 
-// checkDefinedPlayerHolds evaluates the player-state predicate class used by
-// event-trigger conditions. isMonarch and hasInitiative, with the controller,
-// opponent and any-player selectors, are the supported forms; supported is
-// false for any other predicate (withMost*, committedCrimeThisTurn, ...).
-func (e *Engine) checkDefinedPlayerHolds(spec string, you state.PlayerID) (holds, supported bool) {
+// checkDefinedPlayerHolds evaluates CheckDefinedPlayer$ "<base>.<property>",
+// Forge's "the defined players having the property are not empty" gate: the
+// CR 603.4 intervening-if on a trigger and the applicability gate on a
+// replacement (Jared Carthalion's "while you're the monarch"). base picks the
+// candidate seats (You; Opponent/Other; Player/Any), property is read from ONE
+// home: a designation or turn ledger the engine owns (isMonarch,
+// hasInitiative, committedCrimeThisTurn -- rules/turn_ledgers.go) or else the
+// shared player filter (withMost*, IsRemembered+counters_EQ0_<type>, ...),
+// with source bound so a source-anchored qualifier reads its own state.
+//
+// It FAILS CLOSED for every trigger mode: a malformed spec, an unknown base
+// or a property neither home can read holds for nobody (the shared filter
+// matches no seat for a qualifier it does not know). The corpus census in
+// rules/check_defined_player_census_test.go pins which spellings are read.
+func (e *Engine) checkDefinedPlayerHolds(spec string, source state.ObjID, you state.PlayerID) bool {
 	base, property, ok := strings.Cut(strings.TrimSpace(spec), ".")
-	if !ok {
-		return false, false
+	if !ok || property == "" {
+		return false
 	}
-	var predicate func(state.PlayerID) bool
-	switch definedPlayerPropertyCodes.Code(string(property)) {
-	case definedPlayerPropertyIsMonarch:
-		predicate = e.G.IsMonarch
-	case definedPlayerPropertyHasInitiative:
-		// CR 726.1: the initiative designation (Loot Dispute's AttackedTarget$,
-		// Rasaad yn Bashir's / Imoen's end-step intervening-if). It reads the
-		// folded state.Initiative the InitiativeChange event maintains.
-		predicate = e.G.IsInitiative
-	default:
-		return false, false
+	code := definedPlayerPropertyCodes.Code(string(property))
+	var filter string
+	var pc effects.PlayerSpecCtx
+	if code == 0 {
+		filter, pc = "Player."+property, e.playerSpecCtx(source)
+	}
+	holds := func(p state.PlayerID) bool {
+		switch code {
+		case definedPlayerPropertyIsMonarch:
+			return e.G.IsMonarch(p)
+		case definedPlayerPropertyHasInitiative:
+			// CR 726.1: the initiative designation (Loot Dispute's
+			// AttackedTarget$, Rasaad yn Bashir's / Imoen's end-step
+			// intervening-if), the folded state.Initiative.
+			return e.G.IsInitiative(p)
+		case definedPlayerPropertyCommittedCrimeThisTurn:
+			// CR 700.13: the per-turn crime ledger the TargetsChosen fold
+			// maintains (Servant of the Stinger).
+			return e.CommittedCrimeThisTurn(p)
+		}
+		return effects.MatchesPlayerSpecCtx(e.G, filter, p, you, pc)
 	}
 	switch definedPlayerBaseCodes.Code(string(base)) {
 	case definedPlayerBaseYou:
-		return predicate(you), true
+		return holds(you)
 	case definedPlayerBaseOpponent:
 		for _, p := range e.G.AliveFrom(you) {
-			if p != you && predicate(p) {
-				return true, true
+			if p != you && holds(p) {
+				return true
 			}
 		}
-		return false, true
 	case definedPlayerBasePlayer:
 		for _, p := range e.G.AliveFrom(0) {
-			if predicate(p) {
-				return true, true
+			if holds(p) {
+				return true
 			}
 		}
-		return false, true
 	}
-	return false, false
+	return false
 }
 
 // lifeConditionHoldsAs evaluates the LifeTotal$/LifeAmount$ intervening-if.
@@ -613,11 +628,13 @@ type definedPlayerPropertyCode uint16
 const (
 	definedPlayerPropertyIsMonarch definedPlayerPropertyCode = iota + 1
 	definedPlayerPropertyHasInitiative
+	definedPlayerPropertyCommittedCrimeThisTurn
 )
 
 var definedPlayerPropertyCodes = state.NewStrCodes(
 	state.StrEntry[definedPlayerPropertyCode]{Key: "isMonarch", Val: definedPlayerPropertyIsMonarch},
 	state.StrEntry[definedPlayerPropertyCode]{Key: "hasInitiative", Val: definedPlayerPropertyHasInitiative},
+	state.StrEntry[definedPlayerPropertyCode]{Key: "committedCrimeThisTurn", Val: definedPlayerPropertyCommittedCrimeThisTurn},
 )
 
 type definedPlayerBaseCode uint16

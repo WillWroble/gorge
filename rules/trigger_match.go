@@ -448,7 +448,10 @@ type combatFires struct {
 // trigger every time (72 lines over 68 scripts at the FORGE_REF pin) --
 // Exemplar of Light drew on every counter. The entry
 // comments below that cite ActivationLimit$ as a membership reason predate
-// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half.
+// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half. The
+// CheckDefinedPlayer$ half is no longer scoped either: an unreadable
+// predicate fails closed on every mode (checkDefinedPlayerHolds, lb-crime),
+// so the entries citing it now explain only PlayerTurn$.
 var actionTriggerModes = map[string]bool{
 	// Clashed joins them for the same reason: it is an event mode registered
 	// with its own marker Kind (events.Clash, task clash1), so the

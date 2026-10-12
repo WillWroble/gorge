@@ -873,9 +873,9 @@ func (e *Engine) replacementConditionHolds(r cards.Repl, source state.ObjID, you
 			return false
 		}
 	}
-	if _, ok := r.Param(cards.PKCheckDefinedPlayer); ok {
-		// The only corpus shape is You.isMonarch. Monarch state is not yet
-		// represented, so fail closed instead of preventing damage always.
+	if spec, ok := r.Param(cards.PKCheckDefinedPlayer); ok && !e.checkDefinedPlayerHolds(spec, source, you) {
+		// The trigger gate's one evaluator (Jared Carthalion's "while you're
+		// the monarch"); an unreadable predicate fails closed.
 		return false
 	}
 	if check, ok := r.Param(cards.PKCheckSVar); ok {
