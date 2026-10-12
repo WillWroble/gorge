@@ -11,6 +11,7 @@
 package trigmatch
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -387,7 +388,59 @@ func DamageMatchesWithCapture(e Board, t cards.Trigger, source state.ObjID, ev e
 	if t.Mode == "DamageDoneOnce" && strings.EqualFold(t.ParamStr(cards.PKFirstTime), "True") && !firstDamageToThisTurn(e, ev) {
 		return false
 	}
+	// DamageAmount$ (GE/GT/LE/LT/EQ against a literal or SVar operand) reads
+	// THIS event's amount on the per-event modes. The batch modes compare the
+	// batch TOTAL, which only exists once the batch closes, so they are gated
+	// by the caller (DamageAmountBatched / DamageAmountMatches at queue/close).
+	if !DamageAmountBatched(t) && !DamageAmountMatches(e, t, source, ev.Amount) {
+		return false
+	}
 	return true
+}
+
+// DamageAmountBatched reports whether t's DamageAmount$ compares a damage
+// BATCH total: the "one or more"/once-per-batch modes (DamageDealtOnce,
+// DamageDoneOnce, DamageAll, ExcessDamageAll), where the trigger's amount is
+// the sum over the simultaneous batch (Innocent Bystander: two 2-damage hits
+// in one batch are "dealt 3 or more").
+func DamageAmountBatched(t cards.Trigger) bool {
+	switch t.ModeKind() {
+	case cards.TriggerDamageDealtOnce, cards.TriggerDamageDoneOnce, cards.TriggerDamageAll, cards.TriggerExcessDamageAll:
+		return true
+	}
+	return false
+}
+
+// DamageAmountMatches evaluates t's DamageAmount$ against amount. An absent
+// parameter admits everything; an unreadable one (no operator, an operand
+// neither a number nor a readable SVar/count) fails closed like CompareLife.
+func DamageAmountMatches(e Board, t cards.Trigger, source state.ObjID, amount int32) bool {
+	spec := strings.TrimSpace(t.ParamStr(cards.PKDamageAmount))
+	if spec == "" {
+		return true
+	}
+	if len(spec) < 3 {
+		return false
+	}
+	op, raw := spec[:2], strings.TrimSpace(spec[2:])
+	n, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil {
+		obj := e.Game().Obj(source)
+		if obj == nil || obj.Face() == nil {
+			return false
+		}
+		svars := obj.Face().SVars
+		body := raw
+		if b, ok := svars[raw]; ok {
+			body = b
+		}
+		v, ok := e.EvalCount(source, e.ControllerOf(source), svars, body)
+		if !ok {
+			return false
+		}
+		n = int64(v)
+	}
+	return ApplyCompare(int(amount), op, int(n))
 }
 
 // firstDamageToThisTurn is the damage mirror of firstLifeLossThisTurn
