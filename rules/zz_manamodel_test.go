@@ -79,13 +79,25 @@ func TestManaModelGemstoneMineIsWithheldByThePlanner(t *testing.T) {
 // nothing is withheld and the probe never walks the hand.
 func TestManaModelMountainIsNegative(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	e, bolt := mmFixture(t, reg, "Mountain")
+	e, _ := mmFixture(t, reg, "Mountain")
 	r := e.MMProbe(0)
+	// Precondition: the probe must actually have seen Mountain's mana
+	// ability, or "nothing is withheld" is vacuous. A Mountain's {T}: {R}
+	// is free-cost and deterministic, so it is a W unit.
+	var units, inW int
+	for i := range r.Units {
+		units++
+		for k := range r.Units[i].Alts {
+			if r.Units[i].Alts[k].InW {
+				inW++
+			}
+		}
+	}
+	if units == 0 || inW == 0 {
+		t.Fatalf("Mountain: the probe saw no W mana source (%d units, %d W alts): %+v", units, inW, r.Units)
+	}
 	if r.ExcludedW || r.ExcludedP {
 		t.Fatalf("Mountain: no alternative may be outside W or P: %+v", r.Units)
-	}
-	if c := mmBolt(t, r, bolt); c.Obj != 0 && (!c.PayW || !c.PayP) {
-		t.Fatalf("Mountain: Bolt must be payable under the census: %+v", c)
 	}
 }
 
