@@ -429,6 +429,7 @@ const (
 	PKRememberLoser
 	PKRememberManifested
 	PKRememberMilled
+	PKRememberNewCard
 	PKRememberNumber
 	PKRememberPeeked
 	PKRememberRemovedCards
@@ -1211,6 +1212,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKRememberLoser:                    "RememberLoser",
 	PKRememberManifested:               "RememberManifested",
 	PKRememberMilled:                   "RememberMilled",
+	PKRememberNewCard:                  "RememberNewCard",
 	PKRememberNumber:                   "RememberNumber",
 	PKRememberPeeked:                   "RememberPeeked",
 	PKRememberRemovedCards:             "RememberRemovedCards",
