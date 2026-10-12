@@ -481,6 +481,18 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return out, true
 	}
+	// The DOTTED `<Triggered-card referent> <qualifier>` selector (Aunt May's
+	// `Defined$ TriggeredCardLKICopy.Spider` -- "if it's a Spider, put a
+	// +1/+1 counter on it"): the subset of the referent's objects the
+	// qualifier admits, through the same dotted-qualifier grammar
+	// Targeted./ExiledWith. use. Before this the whole value missed the code
+	// table and the caller's source default put the counter on Aunt May
+	// herself. Any base the table maps to the Triggered-card family takes the
+	// qualifier, so the next spelling of that family is covered too; a
+	// non-matching object is known-empty (fail closed to nobody, never Self).
+	if ts, ok := triggeredCardQualified(h, c, spec); ok {
+		return ts, true
+	}
 	switch definedSpecCodes.Code(string(spec)) {
 	case definedSpecEmpty:
 		return nil, false
@@ -2501,3 +2513,24 @@ var exiledWithSourceKeyCodes = state.NewStrCodes(
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "AffectedZone", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Description", Val: exiledWithSourceKeyFilterOrText},
 )
+
+// triggeredCardQualified resolves `<base>.<qualifier>` when base is one of the
+// Triggered-card family spellings (definedSpecTriggeredCard): the base's
+// objects filtered by definedCardQualifierMatches. A compound (" & ") value
+// is not this shape and is left to the callers that split it.
+func triggeredCardQualified(h Host, c *Ctx, spec string) ([]state.Target, bool) {
+	base, qual, dotted := strings.Cut(spec, ".")
+	if !dotted || strings.Contains(spec, " & ") || definedSpecCodes.Code(base) != definedSpecTriggeredCard {
+		return nil, false
+	}
+	ts, _ := definedSpec(h, c, base)
+	g := h.Game()
+	qual = strings.TrimSpace(qual)
+	var out []state.Target
+	for _, t := range ts {
+		if o := g.Obj(t.Obj); o != nil && definedCardQualifierMatches(h, g, c, qual, o) {
+			out = append(out, t)
+		}
+	}
+	return out, true
+}
