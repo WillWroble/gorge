@@ -1778,14 +1778,21 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     /** Whether a cast step's cast_mode is one this driver elects: Bargain,
      * "optionalcost", the face-down Disguise/Morph/Megamorph casts and the "plot" special
-     * action are wired ("plot_cast", the later cast of a plotted card, is not), and an absent or empty mode is the ordinary
+     * action and a graveyard "flashback" cast are wired ("plot_cast", the later cast of a plotted card, is not), and an absent or empty mode is the ordinary
      * cast. Any other mode is a scenario the driver cannot replay and must
      * reject loudly rather than cast at face value. */
     static boolean castModeSupported(String mode) {
         return mode == null || mode.isEmpty()
                 || mode.equals("bargained") || mode.equals("optionalcost")
                 || mode.equals("disguised") || mode.equals("morphed") || mode.equals("megamorphed")
-                || mode.equals("plot");
+                || mode.equals("plot") || mode.equals("flashback");
+    }
+
+    /** The activate command for a card's flashback: TestPlayer's
+     * "@alias ability text" form when setup bound an alias to the card, so the
+     * pick is scoped to that card, else the bare "Flashback" rule prefix. */
+    static String flashbackCommand(String alias) {
+        return alias == null || alias.isEmpty() ? "Flashback" : alias + " Flashback";
     }
 
     /** The XMage target string for one scenario target ref: its alias when
@@ -2278,6 +2285,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
     static final int PASS_PAIR_FIRST = 1;
     static final int PASS_HANDOFF = 2;
     static final int PASS_PAIR_SECOND = 3;
+    /** The active player's own pass on its turn (seat 1 active). XMage's
+     * idle TestPlayer passes without being told, so it queues nothing. */
+    static final int PASS_ACTIVE_OWN = 4;
 
     /** The XMage commands a pass step queues on the active player, the seat
      * that carries every checkpoint. */
@@ -2287,6 +2297,13 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     private static boolean isOp(JsonArray steps, int index, String op) {
         return index >= 0 && index < steps.size() && str(steps.get(index).getAsJsonObject(), "op").equals(op);
+    }
+
+    /** The passing seat is the active player and not seat 0, and the pass is
+     * not half of a pair: gorge's pass answers that seat's own priority. */
+    private static boolean isActiveOwnPass(JsonArray steps, int index, int activeSeat) {
+        return activeSeat != 0 && isOp(steps, index, "pass") && seatOfStep(steps, index) == activeSeat
+                && !isOp(steps, index - 1, "pass") && !isOp(steps, index + 1, "pass");
     }
 
     private static int seatOfStep(JsonArray steps, int index) {
@@ -2299,6 +2316,13 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * named seat. Two opposing passes (p0 then p1) resolve the stack's top
      * object, so p0's pass leaves the stack as it was and only p1's pass
      * resolves. A lone p0 pass hands priority to the p1 cast that follows. */
+    static int passAction(JsonArray steps, int index, int activeSeat) {
+        if (isActiveOwnPass(steps, index, activeSeat)) {
+            return PASS_ACTIVE_OWN;
+        }
+        return passAction(steps, index);
+    }
+
     static int passAction(JsonArray steps, int index) {
         if (index < 0 || index >= steps.size()) {
             throw new IllegalArgumentException("pass step index out of range: " + index);
@@ -2334,12 +2358,16 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * spell, as gorge's does); the second queues the one-object resolution
      * ahead of its checkpoint; the step after a lone p0 pass starts by
      * yielding priority, so the opponent's cast is on the stack before that
-     * step's checkpoint. Passes need the active player to be seat 0. */
+     * step's checkpoint. Pairs and handoffs need the active player to be
+     * seat 0; the active seat 1's own lone pass queues nothing. */
     static List<String> passCommands(JsonArray steps, int index, int activeSeat) {
         List<String> cmds = new ArrayList<>();
+        if (isActiveOwnPass(steps, index, activeSeat)) {
+            return cmds;
+        }
         boolean passHere = isOp(steps, index, "pass");
         boolean afterHandoff = isOp(steps, index - 1, "pass")
-                && passAction(steps, index - 1) == PASS_HANDOFF;
+                && passAction(steps, index - 1, activeSeat) == PASS_HANDOFF;
         if ((passHere || afterHandoff) && activeSeat != 0) {
             throw new IllegalArgumentException("pass at step " + index + " needs seat 0 to be the active player");
         }
@@ -2559,6 +2587,24 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     activateAbility(turn, phase, p, plotText);
                     return;
                 }
+                // "flashback" is the cast of a graveyard card for its
+                // flashback cost. XMage offers it as a separate SpellAbility
+                // named "Flashback <cost>" (CastFromGraveyardAbility), picked
+                // like any ability by its rule-text prefix; the card's alias
+                // scopes the pick to this step's card so another flashback
+                // card in the graveyard cannot be chosen. The step's mana was
+                // added above; a reduction (Bilbo) is applied by XMage itself.
+                if ("flashback".equals(castMode)) {
+                    String fbText = flashbackCommand(refAlias.get(str(st, "card")));
+                    if (!sc0.has("xmage_answers")) {
+                        answers(st, p);
+                    }
+                    for (String t : targets(st)) {
+                        queueCastTarget(p, t);
+                    }
+                    activateAbility(turn, phase, p, fbText);
+                    return;
+                }
                 // "disguised" casts the card face down for {3}; XMage selects
                 // that cast by suffixing the card name ("<card> using
                 // Disguise", DisguiseTest/CovetedFalconTest). "morphed" and
@@ -2719,7 +2765,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             case "pass":
                 // Validated here; its XMage commands are queued around the
                 // checkpoint by queuePassCommands, which the replay loop runs before this step.
-                passAction(steps(sc0), stepIdx);
+                passAction(steps(sc0), stepIdx, activeSeat);
                 return;
             case "resolve":
                 // gorge's resolve op passes priority until the stack is empty.
