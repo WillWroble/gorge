@@ -13,6 +13,11 @@
 # red, a new head first re-checks just those failing tests; the full suite
 # runs again only once they pass.
 #
+# The suite and its bisect steps run GATE class (`gorge_heavy_run -g`): they
+# hold a heavy lane but are never parked or deferred by a ticket gate's broker
+# bracket. This loop is what pushes main, so parking it stalls every landing's
+# push behind the gates of later tickets.
+#
 # A red run also PAUSES the agentctl pipeline (writes $PAUSE, the file the
 # daemon checks every tick) so nothing else lands on a red main while the
 # operator bisects and fixes. The pause is ours only if the file was absent:
@@ -75,7 +80,7 @@ if [ "${1:-}" = "--parse-fails" ]; then parse_fails "$2"; exit 0; fi
 # fails_at <sha> <pkg> <regex>: 0 if the tests FAIL at sha, 1 if they pass.
 fails_at() {
   git -C "$wt" switch -q --detach "$1" || return 2
-  ! (cd "$wt" && gorge_heavy_run "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
+  ! (cd "$wt" && gorge_heavy_run -g "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
 }
 
 # bisect <good> <bad> <pkg> <regex>: first first-parent commit in good..bad
@@ -115,7 +120,7 @@ while true; do
       red_fails=""
       say "FULL start ${head:0:9} ($(git rev-list --first-parent --count "$last_green..$head") since last green ${last_green:0:9})"
       s=$(date +%s)
-      if gorge_heavy_run "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
+      if gorge_heavy_run -g "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
         last_tested=$head
         if git push -q origin "$head:refs/heads/main"; then
           last_green=$head; flaky_reruns=0

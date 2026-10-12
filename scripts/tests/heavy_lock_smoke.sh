@@ -43,6 +43,8 @@ cleanup() {
 	[ -z "${GQPID:-}" ] || kill -KILL "$GQPID" 2>/dev/null
 	[ -z "${GSJOBPID:-}" ] || kill -KILL -- "-$GSJOBPID" 2>/dev/null
 	[ -z "${CLJOBPID:-}" ] || kill -KILL -- "-$CLJOBPID" 2>/dev/null
+	[ -z "${GCPID:-}" ] || kill -KILL "$GCPID" 2>/dev/null
+	[ -z "${GCJOBPID:-}" ] || kill -KILL -- "-$GCJOBPID" 2>/dev/null
 	for v in LPIDA LPIDB LPIDC LPIDD LPIDE; do
 		[ -z "${!v:-}" ] || kill -KILL "${!v}" 2>/dev/null
 	done
@@ -592,6 +594,46 @@ for case in "0 dies" "1 trap"; do
 	flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
 	check "the lane is free after the TERMed sourcing caller ($2 case)" $?
 done
+
+# ---- H: a GATE-class run (-g) is neither deferred nor parked by a bracket ----
+# postmerge_batch.sh runs the full suite with `gorge_heavy_run -g`: it is what
+# pushes main, so a ticket gate's bracket must not freeze it (2026-10-12: a
+# 6-minute suite ran 50+ minutes parked, and a parked binary's 10-minute wall
+# timeout fired as a false RED). It still takes a lane from the pool.
+export GORGE_HEAVY_LANES=1
+export GORGE_HEAVY_LOCK=$TMP/gateclass.lock
+export GORGE_HEAVY_PAUSE_GRACE_S=1
+rm -f "$GORGE_REWARD_DIR/gate-active"
+"$S/broker.sh" gate-begin smoke >/dev/null 2>&1
+rm -f "$TMP/gc-marker"
+"$S/heavy_lock.sh" run -g -w 2 -- touch "$TMP/gc-marker" 2>"$TMP/gc.err"
+rc=$?
+[ "$rc" = 0 ] && [ -e "$TMP/gc-marker" ]
+check "a -g run takes a free lane while the bracket is live" $? "rc=$rc $(cat "$TMP/gc.err")"
+: >"$TMP/gcticks"
+TICKS=$TMP/gcticks JOBPIDFILE=$TMP/gcjobpid JOBFD=$TMP/gcjobfd \
+	bash -c '. "$1/heavy_lock.sh"; gorge_heavy_run -g "$2"' _ "$S" "$TMP/job.sh" >"$TMP/gc.log" 2>&1 &
+GCPID=$!
+for _ in $(seq 80); do [ -s "$TMP/gcjobpid" ] && break; sleep 0.1; done
+GCJOBPID=$(cat "$TMP/gcjobpid" 2>/dev/null || true)
+flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+[ $? -ne 0 ]
+check "a sourced gorge_heavy_run -g job holds its lane during the bracket" $?
+# Past the 1 s grace: a parked job would have stopped ticking by now.
+sleep 2.5
+c1=$(wc -l <"$TMP/gcticks")
+sleep 1
+c2=$(wc -l <"$TMP/gcticks")
+[ "$c2" -gt "$c1" ]
+check "a -g job keeps running while the gate bracket is open (not parked)" $? "$c1 -> $c2 $(cat "$TMP/gc.log")"
+flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+[ $? -ne 0 ]
+check "a -g job never yields its lane to the bracket" $?
+"$S/broker.sh" gate-end smoke >/dev/null 2>&1
+kill -KILL "$GCPID" 2>/dev/null
+wait "$GCPID" 2>/dev/null
+[ -z "$GCJOBPID" ] || kill -KILL -- "-$GCJOBPID" 2>/dev/null
+[ -z "$GCJOBPID" ] || kill -KILL "$GCJOBPID" 2>/dev/null
 
 printf '\n%s failure(s)\n' "$fails"
 [ "$fails" = 0 ]
