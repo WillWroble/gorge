@@ -1455,6 +1455,7 @@ var wordPredicateWordCodes = state.NewStrCodes(
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourGraveyard", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourGraveyardByYou", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromTheirHand", Val: wordPredicateWordCastProvenance},
+	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourLibrary", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromTreasure", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromCave", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromDesert", Val: wordPredicateWordCastSa},
