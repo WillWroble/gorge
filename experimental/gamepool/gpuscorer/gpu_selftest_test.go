@@ -1,6 +1,6 @@
 //go:build gamepool && gamepool_gpu
 
-package gamepool
+package gpuscorer
 
 import "testing"
 

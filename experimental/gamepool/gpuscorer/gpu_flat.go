@@ -1,6 +1,6 @@
 //go:build gamepool && gamepool_gpu
 
-package gamepool
+package gpuscorer
 
 import (
 	"bytes"
@@ -14,9 +14,9 @@ import (
 // The flat training net's geometry (contract constants, same as the scratch
 // POC and native_flat_cpu_reference_v1.rs). Only the forward is used here.
 const (
-	flatStateDim  = 2048
-	flatActionDim = 128
-	flatHidden    = 64
+	flatStateDim   = 2048
+	flatActionDim  = 128
+	flatHidden     = 64
 	flatNumTensors = 14
 )
 
@@ -84,11 +84,11 @@ func loadFlatArtifact(path string) (*flatArtifact, error) {
 // flatDevice holds the JIT'd forward kernels and the device weight buffers.
 type flatDevice struct {
 	fnH1, fnH2, fnValueH, fnValueOut, fnAction, fnGather, fnScorer, fnLogits uintptr
-	dVal                                                                    [flatNumTensors]uint64
+	dVal                                                                     [flatNumTensors]uint64
 
-	dStates, dActions, dOffsets, dOwner                             uint64
+	dStates, dActions, dOffsets, dOwner                               uint64
 	dStateH1, dStateH2, dActionH, dStateForActions, dScorerH, dLogits uint64
-	dValueH, dValues                                                uint64
+	dValueH, dValues                                                  uint64
 
 	capBatch, capActions int
 }
@@ -227,7 +227,7 @@ type flatBatch struct {
 	actionOwner []int32
 }
 
-func (b *flatBatch) batch() int { return len(b.offsets) - 1 }
+func (b *flatBatch) batch() int        { return len(b.offsets) - 1 }
 func (b *flatBatch) totalActions() int { return len(b.actionOwner) }
 
 // forward launches the seven-phase multi-block forward and returns the per

@@ -132,6 +132,17 @@ dzbroker:
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./cmd/dzbroker
 
+# gamepool is the experimental, tag-gated pooled-games driver. It is built
+# from the nested module experimental/gamepool, which alone requires purego
+# (the GPU scorer's CUDA binding): the root go.mod has no require lines
+# (TestRootModuleHasNoRequires). Add gamepool_gpu to GAMEPOOL_TAGS for the GPU
+# scorer.
+.PHONY: gamepool
+GAMEPOOL_TAGS ?= gamepool
+gamepool:
+	@mkdir -p $(BIN_DIR)
+	cd experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
+
 # test-broker runs the broker package's tests under the tag. Kept out of the
 # default `make test` for the same reason the build is.
 test-broker:

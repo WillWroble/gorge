@@ -8,9 +8,12 @@
 // enqueuing goroutine schedules a callback rather than blocking on the GPU.
 // Trivial decisions are answered from the wrapped bot inline.
 //
-// Build and run:
+// It lives in the nested module experimental/gamepool (not the root module)
+// so that its GPU build can depend on purego while the root go.mod keeps zero
+// require lines. Build and run from the repo root:
 //
-//	make gamepool
+//	make gamepool                               # local scorer
+//	make gamepool GAMEPOOL_TAGS='gamepool gamepool_gpu'   # GPU scorer
 //	bin/gamepool -decks internal/testutil/decks -multiply 64 -per-seat 4 -batch 32
 //
 // The reported width histogram is the point: it is how many decisions a single
@@ -40,22 +43,22 @@ import (
 func main() { os.Exit(run(os.Args[1:])) }
 
 type cfg struct {
-	decksDir  string
-	corpusDir string
-	aDeck     string
-	bDeck     string
-	multiply  int
-	seed      uint64
-	concurrent int
-	perSeat   int
-	batch     int
-	flushMS   int
-	scorer    string
+	decksDir    string
+	corpusDir   string
+	aDeck       string
+	bDeck       string
+	multiply    int
+	seed        uint64
+	concurrent  int
+	perSeat     int
+	batch       int
+	flushMS     int
+	scorer      string
 	gpuArtifact string
-	maxTurns  int
-	maxIntent int
-	out       string
-	verbose   bool
+	maxTurns    int
+	maxIntent   int
+	out         string
+	verbose     bool
 }
 
 func run(args []string) int {
