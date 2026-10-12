@@ -2201,12 +2201,26 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		// capture added this walk, the "each card exiled this way" follow-up
 		// shape), and the source object's event-backed Remembered (what an
 		// earlier resolution remembered durably, Forge's persistent host list).
-		for _, t := range sc.Remembered {
+		// A trigger's fire-time capture is a fallback referent, not memory:
+		// the resolution half goes through selectRemembered (the one home
+		// Defined$ Remembered shares), so once the body has remembered cards
+		// of its own (Avatar Destiny's RememberMilled$) the creature whose
+		// death fired the trigger no longer matches.
+		var persistent []state.Target
+		src := g.Obj(sc.Source)
+		if src != nil {
+			persistent = src.Remembered
+		}
+		resolution := sc.Remembered
+		if len(sc.Captured) > 0 {
+			resolution = selectRemembered(sc.Remembered, sc.Captured, sc.DelayedRemembered, persistent)
+		}
+		for _, t := range resolution {
 			if !t.IsPlayer && t.Obj == o.ID {
 				return true, true
 			}
 		}
-		if src := g.Obj(sc.Source); src != nil {
+		if src != nil {
 			for _, t := range src.Remembered {
 				if !t.IsPlayer && t.Obj == o.ID {
 					return true, true
@@ -2613,6 +2627,11 @@ type SpecContext struct {
 	// prefix's context referent (contextReferent): Eradicate's
 	// `ChangeType$ Remembered.sameName` shares names with the captured card.
 	Remembered []state.Target
+	// Captured is the resolution's fire-time trigger seed (Ctx.Captured),
+	// carried beside Remembered so Card.IsRemembered applies the same
+	// capture-as-fallback selection Defined$ Remembered does
+	// (selectRemembered). Empty outside a trigger resolution.
+	Captured []state.Target
 	// RememberedPlayers is the CONSULTATION-time binding for a registered
 	// restriction's captured players (state.ContinuousEffect
 	// .RememberedPlayers). Resolution-time callers leave it zero -- their

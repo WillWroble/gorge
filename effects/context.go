@@ -1944,27 +1944,48 @@ func copyTargets(s []state.Target) []state.Target {
 //     (rules/trigger_delayed.go), so it is filtered like an ordinary written
 //     list -- the firing referent is not a card-list read even when the source
 //     has written nothing else.
+//
+// The capture is a FALLBACK referent, never memory added to what the body
+// itself wrote (task lb-rempollute, CR 603.7). In the second shape, once the
+// resolution has remembered something of its own (Avatar Destiny's
+// RememberMilled$ before its `ChangeType$ Creature.IsRemembered` return) the
+// seeded capture occurrence is dropped: Forge's host list holds the milled
+// cards only, never the creature whose death fired the trigger. Only a
+// context holding nothing but the capture keeps it.
 func resolvedRemembered(h Host, c *Ctx) []state.Target {
-	if len(c.Captured) == 0 {
-		return copyTargets(c.Remembered)
-	}
-	delayed := len(c.DelayedRemembered) > 0
-	if delayed && sameTargets(c.Captured, c.DelayedRemembered) {
-		return copyTargets(c.Remembered)
-	}
 	var persistent []state.Target
 	if src := h.Game().Obj(c.Source); src != nil {
 		persistent = src.Remembered
 	}
-	if !delayed && len(persistent) == 0 {
-		return copyTargets(c.Remembered)
+	return selectRemembered(c.Remembered, c.Captured, c.DelayedRemembered, persistent)
+}
+
+// selectRemembered is resolvedRemembered over plain slices -- the ONE home of
+// the selection rule, shared with the Card.IsRemembered filter predicate
+// (filter.go), which reads a SpecContext rather than a Ctx. remembered is the
+// resolution's set, captured its fire-time seed, delayedRemembered a delayed
+// registration's saved set, persistent the source object's event-backed list.
+// The result never aliases remembered or persistent.
+func selectRemembered(remembered, captured, delayedRemembered, persistent []state.Target) []state.Target {
+	if len(captured) == 0 {
+		return copyTargets(remembered)
 	}
-	if sameTargets(c.Remembered, c.Captured) && len(persistent) > 0 {
+	delayed := len(delayedRemembered) > 0
+	if delayed && sameTargets(captured, delayedRemembered) {
+		return copyTargets(remembered)
+	}
+	if !delayed && len(persistent) == 0 {
+		if written := excludeCaptureOccurrences(remembered, captured); len(written) > 0 {
+			return written
+		}
+		return copyTargets(remembered)
+	}
+	if sameTargets(remembered, captured) && len(persistent) > 0 {
 		return copyTargets(persistent)
 	}
-	out := make([]state.Target, 0, len(c.Remembered))
-	for _, t := range c.Remembered {
-		if containsTarget(c.Captured, t) && !containsTarget(persistent, t) {
+	out := make([]state.Target, 0, len(remembered))
+	for _, t := range remembered {
+		if containsTarget(captured, t) && !containsTarget(persistent, t) {
 			continue
 		}
 		out = append(out, t)
