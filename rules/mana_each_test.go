@@ -6,13 +6,12 @@ package rules
 
 import (
 	"sort"
-
-	"github.com/adams-shaun/gorge/effects"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
