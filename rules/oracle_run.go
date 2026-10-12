@@ -170,6 +170,16 @@ type oracleObserve struct {
 type oracleAnswer struct {
 	Kind string   `json:"kind"`
 	Pick []string `json:"pick"`
+	// Seat, when set, asserts the engine poses the decision this answer is
+	// consumed by to that seat; a mismatch is a harness failure (checked
+	// once the pick has proven consumption, so the generator's wildcard
+	// retry still sees its not-offered failures). The generated xmageport
+	// scenarios set it from the XMage choice's own player, so a decider that
+	// resolves to the wrong seat is caught even when the wrong seat's answer
+	// still produces the right board (B8: OptionalDecider$
+	// TriggeredSourceController asked the trigger source's controller
+	// instead of the damage source's). nil = no assertion.
+	Seat *int `json:"seat,omitempty"`
 }
 
 type oracleExpect struct {
@@ -1133,6 +1143,16 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 			}
 			used[idx] = true
 			choices = append(choices, idx)
+		}
+		// The seat assertion fires only once the pick proves this decision
+		// is the one the answer is consumed by: a wildcard "any" answer that
+		// a foreign decision merely touches keeps its not-offered failure,
+		// which the generator's placement loop retries on the kinds and
+		// steps a setChoice can mean. A consumed answer posed to the wrong
+		// seat is the B8 bug shape and fails here.
+		if a.Seat != nil && int(d.Player) != *a.Seat {
+			return harnessf("answer %q posed to p%d, scenario says p%d: %s",
+				strings.Join(a.Pick, ","), d.Player, *a.Seat, optionDump(d))
 		}
 		return r.submit(d, choices, "answer")
 	}

@@ -1006,28 +1006,26 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// (Leyline of Combustion's 2 damage and Ashenmoor Liege's 4 life are
 		// paid to the targeting spell's controller, never the Leyline's or
 		// the Liege's); the trigger captures that source in TriggerSource,
-		// so it resolves through the identical read. The role is preferred
-		// when the trigger captured one (a DamageDone trigger's Remembered
-		// is the DAMAGED object, whose controller is exactly wrong for the
-		// source form); the fallback -- Remembered[0]'s controller -- is
-		// deciderFromSpec's convention for the same spellings on
-		// OptionalDecider$ lines, so both reads of one spelling agree
-		// wherever the role is absent.
-		ref := c.TriggerSource
+		// so it resolves through the identical read. The source spellings
+		// share TriggeredSourceController -- the same resolver the
+		// OptionalDecider$ consumer reads (rules/trigger_queue.go
+		// deciderFromSpec) -- so both reads of one spelling agree wherever
+		// the role is absent.
 		if spec == "TriggeredTargetController" {
-			if c.TriggerTarget.Obj != 0 || c.TriggerTarget.IsPlayer {
-				if c.TriggerTarget.IsPlayer {
-					return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
-				}
-				ref = c.TriggerTarget.Obj
-			} else if len(c.Remembered) > 0 {
+			if c.TriggerTarget.IsPlayer {
+				return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
+			}
+			ref := c.TriggerTarget.Obj
+			if ref == 0 && len(c.Remembered) > 0 {
 				ref = c.Remembered[0].Obj
 			}
-		} else if ref == 0 && len(c.Remembered) > 0 {
-			ref = c.Remembered[0].Obj
+			if o := g.Obj(ref); o != nil {
+				return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+			}
+			return nil, true
 		}
-		if o := g.Obj(ref); o != nil {
-			return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+		if p, ok := TriggeredSourceController(g, c.TriggerContext, c.Remembered); ok {
+			return []state.Target{{Player: p, IsPlayer: true}}, true
 		}
 		return nil, true
 	case definedSpecTriggeredTargets:
