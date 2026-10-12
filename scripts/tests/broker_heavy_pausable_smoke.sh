@@ -27,6 +27,12 @@ export HEAVY_START_FLOOR_MB=1 PROBE_START_FLOOR_MB=1
 export HEAVY_MAX_LEASES=5 PROBE_MAX_LEASES=5
 export PAUSE_GRACE_S=2 KILL_FLOOR_MB=1 LOAD_CEIL_FRAC=100
 export GORGE_HEAVY_LOCK=$TMP/lockfile
+# The post-merge suite runs this under gorge_heavy_run, which exports the REAL
+# gate-active flag and lock marker. Inherited, an open ticket gate defers the
+# smoke's own heavy.sh forever ("all 3 lane(s)" held, 2026-10-12 17:39 RED
+# 26c5e5db3). Point both at this test's private state.
+export GORGE_HEAVY_GATE_FLAG=$TMP/reward/gate-active
+unset GORGE_HEAVY_LOCK_HELD
 BROKER=$ROOT/scripts/broker.sh
 HEAVY=$ROOT/scripts/heavy.sh
 fails=0
