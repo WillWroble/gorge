@@ -1024,6 +1024,12 @@ func replacementBodyRewritesHeldEvent(with *cards.SA, svars map[string]string) b
 // replacements); passing it derives the action automatically rather than
 // making every caller compute it.
 func (e *Engine) runReplaceWith(ctx *effects.Ctx, replaced state.ObjID, with *cards.SA, ev *events.Event) {
+	// A declined (or no longer legal) as-enters copy election is the optional
+	// replacement NOT applied (CR 614.1c): neither the copy nor its SubAbility$
+	// rider (Altered Ego's X additional counters) runs.
+	if effects.CloneETBNoCopy(e.G, ctx, with) {
+		return
+	}
 	// An Effect-created replacement body is a fresh parse (replacementBodySA)
 	// whose SubAbility$ chain was never linked -- only cards.Link links a
 	// printed body. Resolve it from the source's own SVar table so a body

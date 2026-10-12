@@ -20,7 +20,7 @@ import (
 // deliberate re-measure, so the supported boundary cannot widen (a new
 // parameter accepted into etbCloneWhitelist) or narrow silently.
 var etbCloneCleanNames = []string{
-	"Clever Impersonator", "Clone", "Copy Artifact", "Copy Enchantment", "Copy Land",
+	"Altered Ego", "Clever Impersonator", "Clone", "Copy Artifact", "Copy Enchantment", "Copy Land",
 	"Dack's Duplicate", "Deceptive Frostkite", "Glasspool Mimic",
 	"Jwari Shapeshifter", "Malleable Impostor", "Masterwork of Ingenuity", "Mirror Image",
 	"Mirrormade", "Mocking Doppelganger", "Mockingbird", "Naga Fleshcrafter", "Omni-Changeling",

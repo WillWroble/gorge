@@ -543,6 +543,11 @@ func etbCloneWhitelist(sa *cards.SA, svars map[string]string) bool {
 	if !cp.ETBShapeOK || (effects.SpecNeedsResolver(cp.Choices) && !effects.CloneETBSpendSelector(cp.Choices, svars)) {
 		return false
 	}
+	// A SubAbility$ chain is offered only as Altered Ego's "enters with X
+	// additional +1/+1 counters" rider (effects.CloneETBSubChainOK).
+	if !effects.CloneETBSubChainOK(sa) {
+		return false
+	}
 	// A named static is installed on the cloned face by CloneStatic, so
 	// every static reader sees it through its normal printed-S: path. An
 	// unresolvable member still fails closed before posing the ETB election.
