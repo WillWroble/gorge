@@ -322,6 +322,10 @@ type staticGrantLifetime struct {
 	// self-exile ender keys on it. The printed StaticEffect$ move rider
 	// leaves it false, so only the Effect route is ended by the idiom.
 	FromEffect bool
+	// DurationSource and ExileOnMovedAlso carry an Animate-delivered body's
+	// host-scoped lifetime (registerAnimateStaticAbilities).
+	DurationSource   state.ObjID
+	ExileOnMovedAlso string
 }
 
 // stampGrantLifetime applies lt to one layer's registration. Zero-value
@@ -354,6 +358,12 @@ func stampGrantLifetime(ce *state.ContinuousEffect, lt staticGrantLifetime) {
 	}
 	if lt.FromEffect {
 		ce.FromEffect = true
+	}
+	if lt.DurationSource != 0 {
+		ce.DurationSource = lt.DurationSource
+	}
+	if lt.ExileOnMovedAlso != "" {
+		ce.ExileOnMovedAlso = lt.ExileOnMovedAlso
 	}
 }
 
