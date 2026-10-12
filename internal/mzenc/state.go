@@ -506,7 +506,18 @@ func ProcessState(v view.View, ch view.Chars, seat state.PlayerID, decisionType 
 // hot path and the walker's emit/note calls are no-ops then; ProcessStateReport
 // supplies both maps and reads them back.
 func processState(v view.View, ch view.Chars, seat state.PlayerID, decisionType int, decisionsText string, emitted, unsupported map[string]bool) (map[int32]struct{}, map[string]bool) {
+	return processStateWith(NewEncoder(DefaultTableSize), v, ch, seat, decisionType, decisionsText, emitted, unsupported)
+}
+
+// ProcessStateHook is ProcessState with Encoder.Hook set: every emitted
+// feature is reported with its origin node. Research only (cmd/encablate).
+func ProcessStateHook(v view.View, seat state.PlayerID, decisionType int, decisionsText string, hook func(origin, at *Node, key string)) {
 	e := NewEncoder(DefaultTableSize)
+	e.Hook = hook
+	processStateWith(e, v, nil, seat, decisionType, decisionsText, nil, nil)
+}
+
+func processStateWith(e *Encoder, v view.View, ch view.Chars, seat state.PlayerID, decisionType int, decisionsText string, emitted, unsupported map[string]bool) (map[int32]struct{}, map[string]bool) {
 	w := &walker{e: e, seat: seat, active: v.Active, ch: ch, v: &v,
 		names: map[state.ObjID]string{}, emitted: emitted, unsupported: unsupported}
 	w.indexCards()
