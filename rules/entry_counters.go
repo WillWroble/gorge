@@ -261,6 +261,14 @@ func entryBodyAbsorbableFor(sa *cards.SA, foreign bool) bool {
 	if sa == nil || sa.API != "PutCounter" {
 		return false
 	}
+	// A condition-gated body stays on the ordinary body path: the live
+	// Resolve evaluates the gate and SKIPS the body when it is not met, a
+	// verdict the fold cannot reproduce by adding CounterNumResolved to the
+	// grant (Vampire Socialite's "as long as an opponent lost life this
+	// turn" rider folded unconditionally on a board where no opponent has).
+	if entryBodyConditionGated(sa) {
+		return false
+	}
 	pc := effects.PutCounterOf(sa)
 	if !pc.ETB || sa.Sub != nil {
 		return false
@@ -281,6 +289,34 @@ func entryBodyAbsorbableFor(sa *cards.SA, foreign bool) bool {
 		return false
 	}
 	return true
+}
+
+// entryBodyConditionGated reports whether a PutCounter|ETB$ True body carries
+// a resolution-condition gate: any Condition* key effects.Resolve's
+// conditionMet evaluates, the DB-body PresentDefined$/IsPresent$/
+// PresentCompare$ spellings conditionMetCore normalizes, or an unsupported
+// Condition* key (which Resolve skips loudly, effects/registry.go). The entry
+// fold must leave such a body on the ordinary body path -- the conservative
+// direction entryBodyAbsorbable promises -- because Resolve may skip it
+// entirely, a verdict the fold cannot reproduce from CounterNumResolved alone.
+// One reader, so every absorbability check shares it.
+func entryBodyConditionGated(sa *cards.SA) bool {
+	ap := effects.ActivationOf(sa)
+	return ap.Cond.Any() || ap.PresentDefined != "" || ap.IsPresent.Text != "" ||
+		ap.PresentCompare.Text != "" || ap.Has(effects.ActConditionOther)
+}
+
+// entryBodyAbsorbableMatch is the one selection predicate the entry fold's
+// walks share: a matched Moved replacement the live dispatch would run as an
+// Updated battlefield-entry counter (ReplacementResult$ Updated,
+// Destination$ Battlefield) whose body is the bare self/lent PutCounter shape
+// (entryBodyAbsorbableFor). foreignEntryBodies and absorbMatched both read it,
+// so the fold's selection cannot drift from the live dispatch's.
+func entryBodyAbsorbableMatch(r cards.Repl, foreign bool) bool {
+	if r.ParamStr(cards.PKReplacementResult) != "Updated" || r.ParamStr(cards.PKDestination) != "Battlefield" {
+		return false
+	}
+	return entryBodyAbsorbableFor(r.With, foreign)
 }
 
 // entryBodyKind is a PutCounter|ETB$ True body's counter kind as the entry
@@ -321,7 +357,7 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 	var ids []string
 	var absorb func(m replMatch)
 	absorbMatched := func(m replMatch, foreign bool) {
-		if !entryBodyAbsorbableFor(m.repl.With, foreign) ||
+		if !entryBodyAbsorbableMatch(*m.repl, foreign) ||
 			!entryBodyKindEncodable(m.repl.With) {
 			return
 		}
@@ -412,14 +448,14 @@ func (e *Engine) foreignEntryBodies(entrant state.ObjID, ev events.Event) []repl
 		}
 		for i := range f.Repls {
 			r := &f.Repls[i]
-			if r.Event != "Moved" || r.With == nil || r.With.API != "PutCounter" || r.OptionalValue() ||
-				!entryBodyAbsorbableFor(r.With, true) {
+			if r.Event != "Moved" || r.With == nil || r.OptionalValue() ||
+				!entryBodyAbsorbableMatch(*r, true) {
 				continue
 			}
 			out = append(out, replMatch{id: id, face: f, repl: r})
 		}
 	})
-	return out
+	return e.dropAppliedReplacements(out)
 }
 
 // entryRiderCandidates reports whether an entry might carry an AddsCounters$
