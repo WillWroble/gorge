@@ -5,9 +5,11 @@
 //
 // It has three subcommands, wired together by scripts/postmerge_full.sh:
 //
-//	testbudget exec <test-binary> [args...]
-//	    An ad-hoc wrapper that runs a binary and records its peak RSS (KiB)
-//	    when GORGE_TESTBUDGET_RSS_DIR is set.
+//	go test -exec "/abs/testbudget exec" ...
+//	    Runs each test binary, records its peak RSS (KiB, from wait4's
+//	    rusage) under GORGE_TESTBUDGET_RSS_DIR when set, and keeps the
+//	    `go test` result cache working (see runExec). This is how every
+//	    package's RSS is measured: no package needs a TestMain for it.
 //
 //	go test -json ... | testbudget tee -events events.json
 //	    Reprints the plain `go test` text (failing tests' output and every
