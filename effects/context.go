@@ -1244,8 +1244,14 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 			// The source left the battlefield as a cost ("{5}, Sacrifice
 			// this Aura: Exile enchanted creature"): the move fold cleared
 			// AttachedTo but kept the pre-clear bearer as LastBearer, which
-			// is the last-known-information read CR 608.2h asks for.
-			if o.AttachedTo == 0 && o.LastBearer != 0 && g.Obj(o.LastBearer) != nil {
+			// is the last-known-information read CR 608.2h asks for. The
+			// fallback is only for a source that is OFF the battlefield: a
+			// source still on the battlefield that is merely unattached (a
+			// bearer that died, an Equipment returned unattached) has no
+			// "enchanted/equipped creature" and must resolve to nothing,
+			// never to a stale LastBearer (CR 400.7: the returned permanent
+			// is a new object).
+			if o.Zone != state.ZBattlefield && o.LastBearer != 0 && g.Obj(o.LastBearer) != nil {
 				return []state.Target{{Obj: o.LastBearer}}, true
 			}
 		}
