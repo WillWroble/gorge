@@ -139,6 +139,19 @@ func evalSacrificedOK(c *Ctx, body string) (int32, bool) {
 		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
 	case evalSacrificedOKAmount:
 		n = int32(len(c.Sacrificed))
+	case evalSacrificedOKCardTypes:
+		// Distinct card types among the sacrificed objects' snapshots
+		// (Baba Lysaga's "three or more card types among the sacrificed
+		// permanents"); a set read through len, never ranged into an event.
+		seen := map[string]bool{}
+		for _, s := range c.Sacrificed {
+			for _, typ := range s.Types {
+				if cardTypeWords[typ] {
+					seen[typ] = true
+				}
+			}
+		}
+		n = int32(len(seen))
 	default:
 		// An out-of-scope head (Valid, CardTypes, ChromaSource, CardNumColors,
 		// CardCounters) degrades to zero, exactly as before the fix -- the
@@ -704,6 +717,7 @@ const (
 	evalSacrificedOKCardToughness
 	evalSacrificedOKCardManaCost
 	evalSacrificedOKAmount
+	evalSacrificedOKCardTypes
 )
 
 var evalSacrificedOKCodes = state.NewStrCodes(
@@ -711,6 +725,7 @@ var evalSacrificedOKCodes = state.NewStrCodes(
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardToughness", Val: evalSacrificedOKCardToughness},
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardManaCost", Val: evalSacrificedOKCardManaCost},
 	state.StrEntry[evalSacrificedOKCode]{Key: "Amount", Val: evalSacrificedOKAmount},
+	state.StrEntry[evalSacrificedOKCode]{Key: "CardTypes", Val: evalSacrificedOKCardTypes},
 )
 
 type refTargetsCode uint16

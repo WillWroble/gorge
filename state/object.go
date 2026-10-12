@@ -53,6 +53,11 @@ type SacrificedInfo struct {
 	// cleared the live counters -- Zack Fair's self-sacrifice). Nil for the
 	// P/T-only readers the Sacrificed$<Property> heads are.
 	Counters []Counter
+	// Types is the object's card types at the instant of the sacrifice (the
+	// Sacrificed$CardTypes head reads the distinct set across the sacrificed
+	// objects). Printed face types here; effects.SacrificedLKI overwrites
+	// them with the layer-derived set for a battlefield permanent.
+	Types []string
 }
 
 // LKIObject is the last-known-information snapshot captured by a
@@ -2224,7 +2229,8 @@ func SacrificedInfoOf(g *Game, id ObjID) SacrificedInfo {
 			counters = append(counters, o.Counters[i])
 		}
 	}
-	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(), Counters: counters}
+	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(), Counters: counters,
+		Types: append([]string(nil), o.Face().Types...)}
 }
 
 // CloneChosenModes copies a ChosenModes announcement, preserving the
