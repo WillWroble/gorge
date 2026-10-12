@@ -341,8 +341,7 @@
      }
     }
    ],
-   "xmage": "BecomesTargetTriggerTest#testGlyphKeeperCountersFirstAbilityButNotSecondOne",
-   "known_bug": "B9: Mode$ BecomesTarget ignores FirstTime$ True (rules/trigmatch/actions.go:234-307 never reads it), so Glyph Keeper counters every spell or ability that targets it, not only the first each turn. CR 603.2 (trigger condition as printed)."
+   "xmage": "BecomesTargetTriggerTest#testGlyphKeeperCountersFirstAbilityButNotSecondOne"
   },
   {
    "name": "test-diffusion-sliver",
