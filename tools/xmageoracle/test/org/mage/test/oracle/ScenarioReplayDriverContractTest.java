@@ -479,6 +479,13 @@ public final class ScenarioReplayDriverContractTest {
                 "face-1 cast spell name (back half) did not rewrite to the front");
         check(ScenarioReplay.gorgeSpellingRule(front, whole, "Grizzly Bears").equals("Grizzly Bears"),
                 "an ordinary snapshot name was rewritten");
+        // A non-spell snapshot string (a Room permanent whose back door is
+        // unlocked, CR 709.5) keeps the back half's name; the whole object
+        // name still reads as the front half.
+        check(ScenarioReplay.gorgeObjectSpellingRule(front, whole, "Prop Room").equals("Prop Room"),
+                "an unlocked back-door permanent name was rewritten to the front");
+        check(ScenarioReplay.gorgeObjectSpellingRule(front, whole, whole).equals(front),
+                "whole object name did not rewrite to the front half");
         // Precondition: the back half and the front really are distinct names.
         check(!front.equals("Prop Room"), "halves must differ for the alias to mean anything");
         System.out.println("PASS split/Room spellings (probe whole-name cast, back-half spell alias, "
