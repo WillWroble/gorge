@@ -1790,9 +1790,20 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     /** The activate command for a card's flashback: TestPlayer's
      * "@alias ability text" form when setup bound an alias to the card, so the
-     * pick is scoped to that card, else the bare "Flashback" rule prefix. */
+     * pick is scoped to that card, else the bare "Flashback" rule prefix.
+     * TestPlayer splits that form at its first space, so the alias is the
+     * space-free twin registerObjectAliases binds (abilityAliasRef). */
     static String flashbackCommand(String alias) {
-        return alias == null || alias.isEmpty() ? "Flashback" : alias + " Flashback";
+        return alias == null || alias.isEmpty() ? "Flashback" : abilityAliasRef(alias) + " Flashback";
+    }
+
+    /** The space-free spelling of a scenario ref ("p0:Chatter of the
+     * Squirrel" -> "p0:Chatter_of_the_Squirrel"), bound beside the ref
+     * itself: TestPlayer's "@ref ability text" command ends the ref at its
+     * first space, so a multi-word ref can only scope an ability pick
+     * through this twin. No card name holds an underscore. */
+    static String abilityAliasRef(String ref) {
+        return ref.replace(' ', '_');
     }
 
     /** The XMage target string for one scenario target ref: its alias when
@@ -1997,6 +2008,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         refAlias.put(scenarioRef, "@" + scenarioRef);
         refAlias.putIfAbsent(xmageRef, "@" + scenarioRef);
         bind.bind(scenarioRef, id);
+        if (!abilityAliasRef(scenarioRef).equals(scenarioRef)) {
+            bind.bind(abilityAliasRef(scenarioRef), id);
+        }
         if (!xmageRef.equals(scenarioRef)) {
             bind.bind(xmageRef, id);
         }

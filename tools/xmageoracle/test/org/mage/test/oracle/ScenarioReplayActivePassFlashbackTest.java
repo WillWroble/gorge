@@ -56,8 +56,17 @@ public final class ScenarioReplayActivePassFlashbackTest {
 
         check(ScenarioReplay.castModeSupported("flashback"), "flashback cast_mode must be elected");
         check(!ScenarioReplay.castModeSupported("escape"), "an unwired cast_mode must still be rejected");
-        check(ScenarioReplay.flashbackCommand("@p0:Chatter of the Squirrel")
-                .equals("@p0:Chatter of the Squirrel Flashback"), "flashback command scopes to the card alias");
+        // TestPlayer ends an "@ref ability" ref at its first space, so the
+        // command must carry the space-free twin, and setup must bind it.
+        String fb = ScenarioReplay.flashbackCommand("@p0:Chatter of the Squirrel");
+        check(fb.equals("@p0:Chatter_of_the_Squirrel Flashback"), "flashback command scopes to the card alias: " + fb);
+        check(fb.indexOf(' ') == fb.indexOf(" Flashback"), "alias part of the flashback command holds a space: " + fb);
+        java.util.List<String> bound = new java.util.ArrayList<>();
+        ScenarioReplay.registerObjectAliases(0, "Chatter of the Squirrel", "p0:Chatter of the Squirrel",
+                "p0:Chatter of the Squirrel", 0, java.util.UUID.randomUUID(), new java.util.LinkedHashMap<>(),
+                (ref, objId) -> bound.add(ref));
+        check(bound.contains("p0:Chatter of the Squirrel"), "scenario ref not bound: " + bound);
+        check(bound.contains("p0:Chatter_of_the_Squirrel"), "space-free twin not bound: " + bound);
         check(ScenarioReplay.flashbackCommand(null).equals("Flashback"), "unaliased flashback command");
         System.out.println("PASS active seat 1 own pass is a no-op; flashback cast_mode elected via alias-scoped ability");
     }
