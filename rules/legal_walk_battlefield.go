@@ -484,6 +484,7 @@ func (w *legalWalk) battlefieldWalk() {
 								Cost:  e.abilityOfferCost(p, id, ab),
 								Grant: e.abilityGrant(id, ab), Attach: ab.API == "Attach",
 								GrantStatics:  staticModesFromSVars(ab, abFace.SVars),
+								Loyalty:       abilityLoyaltyFact(o, ab, &cost, loyal),
 								SelfSkipTurns: abilitySelfSkipTurns(ab), ForeignSource: o.Controller != p})
 						}
 						if altOK {
