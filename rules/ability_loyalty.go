@@ -11,12 +11,13 @@ import (
 
 // loyaltyRemovalAPIs are the head/sub-chain APIs whose resolution takes a
 // permanent away from its controller (or hurts it), the effect the bot's
-// loyalty ranking prices as "removes a threat". ChangeZone is classified
-// separately (abilityRemovesPermanent) because only its battlefield-leaving
-// shape is removal.
+// loyalty ranking prices as "removes a threat". ChangeZone and ChangeZoneAll
+// are classified separately (abilityRemovesPermanent) because only their
+// battlefield-leaving shape is removal; ChangeZoneAll's other shapes (a
+// graveyard or library exile) leave every battlefield permanent untouched.
 var loyaltyRemovalAPIs = map[string]struct{}{
 	"Destroy": {}, "DestroyAll": {}, "DealDamage": {}, "DamageAll": {},
-	"Sacrifice": {}, "SacrificeAll": {}, "Fight": {}, "ChangeZoneAll": {},
+	"Sacrifice": {}, "SacrificeAll": {}, "Fight": {},
 }
 
 // abilityLoyaltyFact is decision.Option.Loyalty for an offered activated
@@ -64,7 +65,7 @@ func abilityRemovesPermanent(ab *cards.SA) bool {
 		if _, ok := loyaltyRemovalAPIs[sa.API]; ok {
 			return true
 		}
-		if sa.API != "ChangeZone" {
+		if sa.API != "ChangeZone" && sa.API != "ChangeZoneAll" {
 			continue
 		}
 		if !effects.ZoneListOf(sa.ParamStr(cards.PKOrigin)).Has(state.ZBattlefield) {

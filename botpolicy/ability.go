@@ -114,13 +114,15 @@ func (b Board) abilityScore(o decision.Option, me state.PlayerID) (score int32, 
 	return 1000 - abilityCost(o.Label), true
 }
 
-// Loyalty ranking bands (A7). Every loyalty ability scores above every
-// ordinary ability (1000 - cost <= 1000): a walker may activate one loyalty
-// ability per turn, so taking it forgoes nothing the other abilities could
-// not do afterwards. Within the walker the order is: an ultimate, a minus
-// that removes a threat the opponent actually presents, a plus, a zero, then
-// the remaining minuses (cheapest first; a minus that would kill the walker
-// last).
+// Loyalty ranking bands (A7). A loyalty ability scores above an ordinary
+// ability (1000 - cost <= 1000) except the two bands that kill the walker
+// (1000 for a walker-killing removal, 900 for any other walker-killing
+// minus): a walker may activate one loyalty ability per turn, so taking it
+// forgoes nothing the other abilities could not do afterwards, but spending
+// the walker itself is worse than the ordinary ability it forgoes. Within
+// the walker the order is: an ultimate, a minus that removes a threat the
+// opponent actually presents, a plus, a zero, then the remaining minuses
+// (cheapest first; a minus that would kill the walker last).
 const (
 	loyaltyUltimate    int32 = 1900
 	loyaltyRemoval     int32 = 1500

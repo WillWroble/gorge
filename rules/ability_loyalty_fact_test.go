@@ -19,6 +19,8 @@ func TestLoyaltyOptionFacts(t *testing.T) {
 		"A:AB$ Destroy | Cost$ SubCounter<2/LOYALTY> | ValidTgts$ Creature | TgtPrompt$ Select target creature | Planeswalker$ True | SpellDescription$ Destroy target creature.\n"+
 		"A:AB$ GainLife | Cost$ SubCounter<4/LOYALTY> | LifeAmount$ 20 | Planeswalker$ True | Ultimate$ True | SpellDescription$ Gain 20.\n"+
 		"A:AB$ RestartGame | Cost$ SubCounter<3/LOYALTY> | Planeswalker$ True | Ultimate$ True | SpellDescription$ Restart.\n"+
+		"A:AB$ ChangeZoneAll | Cost$ SubCounter<1/LOYALTY> | Origin$ Battlefield | Destination$ Exile | ChangeType$ Creature | Planeswalker$ True | SpellDescription$ Exile all creatures.\n"+
+		"A:AB$ ChangeZoneAll | Cost$ SubCounter<1/LOYALTY> | Origin$ Graveyard | Destination$ Exile | ChangeType$ Card | Planeswalker$ True | SpellDescription$ Exile all graveyards.\n"+
 		"Oracle:x\n")
 	victim := card(t, "Name:Fact Victim\nTypes:Creature Bear\nPT:2/2\nOracle:x\n")
 	e, _ := tokenReplGameSeats(t, 301, []*cards.Card{walker}, []*cards.Card{victim})
@@ -46,5 +48,15 @@ func TestLoyaltyOptionFacts(t *testing.T) {
 	}
 	if *ult != (decision.Loyalty{Delta: -4, Ultimate: true, Dies: true}) {
 		t.Errorf("[-4] ultimate fact = %+v, want Delta -4 Ultimate Dies", *ult)
+	}
+	// ChangeZoneAll is removal only in its battlefield-leaving shape: a
+	// graveyard/library exile leaves every battlefield permanent untouched.
+	exileAll := abilityOption(t, e, id, 4).Loyalty
+	exileGrave := abilityOption(t, e, id, 5).Loyalty
+	if exileAll == nil || !exileAll.Removal {
+		t.Errorf("ChangeZoneAll Battlefield->Exile fact = %+v, want Removal", exileAll)
+	}
+	if exileGrave == nil || exileGrave.Removal {
+		t.Errorf("ChangeZoneAll Graveyard->Exile fact = %+v, want not Removal", exileGrave)
 	}
 }
