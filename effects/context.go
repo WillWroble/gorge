@@ -752,7 +752,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return nil, true
 	case definedSpecRememberedController:
-		return controllersOf(g, resolvedRemembered(h, c)), true // persistent-aware, as plain Remembered
+		return rememberedControllersLKI(g, c, resolvedRemembered(h, c)), true // persistent-aware, as plain Remembered
 	case definedSpecNonRememberedController:
 		// These selectors name living players other than the controller of a
 		// remembered CARD. A remembered player is not a card anchor, and an
@@ -1567,6 +1567,30 @@ func lkiControllerFor(c *Ctx, id state.ObjID) (state.PlayerID, bool) {
 		}
 	}
 	return 0, false
+}
+
+// rememberedControllersLKI is controllersOf for a Remembered$ controller read
+// with CR 608.2h look-back: a remembered object that is no longer on the
+// battlefield answers with the controller RememberLKI$ captured before its
+// departure (events.Apply's Move resets the live controller to the owner),
+// falling back to the live controller when no capture exists. Unyielding
+// Gatekeeper's "its controller creates a Detective" is the carrier.
+func rememberedControllersLKI(g *state.Game, c *Ctx, ts []state.Target) []state.Target {
+	if c == nil || len(c.Snap.ChangeZone) == 0 {
+		return controllersOf(g, ts)
+	}
+	rewritten := make([]state.Target, 0, len(ts))
+	for _, t := range ts {
+		if !t.IsPlayer {
+			if o := g.Obj(t.Obj); o != nil && o.Zone != state.ZBattlefield {
+				if p, ok := lkiControllerFor(c, t.Obj); ok {
+					t = state.Target{Player: p, IsPlayer: true}
+				}
+			}
+		}
+		rewritten = append(rewritten, t)
+	}
+	return controllersOf(g, rewritten)
 }
 
 // objectsOf returns Remembered's object entries (IsPlayer false) as a fresh
