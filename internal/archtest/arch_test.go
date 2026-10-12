@@ -135,7 +135,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
-			t.Errorf("%s imports time; only host, host/httpapi and cmd/gorged may", path)
+			t.Errorf("%s imports time; only the packages in this test's allowed map may (see its doc comment)", path)
 		}
 	}
 }

@@ -46,7 +46,6 @@ go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 | `validation/oracle/` | verdict refresh runbook | TOOL |
 | `orchestrator/` | `hooks.py` merge-gate hooks for the CI-style landing pipeline | TOOL (live) |
 | `deploy/` | systemd units | TOOL |
-| `patches/` | DraftZero patches "@ gorge c9a422b7" | RED |
 | `docs/` (167) | specs, plans, reports, agent guide | SUPP |
 | `deck.list` (root, 260 KB) | census scratch decklists | SUSP |
 | `benchmark.md` (root) | `dzgorge` benchmark notes | SUSP |
