@@ -14,10 +14,66 @@ import (
 	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
-// TestDecisionTextHasNoEngineSyntax plays the repo-deck sample to completion
-// and checks every decision posed along the way: its Prompt and every
-// option Label must be free of raw Forge cost/filter syntax.
-func TestDecisionTextHasNoEngineSyntaxKernel(t *testing.T) {
+// promptTextChunks is how many independent tests TestDecisionTextHasNoEngineSyntax
+// (it plays the repo-deck sample to completion and checks every decision posed
+// along the way: its Prompt and every option Label must be free of raw Forge
+// cost/filter syntax) is sharded into. Run whole it was 19.4 s wall / 34 CPU-s
+// alone at 4 vCPU and 43.7 s under gate contention (2026-10-12). Chunk i plays
+// games[i*n/K : (i+1)*n/K] of promptTextGames, so the chunks partition the
+// sample exactly -- a deck added to the repo grows a chunk and is never dropped
+// (TestDecisionTextHasNoEngineSyntaxChunksPartitionTheGames). One game (the
+// 4-seat legacy tron/ur-delver/uw-control/uw-tempo pod, ~13 s alone) is the
+// floor of any chunking: a game cannot be split.
+const promptTextChunks = 4
+
+// promptTextChunk returns chunk i's games.
+func promptTextChunk(games []promptTextGame, i int) []promptTextGame {
+	n := len(games)
+	return games[i*n/promptTextChunks : (i+1)*n/promptTextChunks]
+}
+
+func TestDecisionTextHasNoEngineSyntaxChunk00(t *testing.T) { runDecisionTextChunk(t, 0) }
+func TestDecisionTextHasNoEngineSyntaxChunk01(t *testing.T) { runDecisionTextChunk(t, 1) }
+func TestDecisionTextHasNoEngineSyntaxChunk02(t *testing.T) { runDecisionTextChunk(t, 2) }
+func TestDecisionTextHasNoEngineSyntaxChunk03(t *testing.T) { runDecisionTextChunk(t, 3) }
+
+// TestDecisionTextHasNoEngineSyntaxChunksPartitionTheGames holds the sharding
+// to full coverage: one TestDecisionTextHasNoEngineSyntaxChunkN per chunk, and
+// the chunks, concatenated, are exactly promptTextGames' games in order.
+func TestDecisionTextHasNoEngineSyntaxChunksPartitionTheGames(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("long")
+	}
+	games := promptTextGames(t, testutil.CorpusRegistry(t))
+	var joined []string
+	for i := 0; i < promptTextChunks; i++ {
+		c := promptTextChunk(games, i)
+		if len(c) == 0 {
+			t.Errorf("chunk %d of %d games is empty", i, len(games))
+		}
+		for _, g := range c {
+			joined = append(joined, g.label)
+		}
+	}
+	if len(joined) != len(games) {
+		t.Fatalf("chunks cover %d of %d games", len(joined), len(games))
+	}
+	for i, g := range games {
+		if joined[i] != g.label {
+			t.Fatalf("chunk concatenation diverges at %d: %q vs %q", i, joined[i], g.label)
+		}
+	}
+	if tests := len([]func(*testing.T){TestDecisionTextHasNoEngineSyntaxChunk00, TestDecisionTextHasNoEngineSyntaxChunk01,
+		TestDecisionTextHasNoEngineSyntaxChunk02, TestDecisionTextHasNoEngineSyntaxChunk03}); tests != promptTextChunks {
+		t.Fatalf("%d chunk tests for %d chunks", tests, promptTextChunks)
+	}
+}
+
+// runDecisionTextChunk is one shard of TestDecisionTextHasNoEngineSyntax: it
+// plays chunk i's games and checks every decision they pose. Repeated
+// offending text is reported once per chunk.
+func runDecisionTextChunk(t *testing.T, chunk int) {
 	t.Parallel()
 	if testing.Short() {
 		t.Skip("long")
@@ -34,7 +90,7 @@ func TestDecisionTextHasNoEngineSyntaxKernel(t *testing.T) {
 	// gate cgroup's other three sat idle. Per-decision failures stay
 	// attributed to their own game; the unique-text report waits for all of
 	// them.
-	for _, g := range promptTextGames(t, reg) {
+	for _, g := range promptTextChunk(promptTextGames(t, reg), chunk) {
 		t.Run(g.label, func(t *testing.T) {
 			t.Parallel()
 			e := New(g.cfg)
@@ -87,7 +143,7 @@ func TestDecisionTextHasNoEngineSyntaxKernel(t *testing.T) {
 			ks = append(ks, fmt.Sprintf("%s=%d", k, c))
 		}
 		sort.Strings(ks)
-		t.Logf("checked %d decisions (%s) and %d option labels", decisions, strings.Join(ks, " "), labels)
+		t.Logf("chunk %d: checked %d decisions (%s) and %d option labels", chunk, decisions, strings.Join(ks, " "), labels)
 		var texts []string
 		for s := range violations {
 			texts = append(texts, s)
