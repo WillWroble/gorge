@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -69,10 +70,7 @@ var notDefinedTokenRe = regexp.MustCompile(`NotDefined[A-Za-z]+`)
 // notDefinedUnrecognised, so the family cannot silently grow an
 // unrecognised spelling.
 func TestNotDefinedPredicateCensus(t *testing.T) {
-	root := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(root); err != nil {
-		t.Skip("effects: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
+	root := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	seen := map[string]bool{}
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".txt") {
