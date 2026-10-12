@@ -24,6 +24,13 @@
 #   scripts/postmerge_batch.sh --parse-fails <go-test-output>   # self-test aid
 set -uo pipefail
 repo=$(git rev-parse --show-toplevel)
+# Yield to a gate bracket by CPU WEIGHT, never by SIGSTOP: every package here
+# runs under `go test`'s wall-clock -timeout, so a STOPped package times out
+# ("test timed out after 10m") and reads FLAKY/RED. That pinned the pipeline
+# from 029087326 (2f3ba9c27) on -- suite wall ~200-500 s became 1,400-1,800 s
+# and a timeout RED on 2026-10-10 held it paused 47 h. Pinned here, not left to
+# the default, so an exported GORGE_HEAVY_YIELD=stop cannot reach the suite.
+export GORGE_HEAVY_YIELD=weight
 . "$(dirname "$0")/heavy_lock.sh"  # the one HEAVY lock definition
 LOCK=${LOCK:-$GORGE_HEAVY_LOCK}
 LOG=${LOG:-$repo/.ds4/postmerge-batch.log}
