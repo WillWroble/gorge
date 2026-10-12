@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command sbv1agent is a SpellBench protocol v1 agent (the agent role of
 // spec/SPELLBENCH_PROTOCOL_V1.md, Section 10) for any Go policy in
 // internal/spellbench/v1agent. It answers hello, game_start, choose and

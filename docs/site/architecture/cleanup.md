@@ -16,10 +16,10 @@ not a commitment: each item is decided on its own.
    fails on any `require` line.
 2. **Remove dead weight** (H). Delete `patches/`, `internal/hindsight` with
    `cmd/hindsight`, and merge the three identical `bots/sb*` wrappers.
-3. **Decouple the parked SpellBench stacks** (M). Cut the
-   `internal/policynet` → `spellbench/v2agent` import, then move SpellBench v1
-   and v2 (~21k lines) behind a build tag or to their branch. This also stops
-   `cmd/gorged` linking research code.
+3. **Decouple the parked SpellBench stacks** (M). Done: front end V moved to
+   `internal/policynet/v2front`, so `cmd/gorged` no longer links
+   `spellbench/v2agent`, and SpellBench v1 and v2 (~21k lines) build only with
+   `-tags spellbench_bridge` (`make test-spellbench-bridge`).
 4. **Regenerate the package map** (H) from `go list` doc strings, and correct the
    invariants document where it has drifted.
 5. **Choose the surviving search harnesses** (L) on benchmark evidence.
@@ -37,8 +37,8 @@ not a commitment: each item is decided on its own.
 | Candidate | Evidence | Direction |
 |---|---|---|
 | `internal/hindsight` + `cmd/hindsight` (~1.1k lines) | Last substantive change 2026-09-24 recorded a negative result; no Makefile or script references. | **Delete.** (H) |
-| SpellBench v2 (`spellbench/{v2agent,v2engine,v2shadow}`, `cmd/{sbagent,sbv2engine,sbv2local,sbv2shadow}`, ~11.5k) | Development continues on a separate branch; the commands on `main` are last touched 2026-09-28. But `policynet/v2front_v.go` imports `v2agent`, so it is linked into `gorged`. | Cut the `policynet` import, then move the v2 stack to its branch or a module. (M) |
-| SpellBench v1 (`v1agent`, `kshadow`, `cmd/sbv1agent`, `cmd/kshadowcheck`, ~9.8k) | Last touched 2026-09-28; self-contained; the commands have no tests. | Build tag or separate module. (M) |
+| SpellBench v2 (`spellbench/{v2agent,v2engine,v2shadow}`, `cmd/{sbagent,sbv2engine,sbv2local,sbv2shadow}`, ~11.5k) | Development continues on a separate branch; the commands on `main` are last touched 2026-09-28. Front end V now lives in `policynet/v2front`, so `gorged` no longer links `v2agent`. | Done: behind build tag `spellbench_bridge` (`make test-spellbench-bridge`). |
+| SpellBench v1 (`v1agent`, `kshadow`, `cmd/sbv1agent`, `cmd/kshadowcheck`, ~9.8k) | Last touched 2026-09-28; self-contained; the commands have no tests. | Done: behind build tag `spellbench_bridge`. |
 | ManaBrew wire stack (~11k non-test) | Deprioritised, but both wires are kept as permanent; compiled into `gorged`; `cardfuzz` uses its mock client. | Keep; optionally tag the non-test code. (L) |
 | `cmd/exitloop` (1.1k) | Last touched 2026-09-29; the expert-iteration line it drives did not beat the heuristic bot. | Delete unless retraining is planned. (L) |
 | `cmd/dzgorge` + root `benchmark.md` | DraftZero-style self-play driver, still used by side experiments. | Keep the command; move the notes into `docs/`. (M) |

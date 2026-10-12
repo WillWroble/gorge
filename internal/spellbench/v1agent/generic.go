@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 package v1agent
 
 import "strings"
