@@ -123,6 +123,12 @@ func (e *Engine) putTriggersOnStack() bool {
 			e.pendingTriggers, e.orderedTriggers = e.pendingTriggers[:0], 0
 			return false
 		}
+		if e.resolveStaticTriggers() {
+			// Static$ True triggers resolve off the stack (static_trigger.go)
+			// and are never part of the CR 603.3b order choice; their events
+			// can have queued more triggers, so the batch is re-scanned.
+			continue
+		}
 		if e.orderedTriggers == 0 {
 			n := e.sortPendingTriggers()
 			// Forge's OrderDuplicates$: duplicate instances of a flagged
