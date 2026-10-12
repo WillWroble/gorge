@@ -55,4 +55,37 @@ func TestIsBlockingSurvivesAttackerLeaving(t *testing.T) {
 			t.Fatal("removed blocker still blocking")
 		}
 	})
+	// A reselect (ChangeCombatants: Misleading Signpost, Portal Mage,
+	// Windshaper Planetar) re-points an already-blocked attacker. The
+	// re-pointed attack is unblocked, so the former blocker's own record must
+	// clear with the attacker's BlockedBy, or the two diverge (the attacker
+	// reads unblocked while the blocker still reads blocking).
+	t.Run("attacker retargeted", func(t *testing.T) {
+		g := state.NewGame([]string{"a", "b", "c"})
+		l := NewLog(1)
+		bear := bearCard()
+		att := g.AddObject(bear, 0).ID
+		blk := g.AddObject(bear, 1).ID
+		g.SetZone(state.ZLibrary, 0, []state.ObjID{att})
+		g.SetZone(state.ZLibrary, 1, []state.ObjID{blk})
+		for _, id := range []state.ObjID{att, blk} {
+			Emit(g, l, Event{Kind: MoveZone, Obj: id, From: state.ZLibrary, To: state.ZBattlefield})
+		}
+		g.Obj(att).IsAttacking = true
+		g.Obj(att).Attacking = 1
+		Emit(g, l, Event{Kind: DeclareBlockers, Pairs: [][2]state.ObjID{{att, blk}}})
+		if !g.Obj(blk).IsBlocking || len(g.Obj(att).BlockedBy) != 1 {
+			t.Fatalf("precondition: blocker IsBlocking=%v attacker BlockedBy=%v",
+				g.Obj(blk).IsBlocking, g.Obj(att).BlockedBy)
+		}
+		// Seat 2 is the new defender (CombatRetarget's Player is the NEW
+		// defender, Obj the attacker).
+		Emit(g, l, Event{Kind: CombatRetarget, Obj: att, Player: 2})
+		if g.Obj(blk).IsBlocking {
+			t.Fatal("former blocker still blocking after the attacker was retargeted")
+		}
+		if o := g.Obj(att); o.Attacking != 2 || len(o.BlockedBy) != 0 {
+			t.Fatalf("retarget: Attacking=%d BlockedBy=%v, want 2 and empty", o.Attacking, o.BlockedBy)
+		}
+	})
 }

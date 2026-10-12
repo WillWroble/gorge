@@ -67,6 +67,21 @@ func foldCombatRetarget(g *state.Game, e *Event) {
 	// attacker, a fuzz event) is a no-op.
 	if o := g.Obj(e.Obj); o != nil && o.Zone == state.ZBattlefield && o.IsAttacking &&
 		validPlayer(g, e.Player) && !g.Players[e.Player].Lost {
+		// The re-pointed attack is unblocked (Forge's removeFromCombat +
+		// addAttacker + setBlocked(false)): the attacker's block list clears
+		// AND each blocker it was linked to stops blocking (setBlocking(null),
+		// which this effect's own comment claims to model). Clearing only
+		// BlockedBy would leave a former blocker's IsBlocking set while the
+		// attacker reads unblocked -- the two records diverged. A zero
+		// tombstone (an already-removed blocker) names no object and is
+		// skipped. A blocker here blocks only this attacker (the build has no
+		// "blocks an additional creature" keyword), so clearing the flag is
+		// exact, not a partial update.
+		for _, bid := range o.BlockedBy {
+			if b := g.Obj(bid); b != nil {
+				b.IsBlocking = false
+			}
+		}
 		o.Attacking = e.Player
 		o.BlockedBy = nil
 	}
