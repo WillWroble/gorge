@@ -4,7 +4,7 @@
 // libcuda.so.1 is dlopen'd at runtime and its entry points are resolved with
 // dlsym (purego): no cgo, no libcudart, no nvcc at run time. The driver JITs
 // the PTX shipped in the flat cudafile for the device's compute capability.
-package gamepool
+package gpuscorer
 
 import (
 	"fmt"
@@ -19,24 +19,24 @@ const cudaSuccess = 0
 var (
 	libcuda uintptr
 
-	cuInit                   func(flags uint32) int
-	cuDeviceGet              func(dev *int32, ordinal int32) int
-	cuDeviceGetName          func(name *byte, ln int32, dev int32) int
+	cuInit                    func(flags uint32) int
+	cuDeviceGet               func(dev *int32, ordinal int32) int
+	cuDeviceGetName           func(name *byte, ln int32, dev int32) int
 	cuDeviceComputeCapability func(major, minor *int32, dev int32) int
-	cuDevicePrimaryCtxRetain func(ctx *uintptr, dev int32) int
-	cuCtxSetCurrent          func(ctx uintptr) int
-	cuModuleLoadData         func(mod *uintptr, image uintptr) int
-	cuModuleGetFunction      func(fn *uintptr, mod uintptr, name *byte) int
-	cuMemAlloc               func(dptr *uint64, bytes uint64) int
-	cuMemFree                func(dptr uint64) int
-	cuMemcpyHtoD             func(dst uint64, src uintptr, bytes uint64) int
-	cuMemcpyDtoH             func(dst uintptr, src uint64, bytes uint64) int
-	cuLaunchKernel           func(fn uintptr,
+	cuDevicePrimaryCtxRetain  func(ctx *uintptr, dev int32) int
+	cuCtxSetCurrent           func(ctx uintptr) int
+	cuModuleLoadData          func(mod *uintptr, image uintptr) int
+	cuModuleGetFunction       func(fn *uintptr, mod uintptr, name *byte) int
+	cuMemAlloc                func(dptr *uint64, bytes uint64) int
+	cuMemFree                 func(dptr uint64) int
+	cuMemcpyHtoD              func(dst uint64, src uintptr, bytes uint64) int
+	cuMemcpyDtoH              func(dst uintptr, src uint64, bytes uint64) int
+	cuLaunchKernel            func(fn uintptr,
 		gx, gy, gz, bx, by, bz uint32,
 		shmem uint32, stream uintptr,
 		kparams uintptr, extra uintptr) int
 	cuCtxSynchronize func() int
-	cuGetErrorName   func(code int, name *uintptr) int
+	cuGetErrorName   func(code int, name **byte) int
 	cuMemsetD8       func(dst uint64, value uint8, count uint64) int
 )
 
@@ -113,9 +113,9 @@ func cudaInit() (dev int32, name string, ccMajor, ccMinor int32) {
 }
 
 func cudaErr(code int) string {
-	var p uintptr
-	if cuGetErrorName != nil && cuGetErrorName(code, &p) == cudaSuccess && p != 0 {
-		return cstr(unsafe.Slice((*byte)(unsafe.Pointer(p)), 64))
+	var p *byte // the driver writes a static C string address here
+	if cuGetErrorName != nil && cuGetErrorName(code, &p) == cudaSuccess && p != nil {
+		return cstr(unsafe.Slice(p, 64))
 	}
 	return fmt.Sprintf("CUresult(%d)", code)
 }

@@ -1,12 +1,13 @@
 //go:build gamepool && gamepool_gpu
 
-package gamepool
+package gpuscorer
 
 import (
 	"context"
 	"runtime"
 
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/internal/gamepool"
 )
 
 // FlatGPUScorer serves a batch of decisions with ONE flat-net forward on the
@@ -23,7 +24,7 @@ import (
 // trace) mid-run and at process exit.
 //
 // The state vector is the mzenc MageZero feature-id set folded multi-hot into
-// the flat net's 2048-wide surface (encodeStateMZ). The 128-wide action vectors
+// the flat net's 2048-wide surface (gamepool.EncodeStateMZ). The 128-wide action vectors
 // are still a deterministic placeholder keyed on option identity (encodeAction),
 // so the GPU result remains a throughput harness rather than a trained policy:
 // a chosen option the engine would refuse falls back to the request's wrapped
@@ -74,18 +75,18 @@ func (*FlatGPUScorer) Name() string { return "flatgpu" }
 // Serve encodes every request's options as actions, runs the forward on the
 // GPU goroutine, picks each decision's highest-logit option, and validates the
 // resulting intent.
-func (s *FlatGPUScorer) Serve(batch []*Request) error {
+func (s *FlatGPUScorer) Serve(batch []*gamepool.Request) error {
 	fb := &flatBatch{offsets: make([]int32, len(batch)+1)}
 	fb.states = make([]float32, len(batch)*flatStateDim)
 	total := 0
 	for i, r := range batch {
 		fb.offsets[i] = int32(total)
-		encodeStateMZ(r, fb.states[i*flatStateDim:(i+1)*flatStateDim])
+		gamepool.EncodeStateMZ(r, fb.states[i*flatStateDim:(i+1)*flatStateDim])
 		for _, o := range r.Decision.Options {
 			fb.actionOwner = append(fb.actionOwner, int32(i))
 			start := len(fb.actions)
 			fb.actions = append(fb.actions, make([]float32, flatActionDim)...)
-			encodeActionMZ(r, o, fb.actions[start:start+flatActionDim])
+			gamepool.EncodeActionMZ(r, o, fb.actions[start:start+flatActionDim])
 			total++
 		}
 	}
@@ -129,13 +130,13 @@ func (s *FlatGPUScorer) Serve(batch []*Request) error {
 	return nil
 }
 
-func (s *FlatGPUScorer) fallbackAll(batch []*Request) {
+func (s *FlatGPUScorer) fallbackAll(batch []*gamepool.Request) {
 	for _, r := range batch {
 		s.fallback(r)
 	}
 }
 
-func (s *FlatGPUScorer) fallback(r *Request) {
+func (s *FlatGPUScorer) fallback(r *gamepool.Request) {
 	if r.Inner == nil {
 		return
 	}
@@ -144,7 +145,7 @@ func (s *FlatGPUScorer) fallback(r *Request) {
 	}
 }
 
-var _ Scorer = (*FlatGPUScorer)(nil)
+var _ gamepool.Scorer = (*FlatGPUScorer)(nil)
 
 // splitmix64 is a tiny deterministic PRNG (the flat net's own initializer
 // family), used only to fill the encoder's placeholder vectors.

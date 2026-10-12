@@ -146,13 +146,20 @@ checks the worktree, the index and HEAD.
 
 ### 7. No cgo, no third-party dependencies
 
-`go.mod` has no `require` lines. The card pipeline, the rules core and the
-learned-policy stack (`internal/policynet`: hand-derived gradients, no
-autodiff) are pure Go. The engine must also build for 32-bit, so it cannot
-depend on packed 64-bit ints.
+The root `go.mod` has no `require` lines and the root `go.sum` is empty or
+absent. The card pipeline, the rules core and the learned-policy stack
+(`internal/policynet`: hand-derived gradients, no autodiff) are pure Go. The
+engine must also build for 32-bit, so it cannot depend on packed 64-bit ints.
+
+An experiment that genuinely needs a third-party module goes in its own nested
+module that imports the root through a `replace`, never the other way round:
+`experimental/gamepool` (the tag-gated GPU scorer and the `gamepool` command)
+requires purego for its CUDA binding; the pool scheduler it drives stays in
+the root's `internal/gamepool`.
 
 **Enforced by:**
-- `go.mod` review.
+- `internal/archtest` `TestRootModuleHasNoRequires` (parses the root `go.mod`
+  and fails on any `require` directive or a non-empty `go.sum`).
 - `TestEngineCompilesFor32Bit`.
 
 `wazero` is the one planned exception, arriving with the M3 plugin tier.

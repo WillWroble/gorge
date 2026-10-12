@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/adams-shaun/gorge/experimental/gamepool/gpuscorer"
 	"github.com/adams-shaun/gorge/internal/gamepool"
 )
 
@@ -14,7 +15,7 @@ func newScorer(name, artifact string) (gamepool.Scorer, error) {
 	case "", "local":
 		return gamepool.LocalScorer{}, nil
 	case "gpu":
-		return gamepool.NewFlatGPUScorer(artifact)
+		return gpuscorer.NewFlatGPUScorer(artifact)
 	default:
 		return nil, fmt.Errorf("gamepool: unknown scorer %q (want local or gpu)", name)
 	}
