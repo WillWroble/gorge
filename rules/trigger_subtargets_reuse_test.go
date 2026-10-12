@@ -178,3 +178,53 @@ func TestVedalkenPlotterExchangesTheChainTarget(t *testing.T) {
 	}
 	replayCheck(t, e, run.cfg)
 }
+
+// TestTriggerChainLinkPoolReadsTheRootTarget: a placement link whose pool
+// names an earlier target (Glen Elendra's `ControlledBy ... ParentTarget`
+// shape; here `Creature.TargetedPlayerCtrl`) is offered against the root's
+// announced target, as the cast flow's subTargetAsk binds it -- not failed
+// closed to an empty pool that would counter the trigger.
+func TestTriggerChainLinkPoolReadsTheRootTarget(t *testing.T) {
+	e := layerEngine(t)
+	src := onBoard(t, e, 0,
+		"Name:Chain Trigger\nTypes:Creature\nPT:1/1\n"+
+			"T:Mode$ ChangesZone | ValidCard$ Card.Self | Destination$ Battlefield | Execute$ Root | TriggerDescription$ x\n"+
+			"SVar:Root:DB$ Pump | ValidTgts$ Player | SubAbility$ Link\n"+
+			"SVar:Link:DB$ Pump | ValidTgts$ Creature.TargetedPlayerCtrl\nOracle:x\n")
+	theirs := onBoard(t, e, 1, "Name:Their Bear\nTypes:Creature\nPT:2/2\nOracle:x\n")
+	o := e.G.Obj(src)
+	if o == nil || o.Face() == nil || len(o.Face().Triggers) != 1 || o.Face().Triggers[0].Effect == nil {
+		t.Fatalf("precondition: printed trigger compiled, got %+v", o)
+	}
+	root := o.Face().Triggers[0].Effect
+	if root.Sub == nil || root.Sub.Params["ValidTgts"] != "Creature.TargetedPlayerCtrl" {
+		t.Fatalf("precondition: a root-relative chain link, got %+v", root.Sub)
+	}
+	e.pushTrigger(pendingTrigger{Source: src, Controller: 0, Idx: 0, SA: root})
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KTarget || d.ResumeKind == "trig_sub" {
+		t.Fatalf("root ask = %+v, want the player target first", d)
+	}
+	pick := -1
+	for i, opt := range d.Options {
+		if opt.Kind == "player" && opt.Player == 1 {
+			pick = i
+		}
+	}
+	if pick < 0 {
+		t.Fatalf("root ask offers %+v, want player 1", d.Options)
+	}
+	submitChoices(t, e, pick)
+	for _, ev := range e.L.Events {
+		if ev.Text == "countered: no legal targets" {
+			t.Fatal("the link's root-relative pool failed closed and countered the trigger")
+		}
+	}
+	d = e.Pending()
+	if d == nil || d.Kind != decision.KTarget || d.ResumeKind != "trig_sub" {
+		t.Fatalf("chain ask = %+v, want a placement trig_sub", d)
+	}
+	if len(d.Options) != 1 || indexOfObjOption(d, theirs) != 0 {
+		t.Fatalf("chain ask offers %+v, want only player 1's creature %d", d.Options, theirs)
+	}
+}
