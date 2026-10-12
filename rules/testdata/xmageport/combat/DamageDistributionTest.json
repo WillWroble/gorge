@@ -136,8 +136,7 @@
      }
     }
    ],
-   "xmage": "DamageDistributionTest#testDoubleStrikeTrampleVersusIndestructible",
-   "known_bug": "B7: trample lethal damage ignores damage already marked: rules/combat.go:2090 uses need := e.Toughness(bid), so in the regular damage step the double striker assigns 3 more to an indestructible blocker that already has lethal damage instead of trampling over. CR 702.19c, 510.1c."
+   "xmage": "DamageDistributionTest#testDoubleStrikeTrampleVersusIndestructible"
   },
   {
    "name": "test-trample-deathtouch",

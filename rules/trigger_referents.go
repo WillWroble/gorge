@@ -48,13 +48,14 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 			c.TriggerResultMax = maxResult
 		}
 	case cards.TriggerBecomesTarget, cards.TriggerBecomesTargetOnce:
-		// This matcher fires only for its own source being targeted, even when
-		// the causing spell chose several targets. ev.Obj is that spell/ability.
+		// ev.Obj is the targeting spell/ability. TriggerTarget is the TARGETED
+		// object the trigger matched (CR 603.3d), which for a ValidTarget$
+		// watcher (Pawpatch Recruit) is not the trigger's source.
 		// BecomesTargetOnce carries the same roles -- its batch latch is the
 		// queue-time gate, not this capture -- so the plural-mode body
 		// resolves TriggeredSourceSA/TriggeredSourceSAController exactly as
 		// the per-target mode does (Leyline of Combustion's payout).
-		c.TriggerTarget = state.Target{Obj: source}
+		c.TriggerTarget = e.becomesTargetReferent(t, source, ev)
 		c.TriggerSource = e.protectionSource(ev.Obj)
 		c.TriggerStack = ev.Obj
 	case cards.TriggerDamageDone, cards.TriggerDamageDealtOnce, cards.TriggerDamageDoneOnce, cards.TriggerDamageAll, cards.TriggerExcessDamageAll:
@@ -609,4 +610,28 @@ func (e *Engine) targetSpecContext(source, stack state.ObjID, you state.PlayerID
 	// Goblin-killer would not offer a creature a static made a Goblin (the
 	// AGENTS.md row this closes).
 	return e.withNames(sc)
+}
+
+// becomesTargetReferent is the "that creature/player" a BecomesTarget(Once)
+// trigger refers to: the first target of the causing TargetsChosen event that
+// satisfies the line's ValidTarget$ (the same test the matcher ran), a player
+// target when only the player half matched, and the trigger's own source for
+// a line with no ValidTarget$ (the Card.Self / ward shapes) or when nothing
+// matches. Pawpatch Recruit's "other than that creature" reads this role.
+func (e *Engine) becomesTargetReferent(t cards.Trigger, source state.ObjID, ev events.Event) state.Target {
+	v, ok := t.Param(cards.PKValidTarget)
+	if !ok {
+		return state.Target{Obj: source}
+	}
+	you := e.controllerOf(source)
+	for _, id := range ev.IDs {
+		if e.matchesSpecFrom(v, id, you, source) {
+			return state.Target{Obj: id}
+		}
+	}
+	if (ev.Amount == 1 || ev.Amount == 3) &&
+		effects.MatchesPlayerSpecCtx(e.G, v, ev.Player, you, e.playerSpecCtx(source)) {
+		return state.Target{Player: ev.Player, IsPlayer: true}
+	}
+	return state.Target{Obj: source}
 }

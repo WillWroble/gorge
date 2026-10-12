@@ -6,6 +6,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -76,6 +77,73 @@ func setupBackFaceDropsChapter(o *state.Object, backFace bool) bool {
 	}
 	n, _ := cards.SagaChapters(o.Face())
 	return n == 0
+}
+
+// placeSetupCard moves a setup card from the zone it was dealt to into its
+// scenario zone (the MoveZone of oracleRun.build's placement loop).
+//
+// A generated compliance scenario (fixture) mirrors XMage's setup, which
+// places every card with addCard rather than by playing it:
+//
+//   - A BATTLEFIELD placement keeps the ordinary move, so the card's own
+//     enters-with replacements still run, and discards exactly the entry-
+//     shaped triggers the move queued (setupPlacementDropsTrigger).
+//   - Any OTHER zone (graveyard, exile, hand, library, command) is a plain
+//     placement: no "Moved" replacement of a battlefield card may rewrite it
+//     (Rest in Peace's "exile instead", Leyline of the Void's) and no
+//     trigger it queued may fire (Planar Void's "whenever another card is
+//     put into a graveyard"). The replacement pass is skipped with
+//     applyingReplacement for this one emit, restored by defer so a panic or
+//     any early return of the caller cannot leak it past setup, and every
+//     trigger the move queued is discarded.
+//
+// Only fixture scenarios take either branch; a hand-written scenario keeps the
+// ordinary move and every trigger it queues.
+func (r *oracleRun) placeSetupCard(id state.ObjID, from, to state.Zone, fixture, backFace bool) {
+	e := r.e
+	pendingBefore := len(e.pendingTriggers)
+	move := events.Event{Kind: events.MoveZone, Obj: id, From: from, To: to}
+	if !fixture {
+		e.emit(move)
+		return
+	}
+	if to != state.ZBattlefield {
+		func() {
+			prior := e.applyingReplacement
+			e.applyingReplacement = true
+			defer func() { e.applyingReplacement = prior }()
+			e.emit(move)
+		}()
+		if len(e.pendingTriggers) > pendingBefore {
+			e.pendingTriggers = e.pendingTriggers[:pendingBefore]
+		}
+		e.orderedTriggers = min(e.orderedTriggers, len(e.pendingTriggers))
+		return
+	}
+	e.emit(move)
+	// XMage fixture setup places battlefield cards with addCard, which does
+	// not queue entry triggers; drop exactly the entry-shaped triggers this
+	// placement queued and keep every other trigger, including the
+	// CounterAdded triggers a planeswalker's entry loyalty counters fire on
+	// an already-placed permanent (setupPlacementDropsTrigger).
+	kept := e.pendingTriggers[:pendingBefore]
+	ordered := min(e.orderedTriggers, pendingBefore)
+	// Copy the tail first: appending to kept writes back into
+	// e.pendingTriggers[pendingBefore:], the very slice this loop reads, and a
+	// dropped trigger would shift later entries down under the iteration.
+	tail := append([]pendingTrigger(nil), e.pendingTriggers[pendingBefore:]...)
+	// A back-face chapter is dropped only when the entering face is not
+	// itself a Saga (setupBackFaceDropsChapter).
+	dropChapter := setupBackFaceDropsChapter(e.G.Obj(id), backFace)
+	for _, pt := range tail {
+		t, _ := e.triggerOf(pt)
+		if setupPlacementDropsTrigger(t, pt.Chapter && dropChapter) {
+			continue
+		}
+		kept = append(kept, pt)
+	}
+	e.pendingTriggers = kept
+	e.orderedTriggers = ordered
 }
 
 // setupPlacedBackFace reports whether the seat's setup places the named

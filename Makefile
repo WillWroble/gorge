@@ -191,8 +191,13 @@ sim: $(BIN_DIR)/mtgsim
 	$(BIN_DIR)/mtgsim -seats 4 -games 20 -verify
 
 .PHONY: fetch-cards
+# A worktree's corpus tests open the main checkout's .cards, which is outside
+# that worktree's module root, so `go test` does not hash it: a cached pass
+# would survive a corpus change. Drop the test cache when the pin moves.
 fetch-cards: $(BIN_DIR)/forgec
-	$(BIN_DIR)/forgec fetch -dir $(CARDS_DIR) -repo $(FORGE_REPO) -ref $(FORGE_REF)
+	@before=$$(cat $(CARDS_DIR)/cards.lock 2>/dev/null); \
+	$(BIN_DIR)/forgec fetch -dir $(CARDS_DIR) -repo $(FORGE_REPO) -ref $(FORGE_REF) && \
+	if [ "$$before" != "$$(cat $(CARDS_DIR)/cards.lock 2>/dev/null)" ]; then go clean -testcache; echo "corpus changed: go test cache cleared"; fi
 
 .PHONY: compile-cards
 compile-cards: $(BIN_DIR)/forgec

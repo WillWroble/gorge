@@ -2,6 +2,7 @@ package cards
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -10,7 +11,19 @@ import (
 // so a clean checkout still passes `go test ./...` without a network fetch.
 func corpusDir(t *testing.T) string {
 	t.Helper()
-	dir := "../.cards/cardsfolder"
+	root, ok := sharedCorpusDir(".")
+	if !ok {
+		t.Skip("corpus not fetched; run `make fetch-cards`")
+	}
+	// Relative, as the image round-trip test requires: card paths stay
+	// relative. Go joins it with the package dir and cleans it, so the cache
+	// key still names the shared corpus in every worktree.
+	if wd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(wd, root); err == nil {
+			root = rel
+		}
+	}
+	dir := CorpusDir(root)
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip("corpus not fetched; run `make fetch-cards`")
 	}
