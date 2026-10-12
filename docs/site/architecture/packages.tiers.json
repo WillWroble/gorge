@@ -340,12 +340,12 @@
       "purpose": "Heap-footprint ratchet (tests only)."
     },
     "internal/divergence": {
-      "tier": "tooling",
-      "status": "TOOL"
+      "tier": "host",
+      "status": "SUPP"
     },
     "internal/divergence/shadow": {
-      "tier": "tooling",
-      "status": "TOOL"
+      "tier": "bots",
+      "status": "EXT (linked into host)"
     },
     "internal/gamepool": {
       "tier": "bots",
