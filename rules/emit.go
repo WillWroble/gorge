@@ -581,6 +581,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		delete(e.sacrificedLKI, ev.Obj)
 		delete(e.castExiled, ev.Obj)
 		delete(e.castRevealed, ev.Obj)
+		delete(e.castCounterPut, ev.Obj)
 		delete(e.fuseTargets, ev.Obj)
 		delete(e.copyTargetStage, ev.Obj)
 		delete(e.copyAnswerTargets, ev.Obj)

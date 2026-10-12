@@ -407,9 +407,9 @@ func exiledBySource(g *state.Game, o *state.Object, src state.ObjID) bool {
 // CostExile row key, HashLKIListKey) or "Revealed" (CostReveal.doPayment);
 // an absent binding is an empty list -- a legitimate zero, never a fallback.
 func paidCostTargets(c *Ctx, ref string) []state.Target {
-	ids := c.Exiled
+	ids := c.Paid.Exiled
 	if ref == "Revealed" {
-		ids = c.Revealed
+		ids = c.Paid.Revealed
 	}
 	out := make([]state.Target, 0, len(ids))
 	for _, id := range ids {
@@ -629,6 +629,12 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// the chosen targets. This is NOT Object.ExiledWith: an ExileFromGrave
 		// cost emits a plain MoveZone with no ExiledWith marker.
 		return paidCostTargets(c, spec), true
+	case definedSpecCounterPutCards:
+		// Forge's "CounterPut" paid list: the creatures this ability's own
+		// Blight<N> cost put -1/-1 counters on (Grub, Notorious Auntie's
+		// "a copy of the blighted creature"). An unpaid list is the
+		// known-empty pool, never a fallback to the source.
+		return objTargets(c.Paid.CounterPut), true
 	case definedSpecImprintedLKI:
 		// Forge's LKI spelling of the imprint pile, distinct from the bare
 		// "Imprinted" case below: the SOURCE's persistent imprint association,
@@ -2327,6 +2333,7 @@ const (
 	definedSpecRemembered
 	definedSpecRememberedPlayer
 	definedSpecExiled
+	definedSpecCounterPutCards
 	definedSpecImprintedLKI
 	definedSpecImprinted
 	definedSpecRememberedCard
@@ -2406,6 +2413,7 @@ var definedSpecCodes = state.NewStrCodes(
 	state.StrEntry[definedSpecCode]{Key: "RememberedPlayers", Val: definedSpecRememberedPlayer},
 	state.StrEntry[definedSpecCode]{Key: "Exiled", Val: definedSpecExiled},
 	state.StrEntry[definedSpecCode]{Key: "Revealed", Val: definedSpecExiled},
+	state.StrEntry[definedSpecCode]{Key: "CounterPutCards", Val: definedSpecCounterPutCards},
 	state.StrEntry[definedSpecCode]{Key: "ImprintedLKI", Val: definedSpecImprintedLKI},
 	state.StrEntry[definedSpecCode]{Key: "Imprinted", Val: definedSpecImprinted},
 	state.StrEntry[definedSpecCode]{Key: "ImprintedController", Val: definedSpecImprinted},

@@ -23,6 +23,7 @@ func cloneEngineFields(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	cloneFieldsEngineDerivedTables(c, e, sp, remap)
 	cloneFieldsEngineScratch(c, e, sp, remap)
 	cloneFieldsEngineTriggerMaps(c, e, sp, remap)
+	cloneFieldsEngineTriggerMaps2(c, e, sp, remap)
 	cloneFieldsEngineResolution(c, e, sp, remap)
 	cloneFieldsEngineDrain(c, e, sp, remap)
 	cloneFieldsEngineTokenMint(c, e, sp, remap)
@@ -334,6 +335,14 @@ func cloneFieldsEngineTriggerMaps(c, e *Engine, sp *Spare, remap *cloneRemap) {
 			c.castRevealed[k0] = nv0
 		}
 	}
+	if e.castCounterPut != nil {
+		c.castCounterPut = make(map[state.ObjID][]state.ObjID, len(e.castCounterPut))
+		for k0, v0 := range e.castCounterPut {
+			var nv0 []state.ObjID
+			nv0 = append([]state.ObjID(nil), v0...)
+			c.castCounterPut[k0] = nv0
+		}
+	}
 	if e.fuseTargets != nil {
 		c.fuseTargets = make(map[state.ObjID][][]state.Target, len(e.fuseTargets))
 		for k0, v0 := range e.fuseTargets {
@@ -397,6 +406,9 @@ func cloneFieldsEngineTriggerMaps(c, e *Engine, sp *Spare, remap *cloneRemap) {
 		}
 	}
 	c.trigSub = e.trigSub.clone()
+}
+
+func cloneFieldsEngineTriggerMaps2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	if e.charmTargets != nil {
 		c.charmTargets = make(map[state.ObjID][][]state.Target, len(e.charmTargets))
 		for k0, v0 := range e.charmTargets {

@@ -479,8 +479,8 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 		// Forge's cast-cost PAID lists (AbilityUtils.getPaidCards ->
 		// SpellAbility.getPaidList): the cards this cast's own cost removed --
 		// CostExile's row is keyed "Exiled" (HashLKIListKey),
-		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Exiled /
-		// Ctx.Revealed, bound from the engine's per-stack-object capture at
+		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Paid.Exiled /
+		// Ctx.Paid.Revealed, bound from the engine's per-stack-object capture at
 		// payment, so a body such as Draconic Intervention's
 		// `SVar:X:Exiled$CardManaCost` reads the card the ExileFromGrave cost
 		// actually exiled rather than the source or a remembered set. An
