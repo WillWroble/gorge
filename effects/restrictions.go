@@ -678,14 +678,22 @@ func CostStaticParamsReadable(params map[string]string) bool {
 // compare would then lift the wall unconditionally, the wrong-wide
 // direction. The same guard CantAttackParamsReadableForRules keeps.
 func CanAttackDefenderParamsReadable(params map[string]string) bool {
-	for k := range params {
+	var spec1, spec2 string
+	hasCmp := false
+	for k, v := range params {
 		if !canAttackDefenderParamsReadableKeys.Has(k) {
 			return false
 		}
+		switch cantAttackPresentKeyCodes.Code(k) {
+		case cantAttackPresentKeyPresentCompare:
+			hasCmp = true
+		case cantAttackPresentKeyIsPresent:
+			spec1 = strings.TrimSpace(v)
+		case cantAttackPresentKeyIsPresent2:
+			spec2 = strings.TrimSpace(v)
+		}
 	}
-	if _, hasCmp := params["PresentCompare"]; hasCmp {
-		spec1 := strings.TrimSpace(params["IsPresent"])
-		spec2 := strings.TrimSpace(params["IsPresent2"])
+	if hasCmp {
 		if spec1 == "" && spec2 == "" {
 			return false
 		}
