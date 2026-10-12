@@ -18,6 +18,7 @@ on:
       - docs/site/**
       - mkdocs.yml
       - scripts/docs_sets.py
+      - cmd/pkgmap/**
       - .github/workflows/docs.yml
   # Verdicts and the perf-data branch change many times a day; a daily
   # rebuild picks both up without a 7.5-minute oraclediff run per push.
@@ -70,6 +71,11 @@ jobs:
           else
             echo "::warning::oraclediff produced no output; the set page shows only the hand snapshot"
           fi
+
+      # Corpus-free and ~1 s: the per-tier package tables and the tier graph
+      # (cmd/pkgmap, classification in docs/site/architecture/packages.tiers.json).
+      - name: Generate the package map
+        run: go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 
       - name: Fetch the perf history
         run: |

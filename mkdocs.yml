@@ -15,10 +15,12 @@ docs_dir: docs/site
 site_dir: site
 strict: true
 
-# Generated at build time and included by sets.md through snippets; never a
-# page of its own.
+# Generated at build time and included by sets.md / packages.md through
+# snippets; never pages of their own.
 exclude_docs: |
   support/_generated_sets.md
+  architecture/_generated_packages.md
+  architecture/packages.tiers.json
   requirements.txt
 
 theme:

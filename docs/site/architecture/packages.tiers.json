@@ -1,0 +1,512 @@
+{
+  "tiers": [
+    {
+      "id": "core",
+      "title": "T0 card pipeline and T1 rules core",
+      "intro": "The card compiler, the event-sourced state and the rules engine itself."
+    },
+    {
+      "id": "host",
+      "title": "T2 projection, host and wire",
+      "intro": "What a client or server sees: the per-seat view, seats, the wire protocol and the host."
+    },
+    {
+      "id": "bots",
+      "title": "T3 bots, ML and search",
+      "intro": "Hosted bot policies and the optional learned, search and SpellBench extensions."
+    },
+    {
+      "id": "tooling",
+      "title": "T4 tooling",
+      "intro": "Ratchets, test support, code generators and the compliance pipeline."
+    },
+    {
+      "id": "cmd",
+      "title": "Commands (`cmd/`)",
+      "intro": "Binaries. No package imports a command."
+    }
+  ],
+  "packages": {
+    "botpolicy": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "bots": {
+      "tier": "bots",
+      "status": "SUPP"
+    },
+    "bots/all": {
+      "tier": "bots",
+      "status": "SUPP"
+    },
+    "bots/azredeal": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "bots/bot": {
+      "tier": "bots",
+      "status": "SUPP",
+      "purpose": "Thin registration of a built-in policy in the bots registry."
+    },
+    "bots/castprofile": {
+      "tier": "bots",
+      "status": "SUPP",
+      "purpose": "Thin registration of a built-in policy in the bots registry."
+    },
+    "bots/lethalpressure": {
+      "tier": "bots",
+      "status": "SUPP",
+      "purpose": "Thin registration of a built-in policy in the bots registry."
+    },
+    "bots/sbbuiltin": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "bots/sbsearch": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "bots/sbtactical": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "bots/search": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "cards": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "cards/oracletext": {
+      "tier": "core",
+      "status": "TOOL"
+    },
+    "cmd/autopayaudit": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/botbench": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/cardfuzz": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/codeshape": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/compliance": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/corpuscov": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/deckimport": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/dzbroker": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/dzgorge": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/encablate": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/enginebench": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/exitloop": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/forgec": {
+      "tier": "cmd",
+      "status": "CORE"
+    },
+    "cmd/gcgate": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/gentypes": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/gorged": {
+      "tier": "cmd",
+      "status": "CORE"
+    },
+    "cmd/headdiff": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/keywordbench": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/kshadowcheck": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/ledger": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/mtgsim": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/oraclediff": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/oraclepacket": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/paymirror": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/pkgmap": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/policytrain": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/policytune": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/repro": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/sbagent": {
+      "tier": "cmd",
+      "status": "SUSP/EXT"
+    },
+    "cmd/sbv1agent": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/sbv2engine": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/sbv2local": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/sbv2shadow": {
+      "tier": "cmd",
+      "status": "SUSP"
+    },
+    "cmd/searchbench": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/searchprobe": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/searchteacher": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/testbudget": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/traindash": {
+      "tier": "cmd",
+      "status": "EXT"
+    },
+    "cmd/xmageport": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "compliance": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/adopt": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/gate": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/levelb": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/oraclediff": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/oraclegen": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/oraclegen/templates": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "compliance/shape": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "decision": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "deck": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "effects": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "effects/params": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "events": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "host": {
+      "tier": "host",
+      "status": "SUPP"
+    },
+    "host/httpapi": {
+      "tier": "host",
+      "status": "SUPP"
+    },
+    "host/manabrewhttp": {
+      "tier": "host",
+      "status": "EXT"
+    },
+    "internal/archtest": {
+      "tier": "tooling",
+      "status": "TOOL (load-bearing)"
+    },
+    "internal/azmcts": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/azmcts/clairvoyant": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/bench": {
+      "tier": "bots",
+      "status": "TOOL/SUPP"
+    },
+    "internal/botobs": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/broker": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/codeshape": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/corpuscov": {
+      "tier": "bots",
+      "status": "TOOL"
+    },
+    "internal/corpusheap": {
+      "tier": "tooling",
+      "status": "TOOL",
+      "purpose": "Heap-footprint ratchet (tests only)."
+    },
+    "internal/divergence": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/divergence/shadow": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/gamepool": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/manabrew": {
+      "tier": "host",
+      "status": "EXT"
+    },
+    "internal/manabrew/mbtest": {
+      "tier": "host",
+      "status": "EXT"
+    },
+    "internal/mzenc": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/paymirror": {
+      "tier": "bots",
+      "status": "TOOL"
+    },
+    "internal/policynet": {
+      "tier": "bots",
+      "status": "EXT (linked into seat)"
+    },
+    "internal/searchbench": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/searchbench/statespec": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/searchprobe": {
+      "tier": "bots",
+      "status": "EXT (linked into host)"
+    },
+    "internal/searchseat": {
+      "tier": "bots",
+      "status": "EXT (linked into host)"
+    },
+    "internal/spellbench": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/spellbench/builtins": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/spellbench/kshadow": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
+    "internal/spellbench/payexec": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/spellbench/registry": {
+      "tier": "bots",
+      "status": "EXT (2nd registry)"
+    },
+    "internal/spellbench/sbsearch": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/spellbench/v1agent": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
+    "internal/spellbench/v2agent": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
+    "internal/spellbench/v2engine": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
+    "internal/spellbench/v2shadow": {
+      "tier": "bots",
+      "status": "SUSP"
+    },
+    "internal/testbudget": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/testutil": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/testutil/feedback": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "internal/traceboard": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/tsgen": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "protocol": {
+      "tier": "host",
+      "status": "SUPP"
+    },
+    "protocol/manabrew": {
+      "tier": "host",
+      "status": "EXT"
+    },
+    "protocol/manabrew/internal/schemagen": {
+      "tier": "host",
+      "status": "TOOL"
+    },
+    "replay": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/chars": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/combat": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/cost": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/pay": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/resolve": {
+      "tier": "core",
+      "status": "CORE (no own tests)"
+    },
+    "rules/scriptfacts": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "rules/trigmatch": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "seat": {
+      "tier": "host",
+      "status": "CORE"
+    },
+    "state": {
+      "tier": "core",
+      "status": "CORE",
+      "purpose": "Objects, zones, players, the Game and the continuous-effect vocabulary (no package doc yet)."
+    },
+    "view": {
+      "tier": "host",
+      "status": "CORE"
+    }
+  }
+}
