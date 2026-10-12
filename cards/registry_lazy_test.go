@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -9,8 +10,8 @@ import (
 // goroutines at once and asserts the imaged registry hands out exactly one
 // pointer per ordinal (spec §2.5 contract 2). Run it under -race.
 func TestRegistryLazyConcurrent(t *testing.T) {
-	corpusDir(t) // Skips when there is no corpus
-	reg, err := OpenCorpus("../.cards")
+	// corpusDir Skips when there is no corpus and names its cardsfolder.
+	reg, err := OpenCorpus(filepath.Dir(corpusDir(t)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
@@ -23,7 +24,7 @@ func TestStandardUnattachChangeSpeedCarriers(t *testing.T) {
 	}
 	for api, names := range want {
 		var got []string
-		err := filepath.WalkDir("../.cards/cardsfolder", func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir(cards.CorpusDir(testutil.CorpusDirOrSkip(t)), func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
