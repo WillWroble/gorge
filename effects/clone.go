@@ -675,13 +675,19 @@ func cloneNames(raw string) []string {
 }
 
 // cloneBecome resolves CloneTarget$. Absent means Self (the resolving
-// ability's own source object) -- "this permanent becomes a copy". The
-// named forms reuse the same Defined$ referent grammar the source half uses.
+// ability's own source object) -- "this permanent becomes a copy" -- except
+// on a targeting Choices$ ability, where the Choices$ pick is the source and
+// the target is the become operand (CloneParams.ChoicesTargetBecome), read
+// as CloneTarget$ Targeted. The named forms reuse the same Defined$ referent
+// grammar the source half uses.
 func cloneBecome(h Host, c *Ctx, cp *CloneParams) ([]state.Target, bool) {
 	if c.CloneEnter.BecomeValid {
 		return []state.Target{{Obj: c.CloneEnter.Become}}, true
 	}
 	spec := cp.CloneTarget
+	if cp.ChoicesTargetBecome {
+		spec = "Targeted"
+	}
 	if spec == "" {
 		if c.Source == 0 {
 			return nil, true
