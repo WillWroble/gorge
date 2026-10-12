@@ -40,13 +40,28 @@ type GoadEffect struct {
 // has no characteristics from the layer system at all, so the values must be
 // captured while the permanent is still on the battlefield. It carries only
 // the characteristics the Sacrificed$<Property> SVar heads ask for -- power,
-// toughness and mana value -- rather than a full Object clone, since that is
-// all the corpus uses this mechanism for.
+// toughness, mana value and the printed mana-cost string (ChromaSource) --
+// rather than a full Object clone, since that is all the corpus uses this
+// mechanism for.
 type SacrificedInfo struct {
 	Obj       ObjID
 	Power     int32
 	Toughness int32
 	ManaValue int32
+	// ManaCost is the printed cost string the object had at the sacrifice
+	// (the Sacrificed$ChromaSource.<Colour> reader counts its coloured
+	// symbols). A face's printed cost never changes, but it must be captured
+	// here rather than read live for the same reason power is: the reader
+	// runs after the object has left the battlefield, and only the snapshot
+	// is guaranteed to be the object the sacrifice named.
+	ManaCost string
+	// FaceDown records that the sacrificed permanent was face down (CR
+	// 708.5: a face-down permanent has no mana cost), so the ChromaSource
+	// reader contributes nothing for it -- the same rule the battlefield
+	// devotion scan applies to a face-down permanent still in play. The
+	// snapshot is taken before the zone change, which is when Move clears
+	// the flag.
+	FaceDown bool
 	// Counters is the object's counter kinds and counts at the instant of
 	// the sacrifice (the sacrificed-LKI ladder's third rung: a
 	// cost-sacrificed source whose EachFromSource$ copy reads it after Move
@@ -2194,9 +2209,10 @@ func cloneRuntimeSVars(m map[string]int32) map[string]int32 {
 }
 
 // SacrificedInfoOf captures the last-known-information snapshot of the object
-// id names at the instant it is about to be sacrificed -- power, toughness and
-// mana value -- so a later Sacrificed$<Property> SVar can answer "the
-// sacrificed creature's power" without reading a now-graveyard object. It
+// id names at the instant it is about to be sacrificed -- power, toughness,
+// mana value and the printed mana cost -- so a later Sacrificed$<Property>
+// SVar can answer "the sacrificed creature's power" without reading a
+// now-graveyard object. It
 // must be called BEFORE the sacrifice's zone change: the object is still a
 // battlefield permanent then, so its face and any +1/+1 counters (the
 // layer-7d portion of its P/T, preserved because they have not yet been reset
@@ -2224,7 +2240,8 @@ func SacrificedInfoOf(g *Game, id ObjID) SacrificedInfo {
 			counters = append(counters, o.Counters[i])
 		}
 	}
-	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(), Counters: counters}
+	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(),
+		ManaCost: o.Face().ManaCost, FaceDown: o.FaceDown, Counters: counters}
 }
 
 // CloneChosenModes copies a ChosenModes announcement, preserving the

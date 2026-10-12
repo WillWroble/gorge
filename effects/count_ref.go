@@ -117,7 +117,9 @@ func evalTriggerCountOK(c *Ctx, body string, max bool) (int32, bool) {
 // evalSacrificed resolves a "Sacrificed$<Property>[/Op]" body against the
 // LKI snapshots this resolving spell/ability captured when it sacrificed
 // each object (Ctx.Sacrificed). Property is the corpus head after the
-// Sacrificed$ prefix: CardPower, CardToughness, CardManaCost, or Amount (the
+// Sacrificed$ prefix: CardPower, CardToughness, CardManaCost, ChromaSource
+// (the printed cost's coloured mana symbols of the named colour, per symbol),
+// or Amount (the
 // count of objects sacrificed). For a numeric property over more than one
 // sacrificed object the values are summed -- corpus Sac costs are almost
 // always exactly one candidate, so summing agrees with the single-value
@@ -129,22 +131,38 @@ func evalTriggerCountOK(c *Ctx, body string, max bool) (int32, bool) {
 // after the base value, exactly as applyCountOp does for Count$.
 func evalSacrificedOK(c *Ctx, body string) (int32, bool) {
 	body, op, hasOp := strings.Cut(body, "/")
+	trimmed := strings.TrimSpace(body)
 	var n int32
-	switch evalSacrificedOKCodes.Code(string(strings.TrimSpace(body))) {
-	case evalSacrificedOKCardPower:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Power })
-	case evalSacrificedOKCardToughness:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Toughness })
-	case evalSacrificedOKCardManaCost:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
-	case evalSacrificedOKAmount:
-		n = int32(len(c.Sacrificed))
-	default:
-		// An out-of-scope head (Valid, CardTypes, ChromaSource, CardNumColors,
-		// CardCounters) degrades to zero, exactly as before the fix -- the
-		// conservative same-as-before no-op the brief scopes out. NOT
-		// evaluated: a gate over one of these fails open.
-		return 0, false
+	// ChromaSource[.<Colour>] (task lb-chroma) is the dotted spelling the
+	// exact-string enum below cannot hold, so it is claimed first: the
+	// sacrificed objects' coloured mana symbols, read off the LKI capture
+	// (Forge's CostSacrifice.getPaidListName "Sacrificed" feeding the
+	// ChromaSource count). Fiery Bombardment's Sacrificed$ChromaSource.Red
+	// is the corpus carrier. A face-down sacrifice contributed no mana cost
+	// (CR 708.5), and an unreadable colour fails closed.
+	if rest, ok := strings.CutPrefix(trimmed, "ChromaSource"); ok {
+		mask, okm := chromaSourceMask(rest)
+		if !okm {
+			return 0, false
+		}
+		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return chromaSacrificedCount(s, mask) })
+	} else {
+		switch evalSacrificedOKCodes.Code(trimmed) {
+		case evalSacrificedOKCardPower:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Power })
+		case evalSacrificedOKCardToughness:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Toughness })
+		case evalSacrificedOKCardManaCost:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
+		case evalSacrificedOKAmount:
+			n = int32(len(c.Sacrificed))
+		default:
+			// An out-of-scope head (Valid, CardTypes, CardNumColors,
+			// CardCounters) degrades to zero, exactly as before the fix -- the
+			// conservative same-as-before no-op the brief scopes out. NOT
+			// evaluated: a gate over one of these fails open.
+			return 0, false
+		}
 	}
 	if hasOp {
 		n = applyCountOp(n, op)
