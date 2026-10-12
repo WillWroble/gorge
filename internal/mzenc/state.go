@@ -141,11 +141,17 @@ func (w *walker) processPlayer(f *Node, pv *view.PlayerView, isDecisionPlayer bo
 	// nested under the player's subtree exactly as upstream.
 	w.processBattlefield(f.SubFeatures("Battlefield", true), pv, w.ch)
 
-	// graveyard then hand (StateEncoder.java:596-608). perfectInfo is always
-	// true for the public entry, so every player's Hand is walked and no
-	// CardsInHand scalar is emitted.
+	// graveyard then hand (StateEncoder.java:596-608). A visible hand
+	// (pv.Hand non-nil: the viewer's own seat or an omniscient view) is
+	// walked card by card. A redacted hand (nil, CR 400.2) cannot be walked,
+	// so only its COUNT is emitted as CardsInHand, never any identity.
 	w.processGraveyard(f.SubFeatures("Graveyard", true), pv, w.ch)
-	w.processHand(f.SubFeatures("Hand", true), pv, w.ch)
+	if pv.Hand == nil {
+		f.AddNumericFeature("CardsInHand", pv.HandSize, true)
+		w.emit(famCardsInHand)
+	} else {
+		w.processHand(f.SubFeatures("Hand", true), pv, w.ch)
+	}
 
 	// command zone (StateEncoder.java:610-611): after hand, exactly as
 	// upstream. processCommandZone creates the "CommandZone" subtree itself.

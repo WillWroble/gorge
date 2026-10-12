@@ -49,6 +49,7 @@ const (
 	famBattlefield      = "Battlefield"
 	famGraveyard        = "Graveyard"
 	famHand             = "Hand"
+	famCardsInHand      = "CardsInHand"
 	famCommandZone      = "CommandZone"
 	// famEmblem is a caveat family, not an upstream §5 bullet: StateEncoder's
 	// processCommandZone also walks command-zone Emblems (StateEncoder.java:
@@ -104,6 +105,7 @@ var specFamilies = map[string]bool{
 	famBattlefield:        true,
 	famGraveyard:          true,
 	famHand:               true,
+	famCardsInHand:        true,
 	famCommandZone:        true,
 	famEmblem:             true,
 	famGlobalWatchers:     true,
