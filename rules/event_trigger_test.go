@@ -409,6 +409,14 @@ func TestDiscardedTriggerSurvivesDestinationReplacements(t *testing.T) {
 			}
 			discarded := d.Options[0].Obj
 			submitChoices(t, e, d.Options[0].Index)
+			if tc.replacement == "Library of Leng" {
+				// Leng's "you may" is a real ask now: accept it.
+				rd := e.Pending()
+				if rd == nil || rd.Kind != decision.KReplacement || len(rd.Options) != 2 || rd.Options[0].Kind != "apply" {
+					t.Fatalf("Leng discard must pose an apply/decline ask, got %+v", rd)
+				}
+				submitChoices(t, e, rd.Options[0].Index)
+			}
 			if o := e.G.Obj(discarded); o == nil || o.Zone != tc.to {
 				t.Fatalf("discarded card zone = %v, want %v", o.Zone, tc.to)
 			}
