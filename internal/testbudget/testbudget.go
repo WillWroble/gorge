@@ -1,4 +1,6 @@
-// Package testbudget records per-test-binary resource measurements.
+// Package testbudget stores per-test-binary peak RSS records. cmd/testbudget
+// writes them from `go test -exec "testbudget exec"` (no package needs a
+// TestMain to be measured) and reads them back in `testbudget check`.
 package testbudget
 
 import (
@@ -8,38 +10,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
-	"testing"
 )
 
 const RSSDirEnv = "GORGE_TESTBUDGET_RSS_DIR"
 
-// Main runs the test suite and records this process's peak resident set size
-// when RSS measurement is enabled.
-func Main(m *testing.M, after ...func()) {
-	code := m.Run()
-	for _, fn := range after {
-		fn()
-	}
-	if dir := os.Getenv(RSSDirEnv); dir != "" {
-		var usage syscall.Rusage
-		if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
-			fmt.Fprintf(os.Stderr, "testbudget: getrusage: %v\n", err)
-			if code == 0 {
-				code = 1
-			}
-		} else if err := RecordRSS(dir, int64(usage.Maxrss)); err != nil {
-			fmt.Fprintf(os.Stderr, "testbudget: record RSS: %v\n", err)
-			if code == 0 {
-				code = 1
-			}
-		}
-	}
-	os.Exit(code)
-}
-
-// RecordRSS writes this run's peak KiB to the current package's record. A
-// cached package does not call it, preserving that package's last measurement.
+// RecordRSS writes this run's peak KiB to the record of the package whose
+// directory is the current working directory (go test runs the -exec command
+// there). A cached package is not run, preserving its last measurement.
 func RecordRSS(dir string, kib int64) error {
 	rel, err := moduleRelDir()
 	if err != nil {

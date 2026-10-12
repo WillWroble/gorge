@@ -135,7 +135,7 @@ check "candidate derivation pipes pkgs through the default-build filter" $?
 # on exactly its class.
 plan() ( cd "$ROOT" && bash -c "source '$GATE'; gate_affected_plan" )
 STRUCT=$(cd "$ROOT" && bash -c "source '$GATE'; gate_structural_pkgs")
-for want in ./internal/testbudget ./cmd/testbudget ./cmd/gentypes ./compliance/levelb ./internal/policynet ./cmd/pkgmap; do
+for want in ./cmd/testbudget ./cmd/gentypes ./compliance/levelb ./internal/policynet ./cmd/pkgmap; do
 	printf '%s\n' "$STRUCT" | grep -qx -- "$want"
 	check "structural set names $want" $?
 done
