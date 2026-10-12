@@ -1,4 +1,4 @@
-# internal/broker — the experimental decision broker
+# internal/inferbroker — the experimental inference-batching decision broker
 
 *Optional package. Build and run with `-tags broker`; `make dzbroker`,
 `make test-broker`. The default build compiles `broker_stub.go` only, so the

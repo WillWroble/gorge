@@ -322,7 +322,7 @@
       "tier": "tooling",
       "status": "TOOL"
     },
-    "internal/broker": {
+    "internal/inferbroker": {
       "tier": "bots",
       "status": "EXT"
     },
