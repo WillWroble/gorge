@@ -56,9 +56,7 @@ func coverageView() view.View {
 				LibrarySize: 50,
 				HandSize:    1,
 				Pool:        map[string]int32{},
-				Hand: []view.CardView{
-					{ID: 30, Name: "Forest", Types: "Land"},
-				},
+				// Hand nil: the redacted opponent hand, so CardsInHand is exercised.
 			},
 		},
 		Stack: []view.StackView{
