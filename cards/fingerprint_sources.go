@@ -21,6 +21,7 @@ import "embed"
 //
 //go:embed ability_class.go
 //go:embed affected_defined.go
+//go:embed ateot_values.go
 //go:embed breakdown.go
 //go:embed cache_canon.go
 //go:embed card_probes.go
