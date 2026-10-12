@@ -11,15 +11,22 @@ import (
 	"github.com/adams-shaun/gorge/state"
 )
 
-func charmScopeFixture(t *testing.T, cardName string) (*Engine, Config, state.ObjID, *cards.SA) {
+func charmScopeFixture(t *testing.T, cardName string, battlefield ...string) (*Engine, Config, state.ObjID, *cards.SA) {
 	t.Helper()
 	reg := testutil.CorpusRegistry(t)
 	card := mustCorpusCard(t, reg, cardName)
+	deck := []*cards.Card{card}
+	for _, name := range battlefield {
+		deck = append(deck, mustCorpusCard(t, reg, name))
+	}
 	cfg := seatZeroStart(Config{Seed: 78341, Names: []string{"a", "b"}, Tokens: reg.Tokens,
-		Decks: [][]*cards.Card{append([]*cards.Card{card}, mountainDeck(t, 39)...), mountainDeck(t, 40)}})
+		Decks: [][]*cards.Card{append(deck, mountainDeck(t, 40-len(deck))...), mountainDeck(t, 40)}})
 	e := New(cfg)
 	e.Advance()
 	source := placeFromDeck(t, e, 0, cardName)
+	for _, name := range battlefield {
+		placeFromDeck(t, e, 0, name)
+	}
 	e.emit(events.Event{Kind: events.TurnChange, Player: 0, Amount: 2})
 	o := e.G.Obj(source)
 	if o == nil || o.Zone != state.ZBattlefield || o.Controller != 0 {
@@ -149,7 +156,9 @@ func TestCharmChoiceRestrictionYourLastCombatYotianCourier(t *testing.T) {
 
 func TestCharmChoiceRestrictionThisGamePersists(t *testing.T) {
 	t.Parallel()
-	e, _, source, sa := charmScopeFixture(t, "Silent Hallcreeper")
+	// Grizzly Bears is the "another target creature you control" the clone
+	// mode needs; without it CR 700.2a withholds that mode from every ask.
+	e, _, source, sa := charmScopeFixture(t, "Silent Hallcreeper", "Grizzly Bears")
 	if sa.Params["ChoiceRestriction"] != state.ModeScopeThisGame {
 		t.Fatalf("compiled ChoiceRestriction$ = %q", sa.Params["ChoiceRestriction"])
 	}
@@ -183,6 +192,9 @@ func TestCharmChoiceRestrictionThisGamePersists(t *testing.T) {
 		}
 		if got := e.G.Obj(source).ModeChoices; len(got) == 0 || got[len(got)-1].Mode != choose {
 			t.Fatalf("choice %s not recorded on Hallcreeper: %+v", choose, got)
+		}
+		if d := e.Pending(); d != nil && d.Kind == decision.KTarget {
+			submitChoices(t, e, d.Options[0].Index)
 		}
 		passUntilStackEmpty(t, e, 60)
 	}

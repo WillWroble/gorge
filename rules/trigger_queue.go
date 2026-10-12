@@ -1920,11 +1920,14 @@ func (e *Engine) askTriggerModes(p state.PlayerID, obj state.ObjID, sa *cards.SA
 	// game"): a later instance of the same triggered Charm on the same source
 	// must not offer a mode an earlier instance already chose, so the eligible
 	// list is filtered before the bounds clamp and the options are built. With
-	// every mode exhausted, the min-over-modes guard below leaves the trigger
-	// doing nothing -- the oracle's own outcome.
+	// every mode exhausted, the min-over-modes guard below removes the
+	// trigger. CR 700.2a: a mode whose mandatory targets have no legal
+	// candidate can't be chosen either, so it is filtered the same way.
 	eligible := effects.CharmEligibleModes(e, source, sa, choices)
+	eligible = triggerModesWithTargets(e, p, obj, svars, eligible)
 	min, max, repeat := effects.CharmModeBounds(e, ctx, sa, len(eligible))
-	if min > len(eligible) && !repeat {
+	if (min > len(eligible) && !repeat) || (min > 0 && len(eligible) == 0) {
+		removeModelessTrigger(e, obj)
 		return true
 	}
 	e.ask(modeDecisionForChoices(p, source, sa, svars, eligible, min, max, repeat))
