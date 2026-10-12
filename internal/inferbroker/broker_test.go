@@ -1,6 +1,6 @@
 //go:build broker
 
-package broker
+package inferbroker
 
 import (
 	"context"

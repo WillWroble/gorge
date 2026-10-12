@@ -1,5 +1,6 @@
 // Command testbudget enforces the per-test budget: every single test fits
-// 2 GB RSS, 2 vCPU and 1 minute wall (operator, 2026-10-05). It replaces the
+// 4 GB RSS, 4 vCPU and 1 minute wall (operator, 2026-10-05; doubled from 2 GB /
+// 2 vCPU on 2026-10-09). It replaces the
 // per-package TEST_HISTORY.md / ALLOC_HISTORY.md budgets, which nothing
 // enforced.
 //
@@ -24,7 +25,7 @@
 // per test BINARY, which is an upper bound on any test inside it; a package
 // over budget is attributed to a test by a capped `-run '^T$'` run and the
 // pinned inventory lives in internal/testutil/testdata/rss_exceptions.txt.
-// CPU is not probed: the 2 vCPU budget is a property of the scope the suite
+// CPU is not probed: the 4 vCPU budget is a property of the scope the suite
 // runs in, not of a single test.
 package main
 

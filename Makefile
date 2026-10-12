@@ -121,7 +121,7 @@ $(BIN_DIR)/botbench: $(GO_SRC)
 gorged: $(BIN_DIR)/gorged
 	$(BIN_DIR)/gorged -decks internal/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
 
-# dzbroker is the experimental, tag-gated decision broker (internal/broker).
+# dzbroker is the experimental, tag-gated decision broker (internal/inferbroker).
 # It batches learner decisions from many independent games into one inference
 # call with no all-games barrier, and expands one deck matchup into -multiply
 # games with distinct shuffles. The tag keeps it, its seat wrapper and its
@@ -147,7 +147,7 @@ gamepool:
 # test-broker runs the broker package's tests under the tag. Kept out of the
 # default `make test` for the same reason the build is.
 test-broker:
-	go test -tags broker -count=1 ./internal/broker
+	go test -tags broker -count=1 ./internal/inferbroker
 
 .PHONY: traindash
 # traindash serves the read-only live training dashboard over the policynet/PPO

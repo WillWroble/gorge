@@ -141,20 +141,21 @@ cannot support fails, named together with its missing primitives. A table
 entry the build now supports is stale and fails too. **The test's log line is
 the live count.**
 
-Measured 2026-09-28 on `main` (`go test ./rules/ -run
-'TestEveryRepoDeckIsFullySupported|TestEveryRepoDeckParamsAreRead|TestHeads$'
--v`, `make report`, `make sim`):
+Measured 2026-10-12 on `main` (`go test ./rules/ -run
+'TestEveryRepoDeckIsFullySupported|TestEveryRepoDeckParamsAreRead' -v`,
+`make report`, `rules/testdata/heads/*.txt`). The live, regenerated numbers
+are on the docs site, https://adams-shaun.github.io/gorge/; prefer it over
+this snapshot.
 
-- **Ratchet: 3 of 1110 distinct cards unsupported.** The cards come from the
-  29 deck files in `internal/testutil/decks/*.json`: 14 60-card constructed
-  decks and 15 100-card Commander decks. The three are:
+- **Ratchet: 2 of 1123 distinct cards unsupported.** The cards come from the
+  30 deck files in `internal/testutil/decks/*.json`: 15 60-card constructed
+  decks and 15 100-card Commander decks. The two are:
   - Incinerate (`stat:CantRegenerate`)
   - Vines of Vastwood (`stat:CantTarget`)
-  - Ojer Axonil, Deepest Might (`count:NonCombatDamageThisTurn`)
-- **Param census: 23 of 1110.** `TestEveryRepoDeckParamsAreRead`
+- **Param census: 17 of 1123.** `TestEveryRepoDeckParamsAreRead`
   (`rules/paramcensus_test.go`) is the companion ratchet over the same decks'
-  parameters. Its per-card files in `rules/testdata/paramcensus/` held 23 cards that carry an
-  unread param or an unmodelled cost token: 20 distinct param labels and 1
+  parameters. Its per-card files in `rules/testdata/paramcensus/` hold 17 cards that carry an
+  unread param or an unmodelled cost token: 13 distinct param labels and 1
   cost label.
 - **Golden games.** The 12 pinned Legacy decks (`legacyDeckNames`, which
   deliberately excludes the Commander decks) round-robin across 2/4/6/8 seats
@@ -165,12 +166,13 @@ Measured 2026-09-28 on `main` (`go test ./rules/ -run
 
   | seats | 2 | 4 | 6 | 8 |
   |---|---|---|---|---|
-  | chain head | `a991478b3edb213c` | `d4876057e0477830` | `b4a5d33f302e6bfc` | `b73492c5ccdaadca` |
+  | chain head | `bb7767feee2605c2` | `2c7ebe53e20824f9` | `377baec806442301` | `59cc83bb290c5005` |
 
-- **`make sim`:** 20/20 `replay OK` over 20 verified 4-seat games.
-- **Corpus coverage** at the pin `95f04e8a04c8925fa97cb226fc3341cabcc90a53`
-  (`FORGE_REF`): `make report` prints `cards: 33667  playable: 31005 (92.1%)`
-  and `tokens: 839`, matching the `card coverage` CI job's published summary. Since
+- **`make sim`:** 20/20 `replay OK` over 20 verified 4-seat games (last
+  measured 2026-09-28; not re-run for this snapshot).
+- **Corpus coverage** at the pin `25a608a4fc5fe837314a263e4ac6600a01d7c348`
+  (`FORGE_REF`): `make report` prints `cards: 34074  playable: 32089 (94.2%)`
+  and `tokens: 854`. Since
   fuzz-cov3 (2026-09-24) the gate also counts the `count:<head>` value heads
   that a card's SVars read (`effects.modelledValueHeads`, held to the
   evaluator by `TestValueHeadRegistryMatchesEvaluator`). `repl:Untap` is out

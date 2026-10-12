@@ -59,9 +59,25 @@ search clones are one mechanism.
 
 The engine is a pure function of `(Config, intents)`.
 
-- No wall clock. `time` may be imported only by the host tier and by
-  measurement CLIs. Research libraries that need timing take an injected
-  `Millis` hook instead.
+- No wall clock. The authority on who may import `time` is the `allowed`
+  map in `internal/archtest/arch_test.go` (`TestTimeIsImportedOnlyByTheHost`),
+  not this page. It holds four classes, each argued in that test's doc
+  comment:
+  - the host/server tier: `host`, `host/httpapi`, `host/manabrewhttp`,
+    `cmd/gorged` (injected sleep, SSE keep-alive, write and shutdown
+    deadlines);
+  - measurement and developer CLIs that read the clock only to bound a run or
+    report elapsed time (`cmd/botbench`, `cmd/enginebench`, `cmd/searchbench`,
+    `cmd/cardfuzz`, `cmd/paymirror`, `cmd/ledger`, `cmd/traindash`, the
+    search/SpellBench agents and probes, and similar);
+  - a few batching/scheduling libraries whose timers decide only WHEN work is
+    flushed, never what a game sees: `internal/gamepool` and the
+    inference-batching decision broker;
+  - nothing in the engine, card pipeline, effects, view or bot policies.
+
+  Research libraries that need timing take an injected `Millis` hook instead
+  (`searchseat.Millis`, `sbsearch.Millis`, `azmcts.Millis`, installed by the
+  CLI).
 - No ambient randomness. Use `math/rand/v2` with a seeded source; the engine
   has one seeded PCG with a draw counter (`rules/rng.go`). A bot's rng is
   seeded from `(match seed, seat)`.

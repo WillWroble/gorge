@@ -11,11 +11,13 @@ not a commitment: each item is decided on its own.
 
 ## Priorities
 
-1. **Restore a zero-dependency `go.mod`** (H). Move the tag-gated GPU game pool
-   and decision broker into a nested module, and add an architecture test that
-   fails on any `require` line.
-2. **Remove dead weight** (H). Delete `patches/`, `internal/hindsight` with
-   `cmd/hindsight`, and merge the three identical `bots/sb*` wrappers.
+1. **Restore a zero-dependency `go.mod`** (H). Done: the purego-backed GPU
+   scorer and `gamepool` command live in the nested module
+   `experimental/gamepool`, and `internal/archtest`
+   `TestRootModuleHasNoRequires` fails on any root `require` line.
+2. **Remove dead weight** (H). Done: `patches/`, `internal/hindsight` and
+   `cmd/hindsight` are deleted, and the three `bots/sb*` wrappers are merged
+   into `bots/sbbuiltin`.
 3. **Decouple the parked SpellBench stacks** (M). Done: front end V moved to
    `internal/policynet/v2front`, so `cmd/gorged` no longer links
    `spellbench/v2agent`, and SpellBench v1 and v2 (~21k lines) build only with
@@ -36,7 +38,7 @@ not a commitment: each item is decided on its own.
 
 | Candidate | Evidence | Direction |
 |---|---|---|
-| `internal/hindsight` + `cmd/hindsight` (~1.1k lines) | Last substantive change 2026-09-24 recorded a negative result; no Makefile or script references. | **Delete.** (H) |
+| `internal/hindsight` + `cmd/hindsight` (~1.1k lines) | Last substantive change 2026-09-24 recorded a negative result; no Makefile or script references. | Done: deleted. |
 | SpellBench v2 (`spellbench/{v2agent,v2engine,v2shadow}`, `cmd/{sbagent,sbv2engine,sbv2local,sbv2shadow}`, ~11.5k) | Development continues on a separate branch; the commands on `main` are last touched 2026-09-28. Front end V now lives in `policynet/v2front`, so `gorged` no longer links `v2agent`. | Done: behind build tag `spellbench_bridge` (`make test-spellbench-bridge`). |
 | SpellBench v1 (`v1agent`, `kshadow`, `cmd/sbv1agent`, `cmd/kshadowcheck`, ~9.8k) | Last touched 2026-09-28; self-contained; the commands have no tests. | Done: behind build tag `spellbench_bridge`. |
 | ManaBrew wire stack (~11k non-test) | Deprioritised, but both wires are kept as permanent; compiled into `gorged`; `cardfuzz` uses its mock client. | Keep; optionally tag the non-test code. (L) |
@@ -47,30 +49,30 @@ not a commitment: each item is decided on its own.
 
 | Overlap | Evidence | Direction |
 |---|---|---|
-| `patches/0001`–`0006` | 0001, 0002 and 0006 reverse-apply cleanly (already applied); 0005's file exists; 0003/0004 are obsolete; nothing references them. | **Delete.** (H) |
-| `bots/sbfirst`, `bots/sbuniform`, `bots/sbheuristic` | Identical 65-line wrappers from one commit. | **Merge** into one `bots/sbbuiltin`. (H) |
+| `patches/0001`–`0006` | 0001, 0002 and 0006 reverse-apply cleanly (already applied); 0005's file exists; 0003/0004 are obsolete; nothing references them. | Done: deleted. |
+| `bots/sbfirst`, `bots/sbuniform`, `bots/sbheuristic` | Identical 65-line wrappers from one commit. | Done: merged into `bots/sbbuiltin`. |
 | `bots` vs `internal/spellbench/registry` | Two policy registries. | Fold together, or make the second a thin decorator. (M) |
 | `botpolicy` vs `spellbench/builtins` heuristics | An intentional replication of an external benchmark's bots. | Keep; document why. (M) |
 | Four hidden-information search stacks (PIMC `searchprobe`+`searchseat`, PUCT `azmcts`, `spellbench/sbsearch`, `searchbench`; ~22k lines) | Overlapping functionality. | Decide survivors from [benchmark evidence](../performance/bots.md). (L) |
 | `kshadow` vs `v2shadow` | Both rebuild engine state from observations. | Keep at most one. (M) |
 | `policynet` features vs `mzenc` | Two state encoders; `mzenc` is used only for ablations and the GPU pool. | Decide after the ablation study. (L) |
-| Two "brokers" | `scripts/broker.sh` (a cgroup CPU arbiter) and `internal/broker` (inference batching). | Rename one. (M) |
+| Two "brokers" | `scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package is now `internal/inferbroker` (tag `broker`). |
 
 ## Legitimately unimported
 
 These have no importers by design and are **not** cleanup candidates:
 `internal/archtest`, `internal/corpusheap` and `internal/botobs` (test-only
 ratchets), `protocol/manabrew/internal/schemagen` (a generator), and
-`internal/gamepool` / `internal/broker` (build-tag stubs).
+`internal/gamepool` / `internal/inferbroker` (build-tag stubs).
 
 ## Commands with no Makefile or script reference
 
-`corpuscov`, `deckimport`, `dzgorge`, `exitloop`, `hindsight`,
+`corpuscov`, `deckimport`, `dzgorge`, `exitloop`,
 `keywordbench`, `kshadowcheck`, `oraclepacket`, `paymirror`, `policytune`,
 `sbagent`, `sbv1agent`, `sbv2engine`, `sbv2shadow`, `searchbench`,
 `searchprobe`, `searchteacher`, `xmageport`. Several are run by hand and are
 fine; `sbv2local` and `gamepool` are referenced nowhere, and `sbv2local`,
-`sbv2shadow`, `sbv2engine`, `hindsight` and `kshadowcheck` have not changed in
+`sbv2shadow`, `sbv2engine` and `kshadowcheck` have not changed in
 two weeks or more.
 
 ## Stray tracked files

@@ -1,6 +1,6 @@
 //go:build broker
 
-// Package broker is an optional, experimental scheduler: it batches learner
+// Package inferbroker is an optional, experimental scheduler: it batches learner
 // decisions from many independent gorge games into one inference call, with no
 // all-games barrier.
 //
@@ -24,7 +24,7 @@
 // default) is the control: it measures the scheduling envelope with no model
 // cost, which is what the batch-width statistics are for. A GPU scorer can be
 // dropped in without touching the scheduler.
-package broker
+package inferbroker
 
 import (
 	"context"

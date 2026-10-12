@@ -201,7 +201,7 @@ gate_fast_rdep_pkgs() {
     ./cmd/forgec ./cmd/searchbench ./internal/spellbench/registry \
     ./internal/azmcts/clairvoyant ./cmd/ledger ./cmd/gcgate ./cmd/traindash \
     ./protocol/manabrew/internal/schemagen ./cmd/autopayaudit \
-    ./internal/searchbench/statespec ./internal/broker ./internal/gamepool
+    ./internal/searchbench/statespec ./internal/inferbroker ./internal/gamepool
 }
 
 # Input: touched package dirs (./dir form) on stdin. Output: every

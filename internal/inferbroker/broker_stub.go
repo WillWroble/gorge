@@ -1,10 +1,10 @@
 //go:build !broker
 
-// Package broker's default-build stub. The real scheduler is behind -tags
+// Package inferbroker's default-build stub. The real scheduler is behind -tags
 // broker; this file keeps the package importable (and the experimental flag
 // checkable) in a default build without pulling the scheduler, the seat
 // wrapper, or their dependencies into the 32-bit and vet paths.
-package broker
+package inferbroker
 
 import (
 	"errors"
