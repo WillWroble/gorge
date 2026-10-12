@@ -556,14 +556,32 @@ var numericFieldCodes = state.NewStrCodes(
 )
 
 // lacksPT reports an object that has no power or toughness characteristic at
-// all (CR 208.3: only creatures and Vehicle-like objects with a printed P/T
-// have one), so no power/toughness comparison can hold: a noncreature spell
-// is not "power equal to the chosen number 0" (Talion, the Kindly Lord). A
-// context that bound layer-derived P/T already decided the object has one.
+// all (CR 208.3: only creatures and objects with a printed or defined P/T have
+// one), so no power/toughness comparison can hold: a noncreature spell is not
+// "power equal to the chosen number 0" (Talion, the Kindly Lord). The rules
+// seam binds DerivedPower/Toughness for every P/T-reading spec (0 for a
+// P/T-less object), so the bound flags cannot answer this; the object's own
+// characteristics do: no printed/defined P/T and, through layer 4, not a
+// creature (an animated land or crewed Vehicle has one).
 func lacksPT(o *state.Object, sc SpecContext) bool {
-	if sc.HasDerivedPT || sc.HasBasePT {
+	f := o.Face()
+	if f == nil || f.PT != "" {
 		return false
 	}
-	f := o.Face()
-	return f != nil && f.PT == ""
+	if sc.ExtraTypesOwner == o.ID && sc.ExtraTypes != nil {
+		return !typeWordsHave(sc.ExtraTypes, "Creature")
+	}
+	if types, ok := derivedTypesForPtr(o, &sc); ok {
+		return !typeWordsHave(types, "Creature")
+	}
+	return !o.EffectiveIsCreature()
+}
+
+func typeWordsHave(types []string, want string) bool {
+	for _, t := range types {
+		if t == want {
+			return true
+		}
+	}
+	return false
 }

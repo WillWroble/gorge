@@ -97,22 +97,39 @@ func TestETBNumberCarriersAreBounded(t *testing.T) {
 }
 
 // CR 208.3: a noncreature spell has no power or toughness, so "power equal to
-// the chosen number" never holds for it -- even for a chosen 0.
+// the chosen number" never holds for it -- even for a chosen 0. Goes through
+// Engine.matchesSpec, the seam every rules-side match takes, which binds
+// layer-derived P/T (0/0 for a P/T-less object).
 func TestPowerEqualNeverMatchesNoncreatureSpell(t *testing.T) {
 	t.Parallel()
-	e := handEngine(t, corpusCard(t, "Lightning Bolt"))
-	bolt := e.G.Zone(state.ZHand, 0)[0]
+	e := handEngine(t, corpusCard(t, "Lightning Bolt"), corpusCard(t, "Forest"), corpusCard(t, "Grizzly Bears"))
+	hand := e.G.Zone(state.ZHand, 0)
+	if len(hand) != 3 {
+		t.Fatalf("precondition: hand = %d cards, want 3", len(hand))
+	}
+	bolt, land, bear := hand[0], hand[1], hand[2]
 	o := e.G.Obj(bolt)
 	if o == nil || o.Face().PT != "" || o.Face().Cmc() != 1 {
 		t.Fatalf("precondition: want an instant with no printed P/T and mana value 1: %+v", o)
 	}
-	sc := effects.SpecContext{}
-	if !effects.MatchesObjectCtx(e.G, "Card.cmcEQ1", o, sc) {
+	if b := e.G.Obj(bear); b == nil || b.Face().PT != "2/2" {
+		t.Fatalf("precondition: Grizzly Bears should print 2/2: %+v", b)
+	}
+	if !e.matchesSpec("Card.cmcEQ1", bolt, effects.SpecContext{}) {
 		t.Fatal("precondition: cmcEQ1 should match the mana value 1 spell")
 	}
-	for _, spec := range []string{"Card.powerEQ0", "Card.toughnessEQ0", "Card.powerEQtoughness", "Card.powerNOT0"} {
-		if effects.MatchesObjectCtx(e.G, spec, o, sc) {
-			t.Errorf("%s matched a noncreature spell", spec)
+	for _, id := range []state.ObjID{bolt, land} {
+		for _, spec := range []string{"Card.powerEQ0", "Card.toughnessEQ0", "Card.powerEQtoughness", "Card.powerNOT0", "Card.powerLT1", "Card.toughnessLE0"} {
+			if e.matchesSpec(spec, id, effects.SpecContext{}) {
+				t.Errorf("%s matched P/T-less %s", spec, e.G.Obj(id).Face().Name)
+			}
 		}
+	}
+	// Controls: a creature's P/T still compares.
+	if !e.matchesSpec("Card.powerEQ2", bear, effects.SpecContext{}) {
+		t.Error("Card.powerEQ2 should match Grizzly Bears")
+	}
+	if e.matchesSpec("Card.powerEQ0", bear, effects.SpecContext{}) {
+		t.Error("Card.powerEQ0 should not match Grizzly Bears")
 	}
 }
