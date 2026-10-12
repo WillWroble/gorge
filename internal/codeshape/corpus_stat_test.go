@@ -47,8 +47,15 @@ func corpusLookupViolations(root string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".cards", ".ds4", ".worktrees", "node_modules", "testdata":
+			// Dot and underscore dirs are outside the go tool's package
+			// walk; the main checkout keeps untracked research copies in
+			// .superpowers that a clean worktree never has.
+			name := d.Name()
+			if p != root && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
+				return filepath.SkipDir
+			}
+			switch name {
+			case "node_modules", "testdata":
 				return filepath.SkipDir
 			}
 			return nil
