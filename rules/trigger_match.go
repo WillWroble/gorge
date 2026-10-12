@@ -2282,6 +2282,9 @@ func (e *Engine) closeZoneBatch() {
 			if len(ent.moved) > 0 {
 				pt.Ctx.Remembered = append([]state.Target(nil), ent.moved...)
 				pt.Ctx.Captured = append([]state.Target(nil), ent.moved...)
+				// TriggerCount$Amount of a batch zone mode is the number of
+				// objects the batch moved ("put that many counters").
+				pt.Ctx.TriggerContext.TriggerAmount = int32(len(ent.moved))
 			}
 		}
 	}

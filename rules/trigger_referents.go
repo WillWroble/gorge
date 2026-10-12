@@ -166,6 +166,10 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		c.TriggerActivator = player(trigmatch.TapActor(boardOf(e), ev))
 	case cards.TriggerChangesZone, cards.TriggerLandPlayed:
 		c.TriggerCard = ev.Obj
+	case cards.TriggerChangesZoneAll, cards.TriggerPhaseOutAll:
+		// An unbatched event is a batch of one; closeZoneBatch overrides the
+		// amount with the batch's moved count (TriggerCount$Amount).
+		c.TriggerAmount = 1
 	case cards.TriggerMilled, cards.TriggerMilledAll:
 		// The milled card is ev.Obj (what ValidCard$ matched) and the player
 		// whose library was milled is ev.Player (what ValidPlayer$ matched),

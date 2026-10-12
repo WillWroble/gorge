@@ -82,6 +82,9 @@ func dedupeTargets(ts []state.Target) []state.Target {
 // AtEOT$ value is one loud Note per call.
 func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 	g := h.Game()
+	// One resolution's copies enter as one batch (CR 603.2c).
+	h.BeginZoneBatch()
+	defer h.EndZoneBatch()
 
 	// preNotes keeps the Notes emitted before the Choices$ ask, which the
 	// tape branch emits again after the answer.

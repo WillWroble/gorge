@@ -83,8 +83,7 @@
     }
    ],
    "expect": [],
-   "xmage": "WoodlandChampionTest#test_TriggerOnTwoTokens",
-   "known_bug": "B13: one TokenAmount$ 2 creation fires Woodland Champion's Mode$ ChangesZoneAll line once PER token (rules/trigger_match.go:1538 batches ChangesZoneAll only while e.zoneBatchOpen, which token creation never opens), and each per-event trigger reads TriggerCount$Amount as 0 (no TriggerAmount bound for the per-event ChangesZoneAll path in rules/trigger_referents.go), so no counters are put. CR 603.2c (one batch event)."
+   "xmage": "WoodlandChampionTest#test_TriggerOnTwoTokens"
   }
  ]
 }
