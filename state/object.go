@@ -946,6 +946,14 @@ type Object struct {
 	// wherever IsAttacking is.
 	AttackingBattle ObjID
 	BlockedBy       []ObjID
+	// IsBlocking marks a creature declared as a blocker this combat (CR
+	// 509.1g), recorded on the BLOCKER so it survives its attacker leaving
+	// combat: CR 506.4 / 509.1h keep a creature blocking after the creature
+	// it blocks is removed (Norin, Swift Survivalist exiles a blocked
+	// attacker; the blocker is still "blocking"). Set by events.Apply's
+	// DeclareBlockers case, cleared with IsAttacking (EndCombatReset, leaving
+	// the battlefield, a control change, phasing out).
+	IsBlocking bool
 	// EncoreAttackTurn/Defender record "attacks that opponent this turn if
 	// able" on an encore token. Zero Turn means no requirement; turns begin
 	// at 1, so the zero value is unambiguous.

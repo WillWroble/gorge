@@ -275,7 +275,7 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			Token: o.IsToken, Tapped: o.Tapped, FaceDown: o.FaceDown, Damage: o.Damage,
 			Counters: r.snapCounters(o.Counters), Types: types, AllCreatureTypes: derived.AllCreatureTypes,
 			Colors: e.Colors(id), Keywords: kws,
-			Attacking: o.IsAttacking, Blocking: blocking[id],
+			Attacking: o.IsAttacking, Blocking: blocking[id] || o.IsBlocking,
 		}
 		if oracleHasFold(types, "Creature") {
 			p.PT = fmt.Sprintf("%d/%d", e.Power(id), e.Toughness(id))

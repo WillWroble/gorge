@@ -721,6 +721,7 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		o.Damage = 0
 		o.ClassLevelValue = 0
 		o.IsAttacking = false
+		o.IsBlocking = false
 		o.AttackingBattle = 0
 		o.BlockedBy = nil
 		if !countersRemain || to == state.ZHand || to == state.ZLibrary {

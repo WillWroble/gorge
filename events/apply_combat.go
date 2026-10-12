@@ -47,6 +47,7 @@ func foldDeclareBlockers(g *state.Game, e *Event) {
 			continue
 		}
 		a.BlockedBy = append(a.BlockedBy, pr[1])
+		g.Obj(pr[1]).IsBlocking = true
 		g.NoteBlockers()
 	}
 }
@@ -513,6 +514,7 @@ func foldPhaseOut(g *state.Game, e *Event) {
 				other := &g.Objs[i]
 				if other.ID == e.Obj {
 					other.IsAttacking = false
+					other.IsBlocking = false
 					other.AttackingBattle = 0
 					other.BlockedBy = nil
 					continue
