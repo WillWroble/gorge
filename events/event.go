@@ -1172,10 +1172,20 @@ const (
 	// script reads that head, so every other game keeps its chain. Appended
 	// after AbilityTriggered so every earlier ordinal is unchanged.
 	CastBattlefield
+	// DrawBatchProposal is the synthetic pre-action proposal for one draw
+	// instruction's batch: Player is the player about to draw and Amount the
+	// batch's card count. Forge's Player.drawCards(n) runs the DrawCards
+	// replacement class over the whole batch before any card moves (Alms
+	// Collector's "would draw two or more cards"), and the per-card Draw
+	// events are what the log records. It is never logged: the caller holds
+	// it through the replacement registry and draws nothing when a body
+	// consumed it. Appended after CastBattlefield so every earlier ordinal,
+	// hash chain and golden replay is unchanged.
+	DrawBatchProposal
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(CastBattlefield) + 1
+	NumKinds = int(DrawBatchProposal) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving
