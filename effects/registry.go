@@ -78,6 +78,18 @@ type DamageSourceLKI struct {
 type EffectFrame struct {
 	Source state.ObjID
 	Stamp  uint32
+	// Spare, on a source-scoped frame (Stamp 0), is the game clock at the
+	// moment a NESTED api:Effect began registering inside an outer Effect's
+	// own body (Soulfire Grand Master's Static$ trigger body creates the
+	// replacement Effect, then its `ExileSelf` sub exiles the OUTER carrier).
+	// The source-scoped ender spares every registration stamped after it, so
+	// the idiom ends the carrier and not the replacement just created. Zero
+	// means no sparing (the ordinary self-ending one-shot).
+	Spare uint32
+	// Carrier marks the frame rules binds for an Effect-created delayed
+	// trigger's body (the carrier's own Triggers$ execution), as opposed to
+	// the one effEffect binds after a registration in the same chain.
+	Carrier bool
 }
 
 type Ctx struct {

@@ -224,10 +224,10 @@ func (h *fakeHost) EndImprintedEffects(source state.ObjID) {
 
 // EndEffectSource mirrors rules.Engine's EndEffectSource: drop every
 // Effect-created registration from the source, leaving printed statics.
-func (h *fakeHost) EndEffectSource(source state.ObjID) {
+func (h *fakeHost) EndEffectSource(source state.ObjID, spareAfter uint32) {
 	kept := h.continuous[:0]
 	for _, ce := range h.continuous {
-		if ce.Source == source && ce.FromEffect {
+		if ce.Source == source && ce.FromEffect && (spareAfter == 0 || ce.Timestamp <= spareAfter) {
 			continue
 		}
 		kept = append(kept, ce)

@@ -831,14 +831,49 @@ func replacementRedirectsToExile(params map[string]string, body string, svars ma
 	if replacementBodyAPI(body) != "ChangeZone" {
 		return false
 	}
-	return redirectExileBody(replacementBodyParams(body), svars)
+	return redirectExileBody(replacementBodyParams(body), svars, redirectLineRemembered(params))
+}
+
+// redirectLineRemembered reports whether the replacement line's ValidCard$
+// pins the effect's remembered card (Card.IsRemembered...), the only shape in
+// which a body's Defined$ Remembered is the very card the replacement
+// discarded.
+func redirectLineRemembered(params map[string]string) bool {
+	return strings.Contains(params["ValidCard"], "IsRemembered")
 }
 
 // redirectExileBody is replacementRedirectsToExile's body gate: body is the
 // Key$ Value map of the ReplaceWith$ SVar body (a parsed SVar line, not a
 // card Params map) and svars the face's SVar table its SubAbility$ names.
-func redirectExileBody(body map[string]string, svars map[string]string) bool {
-	if body["Defined"] != "ReplacedCard" || body["Destination"] != "Exile" {
+//
+// The head is a ChangeZone of the replaced card to exile -- or, from the
+// stack, to its owner's hand (Soulfire Grand Master's "put that card into
+// your hand instead of into your graveyard as it resolves"). Defined$
+// Remembered names the same card only when the line's ValidCard$ pins
+// IsRemembered (checked by the caller's params), so the head can never move
+// a different card than the one the replacement discarded. The head's
+// SubAbility$ chain is the "if you do, ..." rider (Lilah's plot, Feather's
+// delayed return, Gandalf's suspend grant, the one-shot self-exile idiom):
+// the head has already moved the card by then, so a rider this build cannot
+// resolve loses the rider, never the moved object -- but every link must be
+// a registered API so an unmodelled rider stays on the loud Note path.
+func redirectExileBody(body map[string]string, svars map[string]string, remembered bool) bool {
+	switch redirectDefinedCodes.Code(body["Defined"]) {
+	case redirectDefinedReplaced:
+	case redirectDefinedRemembered:
+		if !remembered {
+			return false
+		}
+	default:
+		return false
+	}
+	switch redirectDestinationCodes.Code(body["Destination"]) {
+	case redirectDestinationExile:
+	case redirectDestinationHand:
+		if redirectOriginCodes.Code(body["Origin"]) != redirectOriginStack {
+			return false
+		}
+	default:
 		return false
 	}
 	for k, v := range body {
@@ -849,8 +884,7 @@ func redirectExileBody(body map[string]string, svars map[string]string) bool {
 				return false
 			}
 		case redirectExileBodySubAbility:
-			line := svars[v]
-			if replacementBodyAPI(line) != "ChangeZone" || !selfExileIdiom(replacementBodyParams(line)) {
+			if !redirectRiderChain(v, svars, 0) {
 				return false
 			}
 		default:
@@ -860,11 +894,32 @@ func redirectExileBody(body map[string]string, svars map[string]string) bool {
 	return true
 }
 
-// selfExileIdiom reports whether sub (a parsed SVar body) is exactly the
-// one-shot `DB$ ChangeZone | Defined$ Self | Origin$ Command | Destination$
-// Exile` idiom that ends the Effect's registration (effects/zone.go).
-func selfExileIdiom(sub map[string]string) bool {
-	return len(sub) == 4 && sub["Defined"] == "Self" && sub["Origin"] == "Command" && sub["Destination"] == "Exile"
+// redirectRiderChain reports whether the SubAbility$ chain starting at name
+// is made only of registered effect APIs (bounded by maxChain so a cyclic
+// script cannot spin the registration gate).
+func redirectRiderChain(name string, svars map[string]string, depth int) bool {
+	if depth >= maxChain {
+		return false
+	}
+	line := svars[name]
+	api := replacementBodyAPI(line)
+	if api == "" {
+		return false
+	}
+	if _, ok := registry.load().byName[api]; !ok {
+		return false
+	}
+	sub := redirectSubName(replacementBodyParams(line))
+	if sub == "" {
+		return true
+	}
+	return redirectRiderChain(sub, svars, depth+1)
+}
+
+// redirectSubName is a replacementBodyParams-built SVar body's SubAbility$
+// name ("" when the chain ends).
+func redirectSubName(body map[string]string) string {
+	return body["SubAbility"]
 }
 
 // replacementBodyParams splits one SVar body line into its Key$ Value map.
@@ -1162,7 +1217,7 @@ var absentDurationMeansThisTurnSet = state.NewNameSet(
 	"CantGainLife",
 )
 
-var replacementRedirectsToExileKeys = state.NewNameSet("Event", "ValidCard", "ValidLKI", "Origin", "Destination", "ActiveZones", "EffectZone", "ReplaceWith", "Description", "Fizzle")
+var replacementRedirectsToExileKeys = state.NewNameSet("Event", "ValidCard", "ValidLKI", "Origin", "Destination", "ActiveZones", "EffectZone", "ReplaceWith", "Description", "Fizzle", "Optional")
 
 var effectOneShotDelayedModeSet = state.NewNameSet(
 	"SpellCast",
@@ -1222,6 +1277,38 @@ var isNextTurnDurationCodes = state.NewStrCodes(
 	state.StrEntry[isNextTurnDurationCode]{Key: "untiltheendofyournextturn", Val: isNextTurnDurationUntilYourNextTurn},
 )
 
+type redirectDefinedCode uint16
+
+const (
+	redirectDefinedReplaced redirectDefinedCode = iota + 1
+	redirectDefinedRemembered
+)
+
+var redirectDefinedCodes = state.NewStrCodes(
+	state.StrEntry[redirectDefinedCode]{Key: "ReplacedCard", Val: redirectDefinedReplaced},
+	state.StrEntry[redirectDefinedCode]{Key: "Remembered", Val: redirectDefinedRemembered},
+)
+
+type redirectDestinationCode uint16
+
+const (
+	redirectDestinationExile redirectDestinationCode = iota + 1
+	redirectDestinationHand
+)
+
+var redirectDestinationCodes = state.NewStrCodes(
+	state.StrEntry[redirectDestinationCode]{Key: "Exile", Val: redirectDestinationExile},
+	state.StrEntry[redirectDestinationCode]{Key: "Hand", Val: redirectDestinationHand},
+)
+
+type redirectOriginCode uint16
+
+const redirectOriginStack redirectOriginCode = 1
+
+var redirectOriginCodes = state.NewStrCodes(
+	state.StrEntry[redirectOriginCode]{Key: "Stack", Val: redirectOriginStack},
+)
+
 type redirectExileBodyCode uint16
 
 const (
@@ -1244,6 +1331,12 @@ var redirectExileBodyCodes = state.NewStrCodes(
 	state.StrEntry[redirectExileBodyCode]{Key: "WithCountersType", Val: redirectExileBodyAllowed},
 	state.StrEntry[redirectExileBodyCode]{Key: "WithCountersAmount", Val: redirectExileBodyAllowed},
 	state.StrEntry[redirectExileBodyCode]{Key: "Hidden", Val: redirectExileBodyHidden},
+	// RememberChanged$ True / ExiledWithEffectSource$ True (Lilah, Feather,
+	// Gandalf; Forger's Foundry): the head ChangeZone records the moved card
+	// for its SubAbility$ rider and tags it exiled-with the effect source --
+	// neither touches where the card goes.
+	state.StrEntry[redirectExileBodyCode]{Key: "RememberChanged", Val: redirectExileBodyHidden},
+	state.StrEntry[redirectExileBodyCode]{Key: "ExiledWithEffectSource", Val: redirectExileBodyHidden},
 	state.StrEntry[redirectExileBodyCode]{Key: "SubAbility", Val: redirectExileBodySubAbility},
 )
 

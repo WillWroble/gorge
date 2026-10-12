@@ -253,7 +253,9 @@ type HostContinuous interface {
 	// with a zero Stamp). Only registrations created by api:Effect are ended
 	// (state.ContinuousEffect.FromEffect); the same source's printed statics
 	// are untouched.
-	EndEffectSource(source state.ObjID)
+	// spareAfter, when non-zero, spares registrations whose Timestamp is
+	// later than it (Ctx.EffectFrame.Spare).
+	EndEffectSource(source state.ObjID, spareAfter uint32)
 	// EndImprintedEffects ends every live continuous-effect registration
 	// that an ImprintOnHost$ True Effect imprinted on the named host card
 	// (state.ContinuousEffect.ImprintOnHost): the analogue of Forge's

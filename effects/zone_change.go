@@ -639,7 +639,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			// the spell/ability that registered it -- so end every Effect-created
 			// registration from that source. The ender's FromEffect marker keeps
 			// the source's printed statics out of it.
-			h.EndEffectSource(f.Source)
+			h.EndEffectSource(f.Source, f.Spare)
 		}
 		return
 	}
@@ -713,7 +713,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		if cz.RememberLKI {
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: o.ID, Controller: o.Controller, Owner: o.Owner})
 		}
-		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 			ev.IDs = []state.ObjID{c.Source}
 		}
 		applyMoveFaceDown(h, c, &cz.Riders.FaceDownRiders, &ev, to)
@@ -1450,7 +1450,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: id, Controller: o.Controller, Owner: o.Owner})
 		}
 	}
-	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 		// The S: static spelling of the same provenance need: a source whose
 		// own Static lines name ExiledWithSource (Intellect Devourer's
 		// MayPlay+ExiledWithSource grant) tracks its exiles exactly like the
