@@ -1237,8 +1237,17 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// The corpus spells this three ways depending on whether the source
 		// is Equipment, an Aura, or a generic script; all three name the
 		// same field (Task 14 wires its producer).
-		if o := g.Obj(c.Source); o != nil && o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
-			return []state.Target{{Obj: o.AttachedTo}}, true
+		if o := g.Obj(c.Source); o != nil {
+			if o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
+				return []state.Target{{Obj: o.AttachedTo}}, true
+			}
+			// The source left the battlefield as a cost ("{5}, Sacrifice
+			// this Aura: Exile enchanted creature"): the move fold cleared
+			// AttachedTo but kept the pre-clear bearer as LastBearer, which
+			// is the last-known-information read CR 608.2h asks for.
+			if o.AttachedTo == 0 && o.LastBearer != 0 && g.Obj(o.LastBearer) != nil {
+				return []state.Target{{Obj: o.LastBearer}}, true
+			}
 		}
 		return nil, true
 	case definedSpecOpponent:
