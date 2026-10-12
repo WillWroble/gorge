@@ -36,3 +36,12 @@ func RoomName(o *state.Object) (string, bool) {
 		return "", true
 	}
 }
+
+// IsRoomCard reports whether o is a two-faced Enchantment Room card.
+func IsRoomCard(o *state.Object) bool {
+	if o == nil || o.Card == nil || len(o.Card.Faces) != 2 {
+		return false
+	}
+	f := o.Card.Faces
+	return f[0] != nil && f[1] != nil && f[0].IsRoom() && f[1].IsRoom()
+}
