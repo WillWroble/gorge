@@ -145,6 +145,11 @@ var baseBuckets = map[string]bucket{
 	// read for OptionalDecider$ (the resolution-time optional gate) and
 	// ResolvedLimit$ (the per-turn resolution cap's increment eligibility).
 	"rt": bTrig,
+	// pt.Trigger is the pendingTrigger's own line -- a granted (AddTrigger$)
+	// or gained trigger carries its cards.Trigger on the queue entry -- read
+	// by staticTriggerLine for Static$ True: the same parameter map t/tr
+	// cover.
+	"pt.Trigger": bTrig,
 	"s":  bStat, "st": bStat, "sv": bStat,
 	// carrier is offBattlefieldGrantedWalk's element of
 	// actionStaticSource.addAbilityContinuous(): a staticView like s/st/sv,
