@@ -290,6 +290,14 @@ func spellCastNarrowSkip(t *cards.Trigger) string {
 			return "spell-cast unsupported " + shape.reason
 		}
 	}
+	// "Whenever you cast a spell using mana produced by CARDNAME" (Tecutlan,
+	// The Myriad Pools, Barracks of the Thousand): gorge reads no spell-cast
+	// mana provenance, so the trigger stays inert on a cast the source paid
+	// for (rules/spellcast_permanent_test.go pins it fail-closed) and no
+	// cause can make it fire.
+	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromcard") {
+		return "spell-cast unsupported mana-from-source provenance (ValidSA$ ManaFromCard)"
+	}
 	// No OpponentTurn$ branch: levelb routes every OpponentTurn$ True row to
 	// the trigger.spell-cast-opponent-turn sub, whose cast-family cause
 	// passes to p1's main phase before the cast, so an unserved row here is
