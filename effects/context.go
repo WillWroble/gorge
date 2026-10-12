@@ -374,11 +374,11 @@ func exiledWithSet(g *state.Game, c *Ctx) []state.Target {
 // payload) OR the source's forward Object.ExiledCards list (Forge's
 // hostCard.exiledCards, written by exiledWithAssociation). `Defined$
 // ExiledWith` (via exiledWithSet) and the `Card.ExiledWithSource` filter
-// family both consume it so those two spellings cannot disagree. A few
-// narrower consumers of the same association still read only the reverse
-// scalar (count_ref.go's `ExiledWith$`, mana_reflected.go's "ExiledWith",
-// type_choices.go's SharedTypeLabels); routing them here too is a follow-up,
-// not part of this fix.
+// family both consume it so those two spellings cannot disagree, as does the
+// ManaReflected "Defined.ExiledWith" scan (mana_reflected.go). A few narrower
+// consumers of the same association still read only the reverse scalar
+// (count_ref.go's `ExiledWith$`, type_choices.go's SharedTypeLabels); routing
+// them here too is a follow-up, not part of this fix.
 func exiledBySource(g *state.Game, o *state.Object, src state.ObjID) bool {
 	if o == nil || src == 0 {
 		return false
@@ -2018,7 +2018,41 @@ func exileProvenanceNeeded(c *Ctx) bool {
 			return true
 		}
 	}
+	// The A: spelling (Mimeoplasm, Revered One's `ValidTgts$
+	// Creature.ExiledWithSource`) names it on the source face's own ability
+	// lines, which no SVar carries. Ctx.Host is bound by effects.Resolve; a
+	// Ctx that never entered Resolve has no host and keeps the SVar-only read.
+	return c.Host != nil && faceAbilitiesNameExiledWithSource(c.Host, c.Source)
+}
+
+// faceAbilitiesNameExiledWithSource reports whether the source CARD's own
+// A: ability lines name ExiledWithSource in any param value -- the ability
+// spelling of the provenance need exileProvenanceNeeded's SVar scan and
+// faceStaticsNameExiledWithSource's S: scan cover. Iterating the param map
+// only feeds a boolean OR, so map order never reaches an event, and the
+// printed face is immutable, so the answer is stable through replay.
+func faceAbilitiesNameExiledWithSource(h Host, src state.ObjID) bool {
+	o := h.Game().Obj(src)
+	if o == nil || o.Face() == nil {
+		return false
+	}
+	for _, sa := range o.Face().Abilities {
+		if sa == nil {
+			continue
+		}
+		for _, v := range sa.Params {
+			if strings.Contains(v, "ExiledWithSource") {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// faceNamesExiledWithSource is the settle sites' source-face test: the S:
+// static spelling or the A: ability spelling of the same provenance need.
+func faceNamesExiledWithSource(h Host, src state.ObjID) bool {
+	return faceStaticsNameExiledWithSource(h, src) || faceAbilitiesNameExiledWithSource(h, src)
 }
 
 // faceStaticsNameExiledWithSource reports whether the source CARD's own

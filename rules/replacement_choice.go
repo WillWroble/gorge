@@ -286,6 +286,12 @@ func (e *Engine) poseReplacementChoice(ev events.Event, matches []replMatch) {
 			return
 		}
 		p = o.Controller
+		if e.shouldPoseLoneOptionalMove(ev, matches) {
+			// A lone "you may" Moved replacement: the same apply/decline
+			// ask the optional Draw replacement poses.
+			kind = replChoiceDraw
+			p = e.replacementAskPlayer(matches, p)
+		}
 	}
 	if int(p) >= len(e.G.Players) {
 		return
@@ -295,6 +301,30 @@ func (e *Engine) poseReplacementChoice(ev events.Event, matches []replMatch) {
 	if e.pending == nil {
 		e.askReplacementChoice(p)
 	}
+}
+
+// shouldPoseLoneOptionalMove reports whether a MoveZone proposal matched by
+// exactly one "Optional$ True" replacement must ask its "may" (Library of
+// Leng, Nephalia Academy, Pulmonic Sliver, Forger's Foundry). A moving object
+// that no longer exists or a departed asking player makes no choice (CR
+// 800.4a), so those keep the deterministic lone-apply path.
+func (e *Engine) shouldPoseLoneOptionalMove(ev events.Event, matches []replMatch) bool {
+	if ev.Kind != events.MoveZone || len(matches) != 1 || !matches[0].repl.OptionalValue() {
+		return false
+	}
+	if len(e.replExclude) > 0 {
+		// A CR 616.1f recheck of a move another replacement already
+		// redirected: the "may" was already made by the election that
+		// produced the modified event, so the remainder applies unasked as
+		// before (two Library of Leng ask once, not twice).
+		return false
+	}
+	o := e.G.Obj(ev.Obj)
+	if o == nil || int(o.Controller) >= len(e.G.Players) {
+		return false
+	}
+	p := e.replacementAskPlayer(matches, o.Controller)
+	return int(p) < len(e.G.Players) && !e.G.Players[p].Lost
 }
 
 func (e *Engine) askReplacementChoice(p state.PlayerID) {
@@ -356,11 +386,17 @@ func (e *Engine) askReplacementChoice(p state.PlayerID) {
 		}
 		d.Prompt = "Apply " + name + "'s optional draw replacement?"
 		applyLabel := "Yes — skip that draw"
+		declineLabel := "No — draw the card"
 		if m.repl.With != nil {
 			applyLabel = "Yes — apply the replacement"
 		}
+		if rc.ev.Kind == events.MoveZone {
+			d.Prompt = "Apply " + name + "'s optional replacement to this move?"
+			applyLabel = "Yes — apply the replacement"
+			declineLabel = "No — let it move normally"
+		}
 		d.Options = []decision.Option{{Index: 0, Kind: "apply", Obj: m.id, Label: applyLabel},
-			{Index: 1, Kind: "decline", Obj: m.id, Label: "No — draw the card"}}
+			{Index: 1, Kind: "decline", Obj: m.id, Label: declineLabel}}
 		if in, ok := parkTapeAnswer(e, d); ok {
 			e.handle(d, in)
 			return

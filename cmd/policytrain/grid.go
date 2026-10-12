@@ -25,6 +25,9 @@ type gridFlags struct {
 	evalCorpus   string
 	evalJSON     string
 	arm          string
+	// keepExplore keeps explore-flagged label rows (value/outcome learning);
+	// the default drops them from policy imitation.
+	keepExplore bool
 }
 
 // active reports whether any pn12 flag moves the load away from Load.
@@ -46,7 +49,8 @@ func (g gridFlags) loadOptions() (policynet.LoadOptions, bool, error) {
 		k := g.maxGameIndex
 		lo.Keep = func(_ string, gameIndex int) bool { return gameIndex < k }
 	}
-	return lo, fs != policynet.FeaturesV1 || lo.Joint || lo.Keep != nil, nil
+	lo.KeepExplore = g.keepExplore
+	return lo, fs != policynet.FeaturesV1 || lo.Joint || lo.Keep != nil || lo.KeepExplore, nil
 }
 
 // loadCorpus loads one corpus path under the grid options: policynet.Load

@@ -119,9 +119,9 @@ func TestStaticGrantedAbilityRowCountPinned(t *testing.T) {
 func TestStaticGrantedAbilityNamedSkips(t *testing.T) {
 	for _, r := range []struct{ card, key, reason string }{
 		// The Aetherspark static#0.1 and Barrensteppe Siege static#0.0 moved
-		// to the granted-trigger observation (static_granted_trigger_test.go).
-		{"Frostcliff Siege", "static#0.1", "static grants a static ability (observed only through its own effect)"},
-		{"Tomik, Orzhov Lawmage", "static#0.0", "static grants a static ability (observed only through its own effect)"},
+		// to the granted-trigger observation (static_granted_trigger_test.go);
+		// Frostcliff Siege static#0.1 and Tomik, Orzhov Lawmage static#0.0
+		// moved to the granted-static observation (static_granted_static_test.go).
 		{"Etrata, Deadly Fugitive", "static#0.0", "static grants an activated ability (needs the driver's activate on a granted ability)"},
 	} {
 		t.Run(r.card+"/"+r.key, func(t *testing.T) {

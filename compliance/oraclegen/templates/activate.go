@@ -20,6 +20,7 @@ package templates
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -80,13 +81,13 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	if strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKTargetsWithSameCreatureType)), "True") {
 		slots = markSameTypePairSlots(slots)
 	}
-	stackTargets := stackTargetRefs(sa, f, name, slots)
 	for _, sl := range slots {
-		// "Target creature that attacked this turn" needs a combat prelude
-		// (attack, then back to a main phase for a sorcery-speed ability)
-		// this template does not script; name the shape rather than report
-		// a generic fixture miss.
-		if attackedThisTurn(sl.Filter) {
+		// "Target creature that attacked this turn" is served by a p0
+		// attacker declared in a combat prelude, then a pass to the second
+		// main phase (activateWith / activateWithFixture). An opponent's
+		// creature cannot have attacked on p0's turn, so that shape stays a
+		// named gap rather than a generic fixture miss.
+		if attackedThisTurn(sl.Filter) && strings.Contains(sl.Filter, "OppCtrl") {
 			return oraclegen.Item{}, &oraclegen.Skip{Card: name,
 				Reason: "activate target gap: attackedThisTurn needs a combat prelude (" + sl.Filter + ")"}
 		}
@@ -96,7 +97,31 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	// a failure is reported as a known restriction rather than the generic
 	// no-fixture reason.
 	restriction, gap := activateRestriction(reg, f, name, sa)
-	it, ok := activateWith(reg, f, name, req, idx, prefix, pool, sa.ParamStr(cards.PKCost), zone, slots, restriction, stackTargets, abilityStackPlanOf(reg, sa, slots))
+	// A "Return<.../Creature.tapped>" cost's fixture creature is tapped by a
+	// real tap spell in the prelude, because setup's Tapped list is undone by
+	// the genesis untap step (see returnTappedPrelude).
+	if pre, ok := returnTappedPrelude(reg, sa.ParamStr(cards.PKCost)); ok {
+		restriction = append(restriction, pre)
+	}
+	// A charm whose root names no ValidTgts$ (an activated AB$ Charm) has no
+	// slots from AbilitySlotSpecs; its modes' own ValidTgts$ live in the
+	// Choices$ SVars. Try the plain (empty-slot) fixture first -- it serves
+	// the already-served charm rows byte-identically -- then each seeded slot
+	// set (charmSlotSets), because the engine chooses an activated charm's
+	// mode and target at RESOLUTION (rules/cast_asks.go), so only the board
+	// needs a legal target.
+	slotSets := [][]oraclegen.Slot{slots}
+	if len(slots) == 0 {
+		slotSets = append(slotSets, charmSlotSets(f, sa)...)
+	}
+	var it oraclegen.Item
+	ok = false
+	for _, ss := range slotSets {
+		it, ok = activateWith(reg, f, name, req, idx, prefix, pool, sa.ParamStr(cards.PKCost), zone, ss, restriction, stackTargetRefs(sa, f, name, ss), abilityStackPlanOf(reg, sa, ss))
+		if ok {
+			break
+		}
+	}
 	if !ok {
 		if oraclegen.HasType(f, "Aura") {
 			// An Aura's ability is offered only while it is attached; this
@@ -173,7 +198,7 @@ func activateWith(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	// Stack slots are served here by a prelude cast the scenario holds at
 	// this step's priority; every other template family keeps the plain
 	// fixtures, whose stack slots stay the caller's own precast.
-	for _, fx := range oraclegen.FixturesServingStack(reg, slots, stackTargets...) {
+	for _, fx := range oraclegen.FixturesServingStack(reg, attackedThisTurnAsAttacking(slots), stackTargets...) {
 		for _, pre := range preludes {
 			it, ok := activateWithFixture(reg, f, name, req, idx, prefix, mana, cost, zone, fx, pre, slots, nil)
 			if ok {
@@ -226,7 +251,14 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	fxPre, combat := fx.Prelude(), fx.CombatSteps()
 	costAttach := sacAttachSteps(name, cost, zone)
 	sourceAttach := auraSourceAttach(f, name, zone, &p0)
-	prelude := make([]oraclegen.Step, 0, len(fxPre)+len(restrictSteps)+len(costAttach)+len(sourceAttach)+len(combat)+1)
+	// Pit of Offerings' reflect ability needs its real ETB trigger to have
+	// exiled a card; the source is played from hand, then untaps.
+	mrPlay, _ := manaReflectedPlayPrelude(f.Abilities[idx], name, &p0)
+	// A requirement on a back face whose front face has a Craft ability
+	// (Sunbird Effigy) is reached by crafting the front face, not by a
+	// back-face setup: the Craft prelude populates the ExiledWith set.
+	craftSteps, craftXab, craftCost, craftOK := craftActivatePrelude(reg, name, f.Abilities[idx], req.Face, &p0)
+	prelude := make([]oraclegen.Step, 0, len(fxPre)+len(restrictSteps)+len(costAttach)+len(sourceAttach)+len(combat)+len(craftSteps)+len(mrPlay)+1)
 	if isLoyaltyCost(cost) {
 		// CR 606.3: a loyalty ability needs an empty stack. The setup can
 		// leave the source's own entry trigger pending (Oko, Lorwyn Liege's
@@ -234,21 +266,37 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 		prelude = append(prelude, oraclegen.Step{Op: "resolve"})
 	}
 	prelude = append(prelude, sourceAttach...)
+	prelude = append(prelude, craftSteps...)
 	prelude = append(prelude, fxPre...)
 	prelude = append(prelude, restrictSteps...)
 	prelude = append(prelude, costAttach...)
+	prelude = append(prelude, mrPlay...)
 	if plan != nil {
 		// The ability prelude leaves the probe ability pending on the stack;
 		// the ability under test (the last activate step) targets it.
 		prelude = append(prelude, plan.steps()...)
 	}
 	prelude = append(prelude, combat...)
-	setupBackFace(&p0, name, req)
+	if len(combat) > 0 && slotsDemandAttackedThisTurn(slots) {
+		// "Attacked this turn" outlives the combat: the ability under test is
+		// sorcery speed, so the attack is followed by the second main phase.
+		prelude = append(prelude, oraclegen.Step{Op: "pass_to", Step: "main2"})
+	}
+	if !craftOK {
+		setupBackFace(&p0, name, req)
+	}
 	steps := make([]oraclegen.Step, 0, len(prelude)+1)
 	steps = append(steps, prelude...)
 	targets := fx.Targets()
 	if plan != nil {
 		targets = plan.targets
+	}
+	// An activated charm's mode and target are chosen at RESOLUTION, not on
+	// activation: a Targets list on the activate step is rejected by the
+	// runner ("unused target(s) for this step"). The seeded fixture only makes
+	// a mode's target legal; the step itself carries none.
+	if f.Abilities[idx].API == "Charm" {
+		targets = nil
 	}
 	steps = append(steps, oraclegen.Step{
 		Op: "activate", Seat: 0, Card: "p0:" + name,
@@ -318,8 +366,19 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	dropCostCompound(it.XAnswers, activateStep, res.Decisions)
 	dropUnproducedManaColours(it.XAnswers, activateStep, res)
 	it.XAnswers = scriptPreludeSacrifice(it.XAnswers, prelude, len(sc.Steps))
+	// A craft prelude's activation asks its own {N} and material-exile cost
+	// questions at the craft step, not the ability under test: script them
+	// from the runner's observed picks (the same shape the static Craft
+	// fixture uses). A generic derivation may already carry the observed
+	// material pick; only add the catalogue answer when none was recorded.
+	if craftOK && craftCost != "" {
+		it.XAnswers = scriptPreludeActivationCost(it.XAnswers, prelude, craftCost, len(sc.Steps), res.Decisions)
+	}
 	it.XAbility = make([]string, len(sc.Steps))
 	copy(it.XAbility[len(fxPre):], pre.xability)
+	if craftOK {
+		copy(it.XAbility, craftXab)
+	}
 	it.XAbility[activateStep] = prefix
 	if comboPrefix, ok := comboManaColourPrefix(f.Abilities[idx], cost, activateStep, res); ok {
 		it.XAbility[activateStep] = comboPrefix
@@ -459,6 +518,38 @@ func attackedThisTurn(filter string) bool {
 		}
 	}
 	return false
+}
+
+// attackedThisTurnAsRE matches the positive attackedThisTurn word of a target
+// filter; a negated "!attackedThisTurn" is preceded by '!' and never matches.
+var attackedThisTurnAsRE = regexp.MustCompile(`(?i)(^|[.+,])attackedThisTurn\b`)
+
+// slotsDemandAttackedThisTurn reports whether any slot filter demands a
+// creature that attacked this turn.
+func slotsDemandAttackedThisTurn(slots []oraclegen.Slot) bool {
+	for _, sl := range slots {
+		if attackedThisTurn(sl.Filter) {
+			return true
+		}
+	}
+	return false
+}
+
+// attackedThisTurnAsAttacking returns slots with every attackedThisTurn word
+// rewritten to attacking, so the fixture builder places a p0 creature and
+// declares it attacking (the engine's attackedThisTurn is then true for it).
+// The caller's slots keep their own filters; the copy is only a fixture
+// request.
+func attackedThisTurnAsAttacking(slots []oraclegen.Slot) []oraclegen.Slot {
+	if !slotsDemandAttackedThisTurn(slots) {
+		return slots
+	}
+	out := make([]oraclegen.Slot, len(slots))
+	copy(out, slots)
+	for i := range out {
+		out[i].Filter = attackedThisTurnAsRE.ReplaceAllString(out[i].Filter, "${1}attacking")
+	}
+	return out
 }
 
 // activateStepIndex returns the index of the scenario's PROBE activate step.
@@ -703,7 +794,6 @@ func addActivationCostFixtures(p0 *oraclegen.Seat, name, cost string, x ...int) 
 		case "Return":
 			if card := returnCreatureFixture(tok); card != "" {
 				p0.Battlefield = appendFixtureUnique(p0.Battlefield, card)
-				p0.Tapped = appendFixtureUnique(p0.Tapped, card)
 			}
 		case "Sac":
 			// The fixture table is the single authority; a self-sacrifice
