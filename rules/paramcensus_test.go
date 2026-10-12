@@ -2182,8 +2182,10 @@ var handRoots = struct {
 		// The generated-scenario runner (oracle_run.go) drops the
 		// enters-the-battlefield triggers its setup placements queued -- XMage's
 		// addCard never fires them -- by reading Mode$ and Destination$ of each
-		// pending trigger, mode-shared, outside the dispatch walk.
-		"oracleRun.build"},
+		// pending trigger, mode-shared, outside the dispatch walk. The read
+		// lives in placeSetupCard, which oracleRun.build calls; the scanner
+		// does not infer that method edge, so name the reader itself.
+		"oracleRun.placeSetupCard"},
 	// applyReplacements is the replacement pipeline's root beside
 	// replacementMatches, whose `r.Event != "Moved"` early return scopes every
 	// r.Params read in it to repl:Moved. handleReplacement is the

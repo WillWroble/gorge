@@ -659,6 +659,9 @@ func (e *Engine) appendAvailableManaAbilitiesGate(out []*cards.SA, statics *acti
 				}
 			}
 		}
+		if len(cost.Sac) > 0 && effects.ManaReflectedReadsSacrificed(ma) {
+			return manaReflectedSacrificeLive(e, asPayer(e), p, id, cost, &c, ma)
+		}
 		return len(effects.ManaReflectedCandidates(e, &c, ma)) > 0
 	}
 	// A ManaReflected ability may sit on the top face or any under-card; each
