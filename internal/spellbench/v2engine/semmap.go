@@ -17,6 +17,7 @@ import (
 
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/policynet/v2front"
 	"github.com/adams-shaun/gorge/internal/spellbench/v2agent"
 	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
@@ -148,7 +149,7 @@ type ParityPair struct {
 	Seat   state.PlayerID
 	Kind   decision.Kind
 	GTable *policynet.V2GTable
-	VTable *policynet.V2VTable
+	VTable *v2front.V2VTable
 	GRes   GResolver
 	GSem   []policynet.V2SemCand
 	VSem   []policynet.V2SemCand
@@ -169,7 +170,7 @@ func (g *Game) Pair() (*ParityPair, error) {
 	JoinSpellPT(gt, g.posed.obsBuild)
 	gt = policynet.V2TableFromView(v, d.Player, d.Kind == decision.KPriority, gt)
 	JoinSemIDs(gt, g.posed.obsBuild)
-	vt := policynet.V2TableFromObservation(g.posed.obsBuild.obs, seatOf(d.Player))
+	vt := v2front.V2TableFromObservation(g.posed.obsBuild.obs, seatOf(d.Player))
 	_, gsem, err := g.SemCandsJSON()
 	if err != nil {
 		return nil, err

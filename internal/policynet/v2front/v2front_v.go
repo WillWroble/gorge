@@ -7,16 +7,20 @@
 // Every S0 convention front end G applies has its mirror here; the parity
 // test (P§3.9) holds the two to byte-identity over real transcripts.
 
-package policynet
+// Package v2front is front end V. It lives outside policynet so that only
+// the SpellBench bridge tools, which import it, link the protocol-v2 wire
+// types; seat and gorged link policynet without them.
+package v2front
 
 import (
+	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/spellbench/v2agent"
 )
 
 // V2VTable is front end V's product: the table plus a V2RefResolver over
 // the observation's own object ids.
 type V2VTable struct {
-	Table   V2Table
+	Table   policynet.V2Table
 	objRows map[string]int32 // object_id -> card row + 1
 	plyRows map[string]int32 // seat word -> -(player row + 1)
 }
@@ -29,12 +33,12 @@ func (t *V2VTable) V2RefPlayer(seat string) int32 { return t.plyRows[seat] }
 
 // v2StackDatumFromEntry builds an ability stack entry's datum (the spell
 // branch is v2CardFromSpellEntry).
-func v2StackDatumFromEntry(se *v2agent.StackEntry, viewer string) (V2CardDatum, uint8) {
-	kd := V2StackActivated
+func v2StackDatumFromEntry(se *v2agent.StackEntry, viewer string) (policynet.V2CardDatum, uint8) {
+	kd := policynet.V2StackActivated
 	if se.StackKind == "triggered_ability" {
-		kd = V2StackTriggered
+		kd = policynet.V2StackTriggered
 	}
-	d := V2CardDatum{Zone: V2ZoneStack, StackKd: kd,
+	d := policynet.V2CardDatum{Zone: policynet.V2ZoneStack, StackKd: kd,
 		CtlSeat: seatRel(se.ControllerSeat, viewer), OwnSeat: seatRel(se.OwnerSeat, viewer),
 		Name: derefName(se.CardName), HasTgts: len(se.Targets) > 0}
 	for _, tgt := range se.Targets {
@@ -59,29 +63,29 @@ func V2TableFromObservation(obs *v2agent.Observation, viewer string) *V2VTable {
 		if rec.ObjectID != "" {
 			t.objRows[rec.ObjectID] = int32(len(t.Table.Cards)) + 1
 		}
-		t.Table.Cards = append(t.Table.Cards, V2CardRow(d))
+		t.Table.Cards = append(t.Table.Cards, policynet.V2CardRow(d))
 	}
 	for i := range obs.Players {
 		rec := &obs.Players[i]
 		t.plyRows[rec.Seat] = -(int32(len(t.Table.Players)) + 1)
 		for j := range rec.Battlefield {
-			add(&rec.Battlefield[j], V2ZoneBattlefield, seatRel(rec.Battlefield[j].ControllerSeat, viewer), seatRel(rec.Battlefield[j].OwnerSeat, viewer))
+			add(&rec.Battlefield[j], policynet.V2ZoneBattlefield, seatRel(rec.Battlefield[j].ControllerSeat, viewer), seatRel(rec.Battlefield[j].OwnerSeat, viewer))
 		}
 		if rec.Seat == viewer {
 			for j := range rec.Hand {
-				add(&rec.Hand[j], V2ZoneHand, v2SeatMine, seatRel(rec.Hand[j].OwnerSeat, viewer))
+				add(&rec.Hand[j], policynet.V2ZoneHand, policynet.V2SeatMine, seatRel(rec.Hand[j].OwnerSeat, viewer))
 			}
 		}
 		for j := range rec.Graveyard {
-			add(&rec.Graveyard[j], V2ZoneGraveyard, seatRel(rec.Graveyard[j].ControllerSeat, viewer), seatRel(rec.Graveyard[j].OwnerSeat, viewer))
+			add(&rec.Graveyard[j], policynet.V2ZoneGraveyard, seatRel(rec.Graveyard[j].ControllerSeat, viewer), seatRel(rec.Graveyard[j].OwnerSeat, viewer))
 		}
 		for j := range rec.Exile {
-			add(&rec.Exile[j], V2ZoneExile, seatRel(rec.Exile[j].ControllerSeat, viewer), seatRel(rec.Exile[j].OwnerSeat, viewer))
+			add(&rec.Exile[j], policynet.V2ZoneExile, seatRel(rec.Exile[j].ControllerSeat, viewer), seatRel(rec.Exile[j].OwnerSeat, viewer))
 		}
 		for j := range rec.Command {
-			add(&rec.Command[j], V2ZoneCommand, seatRel(rec.Command[j].ControllerSeat, viewer), seatRel(rec.Command[j].OwnerSeat, viewer))
+			add(&rec.Command[j], policynet.V2ZoneCommand, seatRel(rec.Command[j].ControllerSeat, viewer), seatRel(rec.Command[j].OwnerSeat, viewer))
 		}
-		t.Table.Players = append(t.Table.Players, V2PlayerRow(V2PlayerDatum{
+		t.Table.Players = append(t.Table.Players, policynet.V2PlayerRow(policynet.V2PlayerDatum{
 			Life:    rec.Life,
 			Pool:    [6]int32{int32(rec.ManaPool.W), int32(rec.ManaPool.U), int32(rec.ManaPool.B), int32(rec.ManaPool.R), int32(rec.ManaPool.G), int32(rec.ManaPool.C)},
 			Hand:    int(rec.HandCount),
@@ -96,13 +100,13 @@ func V2TableFromObservation(obs *v2agent.Observation, viewer string) *V2VTable {
 			if se.ObjectID != "" {
 				t.objRows[se.ObjectID] = int32(len(t.Table.Cards)) + 1
 			}
-			t.Table.Cards = append(t.Table.Cards, V2CardRow(d))
+			t.Table.Cards = append(t.Table.Cards, policynet.V2CardRow(d))
 		} else {
 			d, _ := v2StackDatumFromEntry(se, viewer)
 			if se.ObjectID != "" {
 				t.objRows[se.ObjectID] = int32(len(t.Table.Cards)) + 1
 			}
-			t.Table.Cards = append(t.Table.Cards, V2CardRow(d))
+			t.Table.Cards = append(t.Table.Cards, policynet.V2CardRow(d))
 		}
 	}
 	// The global row. A pregame observation (turn 0) is not encoded: the
@@ -110,7 +114,7 @@ func V2TableFromObservation(obs *v2agent.Observation, viewer string) *V2VTable {
 	// S0 leaves the active/priority bits unset there (H5 closes it).
 	act := derefSeat(obs.ActiveSeat)
 	prio := derefSeat(obs.PrioritySeat)
-	t.Table.Global = V2GlobalRow(V2GlobalDatum{
+	t.Table.Global = policynet.V2GlobalRow(policynet.V2GlobalDatum{
 		Turn:   int(obs.Turn),
 		Step:   obs.PhaseStep,
 		Stack:  len(obs.Stack),
@@ -124,12 +128,12 @@ func V2TableFromObservation(obs *v2agent.Observation, viewer string) *V2VTable {
 // mirrors front end G: a face-down object's printed face is not encoded in
 // S0 (no name, no types, no keywords, mana value and power/toughness 0);
 // its counters, damage and combat state still are.
-func v2CardFromRecord(rec *v2agent.ObjectRecord, zone, ctlSeat, ownSeat uint8) V2CardDatum {
+func v2CardFromRecord(rec *v2agent.ObjectRecord, zone, ctlSeat, ownSeat uint8) policynet.V2CardDatum {
 	perm := rec.Permanent
 	if perm == nil {
 		perm = &v2agent.Permanent{}
 	}
-	d := V2CardDatum{Zone: zone, CtlSeat: ctlSeat, OwnSeat: ownSeat,
+	d := policynet.V2CardDatum{Zone: zone, CtlSeat: ctlSeat, OwnSeat: ownSeat,
 		Facedown: rec.FaceDown, Damage: int32(perm.Damage),
 		Tapped: perm.Tapped, Sick: perm.SummoningSick,
 		Att: perm.Attacking, BlockN: len(perm.BlockedAttackers),
@@ -145,7 +149,7 @@ func v2CardFromRecord(rec *v2agent.ObjectRecord, zone, ctlSeat, ownSeat uint8) V
 		d.Types = append(d.Types, c.Types...)
 		d.Supers = append(d.Supers, c.Supertypes...)
 		for _, k := range c.Keywords {
-			if w := V2KeywordName(k); w != "" {
+			if w := policynet.V2KeywordName(k); w != "" {
 				d.Keywords = append(d.Keywords, w)
 			}
 		}
@@ -167,8 +171,8 @@ func v2CardFromRecord(rec *v2agent.ObjectRecord, zone, ctlSeat, ownSeat uint8) V
 // spell's characteristics blank on both sides. The X a stack spell paid is
 // likewise dropped: the view carries only the printed cost, whose mana
 // value counts X as 0, so the observation's folded value is reduced back.
-func v2CardFromSpellEntry(se *v2agent.StackEntry, viewer string) V2CardDatum {
-	d := V2CardDatum{Zone: V2ZoneStack, StackKd: V2StackSpell,
+func v2CardFromSpellEntry(se *v2agent.StackEntry, viewer string) policynet.V2CardDatum {
+	d := policynet.V2CardDatum{Zone: policynet.V2ZoneStack, StackKd: policynet.V2StackSpell,
 		CtlSeat: seatRel(se.ControllerSeat, viewer), OwnSeat: seatRel(se.OwnerSeat, viewer),
 		Facedown: se.FaceDown, HasTgts: len(se.Targets) > 0}
 	for _, tgt := range se.Targets {
@@ -184,7 +188,7 @@ func v2CardFromSpellEntry(se *v2agent.StackEntry, viewer string) V2CardDatum {
 			d.Types = append(d.Types, c.Types...)
 			d.Supers = append(d.Supers, c.Supertypes...)
 			for _, k := range c.Keywords {
-				if w := V2KeywordName(k); w != "" {
+				if w := policynet.V2KeywordName(k); w != "" {
 					d.Keywords = append(d.Keywords, w)
 				}
 			}
@@ -207,11 +211,11 @@ func v2CardFromSpellEntry(se *v2agent.StackEntry, viewer string) V2CardDatum {
 func seatRel(seat, viewer string) uint8 {
 	switch {
 	case seat == viewer && seat != "":
-		return v2SeatMine
+		return policynet.V2SeatMine
 	case seat == "":
-		return v2SeatNone
+		return policynet.V2SeatNone
 	default:
-		return v2SeatOther
+		return policynet.V2SeatOther
 	}
 }
 
