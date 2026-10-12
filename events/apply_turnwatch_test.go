@@ -26,6 +26,11 @@ func TestTurnWatchersFoldAndReset(t *testing.T) {
 	Emit(g, l, Event{Kind: Damage, Player: 1, Amount: 4})
 	Emit(g, l, Event{Kind: Damage, Player: 1, Amount: 5, Counter: "infect"})
 	Emit(g, l, Event{Kind: TokenCreate, Player: 1, Text: "Bear"})
+	// Every mint fold must tally, not just TokenCreate: a dropped hook in
+	// CopyToken/CardToken/MyriadCopy would otherwise go unnoticed.
+	Emit(g, l, Event{Kind: CopyToken, Player: 1, Obj: id})
+	Emit(g, l, Event{Kind: CardToken, Player: 1, Obj: id})
+	Emit(g, l, Event{Kind: MyriadCopy, Player: 1, Obj: id})
 
 	if p0.SpellsCastThisTurn != 1 || p1.SpellsCastThisTurn != 0 {
 		t.Errorf("spells cast = %d/%d, want 1/0", p0.SpellsCastThisTurn, p1.SpellsCastThisTurn)
@@ -36,11 +41,22 @@ func TestTurnWatchersFoldAndReset(t *testing.T) {
 	if p0.LifeLostThisTurn != 2 || p1.LifeLostThisTurn != 4 {
 		t.Errorf("life lost = %d/%d, want 2/4 (infect is poison, not loss)", p0.LifeLostThisTurn, p1.LifeLostThisTurn)
 	}
-	if p0.TokensCreatedThisTurn != 0 || p1.TokensCreatedThisTurn != 1 {
-		t.Errorf("tokens = %d/%d, want 0/1", p0.TokensCreatedThisTurn, p1.TokensCreatedThisTurn)
+	if p0.TokensCreatedThisTurn != 0 || p1.TokensCreatedThisTurn != 4 {
+		t.Errorf("tokens = %d/%d, want 0/4 (one per mint fold)", p0.TokensCreatedThisTurn, p1.TokensCreatedThisTurn)
 	}
 	if c := g.Clone(); c.Players[1].LifeLostThisTurn != 4 {
 		t.Errorf("clone lost the tally: %d", c.Players[1].LifeLostThisTurn)
+	}
+
+	// CR 733.1: the companion reversal undoes exactly one PutOnStack tally,
+	// and the zero guard keeps a second reversal from underflowing.
+	Emit(g, l, Event{Kind: SpellCastReversed, Player: 0})
+	if p0.SpellsCastThisTurn != 0 {
+		t.Errorf("spell reversal left spells cast at %d, want 0", p0.SpellsCastThisTurn)
+	}
+	Emit(g, l, Event{Kind: SpellCastReversed, Player: 0})
+	if p0.SpellsCastThisTurn != 0 {
+		t.Errorf("a second reversal underflowed the tally: %d", p0.SpellsCastThisTurn)
 	}
 
 	Emit(g, l, Event{Kind: TurnChange, Player: 1, Amount: 2})

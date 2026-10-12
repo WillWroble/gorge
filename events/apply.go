@@ -274,6 +274,8 @@ func ApplyPtr(g *state.Game, e *Event) {
 		foldDungeonRemove(g, e)
 	case ManaUndo:
 		foldManaUndo(g, e)
+	case SpellCastReversed:
+		foldSpellCastReversed(g, e)
 	case ChaosEnsues:
 		// The chaos-ensues marker (CR 901.9, task planar-verbs) is a pure
 		// marker, exactly like PlanarRoll: no state folds. The current plane's

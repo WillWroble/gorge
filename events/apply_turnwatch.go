@@ -32,3 +32,12 @@ func tallyTokenCreated(g *state.Game, p state.PlayerID) {
 		g.Players[p].TokensCreatedThisTurn++
 	}
 }
+
+// foldSpellCastReversed undoes one PutOnStack tally for a CR 733.1 reversed
+// cast (rules' abortCast). The guard at zero keeps a log that reverses
+// without a preceding cast this turn from underflowing the counter.
+func foldSpellCastReversed(g *state.Game, e *Event) {
+	if validPlayer(g, e.Player) && g.Players[e.Player].SpellsCastThisTurn > 0 {
+		g.Players[e.Player].SpellsCastThisTurn--
+	}
+}

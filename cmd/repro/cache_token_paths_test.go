@@ -63,7 +63,16 @@ func TestReproCorpusCachedTokenPathsReadable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no repo root: %v", err)
 	}
-	tokenscripts := filepath.Join(root, ".cards", "tokenscripts")
+	// The registry below is opened through testutil.SharedCorpusDir, which in
+	// a task worktree is the git common dir's .cards, not the worktree's own
+	// symlink path. The "opened corpus" whose paths the reroot must produce is
+	// therefore THAT directory; comparing against <worktree>/.cards would fail
+	// on every worktree even though the bytes are identical.
+	corpus, ok := testutil.SharedCorpusDir(root)
+	if !ok {
+		t.Fatalf("no corpus directory for %s", root)
+	}
+	tokenscripts := filepath.Join(corpus, "tokenscripts")
 	info, err := os.Stat(tokenscripts)
 	if err != nil || !info.IsDir() {
 		t.Fatalf("no tokenscripts directory under the opened corpus %s: %v", tokenscripts, err)
