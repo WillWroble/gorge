@@ -360,7 +360,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		}
 	}
 	stored := ev
-	e.foldEntryMove(&stored, true)
+	absorbedEntry := e.foldEntryMove(&stored, true)
 	e.expireClonesOnEvent(stored, wasTapped)
 	if stored.Kind == events.MoveZone { // CR 303.4f: a non-cast Aura enters attached to its chosen bearer.
 		settleAuraEntry(e, &stored)
@@ -379,7 +379,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 	if (stored.Kind == events.TokenCreate || stored.Kind == events.CardToken) && tokenMintWant != 0 {
 		// Other permanents' "enters tapped / with a counter" replacements
 		// apply to a token's entry too (rules/token_entry_replacements.go).
-		e.applyTokenEntryUpdates(tokenMintWant)
+		e.applyTokenEntryUpdates(tokenMintWant, absorbedEntry)
 	}
 	// E1 (emit-action.md): any object minted during this event (a token, a
 	// named-card or permanent copy, an ability wrapper) is a card the genesis
