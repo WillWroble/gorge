@@ -52,6 +52,8 @@ pause_pipeline() {
   echo "postmerge_batch RED $1 $(date -u +%FT%TZ): main->origin full suite failed; bisecting (see $LOG)" >"$PAUSE"
   say "PAUSED pipeline: RED ${1:0:9}"
 }
+# our_pause: the pause marker exists and this loop wrote it.
+our_pause() { [ -e "$PAUSE" ] && /usr/bin/grep -q '^postmerge_batch ' "$PAUSE"; }
 # resume_pipeline <sha> [why]: lift our own pause; why defaults to "GREEN <sha>".
 resume_pipeline() {
   if [ -e "$PAUSE" ] && /usr/bin/grep -q '^postmerge_batch ' "$PAUSE"; then
@@ -107,7 +109,13 @@ FLAKY_RERUNS_MAX=2
 while true; do
   git fetch -q origin main 2>/dev/null || true
   head=$(git rev-parse main)
-  if [ "$head" != "$last_tested" ] && [ "$(git rev-list --count origin/main..main)" -gt 0 ]; then
+  # Normally only an unpushed head is worth a run. While OUR pause is up,
+  # any new head is: a hand fix pushed straight to origin leaves nothing
+  # ahead, and main cannot move ahead while the pipeline is paused, so
+  # requiring an unpushed commit here kept the pause up forever (2026-10-12:
+  # 6025ab05c, the caretaker-flake fix, was pushed by hand at 15:4x with this
+  # loop's pause in place; the promised confirming rerun never started).
+  if [ "$head" != "$last_tested" ] && { [ "$(git rev-list --count origin/main..main)" -gt 0 ] || our_pause; }; then
     # Still red? Re-check only the failing tests before paying for a full run.
     still=""
     while read -r pkg re; do

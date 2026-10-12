@@ -66,7 +66,7 @@ run_scenario() {
 	cp "$SCRIPT" "$r/scripts/postmerge_batch.sh"
 	cat >"$r/scripts/heavy_lock.sh" <<'EOF'
 GORGE_HEAVY_LOCK=${GORGE_HEAVY_LOCK:-/nonexistent/heavy.lock}
-gorge_heavy_run() { "$@"; }
+gorge_heavy_run() { [ "${1:-}" = -g ] && shift; "$@"; }
 EOF
 	cat >"$r/scripts/postmerge_full.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -74,7 +74,7 @@ EOF
 n=$(( $(cat "$PMB_STATE/fulls" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$PMB_STATE/fulls"
 if [ -e "$PMB_PAUSE" ]; then echo present; else echo absent; fi >"$PMB_STATE/marker_at_full$n"
-if [ "$n" = 1 ] || [ "$PMB_RERUN" = red ]; then
+if { [ "$n" = 1 ] && [ "${PMB_FIRST:-red}" = red ]; } || { [ "$n" != 1 ] && [ "$PMB_RERUN" = red ]; }; then
 	[ "$n" = 1 ] || touch "$PMB_STATE/go_fail" # run #2 red is real: fails alone too
 	printf 'FAIL\tgithub.com/x/pkg\t600.0s\n'
 	exit 1
@@ -89,8 +89,19 @@ EOF
 	echo x >"$r/landed.txt"
 	git -C "$r" add landed.txt && git -C "$r" commit -q -m "landed behind the gate"
 	git -C "$r" worktree add -q --detach "$r/.worktrees/postmerge-full" main
+	if [ "${3:-}" = foreign ]; then
+		git -C "$r" push -q origin main
+		echo "operator hold" >"$r/.ds4/orchestrator/pause"
+	fi
+	if [ "${3:-}" = handpush ]; then
+		# The loop's own pause is up and the fix was pushed by hand: nothing
+		# is ahead of origin.
+		git -C "$r" push -q origin main
+		echo "postmerge_batch RED deadbeef 2026-10-12T21:37:39Z: main->origin full suite failed" \
+			>"$r/.ds4/orchestrator/pause"
+	fi
 	(cd "$r" && PATH="$B:$PATH" PMB_STATE="$d/state" PMB_PAUSE="$r/.ds4/orchestrator/pause" PMB_RERUN="$2" \
-		timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
+		PMB_FIRST="${4:-red}" timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
 	echo "$d"
 }
 
@@ -114,5 +125,21 @@ check "red: marker absent when the confirming rerun started" "$([ "$(cat "$d/sta
 check "red: marker present again after the real RED" "$(has "$r/.ds4/orchestrator/pause" "postmerge_batch RED $head"; echo $?)"
 check "red: paused twice" "$([ "$(/usr/bin/grep -c 'PAUSED pipeline: RED' "$r/.ds4/postmerge-batch.log")" = 2 ]; echo $?)"
 check "red: nothing pushed" "$([ "$(git -C "$d/origin.git" rev-parse main)" != "$head" ]; echo $?)"
+
+# ---- handpush: our pause is up, the fix reached origin by hand ------------
+# Nothing is ahead of origin, so the old loop never ran again and its own
+# pause never lifted. The loop must run the suite at the new head anyway.
+d=$(run_scenario handpush green handpush green)
+r=$d/repo
+head=$(git -C "$r" rev-parse main)
+check "handpush: a full run started with nothing ahead of origin" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "handpush: GREEN lifted our pause" "$([ ! -e "$r/.ds4/orchestrator/pause" ]; echo $?)"
+check "handpush: RESUMED logged" "$(has "$r/.ds4/postmerge-batch.log" "RESUMED pipeline: GREEN ${head:0:9}"; echo $?)"
+
+# ---- foreign: an operator's pause with nothing ahead is left alone --------
+d=$(run_scenario foreign green foreign green)
+r=$d/repo
+check "foreign: no full run for someone else's pause" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "foreign: the operator's pause is untouched" "$(has "$r/.ds4/orchestrator/pause" "operator hold"; echo $?)"
 
 [ "$fails" = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }
