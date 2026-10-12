@@ -69,3 +69,7 @@ __pycache__/
 # `make coverage` output (cmd/forgec coverage): generated card-support tables,
 # published by the `card coverage` CI job, never committed.
 .coverage/
+
+# Operator-local scratch (the CUDA game-pool PoC, since ported to
+# internal/gamepool). Never committed.
+/scratch/
