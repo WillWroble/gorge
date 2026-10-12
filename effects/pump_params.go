@@ -203,7 +203,7 @@ var pumpKnownKeys = [...]string{
 	"IsPresent", "KW", "KWChoice", "Keyword", "KeywordLine", "LeaveBattlefield",
 	"MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity",
 	"NewController", "NoteCards", "NoteCardsFor", "NoteNumber", "NumAtt", "NumDef",
-	"NumDmg", "OpponentTurn", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp",
+	"OpponentTurn", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp",
 	"PrecostDesc", "PresentCompare", "PresentDefined", "PresentZone", "PumpZone", "RandomNumTargets",
 	"ReduceAmount", "ReduceCost", "RememberAnimated", "RememberCostMana", "RememberObjects", "RememberPumped",
 	"RememberTargets", "ReplaceColor", "ReplaceDyingDefined", "ReplaceGraveyard", "ReplaceGraveyardValid",

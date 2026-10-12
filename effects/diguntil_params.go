@@ -115,7 +115,7 @@ var digUntilKnownKeys = [...]string{
 	"ImprintRevealed", "InstantSpeed", "IsCurse", "IsPresent", "KW", "Keyword",
 	"KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor", "MinTotalCMC", "ModeCost",
 	"Monstrosity", "NewController", "NoMoveFound", "NoMoveRevealed", "NoneFoundDestination",
-	"NoneFoundLibraryPosition", "NumDmg", "OpponentTurn", "OptionalFoundMove",
+	"NoneFoundLibraryPosition", "OpponentTurn", "OptionalFoundMove",
 	"OptionalNoDestination", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp",
 	"PrecostDesc", "PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets",
 	"ReduceAmount", "ReduceCost", "RememberAnimated", "RememberCostMana", "RememberFound", "RememberObjects",

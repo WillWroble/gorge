@@ -102,7 +102,7 @@ var digKnownKeys = [...]string{
 	"ForgetOtherTargets", "FromBottom", "GainControl", "GameActivationLimit", "Image", "Imprint", "ImprintCards",
 	"ImprintPlayed", "InstantSpeed", "IsCurse", "IsPresent", "KW", "Keyword", "KeywordLine",
 	"LibraryPosition", "LibraryPosition2", "MaxTotalTargetCMC", "MaxTotalTargetPower",
-	"Mentor", "ModeCost", "Monstrosity", "NewController", "NoLooking", "NoReveal", "NumDmg",
+	"Mentor", "ModeCost", "Monstrosity", "NewController", "NoLooking", "NoReveal",
 	"OpponentTurn", "Optional", "OptionalAbilityPrompt", "Planeswalker", "PlayCost",
 	"PlayerTurn", "PowerUp", "PrecostDesc", "PresentCompare", "PresentDefined",
 	"PresentZone", "PromptToSkipOptionalAbility", "RandomNumTargets", "ReduceAmount",

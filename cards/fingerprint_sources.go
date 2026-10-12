@@ -123,6 +123,7 @@ import "embed"
 //go:embed primitive.go
 //go:embed registry.go
 //go:embed registry_lazy.go
+//go:embed rider_shape.go
 //go:embed saga.go
 //go:embed slot.go
 //go:embed strtab.go
