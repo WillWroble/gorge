@@ -8,6 +8,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/effects"
 )
 
 func active(turn int) int { return (turn - 1) % 2 }
@@ -361,10 +362,16 @@ func (t *translator) choicePick(s string) string {
 
 // manaFromCost converts a Forge mana cost ("3 W", "1 GW GW", "X R", "3 GP")
 // into the runner's pool string. X refuses.
-func manaFromCost(cost string) (string, *refusal) {
+func manaFromCost(cost string) (string, *refusal) { return manaFromCostX(cost, -1) }
+
+// manaFromCostX is manaFromCost with X announced as x (x < 0: X refuses).
+// Each X symbol adds x generic mana.
+func manaFromCostX(cost string, x int) (string, *refusal) {
 	var b strings.Builder
 	for _, tok := range strings.Fields(cost) {
 		switch {
+		case tok == "X" && x >= 0:
+			b.WriteString(strings.Repeat("C", x))
 		case tok == "X" || tok == "Y":
 			return "", refuse("x-cost", "cost %q", cost)
 		case allDigits(tok):
@@ -731,6 +738,11 @@ func (t *translator) mapAssert(c call) ([]*expect, *refusal) {
 		}
 		b := a[1].b
 		return []*expect{{Card: ref, Tapped: &b}}, nil
+	case "assertTappedCount":
+		if len(a) != 3 || a[0].kind != vStr || a[1].kind != vBool || a[2].kind != vInt {
+			return bad()
+		}
+		return t.tappedCount(a[0].s, a[1].b, a[2].n)
 	case "assertDamageReceived":
 		if len(a) != 3 {
 			return bad()
@@ -865,18 +877,18 @@ func (em *emitter) sorcerySpeedCast(name string) bool {
 	return true
 }
 
-func (em *emitter) castMana(name string) (string, *refusal) {
+func (em *emitter) castMana(name string, x int) (string, *refusal) {
 	c, ok := em.t.lookup(name)
 	if !ok {
 		return "", refuse("unknown-card", "%s", name)
 	}
 	for _, f := range c.Faces {
 		if f != nil && sameName(f.Name, name) {
-			return manaFromCost(f.ManaCost)
+			return manaFromCostX(f.ManaCost, x)
 		}
 	}
 	if len(c.Faces) > 0 && c.Faces[0] != nil {
-		return manaFromCost(c.Faces[0].ManaCost)
+		return manaFromCostX(c.Faces[0].ManaCost, x)
 	}
 	return "", nil
 }
@@ -917,7 +929,21 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		}
 		g = &group{at: len(em.steps) - 1}
 		for _, ch := range a.choices {
+			if ch.x >= 0 && a.kind != "cast" && a.kind != "activate" {
+				// "X=N" not tied to a spell or ability: a damage-assignment
+				// or other amount ask gorge does not pose as a choose.
+				return refuse("amount-choice", "setChoice X=%d on %s", ch.x, a.kind)
+			}
 			pick := ch.pick
+			if ch.mode > 0 {
+				lbl, r := em.modeLabel(a, ch.mode)
+				if r != nil {
+					return r
+				}
+				g.xvals = append(g.xvals, xans{Seat: ch.seat, Kind: "mode", Value: pick})
+				g.answers = append(g.answers, answer{Kind: "modes", Pick: []string{lbl}})
+				continue
+			}
 			if strings.HasPrefix(pick, "name:") {
 				n := strings.TrimPrefix(pick, "name:")
 				if ch.target {
@@ -939,6 +965,8 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 				g.targets = append(g.targets, pick)
 			} else if ch.target {
 				g.answers = append(g.answers, answer{Kind: "target", Pick: []string{pick}})
+			} else if ch.x >= 0 {
+				g.answers = append(g.answers, answer{Kind: "choose", Pick: []string{pick}})
 			} else {
 				g.answers = append(g.answers, answer{Kind: "any", Pick: []string{pick}})
 			}
@@ -974,7 +1002,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		}
 		s := &step{Op: a.kind, Seat: a.seat, Card: ref}
 		if a.kind == "cast" {
-			m, r := em.castMana(a.card)
+			m, r := em.castMana(a.card, takeX(a))
 			if r != nil {
 				return nil, r
 			}
@@ -984,7 +1012,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 			if kc := em.kickerCost(a.card); kc != "" && len(a.choices) > 0 && !a.choices[0].target &&
 				(a.choices[0].pick == "yes" || a.choices[0].pick == "no") {
 				if a.choices[0].pick == "yes" {
-					km, r := manaFromCost(kc)
+					km, r := manaFromCostX(kc, takeX(a))
 					if r != nil {
 						return nil, r
 					}
@@ -1028,7 +1056,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 			em.resolve()
 		}
 		em.priorityTo(a.seat)
-		mana, r := manaFromCost(cost)
+		mana, r := manaFromCostX(cost, takeX(a))
 		if r != nil {
 			return nil, r
 		}
@@ -1243,4 +1271,81 @@ func (em *emitter) stopAt(tn, s int) *refusal {
 		em.resolve()
 	}
 	return nil
+}
+
+// takeX returns the action's announced X (the first setChoice "X=N" it
+// consumes), or -1. The choice stays queued: gorge poses X as a choose ask.
+func takeX(a *action) int {
+	for _, ch := range a.choices {
+		if ch.x >= 0 {
+			return ch.x
+		}
+	}
+	return -1
+}
+
+// tappedCount maps assertTappedCount(name, tapped, n): exactly n permanents
+// named name have isTapped()==tapped. Expressible per object only when n is
+// 0 (all have the other state) or every known instance. Lands refuse: the
+// runner pays from the pool, so a land XMage tapped for mana stays untapped.
+func (t *translator) tappedCount(name string, tapped bool, n int) ([]*expect, *refusal) {
+	nm, r := xmageName(name)
+	if r != nil {
+		return nil, r
+	}
+	if c, ok := t.lookup(nm); ok && len(c.Faces) > 0 && c.Faces[0] != nil {
+		for _, ty := range c.Faces[0].Types {
+			if ty == "Land" {
+				return nil, refuse("tapped-land-count", "%s", nm)
+			}
+		}
+	}
+	refs := append(t.permRefs(0, nm), t.permRefs(1, nm)...)
+	if len(refs) == 0 {
+		return nil, refuse("assert-not-in-setup", "%s", nm)
+	}
+	want := tapped
+	switch n {
+	case 0:
+		want = !tapped
+	case len(refs):
+	default:
+		return nil, refuse("tapped-subset", "assertTappedCount %s %d of %d", nm, n, len(refs))
+	}
+	var out []*expect
+	for _, ref := range refs {
+		b := want
+		out = append(out, &expect{Card: ref, Tapped: &b})
+	}
+	return out, nil
+}
+
+// modeLabel names the n-th (1-based) Charm mode of the spell a casts as the
+// label gorge's modes ask offers (effects.CharmModeLabel over Choices$
+// order). Only a cast whose spell ability (or its first sub) is a Charm
+// maps; anything else refuses.
+func (em *emitter) modeLabel(a *action, n int) (string, *refusal) {
+	if a.kind != "cast" {
+		return "", refuse("mode-choice", "setModeChoice on %s", a.kind)
+	}
+	c, ok := em.t.lookup(a.card)
+	if !ok {
+		return "", refuse("unknown-card", "%s", a.card)
+	}
+	for _, f := range c.Faces {
+		if f == nil || !sameName(f.Name, a.card) && len(c.Faces) > 1 {
+			continue
+		}
+		for sa := f.SpellAbility(); sa != nil; sa = sa.Sub {
+			if sa.API != "Charm" {
+				continue
+			}
+			modes := effects.CharmOf(sa).Modes
+			if n > len(modes) {
+				return "", refuse("mode-choice", "mode %d of %d", n, len(modes))
+			}
+			return effects.CharmModeLabel(cards.ResolveSVar(f.SVars, modes[n-1]), modes[n-1]), nil
+		}
+	}
+	return "", refuse("mode-choice", "no Charm on %s", a.card)
 }

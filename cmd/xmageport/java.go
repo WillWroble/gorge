@@ -19,7 +19,8 @@ type javaClass struct {
 	Extends   string
 	Consts    map[string]value
 	Methods   []javaMethod
-	Helpers   map[string]bool // every method name declared in the class
+	Helpers   map[string]bool       // every method name declared in the class
+	Defs      map[string]*helperDef // inlinable non-@Test methods by name
 	Path      string
 	Rel       string
 	ParseNote string
@@ -113,7 +114,7 @@ func parseJava(path, rel, src string) (*javaClass, error) {
 	if m == nil {
 		return nil, fmt.Errorf("no class")
 	}
-	jc := &javaClass{Name: m[1], Extends: m[2], Consts: map[string]value{}, Helpers: map[string]bool{}, Path: path, Rel: rel}
+	jc := &javaClass{Name: m[1], Extends: m[2], Consts: map[string]value{}, Helpers: map[string]bool{}, Defs: map[string]*helperDef{}, Path: path, Rel: rel}
 	// Constants first (resolved in source order so one may use another).
 	for _, cm := range reConst.FindAllStringSubmatch(src, -1) {
 		v := evalExpr(strings.TrimSpace(cm[3]), jc.Consts)
@@ -128,6 +129,13 @@ func parseJava(path, rel, src string) (*javaClass, error) {
 			continue
 		}
 		jc.Helpers[name] = true
+		if d := parseHelperDef(src, mm); d != nil {
+			if _, dup := jc.Defs[name]; dup {
+				jc.Defs[name] = nil // overloaded: not inlinable
+			} else {
+				jc.Defs[name] = d
+			}
+		}
 	}
 	// @Test methods.
 	locs := reTestAnno.FindAllStringSubmatchIndex(src, -1)
@@ -380,15 +388,23 @@ func evalExpr(e string, consts map[string]value) value {
 			}
 		}
 		if allInt {
-			n := vals[0].n
+			// * binds tighter than + and -: fold products into terms first.
+			terms := []int{vals[0].n}
+			var signs []byte
 			for i, op := range ops {
-				switch op {
-				case '+':
-					n += vals[i+1].n
-				case '-':
-					n -= vals[i+1].n
-				case '*':
-					n *= vals[i+1].n
+				if op == '*' {
+					terms[len(terms)-1] *= vals[i+1].n
+					continue
+				}
+				terms = append(terms, vals[i+1].n)
+				signs = append(signs, op)
+			}
+			n := terms[0]
+			for i, op := range signs {
+				if op == '+' {
+					n += terms[i+1]
+				} else {
+					n -= terms[i+1]
 				}
 			}
 			return value{kind: vInt, n: n}
@@ -478,4 +494,156 @@ func splitOps(e string) ([]string, []byte) {
 	}
 	parts = append(parts, strings.TrimSpace(e[start:]))
 	return parts, ops
+}
+
+// helperDef is a class method the translator may inline at a statement call
+// site: its parameter names (the last may be a String... vararg) and body
+// statements.
+type helperDef struct {
+	params []string
+	vararg bool
+	stmts  []string
+}
+
+var reParam = regexp.MustCompile(`^(?:final\s+)?([\w.<>\[\]]+?)(\.\.\.)?\s+(\w+)$`)
+
+func parseHelperDef(src string, mm []int) *helperDef {
+	open := mm[1] - 1
+	closeIdx := matchBrace(src, open)
+	if closeIdx < 0 {
+		return nil
+	}
+	d := &helperDef{stmts: splitStatements(src[open+1 : closeIdx])}
+	if ps := strings.TrimSpace(src[mm[4]:mm[5]]); ps != "" {
+		for i, p := range splitArgs(ps) {
+			m := reParam.FindStringSubmatch(strings.TrimSpace(p))
+			if m == nil {
+				return nil
+			}
+			if m[2] != "" {
+				if i != len(splitArgs(ps))-1 {
+					return nil
+				}
+				d.vararg = true
+			}
+			d.params = append(d.params, m[3])
+		}
+	}
+	return d
+}
+
+var reForEach = regexp.MustCompile(`(?s)^for\s*\(\s*(?:final\s+)?[\w.<>]+\s+(\w+)\s*:\s*(\w+)\s*\)\s*\{(.*)\}$`)
+
+// inlineHelpers expands every statement that is a call to an inlinable
+// helper into the helper's body, with each parameter replaced by the call
+// site's argument text. A for-each over the vararg parameter is unrolled.
+// Statements it cannot expand are returned unchanged (the translator then
+// refuses them with the usual reason).
+func inlineHelpers(stmts []string, defs map[string]*helperDef, depth int) []string {
+	if depth > 4 {
+		return stmts
+	}
+	var out []string
+	for _, st := range stmts {
+		exp, ok := inlineOne(st, defs)
+		if !ok {
+			out = append(out, st)
+			continue
+		}
+		out = append(out, inlineHelpers(exp, defs, depth+1)...)
+	}
+	return out
+}
+
+func inlineOne(st string, defs map[string]*helperDef) ([]string, bool) {
+	m := reCallHead.FindStringSubmatchIndex(st)
+	if m == nil || m[2] >= 0 && st[m[2]:m[3]] != "this" {
+		return nil, false
+	}
+	d := defs[st[m[4]:m[5]]]
+	if d == nil {
+		return nil, false
+	}
+	open := m[1] - 1
+	if matchParen(st, open) != len(st)-1 {
+		return nil, false
+	}
+	args := splitArgs(st[open+1 : len(st)-1])
+	bind := map[string]string{}
+	var rest []string
+	n := len(d.params)
+	if d.vararg {
+		if len(args) < n-1 {
+			return nil, false
+		}
+		rest = args[n-1:]
+		n--
+	} else if len(args) != n {
+		return nil, false
+	}
+	for i := 0; i < n; i++ {
+		bind[d.params[i]] = "(" + args[i] + ")"
+	}
+	var out []string
+	for _, hs := range d.stmts {
+		if d.vararg {
+			if fm := reForEach.FindStringSubmatch(hs); fm != nil && fm[2] == d.params[len(d.params)-1] {
+				body := splitStatements(fm[3])
+				for _, a := range rest {
+					b2 := map[string]string{fm[1]: "(" + a + ")"}
+					for _, bs := range body {
+						out = append(out, substIdents(substIdents(bs, b2), bind))
+					}
+				}
+				continue
+			}
+			if strings.Contains(hs, d.params[len(d.params)-1]) {
+				return nil, false
+			}
+		}
+		out = append(out, substIdents(hs, bind))
+	}
+	return out, true
+}
+
+// substIdents replaces whole identifiers outside string literals.
+func substIdents(s string, bind map[string]string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '"' || c == '\'' {
+			j := i + 1
+			for j < len(s) && s[j] != c {
+				if s[j] == '\\' {
+					j++
+				}
+				j++
+			}
+			if j >= len(s) {
+				j = len(s) - 1
+			}
+			b.WriteString(s[i : j+1])
+			i = j
+			continue
+		}
+		if isIdentByte(c) && !(c >= '0' && c <= '9') && (i == 0 || !isIdentByte(s[i-1]) && s[i-1] != '.') {
+			j := i
+			for j < len(s) && isIdentByte(s[j]) {
+				j++
+			}
+			if r, ok := bind[s[i:j]]; ok {
+				b.WriteString(r)
+			} else {
+				b.WriteString(s[i:j])
+			}
+			i = j - 1
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
+
+func isIdentByte(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
