@@ -81,9 +81,7 @@ func set(s string) map[string]bool {
 // stamp Generated:/last-modified fields and to decide a run's live/stale
 // status from file mtimes; it scans a training output tree and never drives
 // the engine, so no game, event, view or replay depends on its clock.
-// cmd/hindsight (the pn20 branch-mining tool) reads it only to report run and
-// per-decision wall seconds; every sample, rollout and record is a pure
-// function of its seeds. The paymirror A/B harness reads the clock only in
+// The paymirror A/B harness reads the clock only in
 // its cmd/paymirror CLI: the per-game wall-time budget is injected to the
 // library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
 // builds from time.Now, and the CLI's progress line prints per-game elapsed
@@ -123,7 +121,6 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/cardfuzz":      true,
 		module + "/cmd/exitloop":      true,
 		module + "/cmd/traindash":     true,
-		module + "/cmd/hindsight":     true,
 		module + "/cmd/paymirror":     true,
 		module + "/cmd/sbv1agent":     true,
 		module + "/cmd/kshadowcheck":  true,
