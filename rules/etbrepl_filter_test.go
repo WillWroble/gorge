@@ -7,6 +7,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -33,6 +34,7 @@ import (
 // none of these cards mints a token.
 func freshCorpusRegistry(t *testing.T, rels ...string) *cards.Registry {
 	t.Helper()
+	src := testutil.CorpusDirOrSkip(t)
 	dir := t.TempDir()
 	cf := filepath.Join(dir, "cardsfolder")
 	tk := filepath.Join(dir, "tokenscripts")
@@ -43,7 +45,7 @@ func freshCorpusRegistry(t *testing.T, rels ...string) *cards.Registry {
 		t.Fatal(err)
 	}
 	for _, rel := range rels {
-		b, err := os.ReadFile(filepath.Join("../.cards/cardsfolder", rel))
+		b, err := os.ReadFile(filepath.Join(cards.CorpusDir(src), rel))
 		if err != nil {
 			t.Fatalf("corpus copy %s: %v", rel, err)
 		}

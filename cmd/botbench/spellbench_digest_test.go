@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // smokeDigestGolden is the games.jsonl digest of the sb-uniform,sb-heuristic,bot
@@ -56,7 +55,7 @@ const smokeDigestGolden = "dc4be0b6d55cb345962cc8f2f97c9e12fb49fac7981e5d234cded
 // TestSpellbenchSmokeDigestIsStable plays the smoke run and compares its
 // games.jsonl digest against the golden above.
 func TestSpellbenchSmokeDigestIsStable(t *testing.T) {
-	dir := corpusDirForSpellbench(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	o := sbOpts{
 		bots: "sb-uniform,sb-heuristic,bot", pairs: 1, decks: "Burn,Faeries",
 		out: t.TempDir(), baseSeed: 20260926,
@@ -73,28 +72,6 @@ func TestSpellbenchSmokeDigestIsStable(t *testing.T) {
 	if got != smokeDigestGolden {
 		t.Fatalf("games.jsonl digest %s != golden %s", got, smokeDigestGolden)
 	}
-}
-
-// corpusDirForSpellbench resolves the .cards/ corpus the way
-// testutil.CorpusRegistry does (git toplevel, cards.GitEnv against a
-// hook-exported GIT_DIR) and returns the path for spellbenchExit.
-func corpusDirForSpellbench(t *testing.T) string {
-	t.Helper()
-	out, err := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		env := cards.GitEnv()
-		cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-		cmd.Env = env
-		out, err = cmd.Output()
-		if err != nil {
-			t.Fatalf("resolving repo root: %v", err)
-		}
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("no .cards/ corpus present (%v) -- run `make fetch-cards compile-cards`", err)
-	}
-	return dir
 }
 
 // digestGamesJSON hashes a games.jsonl: each line decoded, wall_ms dropped,

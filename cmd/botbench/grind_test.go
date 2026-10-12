@@ -87,7 +87,7 @@ func TestGrindBudgetsIsTheOneGrindEngineTest(t *testing.T) {
 // checks the report: the header, one line per deck at exactly the budgeted
 // iteration count, and the combined line.
 func TestGrindAllDecksEndToEnd(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var out, prog bytes.Buffer
 	if err := runGrind(11, "all", 0, 1, dir, "constructed", 8, 20000, &out, &prog); err != nil {
 		t.Fatalf("runGrind: %v", err)
@@ -136,7 +136,7 @@ func grindRowSays(report, deck, iters string) bool {
 // unknown deck is refused, and -grind alongside -pairs is refused by
 // mainExit before any corpus work.
 func TestGrindValidation(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var out, prog bytes.Buffer
 	if err := runGrind(0, "no-such-deck", 0, 1, dir, "constructed", 0, 0, &out, &prog); err == nil {
 		t.Error("an unknown deck must be an error")

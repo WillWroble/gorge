@@ -346,7 +346,7 @@ func TestTraceWorkerCountDeterminism(t *testing.T) {
 		{a: "mono-red-prowess", b: "mono-green-stompy"},
 		{a: "mono-blue-tempo", b: "mono-black-aggro"},
 	}
-	corpus := corpusDirOrSkip(t)
+	corpus := testutil.CorpusDirOrSkip(t)
 	run := func(workers int) []byte {
 		path := filepath.Join(t.TempDir(), "trace.jsonl")
 		if err := runMatrixTraced(23, 4, 2, "bot", "legacy", corpus, "json", pairs, workers, 200, 20000, false, nil, path, io.Discard, io.Discard); err != nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/adams-shaun/gorge/seat"
 
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // writeZeroCheckpoint writes a genuinely zero-weight checkpoint (every
@@ -120,7 +121,7 @@ func TestPolicynetKindsFlagValidation(t *testing.T) {
 // and declares no attack, so the game terminates (the default bot kills an
 // idle opponent) and the run is clean.
 func TestPolicynetPlaysPairMatrix(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	code := mainExit("policynet", "bot", 1, 42, 2, 0, "mono-red-goblins:mono-blue-tempo", "constructed", "text", 0,
 		200, 20000, dir, "", false, false, "", 0, 0, "", "", "", "", writeZeroCheckpoint(t))
 	if code != 0 {

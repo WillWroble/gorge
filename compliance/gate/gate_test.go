@@ -37,7 +37,11 @@ func TestDeclaredSetsCompliant(t *testing.T) {
 	// errors and fails the test. It is also the process-shared registry: a
 	// registry is read-only after open, and a fresh load per test cost
 	// ~600 MB and ~1 s.
-	reg, err := cards.SharedCorpus(filepath.Join(root, ".cards"))
+	corpus, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("declared sets need the corpus: could not resolve the repo root")
+	}
+	reg, err := cards.SharedCorpus(corpus)
 	if err != nil {
 		t.Fatalf("declared sets need the corpus (make fetch-cards compile-cards): %v", err)
 	}
