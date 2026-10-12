@@ -72,10 +72,43 @@
 #
 # EVERY heavy runner YIELDS its lane while a broker gate bracket is active:
 # heavy.sh leases park their job (heavy.sh:208-243), and gorge_heavy_run / the
-# `run` exec branch park their child the same way from gorge_heavy_supervise
-# below. The lane fd is unlocked (flock -u 9) ONLY while the child process
-# group is STOPped, and re-taken (flock -w 1 9) before it is continued, so a
-# gate that takes a lane is never waiting on a job the bracket itself froze.
+# `run` exec branch yield from gorge_heavy_supervise below. HOW they yield is
+# GORGE_HEAVY_YIELD (default `weight`):
+#
+#   weight  the job keeps RUNNING. Every systemd scope its process group lives
+#           in is dropped to CPUWeight=GORGE_HEAVY_YIELD_WEIGHT (default 10;
+#           a gate scope has the default 100) with `systemctl --user
+#           set-property --runtime`, the lane is released at once (no grace:
+#           lowering a weight loses nothing), and the original weight comes
+#           back only after the lane is re-taken. Scopes the job starts while
+#           yielding are lowered too (rescanned every second).
+#   stop    the 029087326 behaviour: after GORGE_HEAVY_PAUSE_GRACE_S the
+#           group is SIGSTOPped, and continued once the lane is re-taken.
+#
+# Why `weight` is the default, and why post-merge PINS it: `go test -timeout`
+# is a WALL-CLOCK deadline. A STOPped test binary's clock keeps running, so a
+# package frozen across a gate bracket (or several back to back) dies with
+# "panic: test timed out after 10m" -- not a bug in the package, a bug in the
+# yield. That is what post-merge did from 029087326 (merge 2f3ba9c27): the
+# full-suite wall went from ~200-500 s to 1,400-1,800 s, timed-out packages
+# were logged FLAKY, the pipeline paused, and a timeout RED on 2026-10-10
+# deadlocked it for 47 h (.ds4/postmerge-batch.log, postmerge-culprits.log).
+# A lowered weight still gives the gate the CPU (it wins every contended core
+# 10:1) while the test binaries keep advancing, so their deadlines stay honest.
+# STOP is only right for a job with no wall deadline that measures its own
+# CPU-seconds; opt in with GORGE_HEAVY_YIELD=stop.
+#
+# Memory is the same in both modes (a STOPped job holds its memory too), so
+# releasing the lane under `weight` does not change the pool's memory picture:
+# lanes still bound how many jobs START, and the broker's memory floor/kill
+# path (broker.sh enforce) is untouched. A weight-mode job whose processes
+# live in no scope of their own (not wrapped in `systemd-run --scope`) cannot
+# be deprioritised; the supervisor says so once on stderr and lets it run.
+#
+# INVARIANT (both modes): the lane is released ONLY while the job is yielded
+# (STOPped, or every scope it has lowered), and re-taken (flock -w 1 9) before
+# it is continued or restored, so a gate that takes a lane is never waiting on
+# a job the bracket itself froze.
 # The bracket is the broker's gate-active flag (scripts/broker.sh:34), watched
 # at the same path from every worktree (gorge_heavy_gate_active). A fresh lane
 # is not TAKEN while the flag is live (gorge_heavy_acquire defers), so a bisect
@@ -83,7 +116,8 @@
 # gate's OWN command is the inline acquisition in .agentctl/config.toml, never
 # this file, so the deferral can never deadlock the gate.
 # The child runs in its own process group (so it can be STOPped without
-# stopping the wrapper); the wrapper therefore FORWARDS INT/TERM/HUP to that
+# stopping the wrapper, and so its scopes can be found by pgid); the wrapper
+# therefore FORWARDS INT/TERM/HUP to that
 # group (gorge_heavy_forward), or a Ctrl-C / `timeout` would orphan the job
 # with no lane, and then RE-RAISES the signal on the caller once the job is
 # reaped and the lane released, so a sourcing caller dies (or runs its own trap)
@@ -96,6 +130,15 @@ GORGE_HEAVY_LANES=${GORGE_HEAVY_LANES:-3}
 # PAUSE_GRACE_S: heavy.sh sources this file BEFORE it sets PAUSE_GRACE_S, so a
 # shared name would be silently overwritten by whichever ran second.
 GORGE_HEAVY_PAUSE_GRACE_S=${GORGE_HEAVY_PAUSE_GRACE_S:-60}
+# How a supervised job yields to a gate bracket: `weight` (default) or `stop`.
+# See the header: STOP breaks every wall-clock `go test -timeout`.
+GORGE_HEAVY_YIELD=${GORGE_HEAVY_YIELD:-weight}
+# The CPUWeight a yielding job's scopes drop to (`idle` is accepted too). 10,
+# not 1/idle: the box runs at load ~80 on 32 cores, so a near-zero share would
+# stall the job for the whole bracket and its wall deadlines with it.
+GORGE_HEAVY_YIELD_WEIGHT=${GORGE_HEAVY_YIELD_WEIGHT:-10}
+# The systemctl the weight path calls (tests point it at a recorder).
+GORGE_HEAVY_SYSTEMCTL=${GORGE_HEAVY_SYSTEMCTL:-systemctl}
 if [ -z "${GORGE_HEAVY_LOCK:-}" ] || [ -z "${GORGE_HEAVY_GATE_FLAG:-}" ]; then
 	_hl_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 	_hl_common=$(git -C "$_hl_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || _hl_common=$_hl_dir/../.git
@@ -107,7 +150,7 @@ if [ -z "${GORGE_HEAVY_LOCK:-}" ] || [ -z "${GORGE_HEAVY_GATE_FLAG:-}" ]; then
 	[ -n "${GORGE_HEAVY_GATE_FLAG:-}" ] || GORGE_HEAVY_GATE_FLAG=${GORGE_REWARD_DIR:-$(dirname "$_hl_common")/.ds4/reward}/gate-active
 	unset _hl_dir _hl_common
 fi
-export GORGE_HEAVY_LOCK GORGE_HEAVY_LANES GORGE_HEAVY_GATE_FLAG
+export GORGE_HEAVY_LOCK GORGE_HEAVY_LANES GORGE_HEAVY_GATE_FLAG GORGE_HEAVY_YIELD GORGE_HEAVY_YIELD_WEIGHT
 
 gorge_heavy_lanes() {
 	local i
@@ -130,13 +173,14 @@ gorge_heavy_gate_active() {
 	[ $(($(date +%s) - $(stat -c %Y "$GORGE_HEAVY_GATE_FLAG" 2>/dev/null || echo 0))) -le 1800 ]
 }
 
-# gorge_heavy_supervise PID: park PID's process group while a gate bracket is
-# open, yielding the lane on fd 9 for exactly that window. Runs in a background
-# subshell (callers start it with `&`) that SHARES fd 9 with its caller, so
-# flock -u/-w move the one open file description the lane lock lives on. The
-# shape is heavy.sh's lease supervisor (heavy.sh:208-243) with the per-lease
-# pause file replaced by gorge_heavy_gate_active. INVARIANT: the lane is
-# released ONLY while the child group is STOPped (a job running beside a lane
+# gorge_heavy_supervise PID: yield PID's process group while a gate bracket is
+# open (GORGE_HEAVY_YIELD: lower its scopes' CPUWeight, or STOP it), giving up
+# the lane on fd 9 for exactly that window. Runs in a background subshell
+# (callers start it with `&`) that SHARES fd 9 with its caller, so flock -u/-w
+# move the one open file description the lane lock lives on. The STOP shape is
+# heavy.sh's lease supervisor (heavy.sh:208-243) with the per-lease pause file
+# replaced by gorge_heavy_gate_active. INVARIANT: the lane is released ONLY
+# while the child group is yielded (a job running at full weight beside a lane
 # holder is the bug), and it is re-taken before the group is continued.
 #
 # The supervisor holds the lane's open file description too, so the lane is not
@@ -145,7 +189,9 @@ gorge_heavy_gate_active() {
 # FOREGROUND command returns, which would keep a finished job's lane for up to
 # a whole grace period). Plain sleeps carry 9>&- so a stray one cannot pin it.
 gorge_heavy_supervise() {
-	_hl_job=$1 _hl_parked=0 _hl_bg=""
+	_hl_job=$1 _hl_parked=0 _hl_bg="" _hl_units="" _hl_warned=0
+	_hl_mode=$GORGE_HEAVY_YIELD
+	[ "$_hl_mode" = stop ] || _hl_mode=weight
 	# This runs in a background subshell that INHERITS the caller's shell
 	# options (sb-gauntlet.sh runs `set -euo pipefail`), so disable errexit
 	# here: a flock/kill probe returning non-zero must not abort the supervisor
@@ -153,15 +199,24 @@ gorge_heavy_supervise() {
 	set +e
 	# Orphan safety: whenever this supervisor ends while the child is parked
 	# (signalled by its caller, or the caller's shell died and took the group
-	# with it) it re-takes the lane best-effort and continues the child, so it
-	# cannot stay frozen forever. If the PARENT is SIGKILLed the supervisor is
-	# not signalled -- it keeps running and resumes the child when the bracket
-	# clears, holding the lane until the child exits.
+	# with it) it re-takes the lane best-effort and continues the child (or
+	# restores its weights), so it cannot stay frozen forever. If the PARENT is
+	# SIGKILLed the supervisor is not signalled -- it keeps running and resumes
+	# the child when the bracket clears, holding the lane until the child exits.
 	trap 'exit 0' TERM INT HUP
 	trap '_hl_supervise_done' EXIT
 	while kill -0 "$_hl_job" 2>/dev/null; do
 		if gorge_heavy_gate_active; then
-			if [ "$_hl_parked" = 0 ]; then
+			if [ "$_hl_mode" = weight ]; then
+				# No grace: a lowered weight loses no work, and the gate wants the
+				# CPU now. Rescan every pass so a scope the job starts mid-bracket
+				# (driver_replay_batch runs one per `go test`) is lowered too.
+				_hl_weight_lower
+				if [ "$_hl_parked" = 0 ]; then
+					_hl_parked=1
+					flock -u 9 || true
+				fi
+			elif [ "$_hl_parked" = 0 ]; then
 				sleep "$GORGE_HEAVY_PAUSE_GRACE_S" 9>&- &
 				_hl_bg=$!
 				wait "$_hl_bg"
@@ -175,12 +230,17 @@ gorge_heavy_supervise() {
 			fi
 		elif [ "$_hl_parked" = 1 ]; then
 			# Re-acquire in 1 s steps so a child that died while parked is
-			# still noticed by the loop condition; it stays STOPPED until the
-			# lane is ours again.
+			# still noticed by the loop condition; it stays yielded (STOPped, or
+			# at the low weight) until the lane is ours again.
+			[ "$_hl_mode" = stop ] || _hl_weight_lower
 			flock -w 1 9 &
 			_hl_bg=$!
 			if wait "$_hl_bg"; then
-				kill -CONT "-$_hl_job" 2>/dev/null || kill -CONT "$_hl_job" 2>/dev/null || true
+				if [ "$_hl_mode" = stop ]; then
+					kill -CONT "-$_hl_job" 2>/dev/null || kill -CONT "$_hl_job" 2>/dev/null || true
+				else
+					_hl_weight_restore
+				fi
 				_hl_parked=0
 			fi
 		fi
@@ -194,8 +254,72 @@ _hl_supervise_done() {
 	[ -z "$_hl_bg" ] || kill "$_hl_bg" 2>/dev/null
 	if [ "$_hl_parked" = 1 ] && kill -0 "$_hl_job" 2>/dev/null; then
 		flock -w 2 9 2>/dev/null
-		kill -CONT "-$_hl_job" 2>/dev/null || kill -CONT "$_hl_job" 2>/dev/null
+		[ "$_hl_mode" = weight ] || kill -CONT "-$_hl_job" 2>/dev/null || kill -CONT "$_hl_job" 2>/dev/null
 	fi
+	[ -z "$_hl_units" ] || _hl_weight_restore
+	return 0
+}
+
+# _hl_cgroup_of PID: PID's cgroup v2 path ("" if it is gone).
+_hl_cgroup_of() { sed -n 's/^0:://p' "/proc/$1/cgroup" 2>/dev/null; }
+
+# _hl_job_units JOB: the distinct systemd SCOPE units the processes of JOB's
+# process group run in, excluding this supervisor's own cgroup (the caller's
+# unit: lowering that would deprioritise the wrapper, not the job). A process
+# moved into `systemd-run --user --scope` keeps its process group, so every
+# test binary of a scoped `go test` is found through its scope.
+_hl_job_units() {
+	local own pid cg u seen=" "
+	own=$(_hl_cgroup_of "$BASHPID")
+	for pid in "$1" $(pgrep -g "$1" 2>/dev/null); do
+		cg=$(_hl_cgroup_of "$pid")
+		[ -n "$cg" ] && [ "$cg" != "$own" ] || continue
+		u=${cg##*/}
+		case $u in *.scope) ;; *) continue ;; esac
+		case $seen in *" $u "*) continue ;; esac
+		seen+="$u "
+		printf '%s\n' "$u"
+	done
+}
+
+# _hl_weight_lower: drop every not-yet-lowered scope of the job to
+# GORGE_HEAVY_YIELD_WEIGHT, remembering its original CPUWeight in _hl_units
+# ("unit original" lines). systemctl is bounded by `timeout` so a wedged user
+# manager cannot hold the supervisor (and so the lane) hostage.
+_hl_weight_lower() {
+	local u orig any=0
+	while read -r u; do
+		[ -n "$u" ] || continue
+		any=1
+		case $'\n'"$_hl_units" in *$'\n'"$u "*) continue ;; esac
+		orig=$(timeout 5 "$GORGE_HEAVY_SYSTEMCTL" --user show -p CPUWeight --value "$u" 2>/dev/null 9>&-) || continue
+		if timeout 5 "$GORGE_HEAVY_SYSTEMCTL" --user set-property --runtime "$u" "CPUWeight=$GORGE_HEAVY_YIELD_WEIGHT" >/dev/null 2>&1 9>&-; then
+			_hl_units+="$u ${orig:-[not set]}"$'\n'
+		elif [ "$_hl_warned" = 0 ]; then
+			_hl_warned=1
+			printf 'heavy_lock.sh: gate bracket: could not set CPUWeight=%s on %s (job %s keeps running at its own weight)\n' \
+				"$GORGE_HEAVY_YIELD_WEIGHT" "$u" "$_hl_job" >&2
+		fi
+	done < <(_hl_job_units "$_hl_job")
+	if [ "$any" = 0 ] && [ -z "$_hl_units" ] && [ "$_hl_warned" = 0 ]; then
+		_hl_warned=1
+		printf 'heavy_lock.sh: gate bracket: no process of job %s is in a systemd scope of its own; it keeps running at full weight (wrap its work in systemd-run --user --scope)\n' \
+			"$_hl_job" >&2
+	fi
+	return 0
+}
+
+# _hl_weight_restore: put back every lowered scope's original CPUWeight (an
+# unset one is reset with an empty assignment). A scope that has since ended
+# just fails, quietly.
+_hl_weight_restore() {
+	local u orig
+	while read -r u orig; do
+		[ -n "$u" ] || continue
+		case $orig in '[not set]' | 18446744073709551615) orig="" ;; esac
+		timeout 5 "$GORGE_HEAVY_SYSTEMCTL" --user set-property --runtime "$u" "CPUWeight=$orig" >/dev/null 2>&1 9>&-
+	done <<<"$_hl_units"
+	_hl_units=""
 	return 0
 }
 

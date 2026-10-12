@@ -132,6 +132,17 @@ dzbroker:
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./cmd/dzbroker
 
+# gamepool is the experimental, tag-gated pooled-games driver. It is built
+# from the nested module experimental/gamepool, which alone requires purego
+# (the GPU scorer's CUDA binding): the root go.mod has no require lines
+# (TestRootModuleHasNoRequires). Add gamepool_gpu to GAMEPOOL_TAGS for the GPU
+# scorer.
+.PHONY: gamepool
+GAMEPOOL_TAGS ?= gamepool
+gamepool:
+	@mkdir -p $(BIN_DIR)
+	cd experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
+
 # test-broker runs the broker package's tests under the tag. Kept out of the
 # default `make test` for the same reason the build is.
 test-broker:
@@ -322,6 +333,22 @@ fuzz:
 .PHONY: test-manabrew
 test-manabrew:
 	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./protocol/manabrew ./internal/manabrew/... ./host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
+
+# test-spellbench-bridge builds and tests the parked SpellBench protocol v1/v2
+# bridge (build tag `spellbench_bridge`): internal/spellbench/{v1agent,kshadow,
+# v2agent,v2engine,v2shadow}, internal/policynet/v2front and the sbagent,
+# sbv1agent, kshadowcheck, sbv2engine, sbv2local and sbv2shadow commands. Like
+# test-manabrew it is excluded from `go test ./...`, `make test` and the
+# pipeline gates; the live bots' spellbench catalogs, builtins, sbsearch,
+# payexec and registry stay untagged.
+SPELLBENCH_BRIDGE_PKGS = ./internal/spellbench/v1agent ./internal/spellbench/kshadow \
+	./internal/spellbench/v2agent ./internal/spellbench/v2engine ./internal/spellbench/v2shadow \
+	./internal/policynet/v2front ./cmd/sbagent ./cmd/sbv1agent ./cmd/kshadowcheck \
+	./cmd/sbv2engine ./cmd/sbv2local ./cmd/sbv2shadow
+.PHONY: test-spellbench-bridge
+test-spellbench-bridge:
+	go vet -tags spellbench_bridge $(SPELLBENCH_BRIDGE_PKGS)
+	go test $(GO_TEST_FLAGS) -tags spellbench_bridge -count=1 $(SPELLBENCH_BRIDGE_PKGS)
 
 # Engine-speed benchmarking (cmd/enginebench; scripts in scripts/enginebench-*.sh,
 # workload decks committed in cmd/enginebench/testdata/decks). Every run is
