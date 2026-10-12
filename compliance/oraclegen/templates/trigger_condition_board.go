@@ -64,7 +64,6 @@ func triggerConditionFixtures(reg *cards.Registry, f *cards.Face, t *cards.Trigg
 		out = append(out, historyPreludes(reg, f.Name, body, staticCountFrom(t.ParamStr(cards.PKSVarCompare)))...)
 		built, _ := activationSVarPrelude(reg, f, check, t.ParamStr(cards.PKSVarCompare))
 		out = append(out, built...)
-		out = append(out, historyPreludes(reg, f.Name, body, staticCountFrom(t.ParamStr(cards.PKSVarCompare)))...)
 		out = append(out, colorsCountPreludes(reg, body, t.ParamStr(cards.PKSVarCompare))...)
 		out = append(out, opponentComparisonFixtures(f, check, t.ParamStr(cards.PKSVarCompare))...)
 	}
