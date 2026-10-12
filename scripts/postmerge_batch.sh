@@ -96,6 +96,8 @@ bisect() {
 last_tested=""   # head of the last completed full run (green or red)
 last_green=$(git rev-parse origin/main)
 red_fails=""     # "<pkg> <regex>" lines still failing on main
+flaky_reruns=0   # consecutive all-flaky full reruns at one head
+FLAKY_RERUNS_MAX=2
 while true; do
   git fetch -q origin main 2>/dev/null || true
   head=$(git rev-parse main)
@@ -116,14 +118,14 @@ while true; do
       if gorge_heavy_run "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
         last_tested=$head
         if git push -q origin "$head:refs/heads/main"; then
-          last_green=$head
+          last_green=$head; flaky_reruns=0
           say "GREEN ${head:0:9} pushed ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         elif git fetch -q origin main && git merge-base --is-ancestor "$head" origin/main; then
           # Someone pushed main past the green head first (a direct push):
           # the green commit is already on origin, so the pause must lift --
           # with nothing left to push this loop would never run again.
-          last_green=$head
+          last_green=$head; flaky_reruns=0
           say "GREEN ${head:0:9} already on origin ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         else
@@ -137,12 +139,14 @@ while true; do
         if [ -z "$red_fails" ]; then
           say "RED ${head:0:9}: no failing package parsed (vet/testbudget/TestHeads/sim step?) -- see $OUT; not bisected"
         fi
+        real_fails=""
         while read -r pkg re; do
           [ -n "$pkg" ] || continue
           if ! fails_at "$head" "$pkg" "$re"; then
             say "FLAKY ${head:0:9} $pkg $re: passes on rerun"
             continue
           fi
+          real_fails+="$pkg $re"$'\n'
           if fails_at "$last_green" "$pkg" "$re"; then
             say "CULPRIT unknown for $pkg $re: already fails at last green ${last_green:0:9}"
             continue
@@ -151,6 +155,21 @@ while true; do
           msg="CULPRIT ${c:0:9} \"$(git log -1 --format=%s "$c")\" breaks $pkg $re (batch ${last_green:0:9}..${head:0:9})"
           say "$msg"; echo "$(date '+%F %T') $msg" >>"$CULPRITS"
         done <<<"$red_fails"
+        # Every parsed failure passed on rerun: a load flake, not a red main.
+        # Re-run the full suite at this head (clearing last_tested) instead of
+        # waiting for main to move -- main cannot move while paused, so the
+        # old wait deadlocked (2026-10-10 11:18 -> 10-12, 47h, 8 FLAKY).
+        # Bounded: after FLAKY_RERUNS_MAX flaky reruns it stays paused.
+        if [ -n "$red_fails" ] && [ -z "$real_fails" ]; then
+          if [ "$flaky_reruns" -lt "$FLAKY_RERUNS_MAX" ]; then
+            flaky_reruns=$((flaky_reruns + 1))
+            last_tested=""
+            say "ALL FLAKY ${head:0:9}: full rerun $flaky_reruns/$FLAKY_RERUNS_MAX"
+          else
+            say "ALL FLAKY ${head:0:9} again after $FLAKY_RERUNS_MAX reruns: staying paused; operator needed"
+          fi
+        fi
+        red_fails=$real_fails
         git -C "$wt" switch -q --detach "$head"
       fi
     fi
