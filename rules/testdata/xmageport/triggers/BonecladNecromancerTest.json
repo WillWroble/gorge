@@ -45,7 +45,7 @@
       {
        "kind": "any",
        "pick": [
-        "Yes"
+        "yes"
        ]
       }
      ]
@@ -138,7 +138,7 @@
       {
        "kind": "any",
        "pick": [
-        "Yes"
+        "yes"
        ]
       }
      ]

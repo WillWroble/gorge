@@ -49,7 +49,6 @@ var hardCalls = map[string]string{
 	"assertLibraryCount":            "library-assert",
 	"setChoiceAmount":               "amount-choice",
 	"addTargetAmount":               "amount-choice",
-	"setModeChoice":                 "mode-choice",
 	"showBattlefield":               "",
 	"showHand":                      "",
 	"showGraveyard":                 "",
@@ -128,6 +127,8 @@ type choice struct {
 	src    int
 	target bool
 	pick   string // already a gorge pick (ref, yes/no, text)
+	x      int    // setChoice "X=N": N, the announced X (-1 otherwise)
+	mode   int    // setModeChoice "N": 1-based mode index (0 otherwise)
 }
 
 type action struct {
@@ -173,6 +174,7 @@ type translator struct {
 	preChoices    []choice
 	choiceList    []choice
 	droppedOrder  int
+	orphanMode    bool // a setModeChoice no action consumes (a trigger's modes)
 }
 
 func p0(v value) int {
@@ -226,6 +228,8 @@ func (t *translator) assignChoices() {
 		}
 		if to != nil {
 			to.choices = append(to.choices, ch)
+		} else if ch.mode > 0 {
+			t.orphanMode = true
 		}
 	}
 }
@@ -355,7 +359,7 @@ func (t *translator) read() *refusal {
 	var calls []call
 	// First pass: hard refusals win over everything else, so the census key
 	// names the real obstacle.
-	for _, st := range t.m.Stmts {
+	for _, st := range inlineHelpers(t.m.Stmts, t.jc.Defs, 0) {
 		if lm := reLocalDecl.FindStringSubmatch(st); lm != nil {
 			v := evalExpr(lm[3], t.consts)
 			if v.kind != vStr && v.kind != vInt {
@@ -409,6 +413,9 @@ func (t *translator) read() *refusal {
 		return refuse("no-stop", "no setStopAt")
 	}
 	t.assignChoices()
+	if t.orphanMode {
+		return refuse("mode-choice", "setModeChoice with no cast to consume it")
+	}
 	return nil
 }
 
@@ -667,14 +674,26 @@ func (t *translator) readCall(idx int, c call) *refusal {
 			}
 			times = n
 		}
-		var ch choice
+		ch := choice{x: -1}
 		v := c.Args[1]
 		switch {
 		case c.Name == "setChoice" && v.kind == vBool:
 			ch.pick = map[bool]string{true: "yes", false: "no"}[v.b]
 		case v.kind == vStr:
+			if n, ok := xChoice(v.s); ok {
+				ch.pick, ch.x = fmt.Sprint(n), n
+				ch.seat, ch.src = p0(c.Args[0]), idx
+				for i := 0; i < times; i++ {
+					t.choiceList = append(t.choiceList, ch)
+				}
+				return nil
+			}
 			if strings.HasPrefix(v.s, "X=") {
 				return refuse("x-cost", "setChoice %s", v.s)
+			}
+			if c.Name == "setChoice" && (strings.EqualFold(v.s, "yes") || strings.EqualFold(v.s, "no")) {
+				ch.pick = strings.ToLower(v.s)
+				break
 			}
 			if strings.Contains(v.s, "^") || strings.Contains(v.s, "=") {
 				return refuse("multi-target", "%s %q", c.Name, v.s)
@@ -701,6 +720,19 @@ func (t *translator) readCall(idx int, c call) *refusal {
 		for i := 0; i < times; i++ {
 			t.choiceList = append(t.choiceList, ch)
 		}
+	case "setModeChoice":
+		if len(c.Args) != 2 {
+			return refuse("bad-args", "%s", c.Name)
+		}
+		v := c.Args[1]
+		n := 0
+		if v.kind == vStr && allDigits(v.s) && len(v.s) < 3 {
+			fmt.Sscanf(v.s, "%d", &n)
+		}
+		if n < 1 {
+			return refuse("mode-choice", "setModeChoice %s", v)
+		}
+		t.choiceList = append(t.choiceList, choice{seat: p0(c.Args[0]), src: idx, x: -1, mode: n, pick: v.s})
 	case "checkPermanentCount", "checkLife", "checkPT", "checkGraveyardCount", "checkHandCardCount",
 		"checkExileCount", "checkStackSize", "checkAbility", "checkPermanentCounters":
 		if len(c.Args) < 4 {
@@ -756,4 +788,15 @@ func (t *translator) readCall(idx int, c call) *refusal {
 		return refuse("unsupported-call", "%s", c.Name)
 	}
 	return nil
+}
+
+// xChoice parses XMage's announced-X answer "X=N".
+func xChoice(s string) (int, bool) {
+	rest, ok := strings.CutPrefix(s, "X=")
+	if !ok || !allDigits(rest) || len(rest) > 3 {
+		return 0, false
+	}
+	n := 0
+	fmt.Sscanf(rest, "%d", &n)
+	return n, true
 }

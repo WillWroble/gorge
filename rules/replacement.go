@@ -373,7 +373,7 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 
 	// CR 616.1 competitions either compose commutative Updated effects or
 	// park destination-changing effects for the affected player to order.
-	if shouldPoseDrawReplacementChoice(ev, matches) {
+	if shouldPoseDrawReplacementChoice(ev, matches) || e.shouldPoseLoneOptionalMove(ev, matches) {
 		e.poseReplacementChoice(ev, matches)
 		return ev, true
 	}
