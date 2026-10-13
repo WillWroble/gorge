@@ -187,9 +187,11 @@ func (e *Engine) applyReplaceDamageTail(m replMatch, prevented int32, ev *events
 }
 
 // runPreventionShieldRider resolves one PreventionSubAbility$ application.
-// Only the corpus's DB$ DealDamage rider is resolved (both carriers:
-// Acolyte's Retribution, Archon's Vengeance); any other API is loud and the
-// shield's prevention itself stands.
+// The resolved rider APIs are cards.PreventionRiderAPI's set — DealDamage
+// (Acolyte's Retribution, Archon's Vengeance), PutCounter (Test of Faith,
+// Temper) and GainLife (Candles' Glow) — each with the prevented amount bound
+// into its numeric parameter; any other API is loud and the shield's
+// prevention itself stands.
 func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 	objs []state.ObjID, players []state.PlayerID, prevented int32, ev *events.Event) {
 	f := m.face
@@ -209,7 +211,7 @@ func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 			Text: "unimplemented PreventionSubAbility$ " + name + " (SVar unresolved)"})
 		return
 	}
-	if sub.API != "DealDamage" {
+	if !cards.PreventionRiderAPI(sub.API) {
 		e.emit(events.Event{Kind: events.Note, Obj: m.id,
 			Text: "unimplemented PreventionSubAbility$ " + name + " (" + sub.API + ")"})
 		return
@@ -218,11 +220,12 @@ func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 	// corrupt a shared parsed graph; the copy keeps that guarantee explicit.
 	rsub := *sub
 	rsub.Params = make(map[string]string, len(sub.Params))
+	// The prevented amount binds into EVERY parameter whose value names it
+	// (cards.PreventionRiderAPI is the set of APIs this resolver serves): the
+	// DealDamage rider's NumDmg$, the counter rider's CounterNum$ (Test of
+	// Faith, Temper), the life rider's LifeAmount$ (Candles' Glow).
 	for k, v := range sub.Params {
-		rsub.Params[k] = v
-	}
-	if strings.TrimSpace(rsub.ParamStr(cards.PKNumDmg)) == "PreventedDamage" {
-		rsub.SetParam(cards.PKNumDmg, strconv.Itoa(int(prevented)))
+		rsub.Params[k] = bindPreventedAmount(v, int(prevented))
 	}
 	// The selector is read off the parsed template, never the copy: the copy
 	// is rewritten in place below, and a reference compiled from it before
@@ -242,6 +245,16 @@ func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 	// marker, no held-event rewrite surface) keeps them from reading the
 	// damage event this shield was applying to.
 	e.runReplaceWith(ctx, ev.Obj, &rsub, nil)
+}
+
+// bindPreventedAmount is the prevented-amount substitution of a shield
+// rider's parameter value: a value naming PreventedDamage becomes the amount
+// the shield prevented, every other value passes through unchanged.
+func bindPreventedAmount(v string, prevented int) string {
+	if strings.EqualFold(strings.TrimSpace(v), "PreventedDamage") {
+		return strconv.Itoa(prevented)
+	}
+	return v
 }
 
 // damageReplacementMatches applies the damage-specific R: filters before the
