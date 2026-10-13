@@ -45,12 +45,17 @@ type oracleFile struct {
 }
 
 type oracleScenario struct {
-	Name   string                `json:"name"`
-	Turn   *int                  `json:"turn,omitempty"`
-	CR     []string              `json:"cr"`
-	Why    string                `json:"why"`
-	Format string                `json:"format,omitempty"`
-	Setup  map[string]oracleSeat `json:"setup"`
+	Name   string   `json:"name"`
+	Turn   *int     `json:"turn,omitempty"`
+	CR     []string `json:"cr"`
+	Why    string   `json:"why"`
+	Format string   `json:"format,omitempty"`
+	// Players is the seat count: 0 (absent) seats the two-player game every
+	// scenario but a multiplayer one plays, so its bytes never carry the
+	// field; 3 seats p0 plus two opponents, where a player who loses the game
+	// leaves it (CR 800.4a) and the game goes on (CR 104.2a).
+	Players int                   `json:"players,omitempty"`
+	Setup   map[string]oracleSeat `json:"setup"`
 	// SetupAnswers answer decisions posed while the runner drives from
 	// genesis to turn 1's first main phase (a setup permanent's upkeep
 	// trigger), in place of the fallback.
@@ -358,6 +363,23 @@ var oracleZones = map[string]state.Zone{
 // condition a scenario is likely to test.
 const oracleFiller = "Wastes"
 
+// oracleSeatNames names the seats of a scenario game; a two-seat game keeps
+// the historical "a", "b", so its log and replay are unchanged.
+var oracleSeatNames = []string{"a", "b", "c"}
+
+// oracleSeatCount is a scenario's seat count: 0 (the field absent) is the
+// two-player game; a multiplayer scenario names 3. The XMage driver seats at
+// most three, so a larger count is a harness error, never a silent clamp.
+func oracleSeatCount(n int) (int, error) {
+	switch n {
+	case 0:
+		return 2, nil
+	case 2, 3:
+		return n, nil
+	}
+	return 0, harnessf("scenario players %d (want 2 or 3)", n)
+}
+
 func parseSeatRef(s string) (state.PlayerID, bool) {
 	if len(s) < 2 || s[0] != 'p' {
 		return 0, false
@@ -484,7 +506,10 @@ func (r *oracleRun) resolve(ref string) (state.ObjID, error) {
 // named card moved to its setup zone. Placing permanents before the first
 // TurnChange means seat 0's battlefield is not summoning sick on turn 1.
 func (r *oracleRun) build(sc oracleScenario) error {
-	const seats = 2
+	seats, err := oracleSeatCount(sc.Players)
+	if err != nil {
+		return err
+	}
 	turn := 1
 	if sc.Turn != nil {
 		turn = *sc.Turn
@@ -515,7 +540,7 @@ func (r *oracleRun) build(sc oracleScenario) error {
 	places := make([][]placement, seats)
 	for key := range sc.Setup {
 		if p, ok := parseSeatRef(key); !ok || int(p) >= seats {
-			return harnessf("setup key %q (want p0 or p1)", key)
+			return harnessf("setup key %q (want p0..p%d)", key, seats-1)
 		}
 	}
 	for p := 0; p < seats; p++ {
@@ -563,7 +588,7 @@ func (r *oracleRun) build(sc oracleScenario) error {
 			return err
 		}
 	}
-	cfg := Config{Seed: 42, Names: []string{"a", "b"}, Decks: decks, Tokens: r.reg.Tokens, NamedCorpus: r.reg.Universe()}
+	cfg := Config{Seed: 42, Names: oracleSeatNames[:seats], Decks: decks, Tokens: r.reg.Tokens, NamedCorpus: r.reg.Universe()}
 	// A scenario seating a card-name choice ranges it over the scenario's own
 	// cards (oracleNameUniverse); every other scenario is unchanged.
 	cfg.NameUniverse = oracleNameUniverse(decks, sideboards)
@@ -780,7 +805,7 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		}
 		if !seededMana && e.G.Turn == targetTurn && e.G.Step == state.StepMain1 {
 			seededMana = true
-			for p := 0; p < 2; p++ {
+			for p := 0; p < seats; p++ {
 				for _, c := range sc.Setup[fmt.Sprintf("p%d", p)].Mana {
 					e.emit(events.Event{Kind: events.ManaAdd, Player: state.PlayerID(p), Counter: string(c), Amount: 1})
 				}

@@ -210,13 +210,23 @@ type Answer struct {
 	Pick []string `json:"pick"`
 }
 
+// ThreeSeats is Scenario.Players for a multiplayer scenario: p0 and two
+// opponents, so one opponent can lose the game while it goes on (CR 800.4a).
+const ThreeSeats = 3
+
 // Scenario is one generated scenario in the runner's schema.
 type Scenario struct {
-	Name  string          `json:"name"`
-	Turn  int             `json:"turn,omitempty"`
-	CR    []string        `json:"cr"`
-	Why   string          `json:"why"`
-	Setup map[string]Seat `json:"setup"`
+	Name string   `json:"name"`
+	Turn int      `json:"turn,omitempty"`
+	CR   []string `json:"cr"`
+	Why  string   `json:"why"`
+	// Players is the seat count (the runner's and the XMage driver's
+	// "players"): 0 keeps the two-seat game, and omitempty keeps every
+	// two-seat item's bytes, and so its scenario sha, unchanged. A scenario
+	// whose observation needs a player to lose while the game goes on (CR
+	// 800.4a) seats ThreeSeats.
+	Players int             `json:"players,omitempty"`
+	Setup   map[string]Seat `json:"setup"`
 	// SetupAnswers answer decisions posed while the runner drives from
 	// genesis to turn 1 (a permanent's "may begin the game" ask).
 	SetupAnswers []Answer `json:"setup_answers,omitempty"`

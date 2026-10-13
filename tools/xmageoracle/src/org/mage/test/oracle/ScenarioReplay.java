@@ -34,7 +34,9 @@ import mage.constants.Zone;
 import mage.counters.Counter;
 import mage.counters.CounterType;
 import mage.counters.Counters;
+import mage.game.FreeForAll;
 import mage.game.Game;
+import mage.game.GameException;
 import mage.game.PutToBattlefieldInfo;
 import mage.game.events.GameEvent;
 import mage.game.permanent.Permanent;
@@ -85,6 +87,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
     private int TURN = 1;
     private int turn = 1;
     private int activeSeat = 0;
+    // The scenario's seat count ("players"; absent = 2). Read before reset(),
+    // whose createNewGameAndPlayers seats a FreeForAll of three for it.
+    private int seats = 2;
     private boolean attackAdvancedTurn = false;
     private static final PhaseStep MAIN = PhaseStep.PRECOMBAT_MAIN;
 
@@ -108,6 +113,43 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // the game. Wrapping createPlayer(Game, ...)'s result instead copies a
     // player the game already holds, so scripted actions go to a player the
     // game never runs and every scenario ends with no snapshots.
+    /** A three-seat scenario (gorge's oracleScenario.Players) is a FreeForAll
+     * of p0 = PlayerA, p1 = PlayerB, p2 = PlayerC; every other scenario keeps
+     * the base class's TwoPlayerDuel. XMage's PlayerList inserts each new
+     * player AHEAD of the previous one (CircularList.add at index 0), so turn
+     * and priority order run from the first player through the others in
+     * reverse creation order: creating A, C, B makes it A -> B -> C, gorge's
+     * p0 -> p1 -> p2. */
+    @Override
+    protected Game createNewGameAndPlayers() throws GameException, java.io.FileNotFoundException {
+        if (seats != 3) {
+            // A previous three-seat scenario left playerC set; the base
+            // class's per-player helpers treat a non-null playerC as seated.
+            playerC = null;
+            return super.createNewGameAndPlayers();
+        }
+        Game game = new FreeForAll(mage.constants.MultiplayerAttackOption.LEFT, mage.constants.RangeOfInfluence.ALL,
+                mage.game.mulligan.MulliganType.GAME_DEFAULT.getMulligan(0), 20, 7);
+        playerA = createPlayer(game, "PlayerA", deckNameA);
+        playerC = createPlayer(game, "PlayerC", deckNameA);
+        playerB = createPlayer(game, "PlayerB", deckNameB);
+        return game;
+    }
+
+    /** The scenario's "players": absent (or 2) is the two-seat game, 3 the
+     * FreeForAll; anything else fails the scenario, as gorge's runner does. */
+    static int scenarioPlayers(JsonObject sc) {
+        JsonElement v = sc.get("players");
+        if (v == null || v.isJsonNull()) {
+            return 2;
+        }
+        int n = v.getAsInt();
+        if (n != 2 && n != 3) {
+            throw new IllegalArgumentException("scenario players " + v + " (want 2 or 3)");
+        }
+        return n;
+    }
+
     @Override
     protected TestPlayer createPlayer(String name, mage.constants.RangeOfInfluence rangeOfInfluence) {
         return new ScriptedChoicePlayer(new org.mage.test.player.TestComputerPlayer(name, rangeOfInfluence), this);
@@ -1001,6 +1043,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         List<List<String>> targetsA = new ArrayList<>();
         List<List<String>> targetsB = new ArrayList<>();
         try {
+            seats = scenarioPlayers(sc);
             reset();
             skipInitShuffling();
             setStrictChooseMode(strict);
@@ -1354,7 +1397,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     private TestPlayer seat(int i) {
+        if (i == 2 && seats == 3) {
+            return playerC;
+        }
         return i == 0 ? playerA : playerB;
+    }
+
+    /** The scenario seat index of one of this game's TestPlayers. */
+    private int seatOfPlayer(TestPlayer p) {
+        return p == playerA ? 0 : p == playerB ? 1 : 2;
     }
 
     private void build(JsonObject sc) {
@@ -1371,7 +1422,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             throw new IllegalArgumentException("unsupported format " + format);
         }
         JsonObject setup = sc.has("setup") ? sc.getAsJsonObject("setup") : new JsonObject();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             TestPlayer p = seat(i);
             removeAllCardsFromLibrary(p);
             removeAllCardsFromHand(p);
@@ -1418,7 +1469,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
     private void applySetupState(Game g) {
         JsonObject setup = sc0.has("setup") ? sc0.getAsJsonObject("setup") : new JsonObject();
         boolean changed = false;
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             if (!setup.has("p" + i)) {
                 continue;
             }
@@ -1481,7 +1532,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         // target slots: Push // Pull, Keep Out, Radiant Strike).
         List<String> tapped = zone == Zone.BATTLEFIELD ? names(s, "tapped") : new ArrayList<>();
         List<String> backFace = zone == Zone.BATTLEFIELD ? names(s, "back_face") : new ArrayList<>();
-        int i = p == playerA ? 0 : 1;
+        int i = seatOfPlayer(p);
         for (String n : ns) {
             int k = buildCounts.merge(i + "|" + n, 1, Integer::sum);
             String ref = "p" + i + ":" + n + (k > 1 ? "#" + k : "");
@@ -1550,7 +1601,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         // Scenario refs/counters still name the front, even though snapshots
         // and XMage's attack/block commands must name the current back face.
         setupNames.put(back.getId(), xmageSpelling(name));
-        backFaceNames.put("p" + (p == playerA ? 0 : 1) + ":" + xmageSpelling(name), back.getName());
+        backFaceNames.put("p" + seatOfPlayer(p) + ":" + xmageSpelling(name), back.getName());
     }
 
     /** Maps a gorge counter kind (P1P1, M1M1, LOYALTY, CHARGE, ...) to XMage's
@@ -1585,7 +1636,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * ("p0:Grizzly Bears#2") reaches exactly one of them. Counts follow the
      * zone order build() added them in. */
     private void registerAliases(Game g) {
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             TestPlayer pl = seat(i);
             Map<String, Integer> counts = new HashMap<>();
             Map<String, Integer> scenarioCounts = new HashMap<>();
@@ -1604,7 +1655,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             for (mage.MageObject o : objs) {
                 bindSetupObject(i, setupName(o), gorgeName, xmageName, counts, scenarioCounts,
                         frontCounts, o.getId(), refAlias, (ref, objId) -> {
-                            for (int j = 0; j < 2; j++) {
+                            for (int j = 0; j < seats; j++) {
                                 try {
                                     seat(j).addAlias(ref, objId);
                                 } catch (IllegalArgumentException ignored) {
@@ -1732,7 +1783,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             return;
         }
         refAlias.put(ref, "@" + ref);
-        for (int j = 0; j < 2; j++) {
+        for (int j = 0; j < seats; j++) {
             try {
                 seat(j).addAlias(ref, match.getId());
             } catch (IllegalArgumentException ignored) {
@@ -3646,7 +3697,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             if (id == null) {
                 throw new IllegalArgumentException("activate " + ref + ": no setup object bound to " + alias);
             }
-            for (int j = 0; j < 2; j++) {
+            for (int j = 0; j < seats; j++) {
                 seat(j).addAlias(key, id);
             }
         });
@@ -3737,7 +3788,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         if (found == null) {
             throw new IllegalArgumentException("ability ref " + ref + " is not on the stack");
         }
-        for (int j = 0; j < 2; j++) {
+        for (int j = 0; j < seats; j++) {
             seat(j).addAlias(key, found.getId());
         }
     }
@@ -3965,6 +4016,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         if (id == null) {
             return -1;
         }
+        if (seats == 3 && id.equals(playerC.getId())) {
+            return 2;
+        }
         return id.equals(playerA.getId()) ? 0 : id.equals(playerB.getId()) ? 1 : -1;
     }
 
@@ -4007,7 +4061,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         s.addProperty("priority", seatIndex(g, g.getPriorityPlayerId()));
         s.addProperty("over", g.hasEnded());
         JsonArray players = new JsonArray();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             Player p = g.getPlayer(seat(i).getId());
             JsonObject po = new JsonObject();
             po.addProperty("seat", i);
@@ -4042,6 +4096,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
             po.add("library_top", top);
             po.addProperty("pool", pool(p.getManaPool()));
+            if (seats > 2 && p.hasLost()) {
+                // CR 800.4a: only a multiplayer game goes on past a loss, so
+                // only its snapshots carry the flag (gorge's OracleSnapPlayer.Lost).
+                po.addProperty("lost", true);
+            }
             players.add(po);
         }
         s.add("players", players);
