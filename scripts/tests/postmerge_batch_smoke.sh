@@ -50,6 +50,14 @@ cat >"$B/sleep" <<'EOF'
 #!/usr/bin/env bash
 n=$(( $(cat "$PMB_STATE/sleeps" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$PMB_STATE/sleeps"
+# pastpush: an operator pushes main by hand while the loop sleeps (once).
+if [ "$n" = 1 ] && [ -n "${PMB_PUSHPAST:-}" ]; then
+	for i in $(seq 1 "${PMB_PUSHPAST_N:-1}"); do
+		echo "$i" >"$PMB_PUSHPAST/pushed$i.txt"
+		git -C "$PMB_PUSHPAST" add "pushed$i.txt" && git -C "$PMB_PUSHPAST" commit -q -m "hand merge $i"
+	done
+	git -C "$PMB_PUSHPAST" push -q origin main
+fi
 [ "$n" -ge 2 ] && kill -TERM "$PPID"
 exit 0
 EOF
@@ -118,7 +126,7 @@ EOF
 			>"$r/.ds4/orchestrator/pause"
 	fi
 	(cd "$r" && PATH="$B:$PATH" PMB_STATE="$d/state" PMB_PAUSE="$r/.ds4/orchestrator/pause" PMB_RERUN="$2" \
-		BATCH_MIN_AHEAD="${PMB_MIN_AHEAD:-1}" BATCH_MAX_AGE_S="${PMB_MAX_AGE:-1800}" PMB_FIRST="${4:-red}" timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
+		BATCH_MIN_AHEAD="${PMB_MIN_AHEAD:-1}" BATCH_MAX_AGE_S="${PMB_MAX_AGE:-1800}" PMB_FIRST="${4:-red}" PMB_PUSHPAST="$([ "${3:-}" = pastpush ] && echo "$r")" timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
 	echo "$d"
 }
 
@@ -184,5 +192,14 @@ check "aged: full run once the oldest commit exceeds the max age" "$([ "$(cat "$
 # (d) our pause marker, 1 ahead, young -> runs immediately
 d=$(PMB_MIN_AHEAD=4 run_scenario paused green ourpause green)
 check "paused: our pause runs immediately with 1 ahead" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+
+# (e) green, 2 ahead (deferred, young), then 3 hand merges are pushed straight
+# to origin: nothing is "ahead" any more, yet 5 commits since the last green
+# were never covered by a full run -> it must still run (2026-10-13).
+d=$(PMB_MIN_AHEAD=4 PMB_AHEAD=2 PMB_PUSHPAST_N=3 run_scenario pastpush green pastpush green)
+check "pastpush: the batch itself never pushed, yet a full run covered the hand-pushed head" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+# (f) same, but only 2 commits past the last green in all and young -> deferred
+d=$(PMB_MIN_AHEAD=4 PMB_PUSHPAST_N=1 run_scenario pastdefer green pastpush green)
+check "pastpush: 2 commits since the last green and young is deferred" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
 
 [ "$fails" = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }

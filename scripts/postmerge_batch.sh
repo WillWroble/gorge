@@ -129,8 +129,15 @@ while true; do
     ahead=$(git rev-list --count origin/main..main)
     if [ -n "$red_fails" ] || [ "$need_run" = 1 ] || our_pause; then
       { [ "$ahead" -gt 0 ] || our_pause; } && go_run=1
-    elif [ "$ahead" -gt 0 ]; then
-      oldest=$(git log --reverse --format=%ct origin/main..main | head -n1)
+    elif [ "$ahead" -gt 0 ] || [ "$head" != "$last_green" ]; then
+      # Not only unpushed commits: a hand merge pushed straight to origin
+      # leaves nothing "ahead" yet no full run ever covered it (2026-10-13:
+      # origin moved 6 merges past d26effe46 untested for 2.5 h). Count from
+      # the last GREEN head instead, which equals origin..main when we pushed.
+      base=$last_green
+      [ "$ahead" -gt 0 ] && base=origin/main
+      ahead=$(git rev-list --count "$base..main")
+      oldest=$(git log --reverse --format=%ct "$base..main" | head -n1)
       age=$(( $(date +%s) - ${oldest:-$(date +%s)} ))
       if [ "$ahead" -ge "$BATCH_MIN_AHEAD" ] || [ "$age" -ge "$BATCH_MAX_AGE_S" ]; then
         go_run=1
