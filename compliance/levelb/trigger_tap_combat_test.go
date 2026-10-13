@@ -54,7 +54,10 @@ func TestTapCombatClassification(t *testing.T) {
 	}{
 		{"artifact token mana tap with a qualifier has no probe", creature, "TapsForMana", map[string]string{"ValidCard": "Artifact.token+withFlying", "Static": "True"}, "trigger.gap:TapsForMana"},
 		{"artifact token mana tap producing G has no probe", creature, "TapsForMana", map[string]string{"ValidCard": "Artifact.token", "Produced": "G", "Static": "True"}, "trigger.gap:TapsForMana"},
-		{"teamwork tap", creature, "Taps", map[string]string{"ValidCard": "Card.Self", "Teamwork": "True"}, "trigger.gap:Taps"},
+		// A teamwork tap of the card itself is served by its own sub-family
+		// (TestTeamworkTapClassification); a teamwork line naming anything
+		// else stays a gap.
+		{"teamwork tap of another creature", creature, "Taps", map[string]string{"ValidCard": "Creature.YouCtrl", "Teamwork": "True"}, "trigger.gap:Taps"},
 		{"crewed vehicle taps", creature, "Taps", map[string]string{"ValidCard": "Card.CrewedBySource"}, "trigger.gap:Taps"},
 		{"class level trigger", creature, "Taps", map[string]string{"ValidCard": "Card.Self", "ClassBand": "3"}, "trigger.gap:Taps"},
 		{"a non-creature taps itself", artifact, "Taps", map[string]string{"ValidCard": "Card.Self"}, "trigger.gap:Taps"},

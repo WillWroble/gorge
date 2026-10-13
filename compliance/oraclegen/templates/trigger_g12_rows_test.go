@@ -63,9 +63,12 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		// Mikey & Don, Party Planners trigger#0.0 is served by a subtype creature
 		// probe (lb4w2-gen); its Static$ True rider never reaches the stack, so
 		// TestLevelBGeneratorResidueRowsServed pins it by the +1/+1 counter instead.
-		{"Avatar Aang", "trigger#1.0", "trigger did not fire"}, // back face transforms away during setup's turn-1 upkeep
+		// The back face's optional each-upkeep transform: the declined-setup
+		// cause declines its turn-1 and turn-2 firings (lb5-driver).
+		{"Avatar Aang", "trigger#1.0", served},
 		// The prepared-copy cast through Hallway Heckler, a carrier XMage holds
-		// (lb4w2-gen); the XMage driver still lacks cast_mode prepared_copy.
+		// (lb4w2-gen); the XMage driver casts it by its prepare-spell name
+		// since lb5-driver.
 		{"Codie, Ravenous Codex", "trigger#0.0", served},
 		// Buried Treasure's mana spent on the probe (lb4w2-gen).
 		{"Smaug, Wicked Worm", "trigger#0.1", served},

@@ -352,6 +352,15 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			it.Trigger = stackTriggerSlot(src, o.Ability)
 		}
 		it.Source = stackSourceRef(r.objRef(src), src)
+		if o.Ability != nil && src != nil && src.Zone == state.ZBattlefield && src.FaceDown {
+			// An ability whose source is a face-down permanent (a granted
+			// one: Etrata's turn-face-up grant) names no source card: the
+			// face-down permanent has no name (CR 708.2a), as its own
+			// snapshot line shows, so the ref keeps only its seat.
+			if i := strings.IndexByte(it.Source, ':'); i >= 0 {
+				it.Source = it.Source[:i+1]
+			}
+		}
 		s.Stack = append(s.Stack, it)
 	}
 	return s

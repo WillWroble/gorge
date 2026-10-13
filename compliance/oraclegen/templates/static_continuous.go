@@ -383,6 +383,23 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticGrantedSpellTriggerItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A stack-scoped grant of an optional copy cost (conspire, casualty) is
+	// observed by casting a probe that elects the granted cost
+	// (static_granted_optional_copy.go).
+	if it, ok := staticGrantedCopyCostItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A crafted back face that has the abilities of its craft materials is
+	// observed by crafting it and activating a gained ability
+	// (static_crafted_gains.go).
+	if it, ok := staticCraftedGainsItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A grant over face-down creatures is observed by activating the granted
+	// ability on a face-down probe (static_granted_facedown.go).
+	if it, ok := staticGrantFaceDownItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
 	if gap := staticProbeCapGap(probePlan); gap != "" {
 		return skip(gap)
 	}

@@ -114,24 +114,8 @@ func TestStaticGrantedAbilityRowCountPinned(t *testing.T) {
 	}
 }
 
-// TestStaticGrantedAbilityNamedSkips locks the shape each unserved appendix row
-// is skipped for, so none falls back to the generic "effect not observable".
-func TestStaticGrantedAbilityNamedSkips(t *testing.T) {
-	for _, r := range []struct{ card, key, reason string }{
-		// The Aetherspark static#0.1 and Barrensteppe Siege static#0.0 moved
-		// to the granted-trigger observation (static_granted_trigger_test.go);
-		// Frostcliff Siege static#0.1 and Tomik, Orzhov Lawmage static#0.0
-		// moved to the granted-static observation (static_granted_static_test.go).
-		{"Etrata, Deadly Fugitive", "static#0.0", "static grants an activated ability (needs the driver's activate on a granted ability)"},
-	} {
-		t.Run(r.card+"/"+r.key, func(t *testing.T) {
-			it, skip := zoneItem(t, r.card, r.key)
-			if skip == nil {
-				t.Fatalf("served (%s), want the named skip %q", it.ID, r.reason)
-			}
-			if skip.Reason != r.reason {
-				t.Fatalf("skip = %q, want %q", skip.Reason, r.reason)
-			}
-		})
-	}
-}
+// TestStaticGrantedAbilityNamedSkips once locked the unserved appendix rows
+// named skips; its last row, Etrata, Deadly Fugitive static#0.0 (a grant over
+// face-down creatures), is served since lb5-driver by activating the granted
+// ability on a face-down probe (static_granted_facedown.go,
+// TestLB5DriverRowsServed).

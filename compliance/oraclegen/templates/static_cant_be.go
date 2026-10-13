@@ -5,6 +5,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
+	"github.com/adams-shaun/gorge/compliance/oraclediff"
 	"github.com/adams-shaun/gorge/compliance/oraclegen"
 )
 
@@ -59,6 +60,39 @@ func cantBeCastOpponentTurnItem(reg *cards.Registry, f *cards.Face, name string,
 	p1.Hand = []string{opponentCastProbe}
 	sc.Setup["p0"], sc.Setup["p1"] = p0, p1
 	return serveOffered(reg, f, name, "CantBeCast", req, "601.2", sc, func() string { return sourceRemovedControlFails(reg, sc, name) })
+}
+
+// attackedYouDraw is p1's turn-2 draw: a spell p1 cannot pay for.
+const attackedYouDraw = "Colossal Dreadmaw"
+
+// cantBeCastAttackedYouItem (Sandswirl Wanderglyph, "Each opponent who
+// attacked you or a planeswalker you control this turn can't cast spells"):
+// on p1's turn p1 attacks p0 with its Grizzly Bears, and at p1's main2
+// priority Gut Shot ({R/P}, payable with life) is not offered to p1. The
+// source-removed control offers it at the same checkpoint after the same
+// attack, so the refusal is the static's (CR 101.2, 508.1).
+func cantBeCastAttackedYouItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
+	sc := staticScenario(f, name, []string{name}, nil, []oraclegen.Step{
+		{Op: "attack", Seat: 1, Defender: "p0", Attackers: []string{"p1:" + bearsProbe}},
+		{Op: "pass_to", Seat: 1, Step: "main2", Expect: offeredNot(1, "cast", "p1:"+opponentCastProbe)},
+	})
+	p0, p1 := sc.Setup["p0"], sc.Setup["p1"]
+	setupBackFace(&p0, name, req)
+	p1.Battlefield = appendFixtureUnique(p1.Battlefield, bearsProbe)
+	p1.Hand = []string{opponentCastProbe}
+	// p1's turn-2 draw is an uncastable spell, not a filler land: a drawn
+	// Wastes is offered as a land play under a library ordinal ("#8") the
+	// XMage side does not spell, which the offered comparison would read.
+	p1.LibraryTop = []string{attackedYouDraw}
+	sc.Setup["p0"], sc.Setup["p1"] = p0, p1
+	it, sk := serveOffered(reg, f, name, "CantBeCast", req, "601.2", sc, func() string { return sourceRemovedControlFails(reg, sc, name) })
+	if sk == nil {
+		// Compare what the priority holder is offered, so XMage's own
+		// refusal is measured too: an unrestricted XMage offers Gut Shot at
+		// p1's main2 priority, which gorge does not.
+		it.Compare = []string{oraclediff.CompareOffered}
+	}
+	return it, sk
 }
 
 // cantBeActivatedOpponentTurnItem: the same pass pair, p1 holding Mogg Fanatic.
