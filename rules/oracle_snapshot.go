@@ -361,11 +361,17 @@ func stackTriggerSlot(src *state.Object, sa *cards.SA) string {
 // the characteristics of the door it was cast as, so the setup ref's whole
 // "Left // Right" name is replaced by the cast door's name, whichever door
 // that is (FaceIdx 0 included).
+//
+// An Adventure spell on the stack is the same case (CR 715.3b, 715.4): the
+// card was cast as its Adventure face and has only that face's
+// characteristics, so XMage names the stack object by the Adventure's own
+// name ("Stomp"), not the card's.
 func stackSourceRef(ref string, o *state.Object) string {
 	if o == nil || o.CopyFace != nil || o.Face() == nil {
 		return ref
 	}
-	onStackRoom := o.Zone == state.ZStack && o.Ability == nil && chars.IsRoomCard(o)
+	onStackRoom := o.Zone == state.ZStack && o.Ability == nil &&
+		(chars.IsRoomCard(o) || adventureSpellFace(o) == o.Face())
 	if !onStackRoom && (o.Zone != state.ZBattlefield || o.FaceIdx == 0) {
 		return ref
 	}
