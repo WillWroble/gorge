@@ -299,13 +299,15 @@ func TestPluralCharmUnmeetableMinimumFizzles(t *testing.T) {
 	}
 	e.emit(events.Event{Kind: events.StepChange, Step: state.StepBeginCombat})
 	e.putTriggersOnStack()
-	if len(e.G.Stack) != 1 {
-		t.Fatalf("trigger stack = %v, want one ability", e.G.Stack)
+	// CR 700.2a withholds the plural mode at placement, so the "choose two"
+	// cannot be announced and the trigger is removed (CR 603.3c) without a
+	// mode ask.
+	if len(e.G.Stack) != 0 {
+		t.Fatalf("trigger stack = %v, want the unannounceable ability removed", e.G.Stack)
 	}
-	id := e.G.Stack[0]
-	d := e.Pending()
-	if d == nil || d.Kind != decision.KModes {
-		t.Fatalf("placement = %+v, want the mode announcement", d)
+	id := triggerObjOf(t, e, bearer).ID
+	if d := e.Pending(); d != nil && d.Kind == decision.KModes {
+		t.Fatalf("placement posed an unannounceable mode ask: %+v", d)
 	}
 	// The board genuinely cannot meet the plural mode's minimum: exactly one
 	// graveyard card against TargetMin$ 2.
@@ -314,7 +316,6 @@ func TestPluralCharmUnmeetableMinimumFizzles(t *testing.T) {
 		t.Fatalf("precondition: plural mode legal candidates = %d, want 1 (< its minimum of 2)", n)
 	}
 	life := e.G.Players[1].Life
-	submitChoices(t, e, 0, 1)
 	if pd := e.Pending(); pd != nil && pd.Kind == decision.KTarget {
 		t.Fatalf("unanswerable target decision posed: %+v", pd)
 	}

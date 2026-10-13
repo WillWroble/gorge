@@ -66,11 +66,16 @@ func parapetThrasherGame(t *testing.T, seed uint64) (*Engine, Config, state.ObjI
 	if dragon.Faces[0].Name != "Shivan Dragon" {
 		t.Fatalf("corpus lookup returned %q", dragon.Faces[0].Name)
 	}
+	// Each opponent controls an artifact, so the "destroy target artifact
+	// that opponent controls" mode has a legal target (CR 700.2a would
+	// otherwise withhold it from every ask).
+	relic := card(t, "Name:Parapet Test Relic\nManaCost:1\nTypes:Artifact\nOracle:x\n")
 	cfg := seatZeroStart(Config{Seed: seed, Names: []string{"a", "b", "c"},
 		Tokens: reg.Tokens,
 		Decks: [][]*cards.Card{
 			append([]*cards.Card{parapet, dragon, dragon}, mountainDeck(t, 37)...),
-			mountainDeck(t, 40), mountainDeck(t, 40),
+			append([]*cards.Card{relic}, mountainDeck(t, 39)...),
+			append([]*cards.Card{relic}, mountainDeck(t, 39)...),
 		}})
 	e := New(cfg)
 	e.Advance()
@@ -79,6 +84,8 @@ func parapetThrasherGame(t *testing.T, seed uint64) (*Engine, Config, state.ObjI
 	pt := placeFromDeck(t, e, 0, "Parapet Thrasher")
 	d1 := placeFromDeck(t, e, 0, "Shivan Dragon")
 	d2 := placeFromDeck(t, e, 0, "Shivan Dragon")
+	placeFromDeck(t, e, 1, "Parapet Test Relic")
+	placeFromDeck(t, e, 2, "Parapet Test Relic")
 	// A logged turn boundary clears seat 0's summoning sickness (CR 302.6a's
 	// "since the beginning of your most recent turn") and parks the clock at
 	// seat 0's declare-attackers step -- the replay-consistent arming the Jitte
