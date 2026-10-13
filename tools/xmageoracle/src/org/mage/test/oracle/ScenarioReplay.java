@@ -2466,7 +2466,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             cmds.add(CMD_YIELD_PRIORITY);
         }
         if (passHere && passAction(steps, index) == PASS_PAIR_SECOND) {
-            if (pairOpensScenario(index)) {
+            if (pairOpensScenario(steps, index)) {
                 cmds.add(CMD_REQUIRE_EMPTY_STACK);
                 cmds.add(CMD_ADVANCE_STEP);
             } else {
@@ -2478,13 +2478,17 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     /** Whether the pass pair whose second pass is step {@code second} is the
-     * scenario's first two steps. Setup puts nothing on the stack, so both
-     * seats pass in succession on an empty stack and the game moves to the
-     * next step (CR 500.2), as gorge's does: the CantBeCast/CantBeActivated
-     * opponent-priority probes (static_cant_be.go) end with that pair. Any
-     * later pair follows a cast or a trigger and resolves the top object. */
-    static boolean pairOpensScenario(int second) {
-        return second == 1;
+     * scenario's first two steps AND its only steps. Setup then puts nothing
+     * on the stack: the CantBeCast/CantBeActivated opponent-priority probes
+     * (static_cant_be.go) are exactly that pair, so both seats pass in
+     * succession on an empty stack and the game moves to the next step (CR
+     * 500.2), as gorge's does. A pair with any step after it is a prelude to
+     * those steps -- a beginning-of-step trigger is still on the stack there
+     * (Shadow of the Goblin's setupResolvePrelude emits the pair before a
+     * cast) -- so it resolves the top object like any other pair, even though
+     * it is also the scenario's first two steps. */
+    static boolean pairOpensScenario(JsonArray steps, int second) {
+        return second == 1 && steps.size() == 2;
     }
 
     /** The step an opening pass pair moves the game to: the step after the

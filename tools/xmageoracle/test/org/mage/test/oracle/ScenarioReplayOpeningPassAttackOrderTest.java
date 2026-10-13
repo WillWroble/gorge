@@ -20,7 +20,13 @@ import org.mage.test.player.TestPlayer;
  * there; the driver used to demand a stack object and threw "pass pair needs
  * a stack object".
  *
- * (2) Two same-name attackers ("p0:token:Goblin Token", "...#2", Okoye):
+ * (2) A pass pair at the scenario's start with one object on the stack: the
+ * pair is a prelude to the steps after it (Shadow of the Goblin trigger#0.3,
+ * whose setupResolvePrelude pair clears a beginning-of-main1 trigger), so it
+ * resolves the top object and keeps its checkpoint in main1. It must NOT be
+ * treated as an empty-stack pair just because it opens the scenario.
+ *
+ * (3) Two same-name attackers ("p0:token:Goblin Token", "...#2", Okoye):
  * TestPlayer finds "Goblin Token:1" among UNTAPPED creatures only, and the
  * first declaration taps its token, so "Goblin Token:1" was left over. */
 public final class ScenarioReplayOpeningPassAttackOrderTest {
@@ -121,6 +127,51 @@ public final class ScenarioReplayOpeningPassAttackOrderTest {
         System.out.println("PASS opening pass pair (empty stack, checkpoint at begin combat; cast pair unchanged)");
     }
 
+    /** The same opening pair shape, but with one object on the stack: the pair
+     * is a prelude to the steps after it (Shadow of the Goblin trigger#0.3:
+     * setupResolvePrelude emits {pass p0},{pass p1} before the cast that fires
+     * the trigger, and the beginning-of-main1 trigger sits on the stack at the
+     * pair). It must resolve the top object and keep its checkpoint in main1,
+     * not demand an empty stack and advance the step. */
+    private static void openingPairWithStackObject() throws Exception {
+        JsonArray steps = steps("[{op:'pass',seat:0},{op:'pass',seat:1},"
+                + "{op:'cast',seat:0,card:'p0:Misthollow Griffin'},{op:'resolve',seat:0}]");
+        check(ScenarioReplay.passAction(steps, 1) == ScenarioReplay.PASS_PAIR_SECOND,
+                "precondition: step 1 still closes the opening pair");
+        check(ScenarioReplay.passCommands(steps, 1, 0).equals(Arrays.asList(
+                        ScenarioReplay.CMD_REQUIRE_STACK, ScenarioReplay.CMD_WAIT_RESOLVE_ONE)),
+                "a pair with a step after it must resolve the top object (the trigger on the stack), not demand an "
+                        + "empty stack; got " + ScenarioReplay.passCommands(steps, 1, 0));
+
+        TestPlayer a = bare("A");
+        ScenarioReplay r = new ScenarioReplay();
+        JsonObject sc = new JsonObject();
+        sc.add("steps", steps);
+        field("playerA").set(r, a);
+        field("playerB").set(r, bare("B"));
+        field("sc0").set(r, sc);
+        check(field("phase").get(r) == PhaseStep.PRECOMBAT_MAIN, "precondition: a scenario starts in main1");
+        loopStep(r, a, steps, 0);
+        loopStep(r, a, steps, 1);
+        List<String> labels = new ArrayList<>();
+        List<PhaseStep> at = new ArrayList<>();
+        for (PlayerAction act : a.getActions()) {
+            // waitStackResolved queues a PlayerAction whose actionName is empty
+            // (its command lives in getAction()); normalise to the command.
+            labels.add(act.getActionName().isEmpty() ? act.getAction() : act.getActionName());
+            at.add(act.getStep());
+        }
+        check(labels.equals(Arrays.asList("step 0 (pass)", ScenarioReplay.CMD_REQUIRE_STACK,
+                        ScenarioReplay.CMD_WAIT_RESOLVE_ONE, "step 1 (pass)")),
+                "the pair must check for a stack object and resolve it before the second pass's checkpoint; got " + labels);
+        check(at.equals(Arrays.asList(PhaseStep.PRECOMBAT_MAIN, PhaseStep.PRECOMBAT_MAIN,
+                        PhaseStep.PRECOMBAT_MAIN, PhaseStep.PRECOMBAT_MAIN)),
+                "a pair that resolves the stack keeps every checkpoint in main1 (the step does not advance); got " + at);
+        check(!labels.contains(ScenarioReplay.CMD_REQUIRE_EMPTY_STACK) && !labels.contains(ScenarioReplay.CMD_ADVANCE_STEP),
+                "a pair with an object on the stack must not demand an empty stack or advance the step; got " + labels);
+        System.out.println("PASS opening pass pair with a stack object (resolves the trigger, checkpoint stays in main1)");
+    }
+
     /** TestPlayer.findPermanent with FilterCreatureForCombat, modelled: a
      * "Name:k" command takes the k-th untapped creature of that name in
      * battlefield order, and declaring it taps it. Returns the creature
@@ -177,6 +228,7 @@ public final class ScenarioReplayOpeningPassAttackOrderTest {
 
     public static void main(String[] args) throws Exception {
         openingPair();
+        openingPairWithStackObject();
         attackOrder();
     }
 }
