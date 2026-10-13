@@ -32,18 +32,26 @@ if [ ! -s "$cpfile" ]; then
 fi
 cp="$tests/target/test-classes:$tests/target/classes:$(cat "$cpfile")"
 
-classes="$root/driver"
-stamp="$classes/.src.sha"
 sum=$(sha256sum "$src" | cut -d' ' -f1)
-# full-replay.sh starts several of these at once: without the lock each saw
-# a stale stamp and rm -rf'd the classes another was compiling or loading.
-# The stamp is re-read under the lock so only the first job compiles.
+# Compiled classes are keyed by the driver source sha, as
+# forge-oracle-run.sh's are. One shared directory recompiled per sha let a
+# worktree's replay rm -rf the classes a concurrent replay of another driver
+# was still loading lazily (2026-10-13: whole sets HARNESS with
+# NoClassDefFoundError ScenarioReplay$Spelling, others silently run on the
+# other session's driver). A built directory is never rewritten, only
+# created whole by a rename. The lock still makes the first of several
+# concurrent full-replay.sh jobs the only one that compiles. The root is
+# drivers/, not the old flat driver/, because a worktree on an older base
+# still rm -rf's driver/ whenever its stamp differs.
+classes="$root/drivers/${sum:0:12}"
 exec 9>"$root/driver.lock"
 flock 9
-if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$sum" ]; then
-  rm -rf "$classes" && mkdir -p "$classes"
-  javac -nowarn -d "$classes" -cp "$cp" "$src" || exit 1
-  echo "$sum" > "$stamp"
+if [ ! -f "$classes/.done" ]; then
+  tmp=$classes.tmp.$$
+  mkdir -p "$root/drivers" && rm -rf "$tmp" && mkdir -p "$tmp"
+  javac -nowarn -d "$tmp" -cp "$cp" "$src" || { rm -rf "$tmp"; exit 1; }
+  touch "$tmp/.done"
+  rm -rf "$classes" && mv "$tmp" "$classes"
 fi
 flock -u 9; exec 9>&-
 
