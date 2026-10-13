@@ -752,6 +752,12 @@ func (e *Engine) delayedChangesControllerMatches(t cards.Trigger, dt *state.Dela
 	if ev.Kind != events.ControlChange || lki == nil || lki.Controller == ev.Player {
 		return false
 	}
+	// Only a permanent changes controller (CR 108.4, 110.2a): a card entering
+	// the battlefield under GainControl$ is folded onto the card in its origin
+	// zone, which has no controller to lose it "from".
+	if lki.Zone != state.ZBattlefield {
+		return false
+	}
 	ctrl := dt.Controller
 	if v := t.ParamStr(cards.PKValidCard); v != "" && !effects.MatchesObjectCtx(e.G, v, lki, delayedSpecCtx(e.specCtx(dt.Source, ctrl), dt.Remembered)) {
 		return false
