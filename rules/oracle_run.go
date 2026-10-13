@@ -183,13 +183,16 @@ type oracleAnswer struct {
 }
 
 type oracleExpect struct {
-	Card           string                `json:"card,omitempty"`
-	Zone           string                `json:"zone,omitempty"`
-	PT             string                `json:"pt,omitempty"`
-	Keywords       []string              `json:"keywords,omitempty"`
-	NoKeywords     []string              `json:"no_keywords,omitempty"`
-	Types          []string              `json:"types,omitempty"`
-	NoTypes        []string              `json:"no_types,omitempty"`
+	Card       string   `json:"card,omitempty"`
+	Zone       string   `json:"zone,omitempty"`
+	PT         string   `json:"pt,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
+	NoKeywords []string `json:"no_keywords,omitempty"`
+	Types      []string `json:"types,omitempty"`
+	NoTypes    []string `json:"no_types,omitempty"`
+	// Colours asserts the card's current colour set (CR 105.2, layer 5) as
+	// WUBRG letters in any order; "" asserts colourless.
+	Colours        *string               `json:"colours,omitempty"`
 	Tapped         *bool                 `json:"tapped,omitempty"`
 	Damage         *int32                `json:"damage,omitempty"`
 	Counters       map[string]int32      `json:"counters,omitempty"`
@@ -1100,10 +1103,12 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 			if used[o.Index] {
 				continue
 			}
-			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasPrefix(l, "yes")) {
+			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" ||
+				strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "play ") || strings.HasPrefix(l, "cast ")) {
 				return o.Index, nil
 			}
-			if lp == "no" && (k == "no" || k == "decline" || o.Mode == "unless_decline" || strings.HasPrefix(l, "no") ||
+			if lp == "no" && (k == "no" || k == "decline" || k == "trigger_cost_decline" || o.Mode == "unless_decline" || strings.HasPrefix(l, "no") ||
+				strings.HasPrefix(l, "do not") ||
 				strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") || strings.HasPrefix(l, "don't")) {
 				return o.Index, nil
 			}
@@ -1120,6 +1125,24 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 		}
 	}
 	return -1, nil
+}
+
+// oracleColourSet normalises a colour string to its WUBRG letters in fixed
+// order, so an expectation need not know the engine's letter order.
+func oracleColourSet(s string) string {
+	var b strings.Builder
+	for _, c := range "WUBRG" {
+		if strings.ContainsRune(strings.ToUpper(s), c) {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+// abstractYesNo reports whether a pick is the author's abstract yes/no.
+func abstractYesNo(pick string) bool {
+	lp := strings.ToLower(pick)
+	return lp == "yes" || lp == "no"
 }
 
 // answer handles one pending decision. Priority is passed. Anything else is
@@ -1158,6 +1181,15 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 	for i, a := range r.answers {
 		if a.Kind != string(d.Kind) && a.Kind != "any" {
 			continue
+		}
+		// An "any" yes/no is the author's abstract accept/decline: a
+		// decision that offers no yes/no-shaped option (a mana-payment tap
+		// prompt posed ahead of the real ask) is not the one it was meant
+		// for, so the answer stays queued for the next decision.
+		if a.Kind == "any" && len(a.Pick) == 1 && abstractYesNo(a.Pick[0]) {
+			if idx, _ := r.matchPick(d, a.Pick[0], map[int]bool{}); idx < 0 {
+				continue
+			}
 		}
 		r.answers = append(r.answers[:i:i], r.answers[i+1:]...)
 		used := map[int]bool{}
@@ -2030,6 +2062,11 @@ func (r *oracleRun) check(x oracleExpect) []string {
 		for _, ty := range x.NoTypes {
 			if oracleHasFold(types, ty) {
 				failf("%s: has type %q, want not (types %v)", x.Card, ty, types)
+			}
+		}
+		if x.Colours != nil {
+			if got, want := oracleColourSet(e.Derived(id).Colors), oracleColourSet(*x.Colours); got != want {
+				failf("%s: colours %q, want %q", x.Card, got, want)
 			}
 		}
 		if x.Tapped != nil && o.Tapped != *x.Tapped {
