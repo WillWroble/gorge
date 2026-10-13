@@ -253,6 +253,24 @@ func evalCountAdamantHead(h Host, c *Ctx, g *state.Game, head string, depth int)
 }
 
 func evalCountBodyDotted(h Host, c *Ctx, g *state.Game, head, arg string, depth int) (int32, bool, bool) {
+	// Count$ChromaSource[.<Colour>] (task lb-chroma): the number of <Colour>
+	// mana symbols in the resolving SOURCE card's printed mana cost -- Forge's
+	// AbilityUtils Chroma block, whose ChromaSource form reads the passed-in
+	// source card (CardLists.getTotalChroma). A hybrid or Phyrexian symbol
+	// counts once per query it carries a colour for, through
+	// cards.ManaCostChroma. The corpus carrier is Light from Within, whose
+	// AddPower$ AffectedX evaluates this SVar per AFFECTED creature
+	// (staticAmountOn anchors Ctx.Source on it), so the count is that
+	// creature's own symbols. The bare spelling (no <Colour>) is every
+	// colour, Forge's ALL_MANA_COLORS. A face-down battlefield source has no
+	// mana cost (CR 708.5); an unreadable colour fails closed.
+	if rest, ok := strings.CutPrefix(head, "ChromaSource"); ok {
+		mask, okm := chromaSourceMask(rest)
+		if !okm {
+			return 0, false, true
+		}
+		return chromaObjectCount(g.Obj(c.Source), mask), true, true
+	}
 	// Count$<Predicate>.<yes>.<no> — Forge's yes/no branch heads: the value
 	// is the first number when the predicate holds, the second when it does
 	// not (Count$Morbid.1.0 ×33 and Count$Monarch.1.0 ×10 are the corpus's

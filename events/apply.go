@@ -121,6 +121,7 @@ func resetCombat(g *state.Game, only state.ObjID) {
 		o := &g.Objs[i]
 		if only == 0 || o.ID == only {
 			o.IsAttacking = false
+			o.IsBlocking = false
 			o.AttackingBattle = 0
 			o.BlockedBy = nil
 		} else {
