@@ -53,6 +53,13 @@ func staticGrantedReplacementItem(reg *cards.Registry, f *cards.Face, name strin
 			if it, ok := grantedReplacementDamageItem(reg, f, name, req, st, r); ok {
 				return it, true
 			}
+			if it, ok := grantedReplacementPreventItem(reg, f, name, req, st, r); ok {
+				return it, true
+			}
+		case cards.ReplUntap:
+			if it, ok := grantedReplacementUntapItem(reg, f, name, req, st, r); ok {
+				return it, true
+			}
 		case cards.ReplDraw, cards.ReplDrawCards:
 			if it, ok := grantedReplacementDrawItem(reg, f, name, req, st, r); ok {
 				return it, true

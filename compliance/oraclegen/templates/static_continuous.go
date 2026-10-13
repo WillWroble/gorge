@@ -111,6 +111,16 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 		}
 		gatedGrantWhy = why
 	}
+	// A counter-gated self static that also grants a ReplaceDamage prevention
+	// (Hedron-Field Purists' LEVEL bands) is observed by the damage it
+	// prevents BEFORE the generic probe paths: those serve the same row on
+	// its SetPower/SetToughness alone and never exercise the grant. The
+	// snapshot the item compares still carries the card's own P/T.
+	if st.HasParam(cards.PKAddReplacementEffect) {
+		if it, ok := staticGrantedPreventItem(reg, f, name, req, st); ok {
+			return it, nil
+		}
+	}
 	plans := []staticProbePlan{{}}
 	probePlan := staticPlanFor(affected)
 	if !probePlan.empty() {
