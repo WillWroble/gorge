@@ -141,6 +141,7 @@ func cloneFieldsEngine(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	c.controlGrants = append([]controlGrant(nil), e.controlGrants...)
 	c.mulligans = e.mulligans
 	c.windowDiagnostics = e.windowDiagnostics
+	c.paidManaCensus = e.paidManaCensus
 	c.startingLife = e.startingLife
 	c.setNameInPool = e.setNameInPool
 	c.layer4InPool = e.layer4InPool
