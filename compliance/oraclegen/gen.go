@@ -509,6 +509,30 @@ type CharmCombination struct {
 // CharmCombinations enumerates legal combinations from the minimum pick count
 // upward, in Choices$ order within each size. Ordinary charms default to one
 // pick, preserving their historical ordering.
+// optionalCostCharmNum reads a CharmNum$ that names an SVar of the form
+// Count$OptionalGenericCostPaid.<paid>.<unpaid> with literal branches, and
+// returns the two counts in ascending order.
+func optionalCostCharmNum(f *cards.Face, charmNum string) (int, int, bool) {
+	body, ok := f.SVars[strings.TrimSpace(charmNum)]
+	if !ok {
+		return 0, 0, false
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(body), "Count$OptionalGenericCostPaid.")
+	if !ok {
+		return 0, 0, false
+	}
+	parts := strings.Split(rest, ".")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	a, errA := strconv.Atoi(parts[0])
+	b, errB := strconv.Atoi(parts[1])
+	if errA != nil || errB != nil || a <= 0 || b <= 0 {
+		return 0, 0, false
+	}
+	return min(a, b), max(a, b), true
+}
+
 func CharmCombinations(f *cards.Face) []CharmCombination {
 	modes := charmModes(f)
 	if len(modes) == 0 {
@@ -526,6 +550,14 @@ func CharmCombinations(f *cards.Face) []CharmCombination {
 			minCount = n
 		} else if strings.TrimSpace(sa.Params["MinCharmNum"]) == "" {
 			minCount = pickCount
+		}
+		if lo, hi, ok := optionalCostCharmNum(f, sa.Params["CharmNum"]); ok {
+			// The count depends on the cast's optional-cost election (Pyrrhic
+			// Strike's "if this spell's additional cost was paid, choose both
+			// instead"): offer both counts, the smaller first, so a declined
+			// cast keeps its historical first plan and a paid one finds a
+			// plan of its own size.
+			minCount, pickCount = lo, hi
 		}
 		repeat = strings.EqualFold(strings.TrimSpace(sa.Params["CanRepeatModes"]), "True")
 		break
