@@ -2130,28 +2130,39 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return s != null ? s : xmageSpelling(n);
     }
 
-    /** One snapshot value's spelling rewrite for a STACK SPELL's source: gorge
-     * spells every card object by its front face, so XMage's whole "A // B"
-     * object name for a split/Room card (the card under test's whole name, a
-     * probe's, an MDFC land's) is rewritten to its front half, and the spell
-     * of a face-1 cast -- which XMage names by the back half's ability -- is
-     * rewritten to the front the way gorge names the spell. The card under
-     * test's back half is the only back half a scenario can name, so it is
-     * the only alias. The back-half alias is valid ONLY for a spell: a Room
-     * permanent whose back door is unlocked really is named for that back
-     * half (CR 709.5), and gorge reports it so; use gorgeObjectSpellingRule
-     * for every other snapshot string. */
+    /** One snapshot value's spelling rewrite for a STACK SPELL's source, for
+     * a card under test that is not known to be a Room (see the four-argument
+     * form). gorge spells a non-Room split or MDFC spell by its setup ref, the
+     * front face, so XMage's whole "A // B" object name reads as the front
+     * half, and the spell of a face-1 cast -- which XMage names by the back
+     * half's ability -- is rewritten to the front. The card under test's back
+     * half is the only back half a scenario can name, so it is the only alias.
+     * The back-half alias is valid ONLY for a spell: a Room permanent whose
+     * back door is unlocked really is named for that back half (CR 709.5),
+     * and gorge reports it so; use gorgeObjectSpellingRule for every other
+     * snapshot string. */
     static String gorgeSpellingRule(String gorgeName, String xmageName, String s) {
-        if (!xmageName.isEmpty() && xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
+        return gorgeSpellingRule(gorgeName, xmageName, false, s);
+    }
+
+    /** The stack-spell rewrite with the card under test's Room-ness known.
+     * A Room spell has only the characteristics of the door it was cast as
+     * (CR 709.3b), so its name is that door's name, whichever door it is
+     * (CR 709.5); gorge names it so (rules/oracle_snapshot.go
+     * stackSourceRef), so a Room's back-door spell keeps its name and only a
+     * non-Room split/MDFC back face takes the front-face alias. */
+    static String gorgeSpellingRule(String gorgeName, String xmageName, boolean room, String s) {
+        if (!room && !xmageName.isEmpty() && xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
             return gorgeName;
         }
         return gorgeObjectSpellingRule(gorgeName, xmageName, s);
     }
 
     /** The spelling rewrite for every snapshot string that is not a stack
-     * spell's source (permanents, zones, ability sources, targets): the
-     * whole object name reads as the front half, and a bare back-half name is
-     * left alone, because a Room's unlocked back door is a real name. */
+     * spell's source or a permanent's name (hand, graveyard, exile, library,
+     * ability sources, targets): the whole object name reads as the front
+     * half, and a bare back-half name is left alone, because a Room's
+     * unlocked back door is a real name. */
     static String gorgeObjectSpellingRule(String gorgeName, String xmageName, String s) {
         if (!xmageName.isEmpty() && s.equals(xmageName)) {
             return gorgeName;
@@ -2159,23 +2170,80 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return frontHalf(s);
     }
 
+    /** The spelling rewrite for a battlefield permanent's name (a snapshot
+     * permanent's "name" and "attached_to"). The only permanent XMage names
+     * "A // B" is a Room with both doors unlocked, and that IS its name (CR
+     * 709.5: it has both halves' names, the same "Left // Right" gorge binds,
+     * rules/oracle_run.go fieldName), so it is never collapsed to the front
+     * half -- not even for the card under test, whose scenario spelling is
+     * its front face. Any other name takes the card under test's spelling
+     * alias as gorgeObjectSpellingRule does. */
+    static String gorgePermanentSpellingRule(String gorgeName, String xmageName, String s) {
+        if (s.contains(" // ")) {
+            return s;
+        }
+        return gorgeObjectSpellingRule(gorgeName, xmageName, s);
+    }
+
+    /** Whether the XMage card is a Room (CR 709.3; XMage's RoomCard). Card-
+     * based and package-private so a test can pin it without the card
+     * repository (which needs H2). */
+    static boolean isRoomCard(Card c) {
+        return c instanceof mage.cards.RoomCard;
+    }
+
+    // Room-ness per XMage card name: a card's class never changes within a
+    // run, so one repository lookup per name is enough.
+    private static final Map<String, Boolean> ROOM_NAMES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Whether the named XMage card ("A // B") is a Room. Package-private
+     * and overridable so a no-H2 test double can answer without the card
+     * repository. */
+    boolean cardIsRoom(String xmageCardName) {
+        if (!xmageCardName.contains(" // ")) {
+            return false;
+        }
+        return ROOM_NAMES.computeIfAbsent(xmageCardName, n -> {
+            CardInfo info = CardRepository.instance.findCard(n);
+            return isRoomCard(info == null ? null : info.createCard());
+        });
+    }
+
     /** Rewrites XMage's spelling of the card under test back to the scenario's
      * (gorge) spelling throughout a value, so the comparator sees one name. */
     private JsonElement gorgeSpellings(JsonElement e) {
-        return gorgeSpellings(e, false);
+        return gorgeSpellings(e, Spelling.OBJECT);
     }
 
-    private JsonElement gorgeSpellings(JsonElement e, boolean spellSource) {
+    /** Which rewrite a snapshot string takes: an ordinary object name, a
+     * stack spell's source, or a battlefield permanent's name. PERMANENTS
+     * marks the "permanents" array, whose objects' name fields are
+     * PERMANENT. */
+    private enum Spelling { OBJECT, SPELL, PERMANENT, PERMANENTS }
+
+    private JsonElement gorgeSpellings(JsonElement e, Spelling how) {
         if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
             String s = e.getAsString();
-            String r = spellSource ? gorgeSpellingRule(gorgeName, xmageName, s)
-                    : gorgeObjectSpellingRule(gorgeName, xmageName, s);
+            String r;
+            switch (how) {
+                case SPELL:
+                    // Only the card under test's back half can take the alias,
+                    // so the repository is asked only then.
+                    boolean room = s.equals(backHalf(xmageName)) && cardIsRoom(xmageName);
+                    r = gorgeSpellingRule(gorgeName, xmageName, room, s);
+                    break;
+                case PERMANENT:
+                    r = gorgePermanentSpellingRule(gorgeName, xmageName, s);
+                    break;
+                default:
+                    r = gorgeObjectSpellingRule(gorgeName, xmageName, s);
+            }
             return r.equals(s) ? e : new JsonPrimitive(r);
         }
         if (e.isJsonArray()) {
             JsonArray a = new JsonArray();
             for (JsonElement x : e.getAsJsonArray()) {
-                a.add(gorgeSpellings(x, false));
+                a.add(gorgeSpellings(x, how == Spelling.PERMANENTS ? Spelling.PERMANENTS : Spelling.OBJECT));
             }
             return a;
         }
@@ -2185,9 +2253,19 @@ public class ScenarioReplay extends CardTestPlayerBase {
             // is the spell's name and takes the face-1 back-half alias.
             JsonElement kind = in.get("kind");
             boolean spell = kind != null && kind.isJsonPrimitive() && "spell".equals(kind.getAsString());
+            boolean permanent = how == Spelling.PERMANENTS;
             JsonObject o = new JsonObject();
             for (Map.Entry<String, JsonElement> en : in.entrySet()) {
-                o.add(en.getKey(), gorgeSpellings(en.getValue(), spell && en.getKey().equals("source")));
+                String k = en.getKey();
+                Spelling child = Spelling.OBJECT;
+                if (spell && k.equals("source")) {
+                    child = Spelling.SPELL;
+                } else if (permanent && (k.equals("name") || k.equals("attached_to"))) {
+                    child = Spelling.PERMANENT;
+                } else if (!permanent && k.equals("permanents")) {
+                    child = Spelling.PERMANENTS;
+                }
+                o.add(k, gorgeSpellings(en.getValue(), child));
             }
             return o;
         }
