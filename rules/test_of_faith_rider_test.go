@@ -151,16 +151,28 @@ func TestCandlesGlowRiderGainsPreventedLife(t *testing.T) {
 // against the REAL compiled corpus: the rider families this engine resolves
 // (Test of Faith, Temper, Candles' Glow, Acolyte's Reward, Vengeful Archon)
 // carry no api:PreventDamage.OtherRider, while the DB$ Effect riders this
-// engine does not resolve (Sacred Boon, Scars of the Veteran) carry it and so
-// are counted unsupported instead of playable-with-a-loud-Note.
+// engine does not resolve carry it and so are counted unsupported instead of
+// playable-with-a-loud-Note. Sacred Boon and Scars of the Veteran (a DB$ Effect
+// rider whose delayed trigger puts counters equal to the prevented damage)
+// are resolved; a synthetic Effect rider of any other shape is not.
 func TestPreventionRiderCoverageSyntheticMatchesCorpus(t *testing.T) {
 	t.Parallel()
 	reg := sharedCorpus(t)
 	resolved := []string{"Test of Faith", "Temper", "Candles' Glow",
-		"Acolyte's Reward", "Vengeful Archon"}
-	unresolved := []string{"Sacred Boon", "Scars of the Veteran"}
+		"Acolyte's Reward", "Vengeful Archon", "Sacred Boon", "Scars of the Veteran"}
+	unresolved := []string{"Boon Lookalike"}
+	lookalike := "Name:Boon Lookalike\nManaCost:W\nTypes:Instant\n" +
+		"A:SP$ PreventDamage | ValidTgts$ Creature | Amount$ 3 | PreventionSubAbility$ BoonEffect | ShieldEffectTarget$ Targeted\n" +
+		"SVar:BoonEffect:DB$ Effect | RememberObjects$ ShieldEffectTarget | Triggers$ DelTrig\n" +
+		"SVar:DelTrig:Mode$ Phase | Phase$ End of Turn | OneOff$ True | Execute$ DelayedBoon\n" +
+		"SVar:DelayedBoon:DB$ GainLife | Defined$ You | LifeAmount$ 1\nOracle:x\n"
+	lookalikeCard := card(t, lookalike)
 	hasRider := func(name string) bool {
-		for _, p := range mustCorpusCard(t, reg, name).Primitives() {
+		c := lookalikeCard
+		if name != "Boon Lookalike" {
+			c = mustCorpusCard(t, reg, name)
+		}
+		for _, p := range c.Primitives() {
 			if p == "api:PreventDamage.OtherRider" {
 				return true
 			}

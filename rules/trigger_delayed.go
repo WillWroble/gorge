@@ -316,12 +316,16 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 // delayedPresentGateHolds evaluates a Phase delayed registration's
 // IsPresent$/PresentZone$/PresentCompare$ condition at the phase occurrence.
 // The count scans PresentZone (absent = Battlefield) for objects matching
-// PresentSpec with the registration's capture bound as the IsTriggerRemembered
-// referent -- the same SpecContext binding effects.MatchesPlayerSpecCtx gets
-// for ValidPlayer, so a capture-aware filter answers identically at both
-// gates. The compare defaults to GE1 ("at least one present"), exactly the
-// static presentGate default; an unknown PresentZone$ fails closed (count 0),
-// the same direction countStaticPresent takes.
+// PresentSpec with the registration's capture bound as the remembered set --
+// both as DelayedRemembered (the IsTriggerRemembered referent) and as the
+// resolution's Remembered (the IsRemembered referent, Scars of the Veteran's
+// "if it's a creature"): a delayed registration's capture IS its memory, so
+// both spellings answer identically. The same SpecContext binding
+// effects.MatchesPlayerSpecCtx gets for ValidPlayer, so a capture-aware filter
+// answers identically at both gates. The compare defaults to GE1 ("at least
+// one present"), exactly the static presentGate default; an unknown
+// PresentZone$ fails closed (count 0), the same direction countStaticPresent
+// takes.
 func (e *Engine) delayedPresentGateHolds(dt *state.DelayedTrigger) bool {
 	zones, ok := presentZoneFromParam(dt.PresentZone)
 	if !ok {
@@ -329,6 +333,7 @@ func (e *Engine) delayedPresentGateHolds(dt *state.DelayedTrigger) bool {
 	}
 	sc := e.specCtx(dt.Source, dt.Controller)
 	sc.DelayedRemembered = dt.Remembered
+	sc.Remembered = dt.Remembered
 	n := 0
 	for _, zone := range zones {
 		e.forEachObject(func(id state.ObjID) {

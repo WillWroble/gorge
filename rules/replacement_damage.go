@@ -211,7 +211,7 @@ func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 			Text: "unimplemented PreventionSubAbility$ " + name + " (SVar unresolved)"})
 		return
 	}
-	if !cards.PreventionRiderAPI(sub.API) {
+	if !cards.PreventionRiderAPI(sub.API) && !cards.PreventionRiderDelayedCounterEffect(f.SVars, sub) {
 		e.emit(events.Event{Kind: events.Note, Obj: m.id,
 			Text: "unimplemented PreventionSubAbility$ " + name + " (" + sub.API + ")"})
 		return
@@ -234,6 +234,16 @@ func (e *Engine) runPreventionShieldRider(m replMatch, name string,
 		rsub.SetParam(cards.PKDefined, "Remembered")
 	}
 	ctx := e.replCtx(m, *ev)
+	if cards.PreventionRiderDelayedCounterEffect(f.SVars, sub) {
+		// Sacred Boon / Scars of the Veteran: the Effect remembers the shield's
+		// recipients and its delayed counter body reads this application's
+		// prevented amount back from the registration's remembered number.
+		if strings.TrimSpace(sub.ParamStr(cards.PKRememberObjects)) == "ShieldEffectTarget" {
+			rsub.SetParam(cards.PKRememberObjects, "Remembered")
+		}
+		ctx.Num.RememberedCMC = prevented
+		ctx.Num.RememberedCMCBound = true
+	}
 	ctx.Remembered = nil
 	for _, id := range objs {
 		ctx.Remembered = append(ctx.Remembered, state.Target{Obj: id})

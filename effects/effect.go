@@ -481,6 +481,28 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 			if vp := tl.ValidPlayer; vp != "" {
 				text += "|VP=" + vp
 			}
+			// IsPresent$/PresentZone$/PresentCompare$ (Scars of the Veteran's
+			// "if it's a creature"): the Phase registration's presence
+			// condition, decoded by rules' delayed scan exactly like the
+			// DelayedTrigger SA path's PhaseText (delayedtrigger_params.go).
+			// Appended before |RN= so the decoder's reverse strip order sees
+			// the amount suffix at the tail.
+			if tl.IsPresent != "" {
+				text += "|IP=" + tl.IsPresent
+				if tl.PresentZone != "" {
+					text += "|PZ=" + tl.PresentZone
+				}
+				if tl.PresentCompare != "" {
+					text += "|PC=" + tl.PresentCompare
+				}
+			}
+			// A prevention rider's delayed counter body (Sacred Boon) reads the
+			// amount this application prevented as Count$TriggerRememberAmount;
+			// "|RN=" rides last so the decode strips it first.
+			if c.Num.RememberedCMCBound && (cards.DelayedPreventedCounterBody(c.SVars, exec) ||
+				cards.DelayedPreventedCounterBody(effectFaceSVars(h, c.Source), exec)) {
+				text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
+			}
 			for _, owner := range owners {
 				h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
 					Player: owner, Step: step, Counter: exec,
@@ -1242,3 +1264,12 @@ var effEffectCodes = state.NewStrCodes(
 	state.StrEntry[effEffectCode]{Key: "Targeted", Val: effEffectTargeted},
 	state.StrEntry[effEffectCode]{Key: "True", Val: effEffectTargeted},
 )
+
+// effectFaceSVars is the SVar table of source's current face (nil when the
+// object or face is gone).
+func effectFaceSVars(h Host, source state.ObjID) map[string]string {
+	if o := h.Game().Obj(source); o != nil && o.Face() != nil {
+		return o.Face().SVars
+	}
+	return nil
+}
