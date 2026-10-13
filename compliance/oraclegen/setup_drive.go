@@ -40,7 +40,24 @@ func setupDriveAnswers(d rules.OracleDecision, modes map[string]int) []XAnswer {
 	if v, ok := yesNo(d); ok {
 		return []XAnswer{{d.Seat, "setup_choice", v}}
 	}
+	if setupKeepsAllOnTop(d) {
+		// XMage's turn-1 upkeep Surveil/Scry ask is posed during build, before
+		// any step, and consumes the head of the choice queue. Unscripted it
+		// takes the first answer a LATER step queued (the step that
+		// graveyards the card), so the setup checkpoint already shows the
+		// card in the graveyard: script the keep-on-top the runner took.
+		return []XAnswer{{d.Seat, "setup_choice", "[choice_skip]"}}
+	}
 	return nil
+}
+
+// setupKeepsAllOnTop reports a setup-drive library-arrange ask (an upkeep
+// Surveil's graveyard-or-top selection) that the runner answered by keeping
+// every looked-at card where it is. A forced ordering (Min == Max == Options)
+// is a different dialog and is left alone.
+func setupKeepsAllOnTop(d rules.OracleDecision) bool {
+	return d.Step < 0 && d.GorgeKind == "arrange" && d.ArrangeKind == "graveyard" &&
+		d.Options > 0 && len(d.PickIdx) == d.Options && !(d.Min == d.Max && d.Max == d.Options)
 }
 
 // setupModeAnswers is the setup-drive form of the step-time "mode" arm for a

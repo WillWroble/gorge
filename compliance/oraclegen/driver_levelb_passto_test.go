@@ -70,7 +70,7 @@ func TestDriverPassToCheckpointUsesCurrentTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	java := string(b)
-	if !strings.Contains(java, `runCode(cp, turn, phase, playerA`) {
+	if !strings.Contains(java, `runCode(cp, turn, phase, checkpointSeat(op, st)`) {
 		t.Error("per-step runCode checkpoint does not use the current turn variable")
 	}
 	if strings.Contains(java, `runCode(cp, TURN, phase, playerA`) {

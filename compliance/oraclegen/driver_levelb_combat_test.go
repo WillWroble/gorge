@@ -40,7 +40,7 @@ func TestDriverCombatUsesCurrentTurnAndStepSeat(t *testing.T) {
 	if !ok || !strings.Contains(passTo, "attackAdvancedTurn && nextActiveSeat == activeSeat") {
 		t.Error("pass_to must preserve the turn already advanced by an off-turn attack")
 	}
-	if !strings.Contains(java, "runCode(cp, turn, phase, playerA") {
+	if !strings.Contains(java, "runCode(cp, turn, phase, checkpointSeat(op, st)") {
 		t.Error("step checkpoints must use the current turn")
 	}
 }
