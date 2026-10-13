@@ -40,7 +40,7 @@ func TestDriverActivateCasePinsXMageAbility(t *testing.T) {
 	}
 	for _, required := range []string{
 		"xabilityAt(stepIdx)",
-		"activateAbility(turn, phase, p, text)",
+		"activateAbility(turn, phase, p, boundActivationText(p, str(st, \"card\"), text, stepIdx))",
 		"activateManaAbility(turn, phase, p, text)",
 	} {
 		if !strings.Contains(body, required) {

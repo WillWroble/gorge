@@ -51,15 +51,20 @@ func TestUpkeepSurveilTriggerRowsGraveyardAtResolve(t *testing.T) {
 				t.Fatalf("precondition: %s looked at %v, want [Wastes]", name, d.ArrangeLabels)
 			}
 
-			// The XMage script: one name selection, nothing else, on step 1;
-			// the setup bucket stays empty (the setup keep-top is XMage's own
-			// default and the stored setup checkpoint agrees).
+			// The XMage script: the setup drive's upkeep surveil is posed in
+			// XMage during build, before step 0, and takes the head of the
+			// choice queue. Bucket 0 therefore scripts its keep-on-top skip
+			// (gorge's setup checkpoint keeps the card on top); without it
+			// the step-1 "Wastes" answer is consumed there and the card is
+			// already in the graveyard at XMage's setup checkpoint. Step 1
+			// carries the one name selection.
 			want := []oraclegen.XAnswer{{Seat: 0, Kind: "choice", Value: "Wastes"}}
+			wantSetup := []oraclegen.XAnswer{{Seat: 0, Kind: "setup_choice", Value: "[choice_skip]"}}
 			if len(it.XAnswers) != 2 {
 				t.Fatalf("%s xanswers buckets = %d, want 2: %+v", name, len(it.XAnswers), it.XAnswers)
 			}
-			if len(it.XAnswers[0]) != 0 {
-				t.Errorf("%s setup bucket = %+v, want empty", name, it.XAnswers[0])
+			if !reflect.DeepEqual(it.XAnswers[0], wantSetup) {
+				t.Errorf("%s setup bucket = %+v, want %+v", name, it.XAnswers[0], wantSetup)
 			}
 			if !reflect.DeepEqual(it.XAnswers[1], want) {
 				t.Errorf("%s step-1 xanswers = %+v, want %+v", name, it.XAnswers[1], want)
