@@ -195,7 +195,7 @@ func appendUnitAlternatives(e Engine, dst []Alt, u WindowUnit) (grown, alts []Al
 			if mp := params.ManaOf(alt.Ma); mp.CountsAny {
 				produced = altSymbol(m)
 			}
-			m = addTapExtra(e, u.ID, produced, m)
+			m = addTapExtra(e, u.ID, alt.Ma, produced, m)
 			if out == nil {
 				out = make([]Alt, 0, len(u.Alts))
 			}
@@ -214,7 +214,7 @@ func appendUnitAlternatives(e Engine, dst []Alt, u WindowUnit) (grown, alts []Al
 			}
 			var m state.Mana
 			m[i] = alt.Amt
-			m = addTapExtra(e, u.ID, col, m)
+			m = addTapExtra(e, u.ID, alt.Ma, col, m)
 			if out == nil {
 				out = make([]Alt, 0, len(u.Alts))
 			}
@@ -325,14 +325,15 @@ func PaymentPlanQueryAlternatives(e Engine, u WindowUnit) []Alt {
 }
 
 // addTapExtra adds the deterministic additional mana the static TapsForMana
-// triggers bring to one tap of id declaring `produced` (Forsaken Monument's
+// triggers bring to one tap of id (ma must cost {T}: a sacrifice-only mana
+// ability never taps) declaring `produced` (Forsaken Monument's
 // {C} on a {C} production). The same Eval read drove the interference
 // verdict that admitted the source, so validation and execution agree.
-func addTapExtra(e Engine, id state.ObjID, produced string, m state.Mana) state.Mana {
+func addTapExtra(e Engine, id state.ObjID, ma *cards.SA, produced string, m state.Mana) state.Mana {
 	if produced == "" {
 		return m
 	}
-	_, _, _, extra := e.Eval().SourceInterference(id, nil, produced)
+	_, _, _, extra := e.Eval().SourceInterference(id, ma, produced)
 	for i := range m {
 		m[i] += extra[i]
 	}

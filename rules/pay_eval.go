@@ -78,6 +78,10 @@ func (v *payEval) ManaStatic(ab *cards.SA) pay.ManaStatic {
 func (v *payEval) SourceInterference(id state.ObjID, ma *cards.SA, produced string) (pay.Tier, pay.Consequence, string, state.Mana) {
 	e := (*Engine)(v)
 	if produced != "" {
+		// A TapsForMana trigger only fires when the ability's cost taps.
+		if ma == nil || !e.parseCost(ma.ParamStr(cards.PKCost)).Tap {
+			return pay.TierNormal, pay.Consequence{}, "", state.Mana{}
+		}
 		return pay.TierNormal, pay.Consequence{}, "", e.paymentPlanTapExtraMana(id, produced)
 	}
 	tier, c, detail := e.paymentPlanSourceInterference(id, ma)
