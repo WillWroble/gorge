@@ -4,32 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
-	"github.com/adams-shaun/gorge/internal/testutil"
 )
-
-// gapOf finds one static requirement by key and asserts its named-gap
-// classification: the sub-family stays the gap label and the reason names the
-// exact missing probe -- so the generic "static mode X" string from a
-// classifier this ticket touched can never come back for these rows.
-func gapOf(t *testing.T, card, key, sub, reasonContains string) {
-	t.Helper()
-	reg := testutil.CorpusRegistry(t)
-	c, ok := reg.Lookup(card)
-	if !ok {
-		t.Fatalf("precondition: %s absent from corpus", card)
-	}
-	for _, req := range levelb.Requirements(c) {
-		if req.Key != key {
-			continue
-		}
-		if req.Sub != sub || req.Gap == "" || !strings.Contains(req.Gap, reasonContains) {
-			t.Fatalf("%s %s classifies as %q gap %q, want %q gap containing %q", card, key, req.Sub, req.Gap, sub, reasonContains)
-		}
-		return
-	}
-	t.Fatalf("precondition: %s has no requirement %s", card, key)
-}
 
 // TestRemainingStaticModesClassify pins the classification of every row in
 // the remaining-static-modes ticket's measured table: the served rows carry
@@ -70,19 +47,33 @@ func TestRemainingStaticModesClassify(t *testing.T) {
 		// UnspentMana and IgnoreLegendRule.
 		{"Electro, Assaulting Battery", "static#0.0", "static.unspent-mana"},
 		{"Spider-Verse", "static#0.0", "static.ignore-legend-rule"},
+		// FlipCoinMod: Edgar's first-flip-each-turn heads shape, read by
+		// effects.FlipCoinForced and observed by a coin-flip probe.
+		{"Edgar, King of Figaro", "static#0.0", "static.flip-coin-mod"},
 	} {
 		reqOf(t, tc.card, tc.key, tc.sub)
 	}
 }
 
-// TestRemainingStaticModesNamedGaps pins the named gaps of the rows this
-// ticket does not serve: each reason names the exact missing probe, and the
-// sub stays the mode's gap label rather than a blank or a served family.
-func TestRemainingStaticModesNamedGaps(t *testing.T) {
-	for _, tc := range []struct{ card, key, sub, reason string }{
-		// FlipCoinMod: the engine does not read the mode.
-		{"Edgar, King of Figaro", "static#0.0", "static.gap:FlipCoinMod", "no coin-flip probe"},
-	} {
-		gapOf(t, tc.card, tc.key, tc.sub, tc.reason)
+// TestFlipCoinModOtherShapeIsNamedGap: only Edgar's exact Two-Headed Coin
+// shape is served (effects.FlipCoinForced reads nothing else); a FlipCoinMod
+// with any other result keeps the mode's named gap so it never reaches the
+// coin-flip template the engine would not honour.
+func TestFlipCoinModOtherShapeIsNamedGap(t *testing.T) {
+	c, d := cards.ParseBytes("t.txt", []byte("Name:Test Thumb\nTypes:Artifact\n"+
+		"S:Mode$ FlipCoinMod | ValidPlayer$ You | CheckSVar$ Count$YouFlipThisTurn | SVarCompare$ EQ0 | Result$ False\nOracle:x\n"))
+	if len(d) != 0 {
+		t.Fatalf("diags: %v", d)
 	}
+	c.Link()
+	for _, req := range levelb.Requirements(c) {
+		if req.Key != "static#0.0" {
+			continue
+		}
+		if req.Sub != "static.gap:FlipCoinMod" || !strings.Contains(req.Gap, "no coin-flip probe") {
+			t.Fatalf("Result$ False FlipCoinMod classifies as %q gap %q, want the named FlipCoinMod gap", req.Sub, req.Gap)
+		}
+		return
+	}
+	t.Fatal("precondition: no static#0.0 requirement")
 }
