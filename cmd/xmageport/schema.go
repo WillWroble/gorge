@@ -35,6 +35,10 @@ type seat struct {
 type answer struct {
 	Kind string   `json:"kind"`
 	Pick []string `json:"pick"`
+	// Seat is the XMage choice's own player. rules' runner asserts the
+	// decision the answer is consumed by was posed to it, so a decider that
+	// resolves to the wrong seat fails the scenario (B8).
+	Seat *int `json:"seat,omitempty"`
 }
 
 type step struct {

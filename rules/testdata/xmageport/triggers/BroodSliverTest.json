@@ -40,7 +40,8 @@
        "kind": "any",
        "pick": [
         "yes"
-       ]
+       ],
+       "seat": 0
       }
      ]
     }
