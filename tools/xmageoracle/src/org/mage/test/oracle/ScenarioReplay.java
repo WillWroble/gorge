@@ -2654,9 +2654,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     phase = PhaseStep.DRAW;
                 } else if (stepName.equals("end")) {
                     phase = PhaseStep.END_TURN;
-                } else if (stepName.equals("main1") || stepName.isEmpty()) {
+                } else if (stepName.equals("main1")) {
                     phase = MAIN;
                 }
+                // An empty step is a checkpoint wherever the scenario already
+                // is: phase is left as the preceding ops set it.
                 return;
             }
             case "block": {

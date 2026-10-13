@@ -241,6 +241,40 @@ public final class ScenarioReplayDriverContractTest {
         throw new AssertionError("no method " + method);
     }
 
+    private static Object getField(Object target, String name) throws Exception {
+        for (Class<?> c = target.getClass(); c != null; c = c.getSuperclass()) {
+            try {
+                java.lang.reflect.Field f = c.getDeclaredField(name);
+                f.setAccessible(true);
+                return f.get(target);
+            } catch (NoSuchFieldException next) {
+                // keep climbing
+            }
+        }
+        throw new AssertionError("no field " + name);
+    }
+
+    /** A pass_to with no step is a checkpoint where the scenario already is:
+     * it must keep the tracked phase, not reset it to MAIN. */
+    private static void statelessPassToKeepsPhase() throws Exception {
+        JsonArray s = steps("[{op:'pass_to',seat:0,decision:'priority',step:'end'},"
+                + "{op:'pass_to',seat:0,decision:'priority'},"
+                + "{op:'pass_to',seat:0,decision:'priority',step:'main1'},"
+                + "{op:'pass_to',seat:0,decision:'priority'}]");
+        ScenarioReplay r = queueingDriver(s, bare("A"), bare("B"));
+        queue(r, "step", s.get(0).getAsJsonObject(), "pass_to", 0);
+        check(getField(r, "phase") == mage.constants.PhaseStep.END_TURN, "step:'end' must set END_TURN");
+        check(mage.constants.PhaseStep.END_TURN != mage.constants.PhaseStep.PRECOMBAT_MAIN, "precondition");
+        queue(r, "step", s.get(1).getAsJsonObject(), "pass_to", 1);
+        check(getField(r, "phase") == mage.constants.PhaseStep.END_TURN,
+                "a stepless pass_to must keep END_TURN; got " + getField(r, "phase"));
+        queue(r, "step", s.get(2).getAsJsonObject(), "pass_to", 2);
+        check(getField(r, "phase") == mage.constants.PhaseStep.PRECOMBAT_MAIN, "step:'main1' must set MAIN");
+        queue(r, "step", s.get(3).getAsJsonObject(), "pass_to", 3);
+        check(getField(r, "phase") == mage.constants.PhaseStep.PRECOMBAT_MAIN, "a stepless pass_to from MAIN stays MAIN");
+        System.out.println("PASS stepless pass_to keeps the tracked phase");
+    }
+
     private static void passes() throws Exception {
         JsonArray pair = steps("[{op:'pass',seat:0},{op:'pass',seat:1}]");
         check(ScenarioReplay.passAction(pair, 0) == ScenarioReplay.PASS_PAIR_FIRST, "first pass of a pair");
@@ -556,6 +590,7 @@ public final class ScenarioReplayDriverContractTest {
         attachments();
         zones();
         passes();
+        statelessPassToKeepsPhase();
         spree();
         mustAttack();
         bargain();
