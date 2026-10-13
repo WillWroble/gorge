@@ -571,6 +571,12 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 			}
 			return []cand{{seat: "p1", zone: "battlefield", card: "Wyleth, Soul of Steel"}}
 		}
+		if cs, ok := faceDownCandidates(reg, filter); ok {
+			// A face-down permanent exists only through a face-down cast
+			// prelude; the face-up stand-ins below are never offered by the
+			// engine's faceDown word.
+			return cs
+		}
 		if base == "artifact" && strings.Contains(filter, "token") {
 			return artifactTokenCandidates()
 		}
