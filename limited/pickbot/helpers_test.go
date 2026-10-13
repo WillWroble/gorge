@@ -41,6 +41,26 @@ func ref(id, name string, rarity limited.Rarity) limited.CardRef {
 	return limited.CardRef{ID: id, Name: name, Set: "FDN", Rarity: rarity}
 }
 
+// sheetRarities maps each sheet card's name to its printing rarity from the
+// embedded booster spec. The rarity comes off the SheetCard's own field (the
+// manifest's uppercase letter), never off the sheet key: the keys are the
+// lowercase sheet names ("common", "uncommon", ...) while limited.Rarity
+// constants are uppercase ('C', 'U', ...), so reading the key's first byte
+// would hand the heuristic a rarity it scores as 0.
+func sheetRarities(t *testing.T, spec setdata.Spec) map[string]limited.Rarity {
+	t.Helper()
+	rarity := map[string]limited.Rarity{}
+	for _, cards := range spec.Sheets {
+		for _, c := range cards {
+			rarity[c.Name] = c.Rarity
+		}
+	}
+	if len(rarity) == 0 {
+		t.Fatal("booster spec yielded no sheet cards")
+	}
+	return rarity
+}
+
 // fdnMainSetNames lists every FDN sheet card's name from the embedded
 // booster spec.
 func fdnMainSetNames(t *testing.T) []string {
