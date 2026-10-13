@@ -3206,8 +3206,13 @@ public class ScenarioReplay extends CardTestPlayerBase {
             return text;
         }
         String key = "act" + stepIdx;
+        String name = refName(ref);
         runCode("bind " + ref, turn, phase, p, (info, pl, g) -> {
-            UUID id = p.getAliasByName(alias);
+            UUID setupId = p.getAliasByName(alias);
+            UUID id = activationSourceId(p, g, name, text, setupId);
+            if (id == null) {
+                id = setupId;
+            }
             if (id == null) {
                 throw new IllegalArgumentException("activate " + ref + ": no setup object bound to " + alias);
             }
@@ -3216,6 +3221,71 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
         });
         return "@" + key + " " + text;
+    }
+
+    /**
+     * The source id XMage must match for a named activation: the live
+     * playable ability that carries the scenario's ability text belongs to
+     * the named card. The setup alias binds the object as it was created,
+     * but a card that moved zones (a graveyard activation, a permanent cast
+     * from hand) has a NEW id for its ability's source, so binding the setup
+     * id makes XMage find no ability ("Can't find ability to activate
+     * command: @act0 {3}{B}{B}{R}{R}"). Prefer the setup id itself (a
+     * same-named permanent whose source is the setup object, which keeps
+     * duplicate-name cards exact); otherwise fall back to the first live
+     * ability whose source name is the ref's card. Returns null when no live
+     * ability matches, so the caller keeps the setup alias.
+     */
+    private UUID activationSourceId(TestPlayer p, Game g, String name, String text, UUID setupId) {
+        List<ActivationCandidate> candidates = new ArrayList<>();
+        for (Ability ability : p.getPlayable(g, true)) {
+            mage.MageObject source = g.getObject(ability.getSourceId());
+            candidates.add(new ActivationCandidate(source == null ? null : source.getName(),
+                    ability.toString(), ability.getSourceId()));
+        }
+        return chooseActivationSource(candidates, name, text, setupId);
+    }
+
+    /** One live playable ability considered for a named activation: its
+     * source object's name, the ability text XMage matches, and the source
+     * object id the alias must carry. */
+    static final class ActivationCandidate {
+        final String sourceName;
+        final String text;
+        final UUID sourceId;
+
+        ActivationCandidate(String sourceName, String text, UUID sourceId) {
+            this.sourceName = sourceName;
+            this.text = text;
+            this.sourceId = sourceId;
+        }
+    }
+
+    /**
+     * Picks the source id a named activation's alias must carry. Prefer the
+     * setup id itself when a live ability's source is that exact object (a
+     * same-named permanent whose source is the setup object, which keeps
+     * duplicate-name cards exact); otherwise the first live ability whose
+     * text matches and whose source name is the ref's card. A card that
+     * moved zones (a graveyard activation, a permanent cast from hand) has a
+     * new source id, so the setup id no longer matches and the name picks it
+     * out. Null when no live ability matches, so the caller keeps the setup
+     * alias.
+     */
+    UUID chooseActivationSource(List<ActivationCandidate> candidates, String name, String text, UUID setupId) {
+        UUID nameMatch = null;
+        for (ActivationCandidate c : candidates) {
+            if (!c.text.startsWith(text)) {
+                continue;
+            }
+            if (setupId != null && c.sourceId.equals(setupId)) {
+                return c.sourceId;
+            }
+            if (nameMatch == null && sourceNameIsNamed(c.sourceName, name)) {
+                nameMatch = c.sourceId;
+            }
+        }
+        return nameMatch;
     }
 
     private void queueAbilityTarget(TestPlayer p, String ref) {
@@ -3243,11 +3313,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     private boolean abilitySourceIsNamed(mage.MageObject source, String name) {
-        if (source == null) {
-            return false;
-        }
-        String live = source.getName();
-        return live.equals(xmageSpelling(name)) || gorgeSpellingRule(gorgeName, xmageName, live).equals(name);
+        return source != null && sourceNameIsNamed(source.getName(), name);
+    }
+
+    /** Whether a live source object's name is the scenario ref's card, under
+     * both spellings the driver carries (the card under test's XMage name,
+     * and a split/Room object's front half). */
+    private boolean sourceNameIsNamed(String live, String name) {
+        return live != null
+                && (live.equals(xmageSpelling(name)) || gorgeSpellingRule(gorgeName, xmageName, live).equals(name));
     }
 
     /** The name form XMage's attack/block command takes. Unlike a cast

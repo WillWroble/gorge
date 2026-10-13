@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import mage.constants.PhaseStep;
 import org.mage.test.player.TestPlayer;
 import sun.misc.Unsafe;
@@ -60,8 +61,12 @@ public final class ScenarioReplayCheckpointSeatTest {
         set(d, "playerB", b);
         set(d, "turn", 2);
         set(d, "phase", PhaseStep.PRECOMBAT_MAIN);
+        // Unsafe.allocateInstance skips field initializers.
+        set(d, "gorgeName", "");
+        set(d, "xmageName", "");
         java.util.Map<String, String> alias = new java.util.LinkedHashMap<>();
         alias.put("p0:Ajani Goldmane", "@p0:Ajani Goldmane");
+        alias.put("p0:Garland, Knight of Cornelia", "@p0:Garland, Knight of Cornelia");
         set(d, "refAlias", alias);
 
         // Preconditions: the two seats are different objects.
@@ -92,6 +97,40 @@ public final class ScenarioReplayCheckpointSeatTest {
         // A ref with no setup alias keeps the plain text and binds nothing.
         equal("+1", bound.invoke(d, a, "p0:Ajani Unrelenting", "+1", 2));
         equal(1, d.codeActions.size());
+        // A cost-only activation text ("{3}{B}{B}{R}{R}", "Craft with one or
+        // more {5}") goes through the bound path too: the regression was
+        // that XMage cannot match the setup-id binding for a card that moved
+        // zones, so the driver must resolve the live ability's source id.
+        equal("@act3 {3}{B}{B}{R}{R}",
+                bound.invoke(d, a, "p0:Garland, Knight of Cornelia", "{3}{B}{B}{R}{R}", 3));
+        equal(2, d.codeActions.size());
+
+        // The live ability's source id is chosen when the setup id is a
+        // different object (the card moved zones): the half-card of a
+        // transforming DFC, or the permanent of a card cast from hand.
+        UUID setup = UUID.randomUUID();
+        UUID movedSource = UUID.randomUUID();
+        List<ScenarioReplay.ActivationCandidate> moved = List.of(
+                new ScenarioReplay.ActivationCandidate("Garland, Knight of Cornelia",
+                        "{3}{B}{B}{R}{R}: Return this card from your graveyard to the battlefield transformed."
+                                + " Activate only as a sorcery.",
+                        movedSource));
+        equal(movedSource, d.chooseActivationSource(moved, "Garland, Knight of Cornelia", "{3}{B}{B}{R}{R}", setup));
+
+        // A same-named permanent whose source is the setup object keeps the
+        // setup id (duplicate-name cards stay exact even if XMage lists the
+        // other first).
+        UUID other = UUID.randomUUID();
+        List<ScenarioReplay.ActivationCandidate> dup = List.of(
+                new ScenarioReplay.ActivationCandidate("Grizzly Bears", "+1", other),
+                new ScenarioReplay.ActivationCandidate("Grizzly Bears", "+1", setup));
+        equal(setup, d.chooseActivationSource(dup, "Grizzly Bears", "+1", setup));
+
+        // No live ability for the named card: null, so the caller keeps the
+        // setup alias (unchanged behavior for a row that never had the bug).
+        List<ScenarioReplay.ActivationCandidate> none = List.of(
+                new ScenarioReplay.ActivationCandidate("Grizzly Bears", "+1", other));
+        equal(null, d.chooseActivationSource(none, "Ajani Goldmane", "+1", setup));
         System.out.println("PASS checkpoint seat and bound activation text");
     }
 }
