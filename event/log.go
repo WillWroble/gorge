@@ -1,0 +1,148 @@
+// Package event implements the draft-event lifecycle of spec §4.7: the
+// LOBBY → DRAFT → BUILD → ROUND(1..3) → COMPLETE state machine, the
+// append-only log with its Apply mutator, the circle-method pairings, the
+// MTR Appendix C standings and the 17Lands draft-data export.
+//
+// The package is pure: it never plays a game. The caller drives the draft
+// through Next/Apply, plays the pending series and feeds the results back as
+// GameEnded entries, so the engine is never imported here. Event state
+// changes only through Apply; replaying the log reproduces the state
+// exactly, and every log line round-trips as JSON.
+package event
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/adams-shaun/gorge/limited"
+	"github.com/adams-shaun/gorge/limited/build"
+)
+
+// Kind discriminates one log entry's shape. The kind names follow spec
+// §4.7's entry list.
+type Kind string
+
+// The log entry kinds.
+const (
+	KindEventCreated  Kind = "EventCreated"
+	KindPackOpened    Kind = "PackOpened"
+	KindPicked        Kind = "Picked"
+	KindDeckSaved     Kind = "DeckSaved"
+	KindReady         Kind = "Ready"
+	KindSeriesStarted Kind = "SeriesStarted"
+	KindGameEnded     Kind = "GameEnded"
+	KindSeriesEnded   Kind = "SeriesEnded"
+	KindEventEnded    Kind = "EventEnded"
+)
+
+// Entry is one log entry: a Kind discriminator plus the fields of that
+// kind's shape. Fields a kind does not use stay at their zero values, so
+// the struct marshals to one compact JSON line and unmarshals back exactly.
+// Entry is a value: Apply stores its own copy, and callers may reuse theirs.
+type Entry struct {
+	// Kind is the entry's discriminator.
+	Kind Kind `json:"kind"`
+
+	// Seed, Set and Seats are the EventCreated fields.
+	Seed  uint64      `json:"seed,omitempty"`
+	Set   string      `json:"set,omitempty"`
+	Seats [4]SeatSpec `json:"seats,omitempty"`
+
+	// Round is the 1-based draft round or event round the entry belongs to.
+	Round int `json:"round,omitempty"`
+	// PickNo is the seat's 1-based pick number within a draft round.
+	PickNo int `json:"pick_no,omitempty"`
+	// Seat is the acting seat of PackOpened, Picked, DeckSaved and Ready.
+	Seat int `json:"seat,omitempty"`
+	// Game is the 1-based game index within a series.
+	Game int `json:"game,omitempty"`
+	// Rev is the deck revision of DeckSaved and Ready.
+	Rev int `json:"rev,omitempty"`
+	// A and B are the two seats of a series; A must be the lower seat.
+	A int `json:"a,omitempty"`
+	// B is the higher seat of a series.
+	B int `json:"b,omitempty"`
+	// BestOf is the series length; only Bo1 is accepted for now.
+	BestOf int `json:"best_of,omitempty"`
+	// Auto marks a pick the drafter made without asking its controller.
+	Auto bool `json:"auto,omitempty"`
+
+	// ID is the picked CardRef ID.
+	ID string `json:"id,omitempty"`
+	// Head is the played game's chain head, carried for -verify.
+	Head string `json:"head,omitempty"`
+	// Cards is a PackOpened's full CardRef list, logged when the pack is
+	// opened so a replay survives a later change to the set data.
+	Cards []limited.CardRef `json:"cards,omitempty"`
+	// Deck is a DeckSaved's deck list.
+	Deck build.Deck `json:"deck,omitempty"`
+	// Winner is the GameEnded winner's seat, or nil for a draw.
+	Winner *int `json:"winner,omitempty"`
+	// Score is a SeriesEnded's [A wins, B wins].
+	Score [2]int `json:"score,omitempty"`
+	// Standings is the EventEnded final table, computed by Apply and
+	// validated against the caller's value when the caller supplies one.
+	Standings []Standing `json:"standings,omitempty"`
+}
+
+// cloneEntry deep-copies an entry's slice and pointer fields so the log
+// never aliases a caller's memory.
+func cloneEntry(en Entry) Entry {
+	if en.Cards != nil {
+		en.Cards = append([]limited.CardRef(nil), en.Cards...)
+	}
+	if en.Deck.Main != nil {
+		en.Deck.Main = append([]string(nil), en.Deck.Main...)
+	}
+	if en.Winner != nil {
+		w := *en.Winner
+		en.Winner = &w
+	}
+	if en.Standings != nil {
+		en.Standings = append([]Standing(nil), en.Standings...)
+	}
+	return en
+}
+
+// MarshalLog writes entries as JSON lines: one entry per line, each with
+// its kind discriminator. ParseLog reads the same shape back.
+func MarshalLog(entries []Entry) ([]byte, error) {
+	var b bytes.Buffer
+	for i := range entries {
+		line, err := json.Marshal(&entries[i])
+		if err != nil {
+			return nil, fmt.Errorf("event: marshal log entry %d: %w", i, err)
+		}
+		b.Write(line)
+		b.WriteByte('\n')
+	}
+	return b.Bytes(), nil
+}
+
+// ParseLog reads a JSON-lines log written by MarshalLog. An unknown kind or
+// a malformed line is an error naming the line.
+func ParseLog(data []byte) ([]Entry, error) {
+	s := strings.TrimSuffix(string(data), "\n")
+	if s == "" {
+		return nil, nil
+	}
+	lines := strings.Split(s, "\n")
+	out := make([]Entry, 0, len(lines))
+	for i, line := range lines {
+		var en Entry
+		if err := json.Unmarshal([]byte(line), &en); err != nil {
+			return nil, fmt.Errorf("event: parse log line %d: %w", i+1, err)
+		}
+		switch en.Kind {
+		case KindEventCreated, KindPackOpened, KindPicked, KindDeckSaved,
+			KindReady, KindSeriesStarted, KindGameEnded, KindSeriesEnded,
+			KindEventEnded:
+		default:
+			return nil, fmt.Errorf("event: parse log line %d: unknown kind %q", i+1, en.Kind)
+		}
+		out = append(out, en)
+	}
+	return out, nil
+}

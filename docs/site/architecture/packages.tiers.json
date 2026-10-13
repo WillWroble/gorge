@@ -299,6 +299,10 @@
       "tier": "core",
       "status": "CORE"
     },
+    "event": {
+      "tier": "core",
+      "status": "CORE"
+    },
     "events": {
       "tier": "core",
       "status": "CORE"
