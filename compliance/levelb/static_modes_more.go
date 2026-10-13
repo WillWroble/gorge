@@ -3,9 +3,9 @@
 // matching template in compliance/oraclegen/templates serves; any other
 // parameter keeps the requirement a named gap, so a shape a template cannot
 // observe never changes class silently. The modes whose engine behaviour is
-// not observed by any template (FlipCoinMod) or whose fixture cannot be set
-// up (a Condition$ EnduringStory gate) keep a named gap here rather than the
-// generic "static mode X" string.
+// not observed by any template (a FlipCoinMod shape other than Edgar's) or
+// whose fixture cannot be set up (a Condition$ EnduringStory gate) keep a
+// named gap here rather than the generic "static mode X" string.
 package levelb
 
 import (
@@ -143,9 +143,23 @@ func serveStaticMode(f *cards.Face, st *cards.Static) (sub, gap string) {
 		return gapSub, "AlternativeCost Cost$ " + st.ParamStr(cards.PKCost) +
 			" needs an alternative-cost cast option the runner does not select"
 	case "flipcoinmod":
-		return gapSub, "FlipCoinMod is not read by the engine and has no coin-flip probe whose result a snapshot carries"
+		if flipCoinModShape(st) {
+			return "static.flip-coin-mod", ""
+		}
+		return gapSub, "FlipCoinMod is read only in the first-flip-each-turn heads shape (effects.FlipCoinForced); " +
+			"this shape has no coin-flip probe"
 	}
 	return "", ""
+}
+
+// flipCoinModShape reports whether st is Edgar, King of Figaro's Two-Headed
+// Coin exactly as effects.FlipCoinForced reads it: your first coin flips each
+// turn come up heads and win (ValidPlayer$ You, CheckSVar$
+// Count$YouFlipThisTurn, SVarCompare$ EQ0, Result$ True, nothing else).
+func flipCoinModShape(st *cards.Static) bool {
+	return staticParamsOnly(st, "ValidPlayer", "CheckSVar", "SVarCompare", "Result") &&
+		st.ParamStr(cards.PKValidPlayer) == "You" && st.ParamStr(cards.PKCheckSVar) == "Count$YouFlipThisTurn" &&
+		st.ParamStr(cards.PKSVarCompare) == "EQ0" && st.ParamStr(cards.PKResult) == "True"
 }
 
 // staticUnlessShapeOf summarises an unserved unless static's shape for the gap.
