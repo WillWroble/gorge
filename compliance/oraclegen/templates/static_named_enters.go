@@ -5,10 +5,11 @@ package templates
 // resolves, not through an as-enters replacement and not at cast time. The
 // name is chosen mid-trigger-resolution (CR 603.3c), so the scenario plays
 // the land, resolves the ETB trigger, and asserts at p0's next priority. The
-// trigger's NameCard ask is self-answering: gorge's legacy no-universe
-// fallback offers one name -- the top card of p0's library -- and the setup
-// pins that to the probe land, which is exactly the trick the Spyglass family
-// (cantBeActivatedNamedItem) uses.
+// trigger's NameCard ask ranges over the scenario's own cards (the oracle
+// runner's scenario name universe) and the resolve step answers it with the
+// probe land, as the Spyglass family (cantBeActivatedNamedItem) does; the
+// probe also stays on top of p0's library, the one name the pre-universe
+// fallback offered.
 //
 //   - static#0.0 (CantBeActivated ValidCard$ Card.NamedCard): the named probe
 //     land's non-mana activated ability is absent at p0's next priority; the
@@ -68,8 +69,8 @@ func namedCardManaGrant(f *cards.Face, st *cards.Static) bool {
 
 // namedEntersScenario is the Petrified Hamlet shape's scenario: the land in
 // p0's hand, the probe land and its legendary target on the battlefield, and
-// the probe's name on top of p0's library -- the one name gorge's legacy
-// no-universe NameCard ask offers.
+// the probe's name on top of p0's library -- the one name the pre-universe
+// NameCard fallback offered (the resolve step now answers the ask by name).
 func namedEntersScenario(f *cards.Face, name string, steps []oraclegen.Step) oraclegen.Scenario {
 	sc := staticScenario(f, name, nil, []string{name}, steps)
 	p0 := sc.Setup["p0"]
@@ -99,10 +100,17 @@ func namedEntersControl(sc oraclegen.Scenario, name string) oraclegen.Scenario {
 	return ctl
 }
 
-// scriptNamedAnswers copies the name pick the replay recorded onto the
-// item's XAnswers at the step that posed it: XMage offers every card name at
-// a NameCard ask while gorge's legacy fallback offers one (the library top),
-// so XMage's strict-choose driver needs the chosen name scripted.
+// namedProbeAnswer answers a gameplay NameCard ask with the probe's name.
+func namedProbeAnswer(probe string) []oraclegen.Answer {
+	return []oraclegen.Answer{{Kind: "choose", Pick: []string{probe}}}
+}
+
+// scriptNamedAnswers makes sure the name pick the replay recorded reaches
+// the item's XAnswers at the step that posed it: XMage offers every card name
+// at a NameCard ask, so its strict-choose driver needs the chosen name
+// scripted. The generic answer generator already scripts a multi-option name
+// ask; a one-option ask is dropped there as forced, so it is added here --
+// once, never duplicated (a second copy is an unused XMage choice).
 func scriptNamedAnswers(res rules.OracleResult, it *oraclegen.Item) {
 	for _, d := range res.Decisions {
 		if d.Step >= 0 && len(d.PickKinds) == 1 && d.PickKinds[0] == "name" && len(d.Picks) == 1 {
@@ -111,7 +119,10 @@ func scriptNamedAnswers(res rules.OracleResult, it *oraclegen.Item) {
 			for len(it.XAnswers) <= d.Step {
 				it.XAnswers = append(it.XAnswers, nil)
 			}
-			it.XAnswers[d.Step] = append(it.XAnswers[d.Step], oraclegen.XAnswer{Seat: d.Seat, Kind: "choice", Value: d.Picks[0]})
+			want := oraclegen.XAnswer{Seat: d.Seat, Kind: "choice", Value: d.Picks[0]}
+			if !slices.Contains(it.XAnswers[d.Step], want) {
+				it.XAnswers[d.Step] = append(it.XAnswers[d.Step], want)
+			}
 		}
 	}
 }
@@ -132,7 +143,7 @@ func cantBeActivatedNamedEntersItem(reg *cards.Registry, f *cards.Face, name str
 	}
 	steps := []oraclegen.Step{
 		{Op: "play", Seat: 0, Card: "p0:" + name},
-		{Op: "resolve"},
+		{Op: "resolve", Answers: namedProbeAnswer(namedEntersProbe)},
 		{Op: "pass_to", Seat: 0, Decision: "priority", Expect: offered(false)},
 	}
 	sc := namedEntersScenario(f, name, steps)
@@ -170,7 +181,7 @@ func staticGrantedNamedCardItem(reg *cards.Registry, f *cards.Face, name string,
 	}
 	steps := []oraclegen.Step{
 		{Op: "play", Seat: 0, Card: "p0:" + name},
-		{Op: "resolve"},
+		{Op: "resolve", Answers: namedProbeAnswer(namedEntersProbe)},
 		{Op: "pass_to", Seat: 0, Decision: "priority", Expect: offered(true)},
 	}
 	sc := namedEntersScenario(f, name, steps)

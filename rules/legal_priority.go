@@ -158,7 +158,7 @@ func (e *Engine) handlePriority(d *decision.Decision, in decision.Intent) {
 		e.checkStateBased()
 
 	case optStation:
-		// kw:Station (CR 702.150, rules/station.go): the spacecraft is
+		// kw:Station (CR 702.184a, rules/station.go): the spacecraft is
 		// stationed by tapping another creature the KChoose below names. The
 		// pass-count reset matches every other non-pass action.
 		e.emit(events.Event{Kind: events.Priority, Player: e.G.Priority, Amount: 0})

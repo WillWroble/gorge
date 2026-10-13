@@ -602,7 +602,7 @@ func NamedCardActivationStatic(f *cards.Face, st *cards.Static) bool {
 // while the trigger resolves ("When this land enters, choose a land card
 // name"), not through an as-enters replacement. The name is chosen
 // mid-trigger-resolution, so the observation plays the land and answers the
-// ask with the library top (static_named_enters.go).
+// ask with the probe land's name (static_named_enters.go).
 func NamedCardActivationEntersStatic(f *cards.Face, st *cards.Static) bool {
 	if !f.IsLand() || !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Card.NamedCard") ||
 		!strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.!ManaAbility") {

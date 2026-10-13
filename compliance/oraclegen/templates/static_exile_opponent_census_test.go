@@ -31,9 +31,14 @@ import (
 // the Dig exile record the exiled-with association, so the old "cards exiled
 // by the source's Dig carry no exiled-with association" reason no longer
 // holds, and those rows now name the remaining may-play walk gap.
+// Re-pinned by lb4w2-engine: that "walk gap" was never measured -- the walk
+// offers opponent-owned cards (Azula, Null Summoner) -- and the Dig rows only
+// lacked a library-origin fixture. It now serves Maralen, Fae Ascendant (an
+// enters Dig of a targeted opponent's library), and the other 14 rows name
+// the real gap: no fixture exiles an opponent's card with their source.
 var wantOpponentExiledWithCensus = map[string]int{
-	"served": 3,
-	"skip:static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)": 15,
+	"served": 4,
+	"skip:static no fixture exiles an opponent's card with the source (its exile is not an enters ChangeZone or Dig of a targeted opponent's cards)": 14,
 	"skip:static look-at not observable": 2,
 	"skip:static no mana cost":           1,
 	"skip:static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)": 1,

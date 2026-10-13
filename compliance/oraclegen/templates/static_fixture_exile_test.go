@@ -171,9 +171,6 @@ func TestStaticExileUnservedRowsKeepTheNamedGap(t *testing.T) {
 	for _, tc := range []struct{ card, key, want string }{
 		{"Valgavoth, Terror Eater", "static#0.0", "static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"},
 		{"Veteran Survivor", "static#0.0", "static the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"},
-		// Maralen's Dig exile now records the association (its S: static
-		// names ExiledWithSource); the opponent-owned walk gap remains.
-		{"Maralen, Fae Ascendant", "static#0.0", "static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)"},
 		{"The Enigma Jewel", "static#1.0", "static needs the craft activation (the driver has no craft op)"},
 	} {
 		t.Run(tc.card+"/"+tc.key, func(t *testing.T) {

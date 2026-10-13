@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"activate","field":"permanents","diff":"Wedgelight Rammer gorge+[counters=CHARGE=4] xmage+[]"},"key":"static | activate | permanents | Wedgelight Rammer gorge+[counters=CHARGE=4] xmage+[]","cards":1}
-{"card":"Tapestry Warden","template":"static#0.1","status":"diverge","api":"-","sets":["EOE"],"detail":"step 0 (activate) permanents: gorge \"c0 o0 Wedgelight Rammer [artifact spacecraft] {W} counters=CHARGE=4\", xmage \"c0 o0 Wedgelight Rammer [artifact spacecraft] {W}\""}

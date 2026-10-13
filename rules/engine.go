@@ -113,11 +113,12 @@ type Config struct {
 	// NameUniverse is the compiled corpus used by NameCard decisions.
 	NameUniverse *cards.Universe
 	// NamedCorpus is a compiled corpus consulted ONLY by the "copy the card
-	// named N" mechanic (CopyPermanent DefinedName$, state.Game.NamedCard),
-	// the oracle-compliance harness -- which must not gain NameCard asks
-	// its recorded verdicts predate -- supplies it without setting
-	// NameUniverse. NameUniverse is searched first, so an embedder that sets
-	// it needs no second field.
+	// named N" mechanic (CopyPermanent DefinedName$, state.Game.NamedCard).
+	// The oracle-compliance harness supplies it for every scenario, and sets
+	// NameUniverse only for a scenario that seats a card-name choice -- to
+	// that scenario's own cards (rules/oracle_name_universe.go), so its name
+	// asks honour ValidCards$ and name a card XMage knows. NameUniverse is
+	// searched first, so an embedder that sets it needs no second field.
 	NamedCorpus *cards.Universe
 	// NameUniverseNames pins a persisted match's sorted name list. A live
 	// match leaves it nil and derives it from NameUniverse at genesis.

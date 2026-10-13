@@ -645,18 +645,20 @@ func (e *Engine) resolveToss(toss int, alive []state.PlayerID, seats int) (state
 }
 
 // nameUniverseOrCorpus is the compiled corpus the derived-characteristic
-// vocabularies (rules/chars' land-type words) build from: the NameUniverse
-// when the game has one, else NamedCorpus. Both are compiled from the same
-// registry, so the derived list is identical either way; reading NamedCorpus
-// matters because the oracle-compliance harness deliberately supplies it
-// WITHOUT setting NameUniverse (Config's comment: the harness must not gain
-// NameCard asks its recorded verdicts predate) -- the pre-fallback read gave
-// that harness a nil universe and an empty vocabulary, so RemoveLandTypes$
-// statics (Zhao, the Moon Slayer; Ultima's BlightStatic) stripped no land
-// type in every generated scenario.
+// vocabularies (rules/chars' land-type words) build from: NamedCorpus when
+// the game has one, else the NameUniverse. The vocabulary is a property of
+// the WHOLE corpus. The oracle-compliance harness is the one embedder that
+// sets NamedCorpus (the full registry), and it sets NameUniverse only to a
+// SCENARIO-scoped universe for a scenario that seats a card-name choice
+// (rules/oracle_name_universe.go), whose land types would be a fraction of
+// the corpus's; every other embedder sets NameUniverse alone, to the full
+// registry. Before NamedCorpus was read here the harness had a nil universe
+// and an empty vocabulary, so RemoveLandTypes$ statics (Zhao, the Moon
+// Slayer; Ultima's BlightStatic) stripped no land type in every generated
+// scenario.
 func nameUniverseOrCorpus(cfg Config) *cards.Universe {
-	if cfg.NameUniverse != nil {
-		return cfg.NameUniverse
+	if cfg.NamedCorpus != nil {
+		return cfg.NamedCorpus
 	}
-	return cfg.NamedCorpus
+	return cfg.NameUniverse
 }

@@ -705,15 +705,15 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// EFFECT would put one or more counters ..."). It excludes a placement
 		// with no object on the stack: a turn-based action (a Saga's lore
 		// counter, rules/saga.go advanceSagas) and a cost (a planeswalker's [+N]
-		// loyalty counter, pay.EmitChoiceCosts; a station counter,
-		// rules/station.go handleStation) are not effects, and admitting them
+		// loyalty counter, pay.EmitChoiceCosts) are not effects, and admitting them
 		// doubled counters they must not touch. This is exactly the
 		// actionCause()==0 provenance the Moved case's EffectOnly$ gate reads
 		// (costs are paid before an activated ability exists on the stack, so
 		// they deliberately have no cause) -- one shared test, not a second
 		// hand-built identity stamp. A resolving TRIGGERED ability's instruction
 		// (a cumulative-upkeep age counter, rules/cumulative.go) IS an effect
-		// (CR 609.1), so it still qualifies.
+		// (CR 609.1), so it still qualifies, as does a resolving Station
+		// ability's CHARGE counters (CR 702.184a, rules/station.go).
 		if r.ParamStr(cards.PKEffectOnly) == "True" && e.actionCause() == 0 {
 			// A replacement BODY's counter placement (the K:etbCounter entry
 			// body's DB$ PutCounter) also has no stack cause by the time it
