@@ -12,6 +12,9 @@
   import ManaSymbols from './ManaSymbols.svelte';
   import { moveChip } from '../lib/clientmodel/events';
 
+  /** LIVE_TAIL is how many visible lines a live transcript renders. */
+  const LIVE_TAIL = 400;
+
   /**
    * Transcript is the rules log: one line per event, the cursor's line
    * highlighted and scrolled into view, clicking a line scrubs to it. Lines
@@ -95,16 +98,22 @@
   let revealAll = $state(false);
   let revealSteps = $state(false);
   let openSnapshots = $state<Record<number, boolean>>({});
-  const lines = $derived(visibleLog(dvr.events, revealAll, revealSteps));
+  const shown = $derived(visibleLog(dvr.events, revealAll, revealSteps));
+  // While live, only the newest LIVE_TAIL lines render. Every rendered row
+  // re-derives on each event (its line is re-parsed against the new view's
+  // cardColour/identities), so rendering a whole long match made each event
+  // cost O(lines): a 50ms-paced commander game reached ~10k events and the
+  // spectator tab stalled for seconds per event. Live mode already pins the
+  // log to its tail on every event, and pausing (the DVR bar) is the
+  // contract for reading history, so a paused log renders every line.
+  const lines = $derived(dvr.live && shown.length > LIVE_TAIL ? shown.slice(-LIVE_TAIL) : shown);
+  const clipped = $derived(shown.length - lines.length);
   // The live tail-follow's trigger is the seq of the last RENDERED line, as
   // a primitive: a `head` chit re-runs this derived (the dvr var changed)
   // but yields the same number, so the scroll effect below stays put — the
   // log must answer the backfill that appends rows, not the cursor move
   // that announced them.
-  const tailSeq = $derived.by(() => {
-    const shown = visibleLog(dvr.events, revealAll, revealSteps);
-    return shown.length ? shown[shown.length - 1].event.seq : -1;
-  });
+  const tailSeq = $derived(lines.length ? lines[lines.length - 1].event.seq : -1);
 
   // The panel's lifetime follows the objects the transcript currently shows:
   // a card that leaves every visible zone must close a panel opened for it,
@@ -172,9 +181,11 @@
       followedTail = tail;
       followedNotes = noteCount;
       // The tail is the last `.line` row: engine lines and auto-pass notes
-      // share the class, and a note renders under every engine line.
-      const rows = container?.querySelectorAll<HTMLElement>('.line');
-      rows?.[rows.length - 1]?.scrollIntoView({ block: 'end' });
+      // share the class, and a note renders under every engine line. Walk
+      // back from the container's last child rather than querying every row.
+      let row = container?.lastElementChild ?? null;
+      while (row && !row.classList.contains('line')) row = row.previousElementSibling;
+      row?.scrollIntoView({ block: 'end' });
     } else {
       followedTail = -1;
       const seq = dvr.cursor;
@@ -206,6 +217,9 @@
       {revealAll ? 'Hide engine noise' : 'Show engine noise'}
     </button>
   </div>
+  {#if clipped > 0}
+    <div class="clipped" data-clipped>{clipped} earlier lines hidden while live — pause to see the whole log</div>
+  {/if}
   {#each lines as e (e.event.seq)}
     <button
       type="button"
@@ -294,6 +308,11 @@
      to the button's own title, where it is one hover away and costs nothing
      when it is not wanted. Two toggles sit here now: the engine-noise one
      and the step-lines one, independent. */
+  .clipped {
+    font-size: var(--t-12);
+    color: var(--ink-dim);
+    padding: 0 var(--sp-2);
+  }
   .bar {
     display: flex;
     align-items: center;

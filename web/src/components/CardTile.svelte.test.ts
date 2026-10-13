@@ -471,3 +471,14 @@ describe('CardTile attachment riders (fb-20260928T230741Z)', () => {
     expect(html).toContain('aria-label="1 actions for Flayer Husk"');
   });
 });
+
+describe('CardTile keyword marks', () => {
+  it('draws a shared mark once, so two protections do not repeat a keyed mark', () => {
+    // A repeat threw Svelte's each_key_duplicate on every re-render of the tile.
+    const { html } = render(CardTile, {
+      props: { card: card({ keywords: ['Flying', 'Protection from red', 'Protection from blue'] }) },
+    });
+    expect(html.match(/class="mark[^"]*">PRO</g)).toHaveLength(1);
+    expect(html).toMatch(/class="mark[^"]*">FL</);
+  });
+});
