@@ -210,7 +210,17 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 		// No Defined$/Choices$: the SA's own chosen target is the object to
 		// copy (the "target creature you control becomes a copy of target
 		// creature" family has one target being both source and become).
-		for _, t := range c.Targets {
+		// A link with its OWN ValidTgts$ whose become operand names the
+		// PARENT's target (Shuri's DBClone, CloneTarget$ ParentTarget under a
+		// targeting Pump root) copies its own answer (Ctx.PickedTargets),
+		// never the root's list: reading c.Targets made the copy source the
+		// root's target, a self-copy with no change. Other shapes keep
+		// c.Targets (the placement ask's answer for a depth-0 body).
+		own := c.Targets
+		if c.PickedTargets != nil && DefinedIsTargetReuse(cp.CloneTarget) {
+			own = c.PickedTargets
+		}
+		for _, t := range own {
 			if !t.IsPlayer {
 				source = append(source, t)
 			}
