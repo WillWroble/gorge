@@ -1221,6 +1221,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return actual.equals(expected);
     }
 
+    private static int unusedActionCount(String message) {
+        String marker = "must have 0 actions but found ";
+        if (message == null || !message.contains(marker)) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(message.substring(message.indexOf(marker) + marker.length()).trim());
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
     /** Whether a failure is assertAllCommandsUsed's: a queued action,
      * choice or target nothing consumed. */
     static boolean isLeftoverAssertion(String message) {
@@ -1254,18 +1266,6 @@ public class ScenarioReplay extends CardTestPlayerBase {
         }
         return actual.size() <= expected.size()
                 && expected.subList(expected.size() - actual.size(), expected.size()).equals(actual);
-    }
-
-    private static int unusedActionCount(String message) {
-        String marker = "must have 0 actions but found ";
-        if (message == null || !message.contains(marker)) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(message.substring(message.indexOf(marker) + marker.length()).trim());
-        } catch (NumberFormatException ignored) {
-            return -1;
-        }
     }
 
     private static boolean hasEndTurnEffect(String name) {
