@@ -472,6 +472,18 @@
       "tier": "tooling",
       "status": "TOOL"
     },
+    "limited": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "limited/setdata": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "limited/setdata/internal/gen": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
     "protocol": {
       "tier": "host",
       "status": "SUPP"
