@@ -6,28 +6,40 @@ Ticket `cli-20261010T041236Z-ff0e5565` (round t2), branch
 `rules/paid_mana_census.go`, default **off**).
 
 This is a measurement ticket. It changes no engine behaviour and no training.
+All 12 jobs are complete (two deck sets × three policy pairs × flag off/on,
+1200 games each = 600 pairs × 2 legs).
 
 ## Answers to the operator's three questions
 
 1. **Do the bots ever pick the options the widened census newly offers? YES,
    and not rarely.** With the flag on, the fraction of exposed windows where
    the seat *chose* a newly-offered option is: FDN `bot` 13.4%,
-   `bot:autopay` 21.4%, `sbtactical` 5.5%, search 11.3%; the fraction of
-   games that expose at least one new option and in which the seat chooses one
-   is 35.5% / 48.8% / 40.5% / 51.7% respectively. Constructed decks agree
-   (`bot` 15.1%, `bot:autopay` 23.0%, `sbtactical` 4.9%). So the new options
-   are *not* dead weight the policies ignore.
+   `bot:autopay` 21.4%, `sbtactical` 5.5%, search 11.3%; constructed `bot`
+   15.1%, `bot:autopay` 23.0%, `sbtactical` 5.1%, search 13.9%. The fraction
+   of games that expose at least one new option *and* in which the seat
+   chooses one is 35.5 / 48.8 / 40.5 / 51.7% (FDN) and 44.8 / 54.3 / 45.5 /
+   54.9% (constructed) for `bot` / `bot:autopay` / `sbtactical` / search. So
+   the new options are *not* dead weight the policies ignore.
 
-2. **Does the flag change results? The game changes, the win rate does not
-   (significantly).** Paired by deck pair, seed and leg, the flag-on minus
-   flag-off score delta for the seat that gets the flag is negative but
-   within noise on every FDN run (r1 `-0.007 ±0.013`, r2 `-0.009 ±0.017`,
-   r3 `-0.011 ±0.023`); constructed r2 is `+0.003 ±0.016` and constructed r1
-   is marginally negative (`-0.014 ±0.013`). Yet the flag changes the
-   *trajectory* of most games: only 15–40% of games are byte-identical
-   (same result, turn count and intent count) between the two arms. The
-   census is therefore behaviour-relevant without being strength-positive at
-   this sample size.
+2. **Does the flag change results? It changes the game, and for the search on
+   constructed decks it is weakly strength-positive.** Paired by deck pair,
+   seed and leg, the flag-on minus flag-off score delta for the flag-bearing
+   seat:
+
+   | pair | FDN | constructed |
+   |---|---|---|
+   | `sbtactical` vs `bot` | -0.007 ±0.013 | -0.014 ±0.013 |
+   | `bot:autopay` vs `sbtactical` | -0.009 ±0.017 | +0.003 ±0.016 |
+   | search vs `sbtactical` | -0.011 ±0.023 | **+0.023 ±0.021** |
+
+   All but constructed r1 include 0; constructed r1 is marginally negative
+   (CI `[-0.027, -0.001]`) and constructed r3 (the search) is marginally
+   **positive** (CI `[+0.002, +0.044]`). The pattern is coherent: the seat
+   that can *use* a paid-cost source most (the search, on decks dense in such
+   sources) gains the most; the heuristic `sbtactical` gains least and can
+   even lose a hair. The flag changes the *trajectory* of most games in every
+   arm — only 15–40% of games are byte-identical (same result, turn count and
+   intent count) between the two arms.
 
 3. **Does autopay hide decisions (operator hypothesis)? YES, measurably.**
    Same policy, autopay vs manual: FDN-on mean offered-option list `bot`
@@ -37,8 +49,8 @@ This is a measurement ticket. It changes no engine behaviour and no training.
 
 4. **Exploration: yes, but not where `:explore` currently samples.** The new
    options are a *late-game* phenomenon. In the flag-off (exposure) arms, the
-   share of priority windows that expose a new option is 0.02–1.57% at turns
-   1–4, 1.4–6.8% at 5–8, 7.8–18.5% at 9–16 and 20–41% at 17+. `az:…:explore`
+   share of priority windows that expose a new option is 0.02–1.58% at turns
+   1–4, 1.4–7.0% at 5–8, 7.8–18.7% at 9–16 and 20–38% at 17+. `az:…:explore`
    samples moves by visits only on turns 1–4 (`cmd/dzgorge/policy.go:36`), so
    a generation that explores there almost never sees the option class the
    flag adds. See the recommendation below.
@@ -77,7 +89,7 @@ Runs: two deck sets × three policy pairs × flag off/on, `-pairs 600`
   tron, uw-control, uw-tempo.
 - `r1` sb-tactical vs bot; `r2` bot:autopay vs sb-tactical; `r3` the search
   vs sb-tactical. Each pair is played twice per pair index (legs swap seats),
-  so the win column is the flag-bearing seat's score.
+  so the score column is the flag-bearing seat's score.
 
 Every heavy job ran under `flock -o /home/sadams/projects/gorge/.ds4/heavy.lock`,
 one at a time, with `timeout 3h`. Exact per-job command (FDN r1 off; `-on`
@@ -94,8 +106,7 @@ flock -o /home/sadams/projects/gorge/.ds4/heavy.lock timeout 3h \
 ```
 
 The constructed jobs use `-decks cdecks -pool cpool.tsv -only cons.only`
-instead of the FDN inputs. The `cons` source and the FDN set are the same
-driver loop:
+instead of the FDN inputs. The whole set is the driver loop:
 
 ```
 OUT=.ds4/scratch/manamodel DZ=.ds4/scratch/manamodel/dzgorge W=6 PAIRS=600 \
@@ -115,8 +126,7 @@ Tables: `python3 -I scripts/manamodel_ab_report.py .ds4/scratch/manamodel -json 
 | fdn | r3 | `az:sims=100:autopay:oppnodes:oppfull:morekinds:mull` vs `sbtactical` | 1200 | 0.592 | 0.581 | -0.011 | ±0.023 | 14.83% | 16.08% |
 | cons | r1 | `sbtactical` vs `bot` | 1200 | 0.668 | 0.654 | -0.014 | ±0.013 | 33.42% | 5.08% |
 | cons | r2 | `bot:autopay` vs `sbtactical` | 1200 | 0.370 | 0.372 | +0.003 | ±0.016 | 28.75% | 7.92% |
-
-(`cons` r3 is pending; see *Coverage* below.)
+| cons | r3 | `az:sims=100:autopay:oppnodes:oppfull:morekinds:mull` vs `sbtactical` | 1200 | 0.471 | 0.494 | +0.023 | ±0.021 | 14.75% | 14.17% |
 
 ### Exposure and choice per policy (new option = offered with the flag on, not with it off, same state)
 
@@ -130,17 +140,19 @@ Tables: `python3 -I scripts/manamodel_ab_report.py .ds4/scratch/manamodel -json 
 | fdn | `bot` | on | 1200 | 290803 | 10971 (3.77%) | 6115 | 1.17 | 1473 | 13.43% | 679 (56.58%) | 426 (35.50%) | 0 |
 | fdn | `bot:autopay` | on | 1200 | 257963 | 9950 (3.86%) | 4886 | 1.17 | 2126 | 21.37% | 704 (58.67%) | 585 (48.75%) | 0 |
 | fdn | `sbtactical` | on | 3600 | 760781 | 70472 (9.26%) | 17788 | 1.18 | 3846 | 5.46% | 2245 (62.36%) | 1458 (40.50%) | 0 |
+| cons | `az:…:morekinds:mull` | off | 1200 | 287433 | 51161 (17.80%) | 14491 | 1.73 | 0 | n/a | 807 (67.25%) | 0 (0.00%) | 0 |
 | cons | `bot` | off | 1200 | 285716 | 37485 (13.12%) | 11541 | 1.69 | 0 | n/a | 762 (63.50%) | 0 (0.00%) | 0 |
 | cons | `bot:autopay` | off | 1200 | 269484 | 49610 (18.41%) | 12159 | 1.71 | 0 | n/a | 788 (65.67%) | 0 (0.00%) | 0 |
-| cons | `sbtactical` | off | 2400 | 522618 | 96412 (18.45%) | 22562 | 1.62 | 0 | n/a | 1605 (66.88%) | 0 (0.00%) | 0 |
+| cons | `sbtactical` | off | 3600 | 785460 | 138035 (17.57%) | 32535 | 1.59 | 0 | n/a | 2409 (66.92%) | 0 (0.00%) | 0 |
+| cons | `az:…:morekinds:mull` | on | 1200 | 288078 | 26822 (9.31%) | 9875 | 1.51 | 3730 | 13.91% | 801 (66.75%) | 659 (54.92%) | 0 |
 | cons | `bot` | on | 1200 | 286358 | 19013 (6.64%) | 8671 | 1.68 | 2865 | 15.07% | 762 (63.50%) | 537 (44.75%) | 0 |
 | cons | `bot:autopay` | on | 1200 | 271948 | 19977 (7.35%) | 7572 | 1.60 | 4587 | 22.96% | 788 (65.67%) | 651 (54.25%) | 0 |
-| cons | `sbtactical` | on | 2400 | 512755 | 85563 (16.69%) | 19894 | 1.59 | 4174 | 4.88% | 1593 (66.38%) | 1090 (45.42%) | 0 |
+| cons | `sbtactical` | on | 3600 | 771488 | 124826 (16.18%) | 29009 | 1.58 | 6311 | 5.06% | 2396 (66.56%) | 1639 (45.53%) | 0 |
 
 Note the `off`-arm "windows with a new option" is the *exposure* (offered under
 the flag on, absent at the seat's real state); the `on`-arm one is the same
 class in games the flag actually steered, so the two arm totals differ by
-construction. Constructed decks expose more new options per window (1.6–1.7
+construction. Constructed decks expose more new options per window (1.5–1.7
 vs 1.2 on FDN), consistent with their higher density of sacrifice/life/
 generic paid-cost sources.
 
@@ -156,12 +168,14 @@ generic paid-cost sources.
 | fdn | `bot` | on | 290803 | 0.400 | 7.67% | 81.34% | 78477 | 1.362 | 20.36% | 40.72% |
 | fdn | `bot:autopay` | on | 257963 | 0.287 | 6.21% | 86.26% | 47725 | 1.227 | 15.71% | 49.93% |
 | fdn | `sbtactical` | on | 760781 | 0.332 | 11.48% | 80.83% | 125974 | 1.229 | 18.43% | 47.30% |
+| cons | `az:…:morekinds:mull` | off | 287433 | 0.641 | 12.17% | 72.44% | 69714 | 2.010 | 19.64% | 30.05% |
 | cons | `bot` | off | 285716 | 0.411 | 7.14% | 82.15% | 71625 | 1.392 | 18.76% | 44.47% |
 | cons | `bot:autopay` | off | 269484 | 0.322 | 6.62% | 85.20% | 52765 | 1.285 | 17.70% | 48.53% |
-| cons | `sbtactical` | off | 522618 | 0.465 | 14.42% | 74.25% | 91445 | 1.424 | 21.69% | 39.70% |
+| cons | `sbtactical` | off | 785460 | 0.464 | 14.39% | 74.27% | 137261 | 1.413 | 21.61% | 40.00% |
+| cons | `az:…:morekinds:mull` | on | 288078 | 0.789 | 13.40% | 68.09% | 68629 | 2.286 | 18.29% | 27.23% |
 | cons | `bot` | on | 286358 | 0.525 | 7.90% | 78.93% | 71304 | 1.630 | 17.89% | 40.75% |
 | cons | `bot:autopay` | on | 271948 | 0.438 | 7.77% | 81.53% | 52369 | 1.561 | 16.00% | 45.45% |
-| cons | `sbtactical` | on | 512755 | 0.714 | 17.68% | 64.50% | 87429 | 1.799 | 20.44% | 33.09% |
+| cons | `sbtactical` | on | 771488 | 0.695 | 17.55% | 65.16% | 131361 | 1.765 | 20.62% | 33.68% |
 
 ### When the new options appear: priority windows with a new option, and those chosen, by turn bucket (turn counts both players; `:explore` samples turns 1-4)
 
@@ -175,34 +189,40 @@ generic paid-cost sources.
 | fdn | `bot` | on | 7 / 44972 (0.02%) | 837 / 58868 (1.42%) | 5357 / 119486 (4.48%) | 4770 / 67477 (7.07%) | 0 | 17 | 478 | 978 |
 | fdn | `bot:autopay` | on | 5 / 42052 (0.01%) | 974 / 52276 (1.86%) | 4904 / 103435 (4.74%) | 4067 / 60200 (6.76%) | 2 | 140 | 840 | 1144 |
 | fdn | `sbtactical` | on | 75 / 124350 (0.06%) | 3697 / 153744 (2.40%) | 33725 / 306247 (11.01%) | 32975 / 176440 (18.69%) | 0 | 313 | 1594 | 1939 |
+| cons | `az:…:morekinds:mull` | off | 476 / 48747 (0.98%) | 4092 / 58616 (6.98%) | 18053 / 96717 (18.67%) | 28540 / 83353 (34.24%) | n/a | n/a | n/a | n/a |
 | cons | `bot` | off | 306 / 49800 (0.61%) | 2725 / 59988 (4.54%) | 14045 / 97840 (14.36%) | 20409 / 78088 (26.14%) | n/a | n/a | n/a | n/a |
 | cons | `bot:autopay` | off | 525 / 47308 (1.11%) | 3728 / 54735 (6.81%) | 16570 / 89414 (18.53%) | 28787 / 78027 (36.89%) | n/a | n/a | n/a | n/a |
-| cons | `sbtactical` | off | 1448 / 92205 (1.57%) | 6483 / 106899 (6.06%) | 27779 / 175468 (15.83%) | 60702 / 148046 (41.00%) | n/a | n/a | n/a | n/a |
+| cons | `sbtactical` | off | 2181 / 138228 (1.58%) | 9527 / 160575 (5.93%) | 40536 / 263208 (15.40%) | 85791 / 223449 (38.39%) | n/a | n/a | n/a | n/a |
+| cons | `az:…:morekinds:mull` | on | 344 / 48757 (0.71%) | 2820 / 58516 (4.82%) | 10478 / 98137 (10.68%) | 13180 / 82668 (15.94%) | 16 | 245 | 1267 | 2202 |
 | cons | `bot` | on | 164 / 49829 (0.33%) | 1678 / 60238 (2.79%) | 7395 / 99413 (7.44%) | 9776 / 76878 (12.72%) | 16 | 162 | 1029 | 1658 |
 | cons | `bot:autopay` | on | 241 / 47361 (0.51%) | 1949 / 55123 (3.54%) | 7016 / 91381 (7.68%) | 10771 / 78083 (13.79%) | 35 | 240 | 1373 | 2939 |
-| cons | `sbtactical` | on | 1414 / 92147 (1.53%) | 6241 / 106567 (5.86%) | 26125 / 174412 (14.98%) | 51783 / 139629 (37.09%) | 74 | 509 | 1744 | 1847 |
+| cons | `sbtactical` | on | 2143 / 138128 (1.55%) | 9302 / 160049 (5.81%) | 37994 / 262194 (14.49%) | 75387 / 211117 (35.71%) | 111 | 772 | 2631 | 2797 |
 
 ## Recommendation
 
-**Flip the default?** Not on this evidence alone. The flag is not
-strength-negative beyond noise (all FDN CIs include 0; constructed r2 is
-`+0.003`), it is arguably *more* correct (the census counts a source the
-references — XMage's reachable-mana set, Forge's per-cost `canPay` — count),
-and it is not idle (bots pick a new option in ~35–55% of games that expose
-one). But a default flip is a behaviour change to every seat and every
-replay, so it should ride a deliberate correctness ticket, not a strength
-claim. **Operator's call; the numbers neither require nor forbid it.**
+**Flip the default?** The evidence is now mildly in favour, but not decisive.
+On FDN the flag is neutral-to-a-hair-negative for every pair (all CIs include
+0). On the paid-cost-dense constructed decks it is neutral for the heuristics
+and **+2.3% ±2.1% (CI `[+0.002, +0.044]`) for the search** — the seat that
+can exploit a sacrifice/life/generic mana source. That is the expected shape:
+the flag only helps where there is something to exploit, and the search
+exploits it better than the heuristics. The flag is also more *correct*
+(XMage's reachable-mana set and Forge's per-cost `canPay` both count these
+sources) and is not idle (bots pick a new option in 45–55% of constructed
+games that expose one). Still, a default flip changes every seat and every
+replay, so it should ride a deliberate correctness ticket; this measurement
+does not by itself require it. **Operator's call.**
 
 **Exploration.** The plateau is consistent with the exploration window
 missing where the new options live. `az:…:explore` samples moves by visits
 only on turns 1–4 (`cmd/dzgorge/policy.go:36`), while >90% of the flag-added
-options appear at turn 5+, and 20–41% of constructed windows at turn 17+
+options appear at turn 5+, and 26–38% of constructed windows at turn 17+
 expose one. A generation that only random-walks turns 1–4 will essentially
 never record the paid-cost choice class into its self-play corpus. Concretely,
 recommend extending the exploration schedule to cover all turns — either
 
 - widen `:explore`'s visit-sampling window past turn 4 (the turn-bucket table
-  is the justification: T1–4 sees 0.02–1.57% of exposures, T9+ sees 7.8–41%),
+  is the justification: T1–4 sees 0.02–1.58% of exposures, T9+ sees 7.8–38%),
   or
 - add a small epsilon over the legal option list at *every* priority window
   (cheap self-play only), so a new option is visited at some rate regardless
@@ -220,17 +240,12 @@ seats, or the planner must offer more than `Plans[0]` (see
 
 ## Coverage
 
-- **FDN: complete.** All six jobs (r1/r2/r3 × off/on), 1200 games each,
-  600 pairs.
-- **Constructed: r1 and r2 complete** (1200 games each). **r3 (the search,
-  `az:sims=100:…:morekinds:mull`) was still running when this report was
-  written** — it started at 2026-10-13T04:38Z at ~1.0 games/s (~20 min/job),
-  so r3-off + r3-on need ~40 min. The measured FDN r3 delta (`-0.011 ±0.023`)
-  and the constructed r1/r2 deltas (`-0.014 ±0.013`, `+0.003 ±0.016`) bracket
-  the expected constructed r3 result; the search's exposure/choice fractions
-  on FDN (11.3% chosen-per-exposed, 51.7% of exposed games) are the FDN
-  counterpart. If r3 lands before the report is read it is appended below;
-  otherwise the row is a follow-up (see Issues).
+**Complete: all 12 jobs** (2 sets × 3 pairs × off/on), 1200 games each, 600
+pairs. `probe:mismatch` is 0 on every window of every run, so the counterfactual
+option list is exact. `stall`/`error` are 0 in every job's summary. The
+search's own aggregate (`fdn-r3-on`): `az_decisions_searched` 47026 of
+`az_decisions_asked` 308490, `az_redeal_refused` 549, `az_completed_sims_per_searched`
+98.8 of 100.
 
 ## Result files
 
@@ -244,7 +259,7 @@ out (the heavy-run area is not writable from a seat). Contents:
 - `fdn-r{1,2,3}-{off,on}.jsonl` + `.summary.json` — per-game records and the
   per-job aggregates (1200 games each; the `mm` field carries each seat's
   `-mm-stats` counters).
-- `cons-r{1,2}-{off,on}.jsonl` + `.summary.json` (and `cons-r3-*` if complete).
+- `cons-r{1,2,3}-{off,on}.jsonl` + `.summary.json`.
 - `cons.only`, `cdecks/`, `cpool.tsv`, `screen.jsonl*` — the constructed-deck
   screen that picked the 10 decks.
 - `report-tables.md`, `report-summary.json` — the tables above.
@@ -253,11 +268,6 @@ out (the heavy-run area is not writable from a seat). Contents:
 
 ## Issues
 
-- **Constructed r3 (search) not in this round.** Measured cost ~20 min/job on
-  this (heavily loaded) box; the two jobs need ~40 min. All other 10 of the 12
-  jobs are complete. If a follow-up is wanted, re-run
-  `OUT=… DZ=… W=6 PAIRS=600 bash scripts/manamodel_ab.sh cons-r3-off cons-r3-on`
-  — the driver skips jobs whose `.summary.json` exists, so it is resumable.
 - **Probe is measurement-only and slow.** `PriorityOptionsWithPaidManaCensus`
   clones the engine at *every* priority window when `-mm-stats` is on; that is
   why the `-on` arms take ~4–6× the wall of the `-off` arms (e.g. fdn-r3-off
