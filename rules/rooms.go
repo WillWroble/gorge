@@ -21,9 +21,12 @@ import (
 //
 // Face liveness convention: a cast Room's cast face is live, plus the other
 // face once unlocked. A Room entering without being cast has no live face.
-// The room-aware scans walk live faces; other readers keep using Face(). This engine does not model the
-// CR-613 characteristic combination of both doors, but no supported Room half
-// carries P/T.
+// The room-aware scans walk live faces; other readers keep using Face().
+// The CR 709.5 combination of both doors IS modelled for the characteristics
+// the rule moves -- name and rules text in chars.Compute (chars.RoomName /
+// chars.RoomText), mana value at the one effects-tier read
+// (objectManaValue) -- and only P/T stays unmodelled, which is moot: no
+// supported Room half carries P/T.
 
 // roomLockedFaceIndex reports whether fi is a locked face of a two-door Room.
 func roomLockedFaceIndex(o *state.Object, fi int) bool {

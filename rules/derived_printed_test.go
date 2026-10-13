@@ -67,8 +67,8 @@ func TestPrintedCharacteristicsFastPath(t *testing.T) {
 	if kw, ok := e.printedKeywordsOnly(bear); !ok || !slices.Equal(kw, []string{"Trample"}) {
 		t.Fatalf("Keywords fast path: %v %v", kw, ok)
 	}
-	if name, kw, p, tough := e.ViewCharacteristics(bear); name != "Bear" || p != 4 || tough != 4 || !slices.Equal(kw, []string{"Trample"}) {
-		t.Fatalf("ViewCharacteristics = %q %v %d/%d", name, kw, p, tough)
+	if name, nameSet, kw, p, tough := e.ViewCharacteristics(bear); name != "Bear" || nameSet || p != 4 || tough != 4 || !slices.Equal(kw, []string{"Trample"}) {
+		t.Fatalf("ViewCharacteristics = %q set=%v %v %d/%d", name, nameSet, kw, p, tough)
 	}
 	// A layer-3 rename anywhere sends ViewCharacteristics (not
 	// Characteristics) to the full derivation.
@@ -77,8 +77,8 @@ func TestPrintedCharacteristicsFastPath(t *testing.T) {
 	if _, _, _, _, ok := e.printedViewCharacteristics(bear); ok {
 		t.Fatal("view fast path taken with a rename in play")
 	}
-	if name, _, _, _ := e.ViewCharacteristics(elk); name != "Moose" {
-		t.Fatalf("renamed elk = %q", name)
+	if name, nameSet, _, _, _ := e.ViewCharacteristics(elk); name != "Moose" || !nameSet {
+		t.Fatalf("renamed elk = %q set=%v", name, nameSet)
 	}
 	check(bear, true, 4, 4, []string{"Trample"})
 

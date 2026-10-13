@@ -99,7 +99,7 @@ func effCascade(h Host, c *Ctx, sa *cards.SA) {
 	// for every existing carrier. (The candidate's own value stays its
 	// printed face value -- it sits in the library, where CR 202.3b makes
 	// its X 0.)
-	mv := int(src.Face().Cmc()) + int(src.X)
+	mv := objectManaValue(src) + int(src.X)
 	// Snapshot the library before moving out of it: the MoveZone emissions
 	// mutate the zone slice under us.
 	lib := append([]state.ObjID(nil), g.Zone(state.ZLibrary, p)...)
@@ -113,7 +113,7 @@ func effCascade(h Host, c *Ctx, sa *cards.SA) {
 		h.Emit(events.Event{Kind: events.MoveZone, Obj: id, From: state.ZLibrary,
 			To: state.ZExile, Text: "cascaded"})
 		exiled = append(exiled, id)
-		if !o.Face().IsLand() && int(o.Face().Cmc()) < mv {
+		if !o.Face().IsLand() && objectManaValue(o) < mv {
 			found = id
 			break
 		}
