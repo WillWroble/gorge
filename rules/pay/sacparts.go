@@ -56,7 +56,7 @@ func SacrificeCostCandidates(e Engine, p state.PlayerID, source state.ObjID, par
 		}
 		return out
 	}
-	return sacrificeCostScan(e, p, source, matchSpec, cause)
+	return DistinctNameCandidates(e, part.Spec, sacrificeCostScan(e, p, source, matchSpec, cause))
 }
 
 // sacrificeCostScan is sacrificeCostCandidates' full battlefield scan.

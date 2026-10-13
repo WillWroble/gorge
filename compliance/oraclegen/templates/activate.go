@@ -194,7 +194,7 @@ func activateWith(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	if plan != nil {
 		return activateWithAbilityStack(reg, f, name, req, idx, prefix, mana, cost, zone, slots, restrictions, plan)
 	}
-	preludes := withTokenCostPrelude(reg, cost, append([]conditionPrelude{{}}, restrictions...))
+	preludes := withSuspectCostPrelude(reg, cost, withTokenCostPrelude(reg, cost, append([]conditionPrelude{{}}, restrictions...)))
 	// Stack slots are served here by a prelude cast the scenario holds at
 	// this step's priority; every other template family keeps the plain
 	// fixtures, whose stack slots stay the caller's own precast.
@@ -773,6 +773,9 @@ func addActivationCostFixtures(p0 *oraclegen.Seat, name, cost string, x ...int) 
 			}
 			for _, name := range discardCostPlacement(tok) {
 				p0.Hand = appendFixtureUnique(p0.Hand, name)
+			}
+			for _, name := range discardCostBattlefield(tok) {
+				p0.Battlefield = appendFixtureUnique(p0.Battlefield, name)
 			}
 		case "ExileFromGrave", "ExileCtrlOrGrave", "CollectEvidence":
 			if n, ok := namedSelfCount(tok, name, xv); ok {

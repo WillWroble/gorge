@@ -163,9 +163,10 @@ func TestActivateSacSelfAndNICKNAME(t *testing.T) {
 // never silently celled.
 func TestActivateSacGapClasses(t *testing.T) {
 	cases := []struct{ cost, gap string }{
-		// A '+' modifier narrows the accepted token; this build does not
-		// evaluate a Sac spec modifier, so both stay named gaps.
-		{"Sac<3/Artifact.token+WithDifferentNames/artifact tokens with different names>", "Sac<token>"},
+		// A '+' modifier narrows the accepted token and stays a named gap;
+		// the one SET modifier rules/pay enforces (WithDifferentNames, on
+		// artifact tokens) is paid by distinct token makers.
+		{"Sac<3/Artifact.token+WithDifferentNames/artifact tokens with different names>", ""},
 		{"Sac<1/Permanent.token+namedWood/token named Wood>", "Sac<token>"},
 		{"Sac<1/Blood>", "Sac<unsupported-filter>"},
 		// An Aura or Equipment attached to the source is served (commit
@@ -178,7 +179,9 @@ func TestActivateSacGapClasses(t *testing.T) {
 		{"Sac<7/Creature.Other/other creatures>", "Sac<count>"},
 		{"Sac<4/Rat>", "Sac<count>"},
 		{"Sac<X/Artifact>", "Sac<announced>"},
-		{"Sac<1/Creature.IsSuspected/suspected creature>", "Sac<unsupported-filter>"},
+		// A suspected creature is made by the suspect prelude.
+		{"Sac<1/Creature.IsSuspected/suspected creature>", ""},
+		{"Sac<2/Creature.IsSuspected>", "Sac<unsupported-filter>"},
 	}
 	for _, tc := range cases {
 		if _, gap := activationCost(tc.cost); gap != tc.gap {

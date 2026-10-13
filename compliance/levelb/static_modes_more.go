@@ -340,13 +340,22 @@ func manaConvertExtraShape(st *cards.Static) (string, bool) {
 	return "", false
 }
 
-// cantAttackUnlessTaxShape reports whether st is Archangel of Tithes's attack
-// tax: creatures can't attack you unless their controller pays {1}, gated on
-// the card itself being untapped. Condition$/CheckSVar$ carriers (Dáin) stay
-// named gaps.
+// cantAttackUnlessTaxShape reports whether st is an attack tax the
+// unless-tax template observes: creatures can't attack you unless their
+// controller pays {N}, gated either on the card itself being untapped
+// (Archangel of Tithes) or on its controller's enduring story (Dáin, Lord of
+// the Iron Hills' Condition$ EnduringStory, set up by the Storied fixture the
+// static-condition template already uses). CheckSVar$ carriers stay named
+// gaps.
 func cantAttackUnlessTaxShape(st *cards.Static) bool {
-	if !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Creature") ||
-		!strings.EqualFold(st.ParamStr(cards.PKIsPresent), "Card.Self+untapped") {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Creature") {
+		return false
+	}
+	if strings.EqualFold(st.ParamStr(cards.PKCondition), "EnduringStory") {
+		if st.ParamStr(cards.PKIsPresent) != "" {
+			return false
+		}
+	} else if !strings.EqualFold(st.ParamStr(cards.PKIsPresent), "Card.Self+untapped") {
 		return false
 	}
 	n, err := strconv.Atoi(strings.TrimSpace(st.ParamStr(cards.PKCost)))
@@ -358,7 +367,7 @@ func cantAttackUnlessTaxShape(st *cards.Static) bool {
 	default:
 		return false
 	}
-	return staticParamsOnly(st, "ValidCard", "Target", "Cost", "IsPresent")
+	return staticParamsOnly(st, "ValidCard", "Target", "Cost", "IsPresent", "Condition")
 }
 
 // cantBlockUnlessTaxShape reports whether st is Archangel of Tithes's block

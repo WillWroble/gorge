@@ -48,8 +48,10 @@ func TestRemainingStaticModesClassify(t *testing.T) {
 		// CantPreventDamage: unconditional and combat-only.
 		{"Sunspine Lynx", "static#0.1", "static.cant-prevent-damage"},
 		{"Frenzied Baloth", "static#0.0", "static.cant-prevent-damage-combat"},
-		// CantAttackUnless: the untapped self tax (Archangel of Tithes).
+		// CantAttackUnless: the untapped self tax (Archangel of Tithes) and
+		// the enduring-story gate (Dáin, set up by the Storied fixture).
 		{"Archangel of Tithes", "static#0.0", "static.cant-attack-unless-tax"},
+		{"Dáin, Lord of the Iron Hills", "static#0.0", "static.cant-attack-unless-tax"},
 		// IgnoreHexproof, CantPutCounter, NoCleanupDamage, CantBeSuspected.
 		{"Nowhere to Run", "static#0.0", "static.ignore-hexproof"},
 		{"Blossombind", "static#0.0", "static.cant-put-counter"},
@@ -74,8 +76,6 @@ func TestRemainingStaticModesNamedGaps(t *testing.T) {
 	for _, tc := range []struct{ card, key, sub, reason string }{
 		// Elvish Refueler's ceiling is negative and the ability is Exhaust.
 		{"Elvish Refueler", "static#0.0", "static.gap:Activations", "is not the positive PowerUp ceiling"},
-		// Dáin's Condition$ EnduringStory gate cannot be set up.
-		{"Dáin, Lord of the Iron Hills", "static#0.0", "static.gap:CantAttackUnless", "is not a served unless-tax shape"},
 		// Both AlternativeCost shapes: the fixture grammar and the gate.
 		{"Leyline of Mutation", "static#0.0", "static.gap:AlternativeCost", "needs an alternative-cost cast option"},
 		{"Kíli the Resourceful", "static#0.0", "static.gap:AlternativeCost", "EnduringStory"},

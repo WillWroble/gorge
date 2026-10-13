@@ -15,11 +15,57 @@ import (
 // the source-aware filter is applied. The filter owns CARDNAME's object-ID
 // semantics; costs use this helper at both offer and payment time so the two
 // stages cannot disagree about whether a self-reference is payable.
+//
+// Forge's set modifier "+WithDifferentNames" (Transmutation Font's
+// "Sacrifice three artifact tokens with different names") constrains the
+// chosen SET, not any one object, so it is stripped from the per-object
+// filter here and enforced on the candidate list by DistinctNameCandidates.
 func SacrificeMatchSpec(spec string) string {
 	if strings.EqualFold(spec, "NICKNAME") {
 		return "CARDNAME"
 	}
+	if i := strings.Index(spec, sacWithDifferentNames); i >= 0 {
+		return spec[:i] + spec[i+len(sacWithDifferentNames):]
+	}
 	return spec
+}
+
+// sacWithDifferentNames is the set modifier SacrificeMatchSpec strips.
+const sacWithDifferentNames = "+WithDifferentNames"
+
+// DistinctNameCandidates keeps, for a cost spec carrying +WithDifferentNames,
+// only the first candidate of each name in scan order, so any N of the list
+// have pairwise different names and the list's length is the number of
+// distinct names on offer -- the count every payability check compares N
+// against. Every other spec returns ids unchanged. The payer chooses among
+// names; which object of a repeated name pays is the scan order's first, a
+// narrowing of the choice that never changes payability.
+func DistinctNameCandidates(e Engine, spec string, ids []state.ObjID) []state.ObjID {
+	if !strings.Contains(spec, sacWithDifferentNames) || len(ids) < 2 {
+		return ids
+	}
+	out := make([]state.ObjID, 0, len(ids))
+	var seen []string
+	for _, id := range ids {
+		o := e.Game().Obj(id)
+		name := ""
+		if o != nil && o.Face() != nil {
+			name = o.Face().Name
+		}
+		dup := false
+		for _, s := range seen {
+			if s == name {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
+		seen = append(seen, name)
+		out = append(out, id)
+	}
+	return out
 }
 
 // manaAbilityLabel renders a mana ability's Produced$ value as the label the

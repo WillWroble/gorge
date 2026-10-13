@@ -685,12 +685,22 @@ func (e *Engine) webSlingedAdmits(spec string, objID state.ObjID) (string, bool)
 // unrelated cost evaluation is byte-identical.
 func (e *Engine) castProvenanceAdmitsPending(spec string, objID state.ObjID, you state.PlayerID) (string, bool) {
 	if !strings.Contains(spec, "wasCastFromYourHand") && !strings.Contains(spec, "wasCastByYou") &&
-		!specCarriesCastOrigin(spec) {
+		!specCarriesCastOrigin(spec) && !strings.Contains(spec, bareGraveyardCastToken) {
 		return spec, true
 	}
 	o := e.G.Obj(objID)
 	if o == nil {
 		return "", false
+	}
+	if strings.Contains(spec, bareGraveyardCastToken) {
+		var ok bool
+		if spec, ok = e.bareGraveyardCastAdmitsPending(spec, o); !ok {
+			return "", false
+		}
+		if !strings.Contains(spec, "wasCastFromYourHand") && !strings.Contains(spec, "wasCastByYou") &&
+			!specCarriesCastOrigin(spec) {
+			return spec, true
+		}
 	}
 	if o.Zone != state.ZStack {
 		// The origin-zone family is priceable PRE-push, unlike the hand
@@ -817,3 +827,30 @@ func provGateSlot(spec string) uint {
 
 // provenanceGateVerify: see derivedMemoVerify. Set by the rules test binary.
 var provenanceGateVerify = derivedMemoVerifyFlag != ""
+
+// bareGraveyardCastToken is Forge's caster-agnostic "cast from a graveyard"
+// spelling (Aven Interrupter's `RaiseCost | Activator$ Opponent | ValidCard$
+// Card.wasCastFromGraveyard,Card.wasCastFromExile`). Outside the cost paths
+// it is the effects-side CastFlags predicate, whose graveyard-origin bits are
+// stamped by the pay-time CastInfo -- AFTER the cost is determined (CR
+// 601.2f precedes 601.2h), so a cost static keyed on it never saw the cast it
+// prices.
+const bareGraveyardCastToken = "wasCastFromGraveyard"
+
+// bareGraveyardCastAdmitsPending resolves the bare wasCastFromGraveyard
+// alternatives of a COST-path spec against the cast being priced: off the
+// stack the cast will come from the object's CURRENT zone (the pending
+// origin castOriginAdmitsAtZone reads), on the stack from its logged
+// PutOnStack origin. A copy was never cast (CR 707.10). The ByYou spelling
+// is a distinct token StripPredicateToken never confuses with this one.
+func (e *Engine) bareGraveyardCastAdmitsPending(spec string, o *state.Object) (string, bool) {
+	holds := false
+	if !o.IsCopy {
+		if o.Zone != state.ZStack {
+			holds = o.Zone == state.ZGraveyard
+		} else if from, _, ok := e.latestCastOrigin(o.ID); ok {
+			holds = from == state.ZGraveyard
+		}
+	}
+	return admitProvenanceAlternatives(spec, bareGraveyardCastToken, holds)
+}
