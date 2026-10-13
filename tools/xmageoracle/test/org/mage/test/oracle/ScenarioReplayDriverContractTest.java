@@ -384,18 +384,25 @@ public final class ScenarioReplayDriverContractTest {
         check(threw, "a pass on seat 1's turn must be rejected");
 
         // The empty-stack failure names the turn, step, priority holder and the
-        // stack the driver last saw, so a pair that met an empty stack (an
-        // end-step trigger that resolved early, or a pair run at the wrong
-        // step) is self-diagnosing without a re-run.
+        // objects that left the stack since the last checkpoint, so a pair that
+        // met an empty stack (an end-step trigger that resolved early, or a
+        // pair run at the wrong step) is self-diagnosing without a re-run.
         String diag = ScenarioReplay.emptyStackDiagnostic(
-                ScenarioReplay.CMD_REQUIRE_STACK, 1, "END_TURN", "A", "[Ultimecia, Time Sorceress]");
+                ScenarioReplay.CMD_REQUIRE_STACK, 1, "END_TURN", "A",
+                java.util.Arrays.asList("Ultimecia, Time Sorceress"),
+                java.util.Collections.<String>emptyList());
         check(diag.startsWith(ScenarioReplay.CMD_REQUIRE_STACK),
                 "the empty-stack diagnostic must keep the command prefix; got " + diag);
         check(diag.contains("turn 1"), "the empty-stack diagnostic must name the turn; got " + diag);
         check(diag.contains("END_TURN"), "the empty-stack diagnostic must name the step; got " + diag);
         check(diag.contains("priority A"), "the empty-stack diagnostic must name the priority holder; got " + diag);
         check(diag.contains("[Ultimecia, Time Sorceress]"),
-                "the empty-stack diagnostic must name the last checkpoint stack; got " + diag);
+                "the empty-stack diagnostic must name the recent stack departures; got " + diag);
+        String stillThere = ScenarioReplay.emptyStackDiagnostic(
+                ScenarioReplay.CMD_REQUIRE_STACK, 1, "END_TURN", "A",
+                java.util.Arrays.asList("A", "B"), java.util.Arrays.asList("B"));
+        check(stillThere.contains("[A]") && !stillThere.contains("[A, B]"),
+                "the empty-stack diagnostic must report only what departed; got " + stillThere);
 
         System.out.println("PASS pass mapping and queue order (pair resolves after its second pass; "
                 + "lone p0 pass yields before the p1 cast checkpoint; p1-first pair resolves after its "

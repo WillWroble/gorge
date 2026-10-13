@@ -97,7 +97,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     // The stack object names seen at the last checkpoint, for the empty-stack
     // diagnostic: what a pass pair expected to resolve and no longer can.
-    private String lastCheckpointStack = "[]";
+    private List<String> lastCheckpointStack = new ArrayList<>();
 
     // Whether the scenario scripts a divided-damage split ("<ref>^X=<n>"
     // target answers, oraclegen's damageSplitAnswers). Such a cast queues no
@@ -2567,22 +2567,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     /** The stack's object names, top first. */
-    private static String stackNames(Game g) {
+    private static List<String> stackNames(Game g) {
         List<String> names = new ArrayList<>();
         for (StackObject so : g.getStack()) {
             names.add(so.getName());
         }
-        return names.toString();
+        return names;
     }
 
     /** The CMD_REQUIRE_STACK failure text. A pass pair that should resolve the
      * stack's top object found the stack empty; name the turn, step and
-     * priority holder, and the stack the driver last saw at a checkpoint, so
-     * the mechanism (the object resolved early, or the pair ran at the wrong
-     * step) is visible without a re-run. */
-    static String emptyStackDiagnostic(String cmd, int turn, String step, String priority, String lastStack) {
+     * priority holder, and the objects that were on the stack at the last
+     * checkpoint and have since left it (the recent departures), so the
+     * mechanism (the object resolved early, or the pair ran at the wrong step)
+     * is visible without a re-run. */
+    static String emptyStackDiagnostic(String cmd, int turn, String step, String priority,
+            List<String> lastStack, List<String> nowStack) {
+        List<String> departed = new ArrayList<>(lastStack);
+        departed.removeAll(nowStack);
         return cmd + ": the stack is empty (turn " + turn + ", step " + step
-                + ", priority " + priority + ", stack at last checkpoint " + lastStack + ")";
+                + ", priority " + priority + "; since the last checkpoint the stack lost " + departed + ")";
     }
 
     private void queuePassCommands(int stepIdx) {
@@ -2595,7 +2599,8 @@ public class ScenarioReplay extends CardTestPlayerBase {
                                     : g.getPlayer(g.getPriorityPlayerId());
                             throw new IllegalStateException(emptyStackDiagnostic(cmd, g.getTurnNum(),
                                     g.getTurnStepType() == null ? "" : g.getTurnStepType().name(),
-                                    prio == null ? "none" : prio.getName(), lastCheckpointStack));
+                                    prio == null ? "none" : prio.getName(), lastCheckpointStack,
+                                    stackNames(g)));
                         }
                     });
                     break;
