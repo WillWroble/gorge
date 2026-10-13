@@ -23,7 +23,16 @@ type Player struct {
 	LifeGainedThisTurn    int32
 	LifeLostThisTurn      int32
 	TokensCreatedThisTurn int32
-	Pool                  Mana
+	// AttackedPlayersThisTurn and AttackedPlaneswalkersThisTurn are the
+	// seat's attack watchers: bit d is set when a creature this seat
+	// controlled was declared attacking player d itself, or a planeswalker
+	// player d controlled, since the last TurnChange (CR 508.1b) --
+	// Forge's attackedYouTheirCurrentTurn / attackedYouCtrlTheirCurrentTurn
+	// player properties (Sandswirl Wanderglyph). Folded only by events.Apply
+	// (DeclareAttackers) and cleared at TurnChange with the other watchers.
+	AttackedPlayersThisTurn       uint64
+	AttackedPlaneswalkersThisTurn uint64
+	Pool                          Mana
 
 	// RestrictedMana retains the spend restriction on mana produced by a
 	// RestrictValid$ mana ability. It is cleared with the pool at step/phase
