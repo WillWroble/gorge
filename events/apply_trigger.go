@@ -141,6 +141,7 @@ func foldKeywordTriggerPush(g *state.Game, e *Event) {
 	cipher := false
 	casualty := false
 	demonstrate := false
+	storm := false
 	flanking := false
 	gift := e.Counter == "GiftAbility"
 	melee := e.Counter == "__kwMeleeGranted"
@@ -245,6 +246,14 @@ func foldKeywordTriggerPush(g *state.Game, e *Event) {
 			sa = &cards.SA{Kind: "DB", API: "Demonstrate",
 				Params: map[string]string{"Defined": "TriggeredSpellAbility"}}
 			demonstrate = ok
+		}
+		// A granted Storm (rules.pushGrantedStorm's __kwStorm: payload) is
+		// the Demonstrate shape: rebuilt structurally into the printed
+		// K:Storm expansion's body (cards/kw_storm.go), the triggering spell
+		// riding Remembered (IDs).
+		if _, ok := strings.CutPrefix(e.Counter, "__kwStorm:"); ok {
+			sa = StormGrantedBody()
+			storm = ok
 		}
 		// A cascade trigger (rules.pushTrigger's __kwCascade: payload) has
 		// no SVar either: rebuilt structurally into the DB$ Cascade body
@@ -409,7 +418,7 @@ func foldKeywordTriggerPush(g *state.Game, e *Event) {
 	if !gift && keywordTriggerBindsSource(e.Counter, sa) {
 		o.SourceIncarnation = incarnation
 	}
-	if conspire || casualty || demonstrate || flanking || melee || cipher || gift {
+	if conspire || casualty || demonstrate || storm || flanking || melee || cipher || gift {
 		o.Remembered = rememberedFrom(e.IDs)
 	}
 }
@@ -552,4 +561,14 @@ func foldMergedTriggerPush(g *state.Game, e *Event) {
 	o.StackKind, o.StackKindKnown = state.StackKindTriggered, true
 	o.Source = e.Obj
 	o.Remembered = rememberedFrom(e.IDs)
+}
+
+// StormGrantedBody is the body a granted Storm's cast trigger resolves: the
+// printed K:Storm expansion's (cards/kw_storm.go) copy of the triggering
+// spell once per other spell cast before it this turn (CR 702.40a). The
+// rules-side synthesis and the __kwStorm: fold share it, so the live game and
+// a replay mint the identical ability.
+func StormGrantedBody() *cards.SA {
+	return &cards.SA{Kind: "DB", API: "CopySpellAbility", Params: map[string]string{
+		"Defined": "TriggeredSpellAbility", "Amount": "Count$ThisTurnCast/Minus1", "MayChooseTarget": "True"}}
 }

@@ -495,7 +495,7 @@ func (e *Engine) delveAsk() bool {
 		return false
 	}
 	pc.delveDone = true
-	if !e.hasKeywordH(pc.card, kwhDelve) {
+	if !e.hasCastDelve(pc.card) {
 		return false
 	}
 	gy := e.G.Zone(state.ZGraveyard, pc.player)

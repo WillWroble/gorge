@@ -65,7 +65,7 @@ var wantOptionalCostAnswerCensus = map[string]int{
 	"BIG": 0, "BLB": 0, "DFT": 0, "DSK": 0, "ECL": 4,
 	"EOE": 0, "FDN": 0, "FIN": 0, "FRA": 0, "HOB": 0,
 	"LCI": 0, "MKM": 8, "MSH": 0, "OTJ": 0, "SOS": 0,
-	"SPM": 0, "TDM": 2, "TLA": 3, "TMT": 0, "WOE": 0,
+	"SPM": 0, "TDM": 3, "TLA": 3, "TMT": 0, "WOE": 0,
 }
 
 func TestOptionalCostAnswerCensus(t *testing.T) {

@@ -702,6 +702,14 @@ func staticFixtures(reg *cards.Registry, c *cards.Card, f *cards.Face, name stri
 	if fx, ok := staticCraftFixture(reg, c, f, name, st); ok {
 		out = append(out, fx)
 	}
+	if fx, ok := staticCrewCDAFixture(f, name, st); ok {
+		out = append(out, fx)
+	}
+	// Unlocked Room doors (static_unlocked_doors.go), last for the same
+	// reason.
+	if fx, ok := staticUnlockedDoorsFixture(reg, f, st); ok {
+		out = append(out, fx)
+	}
 	return staticAvoidProbeCollision(reg, out)
 }
 
