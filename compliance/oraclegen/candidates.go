@@ -1017,11 +1017,16 @@ func registrySubtype(reg *cards.Registry, subtype string) (string, bool) {
 	if reg == nil {
 		return "", false
 	}
+	// Only the front face: setup deals a card by its front name, so a back
+	// face (Tecutlan, the Searing Rift) is "not dealt".
+	keep := func(c *cards.Card) bool {
+		return len(c.Faces) > 0 && faceHasSubtype(c.Faces[0], subtype) && XMageKnown(c.Faces[0].Name)
+	}
+	if name, ok := pinnedFixture(reg, pinnedSubtypeFixtures, subtype, keep); ok {
+		return name, true
+	}
 	for i := 0; i < reg.Len(); i++ {
-		c := reg.Card(i)
-		// Only the front face: setup deals a card by its front name, so a back
-		// face (Tecutlan, the Searing Rift) is "not dealt".
-		if len(c.Faces) > 0 && faceHasSubtype(c.Faces[0], subtype) && XMageKnown(c.Faces[0].Name) {
+		if c := reg.Card(i); keep(c) {
 			return c.Faces[0].Name, true
 		}
 	}
@@ -1045,17 +1050,21 @@ func registryQuietSubtype(reg *cards.Registry, subtype string) (string, bool) {
 	if reg == nil {
 		return "", false
 	}
-	for i := 0; i < reg.Len(); i++ {
-		c := reg.Card(i)
+	keep := func(c *cards.Card) bool {
 		if len(c.Faces) != 1 {
-			continue
+			return false
 		}
 		f := c.Faces[0]
-		if !XMageKnown(f.Name) || !faceHasSubtype(f, subtype) || !faceHasSubtype(f, "Creature") ||
-			faceHasSubtype(f, "Legendary") || len(f.Triggers) != 0 || len(f.Statics) != 0 || entersWithCounters(f) {
-			continue
+		return XMageKnown(f.Name) && faceHasSubtype(f, subtype) && faceHasSubtype(f, "Creature") &&
+			!faceHasSubtype(f, "Legendary") && len(f.Triggers) == 0 && len(f.Statics) == 0 && !entersWithCounters(f)
+	}
+	if name, ok := pinnedFixture(reg, pinnedQuietSubtypeFixtures, subtype, keep); ok {
+		return name, true
+	}
+	for i := 0; i < reg.Len(); i++ {
+		if c := reg.Card(i); keep(c) {
+			return c.Faces[0].Name, true
 		}
-		return f.Name, true
 	}
 	return "", false
 }
