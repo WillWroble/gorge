@@ -49,6 +49,10 @@ type OracleSnapPlayer struct {
 	LibraryCount int              `json:"library_count"`
 	LibraryTop   []string         `json:"library_top"` // top first, at most oracleLibraryTopN
 	Pool         string           `json:"pool"`        // WUBRGC letters
+	// Lost marks a seat that has lost the game (CR 104.3). Only a game of
+	// three or more seats goes on past it (CR 800.4a), so it is false in
+	// every two-seat checkpoint but a game-over one.
+	Lost bool `json:"lost,omitempty"`
 }
 
 // OracleSnapPerm is one battlefield permanent. Ref is the object's scenario
@@ -283,6 +287,7 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			Hand: r.zoneNames(state.ZHand, p, true), Graveyard: r.zoneNames(state.ZGraveyard, p, false),
 			Exile: r.zoneNames(state.ZExile, p, true), Command: r.zoneNames(state.ZCommand, p, true),
 			LibraryCount: len(lib), LibraryTop: top, Pool: poolString(g.Players[i].Pool),
+			Lost: g.Players[i].Lost,
 		})
 	}
 	var field []state.ObjID

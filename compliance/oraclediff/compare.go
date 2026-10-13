@@ -153,6 +153,12 @@ func fields(s rules.OracleSnapshot, xmage bool, compare []string) []field {
 		out = append(out,
 			field{pf("pool"), sortMana(p.Pool)},
 		)
+		if len(s.Players) > 2 {
+			// Only a multiplayer game goes on after a seat loses (CR
+			// 800.4a), so only its checkpoints carry the field: every
+			// two-seat canonical form, and so every frozen hash, is unchanged.
+			out = append(out, field{pf("lost"), fmt.Sprint(p.Lost)})
+		}
 	}
 	out = append(out,
 		field{"permanents", strings.Join(permKeysOpts(s.Permanents, compare), "\n")},
