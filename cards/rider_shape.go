@@ -38,6 +38,37 @@ func PreventionRiderAPI(api string) bool {
 	return false
 }
 
+// DelayedPreventedCounterBody reports whether the SVar named exec is the
+// delayed counter body of a prevention rider: a PutCounter whose
+// CounterNum$ is PreventedDamage (Sacred Boon's DelayedBoon, Scars of the
+// Veteran's DelayedScars). The amount it names is read back at fire time from
+// the registration's remembered number.
+func DelayedPreventedCounterBody(svars map[string]string, exec string) bool {
+	sub := ResolveSVar(svars, exec)
+	return sub != nil && strings.TrimSpace(sub.API) == "PutCounter" &&
+		strings.EqualFold(strings.TrimSpace(sub.ParamStr(PKCounterNum)), "PreventedDamage")
+}
+
+// PreventionRiderDelayedCounterEffect reports whether sub is the one DB$
+// Effect rider shape the engine resolves (Sacred Boon, Scars of the
+// Veteran): its single Triggers$ SVar is a Mode$ Phase trigger whose
+// Execute$ is a DelayedPreventedCounterBody. Any other Effect rider stays
+// unresolved.
+func PreventionRiderDelayedCounterEffect(svars map[string]string, sub *SA) bool {
+	if sub == nil || strings.TrimSpace(sub.API) != "Effect" {
+		return false
+	}
+	names := strings.Fields(sub.ParamStr(PKTriggers))
+	if len(names) != 1 {
+		return false
+	}
+	tr, ok := ParseTriggerLine(svars[names[0]])
+	if !ok || strings.TrimSpace(tr.Mode) != "Phase" {
+		return false
+	}
+	return DelayedPreventedCounterBody(svars, strings.TrimSpace(tr.ParamStr(PKExecute)))
+}
+
 // PreventionRiderResolved reports whether sa (a PreventDamage ability)
 // carries a PreventionSubAbility$ rider this engine resolves: the
 // ShieldEffectTarget$ scope must be bound and the named SVar must resolve to
@@ -53,5 +84,5 @@ func PreventionRiderResolved(svars map[string]string, sa *SA) bool {
 		return false
 	}
 	sub := ResolveSVar(svars, name)
-	return sub != nil && PreventionRiderAPI(sub.API)
+	return sub != nil && (PreventionRiderAPI(sub.API) || PreventionRiderDelayedCounterEffect(svars, sub))
 }

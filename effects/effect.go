@@ -481,6 +481,13 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 			if vp := tl.ValidPlayer; vp != "" {
 				text += "|VP=" + vp
 			}
+			// A prevention rider's delayed counter body (Sacred Boon) reads the
+			// amount this application prevented as Count$TriggerRememberAmount;
+			// "|RN=" rides last so the decode strips it first.
+			if c.Num.RememberedCMCBound && (cards.DelayedPreventedCounterBody(c.SVars, exec) ||
+				cards.DelayedPreventedCounterBody(effectFaceSVars(h, c.Source), exec)) {
+				text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
+			}
 			for _, owner := range owners {
 				h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
 					Player: owner, Step: step, Counter: exec,
@@ -1242,3 +1249,12 @@ var effEffectCodes = state.NewStrCodes(
 	state.StrEntry[effEffectCode]{Key: "Targeted", Val: effEffectTargeted},
 	state.StrEntry[effEffectCode]{Key: "True", Val: effEffectTargeted},
 )
+
+// effectFaceSVars is the SVar table of source's current face (nil when the
+// object or face is gone).
+func effectFaceSVars(h Host, source state.ObjID) map[string]string {
+	if o := h.Game().Obj(source); o != nil && o.Face() != nil {
+		return o.Face().SVars
+	}
+	return nil
+}
