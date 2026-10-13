@@ -307,6 +307,7 @@ func (m *match) sidecar() sidecar {
 		Head: m.head, Events: events, Turns: m.e.G.Turn, Reason: m.reason, Mulligans: m.cfg.Mulligans,
 		NameUniverse:      m.cfg.NameUniverse.Len() > 0,
 		NameUniverseNames: append([]string(nil), m.e.G.NameUniverseNames...),
+		PaidManaCensus:    !m.cfg.DisablePaidManaCensus,
 		Format:            Format(m.cfg.Format), StartingLife: m.cfg.StartingLife, Commanders: m.cfg.Commanders, BotPolicy: m.table.cfg.BotPolicy,
 		Refusals: m.refusals, Fallbacks: m.fallbacks, RootRefusals: m.rootRefusals}
 }

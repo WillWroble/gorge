@@ -284,7 +284,7 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 		landTypeWords:     chars.CorpusLandTypeWords(nameUniverseOrCorpus(cfg)),
 		mulligans:         cfg.Mulligans,
 		windowDiagnostics: cfg.WindowDiagnostics,
-		paidManaCensus:    cfg.PaidManaCensus,
+		paidManaCensus:    !cfg.DisablePaidManaCensus,
 		startingLife:      life,
 	}
 	// The embedded turn ledger's per-turn slices (engine_turnledger.go).

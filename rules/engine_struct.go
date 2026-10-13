@@ -96,7 +96,8 @@ type Engine struct {
 	// windowDiagnostics is the default-off, observer-only priority sidecar
 	// gate copied from genesis Config.
 	windowDiagnostics bool `clone:"deep"`
-	// paidManaCensus is Config.PaidManaCensus (paid_mana_census.go).
+	// paidManaCensus is !Config.DisablePaidManaCensus (paid_mana_census.go);
+	// ON unless a Config explicitly disables it.
 	paidManaCensus bool `clone:"deep"`
 	// skipPass is the hypothetical-only auto-pass of quiet priority windows
 	// (skip_pass.go); set by the search's world setup, never cloned.

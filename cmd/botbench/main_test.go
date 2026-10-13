@@ -734,9 +734,18 @@ func TestConstructedDefaultIsByteIdentical(t *testing.T) {
 	// avengers-assemble:boros-moxite-burn, which measures 7/13. Removing only
 	// the deck fixture restores 6/14, attributing the movement to adding the
 	// deck to the default pool.
-	const wantSeat0, wantSeat1 = 7, 13
+	// The paid-cost mana census flip (cli-20261012T170859Z) then re-measured
+	// 7/13 to 6/14: the census is now ON by default, so an activated ability
+	// whose mana the floating pool cannot pay but the untapped sources can is
+	// offered at priority (rules/legal_walk_autopay.go) and auto-paid, and the
+	// attack-tax/unless-cost/tap-list readers count payable paid-cost sources
+	// (Treasure, Lotus Petal). The bot activates abilities it never saw (Boros
+	// Moxite Burn's Melded Moxite, avengers-assemble's Ragged Short Spear,
+	// Blood Token, Patriot, Hero's Blade ...). Measured: setting only
+	// Config.DisablePaidManaCensus restores 7/13.
+	const wantSeat0, wantSeat1 = 6, 14
 	if seat0, seat1 := atoi(m[8]), atoi(m[9]); seat0 != wantSeat0 || seat1 != wantSeat1 {
-		t.Errorf("constructed default split = %d/%d, want %d/%d after the Boros Moxite Burn deck import (%s vs %s at seed 0, games 20)", seat0, seat1, wantSeat0, wantSeat1, testutil.RepoDeckNames()[0], testutil.RepoDeckNames()[1])
+		t.Errorf("constructed default split = %d/%d, want %d/%d after the paid-cost census defaulted ON (%s vs %s at seed 0, games 20)", seat0, seat1, wantSeat0, wantSeat1, testutil.RepoDeckNames()[0], testutil.RepoDeckNames()[1])
 	}
 	if strings.Contains(buf.String(), "STALLED") {
 		t.Errorf("constructed default (no stalls) must not print a stall line")

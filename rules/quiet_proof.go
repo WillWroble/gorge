@@ -111,7 +111,7 @@ var quietCoveredSections = map[string]bool{
 	"recordAbilityBlock":        true,
 	"maxSpeedBoastHolds":        true,
 	"pricing":                   true,
-	// autoPayOffer (Config.PaidManaCensus, legal_walk_autopay.go) offers a
+	// autoPayOffer (the paid-cost census, legal_walk_autopay.go) offers a
 	// pool-short printed ability the planner can pay by tapping sources. The
 	// proof's ability blocker prices against the seat's whole mana ceiling
 	// (quietManaCeiling), which already includes every tappable source, so

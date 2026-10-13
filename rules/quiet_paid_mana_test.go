@@ -1,7 +1,7 @@
 package rules
 
 // quiet_paid_mana_test.go -- the quiet proof's mana ceiling against the
-// widened payment model (Config.PaidManaCensus, rules/paid_mana_census.go).
+// widened payment model (the paid-cost census, rules/paid_mana_census.go).
 //
 // The proof's ceiling (quietManaCeiling) sums every untapped source's printed
 // production, whatever its activation cost. The census widening makes the
@@ -38,7 +38,7 @@ const (
 	qpmW  = "Name:Quiet W Instant\nManaCost:W\nTypes:Instant\nA:SP$ Draw | NumCards$ 1\nOracle:x\n"
 )
 
-// qpmEngine builds quietBaseLandWith's table with PaidManaCensus set. Seat 0
+// qpmEngine builds quietBaseLandWith's table with the paid-cost census set. Seat 0
 // holds an untapped Plains when plains is true, else an empty battlefield.
 func qpmEngine(t *testing.T, flag, plains bool, extras []*cards.Card) *Engine {
 	t.Helper()
@@ -53,10 +53,10 @@ func qpmEngine(t *testing.T, flag, plains bool, extras []*cards.Card) *Engine {
 	for i := range deck1 {
 		deck1[i] = mountain
 	}
-	e := New(Config{Seed: 42, Names: []string{"a", "b"}, Tokens: reg.Tokens, PaidManaCensus: flag,
+	e := New(Config{Seed: 42, Names: []string{"a", "b"}, Tokens: reg.Tokens, DisablePaidManaCensus: !flag,
 		Decks: [][]*cards.Card{deck0, deck1}})
 	if e.paidManaCensus != flag {
-		t.Fatalf("precondition: PaidManaCensus not adopted: %v", e.paidManaCensus)
+		t.Fatalf("precondition: paid-cost census not adopted: %v", e.paidManaCensus)
 	}
 	e.Advance()
 	toMain1(t, e)
