@@ -41,6 +41,13 @@ func (f *Face) Primitives() []string {
 		if v := strings.TrimSpace(sa.ParamStr(PKAtEOT)); v != "" && !AtEOTValueSupported(v) {
 			set["api:AtEOT."+v] = struct{}{}
 		}
+		if sa.API == "PreventDamage" && !PreventionRiderResolved(f.SVars, sa) {
+			// The PreventionSubAbility$ rider (Test of Faith's counters,
+			// Candles' Glow's life gain, Sacred Boon's delayed effect) is the
+			// prevented-amount follow-up: a shield that prevents silently and
+			// never runs it is not the card the Oracle text names.
+			set["api:PreventDamage.OtherRider"] = struct{}{}
+		}
 		walk(sa.Sub, depth+1)
 	}
 	for _, a := range f.Abilities {

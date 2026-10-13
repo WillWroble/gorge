@@ -51,9 +51,11 @@ func TestPaymentPlanTiers(t *testing.T) {
 		{"Gemstone Caverns", pay.TierDeferred, "source:conditional", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		{"Pyromancer's Goggles", pay.TierDeferred, "source:special_production", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		// Chrome Mox's production is AB$ ManaReflected (a reflected-colour
-		// read of the imprinted card), not a plain Mana ability, so the
-		// classifier's closed-world API check defers it.
-		{"Chrome Mox", pay.TierDeferred, "source:special_production", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
+		// read of the imprinted card). The reflected shape admits the
+		// Defined.Imprinted selector (no payment step can shrink an imprint),
+		// so it now classifies as a normal tap-only source.
+		// (agent-20261013T014220Z-46d44d41)
+		{"Chrome Mox", pay.TierNormal, "", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		{"Ashnod's Altar", pay.TierDeferred, "source:last_resort", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		{"Cavern of Souls", pay.TierDeferred, "source:special_production", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 	}

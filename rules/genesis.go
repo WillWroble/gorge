@@ -326,7 +326,8 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 	}
 	e.G.Tokens = cfg.Tokens
 	e.setNameInPool, e.layer4InPool, e.controlStaticInPool = poolGates(cfg)
-	e.trigGrant.free = true // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.free = true     // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.replFree = true // the granted-replacement proof (trigger_grantfree.go)
 	e.G.NameUniverse = cfg.NameUniverse
 	e.G.NamedCorpus = cfg.NamedCorpus
 	e.G.NameUniverseNames = append([]string(nil), cfg.NameUniverseNames...)
