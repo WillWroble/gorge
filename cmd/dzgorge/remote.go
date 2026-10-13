@@ -333,27 +333,27 @@ func pad8(n int) int { return (n + 7) &^ 7 }
 // packer accumulates states and their options as SPEC §2's columns. Offsets are
 // kept relative to the packer (they start at 0).
 type packer struct {
-	dense                []float32
-	spOff                []int32
-	spRow                []uint16
-	spVal                []float32
-	cardOff              []int32
-	cardGroup            []uint8
-	cardRaw              []float32
-	crOff                []int32
-	crRow                []uint16
-	crVal                []float32
-	optOff               []int32
-	optDense             []float32
-	optBot               []uint8
-	optEA, optEB         []int32
-	osOff                []int32
-	osRow                []uint16
-	osVal                []float32
-	ohOff                []int32
-	ohRow                []uint16
-	ohVal                []float32
-	buf                  []byte
+	dense        []float32
+	spOff        []int32
+	spRow        []uint16
+	spVal        []float32
+	cardOff      []int32
+	cardGroup    []uint8
+	cardRaw      []float32
+	crOff        []int32
+	crRow        []uint16
+	crVal        []float32
+	optOff       []int32
+	optDense     []float32
+	optBot       []uint8
+	optEA, optEB []int32
+	osOff        []int32
+	osRow        []uint16
+	osVal        []float32
+	ohOff        []int32
+	ohRow        []uint16
+	ohVal        []float32
+	buf          []byte
 }
 
 func (p *packer) reset() {
