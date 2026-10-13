@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"pass","field":"p1.hand","diff":"gorge+[$LIB, Grizzly Bears] xmage+[]"},"key":"static | pass | p1.hand | gorge+[$LIB, Grizzly Bears] xmage+[]","cards":1}
+{"card":"Entropic Battlecruiser","template":"static#0.0","status":"diverge","api":"-","sets":["EOE"],"detail":"step 3 (pass) p1.hand: gorge \"[Grizzly Bears, Wastes, Wastes]\", xmage \"[Wastes]\""}
