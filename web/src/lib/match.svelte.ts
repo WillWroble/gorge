@@ -22,7 +22,13 @@ export class MatchState implements ClientModelSource {
   /** Sequence of the view actually assigned to the rendered board. */
   renderedSeq = $state<number | null>(null);
   seats = $state<SeatInfo[]>([]);
-  dvr = $state<DvrState>(initialDvr);
+  // Raw, not deep: dvrReducer never mutates, it returns a fresh state with a
+  // fresh events array on every event. A deep $state re-proxied that whole
+  // log per event, so every derived reading it (transcript, tail follow, seat
+  // table, step transitions) re-walked and re-subscribed to every event --
+  // O(events) per event, which outran a 50ms-paced commander game and froze
+  // the spectator tab. Reassignment is the only write, so raw is exact.
+  dvr = $state.raw<DvrState>(initialDvr);
   decision = $state<DecisionBody | null>(null);
   halted = $state<string | null>(null);
   loadError = $state<string | null>(null);

@@ -49,7 +49,10 @@ export class ManaBrewMatch implements ClientModelSource, SeatTransport {
   view = $state<View | null>(null);
   renderedSeq = $state<number | null>(null);
   seats = $state<SeatInfo[]>([]);
-  dvr = $state<DvrState>(initialDvr);
+  // Raw, not deep: every write is a whole-object reassignment from
+  // dvrReducer (see MatchState.dvr in ../match.svelte.ts for the freeze a
+  // deep proxy of the growing event log caused).
+  dvr = $state.raw<DvrState>(initialDvr);
   /** The spectator decision line; a ManaBrew source is always seated, so never set. */
   decision = $state<DecisionBody | null>(null);
   halted = $state<string | null>(null);
