@@ -1052,6 +1052,21 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			namedSearch[d.Step] = true
 		}
 	}
+	// A step holding a lone cost_posed decline (loneTriggerCostDecline) is the
+	// one shape where gorge scripts a "no" XMage can consume on an EARLIER
+	// trigger-cost pay chooseUse: XMage asks every optional triggered cost in
+	// resolution order, so Smuggler's Copter's may-draw chooseUse comes before
+	// Balthier and Fran's {1}{R}{G} one, and with the Copter's pay left
+	// unscripted the "no" shifted onto it (XMage never looted what gorge
+	// looted). Script each trigger-cost pay in such a step so the queue stays
+	// aligned. A step with no cost_posed decline keeps the pay unscripted:
+	// XMage's own AI answers it, which the measured rows already agree with.
+	costPosedDeclineStep := map[int]bool{}
+	for _, d := range ds {
+		if loneTriggerCostDecline(d) {
+			costPosedDeclineStep[d.Step] = true
+		}
+	}
 	routing := newAnswerRouting(ds)
 	// Trigger-order name answers are demoted back to the inert text form when
 	// the step also scripts other asks (see the trigger_order case).
@@ -1295,6 +1310,15 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			}
 			if yn, ok := yesNo(d); ok {
 				as = append(as, XAnswer{d.Seat, "choice", yn})
+				break
+			}
+			if pickKind(d, 0) == "trigger_cost_pay" && len(d.Picks) == 1 && costPosedDeclineStep[d.Step] {
+				// The pay side of a triggered optional cost XMage poses as a
+				// chooseUse, in a step that also scripts a cost_posed decline's
+				// "no" (see costPosedDeclineStep). Gorge elected the cost, so
+				// answer XMage's chooseUse yes and let the decline's "no" land
+				// on its own ask instead of this one.
+				as = append(as, XAnswer{d.Seat, "choice", "yes"})
 				break
 			}
 			if d.Resume == "sacrifice" && d.Min == 0 && len(d.Picks) > 0 {
@@ -1775,8 +1799,12 @@ func singleTargetAnswer(d rules.OracleDecision, k int) XAnswer {
 	}
 	if currentFaceTargetRef(d, k) {
 		// The option label names a different object than the ref -- the
-		// permanent's current face (a transformed DFC, a face-down card). The
-		// ref's identity alias selects the live object.
+		// permanent's current face (a transformed DFC, a face-down card). Its
+		// current name selects the live object when no other option shares
+		// it; else the ref's identity alias.
+		if name, ok := uniqueCurrentFaceName(d, k); ok {
+			return XAnswer{d.Seat, "target", name}
+		}
 		return XAnswer{d.Seat, "target", ref}
 	}
 	_, marker := SameNameAmbiguity(d, k)

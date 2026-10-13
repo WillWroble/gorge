@@ -164,6 +164,19 @@ func announcesX(cost string) bool {
 // pick: waterbend lets a player tap permanents for {1}, it never requires it.
 func activationXAnswers(cost string, xMin ...int) []oraclegen.Answer {
 	x := activationX(cost, xMin...)
+	if x > 0 {
+		// A tapXType<X/...> cost's X is the tap election's own selection:
+		// answer it with the catalogue permanents the fixture placed, or
+		// the runner's fallback taps none and announces X = 0.
+		for _, tok := range costTokens(cost) {
+			if !strings.HasPrefix(tok, "tapXType<X/") {
+				continue
+			}
+			if picks, ok := tapXTypeFixtures(tok, x); ok {
+				return []oraclegen.Answer{{Kind: "choose", Pick: picks}}
+			}
+		}
+	}
 	if x == 0 || !announcesX(cost) {
 		return nil
 	}

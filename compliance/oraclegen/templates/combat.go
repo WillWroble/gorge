@@ -106,8 +106,15 @@ func combatScenario(f *cards.Face, name string, req levelb.Requirement, steps []
 			"p0": p0,
 			"p1": {Battlefield: []string{combatBlocker}},
 		},
-		SetupAnswers: oraclegen.OpeningHandAnswers(f),
+		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), faceKeepAnswers(f)...),
 		Steps:        append([]oraclegen.Step(nil), steps...),
+	}
+	if keep := faceKeepAnswers(f); len(keep) > 0 && eachUpkeep(f) && len(sc.Steps) > 0 && sc.Steps[0].Op == "attack" && sc.Steps[0].Seat == 1 {
+		// The opponent's attack advances to its turn, whose upkeep poses
+		// the same "each upkeep" self-transform again (Aang, Master of
+		// Elements): decline it there too, or the block names a face the
+		// card no longer shows.
+		sc.Steps[0].Answers = append(append([]oraclegen.Answer(nil), sc.Steps[0].Answers...), keep...)
 	}
 	oraclegen.Baseline(sc.Setup, f)
 	return sc

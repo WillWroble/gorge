@@ -73,7 +73,7 @@ func costProbeItem(reg *cards.Registry, f *cards.Face, name string, req levelb.R
 	setupBackFace(&p0, name, req)
 	sc := oraclegen.Scenario{
 		Setup:        map[string]oraclegen.Seat{"p0": p0, "p1": p1},
-		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), p.setupAnswers...),
+		SetupAnswers: append(append(oraclegen.OpeningHandAnswers(f), faceKeepAnswers(f)...), p.setupAnswers...),
 	}
 	sc.Steps = append(sc.Steps, fx.CombatSteps()...)
 	sc.Steps = append(sc.Steps, fx.Prelude()...)
