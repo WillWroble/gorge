@@ -77,6 +77,11 @@ func botEventReq(seed uint64, policies ...string) protocol.CreateEventRequest {
 	return req
 }
 
+// pollEvery is the sleep between polls. It is a poll interval, not a
+// threshold: every wait here has a 50s ceiling, so load only slows a poll
+// and never turns PASS into FAIL.
+const pollEvery = time.Second / 50
+
 // waitPhase polls until the event reaches the phase.
 func waitPhase(t *testing.T, h *Host, id, phase string, d time.Duration) {
 	t.Helper()
@@ -92,7 +97,7 @@ func waitPhase(t *testing.T, h *Host, id, phase string, d time.Duration) {
 		if time.Now().After(deadline) {
 			t.Fatalf("phase %s not reached in %s (still %s)", phase, d, st.Phase)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(pollEvery)
 	}
 }
 
@@ -384,7 +389,7 @@ func TestRestartReplaysInFlightGames(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("(1,2) match never finished: %+v", mi)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(pollEvery)
 	}
 
 	p.h.Close()
