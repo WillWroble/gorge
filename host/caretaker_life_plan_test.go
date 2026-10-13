@@ -18,7 +18,7 @@ func TestCaretakerNeverSelectsLifePayingPlan(t *testing.T) {
 	d, v := lifeOnlyDecision()
 	for _, policy := range []string{BotPolicy, LethalPressurePolicy, CastProfilePolicy} {
 		t.Run(policy, func(t *testing.T) {
-			caretaker, err := newCaretakerSeat(policy, 19, true, bots.Deps{})
+			caretaker, err := newCaretakerSeat(policy, 19, true, false, bots.Deps{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +46,7 @@ func TestCaretakerNeverSelectsLifePayingPlan(t *testing.T) {
 		})
 	}
 	// Without auto-pay the caretaker is the plain policy bot.
-	s, err := newCaretakerSeat(BotPolicy, 19, false, bots.Deps{})
+	s, err := newCaretakerSeat(BotPolicy, 19, false, false, bots.Deps{})
 	if err != nil {
 		t.Fatal(err)
 	}
