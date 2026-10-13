@@ -89,6 +89,12 @@ SEED=${SEED:-1}
 # A distinct variable name here means the Makefile's export can never
 # silently reach the server; a long-running demo wants a higher ceiling.
 DEMO_GOMEMLIMIT=${DEMO_GOMEMLIMIT:-8GiB}
+# gorged -pprof: Go runtime profiles at /debug/pprof/ on each demo server.
+# Off by default. gorged refuses -pprof on a non-loopback listener, and the
+# demo binds 127.0.0.1, but anything the box forwards to these ports (a
+# tunnel or reverse proxy publishing the demo) forwards /debug/pprof/ with
+# it. Set PPROF=true for one deploy to profile it, then redeploy without.
+PPROF=${PPROF:-false}
 
 PUB_PORT=${PUB_PORT:-8080}
 # OMNI_PORT empty (the default) runs no second server.
@@ -279,6 +285,7 @@ start_one() {
 		-format "$FORMATS" \
 		-seed "$SEED" \
 		-art-dir "$ART_DIR" \
+		-pprof="$PPROF" \
 		-vsbot \
 		"$@" \
 		>"$log" 2>&1 </dev/null 9>&- &
