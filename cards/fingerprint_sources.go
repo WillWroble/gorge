@@ -27,6 +27,7 @@ import "embed"
 //
 //go:embed ability_class.go
 //go:embed affected_defined.go
+//go:embed ateot_values.go
 //go:embed cache_canon.go
 //go:embed compiled_catalog.go
 //go:embed compiled_codes.go

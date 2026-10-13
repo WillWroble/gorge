@@ -143,8 +143,7 @@
      }
     }
    ],
-   "xmage": "GeistOfSaintTraftTest#testTokenwillBeExiled",
-   "known_bug": "B11: Token AtEOT$ ExileCombat is not implemented (effects/ateot.go:37-52 emits a Note and keeps the token), so Geist of Saint Traft's Angel survives end of combat. CR 511.2 (delayed trigger at end of combat)."
+   "xmage": "GeistOfSaintTraftTest#testTokenwillBeExiled"
   }
  ]
 }
