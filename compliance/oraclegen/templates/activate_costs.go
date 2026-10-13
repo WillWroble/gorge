@@ -252,11 +252,12 @@ func returnCreatureFixture(tok string) string {
 const unblockedAttackerFilter = "creature.youctrl+attacking+unblocked"
 
 // unblockedAttacker is the p0 creature that attacks p1 unblocked to pay it: a
-// vanilla creature no baseline permanent shares a name with.
-const unblockedAttacker = "Hill Giant"
+// vanilla flier, so p1's baseline ground creature has no legal block and no
+// blockers declaration needs scripting in either engine.
+const unblockedAttacker = "Wind Drake"
 
 // returnUnblockedPrelude declares the unblocked attack a Ninjutsu return cost
-// needs: p0's fixture attacks p1 and p1 declares no blockers, leaving p0 with
+// needs: p0's flying fixture attacks p1, which can block nothing, and p0 has
 // priority in the declare blockers step (CR 702.49a's activation window).
 // ok is false for a cost without that part.
 func returnUnblockedPrelude(cost string) (conditionPrelude, bool) {
@@ -269,7 +270,7 @@ func returnUnblockedPrelude(cost string) (conditionPrelude, bool) {
 			if len(parts) >= 2 && strings.EqualFold(strings.TrimSpace(parts[1]), unblockedAttackerFilter) {
 				return conditionPrelude{steps: []oraclegen.Step{
 					{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + unblockedAttacker}},
-					{Op: "block", Seat: 1},
+					{Op: "pass_to", Seat: 0, Step: "declare-blockers"},
 				}}, true
 			}
 		}

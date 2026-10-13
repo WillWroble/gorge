@@ -11,8 +11,8 @@ import (
 
 // activationsExhaustUnboundedItem serves Elvish Refueler's Activations static
 // (MinLimit$ -1 over exhaust abilities, gated on no exhaust activation this
-// turn): the card's own exhaust ability is activated on turn 1, then again on
-// p0's next turn -- an activation exhaust alone forbids (CR 702.177a,
+// turn): the card's own exhaust ability is activated on turn 1, then again in
+// p0's next upkeep -- an activation exhaust alone forbids (CR 702.177a,
 // "activate each exhaust ability only once") and the static re-allows. The
 // second activation's effect is the compared trace; a gorge that withholds it
 // fails the step.
@@ -40,9 +40,10 @@ func activationsExhaustUnboundedItem(reg *cards.Registry, f *cards.Face, name st
 		{Op: "resolve"},
 	}
 	steps := append([]oraclegen.Step(nil), exhaust...)
-	steps = append(steps,
-		oraclegen.Step{Op: "pass_to", Seat: 0, Step: "upkeep", Active: "p0"},
-		oraclegen.Step{Op: "pass_to", Seat: 0, Step: "main1", Active: "p0"})
+	// The exhaust ability has no timing restriction, so it is re-activated
+	// in p0's next upkeep: one pass_to, which both engines stop at on turn 3
+	// (a second pass_to to main1 ran XMage a full round further).
+	steps = append(steps, oraclegen.Step{Op: "pass_to", Seat: 0, Step: "upkeep", Active: "p0"})
 	steps = append(steps, exhaust...)
 	sc := withBackFace(staticScenario(f, name, []string{name}, nil, steps), name, req)
 	res, ok := runStatic(reg, sc)

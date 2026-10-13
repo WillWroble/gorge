@@ -68,6 +68,14 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	if !ok {
 		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "activate xmage text ambiguous"}
 	}
+	// XMage renders A Killer Among Us's reveal cost as "Reveal the creature
+	// type you chose", not the Oracle's "Reveal the chosen creature type";
+	// the sacrifice part alone selects the card's one activated ability.
+	if _, reveal := revealChosenTokenShape(f, sa); reveal {
+		if i := strings.Index(prefix, ", Reveal"); i > 0 {
+			prefix = prefix[:i]
+		}
+	}
 	zone := activationZone(req.Sub)
 	pool, gap := activationCostIn(sa.ParamStr(cards.PKCost), zone, name, saXMin(sa))
 	if gap != "" {
