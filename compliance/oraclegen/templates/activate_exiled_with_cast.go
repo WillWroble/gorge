@@ -131,10 +131,14 @@ func faceDownTargetShape(sa *cards.SA) bool {
 
 // castFixturePrelude is the activate template's one hook for a target the
 // fixture cross product cannot place and a real cast must make: the source's
-// own exiled-with cast, or a face-down probe. ok is false when neither shape
+// own exiled-with cast, the source's own token-and-secret-choice cast (A
+// Killer Among Us), or a face-down probe. ok is false when neither shape
 // holds.
 func castFixturePrelude(reg *cards.Registry, f *cards.Face, sa *cards.SA, name string, p0 *oraclegen.Seat) ([]oraclegen.Step, []string, bool) {
 	if steps, targets, ok := exiledWithCastPrelude(f, sa, name, p0); ok {
+		return steps, targets, true
+	}
+	if steps, targets, ok := revealChosenTokenPrelude(f, sa, name, p0); ok {
 		return steps, targets, true
 	}
 	return faceDownTargetPrelude(reg, sa, p0)
@@ -142,5 +146,76 @@ func castFixturePrelude(reg *cards.Registry, f *cards.Face, sa *cards.SA, name s
 
 // castFixtureShape reports whether castFixturePrelude serves the ability.
 func castFixtureShape(f *cards.Face, sa *cards.SA) bool {
-	return exiledWithCastShape(f, sa) || (sa != nil && faceDownTargetShape(sa))
+	_, reveal := revealChosenTokenShape(f, sa)
+	return exiledWithCastShape(f, sa) || reveal || (sa != nil && faceDownTargetShape(sa))
+}
+
+// revealChosenTokenShape reads an ability whose cost reveals the source's
+// secretly chosen creature type and sacrifices the source, targeting an
+// attacking creature token (A Killer Among Us). The source's own enters
+// trigger makes the tokens and makes the secret choice among ValidTypes$;
+// chosen is the first type, whose token the prelude attacks with. ok is false
+// for any other ability.
+func revealChosenTokenShape(f *cards.Face, sa *cards.SA) (chosen string, ok bool) {
+	if sa == nil || !strings.Contains(sa.ParamStr(cards.PKCost), "RevealChosen<Type/") ||
+		!strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKValidTgts)), "Creature.token+attacking") {
+		return "", false
+	}
+	for _, t := range f.Triggers {
+		if t.Mode != "ChangesZone" || !strings.EqualFold(t.ParamStr(cards.PKValidCard), "Card.Self") {
+			continue
+		}
+		body := f.SVars[t.Params["Execute"]]
+		sub := f.SVars[subAbilityOf(body)]
+		if !strings.Contains(body, "DB$ Token") || !strings.Contains(sub, "DB$ ChooseType") || !strings.Contains(sub, "Secretly$ True") {
+			continue
+		}
+		for _, part := range strings.Split(sub, "|") {
+			if v, has := strings.CutPrefix(strings.TrimSpace(part), "ValidTypes$"); has {
+				first := strings.TrimSpace(strings.Split(v, ",")[0])
+				return first, first != ""
+			}
+		}
+	}
+	return "", false
+}
+
+// subAbilityOf is an SVar body's SubAbility$ name, "" when it has none.
+func subAbilityOf(body string) string {
+	for _, part := range strings.Split(body, "|") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(part), "SubAbility$"); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// revealChosenTokenPrelude casts the source, answers its secret choice with
+// the first offered type, advances to p0's next turn (a token made this turn
+// cannot attack, CR 302.6) and attacks with that type's token, which the
+// activation then targets.
+func revealChosenTokenPrelude(f *cards.Face, sa *cards.SA, name string, p0 *oraclegen.Seat) ([]oraclegen.Step, []string, bool) {
+	chosen, ok := revealChosenTokenShape(f, sa)
+	if !ok {
+		return nil, nil, false
+	}
+	pool, why := oraclegen.PoolFor(f.ManaCost)
+	if why != "" {
+		return nil, nil, false
+	}
+	for i, n := range p0.Battlefield {
+		if n == name {
+			p0.Battlefield = append(p0.Battlefield[:i:i], p0.Battlefield[i+1:]...)
+			break
+		}
+	}
+	p0.Hand = appendFixtureUnique(p0.Hand, name)
+	token := "p0:token:" + chosen + " Token"
+	return []oraclegen.Step{
+		{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: pool},
+		{Op: "resolve", Answers: []oraclegen.Answer{{Kind: "choose", Pick: []string{chosen}}}},
+		{Op: "pass_to", Seat: 0, Step: "upkeep", Active: "p0"},
+		{Op: "pass_to", Seat: 0, Step: "main1", Active: "p0"},
+		{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{token}},
+	}, []string{token}, true
 }

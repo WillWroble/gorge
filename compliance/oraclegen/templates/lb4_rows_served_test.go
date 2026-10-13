@@ -89,6 +89,13 @@ func TestLevelBCostAndStaticRowsServed(t *testing.T) {
 					t.Fatalf("Kaito did not enter tapped and attacking: %+v", p)
 				}
 			}},
+		{"A Killer Among Us", "activate#0.0", "RevealChosen: the secret choice made by the source's cast, the token attacking",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				p, ok := permByNameIn(res, "Human Token")
+				if !ok || p.Counters["P1P1"] != 3 {
+					t.Fatalf("the chosen-type Human token holds %v, want P1P1=3", p.Counters)
+				}
+			}},
 		{"Leyline of Mutation", "static#0.0", "AlternativeCost for your spells", poolEmpty(0)},
 		{"Kíli the Resourceful", "static#0.0", "AlternativeCost {0} equip under an enduring story", nil},
 		{"Agatha's Soul Cauldron", "static#0.1", "abilities of cards exiled with the source on countered creatures",

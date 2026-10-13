@@ -97,6 +97,13 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 			if _, _, _, ok := otherCounterCost(tok); ok {
 				continue
 			}
+		case "RevealChosen":
+			// Revealing the source's secretly chosen type (A Killer Among
+			// Us): the choice is made by the source's own cast in
+			// revealChosenTokenPrelude; the reveal pays no resource.
+			if strings.HasPrefix(tok, "RevealChosen<Type/") {
+				continue
+			}
 		case "RemoveAnyCounter":
 			if _, _, ok := sourceCounterCost(tok); ok {
 				continue
