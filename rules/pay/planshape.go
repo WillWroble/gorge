@@ -614,7 +614,7 @@ func ManaReachable(e Engine, p state.PlayerID, cost costvocab.Cost, pool, snow s
 				// present before the tap and is gone for the priced cost
 				// afterwards. Every shared-window alt carries life 0, so
 				// this is inert for the attack and unless windows.
-				if a.Life > lifeLeft {
+				if a.Life > lifeLeft || (a.LifeKeep && a.Life >= lifeLeft) {
 					continue
 				}
 				if rec(i+1, remaining-1, ManaAdd(acc, a.Mana()), lifeLeft-a.Life) {

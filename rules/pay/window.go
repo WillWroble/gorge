@@ -51,6 +51,12 @@ type WindowAlt struct {
 	// that spends Life must not be promised as if the Life were still
 	// available for the cost being priced.
 	Life int32
+	// LifeKeep marks a Life debit that must leave the payer alive: the
+	// affordability search skips the alt when Life would take the payer to
+	// 0 or below. Only the paid-cost census layer (paidManaAlts) sets it, so
+	// every other alt keeps the cast probe's historical "Life > lifeLeft"
+	// test.
+	LifeKeep bool
 	// CostGeneric is the literal generic mana the activation pays BEFORE the
 	// production is added (a "{N}, {T}: add ..." activation cost). Every alt
 	// the shared windowManaUnits builds carries 0 (a free tap), so the field
