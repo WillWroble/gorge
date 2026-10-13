@@ -332,6 +332,15 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return nil, true
 	case soleAltCost(d):
 		return as, true
+	case r.unpayableCostWindowClosed(i):
+		// gorge's mana window for an optional triggered cost, closed with
+		// "done" because no potential mana covers the cost (the runner's
+		// unpayableTriggerCostWindowDone), then the decline-only ask the
+		// forced-single-option filter drops. XMage has no mana window; it
+		// poses DoIfCostPaid's "Pay {2}?" chooseUse (measured on Esoteric
+		// Duplicator: strict mode's "Missing CHOICE def" on that ask), so
+		// the window's close scripts the decline there.
+		return append(as, XAnswer{d.Seat, "choice", "no"}), true
 	case waterbendHelperDeclined(d):
 		// The waterbend tap-helpers ask: XMage pays the ability's waterbend
 		// generic from the prefilled mana pool and never poses the ask, so
@@ -420,6 +429,18 @@ func distinctRefs(refs []string) int {
 		seen[ref] = struct{}{}
 	}
 	return len(seen)
+}
+
+// unpayableCostWindowClosed reports decision i as a payment mana window
+// (options "Tap <source> for mana" ... "Done") answered "done", followed by
+// the same asker's decline-only triggered-cost ask ("Do not pay" alone).
+func (r *answerRouting) unpayableCostWindowClosed(i int) bool {
+	d := r.ds[i]
+	if d.Kind != "choose_n" || len(d.Picks) != 1 || pickKind(d, 0) != "done" || i+1 >= len(r.ds) {
+		return false
+	}
+	next := r.ds[i+1]
+	return sameAsker(d, next) && next.Options == 1 && len(next.Picks) == 1 && pickKind(next, 0) == "trigger_cost_decline"
 }
 
 // lookedFirst reports a look_ack by the same seat earlier in decision i's

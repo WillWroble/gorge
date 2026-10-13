@@ -323,6 +323,15 @@ func TestMayYesQueuesEveryFallbackDecisionInStepOrder(t *testing.T) {
 	if !reflect.DeepEqual(got.Steps[0].Answers, want) {
 		t.Fatalf("answers = %+v, want %+v", got.Steps[0].Answers, want)
 	}
+
+	// A fallback that deliberately answered past option 0 (the runner's
+	// "done" on an optional triggered cost's unpayable mana window) is not
+	// re-pinned to option 0: that would tap the source it declined to tap.
+	done := []rules.OracleDecision{{Step: 0, GorgeKind: "choose", First: "Tap Llanowar Elves for mana", Options: 2,
+		Via: "resolve fallback", Picks: []string{"Done"}, PickIdx: []int{1}}}
+	if got, changed := MayYes(sc, done); changed || len(got.Steps[0].Answers) != 0 {
+		t.Fatalf("MayYes re-pinned a deliberate non-first fallback: %+v", got.Steps)
+	}
 }
 
 // TestXMQueueCensus pins the option-kind to queue mapping directly, so a kind
