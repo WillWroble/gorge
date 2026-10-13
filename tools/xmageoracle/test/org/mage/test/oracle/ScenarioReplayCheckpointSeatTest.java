@@ -72,7 +72,7 @@ public final class ScenarioReplayCheckpointSeatTest {
         // Preconditions: the two seats are different objects.
         equal(false, a == b);
 
-        Method seatFor = ScenarioReplay.class.getDeclaredMethod("checkpointSeat", String.class, JsonObject.class);
+        Method seatFor = ScenarioReplay.class.getDeclaredMethod("checkpointSeat", String.class, JsonObject.class, int.class);
         seatFor.setAccessible(true);
         JsonObject seat0 = JsonParser.parseString("{\"op\":\"pass_to\",\"seat\":0}").getAsJsonObject();
         JsonObject seat1Resolve = JsonParser.parseString("{\"op\":\"resolve\",\"seat\":1}").getAsJsonObject();
@@ -80,12 +80,24 @@ public final class ScenarioReplayCheckpointSeatTest {
 
         // pass_to checkpoints on the active seat, whatever seat the step names.
         set(d, "activeSeat", 1);
-        equal(true, seatFor.invoke(d, "pass_to", seat0) == b);
+        equal(true, seatFor.invoke(d, "pass_to", seat0, 0) == b);
         set(d, "activeSeat", 0);
-        equal(true, seatFor.invoke(d, "pass_to", seat0) == a);
+        equal(true, seatFor.invoke(d, "pass_to", seat0, 0) == a);
         // A seat-1 resolve waits on seat 1's queue; other ops keep seat 0.
-        equal(true, seatFor.invoke(d, "resolve", seat1Resolve) == b);
-        equal(true, seatFor.invoke(d, "cast", seat0Cast) == a);
+        equal(true, seatFor.invoke(d, "resolve", seat1Resolve, 0) == b);
+        equal(true, seatFor.invoke(d, "cast", seat0Cast, 0) == a);
+        // The active seat 1's own cast-then-pass pair (Zidane) resolves on
+        // seat 1's queue, so its second pass checkpoints there; its first
+        // pass keeps seat 0, which sees the spell after seat 1 passes.
+        set(d, "sc0", JsonParser.parseString("{\"steps\":[{\"op\":\"pass_to\",\"seat\":0,\"step\":\"main1\",\"active\":\"p1\"},"
+                + "{\"op\":\"cast\",\"seat\":1},{\"op\":\"pass\",\"seat\":1},{\"op\":\"pass\",\"seat\":0},"
+                + "{\"op\":\"resolve\",\"seat\":0}]}").getAsJsonObject());
+        JsonObject pass1 = JsonParser.parseString("{\"op\":\"pass\",\"seat\":1}").getAsJsonObject();
+        JsonObject pass0 = JsonParser.parseString("{\"op\":\"pass\",\"seat\":0}").getAsJsonObject();
+        set(d, "activeSeat", 1);
+        equal(true, seatFor.invoke(d, "pass", pass1, 2) == a);
+        equal(true, seatFor.invoke(d, "pass", pass0, 3) == b);
+        set(d, "activeSeat", 0);
 
         // The activation text names its card: a space-free alias prefix, so
         // "+1" no longer matches whichever planeswalker XMage lists first.
