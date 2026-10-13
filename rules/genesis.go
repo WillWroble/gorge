@@ -330,10 +330,7 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 	e.trigGrant.replFree = true // the granted-replacement proof (trigger_grantfree.go)
 	e.G.NameUniverse = cfg.NameUniverse
 	e.G.NamedCorpus = cfg.NamedCorpus
-	e.G.NameUniverseNames = append([]string(nil), cfg.NameUniverseNames...)
-	if len(e.G.NameUniverseNames) == 0 && cfg.NameUniverse.Len() > 0 {
-		e.G.NameUniverseNames = effects.NameUniverseNames(cfg.NameUniverse)
-	}
+	e.G.NameUniverseNames = effects.InternNameUniverseNames(cfg.NameUniverse, cfg.NameUniverseNames)
 	e.manaExpendedTurn = e.G.Turn
 	e.format = cfg.Format
 	for i := range e.G.Players {
