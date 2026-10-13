@@ -402,6 +402,19 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		// no chooseUse to answer (measured driver error: "Found wrong choice
 		// command").
 		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}), true
+	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && !r.lookedFirst(i) &&
+		d.Max > 1 && distinctRefs(d.OptionRefs) > 1:
+		// A declined "you may cast up to N of them" Play over several cards
+		// (Baron Helmut Zemo's "cast up to three of the copies"): XMage's
+		// CardUtil.castMultipleWithAttributeForFree first asks WHICH card
+		// through a TargetCard(0, 1) player.choose -- TestPlayer's CHOICE
+		// queue -- so the decline is the choice skip token (measured: a
+		// chooseUse "no" there is "Found wrong choice command ... Select up
+		// to one card to cast"). A skipped pick is a cast that did not
+		// happen, after which a human player is asked "Continue casting?"
+		// (chooseUse): "no" ends the loop, or the unanswered ask lets the
+		// AI cast the copies.
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}, XAnswer{d.Seat, "choice", "no"}), true
 	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && r.lookedFirst(i):
 		// A declined optional Play after a hidden-zone look (Cosmic Cube's
 		// "you may cast a spell from among them"). XMage's

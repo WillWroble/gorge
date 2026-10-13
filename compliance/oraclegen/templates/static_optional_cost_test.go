@@ -152,16 +152,24 @@ func TestStaticOptionalCostServed(t *testing.T) {
 	}
 }
 
-// TestStaticOptionalCostNamedSkips: the compound cost gets a named skip, never
-// the generic gap, and the level-A cast of a served card keeps its bytes.
-func TestStaticOptionalCostNamedSkips(t *testing.T) {
+// TestStaticOptionalCostCompoundShapes: the one measured compound cost,
+// Celestial Reunion's "ChooseCreatureType<1> Behold<2/Creature.ChosenType>",
+// is served (chooseTypeBeholdSetup); any other compound shape is refused, so
+// optionalCostItem names it as a skip rather than serving it blindly.
+func TestStaticOptionalCostCompoundShapes(t *testing.T) {
 	reg := loadGenRegistry(t)
-	_, skip := GenerateB(reg, "Celestial Reunion", optionalCostReq(t, reg, "Celestial Reunion"))
-	if skip == nil {
-		t.Fatalf("Celestial Reunion: served, want a named skip")
+	if _, skip := GenerateB(reg, "Celestial Reunion", optionalCostReq(t, reg, "Celestial Reunion")); skip != nil {
+		t.Fatalf("Celestial Reunion skipped: %s", skip.Reason)
 	}
-	if !strings.HasPrefix(skip.Reason, "static OptionalCost ") || !strings.Contains(skip.Reason, "compound cost") {
-		t.Errorf("skip %q, want static OptionalCost ... compound cost", skip.Reason)
+	for _, toks := range [][]string{
+		{"ChooseCreatureType<1>", "Behold<1/Creature.ChosenType>"},
+		{"ChooseCreatureType<1>", "Behold<2/Creature>"},
+		{"Behold<2/Creature.ChosenType>", "ChooseCreatureType<1>"},
+		{"ChooseCreatureType<1>", "Blight<1>"},
+	} {
+		if _, ok := chooseTypeBeholdSetup(toks); ok {
+			t.Errorf("compound %v is served, want refused", toks)
+		}
 	}
 }
 

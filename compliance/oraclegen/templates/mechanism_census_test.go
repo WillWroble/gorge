@@ -61,8 +61,10 @@ func censusPrintedCards(t *testing.T) ([]string, map[string][]string) {
 // (ticket lb-xoptcost rows 138/182). The counts are the corpus-wide inventory
 // of the mechanism; a card that starts or stops scripting the yes, or a set
 // whose served rows move, must be re-measured and re-pinned here.
+// ECL 5: Celestial Reunion's compound "choose a creature type and behold
+// two" joined the served rows (lb5-costgrammar).
 var wantOptionalCostAnswerCensus = map[string]int{
-	"BIG": 0, "BLB": 0, "DFT": 0, "DSK": 0, "ECL": 4,
+	"BIG": 0, "BLB": 0, "DFT": 0, "DSK": 0, "ECL": 5,
 	"EOE": 0, "FDN": 0, "FIN": 0, "FRA": 0, "HOB": 0,
 	"LCI": 0, "MKM": 8, "MSH": 0, "OTJ": 0, "SOS": 0,
 	"SPM": 0, "TDM": 3, "TLA": 3, "TMT": 0, "WOE": 0,
