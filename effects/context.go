@@ -619,7 +619,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// selector was unknown and Defined's plain-Remembered drop left it
 		// charging NOBODY. An empty remembered-player pool is the known-empty
 		// set (ok=true), never a fallback to the source.
-		return playersOf(resolvedRemembered(h, c)), true
+		return playersOf(hostRemembered(h, c)), true
 	case definedSpecExiled:
 		// Forge's cast-cost PAID lists: the cards this cast's/activation's own
 		// cost exiled or revealed (see paidCostTargets -- the one shared home
@@ -758,14 +758,14 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return nil, true
 	case definedSpecRememberedController:
-		return controllersOf(g, resolvedRemembered(h, c)), true // persistent-aware, as plain Remembered
+		return controllersOf(g, hostRemembered(h, c)), true // persistent-aware, capture-excluded
 	case definedSpecNonRememberedController:
 		// These selectors name living players other than the controller of a
 		// remembered CARD. A remembered player is not a card anchor, and an
 		// absent remembered card fails closed to nobody.
 		var excluded state.PlayerID
 		found := false
-		for _, t := range c.Remembered {
+		for _, t := range hostRemembered(h, c) {
 			if t.IsPlayer || t.Obj == 0 {
 				continue
 			}
@@ -786,7 +786,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return out, true
 	case definedSpecRememberedOwner:
-		return ownersOf(g, c.Remembered), true
+		return ownersOf(g, hostRemembered(h, c)), true
 	case definedSpecTargetedController:
 		return controllersOf(g, c.Targets), true
 	case definedSpecTargetedPlayer:
@@ -1978,20 +1978,33 @@ func copyTargets(s []state.Target) []state.Target {
 //     list -- the firing referent is not a card-list read even when the source
 //     has written nothing else.
 func resolvedRemembered(h Host, c *Ctx) []state.Target {
+	if len(c.Captured) > 0 && len(c.DelayedRemembered) == 0 && len(sourceRemembered(h, c)) == 0 {
+		// The ordinary trigger whose source wrote nothing: the capture is
+		// all the context has (the second shape above).
+		return copyTargets(c.Remembered)
+	}
+	return hostRemembered(h, c)
+}
+
+// hostRemembered is Forge's host remembered list: resolvedRemembered
+// WITHOUT its ordinary-trigger fallback, so a firing-event capture the
+// source never wrote is dropped even when the source wrote nothing at all.
+// It is the set every Remembered* PLAYER derivation reads (RememberedOwner,
+// RememberedController, NonRememberedController, RememberedPlayer): those
+// name the player tied to a card the ability remembered, and Forge's
+// getDefinedPlayers never consults the triggered object for them. Unidentified
+// Hovership is the measured case (CR 608.2b): its leave trigger is
+// `DefinedPlayer$ RememberedOwner`, the trigger's capture is the Hovership
+// itself, and an ETB that exiled nothing left the source's list empty -- the
+// fallback made the Hovership's owner manifest dread instead of nobody.
+func hostRemembered(h Host, c *Ctx) []state.Target {
 	if len(c.Captured) == 0 {
 		return copyTargets(c.Remembered)
 	}
-	delayed := len(c.DelayedRemembered) > 0
-	if delayed && sameTargets(c.Captured, c.DelayedRemembered) {
+	if len(c.DelayedRemembered) > 0 && sameTargets(c.Captured, c.DelayedRemembered) {
 		return copyTargets(c.Remembered)
 	}
-	var persistent []state.Target
-	if src := h.Game().Obj(c.Source); src != nil {
-		persistent = src.Remembered
-	}
-	if !delayed && len(persistent) == 0 {
-		return copyTargets(c.Remembered)
-	}
+	persistent := sourceRemembered(h, c)
 	if sameTargets(c.Remembered, c.Captured) && len(persistent) > 0 {
 		return copyTargets(persistent)
 	}
@@ -2003,6 +2016,15 @@ func resolvedRemembered(h Host, c *Ctx) []state.Target {
 		out = append(out, t)
 	}
 	return out
+}
+
+// sourceRemembered is the resolving source's persistent, event-backed
+// Remembered list (nil for a departed source).
+func sourceRemembered(h Host, c *Ctx) []state.Target {
+	if src := h.Game().Obj(c.Source); src != nil {
+		return src.Remembered
+	}
+	return nil
 }
 
 func sameTargets(a, b []state.Target) bool {
