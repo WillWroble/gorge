@@ -183,6 +183,10 @@ func (e *Engine) entryETBChoice(ev events.Event, ordinal int) (etbChoice, bool) 
 				// exactly the list the mid-resolution ChooseType ask builds
 				// (effects/type_choices.go), so the two asks cannot disagree.
 				opts = e.typeChoiceOptions(you, o.ID, r.With.Params)
+			} else if kind == "number" {
+				// The card's own Min$/Max$ bound, through the ONE bound reader
+				// the mid-resolution ChooseNumber ask uses (Talion: 1..10).
+				opts = effects.ETBNumberChoices(e, o.ID, you, o.Face().SVars, r.With)
 			} else {
 				opts = e.etbOptions(you, o.ID, kind,
 					r.With.ParamStr(cards.PKValidCards), selector,

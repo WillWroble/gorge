@@ -6,6 +6,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/state"
 )
 
 // This file is the ONE home for the option list a ChooseNumber ask ranges
@@ -69,8 +70,7 @@ const chooseNumberBoundedCeiling = 1000
 //
 // Without a Max$ the list stays the historical fixed 0..chooseNumberMaxOffer,
 // unless Min$ sets a floor (then the same default ceiling is retained). The
-// as-enters ask (rules/cast.go etbOptions' number arm) still shares its
-// unchanged no-argument NumberChoices list.
+// as-enters ask reaches this function through ETBNumberChoices.
 //
 // ok=false reports a bound the card states but this context cannot honour: an
 // unresolvable Max$/Min$ expression, a lower bound above the upper one, a
@@ -129,4 +129,19 @@ func boundedNumberChoices(lo, hi int32) []decision.Option {
 		out = append(out, decision.Option{Index: len(out), Kind: "number", Label: strconv.Itoa(int(i)), Amount: int(i)})
 	}
 	return out
+}
+
+// ETBNumberChoices is the as-enters ask's entry into chooseNumberAsk, so the
+// "As ~ enters, choose a number between A and B" ask honours the same Min$/
+// Max$ bounds (and SVar-driven bounds, resolved against the entering object's
+// own script table) the mid-resolution ChooseNumber ask does. A bound the
+// context cannot honour falls back to the historical fixed list: an entry ask
+// must never be handed out with zero options (rules/cast_etbchoice.go's
+// totality rule).
+func ETBNumberChoices(h Host, source state.ObjID, controller state.PlayerID, svars map[string]string, sa *cards.SA) []decision.Option {
+	c := NewCtxPtr(source, controller, CtxInit{SVars: svars})
+	if opts, _, ok := chooseNumberAsk(h, c, sa); ok && len(opts) > 0 {
+		return opts
+	}
+	return NumberChoices()
 }
