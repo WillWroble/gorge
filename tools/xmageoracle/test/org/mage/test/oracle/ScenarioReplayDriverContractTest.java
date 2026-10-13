@@ -377,11 +377,11 @@ public final class ScenarioReplayDriverContractTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Object optionalAdditionalCostAnswer(boolean bargained, List<String> choices) throws Exception {
+    private static Object optionalAdditionalCostAnswer(boolean bargained, boolean optionalCost, List<String> choices) throws Exception {
         Class<?> adapter = Class.forName("org.mage.test.oracle.ScenarioReplay$ScriptedChoicePlayer");
-        Method method = adapter.getDeclaredMethod("optionalAdditionalCostAnswer", boolean.class, List.class);
+        Method method = adapter.getDeclaredMethod("optionalAdditionalCostAnswer", boolean.class, boolean.class, List.class);
         method.setAccessible(true);
-        return method.invoke(null, bargained, choices);
+        return method.invoke(null, bargained, optionalCost, choices);
     }
 
     @SuppressWarnings("unchecked")
@@ -391,6 +391,20 @@ public final class ScenarioReplayDriverContractTest {
         Method method = adapter.getDeclaredMethod("costPickChoice", List.class, List.class, BiPredicate.class);
         method.setAccessible(true);
         return (UUID) method.invoke(null, picks, candidates, matches);
+    }
+
+    private static boolean isCraftMaterialsAsk(mage.target.Target target) throws Exception {
+        Class<?> adapter = Class.forName("org.mage.test.oracle.ScenarioReplay$ScriptedChoicePlayer");
+        Method method = adapter.getDeclaredMethod("isCraftMaterialsAsk", mage.target.Target.class);
+        method.setAccessible(true);
+        return (Boolean) method.invoke(null, target);
+    }
+
+    private static boolean craftMaterialsNeedFill(int chosen, int min, boolean queueNonEmpty) throws Exception {
+        Class<?> adapter = Class.forName("org.mage.test.oracle.ScenarioReplay$ScriptedChoicePlayer");
+        Method method = adapter.getDeclaredMethod("craftMaterialsNeedFill", int.class, int.class, boolean.class);
+        method.setAccessible(true);
+        return (Boolean) method.invoke(null, chosen, min, queueNonEmpty);
     }
 
     private static void bargain() throws Exception {
@@ -422,19 +436,28 @@ public final class ScenarioReplayDriverContractTest {
         check(!isSacrificeChoice(null), "a null ask was classified as a sacrifice");
 
         // The optional-additional-cost yes/no: a bargained cast pays (the ask
-        // is exactly what kicker/offspring/waterbend pose), a scripted "No" is
-        // consumed so strict mode sees it used, anything else declines.
-        Object pay = optionalAdditionalCostAnswer(true, new ArrayList<>());
-        Object consume = optionalAdditionalCostAnswer(false, new ArrayList<>(Arrays.asList("No")));
-        Object decline = optionalAdditionalCostAnswer(false, new ArrayList<>());
+        // is exactly what kicker/offspring/waterbend pose), a scripted no is
+        // consumed so strict mode sees it used, a scripted yes is consumed
+        // (and so pays) only on an "optionalcost" cast where gorge elected
+        // the cost, anything else declines.
+        Object pay = optionalAdditionalCostAnswer(true, false, new ArrayList<>());
+        Object consume = optionalAdditionalCostAnswer(false, false, new ArrayList<>(Arrays.asList("No")));
+        Object consumeYes = optionalAdditionalCostAnswer(false, true, new ArrayList<>(Arrays.asList("Yes")));
+        Object decline = optionalAdditionalCostAnswer(false, false, new ArrayList<>());
+        // On a plain cast a leading Yes belongs to a later ask: leave it.
+        check(optionalAdditionalCostAnswer(false, false, new ArrayList<>(Arrays.asList("Yes"))).toString().equals("DECLINE"),
+                "a plain cast consumed a leading Yes meant for a later ask");
         check(pay.toString().equals("PAY"), "a bargained cast did not PAY the optional additional cost");
         check(consume.toString().equals("CONSUME"), "a scripted No was not consumed");
+        check(consumeYes.toString().equals("CONSUME"), "a scripted Yes was not consumed");
         check(decline.toString().equals("DECLINE"), "an unscripted ask was not declined");
         // Preconditions: the three outcomes really differ, and the elected
         // mode wins over a stale scripted No.
         check(!pay.toString().equals(consume.toString()) && !consume.toString().equals(decline.toString()),
                 "the three optional-cost outcomes must differ");
-        check(optionalAdditionalCostAnswer(true, new ArrayList<>(Arrays.asList("No"))).toString().equals("PAY"),
+        check(!consumeYes.toString().equals(decline.toString()),
+                "a scripted Yes must be consumed, not declined");
+        check(optionalAdditionalCostAnswer(true, false, new ArrayList<>(Arrays.asList("No"))).toString().equals("PAY"),
                 "the elected mode must win over a scripted No");
 
         // The sacrifice object comes from the cast's recorded choose picks.
@@ -449,6 +472,34 @@ public final class ScenarioReplayDriverContractTest {
         check(costPickChoice(unmatched, both, byId) == null, "an unmatched pick was accepted");
         System.out.println("PASS Bargain election (cast_mode acceptance, sacrifice recognition, "
                 + "pay/consume/decline, recorded sacrifice pick)");
+    }
+
+    /** The craft material ask and the driver's fill loop. CraftCost.pay calls
+     * chooseTarget exactly once, so the driver must keep asking until the
+     * ask's minimum is chosen; the recognition must be structural (the target
+     * class plus a min of two or more), because the same target class serves
+     * single-material asks (Endless Detour, Daretti). */
+    private static void craft() throws Exception {
+        mage.filter.common.FilterCreatureCard cards = new mage.filter.common.FilterCreatureCard();
+        mage.filter.common.FilterControlledCreaturePermanent permanents =
+                new mage.filter.common.FilterControlledCreaturePermanent();
+        mage.target.Target craft = new mage.target.common.TargetCardInGraveyardBattlefieldOrStack(
+                2, 2, cards, permanents);
+        mage.target.Target single = new mage.target.common.TargetCardInGraveyardBattlefieldOrStack(
+                1, 1, cards, permanents);
+        mage.target.Target ordinary = new mage.target.TargetPermanent();
+        check(isCraftMaterialsAsk(craft), "a two-material graveyard/battlefield ask was not recognized as craft");
+        check(!isCraftMaterialsAsk(single), "a single-material graveyard/battlefield ask was classified as craft");
+        check(!isCraftMaterialsAsk(ordinary), "an ordinary permanent ask was classified as craft");
+        check(!isCraftMaterialsAsk(null), "a null ask was classified as craft");
+
+        // The fill loop's decision: fill only while below the minimum AND an
+        // answer is queued; a satisfied ask or an empty queue must stop it
+        // (an empty queue would fall into the base's strict-mode AI pick).
+        check(craftMaterialsNeedFill(1, 2, true), "a half-filled craft ask with a queued answer must fill");
+        check(!craftMaterialsNeedFill(2, 2, true), "a satisfied craft ask must not fill");
+        check(!craftMaterialsNeedFill(1, 2, false), "an empty queue must stop the fill loop");
+        System.out.println("PASS craft material fill (structural recognition, fill decision)");
     }
 
     /** The split/Room spellings the contract pins, both engines' sides of
@@ -508,6 +559,7 @@ public final class ScenarioReplayDriverContractTest {
         spree();
         mustAttack();
         bargain();
+        craft();
         spellings();
     }
 }

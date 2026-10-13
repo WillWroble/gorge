@@ -46,6 +46,7 @@ import mage.util.RandomUtil;
 import mage.players.Player;
 import mage.filter.FilterCard;
 import mage.target.TargetCard;
+import mage.target.common.TargetCardInGraveyardBattlefieldOrStack;
 import mage.util.CardUtil;
 import mage.watchers.common.PermanentsEnteredBattlefieldWatcher;
 import org.mage.test.player.PlayerAction;
@@ -119,6 +120,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // mode's reduction is in force, and the sacrifice it adds is paid from
     // this cast's own recorded choose picks.
     private boolean bargainedCast = false;
+    // A cast step with cast_mode "optionalcost": gorge elected the cast's
+    // optional additional cost (collect evidence, blight, waterbend, behold),
+    // so the generator's leading scripted "Yes" is that cost's ask. On any
+    // other cast a leading Yes belongs to a later ask and is left queued.
+    private boolean optionalCostCast = false;
 
     /** TestPlayer normally delegates these library decisions directly to its AI,
      * bypassing the scripted target/choice queues. Route them through this player. */
@@ -155,8 +161,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
          * the opening-hand Leyline ask (LeylineAbility) is No; every optional
          * additional cost (kicker, offspring, waterbend: the
          * OptionalAdditionalSourceCosts hook; XMage's mana costs always report
-         * canPay, so it asks even when the pool is short) is No, consuming the
-         * generator's own leading "No" when it scripted one; an either-or
+         * canPay, so it asks even when the pool is short) takes the
+         * generator's own leading "No" when it scripted one, and on an
+         * "optionalcost" cast its leading "Yes" -- gorge elected the cost, so
+         * XMage pays it too; an either-or
          * additional cost (OrCost) takes the cost gorge recorded for the step.
          * Every other ask stays with the scripted queue.
          */
@@ -166,7 +174,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 return false;
             }
             if (askedBy(OptionalAdditionalSourceCosts.class, "addOptionalAdditionalCosts")) {
-                switch (optionalAdditionalCostAnswer(owner.bargainedCast, getChoices())) {
+                switch (optionalAdditionalCostAnswer(owner.bargainedCast, owner.optionalCostCast, getChoices())) {
                     case PAY:
                         // The step elected Bargain: pay the cost. This is the
                         // SAME ask every optional additional cost poses
@@ -548,18 +556,44 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     && target.getChooseHint().startsWith("to sacrifice");
         }
 
+        /** A craft cost's material ask: CraftCost.pay's target is a
+         * TargetCardInGraveyardBattlefieldOrStack (CraftAbility.makeTarget)
+         * with a minimum of two or more materials, and pay() calls
+         * chooseTarget exactly ONCE -- unlike every normal multi-target ask,
+         * which the game re-asks until its minimum is met. A census of the
+         * XMage sets shows the only min>1 users of this target class are the
+         * craft abilities, so this is the structural craft marker. */
+        static boolean isCraftMaterialsAsk(mage.target.Target target) {
+            return target != null
+                    && target.getOriginalTarget() instanceof TargetCardInGraveyardBattlefieldOrStack
+                    && target.getMinNumberOfTargets() > 1;
+        }
+
+        /** Whether the craft fill loop must call chooseTarget again: the ask
+         * has fewer materials chosen than its minimum and the scripted queue
+         * still holds an answer for it. An empty queue stops the loop: the
+         * base player would otherwise fall into strict-mode AI auto-pick (or
+         * fail on an unmatched definition), neither of which a scenario
+         * authored. */
+        static boolean craftMaterialsNeedFill(int chosen, int min, boolean queueNonEmpty) {
+            return chosen < min && queueNonEmpty;
+        }
+
         /** The decision a cast-time optional additional cost ask gets,
          * independent of any Game so the contract test can exercise all three
          * outcomes: a bargained cast PAYs it; otherwise the generator's own
-         * leading "No" is CONSUMED by the caller so strict mode sees it used;
-         * every other ask is DECLINEd (gorge casts for the mana cost only). */
+         * leading "No" is CONSUMED by the caller so strict mode sees it used,
+         * and so is a leading "Yes" on an "optionalcost" cast (gorge elected
+         * the cost, so the consumed Yes pays it); every other ask is DECLINEd
+         * (gorge casts for the mana cost only). */
         enum OptionalCostAnswer { PAY, CONSUME, DECLINE }
 
-        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, List<String> choices) {
+        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, boolean optionalCostCast, List<String> choices) {
             if (bargainedCast) {
                 return OptionalCostAnswer.PAY;
             }
-            if (!choices.isEmpty() && choices.get(0).equals("No")) {
+            if (!choices.isEmpty() && (choices.get(0).equals("No")
+                    || (optionalCostCast && choices.get(0).equals("Yes")))) {
                 return OptionalCostAnswer.CONSUME;
             }
             return OptionalCostAnswer.DECLINE;
@@ -655,6 +689,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     getTargets().remove(0);
                     return true;
                 }
+            }
+            if (isCraftMaterialsAsk(target)) {
+                // CraftCost.pay calls chooseTarget exactly ONCE while
+                // TestPlayer.chooseTarget consumes one queued definition per
+                // call, so without this a craft with two or more materials
+                // would exile only the first and leave the rest of the
+                // scripted queue to fail assertAllCommandsUsed. Fill to the
+                // ask's minimum, one definition per call; the chosen count is
+                // the progress guard, since the base can return true having
+                // only consumed a [target_skip].
+                boolean chosen = super.chooseTarget(outcome, target, source, game);
+                while (chosen && craftMaterialsNeedFill(target.getSize(),
+                        target.getMinNumberOfTargets(), !getTargets().isEmpty())) {
+                    int before = target.getSize();
+                    chosen = super.chooseTarget(outcome, target, source, game);
+                    if (target.getSize() == before) {
+                        break;
+                    }
+                }
+                return chosen;
             }
             return super.chooseTarget(outcome, target, source, game);
         }
@@ -858,6 +912,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             // Reset here so an earlier scenario's Bargain cannot answer this
             // one's optional additional costs.
             bargainedCast = false;
+            optionalCostCast = false;
             gorgeName = str(sc, "card");
             xmageName = str(sc, "xmage_name");
             endTurnScenario = hasEndTurnEffect(xmageName.isEmpty() ? gorgeName : xmageName);
@@ -2590,6 +2645,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     throw new IllegalArgumentException("cast_mode " + castMode + " unsupported");
                 }
                 bargainedCast = "bargained".equals(castMode);
+                optionalCostCast = "optionalcost".equals(castMode);
                 // "plot" is XMage's Plot special action (PlotAbility is a
                 // SpecialAction: no stack, not a cast), activated from the
                 // hand by its rule text "Plot {cost}" like XMage's own
