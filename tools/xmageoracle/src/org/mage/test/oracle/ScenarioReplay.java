@@ -2030,21 +2030,31 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return s != null ? s : xmageSpelling(n);
     }
 
-    /** One snapshot value's spelling rewrite: gorge spells every card object
-     * by its front face, so XMage's whole "A // B" object name for a
-     * split/Room card (the card under test's whole name, a probe's, an MDFC
-     * land's) is rewritten to its front half, and the spell of a face-1 cast
-     * -- which XMage names by the back half's ability -- is rewritten to the
-     * front the way gorge names the spell. The card under test's back half
-     * is the only back half a scenario can name, so it is the only alias. */
+    /** One snapshot value's spelling rewrite for a STACK SPELL's source: gorge
+     * spells every card object by its front face, so XMage's whole "A // B"
+     * object name for a split/Room card (the card under test's whole name, a
+     * probe's, an MDFC land's) is rewritten to its front half, and the spell
+     * of a face-1 cast -- which XMage names by the back half's ability -- is
+     * rewritten to the front the way gorge names the spell. The card under
+     * test's back half is the only back half a scenario can name, so it is
+     * the only alias. The back-half alias is valid ONLY for a spell: a Room
+     * permanent whose back door is unlocked really is named for that back
+     * half (CR 709.5), and gorge reports it so; use gorgeObjectSpellingRule
+     * for every other snapshot string. */
     static String gorgeSpellingRule(String gorgeName, String xmageName, String s) {
-        if (!xmageName.isEmpty()) {
-            if (s.equals(xmageName)) {
-                return gorgeName;
-            }
-            if (xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
-                return gorgeName;
-            }
+        if (!xmageName.isEmpty() && xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
+            return gorgeName;
+        }
+        return gorgeObjectSpellingRule(gorgeName, xmageName, s);
+    }
+
+    /** The spelling rewrite for every snapshot string that is not a stack
+     * spell's source (permanents, zones, ability sources, targets): the
+     * whole object name reads as the front half, and a bare back-half name is
+     * left alone, because a Room's unlocked back door is a real name. */
+    static String gorgeObjectSpellingRule(String gorgeName, String xmageName, String s) {
+        if (!xmageName.isEmpty() && s.equals(xmageName)) {
+            return gorgeName;
         }
         return frontHalf(s);
     }
@@ -2052,22 +2062,32 @@ public class ScenarioReplay extends CardTestPlayerBase {
     /** Rewrites XMage's spelling of the card under test back to the scenario's
      * (gorge) spelling throughout a value, so the comparator sees one name. */
     private JsonElement gorgeSpellings(JsonElement e) {
+        return gorgeSpellings(e, false);
+    }
+
+    private JsonElement gorgeSpellings(JsonElement e, boolean spellSource) {
         if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
             String s = e.getAsString();
-            String r = gorgeSpellingRule(gorgeName, xmageName, s);
+            String r = spellSource ? gorgeSpellingRule(gorgeName, xmageName, s)
+                    : gorgeObjectSpellingRule(gorgeName, xmageName, s);
             return r.equals(s) ? e : new JsonPrimitive(r);
         }
         if (e.isJsonArray()) {
             JsonArray a = new JsonArray();
             for (JsonElement x : e.getAsJsonArray()) {
-                a.add(gorgeSpellings(x));
+                a.add(gorgeSpellings(x, false));
             }
             return a;
         }
         if (e.isJsonObject()) {
+            JsonObject in = e.getAsJsonObject();
+            // A stack entry {"kind":"spell","source":name}: only its source
+            // is the spell's name and takes the face-1 back-half alias.
+            JsonElement kind = in.get("kind");
+            boolean spell = kind != null && kind.isJsonPrimitive() && "spell".equals(kind.getAsString());
             JsonObject o = new JsonObject();
-            for (Map.Entry<String, JsonElement> en : e.getAsJsonObject().entrySet()) {
-                o.add(en.getKey(), gorgeSpellings(en.getValue()));
+            for (Map.Entry<String, JsonElement> en : in.entrySet()) {
+                o.add(en.getKey(), gorgeSpellings(en.getValue(), spell && en.getKey().equals("source")));
             }
             return o;
         }
