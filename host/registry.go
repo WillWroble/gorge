@@ -143,6 +143,14 @@ type Options struct {
 	// configured behaviour. gorged supplies its -bot-auto-mana startup flag
 	// here to migrate an existing deployment when it first runs this build.
 	DefaultBotAutoPayMana bool
+	// DefaultBotCommonSense is the same restore-time migration for
+	// TableConfig.BotCommonSense (the bots/sanity CommonSense guard): a table
+	// written before TableConfig recorded bot_common_sense adopts the
+	// server's -bot-common-sense startup flag when it is first loaded by this
+	// build, while a new table's explicit setting — including false — always
+	// survives a restart verbatim. Default false leaves every pre-field
+	// deployment byte-identical to the unwrapped policies it served.
+	DefaultBotCommonSense bool
 	// MaxOnDemandTables bounds browser-created private tables retained by a
 	// running process. 0 keeps the historical unlimited behaviour. A limit
 	// refuses a new game instead of deleting a finished table: its private

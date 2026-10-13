@@ -127,6 +127,20 @@ type TableConfig struct {
 	// offered payment plans rather than manually tapping mana. It is part of
 	// persisted table configuration so a restart preserves bot behaviour.
 	BotAutoPayMana bool `json:"bot_auto_pay_mana"`
+	// BotCommonSense opts every hosted bot and human-seat caretaker into the
+	// bots/sanity CommonSense guard (bots.Options.CommonSense): hostile
+	// removal the engine says can only hit the seat's own permanents or
+	// player is dropped from the option list, and the London mulligan ask is
+	// answered by botpolicy.MulliganConstructed. The guard changes the
+	// intents a seat answers, so it is part of persisted table configuration
+	// exactly like BotAutoPayMana: a table resumed after a restart must
+	// rebuild the same seats or its replay diverges from the recorded log.
+	// Default false, and a false seat is byte-identical to the unwrapped
+	// policy, so a table written before the field existed replays unchanged.
+	// Serialized explicitly (no omitempty) so the restore-time migration can
+	// tell a pre-field file from a deliberate false the same way
+	// bot_auto_pay_mana does.
+	BotCommonSense bool `json:"bot_common_sense"`
 	// AutoMana enables payment-plan publication and the Auto Mana controls for
 	// human seats. Disabled is the legacy human path: plans are never sent to
 	// a human client and only ordinary casts/manual mana are available.
