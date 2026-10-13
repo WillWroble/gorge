@@ -159,7 +159,7 @@ func TestCasualtyAshadGrantOnlyFirstArtifactPerTurn(t *testing.T) {
 		t.Fatal("artifact spell cast-path precondition failed")
 	}
 	addMana(t, e, 0, "RRRR")
-	if n := len(e.spellsCastThisTurnMatching(0, "Artifact.nonLegendary+YouCtrl", 0)); n != 0 {
+	if n := len(e.spellsCastThisTurnMatching(0, "Artifact.nonLegendary+YouCtrl", 0, noTC)); n != 0 {
 		t.Fatalf("Ashad EQ0 precondition: already cast %d artifacts", n)
 	}
 	opt := castOptMode(t, e.Pending().Options, first, "casualty")
@@ -190,7 +190,7 @@ func TestCasualtyAshadGrantOnlyFirstArtifactPerTurn(t *testing.T) {
 		t.Fatalf("artifact spell copy made %d Sol Ring tokens, want 1", tokens)
 	}
 	addMana(t, e, 0, "RR")
-	if n := len(e.spellsCastThisTurnMatching(0, "Artifact.nonLegendary+YouCtrl", 0)); n != 1 {
+	if n := len(e.spellsCastThisTurnMatching(0, "Artifact.nonLegendary+YouCtrl", 0, noTC)); n != 1 {
 		t.Fatalf("Ashad EQ0 comparison did not change: cast count = %d, want 1", n)
 	}
 	for _, o := range e.Pending().Options {

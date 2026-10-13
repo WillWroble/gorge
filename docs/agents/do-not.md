@@ -34,8 +34,9 @@ so most of these hurt someone other than you.
 - **Don't read the wall clock, use `math/rand` (v1) or unseeded randomness,
   or range over a map on a path that reaches events, option order, traces or
   checkpoints.**
-- **Don't add a Go dependency or cgo.** `go.mod` has no `require` lines, and
-  it stays that way.
+- **Don't add a Go dependency or cgo.** The root `go.mod` has no `require`
+  lines, and it stays that way (`TestRootModuleHasNoRequires`); a tag-gated
+  experiment that needs one is a nested module, like `experimental/gamepool`.
 - **Don't use maps or per-call string parsing on hot paths.** Use bitsets and
   dense slices, and compile strings to masks once.
 - **Don't hand-edit `web/src/protocol.ts`.** Run `make gentypes`.

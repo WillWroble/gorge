@@ -9,8 +9,10 @@
 // answered by the wrapped bot directly and never reach the batch.
 //
 // Build it with -tags gamepool. It is off by default so the default build,
-// vet and the 32-bit gate never see it. The GPU scorer is a further tag,
-// gamepool_gpu, so the scheduler itself stays pure Go.
+// vet and the 32-bit gate never see it. The GPU scorer lives in its own
+// nested module, experimental/gamepool (package gpuscorer, tag gamepool_gpu),
+// because it needs a third-party dependency (purego) and the root go.mod has
+// none; the scheduler itself stays pure Go and stays here.
 //
 // The shape, from the operator's spec:
 //
@@ -53,11 +55,11 @@ func dbg(f string, a ...any) {
 // the scheduler falls back to (and the local scorer uses); Intent is filled by
 // the scorer and delivered to the game by the callback (done).
 type Request struct {
-	SeatIdx int
-	Inner   seat.Seat
-	View    view.View
+	SeatIdx  int
+	Inner    seat.Seat
+	View     view.View
 	Decision decision.Decision
-	Intent  decision.Intent
+	Intent   decision.Intent
 
 	Answer   chan decision.Intent
 	done     func(decision.Intent)

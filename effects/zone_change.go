@@ -206,6 +206,55 @@ func hasRememberedDestroyedLand(g *state.Game, ts []state.Target) bool {
 	return false
 }
 
+// changeZoneMoveSkip repeats the mover loop's per-object skip guards.
+// Origin$, when given, is a precondition: the object must actually be where
+// the script expects, or the movement does not happen. This is also this
+// build's only CR 608.2b guard for ChangeZone: a target moved away by an
+// earlier effect in the same resolution, or by a response that has already
+// resolved, is simply skipped rather than moved a second time or moved from
+// the wrong zone. A CantExile restriction (The Master, Multiplied: "Triggered
+// abilities you control can't cause you to ... exile creature tokens you
+// control") withholds the object from an exile entirely: it never leaves the
+// battlefield, no MoveZone is emitted and none of the inlined riders
+// (exiled-with, RememberChanged, exile-return) run. The shared settle path
+// (settleChangeZoneMoveAs) carries the same guard for every other ChangeZone
+// mover, and effChangeZone's departure-batch pre-pass
+// (changeZoneDepartureBatch) shares this predicate so its victim list cannot
+// drift from the moves.
+func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
+	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
+		return true
+	}
+	return to == state.ZExile && h.ExileBlocked(o.ID, false)
+}
+
+// changeZoneDepartureBatch lists the mover loop's battlefield departures for
+// ONE simultaneous departure batch (CR 614.6/616.1 with 603.10): the members
+// leave as one event, so a departing replacement source among them (Kalitas,
+// Traitor of Ghet) keeps its ActiveZones$ Battlefield replacement for the
+// later members (rules' batchMemberReplActive) and their
+// leaves-the-battlefield triggers see one pre-departure board. A battlefield
+// ENTRY (to == battlefield) departs nothing. The read uses the loop's own
+// skip guards; a member the loop then skips (it re-reads the zone live) is a
+// straggler EndBatchDepartures discards.
+func changeZoneDepartureBatch(h Host, cz *ChangeZoneParams, targets []state.Target, to state.Zone, originAll bool) []state.ObjID {
+	if to == state.ZBattlefield {
+		return nil
+	}
+	var departing []state.ObjID
+	for _, t := range targets {
+		if t.IsPlayer {
+			continue
+		}
+		o := h.Game().Obj(t.Obj)
+		if o == nil || o.Zone != state.ZBattlefield || changeZoneMoveSkip(h, cz, o, to, originAll) {
+			continue
+		}
+		departing = append(departing, o.ID)
+	}
+	return departing
+}
+
 func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 	cz := ChangeZoneOf(sa)
 	to, stop := changeZonePrelude(h, c, cz)
@@ -590,7 +639,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			// the spell/ability that registered it -- so end every Effect-created
 			// registration from that source. The ender's FromEffect marker keeps
 			// the source's printed statics out of it.
-			h.EndEffectSource(f.Source)
+			h.EndEffectSource(f.Source, f.Spare)
 		}
 		return
 	}
@@ -616,6 +665,12 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		cz.DefinedImprinted {
 		h.EndImprintedEffects(c.Source)
 	}
+	// The battlefield departures of the move loop below are one simultaneous
+	// departure batch; see changeZoneDepartureBatch.
+	if departing := changeZoneDepartureBatch(h, cz, targets, to, originAll); len(departing) > 0 {
+		h.BatchDepartures(departing)
+		defer h.EndBatchDepartures()
+	}
 	// The objects the move loop actually moved, in move order: ChangeZone's
 	// AtEOT$ affected set is the MOVED objects (some carriers carry
 	// RememberChanged$ and some do not, so the moved set is collected here
@@ -633,23 +688,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		if o == nil {
 			continue
 		}
-		// Origin$, when given, is a precondition: the object must actually be
-		// where the script expects, or the movement does not happen. This is
-		// also this build's only CR 608.2b guard for ChangeZone: a target
-		// moved away by an earlier effect in the same resolution, or by a
-		// response that has already resolved, is simply skipped rather than
-		// moved a second time or moved from the wrong zone.
-		if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
-			continue
-		}
-		// A CantExile restriction (The Master, Multiplied: "Triggered abilities
-		// you control can't cause you to ... exile creature tokens you
-		// control") withholds the object from this exile entirely: it never
-		// leaves the battlefield, no MoveZone is emitted and none of the
-		// inlined riders (exiled-with, RememberChanged, exile-return) run. The
-		// shared settle path (settleChangeZoneMoveAs) carries the same guard
-		// for every other ChangeZone mover.
-		if to == state.ZExile && h.ExileBlocked(o.ID, false) {
+		// Origin$ precondition and CantExile guard, shared with the
+		// departure-batch pre-pass above: see changeZoneMoveSkip.
+		if changeZoneMoveSkip(h, cz, o, to, originAll) {
 			continue
 		}
 		// Inlined rather than routed through settleChangeZoneMove: this loop
@@ -672,7 +713,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		if cz.RememberLKI {
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: o.ID, Controller: o.Controller, Owner: o.Owner})
 		}
-		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 			ev.IDs = []state.ObjID{c.Source}
 		}
 		applyMoveFaceDown(h, c, &cz.Riders.FaceDownRiders, &ev, to)
@@ -1409,7 +1450,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: id, Controller: o.Controller, Owner: o.Owner})
 		}
 	}
-	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 		// The S: static spelling of the same provenance need: a source whose
 		// own Static lines name ExiledWithSource (Intellect Devourer's
 		// MayPlay+ExiledWithSource grant) tracks its exiles exactly like the

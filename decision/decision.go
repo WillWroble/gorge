@@ -412,6 +412,14 @@ type Option struct {
 	// the engine's own derived-keyword facts and the stack -- a human
 	// client never sees it, so it is never on the wire.
 	Grant *Grant `json:"-"`
+	// Loyalty is server-side only (json:"-") and present only on an
+	// "ability" option whose ability is a planeswalker loyalty ability. A
+	// loyalty ability's label carries no digits (the cost is in Cost, as
+	// prose), so the bot's cost-from-label ranking tied every one of a
+	// walker's abilities and only the first was ever chosen. The fact
+	// carries what the ranking needs, read from the compiled cost and the
+	// printed ability; a human client never sees it.
+	Loyalty *Loyalty `json:"-"`
 	// Attach is server-side only (json:"-"), set on a printed, gained or
 	// granted "ability" option whose ability is an AB$ Attach -- K:Equip, Reconfigure and
 	// Fortify expand to one (cards/keywords.go). It is what scopes the bot
@@ -493,6 +501,26 @@ type Option struct {
 	// Value2 is the option's price under the decision's second cumulative
 	// budget (Decision.MaxSum2).
 	Value2 int `json:"value2,omitempty"`
+}
+
+// Loyalty describes one planeswalker loyalty ability option
+// (decision.Option.Loyalty, server-side only).
+type Loyalty struct {
+	// Delta is the net loyalty change the cost settles: +N for [+N], -N for
+	// [-N], 0 for [0]. Unset (0) for an announced [-X], which sets X.
+	Delta int32
+	// X marks a variable [-X] cost.
+	X bool
+	// Ultimate is the ability's Ultimate$ True marker.
+	Ultimate bool
+	// Removal marks an effect chain that destroys, damages, sacrifices,
+	// fights or moves a permanent off the battlefield.
+	Removal bool
+	// Dies is true when paying the cost leaves the walker with no loyalty.
+	Dies bool
+	// Restart marks a RestartGame effect (Karn Liberated's ultimate). The
+	// engine ends such a game as a draw, so the bot never takes it.
+	Restart bool
 }
 
 // Grant describes the idempotent keyword grant of one "ability" option

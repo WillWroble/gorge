@@ -112,6 +112,9 @@ func baseTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *cards
 			steps:      []oraclegen.Step{{Op: "play", Seat: 0, Card: "p0:" + name}},
 		}}, ""
 	case "trigger.etb-other":
+		if causes, why, ok := backFaceEntersRecipe(reg, f, name, t); ok {
+			return causes, why
+		}
 		return etbProbeCauses(reg, name, t)
 	case "trigger.leaves-graveyard", "trigger.ltb-other", "trigger.zone-change-residue":
 		return zoneTriggerRecipe(reg, name, t, sub)

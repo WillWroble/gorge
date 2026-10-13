@@ -139,6 +139,19 @@ func evalSacrificedOK(c *Ctx, body string) (int32, bool) {
 		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
 	case evalSacrificedOKAmount:
 		n = int32(len(c.Sacrificed))
+	case evalSacrificedOKCardTypes:
+		// Distinct card types among the sacrificed objects' snapshots
+		// (Baba Lysaga's "three or more card types among the sacrificed
+		// permanents"); a set read through len, never ranged into an event.
+		seen := map[string]bool{}
+		for _, s := range c.Sacrificed {
+			for _, typ := range s.Types {
+				if cardTypeWords[typ] {
+					seen[typ] = true
+				}
+			}
+		}
+		n = int32(len(seen))
 	default:
 		// An out-of-scope head (Valid, CardTypes, ChromaSource, CardNumColors,
 		// CardCounters) degrades to zero, exactly as before the fix -- the
@@ -473,8 +486,8 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 		// Forge's cast-cost PAID lists (AbilityUtils.getPaidCards ->
 		// SpellAbility.getPaidList): the cards this cast's own cost removed --
 		// CostExile's row is keyed "Exiled" (HashLKIListKey),
-		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Exiled /
-		// Ctx.Revealed, bound from the engine's per-stack-object capture at
+		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Paid.Exiled /
+		// Ctx.Paid.Revealed, bound from the engine's per-stack-object capture at
 		// payment, so a body such as Draconic Intervention's
 		// `SVar:X:Exiled$CardManaCost` reads the card the ExileFromGrave cost
 		// actually exiled rather than the source or a remembered set. An
@@ -711,6 +724,7 @@ const (
 	evalSacrificedOKCardToughness
 	evalSacrificedOKCardManaCost
 	evalSacrificedOKAmount
+	evalSacrificedOKCardTypes
 )
 
 var evalSacrificedOKCodes = state.NewStrCodes(
@@ -718,6 +732,7 @@ var evalSacrificedOKCodes = state.NewStrCodes(
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardToughness", Val: evalSacrificedOKCardToughness},
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardManaCost", Val: evalSacrificedOKCardManaCost},
 	state.StrEntry[evalSacrificedOKCode]{Key: "Amount", Val: evalSacrificedOKAmount},
+	state.StrEntry[evalSacrificedOKCode]{Key: "CardTypes", Val: evalSacrificedOKCardTypes},
 )
 
 type refTargetsCode uint16

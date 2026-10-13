@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestSpellbenchSubsetCorpusMatchesFull plays the same small FDN spellbench
@@ -22,7 +24,7 @@ import (
 // opened -- is still worth pinning: the default must be the shared full
 // registry, and -corpus-full must not change a single byte.
 func TestSpellbenchSubsetCorpusMatchesFull(t *testing.T) {
-	dir := corpusDirForSpellbench(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	run := func(full bool) (string, string, string) {
 		t.Helper()
 		prev := *corpusFull

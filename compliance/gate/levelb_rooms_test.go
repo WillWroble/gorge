@@ -45,8 +45,6 @@ func TestLevelBRoomVerdictsAreLookedUpByFace(t *testing.T) {
 		{"Bottomless Pool", "trigger#0.0", compliance.StatusAgree},
 		{"Dazzling Theater", "static#0.0", compliance.StatusAgree},
 		{"Central Elevator", "trigger#0.0", compliance.StatusAgree},
-		{"Central Elevator", "trigger#1.0", compliance.StatusDiverge},
-		{"Roaring Furnace", "trigger#0.0", compliance.StatusDiverge},
 	} {
 		r, ok := verdicts[w.card][w.tmpl]
 		if !ok {
@@ -77,12 +75,21 @@ func TestLevelBRoomVerdictsAreLookedUpByFace(t *testing.T) {
 			}
 		}
 	}
-	// The diverged rows are reported as divergences, with their real detail,
-	// never as a missing verdict.
-	for _, tc := range []struct{ card, key string }{
-		{"Central Elevator", "trigger#1.0"},
-		{"Roaring Furnace", "trigger#0.0"},
-	} {
+	// Every committed diverge row of these Rooms is reported as a divergence,
+	// with its real detail, never as a missing verdict. The rows are read from
+	// the store rather than pinned: rulings (xmage_wrong) and driver fixes keep
+	// moving individual Room rows off diverge, and that must not break the
+	// lookup this test guards.
+	type rowKey struct{ card, key string }
+	var diverged []rowKey
+	for _, card := range []string{"Central Elevator", "Roaring Furnace"} {
+		for key, r := range verdicts[card] {
+			if r.Status == compliance.StatusDiverge {
+				diverged = append(diverged, rowKey{card, key})
+			}
+		}
+	}
+	for _, tc := range diverged {
 		found := false
 		for _, r := range byCard[tc.card] {
 			if strings.Contains(r, "verdict diverge ("+tc.key+")") {

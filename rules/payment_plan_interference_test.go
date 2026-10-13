@@ -116,49 +116,59 @@ func TestPaymentPlanInterferenceManabarbsDefersOnlyWhatItMatches(t *testing.T) {
 }
 
 // Seat 0's own Wild Growth on Island A: its TapsForMana ValidCard$
-// Card.AttachedBy matches only A, so A is deferred and the {U} plan uses the
-// untouched Island B.
-func TestPaymentPlanInterferenceWildGrowthDefersOnlyEnchantedLand(t *testing.T) {
+// Card.AttachedBy matches only A, and its body is a fixed `Add {G}` to the
+// land's controller, so A is priced as {U}{G} (Free:Tier slice 2) while the
+// untouched Island B stays {U}. (Before the fold A was deferred by name.)
+func TestPaymentPlanInterferenceWildGrowthPricesOnlyEnchantedLand(t *testing.T) {
 	t.Parallel()
 	e, _, spell := newFixtureDeck(t, 9903, interferenceBlueInstant)
 	islandA := onBoard(t, e, 0, interferenceIsland)
 	islandB := onBoard(t, e, 0, interferenceIsland)
 	growth := onBoardCard(t, e, 0, corpusCard(t, "Wild Growth"))
 	e.G.Obj(growth).AttachedTo = islandA
-	got := e.PlanCastPayment(0, paymentCast(spell))
-	if srcs := interferencePlanSources(got); len(srcs) != 1 || srcs[0] != islandB {
-		t.Fatalf("plan = %+v (sources %v), want Island B %d only", got, srcs, islandB)
+	if o := e.G.Obj(growth); o.Zone != state.ZBattlefield || o.Face().Triggers[0].Mode != "TapsForMana" {
+		t.Fatalf("precondition: Wild Growth zone %v triggers %+v", o.Zone, o.Face().Triggers)
 	}
-	if tier, _, detail := interferenceTier(t, e, islandA); tier != pay.TierDeferred || !strings.Contains(detail, "Wild Growth") {
-		t.Fatalf("enchanted Island tier = %d %q, want deferred naming Wild Growth", tier, detail)
+	if tier, _, detail := interferenceTier(t, e, islandA); tier != pay.TierNormal {
+		t.Fatalf("enchanted Island tier = %d %q, want normal (priced)", tier, detail)
 	}
-	if tier, _, _ := interferenceTier(t, e, islandB); tier != pay.TierNormal {
-		t.Fatalf("untouched Island tier = %d, want normal", tier)
+	if got := interferenceAltMana(t, e, islandA); got != (state.Mana{state.MU: 1, state.MG: 1}) {
+		t.Fatalf("enchanted Island alternative = %v, want {U}{G}", got)
 	}
-	// With B tapped, A is the only source: no plan, and the reason names the
-	// aura rather than declining every plan globally.
+	if got := interferenceAltMana(t, e, islandB); got != (state.Mana{state.MU: 1}) {
+		t.Fatalf("untouched Island alternative = %v, want {U}", got)
+	}
+	// With B tapped, A alone funds the {U} plan, disclosing {U}{G}.
 	e.G.Obj(islandB).Tapped = true
-	got = e.PlanCastPayment(0, paymentCast(spell))
-	if got.Plan != nil || got.Reason != "insufficient" || !strings.Contains(got.Detail, "Wild Growth") {
-		t.Fatalf("only the enchanted Island left = %+v, want insufficient naming Wild Growth", got)
+	got := e.PlanCastPayment(0, paymentCast(spell))
+	if srcs := interferencePlanSources(got); len(srcs) != 1 || srcs[0] != islandA {
+		t.Fatalf("only the enchanted Island left = %+v (sources %v), want Island A %d", got, srcs, islandA)
 	}
 }
 
-// Crypt Ghast's TapsForMana is ValidCard$ Swamp | Activator$ You: seat 0's
-// Swamps are deferred, seat 0's Island still pays, and an opponent's Crypt
-// Ghast leaves seat 0's Swamp alone.
+// Crypt Ghast's TapsForMana is ValidCard$ Swamp | Activator$ You with a fixed
+// `Add {B}`: seat 0's Swamp is priced {B}{B} (the Island stays {U}), and an
+// opponent's Crypt Ghast leaves seat 0's Swamp at {B}.
 func TestPaymentPlanInterferenceCryptGhastScopesByActivator(t *testing.T) {
 	t.Parallel()
 	e, _, spell := newFixtureDeck(t, 9904, interferenceOneInstant)
 	swamp := onBoard(t, e, 0, interferenceSwamp)
 	island := onBoard(t, e, 0, interferenceIsland)
 	ghast := onBoardCard(t, e, 0, corpusCard(t, "Crypt Ghast"))
-	if tier, _, detail := interferenceTier(t, e, swamp); tier != pay.TierDeferred || !strings.Contains(detail, "Crypt Ghast") {
-		t.Fatalf("own Swamp under own Crypt Ghast tier = %d %q, want deferred", tier, detail)
+	if o := e.G.Obj(ghast); o.Zone != state.ZBattlefield || o.Controller != 0 || o.Face().Triggers[0].Mode != "TapsForMana" {
+		t.Fatalf("precondition: Crypt Ghast zone %v controller %d", o.Zone, o.Controller)
 	}
-	got := e.PlanCastPayment(0, paymentCast(spell))
-	if srcs := interferencePlanSources(got); len(srcs) != 1 || srcs[0] != island {
-		t.Fatalf("plan = %+v (sources %v), want the Island %d", got, srcs, island)
+	if tier, _, detail := interferenceTier(t, e, swamp); tier != pay.TierNormal {
+		t.Fatalf("own Swamp under own Crypt Ghast tier = %d %q, want normal", tier, detail)
+	}
+	if got := interferenceAltMana(t, e, swamp); got != (state.Mana{state.MB: 2}) {
+		t.Fatalf("Swamp under Crypt Ghast = %v, want {B}{B}", got)
+	}
+	if got := interferenceAltMana(t, e, island); got != (state.Mana{state.MU: 1}) {
+		t.Fatalf("Island under Crypt Ghast = %v, want {U}", got)
+	}
+	if got := e.PlanCastPayment(0, paymentCast(spell)); got.Plan == nil {
+		t.Fatalf("no plan under Crypt Ghast: %+v", got)
 	}
 	// Hand the Ghast to the opponent: "you" is now seat 1.
 	e.G.Obj(ghast).Controller = 1
@@ -168,6 +178,30 @@ func TestPaymentPlanInterferenceCryptGhastScopesByActivator(t *testing.T) {
 	if tier, _, detail := interferenceTier(t, e, swamp); tier != pay.TierNormal {
 		t.Fatalf("own Swamp under opponent's Crypt Ghast tier = %d %q, want normal", tier, detail)
 	}
+	if got := interferenceAltMana(t, e, swamp); got != (state.Mana{state.MB: 1}) {
+		t.Fatalf("Swamp under opponent's Crypt Ghast = %v, want {B}", got)
+	}
+}
+
+// interferenceAltMana is the Mana of src's single planner alternative.
+func interferenceAltMana(t *testing.T, e *Engine, src state.ObjID) state.Mana {
+	t.Helper()
+	o := e.G.Obj(src)
+	for _, u := range e.paymentPlanManaUnits(o.Controller) {
+		if u.ID != src {
+			continue
+		}
+		alts := pay.PaymentPlanUnitAlternatives(asPayer(e), u)
+		if len(alts) != 1 {
+			t.Fatalf("%s has %d planner alternatives, want 1", o.Face().Name, len(alts))
+		}
+		if alts[0].Tier != pay.TierNormal {
+			t.Fatalf("%s alternative tier = %d", o.Face().Name, alts[0].Tier)
+		}
+		return alts[0].Mana
+	}
+	t.Fatalf("%s is not a mana unit of seat %d", o.Face().Name, o.Controller)
+	return state.Mana{}
 }
 
 func interferenceRemoveID(ids []state.ObjID, id state.ObjID) []state.ObjID {

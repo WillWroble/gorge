@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command sbv2engine serves the ENVIRONMENT role of SpellBench protocol v2
 // over the real gorge rules engine (internal/spellbench/v2engine): NDJSON
 // hello / reset / step / validate_deck on stdin/stdout until stdin closes.

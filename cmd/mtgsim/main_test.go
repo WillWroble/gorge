@@ -2,52 +2,20 @@ package main
 
 import (
 	"bytes"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/replay"
 )
-
-// corpusDirOrSkip resolves the repo root the way testutil.CorpusRegistry and
-// cards/boundary_test.go do -- git rev-parse --show-toplevel, never a
-// hard-coded relative path -- and Skips when .cards/ is absent, so this test
-// still passes on a clean checkout with nothing fetched. cmd/mtgsim cannot
-// call testutil.CorpusRegistry directly for this: that helper returns a
-// *cards.Registry, but run's -dir parameter wants a directory path, so this
-// mirrors its resolve-and-skip shape instead of its return value.
-func corpusDirOrSkip(t *testing.T) string {
-	t.Helper()
-	// Run the child git with cards.GitEnv(): a test binary's cwd is this
-	// package directory, not the repo root, and git exports GIT_INDEX_FILE --
-	// and in a linked worktree GIT_DIR -- to every hook it runs, as a path
-	// that names the enclosing repository. An inherited relative GIT_* would
-	// redirect "-C ." at a .git that does not resolve from here, so rev-parse
-	// fails and the corpus is never found (the gitiso hazard; see
-	// cards/gitenv.go and internal/testutil/decks.go).
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("could not resolve git repo root: %v", err)
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	return dir
-}
 
 // TestRunPlaysAndVerifiesATwoSeatGame is the fix-round-1 test Minor #3 asked
 // for: run's io.Writer signature (rather than the old *os.File) is exercised
 // directly, with no subprocess and no real file, over a 2-seat, 1-game
 // -verify run against the repo's own decks.
 func TestRunPlaysAndVerifiesATwoSeatGame(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var buf bytes.Buffer
 	if err := run("", 2, 0, 1, true, false, dir, &buf); err != nil {
 		t.Fatalf("run: %v", err)

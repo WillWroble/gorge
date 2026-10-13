@@ -113,7 +113,7 @@ func (c *Ctx) Child(source state.ObjID, controller state.PlayerID) Ctx {
 // knows about the source that the minted ability's counts read: the LKI
 // snapshot and LKI power/toughness, the damage-source lifelink and
 // controller LKI, and private copies of the cost-paid lists (Sacrificed,
-// Exiled, Revealed). It does not inherit c's targets, remembered set or any
+// Paid). It does not inherit c's targets, remembered set or any
 // ask cursor; the caller sets Remembered to the instance's own set.
 func (c *Ctx) ForTrigger(tc TriggerContext) Ctx {
 	return Ctx{
@@ -128,8 +128,11 @@ func (c *Ctx) ForTrigger(tc TriggerContext) Ctx {
 			SourceController: c.Snap.SourceController, SourceControllerValid: c.Snap.SourceControllerValid,
 		},
 		Sacrificed: append([]state.SacrificedInfo(nil), c.Sacrificed...),
-		Exiled:     append([]state.ObjID(nil), c.Exiled...),
-		Revealed:   append([]state.ObjID(nil), c.Revealed...),
+		Paid: PaidCostLists{
+			Exiled:     append([]state.ObjID(nil), c.Paid.Exiled...),
+			Revealed:   append([]state.ObjID(nil), c.Paid.Revealed...),
+			CounterPut: append([]state.ObjID(nil), c.Paid.CounterPut...),
+		},
 	}
 }
 

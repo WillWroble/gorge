@@ -89,6 +89,10 @@ type result struct {
 	SimsPS  float64 `json:"sims_per_s,omitempty"`
 	SimsPSC float64 `json:"sims_per_cpu_s,omitempty"`
 	MSPerRt float64 `json:"ms_per_root,omitempty"`
+
+	// Build and host provenance (provenance.go): commit, go_version,
+	// cpu_model, gogc, pin. Embedded so the keys stay top-level.
+	provenance
 }
 
 func main() {
@@ -146,7 +150,7 @@ func main() {
 		}
 	}()
 
-	r := result{Label: *label, Row: *row, Pair: *pair, Rep: *rep, Unix: time.Now().Unix(), Load1: load1(), Procs: runtime.GOMAXPROCS(0)}
+	r := result{Label: *label, Row: *row, Pair: *pair, Rep: *rep, Unix: time.Now().Unix(), Load1: load1(), Procs: runtime.GOMAXPROCS(0), provenance: readProvenance()}
 	err := func() error {
 		names, err := allNames(*deckDir, *burn)
 		if err != nil {

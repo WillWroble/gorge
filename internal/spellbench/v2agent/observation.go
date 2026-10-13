@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 package v2agent
 
 // The observation of spec Section 6, typed. Every field the spec lists is

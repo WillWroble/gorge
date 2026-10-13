@@ -116,6 +116,14 @@ func (e *Engine) delayedRegistrationLive(dt *state.DelayedTrigger) bool {
 			return false
 		}
 	}
+	// DelayedTriggerDefinedPlayer$ + ThisTurn$ (Kav Landseeker, Suppress):
+	// the registration is armed for the defined player's next turn only, so
+	// it is dead once that turn has ended.
+	if dt.ThisTurnDefined {
+		if first, ok := e.definedPlayerArmTurn(dt); ok && e.G.Turn > first {
+			return false
+		}
+	}
 	if dt.EventMode != "" {
 		if dt.Trigger == "" {
 			return false
@@ -151,6 +159,17 @@ func (e *Engine) turnStartsFor(p state.PlayerID) []int32 {
 		return nil
 	}
 	return e.turnStartTurns[p]
+}
+
+// definedPlayerArmTurn is the turn a DelayedTriggerDefinedPlayer$
+// registration arms at: the defined player's first turn start after the
+// registering turn. ok false when that turn has not begun (or the
+// registration names no player).
+func (e *Engine) definedPlayerArmTurn(dt *state.DelayedTrigger) (int32, bool) {
+	if dt.DefinedPlayer <= 0 {
+		return 0, false
+	}
+	return firstTurnStartAfter(e.turnStartsFor(state.PlayerID(dt.DefinedPlayer-1)), dt.BirthTurn)
 }
 
 // firstTurnStartAfter returns the first turn number in the sorted starts
@@ -202,6 +221,12 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 		// registration -- the trigger fires exactly once, in the granted
 		// turn, and the registration stays pending until then.
 		if dt.MinTurn > 0 && e.G.Turn < dt.MinTurn {
+			continue
+		}
+		// DelayedTriggerDefinedPlayer$ (Gideon Jura): armed only from the
+		// defined player's first turn start after registration (CR 603.7c);
+		// a gate the step fails leaves the registration pending.
+		if first, ok := e.definedPlayerArmTurn(dt); dt.DefinedPlayer > 0 && (!ok || e.G.Turn < first) {
 			continue
 		}
 		// Expiry is collected on TurnChange, including when this phase is
@@ -266,6 +291,8 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 			DelayedID:  dt.ID,
 			Execute:    dt.Execute,
 			SA:         sa,
+			// Static$ True: Forge runs the body off the stack (static_trigger.go).
+			DelayedStatic: dt.Static && dt.OptionalSpec == "",
 			Ctx: effects.NewCtx(dt.Source, dt.Controller, effects.CtxInit{
 				Remembered: append([]state.Target(nil), dt.Remembered...),
 				Captured:   append([]state.Target(nil), dt.Remembered...),
@@ -658,7 +685,7 @@ func effectDelayedFrame(dt *state.DelayedTrigger) effects.EffectFrame {
 	if dt == nil || !dt.EffectRepeat {
 		return effects.EffectFrame{}
 	}
-	return effects.EffectFrame{Source: dt.Source}
+	return effects.EffectFrame{Source: dt.Source, Carrier: true}
 }
 
 // delayedEventModeHandled names the modes delayedEventMatches evaluates with

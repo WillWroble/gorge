@@ -70,6 +70,13 @@ const (
 	// values remain unchanged.
 	replChoiceDraw
 	replChoiceLoseMana
+	// replChoiceDrawBatch parks CR 616.1's order competition over one draw
+	// instruction's DrawCards batch (events.DrawBatchProposal): two or more
+	// DrawCards replacements that would modify the same batch (Alms
+	// Collector and Quantum Riddler on one board). The affected player is
+	// the draw-er, exactly as for a per-card Draw. Appended so existing
+	// in-memory enum values remain unchanged.
+	replChoiceDrawBatch
 )
 
 type replChoice struct {
@@ -216,12 +223,13 @@ func (e *Engine) replacementChoicePlayer(rc replChoice) (state.PlayerID, bool) {
 		return rc.ev.Player, int(rc.ev.Player) < len(e.G.Players)
 	case replChoicePhaseOrder, replChoicePhaseOptional:
 		return e.G.Active, int(e.G.Active) < len(e.G.Players)
-	case replChoiceDamage, replChoiceCounter, replChoiceDraw:
+	case replChoiceDamage, replChoiceCounter, replChoiceDraw, replChoiceDrawBatch:
 		// Already resolved by poseDamageReplacementChoice/the recomputation
 		// cycle (replacementAskPlayer over the freshly recomputed CR 616.1e
 		// affected player), never re-derived from rc.ev.Obj's controller here
 		// -- a redirect or an OptionalDecider$ can make the asking player
-		// differ from that.
+		// differ from that. replChoiceDrawBatch's affected player is the
+		// draw-er, resolved at pose time.
 		return rc.player, int(rc.player) < len(e.G.Players)
 	case replChoiceAddCounter, replChoiceEntryOrder:
 		// Resolved at pose time (the counter's recipient or the affected
@@ -275,11 +283,18 @@ func (e *Engine) poseReplacementChoice(ev events.Event, matches []replMatch) {
 	if ev.Kind == events.ManaClear {
 		kind = replChoiceLoseMana
 	}
+	if ev.Kind == events.DrawBatchProposal {
+		// The batch competition's affected player is the draw-er, like a
+		// per-card Draw; the event has no object whose controller could be
+		// consulted (Obj names the drawing instruction's source, not the
+		// affected player).
+		kind = replChoiceDrawBatch
+	}
 	if ev.Kind == events.Draw && len(matches) == 1 && matches[0].repl.OptionalValue() {
 		kind = replChoiceDraw
 		p = e.replacementAskPlayer(matches, ev.Player)
 	}
-	if ev.Kind != events.Draw && ev.Kind != events.ManaClear &&
+	if ev.Kind != events.Draw && ev.Kind != events.DrawBatchProposal && ev.Kind != events.ManaClear &&
 		!(ev.Kind == events.LifeChange && ev.Text == pay.PayLifeProposalText) {
 		o := e.G.Obj(ev.Obj)
 		if o == nil {
@@ -336,6 +351,8 @@ func (e *Engine) askReplacementChoice(p state.PlayerID) {
 		indices[i] = i
 	}
 	switch rc.kind {
+	case replChoiceDrawBatch:
+		d.Prompt = "Several replacement effects would modify this draw: choose which applies first."
 	case replChoiceLoseMana:
 		d.Prompt = "Several replacement effects would convert unspent mana: choose which applies."
 	case replChoiceDamage:

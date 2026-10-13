@@ -22,7 +22,10 @@ type legalWalk struct {
 	// gates counts the walk's reads of its pricing pool (pricing): the
 	// block reuse below (walk_block_reuse.go) treats a block that read none
 	// as independent of the pool.
-	gates     int
+	gates int
+	// autoBound is the lazily read PotentialMana bound the autopay offer
+	// (autoPayOffer) prices against; nil until first needed.
+	autoBound *state.Mana
 	castsOnly bool
 	sorcery   bool
 	out       []decision.Option
