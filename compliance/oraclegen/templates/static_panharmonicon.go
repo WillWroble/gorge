@@ -106,6 +106,9 @@ func panharmoniconItem(reg *cards.Registry, f *cards.Face, name string, req leve
 	case strings.Contains(valid, "chosentype"):
 		return skip("chosen-type filter needs an as-enters creature-type choice on a setup permanent")
 	case strings.Contains(valid, "equipped") || strings.Contains(valid, "attached"):
+		if it, ok := panharmoniconEquippedItem(reg, f, name, req); ok {
+			return it, nil
+		}
 		return skip("equipped-self filter: the card's only trigger is its own enters, which fires before it can be equipped")
 	}
 

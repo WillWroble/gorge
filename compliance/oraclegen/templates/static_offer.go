@@ -138,6 +138,13 @@ type offerTry struct {
 	// a granted loyalty ability whose cost exceeds the probe's printed
 	// starting loyalty (Avatar of Burgeoning Echoes' [-10]) is still payable.
 	probeLoyalty int32
+	// backFace places the setup source on its back face (setupBackFace): a
+	// back-face permission (Hades, Sorcerer of Eld, Emet-Selch, Unsundered's
+	// back face: "During your turn, you may play cards from your graveyard")
+	// exists only there. Set only on the retry staticOfferItem makes after
+	// every front-face candidate failed, so a row served on the front face
+	// keeps its scenario bytes.
+	backFace bool
 }
 
 // staticOfferItem serves a play-permission or granted-Flashback static as an
@@ -171,6 +178,17 @@ func staticOfferItem(reg *cards.Registry, c *cards.Card, f *cards.Face, name str
 	// the probe must be exiled by the source's own move, which the setup
 	// placement above cannot fake (static_fixture_exile.go). Last, so a row
 	// an existing candidate already serves keeps its scenario bytes.
+	if req.Face > 0 {
+		for _, t := range tries {
+			if t.self {
+				continue
+			}
+			t.backFace = true
+			if it, ok := offerItem(reg, f, name, req, t, nil); ok {
+				return it, true
+			}
+		}
+	}
 	if it, ok := staticExileOfferItem(reg, f, name, req, st); ok {
 		return it, true
 	}
@@ -258,6 +276,8 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 			}
 			tries = append(tries, t)
 		}
+	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Mayhem") && !self:
+		tries = mayhemTries(reg)
 	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Plot"):
 		// Plot is a special action offered from the zone the card sits in,
 		// for the card's own mana cost.
@@ -440,6 +460,9 @@ func offerScenario(f *cards.Face, name string, t offerTry, want bool, base *orac
 	if t.probeLoyalty > 0 {
 		p0 = oraclegen.WithCounters(p0, t.probe, "LOYALTY", t.probeLoyalty)
 	}
+	if t.backFace && !control && base == nil {
+		p0.BackFace = appendFixtureUnique(append([]string(nil), p0.BackFace...), name)
+	}
 	setup["p0"] = p0
 	sc.Setup = setup
 	return sc
@@ -567,4 +590,41 @@ func creatureDeathPrelude(reg *cards.Registry) ([]oraclegen.Step, []string) {
 		{Op: "cast", Seat: 0, Card: "p0:Shock", Mana: "R", Targets: []string{"p0:" + staticProbe}},
 		{Op: "resolve"},
 	}, []string{"Shock"}
+}
+
+// mayhemDiscarder is the spell p0 casts at itself so the probe is discarded
+// this turn: Mind Rot ("Target player discards two cards") with the probe the
+// only other card in hand, so the discard poses no choice.
+const mayhemDiscarder = "Mind Rot"
+
+// mayhemTries are the candidates for a granted Mayhem (Green Goblin, Norman
+// Osborn's back face: "Each nonland card in your graveyard has mayhem ... You
+// may cast a card from your graveyard for its mayhem cost if you discarded it
+// this turn"). The probe starts in hand and the prelude discards it with
+// mayhemDiscarder, so the observation is the graveyard cast labelled
+// "(mayhem)"; the control, the source removed, offers no such cast.
+func mayhemTries(reg *cards.Registry) []offerTry {
+	c, ok := reg.Lookup(mayhemDiscarder)
+	if !ok || len(c.Faces) == 0 || !oraclegen.XMageKnown(mayhemDiscarder) {
+		return nil
+	}
+	pool, why := oraclegen.PoolFor(c.Faces[0].ManaCost)
+	if why != "" {
+		return nil
+	}
+	prelude := []oraclegen.Step{
+		{Op: "cast", Seat: 0, Card: "p0:" + mayhemDiscarder, Mana: pool, Targets: []string{"p0"}},
+		{Op: "resolve"},
+	}
+	var tries []offerTry
+	for _, p := range offerProbeNames {
+		t, ok := offerTryFor(reg, p, offerHand, false, false)
+		if !ok || t.kind != offerKindCast || t.mana == "" {
+			continue
+		}
+		t.label = "(mayhem)"
+		t.prelude, t.extraHand = prelude, []string{mayhemDiscarder}
+		tries = append(tries, t)
+	}
+	return tries
 }

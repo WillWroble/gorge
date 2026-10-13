@@ -26,8 +26,9 @@ import (
 // APNAP/pile order; every gate the walk applies to the OUTER static before it
 // enqueues the inner one is applied here too: the room-door and
 // abilities-gone gates, the outer EffectZone$ admission and the shared
-// "as long as" gate (Condition$, IsPresent$, ClassBand$, CheckSVar$). A gate
-// this build cannot evaluate fails closed, exactly as it does in the walk.
+// "as long as" gate (Condition$, IsPresent$, ClassBand$, CheckSVar$), plus
+// the outer Phases$ window (grantPhasesHold). A gate this build cannot
+// evaluate fails closed, exactly as it does in the walk.
 func (e *Engine) grantedStatics(mode string) []staticView {
 	var out []staticView
 	for _, p := range e.G.AliveFrom(0) {
@@ -64,6 +65,9 @@ func (e *Engine) grantedStatics(mode string) []staticView {
 				}
 				if st.MayHaveAnyParam(continuousGateKeys) &&
 					!e.continuousGateHolds(staticView{Source: id, Controller: o.Controller, Params: st.Params, PS: st.ParamSetOf(), SVars: pst.Face.SVars}) {
+					continue
+				}
+				if !e.grantPhasesHold(st) {
 					continue
 				}
 				inners, ok := cards.ParseStaticLines(pst.Face.SVars[name])
@@ -103,4 +107,17 @@ func (e *Engine) grantedStaticHosts(out []staticView, affects string, source sta
 		}
 	}
 	return out
+}
+
+// grantPhasesHold evaluates the OUTER static's Phases$ window for a granted
+// static: Zurgo, Thunder's Decree's `Condition$ PlayerTurn | Phases$ End of
+// Turn` grants "This token can't be sacrificed" only during its controller's
+// end step. An absent Phases$ always holds; an unparsable one fails closed.
+func (e *Engine) grantPhasesHold(st cards.Static) bool {
+	phases := strings.TrimSpace(st.ParamStr(cards.PKPhases))
+	if phases == "" {
+		return true
+	}
+	pp := e.parsedPhaseSpec(phases)
+	return pp.valid && pp.set.Has(e.G.Step)
 }
