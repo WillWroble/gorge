@@ -445,8 +445,17 @@ func CantAttackUnlessRestrictionParamsReadable(params map[string]string) bool {
 // Cause-scoped CantSacrifice delivered by a DB$ Effect stays an
 // unimplemented Note. The asymmetry is the permissive direction for a
 // restriction on the path that cannot evaluate the cause.
+//
+// `ActiveZones$ Battlefield` is readable too: SacrificeBlocked walks only
+// battlefield sources (and granted statics' battlefield hosts), so the
+// battlefield-only zone gate already holds for every view it reads. Any
+// other ActiveZones$ value stays unreadable. Zurgo, Thunder's Decree's
+// granted "This token can't be sacrificed" is the corpus carrier.
 func CantSacrificeRestrictionParamsReadable(params map[string]string) bool {
-	for k := range params {
+	for k, v := range params {
+		if k == "ActiveZones" && strings.EqualFold(strings.TrimSpace(v), "Battlefield") {
+			continue
+		}
 		if !cantSacrificeRestrictionParamsReadableKeys.Has(k) {
 			return false
 		}

@@ -160,43 +160,61 @@ func (e *Engine) sacrificeBlocked(id state.ObjID, forCost bool, cause pay.CostCa
 		}
 	}
 	for _, sv := range e.activeStatics("CantSacrifice") {
-		if !effects.CantSacrificeRestrictionParamsReadable(sv.Params) {
-			continue
-		}
-		// cantsac1: the cause-scoping parameters, evaluated before the
-		// ValidCard match so an unevaluable shape stays skipped (the
-		// permissive direction) instead of blanket-blocking. ForCost$ True
-		// restricts only COST sacrifices; ForCost$ False never restricts one.
-		switch sacrificeBlockedCodes.Code(string(sv.ParamStr(cards.PKForCost))) {
-		case sacrificeBlockedTrue:
-			if !forCost {
-				continue
-			}
-		case sacrificeBlockedFalse:
-			if forCost {
-				continue
-			}
-		}
-		// ValidCause$ names the kind of spell/ability that must be causing
-		// the sacrifice. The effect path (forCost false) has a real
-		// resolving wrapper, so actionCause() evaluates it (causeSpecAdmits).
-		// The cost path has none, so it evaluates the pending cast/activation
-		// identity instead (causeCostAdmits) -- a cost sacrifice is caused by
-		// the spell being cast or the ability being activated, never by the
-		// object already on the stack.
-		if spec := sv.ParamStr(cards.PKValidCause); spec != "" {
-			if forCost {
-				if !causeCostAdmits(spec, cause) {
-					continue
-				}
-			} else if !e.causeSpecAdmits(spec, sv.Source) {
-				continue
-			}
-		}
-		if spec := sv.ParamStr(cards.PKValidCard); spec != "" &&
-			e.matchesSpec(spec, id, e.specCtx(sv.Source, sv.Controller)) {
+		if e.cantSacStaticBlocks(sv, id, forCost, cause) {
 			return true
 		}
+	}
+	// A CantSacrifice static GRANTED by another permanent's
+	// AddStaticAbility$ (Zurgo, Thunder's Decree: "During your end step,
+	// Warrior tokens you control have 'This token can't be sacrificed'"):
+	// the granted body's Card.Self resolves against its host, the token.
+	for _, sv := range e.grantedStatics("CantSacrifice") {
+		if e.cantSacStaticBlocks(sv, id, forCost, cause) {
+			return true
+		}
+	}
+	return false
+}
+
+// cantSacStaticBlocks reports whether one face (or granted) CantSacrifice
+// static view forbids sacrificing id under the caller's provenance.
+func (e *Engine) cantSacStaticBlocks(sv staticView, id state.ObjID, forCost bool, cause pay.CostCause) bool {
+	if !effects.CantSacrificeRestrictionParamsReadable(sv.Params) {
+		return false
+	}
+	// cantsac1: the cause-scoping parameters, evaluated before the
+	// ValidCard match so an unevaluable shape stays skipped (the
+	// permissive direction) instead of blanket-blocking. ForCost$ True
+	// restricts only COST sacrifices; ForCost$ False never restricts one.
+	switch sacrificeBlockedCodes.Code(string(sv.ParamStr(cards.PKForCost))) {
+	case sacrificeBlockedTrue:
+		if !forCost {
+			return false
+		}
+	case sacrificeBlockedFalse:
+		if forCost {
+			return false
+		}
+	}
+	// ValidCause$ names the kind of spell/ability that must be causing
+	// the sacrifice. The effect path (forCost false) has a real
+	// resolving wrapper, so actionCause() evaluates it (causeSpecAdmits).
+	// The cost path has none, so it evaluates the pending cast/activation
+	// identity instead (causeCostAdmits) -- a cost sacrifice is caused by
+	// the spell being cast or the ability being activated, never by the
+	// object already on the stack.
+	if spec := sv.ParamStr(cards.PKValidCause); spec != "" {
+		if forCost {
+			if !causeCostAdmits(spec, cause) {
+				return false
+			}
+		} else if !e.causeSpecAdmits(spec, sv.Source) {
+			return false
+		}
+	}
+	if spec := sv.ParamStr(cards.PKValidCard); spec != "" &&
+		e.matchesSpec(spec, id, e.specCtx(sv.Source, sv.Controller)) {
+		return true
 	}
 	return false
 }
