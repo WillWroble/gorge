@@ -330,7 +330,7 @@ func (e *Engine) resolveTop() {
 		// o.Source; this was a one-line inconsistency, not a second design.
 		ctx := e.arenaCtx()
 		*ctx = effects.NewCtx(o.Source, o.Controller, effects.CtxInit{
-			Targets: targets, Remembered: e.resolvingRemembered(o), Captured: o.Remembered, TriggerContext: e.triggerContexts[id],
+			Targets: targets, Remembered: e.resolvingRemembered(o), Captured: e.resolvingCaptured(o), TriggerContext: e.triggerContexts[id],
 			// An Effect-created delayed trigger body resolves under the Effect's
 			// source-scoped frame (queued by rules' delayed-trigger fire), so the
 			// one-shot self-exile idiom it may run ends the Effect. Zero for every

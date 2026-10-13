@@ -890,6 +890,16 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 		}
 		if d.Kind == decision.KTarget && d.ResumeSA != nil {
 			od.Divided = effects.DividedTotal(d.ResumeSA)
+		} else if d.Kind == decision.KTarget && d.ResumeKind == "" && r.e.cast != nil && r.e.cast.isAbility() {
+			// An activation's own root target ask (cast_targets.go) carries
+			// no ResumeSA; its body is the proposal's ability. A divided
+			// activation (The Earth Crystal's DividedAsYouChoose$ 2) is
+			// XMage's TargetAmount, which the generator answers per
+			// recipient with its share. A spell's root ask stays unmarked:
+			// its divided targets reach XMage through castSpell.
+			if sa := r.e.pcAbility(r.e.cast); sa != nil {
+				od.Divided = effects.DividedTotal(sa)
+			}
 		}
 		if d.Kind == decision.KTarget && d.ResumeKind == "copy_targets" {
 			// CR 707.10c: XMage poses one "Change this N of M target?"

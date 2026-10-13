@@ -6,6 +6,7 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
 	"github.com/adams-shaun/gorge/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/decision"
 )
 
 // triggerCause is one candidate way of making a trigger's cause happen on
@@ -35,6 +36,10 @@ type triggerCause struct {
 	// action reads the revealed top card (an explore a "explores a land" /
 	// "explores a nonland" trigger narrows on).
 	libraryTop []string
+	// setupAnswers answer the setup drive's own asks (the scenario's
+	// setup_answers): a setup permanent's optional turn-1 upkeep trigger the
+	// cause must decline so the observed firing is a later one.
+	setupAnswers []oraclegen.Answer
 	// opponentBattlefield are p1 permanents (a blocker, an attacker, a tap
 	// target, an opponent-comparison gate) the cause needs on the other side
 	// of the table.
@@ -312,6 +317,9 @@ func baseTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *cards
 				}
 			}
 		}
+		if declined, ok := declinedSetupUpkeepCause(t, base, step, active); ok {
+			out = append(out, declined)
+		}
 		if active == "p0" && step != "main1" {
 			// Setup passes turn 1's upkeep and draw with the fixture in
 			// place, so a source that acts on it (transforms, makes a token)
@@ -339,6 +347,9 @@ func baseTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *cards
 			return causes, why
 		}
 		if causes, why, ok := crewedTriggerRecipe(reg, f, name, t, sub); ok {
+			return causes, why
+		}
+		if causes, why, ok := teamworkTriggerRecipe(reg, f, name, t, sub); ok {
 			return causes, why
 		}
 		if causes, why, ok := stateTriggerRecipe(reg, f, name, t, sub); ok {
@@ -458,4 +469,28 @@ func remembersOwnChoices(sa *cards.SA) bool {
 		}
 	}
 	return false
+}
+
+// declinedSetupUpkeepCause is the phase cause for an OPTIONAL "at the
+// beginning of each upkeep" trigger that changes its own source (Aang, Master
+// of Elements: "you may transform Aang"): the setup permanent's trigger also
+// fires on turn 1 (the setup drive) and, with no ValidPlayer$, on p1's turn-2
+// upkeep the pass_to crosses, and the fallback's yes transforms the card off
+// the face the trigger lives on before p0's turn-3 upkeep is reached. The
+// variant declines both earlier firings -- the turn-1 ask through the
+// scenario's setup_answers, the turn-2 ask on the pass_to step -- so the
+// observed firing is turn 3's. ok is false for any other trigger; it is
+// appended after the plain cause, so a row the plain cause serves keeps its
+// bytes.
+func declinedSetupUpkeepCause(t *cards.Trigger, base triggerCause, step, active string) (triggerCause, bool) {
+	if step != "upkeep" || active != "p0" || t.ParamStr(cards.PKValidPlayer) != "" ||
+		!strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKOptionalDecider)), "You") {
+		return triggerCause{}, false
+	}
+	decline := oraclegen.Answer{Kind: string(decision.KTriggerOptional), Pick: []string{"no"}}
+	c := base
+	c.setupAnswers = []oraclegen.Answer{decline}
+	c.steps = append([]oraclegen.Step(nil), base.steps...)
+	c.steps[0].Answers = append(append([]oraclegen.Answer(nil), c.steps[0].Answers...), decline)
+	return c, true
 }

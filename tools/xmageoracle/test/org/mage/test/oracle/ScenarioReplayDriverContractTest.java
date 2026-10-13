@@ -589,6 +589,72 @@ public final class ScenarioReplayDriverContractTest {
                 + "pay/consume/decline, recorded sacrifice pick)");
     }
 
+    private static Object staticCall(String cls, String name, Class<?>[] types, Object... args) throws Exception {
+        Method m = Class.forName(cls).getDeclaredMethod(name, types);
+        m.setAccessible(true);
+        return m.invoke(null, args);
+    }
+
+    /** The wave-5 (lb5-driver) ops: the copy-cost cast modes and the keyword
+     * each elects, the prepared copy cast, the divided activation's scripted
+     * "^X=" shares, the teamwork tap's recorded picks and the gained
+     * tap-for-mana text a printed card does not carry. */
+    private static void wave5() throws Exception {
+        final String replay = "org.mage.test.oracle.ScenarioReplay";
+        final String player = "org.mage.test.oracle.ScenarioReplay$ScriptedChoicePlayer";
+        for (String mode : new String[]{"prepared_copy", "conspired", "casualty", "teamworked"}) {
+            check(castModeSupported(mode).equals("true"), mode + " cast_mode was not accepted");
+        }
+        Class<?>[] str = {String.class};
+        check(mage.abilities.keyword.ConspireAbility.class.equals(staticCall(replay, "copyCostKeyword", str, "conspired")),
+                "conspired must elect ConspireAbility's cost");
+        check(mage.abilities.keyword.CasualtyAbility.class.equals(staticCall(replay, "copyCostKeyword", str, "casualty")),
+                "casualty must elect CasualtyAbility's cost");
+        check(mage.abilities.keyword.TeamworkAbility.class.equals(staticCall(replay, "copyCostKeyword", str, "teamworked")),
+                "teamworked must elect TeamworkAbility's cost");
+        for (String mode : new String[]{"", "bargained", "prepared_copy", "optionalcost"}) {
+            check(staticCall(replay, "copyCostKeyword", str, mode) == null, mode + " must elect no copy cost");
+        }
+
+        // A divided activation (The Earth Crystal) skips its bare step
+        // targets only when its own step scripts a "^X=" share.
+        JsonObject sc = JsonParser.parseString("{\"xmage_answers\":[[{\"seat\":0,\"kind\":\"target\","
+                + "\"value\":\"p0:Grizzly Bears^X=2\"}],null,[{\"seat\":0,\"kind\":\"target\",\"value\":\"p1:Grizzly Bears\"}]]}")
+                .getAsJsonObject();
+        Class<?>[] scIdx = {JsonObject.class, int.class};
+        check((Boolean) staticCall(replay, "stepScriptsTargetAmount", scIdx, sc, 0), "a scripted ^X= share was not seen");
+        check(!(Boolean) staticCall(replay, "stepScriptsTargetAmount", scIdx, sc, 1), "a null step scripted a share");
+        check(!(Boolean) staticCall(replay, "stepScriptsTargetAmount", scIdx, sc, 2), "a bare target was read as a share");
+        check(!(Boolean) staticCall(replay, "stepScriptsTargetAmount", scIdx, sc, 5), "an out-of-range step scripted a share");
+        check(!(Boolean) staticCall(replay, "stepScriptsTargetAmount", scIdx, new JsonObject(), 0),
+                "a scenario with no answers scripted a share");
+
+        // The teamwork tap names the recorded creatures, then closes the
+        // open-ended ask only when another candidate is left.
+        UUID hill = id(21), bears = id(22);
+        BiPredicate<UUID, String> byId = (candidate, answer) -> answer.equals(candidate.toString());
+        Class<?>[] tw = {List.class, List.class, BiPredicate.class};
+        Object only = staticCall(player, "teamworkTapChoices", tw,
+                new ArrayList<>(Arrays.asList(hill.toString())), Arrays.asList(hill), byId);
+        check(only.equals(Arrays.asList(hill.toString())), "a lone candidate's tap must not be followed by a skip: " + only);
+        Object more = staticCall(player, "teamworkTapChoices", tw,
+                new ArrayList<>(Arrays.asList(hill.toString())), Arrays.asList(hill, bears), byId);
+        check(more.equals(Arrays.asList(hill.toString(), TestPlayer.CHOICE_SKIP)),
+                "a tap leaving a candidate untapped must close the ask: " + more);
+        Object none = staticCall(player, "teamworkTapChoices", tw,
+                new ArrayList<>(Arrays.asList("@nope")), Arrays.asList(hill, bears), byId);
+        check(((List<?>) none).isEmpty(), "an unmatched pick must queue nothing (strict mode names the miss)");
+
+        // Locus of Enlightenment's gained "{T}: Add {G}" is a mana ability
+        // by its text; a cost or a non-mana effect is not.
+        check((Boolean) staticCall(replay, "isTapManaText", str, "{T}: Add {G}"), "{T}: Add {G} is a tap-mana text");
+        check((Boolean) staticCall(replay, "isTapManaText", str, "{T}: Add {C}{C}."), "{T}: Add {C}{C}. is a tap-mana text");
+        check(!(Boolean) staticCall(replay, "isTapManaText", str, "{1}, {T}: Add {G}"), "a mana-costed ability is not the shape");
+        check(!(Boolean) staticCall(replay, "isTapManaText", str, "{T}: Draw a card."), "a draw is not a mana ability");
+        System.out.println("PASS wave-5 ops (copy-cost modes, prepared copy, divided activation shares, "
+                + "teamwork tap, gained tap-mana text)");
+    }
+
     /** The craft material ask and the driver's fill loop. CraftCost.pay calls
      * chooseTarget exactly once, so the driver must keep asking until the
      * ask's minimum is chosen; the recognition must be structural (the target
@@ -697,6 +763,7 @@ public final class ScenarioReplayDriverContractTest {
         mustAttack();
         bargain();
         craft();
+        wave5();
         spellings();
         seatCounts();
     }

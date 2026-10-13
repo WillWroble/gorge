@@ -15,6 +15,38 @@ func resetTurnWatchers(p *state.Player) {
 	p.LifeGainedThisTurn = 0
 	p.LifeLostThisTurn = 0
 	p.TokensCreatedThisTurn = 0
+	p.AttackedPlayersThisTurn = 0
+	p.AttackedPlaneswalkersThisTurn = 0
+}
+
+// tallyAttack records, for the controller of each declared attacker, that it
+// attacked defending seat e.Player this turn: the player itself (e.Obj zero)
+// or a planeswalker that seat controls (e.Obj a planeswalker). A battle
+// attack (CR 310.7) is neither and records nothing.
+func tallyAttack(g *state.Game, e *Event) {
+	if !validPlayer(g, e.Player) || e.Player < 0 || e.Player >= 64 {
+		return
+	}
+	bit := uint64(1) << uint(e.Player)
+	walker := false
+	if e.Obj != 0 {
+		target := g.Obj(e.Obj)
+		if target == nil || target.Face() == nil || !target.Face().IsPlaneswalker() {
+			return
+		}
+		walker = true
+	}
+	for _, id := range e.IDs {
+		o := g.Obj(id)
+		if o == nil || !validPlayer(g, o.Controller) {
+			continue
+		}
+		if walker {
+			g.Players[o.Controller].AttackedPlaneswalkersThisTurn |= bit
+		} else {
+			g.Players[o.Controller].AttackedPlayersThisTurn |= bit
+		}
+	}
 }
 
 // tallySpellCast counts one spell put on the stack by e.Player (the same

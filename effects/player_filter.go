@@ -389,6 +389,21 @@ func matchesPlayerSingleSpec(g *state.Game, alts []playerAlt, p, you state.Playe
 			if ctrl, ok := playerEnchantedController(g, pc.Source); ok && ctrl == p {
 				return true
 			}
+		case playerSpecQualifierAttackedYouTheirCurrentTurn:
+			// Forge PlayerProperty attackedYouTheirCurrentTurn (Sandswirl
+			// Wanderglyph's "each opponent who attacked you ... this turn"):
+			// the seat is taking its turn and declared a creature attacking
+			// `you` itself this turn (CR 508.1b), the DeclareAttackers watcher
+			// TurnChange clears.
+			if p == g.Active && attackedThisTurn(g, p, you, false) {
+				return true
+			}
+		case playerSpecQualifierAttackedYouCtrlPlaneswalkerTheirCurrentTurn:
+			// attackedYouCtrlTheirCurrentTurn_Planeswalker: the same turn
+			// gate, the attack declared at a planeswalker `you` controls.
+			if p == g.Active && attackedThisTurn(g, p, you, true) {
+				return true
+			}
 		case playerSpecQualifierDescended:
 			// CR 700.11: a permanent CARD entered this player's graveyard
 			// this turn from any zone. ZoneEntry captures owner and card type at
@@ -497,6 +512,21 @@ func playerDamageByRefThisGame(g *state.Game, p, you state.PlayerID, pc PlayerSp
 		}
 	}
 	return false
+}
+
+// attackedThisTurn reports whether seat p declared an attack this turn at
+// defending seat d itself (walker false) or at a planeswalker d controls
+// (walker true): the state.Player attack watchers events.Apply folds from
+// DeclareAttackers and clears at TurnChange, so a replay derives them.
+func attackedThisTurn(g *state.Game, p, d state.PlayerID, walker bool) bool {
+	if int(p) < 0 || int(p) >= len(g.Players) || int(d) < 0 || int(d) >= 64 {
+		return false
+	}
+	bits := g.Players[p].AttackedPlayersThisTurn
+	if walker {
+		bits = g.Players[p].AttackedPlaneswalkersThisTurn
+	}
+	return bits&(uint64(1)<<uint(d)) != 0
 }
 
 // descendedThisTurn counts the permanent CARDS that entered player p's
@@ -912,6 +942,8 @@ const (
 	playerSpecQualifierEnchantedController
 	playerSpecQualifierDescended
 	playerSpecQualifierTriggeredDefendingPlayer
+	playerSpecQualifierAttackedYouTheirCurrentTurn
+	playerSpecQualifierAttackedYouCtrlPlaneswalkerTheirCurrentTurn
 )
 
 var playerSpecQualifierCodes = state.NewStrCodes(
@@ -928,6 +960,8 @@ var playerSpecQualifierCodes = state.NewStrCodes(
 	state.StrEntry[playerSpecQualifierCode]{Key: "EnchantedController", Val: playerSpecQualifierEnchantedController},
 	state.StrEntry[playerSpecQualifierCode]{Key: "descended", Val: playerSpecQualifierDescended},
 	state.StrEntry[playerSpecQualifierCode]{Key: "TriggeredDefendingPlayer", Val: playerSpecQualifierTriggeredDefendingPlayer},
+	state.StrEntry[playerSpecQualifierCode]{Key: "attackedYouTheirCurrentTurn", Val: playerSpecQualifierAttackedYouTheirCurrentTurn},
+	state.StrEntry[playerSpecQualifierCode]{Key: "attackedYouCtrlTheirCurrentTurn_Planeswalker", Val: playerSpecQualifierAttackedYouCtrlPlaneswalkerTheirCurrentTurn},
 )
 
 type playerHasMostCode uint16

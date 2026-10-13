@@ -154,7 +154,7 @@ func (e *Engine) resumeResolution(rp *resumePoint, chosen []decision.Option) {
 		ctx.Source = o.Source
 		ctx.TriggerContext = e.triggerContexts[rp.obj]
 		ctx.Remembered = e.resolvingRemembered(o)
-		ctx.Captured = o.Remembered
+		ctx.Captured = e.resolvingCaptured(o)
 		ctx.Grantor = o.GrantedBy
 		bindNinjutsuDefender(ctx, o)
 		e.bindStationAmount(ctx, o)

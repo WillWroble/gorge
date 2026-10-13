@@ -1,3 +1,0 @@
-{"shape":{"template":"activate","op":"harness","field":"xmage","diff":"AssertionError: Must be target amount, but found unknown target: @pN:Grizzly Bears"},"key":"activate | harness | xmage | AssertionError: Must be target amount, but found unknown target: @pN:Grizzly Bears","cards":2}
-{"card":"Chandra, Flameshaper","template":"activate#0.2","status":"harness","api":"-","sets":["FDN"],"detail":"xmage: AssertionError: Must be target amount, but found unknown target: @p1:Grizzly Bears"}
-{"card":"The Earth Crystal","template":"activate#0.0","status":"harness","api":"-","sets":["FIN"],"detail":"xmage: AssertionError: Must be target amount, but found unknown target: @p0:Grizzly Bears"}

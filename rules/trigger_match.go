@@ -2471,6 +2471,25 @@ func (e *Engine) resolvingRemembered(o *state.Object) []state.Target {
 	return append([]state.Target(nil), src.Remembered...)
 }
 
+// resolvingCaptured is the capture set a resolving ability object's chain
+// excludes from its Remembered reads (effects' rememberedExcludingCapture):
+// the object's own capture, except where resolvingRemembered dropped it. A
+// printed Mode$ Phase trigger's self capture is the step change's fallback
+// object, never seeded into the chain's Remembered, so keeping it as Captured
+// excluded a REAL memory of the source instead: Aang, Master of Elements'
+// "you may transform Aang. If you do, you gain 4 life, draw four cards ..."
+// (SetState RememberChanged$ True, then ConditionDefined$ Remembered gates)
+// transformed and then did nothing, its RememberChanged entry -- the source
+// itself -- cancelled against the capture (CR 603.12, 608.2c).
+func (e *Engine) resolvingCaptured(o *state.Object) []state.Target {
+	if o.Card == nil && o.Ability != nil && len(o.Remembered) == 1 && !o.Remembered[0].IsPlayer && o.Remembered[0].Obj == o.Source {
+		if t, _, ok := e.findTriggerForAbilityFace(o.Source, o.Ability); ok && t.Mode == "Phase" {
+			return nil
+		}
+	}
+	return o.Remembered
+}
+
 // stateTriggerRemembered is a CR 603.8 state trigger's (Mode$ Always)
 // Remembered: its source alone, the capture triggerRemembered falls back to
 // for an event naming no object. A state trigger has no triggering event --

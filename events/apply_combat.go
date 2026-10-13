@@ -37,6 +37,7 @@ func foldDeclareAttackers(g *state.Game, e *Event) {
 			o.AttackedTurn, o.AttackedCombat = g.Turn, g.CombatsThisTurn
 		}
 	}
+	tallyAttack(g, e)
 }
 
 // foldDeclareBlockers folds Kind DeclareBlockers into state.

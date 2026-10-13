@@ -35,7 +35,7 @@ func staticSubs(sub string) bool {
 	}
 	switch sub {
 	case "static.disable-triggers", "static.combat-damage-toughness", "static.can-attack-defender", "static.can-attack-defender-svar", "static.cant-block-by", "static.cant-be-cast-threshold", "static.cant-be-cast-combat", "static.cant-be-activated-combat", "static.cant-block-self", "static.cant-block-by-self", "static.min-blockers",
-		"static.cant-be-cast-opponent-turn", "static.cant-be-cast-first-turns", "static.cant-be-cast-limit", "static.cant-be-activated-opponent-turn", "static.cant-be-activated-all", "static.cant-be-activated-enchanted", "static.panharmonicon", "static.optional-cost",
+		"static.cant-be-cast-opponent-turn", "static.cant-be-cast-attacked-you", "static.cant-be-cast-first-turns", "static.cant-be-cast-limit", "static.cant-be-activated-opponent-turn", "static.cant-be-activated-all", "static.cant-be-activated-enchanted", "static.panharmonicon", "static.optional-cost",
 		"static.cant-attack-enchanted", "static.cant-block-enchanted", "static.cant-block-by-blocker-filter", "static.cant-gain-life", "static.cant-gain-life-enchanted", "static.alternative-cost-spells", "static.alternative-cost-equip", "static.activations-exhaust-unbounded", "static.mana-convert-creature-spells", "static.cant-be-activated-named",
 		"static.cant-be-activated-named-enters",
 		"static.tap-power-value", "static.tap-power-value-station", "static.cast-with-flash", "static.untap-other-player", "static.cant-draw",
@@ -125,6 +125,8 @@ func staticRequirement(reg *cards.Registry, f *cards.Face, name string, req leve
 		return cantBeActivatedItem(reg, f, name, req)
 	case "static.cant-be-cast-opponent-turn":
 		return cantBeCastOpponentTurnItem(reg, f, name, req)
+	case "static.cant-be-cast-attacked-you":
+		return cantBeCastAttackedYouItem(reg, f, name, req)
 	case "static.cant-be-cast-first-turns":
 		return cantBeCastFirstTurnsItem(reg, f, name, req)
 	case "static.cant-be-cast-limit":

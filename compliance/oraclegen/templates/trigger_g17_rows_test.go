@@ -147,13 +147,22 @@ func g17SlotOnStack(t *testing.T, reg *cards.Registry, sc oraclegen.Scenario, na
 	for len(cause) > 0 && cause[len(cause)-1].Op == "resolve" {
 		cause = cause[:len(cause)-1]
 	}
+	// A back-face trigger's stack entry names the face it stands on (the
+	// snapshot's stackSourceRef: Aang, Master of Elements for Avatar Aang's
+	// trigger#1.0), so every face name of the card is the source.
+	sources := map[string]bool{"p0:" + name: true}
+	if c, ok := reg.Lookup(name); ok {
+		for _, f := range c.Faces {
+			sources["p0:"+f.Name] = true
+		}
+	}
 	passes := []oraclegen.Step{{Op: "pass", Seat: 0}, {Op: "pass", Seat: 1}}
 	checkpoint := append(append([]oraclegen.Step(nil), passes...), oraclegen.Step{Op: "pass_to", Decision: "priority"})
 	for _, steps := range [][]oraclegen.Step{cause, append(append([]oraclegen.Step(nil), cause...), passes...), append(append([]oraclegen.Step(nil), cause...), checkpoint...)} {
 		res := runSteps(t, reg, sc, steps)
 		for _, snap := range res.Snapshots {
 			for _, entry := range snap.Stack {
-				if entry.Kind == "ability" && entry.Source == "p0:"+name && entry.Trigger == slot {
+				if entry.Kind == "ability" && sources[entry.Source] && entry.Trigger == slot {
 					return true
 				}
 			}

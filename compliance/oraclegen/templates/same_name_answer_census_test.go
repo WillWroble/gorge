@@ -251,12 +251,17 @@ func sameNameBucketRank(bucket string) int {
 // is no longer also an xmage_answers alias. All four replay AGREE in XMage
 // without the duplicate, which XMage had left unconsumed ("Count are not
 // equal"). Unresolved and unproven did not move.
+//
+// Re-measured on lb5-driver: ECL alias 0 -> 1, SOS 0 -> 1. Each gained alias
+// is a NEW row's copy-cost election (Raiding Schemes' conspire tap of two of
+// three Grizzly Bears, Silverquill's casualty sacrifice of one), whose gorge
+// choose names the exact same-name Bears by ref; both replay AGREE in XMage.
 var wantSameNameCensus = map[string]string{
 	"BIG": `{"alias":0,"copy":0,"unresolved":0,"unproven":1,"items":null}`,
 	"BLB": `{"alias":3,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"DFT": `{"alias":0,"copy":0,"unresolved":0,"unproven":4,"items":null}`,
 	"DSK": `{"alias":2,"copy":0,"unresolved":0,"unproven":36,"items":null}`,
-	"ECL": `{"alias":0,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
+	"ECL": `{"alias":1,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"EOE": `{"alias":3,"copy":0,"unresolved":0,"unproven":2,"items":null}`,
 	"FDN": `{"alias":0,"copy":1,"unresolved":0,"unproven":2,"items":null}`,
 	"FIN": `{"alias":0,"copy":0,"unresolved":0,"unproven":4,"items":null}`,
@@ -266,7 +271,7 @@ var wantSameNameCensus = map[string]string{
 	"MKM": `{"alias":3,"copy":0,"unresolved":0,"unproven":2,"items":null}`,
 	"MSH": `{"alias":1,"copy":0,"unresolved":0,"unproven":3,"items":null}`,
 	"OTJ": `{"alias":2,"copy":1,"unresolved":0,"unproven":1,"items":null}`,
-	"SOS": `{"alias":0,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
+	"SOS": `{"alias":1,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"SPM": `{"alias":1,"copy":0,"unresolved":0,"unproven":2,"items":null}`,
 	"TDM": `{"alias":1,"copy":0,"unresolved":0,"unproven":6,"items":null}`,
 	"TLA": `{"alias":1,"copy":1,"unresolved":0,"unproven":2,"items":null}`,
