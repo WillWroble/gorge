@@ -27,43 +27,81 @@ const (
 	draftMulligans = 2
 )
 
-// playGame plays one Bo1 game between seats a and b through the rules
-// engine the way cmd/mtgsim does, and with verify set replays the chain
-// afterwards. It returns the game's record with its chain head; the
-// winner is the event seat index (a drives player 0, b player 1), nil for
-// a draw or a watchdog stall.
+// gameOutcome is one driven game's engine-level result, in the shape both
+// callers consume: the event's round-robin (playGame) and the gauntlet's
+// measurement games (playSeeded's direct callers).
+type gameOutcome struct {
+	// winner is the winning PLAYER index, 0 for the first-listed seat and
+	// 1 for the second; nil for a draw or a watchdog stall.
+	winner *int
+	// stall is the watchdog that capped the game, "" for a finished one.
+	stall string
+	// turns, intents and head are the chain facts -verify re-checks.
+	turns   int
+	intents int
+	head    string
+}
+
+// playGame plays one Bo1 game between event seats a and b, deriving the
+// engine seed the way every event game does, and with verify set replays
+// the chain afterwards. It returns the game's record with its chain head;
+// the winner is the event seat index, nil for a draw or a watchdog stall.
 func playGame(r *runner, eventSeed uint64, round, a, b, game int, deckA, deckB []*cards.Card, verify bool) (gameRecord, error) {
 	seed := gameSeed(eventSeed, round, a, b, game)
-	oc, eng, err := driveGame(r, seed, a, b, deckA, deckB)
+	oc, err := playSeeded(r, seed, [2]string{r.players[a], r.players[b]},
+		[2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, deckA, deckB, verify)
 	if err != nil {
 		return gameRecord{}, err
 	}
 	rec := gameRecord{
-		head:     eng.L.Head(),
-		turns:    int(oc.Turns),
-		intents:  oc.Intents,
+		head:     oc.head,
+		turns:    oc.turns,
+		intents:  oc.intents,
 		verified: verify,
 	}
-	switch {
-	case bench.IsAbort(oc.StallOn):
-		return gameRecord{}, fmt.Errorf("seed %d: engine aborted (%s): %s", seed, oc.StallOn, firstLine(oc.Livelock))
-	case oc.StallOn != "":
-		rec.stall = oc.StallOn
-	case oc.Draw:
-		// winner stays nil: a drawn game
-	default:
+	rec.stall = oc.stall
+	if oc.winner != nil {
 		w := a
-		if oc.WinnerSeat == 1 {
+		if *oc.winner == 1 {
 			w = b
 		}
 		rec.winner = &w
 	}
-	if verify && rec.stall == "" {
-		if _, err := replay.Replay(eng.L, gameConfig(r, seed, a, b, deckA, deckB)); err != nil {
-			return gameRecord{}, fmt.Errorf("seed %d: replay: %w", seed, err)
+	return rec, nil
+}
+
+// playSeeded plays one Bo1 game with an explicit engine seed, the two
+// seats' policies, display names and decks, and with verify set replays
+// the chain afterwards. It is the shared body of playGame (the event's
+// round-robin games, seed derived from the event) and the gauntlet's
+// measurement games (seed derived from the gauntlet's own salt space).
+func playSeeded(r *runner, seed uint64, players, names [2]string, deckA, deckB []*cards.Card, verify bool) (gameOutcome, error) {
+	oc, eng, err := driveGame(r, seed, players, names, deckA, deckB)
+	if err != nil {
+		return gameOutcome{}, err
+	}
+	out := gameOutcome{
+		head:    eng.L.Head(),
+		turns:   int(oc.Turns),
+		intents: oc.Intents,
+	}
+	switch {
+	case bench.IsAbort(oc.StallOn):
+		return gameOutcome{}, fmt.Errorf("seed %d: engine aborted (%s): %s", seed, oc.StallOn, firstLine(oc.Livelock))
+	case oc.StallOn != "":
+		out.stall = oc.StallOn
+	case oc.Draw:
+		// winner stays nil: a drawn game
+	default:
+		w := oc.WinnerSeat
+		out.winner = &w
+	}
+	if verify && out.stall == "" {
+		if _, err := replay.Replay(eng.L, gameConfig(r, seed, names, deckA, deckB)); err != nil {
+			return gameOutcome{}, fmt.Errorf("seed %d: replay: %w", seed, err)
 		}
 	}
-	return rec, nil
+	return out, nil
 }
 
 // replayGameHead re-plays one logged game from the log-rebuilt event's
@@ -79,7 +117,8 @@ func replayGameHead(r *runner, ev *event.Event, round, a, b, game int) (string, 
 		return "", fmt.Errorf("seat %d deck: %w", b, err)
 	}
 	seed := gameSeed(ev.Seed(), round, a, b, game)
-	oc, eng, err := driveGame(r, seed, a, b, deckA, deckB)
+	oc, eng, err := driveGame(r, seed, [2]string{r.players[a], r.players[b]},
+		[2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, deckA, deckB)
 	if err != nil {
 		return "", err
 	}
@@ -104,17 +143,19 @@ func resolveSavedDeck(r *runner, ev *event.Event, seatIdx int) ([]*cards.Card, e
 
 // driveGame builds the two seats and the engine config for one game and
 // drives it to completion (or to a watchdog cap) on the caller's own
-// goroutine, exactly cmd/mtgsim's drive loop's contract.
-func driveGame(r *runner, seed uint64, a, b int, deckA, deckB []*cards.Card) (bench.Outcome, *rules.Engine, error) {
+// goroutine, exactly cmd/mtgsim's drive loop's contract. players names the
+// bot policy for each player and names the deck display names the engine
+// config carries; both are indexed by player.
+func driveGame(r *runner, seed uint64, players, names [2]string, deckA, deckB []*cards.Card) (bench.Outcome, *rules.Engine, error) {
 	seats := make([]seat.Seat, 2)
-	for i, p := range []int{a, b} {
-		st, err := bots.New(r.players[p], bots.Options{
+	for i, p := range players {
+		st, err := bots.New(p, bots.Options{
 			Seed:        seed ^ uint64(i+1),
 			AutoPayMana: true,
 			Deps:        bots.Deps{Cards: r.reg},
 		})
 		if err != nil {
-			return bench.Outcome{}, nil, fmt.Errorf("seat %d policy %q: %w", p, r.players[p], err)
+			return bench.Outcome{}, nil, fmt.Errorf("seat %d policy %q: %w", i, p, err)
 		}
 		// The limited mulligan: the plain policies all build on *seat.Bot,
 		// whose London rule is opt-in per seat. A policy that some day
@@ -124,7 +165,7 @@ func driveGame(r *runner, seed uint64, a, b int, deckA, deckB []*cards.Card) (be
 		}
 		seats[i] = st
 	}
-	oc, eng, err := bench.PlayGame(gameConfig(r, seed, a, b, deckA, deckB), seats, gameMaxTurns, gameMaxIntents, bench.Hooks{
+	oc, eng, err := bench.PlayGame(gameConfig(r, seed, names, deckA, deckB), seats, gameMaxTurns, gameMaxIntents, bench.Hooks{
 		// The pregame ask, the way cmd/mtgsim's playOne poses it (the
 		// brief's Facts line): the engine is built with
 		// rules.NewStartingPlayerChoice, which defers the pregame rounds,
@@ -142,11 +183,13 @@ func driveGame(r *runner, seed uint64, a, b int, deckA, deckB []*cards.Card) (be
 }
 
 // gameConfig is one game's engine config: the two decks, the derived seed
-// and the name universe the engine's NameCard asks may need.
-func gameConfig(r *runner, seed uint64, a, b int, deckA, deckB []*cards.Card) rules.Config {
+// and the name universe the engine's NameCard asks may need. names carries
+// each player's deck display name (the same "p0"/"p1" labels the event
+// games always used).
+func gameConfig(r *runner, seed uint64, names [2]string, deckA, deckB []*cards.Card) rules.Config {
 	return rules.Config{
 		Seed:         seed,
-		Names:        []string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)},
+		Names:        []string{names[0], names[1]},
 		Decks:        [][]*cards.Card{deckA, deckB},
 		Tokens:       r.reg.Tokens,
 		NameUniverse: r.reg.Universe(),

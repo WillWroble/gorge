@@ -108,7 +108,7 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 		return nil, nil, err
 	}
 
-	er := &eventResult{}
+	er := &eventResult{decks: decks}
 	for {
 		pending := e.PendingSeries()
 		if len(pending) == 0 {

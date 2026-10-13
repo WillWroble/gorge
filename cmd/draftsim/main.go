@@ -32,6 +32,10 @@ func main() {
 	fs.StringVar(&o.builder, "builder", "best23", "pickbot builder name")
 	fs.BoolVar(&o.verify, "verify", false, "replay each event from its own log and every game from its chain, exiting non-zero on the first mismatch")
 	fs.StringVar(&o.draftlog, "draftlog", "", "path to append the events' picks to as 17Lands draft_data CSV")
+	fs.StringVar(&o.gauntlet, "gauntlet", "", "deck-quality gauntlet after each event: play the built (and random baseline) decks against a spellbench catalog; only fdn-limited, and requires -set FDN")
+	fs.IntVar(&o.gauntletGames, "gauntlet-games", 2, "games per gauntlet pairing, alternating which side sits in player 0's seat (one on the play's seat, one on the draw's)")
+	fs.StringVar(&o.gauntletPlayer, "gauntlet-player", "bot", "bot policy for BOTH gauntlet seats (an Env policy is refused, like the draft seats)")
+	fs.StringVar(&o.baseline, "baseline", "random", "gauntlet baseline deck per seat: random (23 random non-land pool cards + AutoLands) or none")
 	fs.BoolVar(&o.verbose, "v", false, "print each seat's policy and deck summary")
 	dir := fs.String("dir", ".cards", "corpus directory (holds ir.gob.gz / cardsfolder)")
 	fs.Parse(os.Args[1:])
@@ -56,6 +60,14 @@ type options struct {
 	draftlog string
 	verbose  bool
 	dir      string
+	// gauntlet, gauntletGames, gauntletPlayer and baseline are the
+	// -gauntlet measurement flags (gauntlet.go); gauntletMaxHuman caps the
+	// human deck list for tests and is not a flag.
+	gauntlet         string
+	gauntletGames    int
+	gauntletPlayer   string
+	baseline         string
+	gauntletMaxHuman int
 }
 
 // playerList splits the -players flag into its four seat policies.
