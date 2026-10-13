@@ -1,0 +1,22 @@
+{
+  "code": "BLB",
+  "name": "Bloomburrow",
+  "main_max": 261,
+  "pack_size": 14,
+  "land_sheet": {
+    "names": [
+      "Plains",
+      "Island",
+      "Swamp",
+      "Mountain",
+      "Forest"
+    ]
+  },
+  "slots": [
+    { "sheet": "common", "count": 7, "balance_colours": true },
+    { "sheet": "uncommon", "count": 3 },
+    { "rare_mythic": { "rare_weight": 2, "mythic_weight": 1 }, "count": 1 },
+    { "sheet": "land", "count": 1 },
+    { "wildcard": { "common": 0.571, "uncommon": 0.417, "rare_mythic": 0.012 }, "count": 2 }
+  ]
+}

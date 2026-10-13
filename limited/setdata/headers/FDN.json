@@ -1,0 +1,27 @@
+{
+  "code": "FDN",
+  "name": "Foundations",
+  "main_max": 271,
+  "pack_size": 14,
+  "land_sheet": {
+    "names": [
+      "Bloodfell Caves",
+      "Blossoming Sands",
+      "Dismal Backwater",
+      "Jungle Hollow",
+      "Rugged Highlands",
+      "Scoured Barrens",
+      "Swiftwater Cliffs",
+      "Thornwood Falls",
+      "Tranquil Cove",
+      "Wind-Scarred Crag"
+    ]
+  },
+  "slots": [
+    { "sheet": "common", "count": 7, "balance_colours": true },
+    { "sheet": "uncommon", "count": 3 },
+    { "rare_mythic": { "rare_weight": 2, "mythic_weight": 1 }, "count": 1 },
+    { "sheet": "land", "count": 1 },
+    { "wildcard": { "common": 0.571, "uncommon": 0.417, "rare_mythic": 0.012 }, "count": 2 }
+  ]
+}
