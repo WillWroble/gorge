@@ -1,2 +1,2 @@
 {"shape":{"template":"trigger","op":"resolve","field":"p0.library","diff":"placement"},"key":"trigger | resolve | p0.library | placement","cards":1}
-{"card":"Cosmic Cube","template":"trigger#0.0","status":"diverge","api":"AttackersDeclared:PeekAndReveal+BecomesTarget:Ward","sets":["MSH"],"detail":"step 1 (resolve) p0.library_count: gorge \"38\", xmage \"37\""}
+{"card":"Balthier and Fran","template":"trigger#0.0","status":"diverge","api":"Attacks:AddPhase","sets":["FIN"],"detail":"step 3 (resolve) p0.graveyard: gorge \"[Wastes]\", xmage \"[]\""}

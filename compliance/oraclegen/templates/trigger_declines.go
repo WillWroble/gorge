@@ -46,8 +46,11 @@ func hasExileLibraryLook(sa *cards.SA) bool {
 // hidden-zone look (Whiskervale Forerunner's "you may reveal a creature card
 // ... You may put it onto the battlefield"): XMage poses the ask without a
 // chooseUse, so the declined pair's "no" boolean has nothing to answer
-// (measured driver error: "Found wrong choice command") and the lone target
-// skip declines it. The gate is card-side — the served chain's ChooseCard
+// (measured driver error: "Found wrong choice command"). It is only the
+// fallback for a decline the forced pick could not replace: XMage's ask is a
+// 1..1 makeChoose that no skip token declines, so SearchPicksFromLook forces
+// the pick first (searchPicks' declinedLookedOnePick arm) and a forced item
+// never reaches this rewrite. The gate is card-side — the served chain's ChooseCard
 // over the looked-at cards — because the same decision shape on a cast item
 // (Break Out's cast-resolve row) agrees with the measured pair, so the pose
 // follows the card, not the decision. An unproven shape keeps the pair.

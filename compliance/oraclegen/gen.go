@@ -308,6 +308,13 @@ func mayYes(sc Scenario, ds []rules.OracleDecision) (Scenario, bool) {
 		if len(d.Picks) == 0 && tapPaymentAsk(d.First) {
 			continue
 		}
+		if len(d.Picks) > 0 && d.Picks[0] != d.First {
+			// The runner's fallback deliberately answered past option 0
+			// (the "done" it takes for an optional triggered cost's mana
+			// window no potential mana can pay, Esoteric Duplicator):
+			// pinning option 0 would tap the source it declined to tap.
+			continue
+		}
 		st := out.Steps[d.Step]
 		st.Answers = append(append([]Answer(nil), st.Answers...), Answer{Kind: d.GorgeKind, Pick: []string{d.First}})
 		out.Steps[d.Step] = st
