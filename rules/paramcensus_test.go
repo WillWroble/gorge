@@ -150,7 +150,7 @@ var baseBuckets = map[string]bucket{
 	// by staticTriggerLine for Static$ True: the same parameter map t/tr
 	// cover.
 	"pt.Trigger": bTrig,
-	"s":  bStat, "st": bStat, "sv": bStat,
+	"s":          bStat, "st": bStat, "sv": bStat,
 	// carrier is offBattlefieldGrantedWalk's element of
 	// actionStaticSource.addAbilityContinuous(): a staticView like s/st/sv,
 	// whose Params (Condition$/Affected$/AddAbility$) the offer walk reads.
