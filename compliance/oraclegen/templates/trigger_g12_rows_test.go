@@ -6,8 +6,13 @@
 package templates
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/compliance"
 
 	"github.com/adams-shaun/gorge/compliance/levelb"
 	"github.com/adams-shaun/gorge/compliance/oraclegen"
@@ -15,6 +20,8 @@ import (
 
 func TestG12TriggerFilterRows(t *testing.T) {
 	reg := loadGenRegistry(t)
+	// Generate as oraclediff gen does: only probes XMage's database holds.
+	installManifestXMageKnown(t)
 	const served = ""
 	for _, tc := range []struct{ name, key, skip string }{
 		// Setup's turn-1 upkeep spent the target or the source: cast on turn 1.
@@ -40,7 +47,6 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		{"Jackal, Genius Geneticist", "trigger#0.0", served},
 		{"Tokka & Rahzar, Terrible Twos", "trigger#0.0", served},
 		{"Fin Fang Foom", "trigger#0.0", served},
-		{"Codie, Ravenous Codex", "trigger#0.0", served},
 		{"Riku of Many Paths", "trigger#0.0", served},
 		{"Danitha, Sword of Hope", "trigger#0.0", served},
 		// Origin zones.
@@ -53,6 +59,7 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		{"Oblivious Bookworm", "trigger#0.2", "trigger did not fire"},          // Static$ True bookkeeping trigger: never uses the stack
 		{"Mikey & Don, Party Planners", "trigger#0.0", "trigger did not fire"}, // Static$ True: never uses the stack
 		{"Avatar Aang", "trigger#1.0", "trigger did not fire"},                 // back face transforms away during setup's turn-1 upkeep
+		{"Codie, Ravenous Codex", "trigger#0.0", "trigger did not fire"},       // the prepared-copy probe's spell face (Whiplash Wordsmith's) is not in the XMage manifests
 		{"Smaug, Wicked Worm", "trigger#0.1", "trigger did not fire"},          // Spell.ManaFromTreasure: the scenario pays from a seeded pool, never a Treasure
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -100,4 +107,31 @@ func TestG12TriggerFilterRows(t *testing.T) {
 			}
 		})
 	}
+}
+
+// installManifestXMageKnown loads every committed set manifest's names into
+// oraclegen.XMageKnown, the filter oraclediff gen runs under, and restores
+// the permissive default afterwards.
+func installManifestXMageKnown(t *testing.T) {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join("..", "..", "manifests", "*.json"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no committed manifests found (glob err %v, %d paths)", err, len(paths))
+	}
+	var names []string
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m compliance.Manifest
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		for _, c := range m.Cards {
+			names = append(names, c.Name)
+		}
+	}
+	oraclegen.SetXMageKnown(names)
+	t.Cleanup(func() { oraclegen.SetXMageKnown(nil) })
 }
