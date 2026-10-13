@@ -22,15 +22,22 @@ const (
 // classifyTurnFaceUpTrigger names the two TurnFaceUp sub-families: the source
 // itself (Card.Self, or a comma list that includes it) and another permanent
 // (Permanent, Permanent.YouCtrl, Detective.YouCtrl, ...). A ValidCause$
-// qualifier ("turned face up by a spell or ability you control") needs an
-// event-cause match the morph-family turn-face-up special action does not
-// carry, so it stays a mode gap. ok is false for every other trigger.
+// qualifier is served only as "you turn ... face up" (SpellAbility.YouCtrl),
+// which the recipe's own p0 special action is; any other qualifier stays a
+// mode gap. ok is false for every other trigger.
 func classifyTurnFaceUpTrigger(t *cards.Trigger) (sub string, ok bool) {
 	if t.ModeKind() != cards.TriggerTurnFaceUp {
 		return "", false
 	}
-	if strings.TrimSpace(t.ParamStr(cards.PKValidCause)) != "" {
-		return "", false
+	if cause := strings.TrimSpace(t.ParamStr(cards.PKValidCause)); cause != "" {
+		// "Whenever YOU turn a permanent face up" (Growing Dread: ValidCause$
+		// SpellAbility.YouCtrl): the recipe's cause is p0's own turn-face-up
+		// special action, which is exactly the turn-up this names. Every
+		// other cause qualifier stays a gap. Static$ True bookkeeping lines
+		// (Oblivious Bookworm's remember) never reach the stack.
+		if !strings.EqualFold(cause, "SpellAbility.YouCtrl") || strings.EqualFold(t.ParamStr(cards.PKStatic), "True") {
+			return "", false
+		}
 	}
 	v := t.ParamStr(cards.PKValidCard)
 	if v == "" {

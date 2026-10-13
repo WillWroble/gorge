@@ -35,6 +35,11 @@ const caseSolvedProbe = "Case of the Stashed Skeleton"
 // control (Blade of Shared Souls) has a legal target at queue time.
 const attachExtraProbe = "Llanowar Elves"
 
+// opposingAuraProbe is the Aura p0 casts on p1's creature for a bearer filter
+// relative to the Aura's own mana value (Eriette, the Beguiler): Pacifism's
+// mana value 2 admits the baseline Grizzly Bears.
+const opposingAuraProbe = "Pacifism"
+
 // remainderTriggerRecipe builds the causes for the remainder sub-families.
 // ok is false for every other sub-family, which baseTriggerRecipe then treats
 // as it always has.
@@ -157,6 +162,13 @@ func attachedCause(reg *cards.Registry, f *cards.Face, name string, t *cards.Tri
 				Op: "attach", Seat: 0, Card: "p0:" + name, AttachedTo: "p0:" + bearsProbe,
 			}},
 		}, true
+	}
+	if strings.HasPrefix(t.Params["TargetRelativeToSource"], "Permanent.nonLand+OppCtrl") {
+		// Eriette: an Aura of p0's becomes attached to an opponent's
+		// nonland permanent whose mana value is at most the Aura's.
+		// Pacifism (mana value 2) on p1's baseline Grizzly Bears (2).
+		c, ok := castCause(reg, name, opposingAuraProbe, "p1:"+bearsProbe)
+		return c, ok
 	}
 	// The bearer is the source itself when the line watches an Aura arrive
 	// on CARDNAME, otherwise a probe creature p0 controls.

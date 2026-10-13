@@ -1186,6 +1186,13 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 		// attaching object that fired the trigger.
 		base.Aura = c.TriggerSource
 		if base.Aura == 0 {
+			// Mode$ Attached binds the attaching object as the trigger's
+			// card (rules/trigger_referents.go: TriggerCard is the Aura,
+			// TriggerBearer the permanent it became attached to), which
+			// is how Eriette, the Beguiler's own Attached line names it.
+			base.Aura = c.TriggerCard
+		}
+		if base.Aura == 0 {
 			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Text: "GainControl UntilSourceUnattached has no triggering attachment"})
 			return
 		}

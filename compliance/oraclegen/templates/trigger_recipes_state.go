@@ -31,6 +31,16 @@ func stateTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *card
 	}
 	prefixes, xwhy := oraclegen.XMageAbility(f)
 	for idx, sa := range f.Abilities {
+		if sa.IsActivated() && selfCounterDoubling(sa, kind) {
+			// The Millennium Calendar: its own doubling activation reaches
+			// the 1,000-counter gate from 500, but the trigger's body ("each
+			// opponent loses 1,000 life") ends the two-seat game, and the
+			// XMage driver stops at game over with the scenario's remaining
+			// steps unconsumed (a harness row, measured lb4-gtrig). A named
+			// skip until the driver tolerates a game-ending step or setup
+			// can raise p1's life total.
+			return nil, "state trigger: the doubling cause ends the game (driver stops at game over)", true
+		}
 		if !sa.IsActivated() || !selfCounterActivation(sa, kind) {
 			continue
 		}
@@ -92,6 +102,22 @@ func selfCounterActivation(sa *cards.SA, kind string) bool {
 		return false
 	}
 	if num := strings.TrimSpace(sa.Params["CounterNum"]); num != "" && num != "1" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(sa.Params["CounterType"]), kind)
+}
+
+// selfCounterDoubling reports an untargeted activated MultiplyCounter of
+// kind on its own source with the default doubling (The Millennium
+// Calendar's "{2}, {T}: Double the number of time counters on CARDNAME").
+func selfCounterDoubling(sa *cards.SA, kind string) bool {
+	if !strings.EqualFold(sa.API, "MultiplyCounter") || sa.Params["ValidTgts"] != "" {
+		return false
+	}
+	if d := strings.TrimSpace(sa.Params["Defined"]); d != "" && !strings.EqualFold(d, "Self") {
+		return false
+	}
+	if m := strings.TrimSpace(sa.Params["Multiplier"]); m != "" && m != "2" {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(sa.Params["CounterType"]), kind)

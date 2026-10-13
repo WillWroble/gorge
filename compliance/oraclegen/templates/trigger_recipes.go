@@ -54,6 +54,12 @@ type triggerCause struct {
 	// whose cost carries a choice (scriptPreludeActivationCost exports its
 	// picks); "" when no prelude activates with such a cost.
 	preludeActivationCost string
+	// choicesAsTargets re-scripts every "choice" answer as a "target" one:
+	// XMage poses the chooser's single ChooseCard pick and a transform's
+	// "choose an opponent" as targets (TargetCreaturePermanent,
+	// TargetOpponent), not as the choice-queue asks gorge records
+	// (chosenCardLeavesCauses).
+	choicesAsTargets bool
 }
 
 // Probe cards, each named with why. Spec hypothesis H4: the probe exists in

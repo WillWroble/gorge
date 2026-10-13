@@ -183,13 +183,13 @@ func TestCombatRemainderCauseDetails(t *testing.T) {
 }
 
 // TestCombatRemainderNamedGaps: the shapes with no cause the recipes can
-// build stay named gaps -- Eriette's TargetRelativeToSource$ Attached line
-// (the engine's matcher never fires without a ValidTarget$) and the Static$
-// True Attached lines.
+// build stay named gaps -- the Static$ True Attached lines. (Eriette's
+// TargetRelativeToSource$ line left this table in wave-4 lb4-gtrig: the
+// engine's matcher reads it and trigger.attached casts Pacifism on p1's
+// creature.)
 func TestCombatRemainderNamedGaps(t *testing.T) {
 	reg := loadGenRegistry(t)
 	for _, tc := range []struct{ name, key string }{
-		{"Eriette, the Beguiler", "trigger#0.0"},
 		{"Metamorphic Alteration", "trigger#0.0"},
 	} {
 		c, ok := reg.Lookup(tc.name)

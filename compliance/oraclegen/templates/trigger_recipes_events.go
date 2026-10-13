@@ -104,6 +104,9 @@ func eventTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *card
 	case "trigger.land-played":
 		causes, why = landPlayedTriggerRecipe()
 		return causes, why, true
+	case levelb.LandPlayedZoneSub:
+		causes, why = landPlayedZoneRecipe(reg, f, t)
+		return causes, why, true
 	case "trigger.dies-other":
 		var why string
 		if causes, why = diesOtherRecipe(reg, f, name, t); why != "" {

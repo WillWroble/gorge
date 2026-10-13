@@ -711,6 +711,16 @@ const validSAManaFromPrefix = "Spell.ManaFrom"
 // otherwise.
 const validSATeamworkClause = "Spell.Teamwork"
 
+// validSAMayPlaySourceClause is the SA-level spelling of the card-level
+// "CastSa Spell.MayPlaySource" provenance (Undead Sprinter's and
+// Hundred-Battle Veteran's "if you cast it this way" riders, Thundermane
+// Dragon's "cast this way" grant): the spell was cast through a may-play
+// permission. It is answered through the same CastSa strip as the
+// Spell.ManaFrom<Tag> spellings, i.e. from the cast's FlagMayPlay -- the
+// identical approximation the card-level token already makes (the flag does
+// not record WHICH permission host granted the cast).
+const validSAMayPlaySourceClause = "Spell.MayPlaySource"
+
 func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.PlayerID, clause string) bool {
 	if validSATargetingList(clause) {
 		// A comma list carrying the spaced `IsTargeting <spec>` alternative
@@ -730,7 +740,7 @@ func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.Pla
 			o := e.Game().Obj(ev.Obj)
 			return o != nil && o.CastFlags&state.FlagTeamworkPaid != 0
 		}
-		if strings.HasPrefix(fields[0], validSAManaFromPrefix) {
+		if strings.HasPrefix(fields[0], validSAManaFromPrefix) || fields[0] == validSAMayPlaySourceClause {
 			// Spell.ManaFrom<Tag> (Smaug, Wicked Worm; Mastermind Plum;
 			// Alchemist's Talent) is the SA-level spelling of the card-level
 			// "CastSa Spell.ManaFrom<Tag>" predicate: answer it from the same
