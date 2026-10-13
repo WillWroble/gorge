@@ -87,8 +87,8 @@ func TestLibrarySearchGainControlTrueHandsPermanentToCaster(t *testing.T) {
 	if controlIdx < 0 {
 		t.Fatalf("no ControlChange for the fetched permanent: %+v", h.log)
 	}
-	if moveIdx > controlIdx {
-		t.Fatalf("ControlChange (%d) preceded the MoveZone (%d); control must be recorded after the entry", controlIdx, moveIdx)
+	if controlIdx > moveIdx {
+		t.Fatalf("ControlChange (%d) followed the MoveZone (%d); the permanent must enter under the new controller (CR 110.2a)", controlIdx, moveIdx)
 	}
 }
 

@@ -38,8 +38,11 @@ type DigParams struct {
 	// ChangeNum is ChangeNum$. ChangeNumAny is the any-number cap ("Any");
 	// ChangeNumCapped is a value that narrows the cap (neither absent, All
 	// nor Any), resolved through the Num grammar with DigNum as default.
-	ChangeNum       ParamText
-	ChangeNumAny    bool
+	ChangeNum    ParamText
+	ChangeNumAny bool
+	// ChangeNumAll is the literal ChangeNum$ All: every matching card in
+	// the window moves, so a take election is all-or-nothing.
+	ChangeNumAll    bool
 	ChangeNumCapped bool
 	// WithTotalCMC is WithTotalCMC$, the cumulative mana-value budget.
 	WithTotalCMC ParamText
@@ -116,7 +119,7 @@ var digKnownKeys = [...]string{
 	"TargetingPlayerControls", "TargetsAtRandom", "TargetsForEachPlayer",
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
-	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription",
 	"Type", "Ultimate", "Unearth", "UnlessAI", "UnlessCost", "UnlessPayer",
@@ -160,6 +163,7 @@ func compileDig(sa *cards.SA) *DigParams {
 	p.DigNumX = strings.TrimSpace(p.DigNum.Text) == "X"
 	changeNum, ok := sa.Param(cards.PKChangeNum)
 	p.ChangeNum = ParamText{Text: changeNum, Present: ok}
+	p.ChangeNumAll = changeNum == "All"
 	if changeNum != "" && changeNum != "All" {
 		p.ChangeNumAny = changeNum == "Any"
 		p.ChangeNumCapped = !p.ChangeNumAny

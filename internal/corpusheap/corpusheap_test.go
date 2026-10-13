@@ -14,15 +14,13 @@ package corpusheap_test
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"runtime/metrics"
-	"strings"
 	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 
 	// Register the effects' ParamCoders exactly as a real process does, so the
 	// census reflects what a server holds, not a bare parser.
@@ -115,10 +113,7 @@ func report() heapSample {
 // .cards/ corpus, the same way internal/testutil.CorpusRegistry does, so a
 // clean clone with no fetched corpus still passes.
 func TestCorpusHeapCensus(t *testing.T) {
-	dir := corpusDir(t)
-	if dir == "" {
-		t.Skip("corpusheap: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
+	dir := testutil.CorpusDirOrSkip(t)
 
 	// Measure ONE deterministic path: the imaged lazy registry that
 	// LoadRegistry serves from a gob cache. Build that cache OURSELVES in a
@@ -231,27 +226,6 @@ func check(t *testing.T, label, metric string, got int64, ceiling int64) {
 			metric, gotF, mb(uint64(got)), staleFraction*100, mb(uint64(ceiling)))
 	}
 	_ = label
-}
-
-// corpusDir finds the repository root the way internal/testutil/decks.go:211
-// and cards/boundary_test.go do -- `git rev-parse --show-toplevel`, not a
-// hard-coded relative path. A test binary's working directory is its own
-// package directory, and under a hook GIT_DIR can point somewhere wrong, so the
-// child git runs with cards.GitEnv() (every inherited GIT_* stripped), exactly
-// as that discovery does. It returns "" when there is no .cards/ directory.
-func corpusDir(t *testing.T) string {
-	t.Helper()
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	return dir
 }
 
 // mb renders a byte count as a human-readable MB figure.

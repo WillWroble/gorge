@@ -35,6 +35,7 @@ var modelledValueHeads = []string{
 	"CastTotalManaSpent",
 	"ChosenNumber",
 	"ChosenSize",
+	"ChromaSource",
 	"ColorsColorIdentity",
 	"Compare",
 	"Converge",

@@ -304,7 +304,18 @@ func rollDiceBodyChainSupported(with *cards.SA) bool {
 // count-bearing action. The proposal is never logged; its specialized
 // replacement continuation returns the rewritten event to the effects layer.
 // RollDice retains its historical minimum count and ignored-low normalization.
+// The draw instruction's DrawBatchProposal rides the same seam: it is the one
+// held proposal that runs even inside a replacement body, because the draw
+// chain's applied-set exclusion (not the applyingReplacement guard) is what
+// keeps it terminating; a consumed batch reports Amount 0
+// (proposeDrawBatchReplacement).
 func (e *Engine) CountReplacementProposed(ev events.Event) events.Event {
+	if ev.Kind == events.DrawBatchProposal {
+		// The draw-batch proposal is the one held proposal that must run
+		// even inside a replacement body (the chain's exclusion, not the
+		// applyingReplacement guard, keeps it terminating).
+		return proposeDrawBatchReplacement(e, ev)
+	}
 	if e.applyingReplacement {
 		return ev
 	}

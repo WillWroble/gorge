@@ -31,8 +31,6 @@ package host
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -647,13 +645,7 @@ const committedCaptureRel = "../cmd/repro/testdata/feedback/20260915T094418Z-e48
 // proves nothing.
 func requireCommittedCapture(t *testing.T) {
 	t.Helper()
-	root, err := feedback.Root()
-	if err != nil {
-		t.Skipf("no repo root: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".cards")); err != nil {
-		t.Skip("no .cards/ corpus present — the committed capture cannot replay")
-	}
+	testutil.CorpusDirOrSkip(t)
 }
 
 // TestCommittedOvershootCaptureReplaysToTheParkedAsk is the committed

@@ -12,7 +12,6 @@ live in [repo-map-internal.md](repo-map-internal.md).
 | `searchbench/statespec` | Strict Go mirror of Draft Zero's StateSpec v1 JSON (validation, aliases, typed labels). |
 | `searchprobe` | Hidden-information world sampler (`Collector`, `Sample`, `Redealer`, known-card tracking) and PIMC teacher scoring. Research harness, not production. |
 | `searchseat` | The PIMC search decision function (`Choose`) shared by the teacher corpus generator and `SearchBot`. |
-| `hindsight` | Deterministic hindsight-branch mechanics (no clock, no files). |
 | `paymirror` | A/B check of planned vs manual cast payment. |
 
 ## `cmd/` bench and training tools
@@ -21,6 +20,6 @@ live in [repo-map-internal.md](repo-map-internal.md).
 |---|---|
 | `botbench` | Head-to-head policy evaluation: deck-pair matrices, CIs, decision traces, search/az front doors. |
 | `searchteacher` / `searchprobe` | PIMC label-corpus generator / search calibration (also the engine perf oracle). |
-| `policytrain` / `policytune` / `exitloop` / `hindsight` | Train `policynet` / SPSA-fit cast weights / expert-iteration loop / hindsight labels. |
+| `policytrain` / `policytune` / `exitloop` | Train `policynet` / SPSA-fit cast weights / expert-iteration loop. |
 | `traindash` | Read-only training dashboard over `/mnt/sata/gorge-training` (`make traindash`). |
 | `enginebench` | The draft-zero docs/015 engine-speed rows (random/bot play, Clone, one step, search rates). Workload decks are committed in `testdata/decks`. `make enginebench-pair BASE=main CAND=.` runs a paired base-vs-candidate comparison per CPU-second, `make enginebench-profile` prints CPU and allocation tops, and `make enginebench-verify` runs a memo-verify-mode smoke (scripts: `scripts/enginebench-*.sh`). Results: `docs/superpowers/reports/2026-09-30-gorge-engine-speed.md`. |

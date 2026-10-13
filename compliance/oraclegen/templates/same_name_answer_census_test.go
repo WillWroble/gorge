@@ -238,7 +238,7 @@ var wantSameNameCensus = map[string]string{
 	"BIG": `{"alias":0,"copy":0,"unresolved":0,"unproven":1,"items":null}`,
 	"BLB": `{"alias":3,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"DFT": `{"alias":0,"copy":0,"unresolved":0,"unproven":4,"items":null}`,
-	"DSK": `{"alias":3,"copy":0,"unresolved":0,"unproven":36,"items":null}`,
+	"DSK": `{"alias":3,"copy":0,"unresolved":0,"unproven":35,"items":null}`,
 	"ECL": `{"alias":0,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"EOE": `{"alias":3,"copy":0,"unresolved":0,"unproven":2,"items":null}`,
 	"FDN": `{"alias":0,"copy":1,"unresolved":0,"unproven":2,"items":null}`,

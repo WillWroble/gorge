@@ -9,7 +9,8 @@ import (
 
 // CompilerFingerprint identifies the cards package source this binary was
 // compiled from: a 32-hex-character SHA-256 over the sorted (name, contents)
-// pairs of the package's non-test .go files. It is embedded at build time, so
+// pairs of the package's IR-affecting non-test .go files (compilerSources,
+// classified by fingerprintCensus). It is embedded at build time, so
 // it is a constant for a given binary and never changes at runtime.
 //
 // It keys the IR cache file name (CachePath): a worktree whose parser differs

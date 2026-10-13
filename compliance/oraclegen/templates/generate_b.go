@@ -61,6 +61,12 @@ func GenerateB(reg *cards.Registry, name string, req levelb.Requirement) (item o
 		// zones uniform so the drawn hand is the same whatever the order; only
 		// a setup holding several distinct shuffled names compares the hand by
 		// size instead.
+		// A shuffle-then-manifest/mill sends cards off the top of the
+		// shuffled library to the graveyard, and which ones is the order
+		// XMage randomises: compare the graveyard's size, not its names.
+		if oraclegen.ShufflesThenReadsLibrary(c.Faces[req.Face]) && !hasCompareOption(item.Compare, oraclegen.CompareGraveyardCount) {
+			item.Compare = append(item.Compare, oraclegen.CompareGraveyardCount)
+		}
 		if oraclegen.ShufflesThenDraws(c.Faces[req.Face]) {
 			if !oraclegen.UniformShuffledZones(&item.Scenario, name) && !hasCompareOption(item.Compare, oraclegen.CompareHandCount) {
 				item.Compare = append(item.Compare, oraclegen.CompareHandCount)

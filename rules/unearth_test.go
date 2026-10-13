@@ -20,6 +20,7 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -28,14 +29,15 @@ import (
 // worktree's gitignored .cards corpus into a temp dir; nothing is committed.
 func freshUnearthRegistry(t *testing.T) *cards.Registry {
 	t.Helper()
+	src := testutil.CorpusDirOrSkip(t)
 	dir := t.TempDir()
 	cf := filepath.Join(dir, "cardsfolder")
 	if err := os.MkdirAll(cf, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	for _, pair := range [][2]string{
-		{"../.cards/cardsfolder/a/ashnods_harvester.txt", "ashnods_harvester.txt"},
-		{"../.cards/cardsfolder/p/priest_of_fell_rites.txt", "priest_of_fell_rites.txt"},
+		{filepath.Join(cards.CorpusDir(src), "a", "ashnods_harvester.txt"), "ashnods_harvester.txt"},
+		{filepath.Join(cards.CorpusDir(src), "p", "priest_of_fell_rites.txt"), "priest_of_fell_rites.txt"},
 	} {
 		b, err := os.ReadFile(pair[0])
 		if err != nil {

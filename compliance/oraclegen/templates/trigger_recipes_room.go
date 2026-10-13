@@ -83,14 +83,17 @@ func roomTriggerCauses(reg *cards.Registry, name string, req levelb.Requirement)
 	return nil, "", false
 }
 
-// roomSecondDoorCauses turns the face-0 causes of a trigger on a Room's second
-// door into causes that first cast that door: the Room starts in hand, the
-// prelude casts the door and resolves it, and the cause's own steps then run
-// with the second door unlocked on the battlefield. A cause that already casts
-// the card itself is dropped, since the prelude is that cast.
-func roomSecondDoorCauses(reg *cards.Registry, name string, req levelb.Requirement, causes []triggerCause) []triggerCause {
+// roomDoorCauses turns the causes of a trigger on a Room door into causes
+// that first cast that door: the Room starts in hand, the prelude casts the
+// door and resolves it, and the cause's own steps then run with the door
+// unlocked on the battlefield. Setup places a Room with both doors locked, so
+// without the cast neither door's abilities exist in either engine (CR 709.5).
+// A cause that already casts the card itself is dropped for the second door,
+// since the prelude is that cast, and kept as is for the first door, whose
+// cast it already performs.
+func roomDoorCauses(reg *cards.Registry, name string, req levelb.Requirement, causes []triggerCause) []triggerCause {
 	c, found := reg.Lookup(name)
-	if !found || !levelb.IsRoomCard(c) || req.Face != 1 {
+	if !found || !levelb.IsRoomCard(c) {
 		return causes
 	}
 	cast, castable := roomDoorCast(c, name, req.Face)
@@ -100,6 +103,9 @@ func roomSecondDoorCauses(reg *cards.Registry, name string, req levelb.Requireme
 	var out []triggerCause
 	for _, cause := range causes {
 		if cause.castSelfX || cause.selfInHand {
+			if req.Face == 0 {
+				out = append(out, cause)
+			}
 			continue
 		}
 		cause.selfInHand = true

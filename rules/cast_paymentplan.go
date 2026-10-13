@@ -401,4 +401,10 @@ func (e *Engine) installPaidCostLists(pc *pendingCast) {
 		}
 		e.castRevealed[pc.stackObj] = append([]state.ObjID(nil), pc.Reveals...)
 	}
+	if len(pc.Blights) > 0 {
+		if e.castCounterPut == nil {
+			e.castCounterPut = make(map[state.ObjID][]state.ObjID)
+		}
+		e.castCounterPut[pc.stackObj] = append([]state.ObjID(nil), pc.Blights...)
+	}
 }

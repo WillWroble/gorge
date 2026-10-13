@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command kshadowcheck measures the kernel shadow offline over recorded
 // mtg-kernel games (scripts/spellbench-arena/kshadow_corpus.py output): for
 // every recorded decision it stages the acting seat's observation into a

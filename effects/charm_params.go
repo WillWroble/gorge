@@ -190,7 +190,7 @@ var charmKnownKeys = [...]string{
 	"TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType", "TargetsWithSharedTypes",
 	"TempRemember", "TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription",
 	"Type", "Ultimate", "UnlessAI", "UnlessCost",

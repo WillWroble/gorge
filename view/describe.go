@@ -733,6 +733,11 @@ func Describe(g *state.Game, ev events.Event) string {
 		if i := strings.Index(phase, "|VP="); i >= 0 {
 			phase = phase[:i]
 		}
+		for _, sfx := range []string{"|DP=", "|ST"} {
+			if i := strings.Index(phase, sfx); i >= 0 {
+				phase = phase[:i]
+			}
+		}
 		return obj(g, ev.Obj) + " sets up a delayed trigger for " + phase
 	case events.DelayedPush:
 		// The registered phase arrived and the delayed ability went on the

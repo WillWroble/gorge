@@ -73,6 +73,13 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		}
 		if o := e.G.Obj(e.inFlightDamageSource()); o != nil && o.IsAttacking {
 			c.DefendingPlayer = player(o.Attacking)
+			// The attacking player is the attacker's controller (Contested
+			// Game Ball's NewController$ TriggeredAttackingPlayer), bound
+			// beside the defending player from the same combat source. Read
+			// through controllerOf so the recurring-Effect overlay, the ONE
+			// home for a source-controller read, is honoured here as at every
+			// sibling capture site (trigger_blocks.go, trigger_granted.go).
+			c.AttackingPlayer = player(e.controllerOf(o.ID))
 		}
 	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll:
 		// The batch size the body reads as TriggerCount$Amount (Simic
@@ -166,6 +173,10 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		c.TriggerActivator = player(trigmatch.TapActor(boardOf(e), ev))
 	case cards.TriggerChangesZone, cards.TriggerLandPlayed:
 		c.TriggerCard = ev.Obj
+	case cards.TriggerChangesZoneAll, cards.TriggerPhaseOutAll:
+		// An unbatched event is a batch of one; closeZoneBatch overrides the
+		// amount with the batch's moved count (TriggerCount$Amount).
+		c.TriggerAmount = 1
 	case cards.TriggerMilled, cards.TriggerMilledAll:
 		// The milled card is ev.Obj (what ValidCard$ matched) and the player
 		// whose library was milled is ev.Player (what ValidPlayer$ matched),
@@ -601,6 +612,9 @@ func (e *Engine) targetSpecContext(source, stack state.ObjID, you state.PlayerID
 		srcLKI: srcLKI, srcLKIValid: srcLKIValid, resolveFn: env.resolveFn}
 	sc := effects.NewSpecContext(you, source)
 	sc.TriggerContext, sc.Remembered, sc.Resolve = tcx, remembered, env.resolveFn
+	if srcLKIValid {
+		sc.SourceLKIValid, sc.SourceChosenType, sc.SourceChosenColor = true, srcLKI.chosenType, srcLKI.chosenColor
+	}
 	// The stack object's Remembered and fire-time LKI are bound above, beside
 	// TriggerContext, so placement-time numeric SVars read the same captured
 	// referents the resolving Ctx receives later.

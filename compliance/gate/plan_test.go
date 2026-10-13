@@ -17,7 +17,7 @@ import (
 //
 // SharedCorpus (not bare LoadRegistry) so an absent fingerprint-keyed IR
 // cache is compiled on demand instead of failing: see the note on
-// TestDeclaredSetsCompliant.
+// loadDeclaredClaim (declared_chunks_test.go).
 func corpus(t *testing.T) *cards.Registry {
 	t.Helper()
 	reg, err := cards.SharedCorpus(filepath.Join("..", "..", ".cards"))

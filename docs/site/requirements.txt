@@ -1,0 +1,2 @@
+# Pinned for the docs build (.github/workflows/docs.yml) and local preview.
+mkdocs-material==9.7.7

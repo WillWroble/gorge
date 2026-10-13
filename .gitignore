@@ -69,3 +69,15 @@ __pycache__/
 # `make coverage` output (cmd/forgec coverage): generated card-support tables,
 # published by the `card coverage` CI job, never committed.
 .coverage/
+
+# Operator-local scratch (the CUDA game-pool PoC, since ported to
+# internal/gamepool). Never committed.
+/scratch/
+
+# MkDocs build output (mkdocs.yml site_dir) and the docs workflow's
+# build-time inputs: the generated set and package tables and the perf history fetched
+# from the perf-data branch. Never committed.
+/site/
+docs/site/support/_generated_sets.md
+docs/site/architecture/_generated_packages.md
+docs/site/perf/history.jsonl

@@ -58,7 +58,7 @@ func TestMayPlaySourceCastProvenance(t *testing.T) {
 		t.Fatal("Affected$ layer match rejected the paid may-play cast")
 	}
 
-	counted := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.MayPlaySource", 0)
+	counted := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.MayPlaySource", 0, noTC)
 	if len(counted) != 1 || counted[0] != spell.ID {
 		t.Fatalf("Count$ThisTurnCast_ matches = %v, want this paid may-play cast %d", counted, spell.ID)
 	}
