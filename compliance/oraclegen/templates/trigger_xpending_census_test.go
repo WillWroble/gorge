@@ -83,9 +83,11 @@ func TestTriggerAsksAreSettledBeforeTheCheckpoint(t *testing.T) {
 }
 
 // Famished Worldsire's Ward is its trigger#0.1; the card is a printed 0/0 that
-// dies as it enters, so nothing can target it. The skip names that cause
-// instead of the bare "did not fire".
-func TestZeroToughnessWardSkipIsNamed(t *testing.T) {
+// dies as it enters unless something keeps it alive. The wave-4 G12 tail cause
+// (lb4-g12) seats it with a +1/+1 counter, so the becomes-target row is served
+// instead of skipping with the named zero-toughness reason (whose census count
+// trigger_census_test.go pins at 0).
+func TestZeroToughnessWardIsServed(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	c, ok := reg.Lookup("Famished Worldsire")
 	if !ok {
@@ -100,13 +102,8 @@ func TestZeroToughnessWardSkipIsNamed(t *testing.T) {
 		if r.Sub != "trigger.becomes-target" {
 			t.Fatalf("precondition: trigger#0.1 is %q, want trigger.becomes-target", r.Sub)
 		}
-		_, skip := GenerateB(reg, "Famished Worldsire", r)
-		if skip == nil {
-			t.Fatal("trigger#0.1 is now served; the zero-toughness skip is dead")
-		}
-		const want = "trigger creature enters with toughness 0 and dies before it can be targeted"
-		if skip.Reason != want {
-			t.Fatalf("skip = %q, want %q", skip.Reason, want)
+		if _, skip := GenerateB(reg, "Famished Worldsire", r); skip != nil {
+			t.Fatalf("trigger#0.1 skips again: %q", skip.Reason)
 		}
 	}
 	if !found {
