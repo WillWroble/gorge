@@ -2413,7 +2413,11 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 	}
 	for i, st := range sc.Steps {
 		r.step = i
+		top := r.passResolves(st)
 		if err := r.do(st); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		if err := r.settleResolutionAsk(sc.Steps, i, top); err != nil {
 			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
 		}
 		if err := r.settleTriggerAsks(sc.Steps, i); err != nil {
