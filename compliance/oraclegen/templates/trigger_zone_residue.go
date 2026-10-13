@@ -18,7 +18,9 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
+	"github.com/adams-shaun/gorge/compliance/oraclegen"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/rules"
 )
 
 // millProbes are the spells that put cards from p0's library into p0's
@@ -148,6 +150,7 @@ func chosenCardLeavesCauses(reg *cards.Registry, name string, t *cards.Trigger) 
 			continue
 		}
 		cs.castSelfX = true
+		cs.choicesAsTargets = true
 		out = append(out, cs)
 	}
 	if len(out) == 0 {
@@ -171,4 +174,31 @@ func selfETBChoosesOpposingCreature(f *cards.Face) bool {
 		}
 	}
 	return false
+}
+
+// choicesAsTargetAnswers rewrites the item's "choice" answers as "target"
+// answers naming the decision's exact pick: the object ref gorge picked
+// (Zenos's ETB "choose a creature an opponent controls"), or the seat ref
+// (Shinryu's "choose an opponent"). XMage asks both as targets, so a
+// choice-queue answer is consumed by the wrong ask (measured lb4-gtrig:
+// "Found wrong choice command ... TargetOpponent").
+func choicesAsTargetAnswers(xa [][]oraclegen.XAnswer, ds []rules.OracleDecision) [][]oraclegen.XAnswer {
+	for step := range xa {
+		for i := range xa[step] {
+			a := &xa[step][i]
+			if a.Kind != "choice" || a.Value == "yes" || a.Value == "no" {
+				continue
+			}
+			a.Kind = "target"
+			if strings.HasPrefix(a.Value, "p0") || strings.HasPrefix(a.Value, "p1") {
+				continue
+			}
+			for _, d := range ds {
+				if d.Step == step && len(d.ObjectPicks) == 1 && len(d.PickRefs) == 1 {
+					a.Value = d.PickRefs[0]
+				}
+			}
+		}
+	}
+	return xa
 }

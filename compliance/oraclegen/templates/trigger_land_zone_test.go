@@ -102,3 +102,23 @@ func TestAttachedRelativeBearerRowGenerates(t *testing.T) {
 	}
 	t.Fatalf("p0 did not gain p1's Grizzly Bears: %+v", res.Snapshots[len(res.Snapshots)-1].Permanents)
 }
+
+// TestChosenCardLeavesAnswersAreTargets: XMage asks Zenos's ETB pick and
+// Shinryu's "choose an opponent" as targets, so the item scripts both as
+// target answers (a choice-queue answer is consumed by the wrong ask).
+func TestChosenCardLeavesAnswersAreTargets(t *testing.T) {
+	reg := loadGenRegistry(t)
+	it := triggerRequirement(t, reg, "Zenos yae Galvus", "trigger#0.1", "trigger.zone-change-residue")
+	var got []string
+	for _, step := range it.XAnswers {
+		for _, a := range step {
+			if a.Kind != "target" {
+				t.Fatalf("answer %+v is not a target", a)
+			}
+			got = append(got, a.Value)
+		}
+	}
+	if strings.Join(got, ",") != "p1:Grizzly Bears,p1" {
+		t.Fatalf("answers %v, want [p1:Grizzly Bears p1]", got)
+	}
+}

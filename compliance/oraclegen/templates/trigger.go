@@ -452,6 +452,9 @@ func triggerServe(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	// A declined one-card pick after the chain's hidden-zone look: XMage
 	// poses it without a chooseUse (trigger_declines.go).
 	it.XAnswers = scriptLookedPickDecline(it.XAnswers, eff, res.Decisions)
+	if c.choicesAsTargets {
+		it.XAnswers = choicesAsTargetAnswers(it.XAnswers, res.Decisions)
+	}
 	// Ward is caused by targeting; decline its unless-pay mode so the probe
 	// does not depend on the opponent's ability to pay the ward cost.
 	for _, d := range res.Decisions {
