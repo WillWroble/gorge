@@ -243,16 +243,23 @@ func rememberedExcludingCapture(h Host, c *Ctx) []state.Target {
 	if len(c.Captured) == 0 {
 		return c.Remembered
 	}
+	return excludeCaptureOccurrences(c.Remembered, c.Captured)
+}
+
+// excludeCaptureOccurrences is rememberedExcludingCapture over plain slices,
+// shared with selectRemembered so the capture-occurrence rule has one home.
+// The result is freshly allocated (nil when nothing remains).
+func excludeCaptureOccurrences(remembered, captured []state.Target) []state.Target {
 	// Remove only the seeded occurrence(s), not every equal target. A body
 	// can explicitly remember the captured object again (e.g. RememberSacrificed
 	// on a death trigger); that later occurrence is real memory even though its
 	// identity equals the capture.
-	remaining := make(map[state.Target]int, len(c.Captured))
-	for _, t := range c.Captured {
+	remaining := make(map[state.Target]int, len(captured))
+	for _, t := range captured {
 		remaining[t]++
 	}
 	var out []state.Target
-	for _, t := range c.Remembered {
+	for _, t := range remembered {
 		if remaining[t] > 0 {
 			remaining[t]--
 			continue

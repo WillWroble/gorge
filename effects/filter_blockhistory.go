@@ -147,14 +147,24 @@ func blockHistoryRememberedNames(g *state.Game, history []state.ObjID, sc *SpecC
 // set UNIONED with the source object's event-backed Remembered, objects only
 // -- and reports whether fn accepts any id. IsRemembered and the
 // *Remembered block-history words share it, so the two cannot disagree on
-// what "remembered" is.
+// what "remembered" is. A trigger's fire-time capture in the resolution set
+// is filtered through selectRemembered, the Defined$ Remembered rule.
 func anyRemembered(g *state.Game, sc *SpecContext, fn func(state.ObjID) bool) bool {
-	for _, t := range sc.Remembered {
+	var persistent []state.Target
+	src := g.Obj(sc.Source)
+	if src != nil {
+		persistent = src.Remembered
+	}
+	resolution := sc.Remembered
+	if len(sc.Captured) > 0 {
+		resolution = selectRemembered(sc.Remembered, sc.Captured, sc.DelayedRemembered, persistent)
+	}
+	for _, t := range resolution {
 		if !t.IsPlayer && fn(t.Obj) {
 			return true
 		}
 	}
-	if src := g.Obj(sc.Source); src != nil {
+	if src != nil {
 		for _, t := range src.Remembered {
 			if !t.IsPlayer && fn(t.Obj) {
 				return true

@@ -16,6 +16,12 @@ func changesControllerMatches(e Board, t cards.Trigger, source state.ObjID, ev e
 	if ev.Kind != events.ControlChange || lki == nil || lki.Controller == ev.Player {
 		return false
 	}
+	// Only a permanent changes controller (CR 108.4, 110.2a): a card entering
+	// the battlefield under GainControl$ is folded onto the card in its origin
+	// zone, which has no controller to lose it "from".
+	if lki.Zone != state.ZBattlefield {
+		return false
+	}
 	you := e.ControllerOf(source)
 	if v := t.ParamStr(cards.PKValidCard); v != "" &&
 		!e.MatchesObject(v, lki, source, you, SpecOpts{}) {
