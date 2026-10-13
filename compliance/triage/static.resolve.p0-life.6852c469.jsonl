@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"resolve","field":"p0.life","diff":"gorge-xmage=-1"},"key":"static | resolve | p0.life | gorge-xmage=-1","cards":1}
-{"card":"Ruinous Waterbending","template":"static#0.0","status":"diverge","api":"PumpAll+Effect","sets":["TLA"],"detail":"step 1 (resolve) p0.life: gorge \"20\", xmage \"21\""}
