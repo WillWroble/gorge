@@ -27,6 +27,11 @@ func (r *run) advanceBuild() bool {
 		}
 		if r.ev.SavedRev(s) == 0 {
 			if _, err := r.saveDeck(s, r.builders[s].Build(r.meta.Set, r.ev.Pool(s))); err != nil {
+				// A bot's own deck failing to validate is a builder
+				// defect: halt rather than stall in BUILD forever.
+				if r.halted == "" {
+					r.halted = fmt.Sprintf("event %s: bot seat %d could not save its deck: %v", r.meta.ID, s, err)
+				}
 				return applied
 			}
 			applied = true
@@ -78,6 +83,9 @@ func (h *Host) EventPool(id, token string) (protocol.EventPool, error) {
 	seat, terr := r.seatFor(token, false)
 	if terr != nil {
 		return protocol.EventPool{}, terr
+	}
+	if r.ev.Phase() == event.PhaseLobby {
+		return protocol.EventPool{}, errConflict("eventhost: the event has not drafted yet (phase %s)", r.ev.Phase())
 	}
 	return r.poolFor(seat), nil
 }

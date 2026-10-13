@@ -61,6 +61,11 @@ func TestHumanBuildFlow(t *testing.T) {
 	h, _ := newHost(t, nil)
 	resp := createOK(t, h, oneHumanReq(7))
 	id, tok := resp.Event, func() string { tk, _ := humanToken(t, resp); return tk }()
+	if _, err := h.EventPool(id, tok); err == nil {
+		t.Fatal("EventPool before the draft succeeded")
+	} else {
+		wantErr(t, err, codeConflict, 409)
+	}
 	joinOK(t, h, id, tok, "Ann")
 	pickTop(t, h, id, tok, 64)
 	if st := stateOf(t, h, id, tok); st.Phase != "BUILD" {
