@@ -6,12 +6,13 @@ import type { Frame, Hello } from '../protocol';
 // The openStream mock records the URL it is given, which is what the
 // base-path wiring tests below assert on (streaming rides the same base as
 // every other request path).
-const { fakeStream, subscribeMock, unsubscribeMock, emit, streamUrls } = vi.hoisted(() => {
+const { fakeStream, subscribeMock, unsubscribeMock, emit, streamUrls, eventSubscribeMock } = vi.hoisted(() => {
   const handlers = new Set<(f: Frame) => void>();
   let sessionId: string | null = null;
   const subscribeMock = vi.fn().mockResolvedValue(undefined);
   const unsubscribeMock = vi.fn().mockResolvedValue(undefined);
   const streamUrls: string[] = [];
+  const eventSubscribeMock = vi.fn().mockResolvedValue(undefined);
   const fakeStream = {
     get session() { return sessionId; },
     onFrame(h: (f: Frame) => void) { handlers.add(h); return () => handlers.delete(h); },
@@ -21,10 +22,11 @@ const { fakeStream, subscribeMock, unsubscribeMock, emit, streamUrls } = vi.hois
     if (f.t === 'hello') sessionId = (f.body as Hello).session;
     for (const h of handlers) h(f);
   };
-  return { fakeStream, subscribeMock, unsubscribeMock, emit, streamUrls };
+  return { fakeStream, subscribeMock, unsubscribeMock, emit, streamUrls, eventSubscribeMock };
 });
 vi.mock('./stream', () => ({ openStream: (url: string) => { streamUrls.push(url); return fakeStream; } }));
 vi.mock('./api', () => ({ subscribe: subscribeMock, unsubscribe: unsubscribeMock }));
+vi.mock('./eventapi', () => ({ eventApi: { subscribe: eventSubscribeMock } }));
 
 const { session } = await import('./session.svelte');
 
@@ -96,6 +98,27 @@ describe('session', () => {
     expect(subscribeMock).toHaveBeenCalledTimes(4);
     mod.setResubscribeDelay(previous);
     await session.unfocus('t9');
+  });
+
+  it('binds a watched draft event to the session and re-binds it on every new hello', async () => {
+    emit(hello('s-ev'));
+    await flush();
+    eventSubscribeMock.mockClear();
+    await session.watchEvent('e1', 'tok0');
+    expect(eventSubscribeMock).toHaveBeenCalledWith('e1', 'tok0', 's-ev');
+    eventSubscribeMock.mockClear();
+    emit(hello('s-ev2'));
+    await flush();
+    expect(eventSubscribeMock).toHaveBeenCalledWith('e1', 'tok0', 's-ev2');
+    // a spectator watches with no token
+    await session.watchEvent('e2', null);
+    expect(eventSubscribeMock).toHaveBeenCalledWith('e2', null, 's-ev2');
+    session.unwatchEvent('e1');
+    session.unwatchEvent('e2');
+    eventSubscribeMock.mockClear();
+    emit(hello('s-ev3'));
+    await flush();
+    expect(eventSubscribeMock).not.toHaveBeenCalled();
   });
 
   it('opens the stream under the base path when the served page sets one', async () => {
