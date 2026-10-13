@@ -340,25 +340,32 @@ func appendTypeOnce(types []string, word string) []string {
 // sorted (deterministic) order. A word the printed face or an earlier effect
 // already carries is skipped (CR 205.1b, the appendTypeOnce rule): the
 // vocabulary itself has no repeats, so only the creature subtypes present
-// BEFORE this grant need checking, and those are gathered once up front --
-// the common case (a printed Thopter, a granted Elf) compares each
-// vocabulary word against one or two words, not the whole growing list.
+// BEFORE this grant need checking. They are gathered once up front into a
+// bitset over the vocabulary's indices, so the cost is linear in the list
+// plus the vocabulary. It used to compare every vocabulary word against
+// every creature subtype already present, which is quadratic in the
+// vocabulary once an EARLIER all-types grant has materialised it: a manland
+// animated twice in one turn (Soulstone Sanctuary under search) re-paid
+// ~10^5 EqualFolds on every layer-4 read. A present word is always an
+// exact vocabulary member (CreatureTypeWords is case-sensitive) and no two
+// vocabulary words fold to each other (TestCreatureTypeVocabularyFoldDistinct),
+// so an index match is exactly the EqualFold match it replaces; a list that
+// already holds every word is returned unchanged.
 // The effects filter's type predicates (hasTypeCtx) answer every
 // creature-subtype predicate and base from this list through ExtraTypes,
 // exactly as Changeling's intrinsic CDA is answered through hasType.
 func appendAllCreatureTypes(types []string) []string {
-	var buf [8]string
-	had := buf[:0]
-	for _, t := range types {
-		if effects.CreatureTypeWords(t) {
-			had = append(had, t)
-		}
+	vocab := effects.CreatureTypeWordList()
+	var had effects.CreatureTypeSet
+	present := had.AddWords(types)
+	if present == len(vocab) {
+		return types
 	}
-	for _, w := range effects.CreatureTypeWordList() {
-		if len(had) > 0 && slices.ContainsFunc(had, func(t string) bool { return strings.EqualFold(t, w) }) {
-			continue
+	types = slices.Grow(types, len(vocab)-present)
+	for i, w := range vocab {
+		if !had.Has(i) {
+			types = append(types, w)
 		}
-		types = append(types, w)
 	}
 	return types
 }
