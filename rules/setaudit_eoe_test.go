@@ -104,7 +104,8 @@ func TestSetAudit_eoe_TapestryWarden_StationUsesToughness(t *testing.T) {
 	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{pick}}); err != nil {
 		t.Fatalf("submit tap pick: %v", err)
 	}
-	// CR 702.150a with Tapestry Warden's replacement: the wall's TOUGHNESS.
+	passUntilStackEmpty(t, e, 20) // CR 702.184a: Station uses the stack.
+	// CR 702.184a with Tapestry Warden's replacement: the wall's TOUGHNESS.
 	if got := e.G.Obj(hearth).Counter("CHARGE"); got != 4 {
 		t.Fatalf("Hearthhull has %d CHARGE counters after stationing with the 0/4 wall, "+
 			"want 4 (its toughness; Tapestry Warden's static)", got)

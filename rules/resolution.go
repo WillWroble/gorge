@@ -157,6 +157,7 @@ func (e *Engine) resumeResolution(rp *resumePoint, chosen []decision.Option) {
 		ctx.Captured = o.Remembered
 		ctx.Grantor = o.GrantedBy
 		bindNinjutsuDefender(ctx, o)
+		e.bindStationAmount(ctx, o)
 		if abilityXAnnounced(o) {
 			ctx.XAnnounced = true
 		}

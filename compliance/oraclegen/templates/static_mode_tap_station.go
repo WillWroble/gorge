@@ -36,9 +36,10 @@ func tapPowerValueStationItem(reg *cards.Registry, f *cards.Face, name string, r
 	if _, ok := reg.Lookup(stationProbe); !ok {
 		return skip("probe not in corpus")
 	}
-	// Station is a special action the engine offers under its own option
-	// kind, selected by label (no IR ability index); XMage selects it by its
-	// keyword line.
+	// Station is an activated ability that uses the stack (CR 702.184a); the
+	// engine offers it under its own option kind, selected by label (no IR
+	// ability index), and XMage selects it by its keyword line. The resolve
+	// step lets the ability resolve before the counters are read.
 	steps := []oraclegen.Step{
 		{Op: "activate", Seat: 0, Card: "p0:" + stationProbe, Ability: "Station"},
 		{Op: "resolve"},

@@ -216,7 +216,7 @@ func tapPowerSAScopeMatches(validSA, saKind string) bool {
 }
 
 // tapPowerValue returns the value a creature id contributes when it is
-// tapped to pay an activated action's tap-power amount -- CR 702.150a's
+// tapped to pay an activated action's tap-power amount -- CR 702.184a's
 // Station ("charge counters equal to its power"), Crew's "total power N or
 // greater" and Saddle's count. It honours any stat:TapPowerValue static
 // whose ValidSA$ scopes that action kind and whose ValidCard$ matches the
