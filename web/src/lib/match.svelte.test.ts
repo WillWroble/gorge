@@ -165,8 +165,33 @@ describe('MatchState', () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
+    // A spectator's follow-up waits out the repaint floor (SPECTATOR_VIEW_MIN_MS).
+    await new Promise((r) => setTimeout(r, 220));
     expect(fetchViewMock).toHaveBeenCalledTimes(2); // exactly one coalesced follow-up, not three
     expect(m.view).toEqual(view(9));
+  });
+
+  it('a spectator repaints the live board at most every 200ms; the deferred fetch reads the newest head', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchViewMock.mockReset();
+      fetchViewMock.mockResolvedValue(view(9));
+      const m = new MatchState('t2');
+      m.apply({ v: 1, t: 'match_start', table: 't2', match: 1, seq: 0, body: matchStart() });
+      m.apply({ v: 1, t: 'snapshot', table: 't2', match: 1, seq: 0, body: { view: view(1), turn_starts: [0], head: 5 } });
+      m.apply({ v: 1, t: 'decision', table: 't2', match: 1, seq: 6, body: { player: 0, kind: 'priority', prompt: 'p1' } });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchViewMock).toHaveBeenCalledTimes(1);
+      // A burst inside the floor waits for it, then fetches once.
+      m.apply({ v: 1, t: 'decision', table: 't2', match: 1, seq: 6, body: { player: 0, kind: 'priority', prompt: 'p2' } });
+      m.apply({ v: 1, t: 'decision', table: 't2', match: 1, seq: 6, body: { player: 0, kind: 'priority', prompt: 'p3' } });
+      await vi.advanceTimersByTimeAsync(150);
+      expect(fetchViewMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(fetchViewMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('ignores frames addressed to another table', () => {

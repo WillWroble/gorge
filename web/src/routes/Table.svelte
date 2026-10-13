@@ -42,6 +42,7 @@
   import { everyVisibleCard } from '../lib/board';
   import { seatColour } from '../lib/colours';
   import { seatRows } from '../lib/seattable';
+  import { railEvents } from '../lib/dvr';
   import { buildCardOwnerColour } from '../lib/logrender';
   import { href, navigate } from '../lib/router';
   import { getSeat } from '../lib/seat';
@@ -564,7 +565,7 @@
           {stuck}
           {onContinue}
           emphasizeTop={seated}
-          events={m.dvr.events}
+          events={railEvents(m.dvr)}
           showLog={showLog}
           onToggleLog={optionsReachable ? null : toggleLog}
           yields={panel?.yields ?? null}
