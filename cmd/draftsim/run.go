@@ -95,11 +95,17 @@ func run(o options, out io.Writer) (*result, error) {
 	}
 
 	var csvOut *os.File
+	csvHeader := true
 	if o.draftlog != "" {
 		if csvOut, err = os.OpenFile(o.draftlog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err != nil {
 			return nil, fmt.Errorf("opening -draftlog %s: %w", o.draftlog, err)
 		}
 		defer csvOut.Close()
+		// The header line belongs to a fresh file only: appended runs add
+		// rows, and a second header mid-file is not a 17Lands CSV.
+		if st, serr := csvOut.Stat(); serr == nil && st.Size() > 0 {
+			csvHeader = false
+		}
 	}
 
 	res := &result{}
@@ -130,9 +136,14 @@ func run(o options, out io.Writer) (*result, error) {
 			return nil, fmt.Errorf("event %d ended in phase %s, want COMPLETE", n+1, ev.Phase())
 		}
 		if csvOut != nil {
-			if err := event.DraftDataCSV(ev, csvOut, sheetNames(spec)); err != nil {
+			write := event.DraftDataCSV
+			if !csvHeader {
+				write = event.DraftDataCSVRows
+			}
+			if err := write(ev, csvOut, sheetNames(spec)); err != nil {
 				return nil, fmt.Errorf("event %d: draft CSV: %w", n+1, err)
 			}
+			csvHeader = false
 		}
 		printStandings(out, er)
 		res.events = append(res.events, *er)
