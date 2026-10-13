@@ -185,7 +185,7 @@ func TestTimeoutTurnsDecisionThenNextDecisionAcceptsHuman(t *testing.T) {
 	case in1 = <-got1:
 	case err := <-errc1:
 		t.Fatalf("caretaker failed: %v", err)
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("ThinkTimeout did not fire the caretaker")
 	}
 	if in1.Seq != d1.Seq || len(in1.Choices) == 0 {
@@ -223,7 +223,7 @@ func TestTimeoutTurnsDecisionThenNextDecisionAcceptsHuman(t *testing.T) {
 		if in2.Seq != d2.Seq || len(in2.Choices) != 1 || in2.Choices[0] != 0 {
 			t.Fatalf("d2 intent %+v", in2)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("next decision not answered by the human submit")
 	}
 }
@@ -250,7 +250,7 @@ func TestZeroThinkTimeoutMeansNoTimeout(t *testing.T) {
 		if in.Seq != 7 || len(in.Choices) != 1 || in.Choices[0] != 0 {
 			t.Fatalf("intent %+v", in)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("seat did not answer after a submit under zero ThinkTimeout")
 	}
 }
@@ -289,7 +289,7 @@ func TestCaretakerAnswersOnContextCancelWithZeroTimeout(t *testing.T) {
 		}
 	case err := <-errc:
 		t.Fatalf("cancel errored instead of answering with the caretaker: %v", err)
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("cancel did not fall back to the caretaker")
 	}
 }

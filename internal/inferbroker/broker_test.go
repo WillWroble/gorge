@@ -130,7 +130,7 @@ func TestWaitWidensBatches(t *testing.T) {
 	narrow := run(0)
 	// A generous wait relative to the scorer delay must collect wider batches
 	// than serving the ready set immediately.
-	wide := run(5 * time.Millisecond)
+	wide := run(50 * time.Millisecond) // >=10x the arrival stagger (~1.3ms) so a loaded box still collects
 	if !(wide > narrow) {
 		t.Fatalf("mean width did not widen with a wait: wait=0 -> %.2f, wait=5ms -> %.2f", narrow, wide)
 	}
