@@ -34,7 +34,7 @@ import (
 // faceDownCastPool is the family-independent {3} a Morph, Megamorph or
 // Disguise card is cast face down for (CR 702.37a/702.168a/702.169a). The
 // turn-up cost is the printed keyword head's own parameter.
-const faceDownCastPool = "CCC"
+const faceDownCastPool = oraclegen.FaceDownCastPool
 
 // turnUpXRule is the XMage rule text TurnFaceUpAbility renders with the
 // cost's toString() prefix (Mage/.../common/TurnFaceUpAbility.java: "Turn
@@ -87,13 +87,10 @@ func morphFamilyCost(f *cards.Face) (raw, pool, mode string, megamorph bool, why
 }
 
 // turnedFaceUpDisguiseProbes are Disguise cards with no TurnFaceUp trigger of
-// their own, tried in order for the other-permanent filter: Bolrac-Clan
-// Basher (a plain creature, accepted by any creature/permanent filter), then
-// a Vampire Detective and an Elf Crocodile Detective so a Detective filter has
-// a candidate. The trigger's own matcher decides, not this list.
-var turnedFaceUpDisguiseProbes = []string{
-	"Bolrac-Clan Basher", "Basilica Stalker", "Undercover Crocodelf",
-}
+// their own, tried in order for the other-permanent filter. The trigger's own
+// matcher decides, not this list. The list lives in oraclegen so the
+// face-down target fixture (candidates_facedown.go) reads the same one.
+var turnedFaceUpDisguiseProbes = oraclegen.DisguiseProbes
 
 // turnedFaceUpRecipe builds the causes for the two turned-face-up
 // sub-families. ok is false for every other sub-family.
