@@ -308,11 +308,15 @@ func mayYes(sc Scenario, ds []rules.OracleDecision) (Scenario, bool) {
 		if len(d.Picks) == 0 && tapPaymentAsk(d.First) {
 			continue
 		}
-		if len(d.Picks) > 0 && d.Picks[0] != d.First {
+		if len(d.Picks) > 0 && (d.Picks[0] != d.First || (len(d.PickIdx) > 0 && d.PickIdx[0] != 0)) {
 			// The runner's fallback deliberately answered past option 0
 			// (the "done" it takes for an optional triggered cost's mana
 			// window no potential mana can pay, Esoteric Duplicator):
 			// pinning option 0 would tap the source it declined to tap.
+			// Option 0 can share the pick's label (a CR 704.5j keep among
+			// same-named legends, where the runner keeps the member that
+			// survives the batch: Grub, Notorious Auntie's token), so the
+			// index decides, not the label.
 			continue
 		}
 		st := out.Steps[d.Step]
@@ -1088,8 +1092,8 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 				// The last pick is never consumed: XMage asks only while more
 				// than one ability is pending and pushes the last without an
 				// ask (same drop as the gameplay name form below).
-				for k := 0; k+1 < len(d.Picks); k++ {
-					setupTrigAnswers = append(setupTrigAnswers, XAnswer{d.Seat, "setup_choice", triggerOrderChoice(d, k)})
+				for _, key := range setupTriggerOrderKeys(d) {
+					setupTrigAnswers = append(setupTrigAnswers, XAnswer{d.Seat, "setup_choice", key})
 				}
 				any = true
 			default:
@@ -1392,6 +1396,15 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 					// let it.
 					if ans, ok := routing.manaHoistSpan(i); ok {
 						as = append(as, ans)
+						break
+					}
+					// XMage's rule-text form steers the ask and is consumed
+					// by it (xmageTriggerOrderKeys); picks it cannot key
+					// apart keep the inert text form.
+					if keys, ok := xmageTriggerOrderKeys(d); ok {
+						for _, key := range keys {
+							as = append(as, XAnswer{d.Seat, "choice", key})
+						}
 						break
 					}
 					as = append(as, triggerOrderTextAnswers(d)...)
