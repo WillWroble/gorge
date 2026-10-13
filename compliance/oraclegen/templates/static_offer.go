@@ -276,6 +276,8 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 			}
 			tries = append(tries, t)
 		}
+	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Mayhem") && !self:
+		tries = mayhemTries(reg)
 	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Plot"):
 		// Plot is a special action offered from the zone the card sits in,
 		// for the card's own mana cost.
@@ -588,4 +590,41 @@ func creatureDeathPrelude(reg *cards.Registry) ([]oraclegen.Step, []string) {
 		{Op: "cast", Seat: 0, Card: "p0:Shock", Mana: "R", Targets: []string{"p0:" + staticProbe}},
 		{Op: "resolve"},
 	}, []string{"Shock"}
+}
+
+// mayhemDiscarder is the spell p0 casts at itself so the probe is discarded
+// this turn: Mind Rot ("Target player discards two cards") with the probe the
+// only other card in hand, so the discard poses no choice.
+const mayhemDiscarder = "Mind Rot"
+
+// mayhemTries are the candidates for a granted Mayhem (Green Goblin, Norman
+// Osborn's back face: "Each nonland card in your graveyard has mayhem ... You
+// may cast a card from your graveyard for its mayhem cost if you discarded it
+// this turn"). The probe starts in hand and the prelude discards it with
+// mayhemDiscarder, so the observation is the graveyard cast labelled
+// "(mayhem)"; the control, the source removed, offers no such cast.
+func mayhemTries(reg *cards.Registry) []offerTry {
+	c, ok := reg.Lookup(mayhemDiscarder)
+	if !ok || len(c.Faces) == 0 || !oraclegen.XMageKnown(mayhemDiscarder) {
+		return nil
+	}
+	pool, why := oraclegen.PoolFor(c.Faces[0].ManaCost)
+	if why != "" {
+		return nil
+	}
+	prelude := []oraclegen.Step{
+		{Op: "cast", Seat: 0, Card: "p0:" + mayhemDiscarder, Mana: pool, Targets: []string{"p0"}},
+		{Op: "resolve"},
+	}
+	var tries []offerTry
+	for _, p := range offerProbeNames {
+		t, ok := offerTryFor(reg, p, offerHand, false, false)
+		if !ok || t.kind != offerKindCast || t.mana == "" {
+			continue
+		}
+		t.label = "(mayhem)"
+		t.prelude, t.extraHand = prelude, []string{mayhemDiscarder}
+		tries = append(tries, t)
+	}
+	return tries
 }

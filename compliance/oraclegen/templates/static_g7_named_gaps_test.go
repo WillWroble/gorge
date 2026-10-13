@@ -42,3 +42,36 @@ func TestStaticG7BackFaceGraveyardOfferServed(t *testing.T) {
 	}
 	t.Fatalf("precondition: %s carries no requirement %s", name, key)
 }
+
+// TestStaticOfferMayhemServed: Norman Osborn static#1.1 (Green Goblin's
+// "Each nonland card in your graveyard has mayhem") was "grants only keywords
+// outside the compared evergreen set". Mayhem lets a card be cast from the
+// graveyard only if it was discarded this turn, so the probe starts in hand,
+// p0's Mind Rot at itself discards it, and the graveyard cast is offered with
+// the "(mayhem)" label -- on the back face, through the back-face retry.
+func TestStaticOfferMayhemServed(t *testing.T) {
+	const name, key = "Norman Osborn", "static#1.1"
+	reg := testutil.CorpusRegistry(t)
+	c, ok := reg.Lookup(name)
+	if !ok {
+		t.Fatalf("%s not in the corpus", name)
+	}
+	for _, r := range levelb.Requirements(c) {
+		if r.Key != key {
+			continue
+		}
+		it, skip := templates.GenerateB(reg, name, r)
+		if skip != nil {
+			t.Fatalf("%s %s skipped: %s", name, key, skip.Reason)
+		}
+		last := it.Scenario.Steps[len(it.Scenario.Steps)-1]
+		if len(last.Expect) != 1 || last.Expect[0].Offered == nil || last.Expect[0].Offered.Label != "(mayhem)" {
+			t.Fatalf("last step %+v, want an offered (mayhem) cast", last)
+		}
+		if p0 := it.Scenario.Setup["p0"]; len(p0.BackFace) != 1 || len(p0.Graveyard) != 0 {
+			t.Fatalf("setup p0 = %+v, want the source on its back face and an empty graveyard (the probe is discarded this turn)", p0)
+		}
+		return
+	}
+	t.Fatalf("precondition: %s carries no requirement %s", name, key)
+}
