@@ -105,8 +105,7 @@
      "eq": 9
     }
    ],
-   "xmage": "ProgenitorMimicTest#testDeadbridgeChant",
-   "known_bug": "XP[etb-clone-noncast-entry-unimplemented]: a Progenitor Mimic returned by Deadbridge Chant (non-cast entry) has no recorded ETB clone election, so effClone emits 'unimplemented API Clone' and it enters as a 0/0 and dies (graveyard stays 10; probe confirmed Deadbridge itself returns a Grizzly Bears fine) (effects/clone.go:65-75); Progenitor's DBCopy also carries AddTriggers$/AddSVars$ outside cloneETBShapeKeys (effects/clone_params.go:279). CR 707.9, 614.1c, 614.12."
+   "xmage": "ProgenitorMimicTest#testDeadbridgeChant"
   }
  ]
 }

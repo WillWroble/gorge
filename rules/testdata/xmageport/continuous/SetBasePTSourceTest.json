@@ -127,8 +127,7 @@
      "pt": "5/5"
     }
    ],
-   "xmage": "SetBasePTSourceTest#testSvogthos",
-   "known_bug": "XP[animate-granted-continuous-static-unimplemented]: Animate's staticAbilities$ registers only CantSacrifice/CantBlockUnless/CantAttackUnless/cost statics; a granted Mode$ Continuous SetPower$/SetToughness$ body is dropped with 'is not implemented; ignored' (effects/leavebattlefield.go:174-177), so animated Svogthos is 0/0 instead of 5/5. CR 613.4b, 611.3."
+   "xmage": "SetBasePTSourceTest#testSvogthos"
   }
  ]
 }

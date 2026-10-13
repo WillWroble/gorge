@@ -176,8 +176,7 @@
      "eq": 3
     }
    ],
-   "xmage": "PhantasmalImageTest#testCopyBecomesTargetTriggeredAbility",
-   "known_bug": "XP[etb-clone-whitelist-rejects-addtriggers-addsvars]: both Phantasmal Images never get the ETB copy election (AddTriggers$/AddSVars$ not in cloneETBShapeKeys, effects/clone_params.go:279; fallback effects/clone.go:63-75), enter as 0/0 and die (graveyard 2, Servant count 1). The p1 life 17 is a knock-on: the unconsumed \"p0:Illusionary Servant\" setChoice was re-placed by the tool's answer search onto the turn-1 attackers decision (cmd/xmageport/run.go answerKinds 'any'), so the Servant attacked. CR 707.9a, 614.1c."
+   "xmage": "PhantasmalImageTest#testCopyBecomesTargetTriggeredAbility"
   },
   {
    "name": "test-copy-as-enters-battlefield-ability",

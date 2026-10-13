@@ -284,8 +284,7 @@
      "eq": 0
     }
    ],
-   "xmage": "BecomesTargetTriggerTest#testGlyphKeeperCountersFirstSpellButNotSecondSpell",
-   "known_bug": "XP[becomestarget-firsttime-ignored]: becomesTargetMatches never reads FirstTime$ (rules/trigmatch/actions.go:233-306), so Glyph Keeper counters the second Bolt too and survives (both Bolts are in the graveyard). CR 603.2 + Oracle 'for the first time each turn'."
+   "xmage": "BecomesTargetTriggerTest#testGlyphKeeperCountersFirstSpellButNotSecondSpell"
   },
   {
    "name": "test-glyph-keeper-counters-first-ability-but-not-second-one",
