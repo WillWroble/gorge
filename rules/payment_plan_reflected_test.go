@@ -166,3 +166,29 @@ func TestPaymentPlanReflectedBotAnswerValidates(t *testing.T) {
 		t.Fatalf("spell zone after the bot's plan = %s, want stack", z)
 	}
 }
+
+// TestPaymentPlanReflectedChoosesAmongSeveralColours: with the opponent's
+// lands producing W, R and G, the Orchard is a real three-way choice; the
+// planned step names R and the executor resolves it without posing the
+// reflected colour ask.
+func TestPaymentPlanReflectedChoosesAmongSeveralColours(t *testing.T) {
+	t.Parallel()
+	e, spell, src := reflectedBoard(t, 9615, reflectedRedProbe, "Exotic Orchard")
+	onBoardCard(t, e, 1, choiceCard(t, "Selesnya Guildgate"))
+	if got := choiceColours(choiceAlts(t, e, src)); !slices.Equal(got, []string{"W", "R", "G"}) {
+		t.Fatalf("precondition: Orchard alternatives = %v, want [W R G]", got)
+	}
+	d := ppAsk(t, e)
+	act := ppAction(t, d, spell)
+	mark := len(e.L.Events)
+	ppSubmitPlan(t, e, d, act)
+	if nd := e.Pending(); nd == nil || nd.Kind != decision.KPriority {
+		t.Fatalf("after the planned cast pending = %#v, want priority (no colour ask)", nd)
+	}
+	if prod := ppProduced(e, mark); !slices.Equal(prod, []string{"R"}) {
+		t.Errorf("mana produced = %v, want [R]", prod)
+	}
+	if z := e.G.Obj(spell).Zone; z != state.ZStack {
+		t.Errorf("spell zone after payment = %s, want stack", z)
+	}
+}
