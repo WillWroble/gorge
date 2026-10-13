@@ -43,20 +43,31 @@ func TestActivateSacAttachedCost(t *testing.T) {
 			if !strings.Contains(cost, ".Attached") {
 				t.Fatalf("precondition: %s ability %d cost %q has no attached-Sac", tc.name, idx, cost)
 			}
-			// The fixture card is on p0's battlefield and the prelude attaches
-			// it to the source.
+			// An Equipment fixture is on p0's battlefield and the prelude
+			// attaches it to the source. An Aura fixture is cast onto the
+			// source from p0's hand instead: XMage puts an unattached Aura
+			// placed on the battlefield into the graveyard (CR 704.5m) before
+			// an attach step runs (Faunsbane Troll's wave-4 harness row).
 			seat := it.Scenario.Setup["p0"]
-			if !containsString(seat.Battlefield, tc.fixture) {
-				t.Fatalf("attached fixture %q absent from p0 battlefield: %v", tc.fixture, seat.Battlefield)
+			aura := tc.fixture == attachedAuraFixture
+			zone := seat.Battlefield
+			if aura {
+				zone = seat.Hand
+			}
+			if !containsString(zone, tc.fixture) {
+				t.Fatalf("attached fixture %q absent from its p0 setup zone: %+v", tc.fixture, seat)
 			}
 			sawAttach := false
 			for _, st := range it.Scenario.Steps {
-				if st.Op == "attach" && st.Card == "p0:"+tc.fixture && st.AttachedTo == "p0:"+tc.name {
+				if !aura && st.Op == "attach" && st.Card == "p0:"+tc.fixture && st.AttachedTo == "p0:"+tc.name {
+					sawAttach = true
+				}
+				if aura && st.Op == "cast" && st.Card == "p0:"+tc.fixture && len(st.Targets) == 1 && st.Targets[0] == "p0:"+tc.name {
 					sawAttach = true
 				}
 			}
 			if !sawAttach {
-				t.Fatalf("no attach step for %q to %s in scenario steps %+v", tc.fixture, tc.name, it.Scenario.Steps)
+				t.Fatalf("no step attaches %q to %s in scenario steps %+v", tc.fixture, tc.name, it.Scenario.Steps)
 			}
 			// The XMage sacrifice answer names the attached fixture exactly
 			// once.

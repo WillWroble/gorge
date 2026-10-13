@@ -1762,8 +1762,12 @@ func singleTargetAnswer(d rules.OracleDecision, k int) XAnswer {
 	}
 	if currentFaceTargetRef(d, k) {
 		// The option label names a different object than the ref -- the
-		// permanent's current face (a transformed DFC, a face-down card). The
-		// ref's identity alias selects the live object.
+		// permanent's current face (a transformed DFC, a face-down card). Its
+		// current name selects the live object when no other option shares
+		// it; else the ref's identity alias.
+		if name, ok := uniqueCurrentFaceName(d, k); ok {
+			return XAnswer{d.Seat, "target", name}
+		}
 		return XAnswer{d.Seat, "target", ref}
 	}
 	_, marker := SameNameAmbiguity(d, k)

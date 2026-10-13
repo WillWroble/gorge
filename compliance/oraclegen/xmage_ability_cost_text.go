@@ -26,6 +26,14 @@
 //   - "Waterbend {N}" is the mana-cost text "waterbend {N}" (WaterbendCost,
 //     WaterbendXCost); an ability-word header capitalises the rule's first
 //     character, a keyword header does not.
+//   - A cost part separator the Oracle prints without its space ("{1}{W},{T},
+//     Exile this artifact", Phoenix Down) is ", " in XMage: Costs.getText
+//     joins every cost's text with ", ".
+//   - "another card named {this}" / "other cards named {this}" keeps the
+//     card's printed name: the cost's text is the target filter's message,
+//     built from a literal name (GrandeurAbility's "another card named " +
+//     cardName; Say Its Name's "two other cards named Say Its Name"), never
+//     the {this} placeholder.
 package oraclegen
 
 import (
@@ -51,6 +59,7 @@ var (
 	discardSelfRE     = regexp.MustCompile(`^Discard (\{this\}|this card)$`)
 	removeCountersRE  = regexp.MustCompile(`^(Remove .+) from this [A-Za-z]+$`)
 	dashHeaderWordsRE = regexp.MustCompile(`^[^{},:]+$`)
+	tightCommaRE      = regexp.MustCompile(`([}\]]),(\S)`)
 )
 
 // xmageCostText rewrites the cost portion of an ability line (the text before
@@ -60,6 +69,7 @@ var (
 func xmageCostText(cost, sourceName string) string {
 	header, rest, keywordHeader := splitDashHeader(cost)
 	rest = shortSelfRef(rest, sourceName)
+	rest = tightCommaRE.ReplaceAllString(rest, "$1, $2")
 	parts := strings.Split(rest, ", ")
 	for i, part := range parts {
 		parts[i] = xmageCostPart(part)
@@ -69,7 +79,17 @@ func xmageCostText(cost, sourceName string) string {
 	if strings.HasPrefix(parts[0], "Waterbend ") && (header == "" || keywordHeader) {
 		parts[0] = "waterbend " + strings.TrimPrefix(parts[0], "Waterbend ")
 	}
-	return header + strings.Join(parts, ", ")
+	return header + namedSelfLiteral(strings.Join(parts, ", "), sourceName)
+}
+
+// namedSelfLiteral restores the printed name in a cost's "named {this}": XMage
+// renders that clause from a target filter's message, which names the card
+// literally.
+func namedSelfLiteral(cost, sourceName string) string {
+	if sourceName == "" {
+		return cost
+	}
+	return strings.ReplaceAll(cost, "named {this}", "named "+sourceName)
 }
 
 // xmageCostPart rewrites one comma-separated cost part.
