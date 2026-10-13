@@ -86,3 +86,100 @@ func putCounterExistingPick(h Host, c *Ctx, sa *cards.SA, ti int, kinds []string
 	}
 	return kinds[0]
 }
+
+// putCounterExistingChoices runs CounterType$ ExistingCounter with Choices$
+// (Aven Courier, Contractual Safeguard): there Choices$ is the SOURCE of the
+// kind -- "choose a counter on a permanent you control" -- never the
+// recipient pick the bare-Choices$ shape makes. The source set is every
+// battlefield object matching Choices$ (zone order); one kind is chosen from
+// the kinds they carry through the shared counter_kind ask (no ask for one
+// kind, none at all when there are no counters). The recipients are
+// PutOnDefined$ (resolved through the ordinary Defined machinery) or
+// PutOnEachOther$ (every battlefield object matching the spec except the
+// objects carrying the chosen kind in the source set), in zone order;
+// OnlyNewKind$ True skips a recipient that already has the kind.
+//
+// Deviation, deliberate: Forge picks ONE source object and then excludes just
+// it for "each other". Here the source-object choice is collapsed into the
+// kind choice over the union of the source set, so "each other" excludes
+// every source object that carries the chosen kind (CR 122.1: the kind, not
+// the object, is what the effect keys on).
+func putCounterExistingChoices(h Host, c *Ctx, sa *cards.SA, pc *PutCounterParams, n int32) {
+	if n <= 0 {
+		return
+	}
+	g := h.Game()
+	sctx := c.SpecContext(c.Controller)
+	var source []state.ObjID
+	for _, p := range g.AliveFrom(0) {
+		for _, id := range g.Zone(state.ZBattlefield, p) {
+			if MatchesSpecCtx(g, pc.Choices, id, sctx) {
+				source = append(source, id)
+			}
+		}
+	}
+	var seen []state.Counter
+	for _, id := range source {
+		if o := g.Obj(id); o != nil {
+			seen = append(seen, o.Counters...)
+		}
+	}
+	kinds := distinctCounterKinds(counterKinds("", len(seen),
+		func(i int) string { return seen[i].Kind },
+		func(i int) int32 { return seen[i].N }))
+	if len(kinds) == 0 {
+		return
+	}
+	kind := putCounterExistingPick(h, c, sa, 0, kinds)
+
+	var recipients []state.ObjID
+	switch {
+	case pc.PutOnEachOther != "":
+		carriers := map[state.ObjID]bool{}
+		for _, id := range source {
+			if o := g.Obj(id); o != nil && o.Counter(kind) > 0 {
+				carriers[id] = true
+			}
+		}
+		for _, p := range g.AliveFrom(0) {
+			for _, id := range g.Zone(state.ZBattlefield, p) {
+				if !carriers[id] && MatchesSpecCtx(g, pc.PutOnEachOther, id, sctx) {
+					recipients = append(recipients, id)
+				}
+			}
+		}
+	case pc.PutOnDefined != "":
+		for _, t := range DefinedSpec(h, c, pc.PutOnDefined) {
+			if !t.IsPlayer && g.Obj(t.Obj) != nil {
+				recipients = append(recipients, t.Obj)
+			}
+		}
+	}
+	var placed []state.Target
+	for _, id := range recipients {
+		if pc.OnlyNewKind && g.Obj(id).Counter(kind) > 0 {
+			continue
+		}
+		emitPutCounterChange(h, c, sa, events.Event{Kind: events.CounterChange, Obj: id, Counter: kind, Amount: n})
+		placed = append(placed, state.Target{Obj: id})
+	}
+	rememberPlaced(c, sa, placed)
+}
+
+// distinctCounterKinds drops repeats, keeping first-seen order.
+func distinctCounterKinds(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, k := range in {
+		dup := false
+		for _, o := range out {
+			if o == k {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, k)
+		}
+	}
+	return out
+}
