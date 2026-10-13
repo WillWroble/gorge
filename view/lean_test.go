@@ -132,11 +132,11 @@ func TestProjectLeanIntoAcrossWholeGames(t *testing.T) {
 				}
 			}
 			for id := state.ObjID(1); int(id) <= len(e.G.Objs); id++ {
-				name, kw, pw, tg := e.ViewCharacteristics(id)
+				name, nameSet, kw, pw, tg := e.ViewCharacteristics(id)
 				kw = slices.Clone(kw)
-				if name != e.Name(id) || !slices.Equal(kw, e.Keywords(id)) || pw != e.Power(id) || tg != e.Toughness(id) {
-					t.Fatalf("seed %d obj %d: ViewCharacteristics (%q %v %d/%d) != accessors (%q %v %d/%d)",
-						seed, id, name, kw, pw, tg, e.Name(id), e.Keywords(id), e.Power(id), e.Toughness(id))
+				if name != e.Name(id) || nameSet != e.Derived(id).NameSet || !slices.Equal(kw, e.Keywords(id)) || pw != e.Power(id) || tg != e.Toughness(id) {
+					t.Fatalf("seed %d obj %d: ViewCharacteristics (%q set=%v %v %d/%d) != accessors (%q %v %d/%d)",
+						seed, id, name, nameSet, kw, pw, tg, e.Name(id), e.Keywords(id), e.Power(id), e.Toughness(id))
 				}
 			}
 		}
