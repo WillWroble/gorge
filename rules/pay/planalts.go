@@ -207,7 +207,7 @@ func appendUnitAlternatives(e Engine, dst []Alt, u WindowUnit) (grown, alts []Al
 		if !alt.Any || alt.Amt <= 0 {
 			continue
 		}
-		for _, col := range PaymentPlanChoiceColours(e, u.ID, alt.Ma) {
+		for _, col := range planAltChoiceColours(e, u.ID, alt) {
 			i := strings.IndexByte("WUBRG", col[0])
 			if i < 0 {
 				continue

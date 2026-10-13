@@ -325,6 +325,16 @@ func (gs *gameState) observe(seatIdx int, d *decision.Decision, in decision.Inte
 				if !planned[c.Obj] && !offered[c.Obj] {
 					gs.add(seatIdx, "L2P:real_hidden_from_autopay", 1)
 				}
+				if strings.HasPrefix(c.ClassP, "Free:Tier") {
+					for _, u := range r.Units {
+						for _, a := range u.Alts {
+							if !a.InP && a.Class == "Free:Tier" {
+								gs.add(seatIdx, "L2P:real:freetier:"+gs.name(u.ID)+":"+a.Detail, 1)
+								break
+							}
+						}
+					}
+				}
 				gs.ex("L2P:real:"+c.ClassP, "%s withheld by the planner census, payable (board mana: %s)", c.Name, gs.boardSources(p, r))
 			} else if res.Known {
 				gs.ex("L2P:false:"+c.ClassP, "%s L1 proxy over-count (board: %s)", c.Name, gs.boardSources(p, r))
@@ -353,7 +363,7 @@ func (gs *gameState) boardSources(p state.PlayerID, r rules.MMProbeResult) strin
 			if !a.InW || !a.InP {
 				tag := ""
 				if !a.InP {
-					tag = "!P"
+					tag = "!P:" + a.Detail
 				} else {
 					tag = "!W"
 				}
