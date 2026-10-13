@@ -52,6 +52,14 @@ func TestXMageAbilityCostSpelling(t *testing.T) {
 		{"Case of the Filched Falcon", map[int]string{0: "<i>Solved</i> &mdash; {2}{U}, Sacrifice this Case"}},
 		{"Case of the Stashed Skeleton", map[int]string{0: "<i>Solved</i> &mdash; {1}{B}, Sacrifice this Case"}},
 		{"Case of the Uneaten Feast", map[int]string{0: "<i>Solved</i> &mdash; Sacrifice this Case"}},
+		// "{1}{W},{T}, Exile this artifact": the Oracle prints no space after
+		// the first comma; Costs.getText joins with ", " (Phoenix Down).
+		{"Phoenix Down", map[int]string{0: "{1}{W}, {T}, Exile {this}"}},
+		// "named {this}" keeps the printed name: the cost text is a target
+		// filter's message built from a literal name (GrandeurAbility's
+		// "another card named " + cardName; Say Its Name's filter).
+		{"Page, Loose Leaf", map[int]string{0: "{T}", 1: "<i>Grandeur</i> &mdash; Discard another card named Page, Loose Leaf"}},
+		{"Say Its Name", map[int]string{1: "Exile this card and two other cards named Say Its Name from your graveyard"}},
 	} {
 		c, ok := reg.Lookup(tc.card)
 		if !ok || len(c.Faces) == 0 {

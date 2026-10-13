@@ -47,34 +47,33 @@ func TestLevelBPerPlayerTargetAsk(t *testing.T) {
 	}
 }
 
-// TestLevelBTransformedTargetRef: Jill, Shiva's Dominant's activation returns
-// her transformed (Shiva, Warden of Ice), whose Saga chapter targets a
-// creature. The pick's option label names the current face while its ref is
-// the front name, so the answer must be the exact ref (the driver binds it by
-// identity) rather than the front name, which matches no XMage object.
+// TestLevelBTransformedTargetRef: Jill, Shiva's Dominant's activation exiles
+// her and returns her transformed (Shiva, Warden of Ice), whose Saga chapter
+// targets a creature. The pick's option label names the current face while
+// its ref is the front name. The returned permanent is a new XMage object, so
+// the setup alias the exact ref binds no longer names it (XMage left the
+// "@p0:Jill, Shiva's Dominant" target unused); the current face's name,
+// unique among the options, does.
 func TestLevelBTransformedTargetRef(t *testing.T) {
 	it := levelBItem(t, "Jill, Shiva's Dominant", "activate#0.0")
 	as := answerAt(it, 1)
 	if len(as) != 1 || as[0].Kind != "target" {
 		t.Fatalf("resolve answers = %+v, want one target", as)
 	}
-	if as[0].Value != "p0:Jill, Shiva's Dominant" {
-		t.Fatalf("target answer = %q, want the exact ref p0:Jill, Shiva's Dominant (the alias selects the transformed object)", as[0].Value)
-	}
-	if !strings.Contains(as[0].Value, ":") {
-		t.Fatal("the answer is not a scenario ref the driver can bind")
+	if as[0].Value != "Shiva, Warden of Ice" {
+		t.Fatalf("target answer = %q, want the current face's name Shiva, Warden of Ice", as[0].Value)
 	}
 }
 
 // TestLevelBTapOrUntapAnswer: Inverted Iceberg's back-face attack trigger
 // targets an artifact or creature and then asks XMage's chooseUse to tap or
-// untap it. The target is the transformed permanent (answered by its exact
-// ref) and the election is the boolean XMage asks, not gorge's option label.
+// untap it. The target is the transformed permanent (answered by its current
+// face's name, unique among the options) and the election is the boolean XMage asks, not gorge's option label.
 func TestLevelBTapOrUntapAnswer(t *testing.T) {
 	it := levelBItem(t, "Inverted Iceberg", "trigger#1.0")
 	first := answerAt(it, 0)
-	if len(first) != 1 || first[0].Kind != "target" || first[0].Value != "p0:Inverted Iceberg" {
-		t.Fatalf("attack answers = %+v, want the exact ref of the transformed permanent", first)
+	if len(first) != 1 || first[0].Kind != "target" || first[0].Value != "Iceberg Titan" {
+		t.Fatalf("attack answers = %+v, want the transformed permanent's current (unique) name", first)
 	}
 	second := answerAt(it, 1)
 	if len(second) != 1 || second[0].Kind != "choice" || (second[0].Value != "yes" && second[0].Value != "no") {

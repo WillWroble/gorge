@@ -81,6 +81,9 @@ func xanswersForScenario(res rules.OracleResult, sc Scenario, modes map[string]i
 		}
 	}
 	collapseRoomLock(ds)
+	if castSteps == nil {
+		castSteps = stepsWithOwnTargets(sc)
+	}
 	out := xanswersSetup(ds, len(sc.Steps), modes, castSteps, sc.Setup)
 	// The deterministic trample assignment XMage poses as a multi-amount
 	// dialog is no decision the engine recorded, so it is synthesized from
@@ -183,4 +186,21 @@ func movedCards(snaps []rules.OracleSnapshot, sc Scenario, step, seat int, zone 
 		return nil
 	}
 	return added
+}
+
+// stepsWithOwnTargets marks the cast/activate steps that carry their own
+// Targets, for a caller that rewrote none (castSteps nil). The driver queues
+// a step's Targets itself, so its target decisions must not be scripted a
+// second time: the spare answer is consumed by the next target ask
+// (Meltstrider's Resolve's "Hill Giant" answered its own enters trigger's
+// opponent-creature target; Choreographed Sparks' "p1" answered its
+// TargetSpell), which rejects it.
+func stepsWithOwnTargets(sc Scenario) map[int]bool {
+	out := map[int]bool{}
+	for i, st := range sc.Steps {
+		if (st.Op == "cast" || st.Op == "activate") && len(st.Targets) > 0 {
+			out[i] = true
+		}
+	}
+	return out
 }
