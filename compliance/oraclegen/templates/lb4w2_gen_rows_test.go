@@ -1,0 +1,57 @@
+package templates
+
+import (
+	"testing"
+
+	"github.com/adams-shaun/gorge/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/rules"
+)
+
+// TestLevelBGeneratorResidueRowsServed pins the wave-4 generator-residue rows
+// lb4w2-gen serves, one row per mechanism. Each must generate, replay through
+// gorge with no fail, and show its mechanism's observable, so a row is never
+// served by a scenario that does not exercise it.
+func TestLevelBGeneratorResidueRowsServed(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	for _, tc := range []struct {
+		name, key, mechanism string
+		check                func(*testing.T, oraclegen.Item, rules.OracleResult)
+	}{
+		{"Coveted Falcon", "trigger#0.0", "Permanent.YouOwn+YouDontCtrl: the donated-permanent prelude",
+			func(t *testing.T, it oraclegen.Item, res rules.OracleResult) {
+				// The prelude hands p1 the p0-owned probe; the trigger hands
+				// it back. Both control changes must be observed.
+				donated := false
+				for _, s := range res.Snapshots {
+					for _, p := range s.Permanents {
+						if p.Name == oraclegen.DonatedProbe && p.Owner == 0 && p.Controller == 1 {
+							donated = true
+						}
+					}
+				}
+				if !donated {
+					t.Fatalf("%s was never controlled by p1 (steps %+v)", oraclegen.DonatedProbe, it.Steps)
+				}
+				p, ok := permByNameIn(res, oraclegen.DonatedProbe)
+				if !ok || p.Controller != 0 {
+					t.Fatalf("%s after the trigger: %+v, want p0 controlling it again", oraclegen.DonatedProbe, p)
+				}
+			}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := requirementFor(t, reg, tc.name, tc.key)
+			it, skip := GenerateB(reg, tc.name, req)
+			if skip != nil {
+				t.Fatalf("%s %s (%s) skipped: %s", tc.name, tc.key, tc.mechanism, skip.Reason)
+			}
+			res, err := rules.RunOracleScenarioJSON(reg, it.Raw())
+			if err != nil || len(res.Fails) != 0 {
+				t.Fatalf("%s %s does not replay: err=%v fails=%v", tc.name, tc.key, err, res.Fails)
+			}
+			if tc.check != nil {
+				tc.check(t, it, res)
+			}
+		})
+	}
+}

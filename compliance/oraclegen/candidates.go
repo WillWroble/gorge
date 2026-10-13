@@ -535,6 +535,9 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 	}
 	alt := strings.Split(filter, ",")
 	base := strings.ToLower(strings.SplitN(strings.TrimSpace(alt[0]), ".", 2)[0])
+	if role == roleNone && len(alt) == 1 && filterHasComponent(filter, "YouOwn") && filterHasComponent(filter, "YouDontCtrl") {
+		return donatedCandidates(base)
+	}
 	mine := strings.Contains(filter, "YouCtrl") || strings.Contains(filter, "YouOwn")
 	if role == roleNone {
 		if pair {
