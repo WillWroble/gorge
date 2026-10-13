@@ -49,6 +49,18 @@ func TestLevelBGeneratorResidueRowsServed(t *testing.T) {
 					t.Fatalf("%s entered with %v, want the rider's one +1/+1 counter", top[0], p.Counters)
 				}
 			}},
+		{"Smaug, Wicked Worm", "trigger#0.1", "Spell.ManaFromTreasure: a nontoken Treasure's mana spent on the probe",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				// "you draw a card and lose 1 life": both halves observed.
+				if life := lifeOf(res, 0); life != 19 {
+					t.Fatalf("p0 at %d life, want 19 (the trigger's life loss)", life)
+				}
+				for _, p := range res.Snapshots[len(res.Snapshots)-1].Players {
+					if p.Seat == 0 && len(p.Hand) != 1 {
+						t.Fatalf("p0 hand %v, want the one drawn card", p.Hand)
+					}
+				}
+			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := requirementFor(t, reg, tc.name, tc.key)
