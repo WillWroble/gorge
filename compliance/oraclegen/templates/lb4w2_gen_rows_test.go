@@ -38,6 +38,17 @@ func TestLevelBGeneratorResidueRowsServed(t *testing.T) {
 					t.Fatalf("%s after the trigger: %+v, want p0 controlling it again", oraclegen.DonatedProbe, p)
 				}
 			}},
+		{"Mikey & Don, Party Planners", "trigger#0.0", "MayPlay rider over creature subtypes: a Mutant/Ninja/Turtle probe cast from the library top",
+			func(t *testing.T, it oraclegen.Item, res rules.OracleResult) {
+				top := it.Scenario.Setup["p0"].LibraryTop
+				if len(top) != 1 {
+					t.Fatalf("p0 library top %v, want the one subtype probe", top)
+				}
+				p, ok := permByNameIn(res, top[0])
+				if !ok || p.Counters["P1P1"] != 1 {
+					t.Fatalf("%s entered with %v, want the rider's one +1/+1 counter", top[0], p.Counters)
+				}
+			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := requirementFor(t, reg, tc.name, tc.key)
