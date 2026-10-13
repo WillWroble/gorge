@@ -65,23 +65,22 @@ func TestChosenCardLeavesRowGenerates(t *testing.T) {
 	t.Fatalf("Zenos did not transform: %+v", res.Snapshots[len(res.Snapshots)-1].Permanents)
 }
 
-// TestStateCounterDoublingRowNamedSkip: The Millennium Calendar's state
-// trigger keeps a named skip -- its doubling cause ends the game, which the
-// XMage driver cannot replay past.
-func TestStateCounterDoublingRowNamedSkip(t *testing.T) {
+// TestStateCounterDoublingRowGenerates: The Millennium Calendar's "When
+// there are 1,000 or more time counters" state trigger is caused by its own
+// doubling activation from 500 counters; the trigger sacrifices it.
+func TestStateCounterDoublingRowGenerates(t *testing.T) {
 	reg := loadGenRegistry(t)
-	c, _ := reg.Lookup("The Millennium Calendar")
-	for _, r := range levelb.Requirements(c) {
-		if r.Key != "trigger#0.1" {
-			continue
-		}
-		_, skip := GenerateB(reg, "The Millennium Calendar", r)
-		if skip == nil || !strings.Contains(skip.Reason, "ends the game") {
-			t.Fatalf("skip = %v, want the game-over named skip", skip)
-		}
-		return
+	it := triggerRequirement(t, reg, "The Millennium Calendar", "trigger#0.1", "trigger.state-self-counters")
+	res, ok := oraclegen.PlaysThrough(reg, it.Scenario)
+	if !ok {
+		t.Fatalf("does not play through gorge: fails=%v", res.Fails)
 	}
-	t.Fatal("no trigger#0.1")
+	last := res.Snapshots[len(res.Snapshots)-1]
+	for _, p := range last.Permanents {
+		if p.Name == "The Millennium Calendar" {
+			t.Fatalf("the Calendar is still on the battlefield: %+v", p)
+		}
+	}
 }
 
 // TestAttachedRelativeBearerRowGenerates: Eriette, the Beguiler's
