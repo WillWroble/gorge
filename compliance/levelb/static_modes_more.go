@@ -89,6 +89,9 @@ func serveStaticMode(f *cards.Face, st *cards.Static) (sub, gap string) {
 		if activationsPowerUpShape(st) {
 			return "static.activations-powerup", ""
 		}
+		if activationsExhaustUnboundedShape(st) {
+			return "static.activations-exhaust-unbounded", ""
+		}
 		return gapSub, "Activations ValidSA$ " + st.ParamStr(cards.PKValidSA) + " MinLimit$ " +
 			st.ParamStr(cards.PKMinLimit) + " is not the positive PowerUp ceiling the power-up template observes"
 	case "cantbesuspected":
@@ -128,8 +131,14 @@ func serveStaticMode(f *cards.Face, st *cards.Static) (sub, gap string) {
 		}
 		return gapSub, "CantBlockUnless " + staticUnlessShapeOf(st) + " is not a served unless-tax shape"
 	case "alternativecost":
+		if alternativeCostEquipShape(st) {
+			return "static.alternative-cost-equip", ""
+		}
 		if strings.Contains(strings.ToLower(st.ParamStr(cards.PKCondition)), "enduringstory") {
 			return gapSub, "AlternativeCost Condition$ EnduringStory cannot be set up by any fixture"
+		}
+		if alternativeCostSpellsShape(st) {
+			return "static.alternative-cost-spells", ""
 		}
 		return gapSub, "AlternativeCost Cost$ " + st.ParamStr(cards.PKCost) +
 			" needs an alternative-cost cast option the runner does not select"
@@ -383,4 +392,63 @@ func cantBlockUnlessTaxShape(st *cards.Static) bool {
 		return false
 	}
 	return staticParamsOnly(st, "ValidCard", "Cost", "IsPresent")
+}
+
+// alternativeCostSpellsShape reports whether st is a mana-only alternative
+// cost its controller may pay for every spell they cast (Leyline of
+// Mutation's "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for
+// spells that you cast"): ValidSA$ Spell, ValidPlayer$ You, a Cost$ of mana
+// symbols only, and no other scope.
+func alternativeCostSpellsShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Spell") ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") {
+		return false
+	}
+	cost := strings.TrimSpace(st.ParamStr(cards.PKCost))
+	if cost == "" {
+		return false
+	}
+	for _, sym := range strings.Fields(cost) {
+		switch sym {
+		case "W", "U", "B", "R", "G", "C":
+		default:
+			if _, err := strconv.Atoi(sym); err != nil {
+				return false
+			}
+		}
+	}
+	return staticParamsOnly(st, "ValidSA", "ValidPlayer", "Cost")
+}
+
+// alternativeCostEquipShape reports whether st is Kíli the Resourceful's
+// equip alternative: ValidSA$ Activated.Equip, ValidPlayer$ You, a numeric
+// Cost$, gated on Condition$ EnduringStory (the Storied fixture) and the
+// "first equip ability you activate each turn" CheckSVar$ (nothing activated
+// yet in the probe's turn).
+func alternativeCostEquipShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.Equip") ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") ||
+		!strings.EqualFold(st.ParamStr(cards.PKCondition), "EnduringStory") {
+		return false
+	}
+	if _, err := strconv.Atoi(strings.TrimSpace(st.ParamStr(cards.PKCost))); err != nil {
+		return false
+	}
+	return staticParamsOnly(st, "ValidSA", "ValidPlayer", "Cost", "Condition", "CheckSVar", "SVarCompare")
+}
+
+// activationsExhaustUnboundedShape reports whether st is Elvish Refueler's
+// "During your turn, as long as you haven't activated an exhaust ability this
+// turn, you may activate exhaust abilities as though they haven't been
+// activated": ValidSA$ Activated.Exhaust, MinLimit$ -1, ValidPlayer$ and
+// PlayerTurn$ You, and the CheckSVar$ that gates it on this turn's exhaust
+// activations.
+func activationsExhaustUnboundedShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.Exhaust") ||
+		strings.TrimSpace(st.ParamStr(cards.PKMinLimit)) != "-1" ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") ||
+		!strings.EqualFold(st.ParamStr(cards.PKPlayerTurn), "You") {
+		return false
+	}
+	return staticParamsOnly(st, "ValidSA", "MinLimit", "ValidPlayer", "PlayerTurn", "CheckSVar", "SVarCompare")
 }

@@ -380,7 +380,9 @@ func scriptPreludeSacrifice(xa [][]oraclegen.XAnswer, prelude []oraclegen.Step, 
 			break
 		}
 		for _, a := range st.Answers {
-			if a.Kind != "choose" || len(a.Pick) != 1 {
+			// An announced X ("X = 1") is a recorded decision whose XMage
+			// spelling ("X=1") the derived stream already carries.
+			if a.Kind != "choose" || len(a.Pick) != 1 || strings.HasPrefix(a.Pick[0], "X = ") {
 				continue
 			}
 			if xa == nil {

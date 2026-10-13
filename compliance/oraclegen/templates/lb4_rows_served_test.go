@@ -68,6 +68,42 @@ func TestLevelBCostAndStaticRowsServed(t *testing.T) {
 					t.Fatalf("enchanted p0 is at %d life after the life-gain probe, want 20", life)
 				}
 			}},
+		{"Mimeoplasm, Revered One", "activate#0.0", "ExiledWithSource target made by the source's own cast",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				for _, p := range res.Snapshots[len(res.Snapshots)-1].Permanents {
+					if p.Ref == "p0:Mimeoplasm, Revered One" && p.Name != exiledWithCastCard {
+						t.Fatalf("Mimeoplasm is %q, want a copy of %s", p.Name, exiledWithCastCard)
+					}
+				}
+			}},
+		{"Hauntwoods Shrieker", "activate#0.0", "face-down target made by a Disguise cast",
+			func(t *testing.T, it oraclegen.Item, _ rules.OracleResult) {
+				if !stepsCast(it.Scenario.Steps, faceDownTargetProbe) {
+					t.Fatalf("no face-down cast of %s: %+v", faceDownTargetProbe, it.Scenario.Steps)
+				}
+			}},
+		{"Kaito, Bane of Nightmares", "activate#0.3", "Ninjutsu: an unblocked attacker returned",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				p, ok := permByNameIn(res, "Kaito, Bane of Nightmares")
+				if !ok || !p.Attacking || !p.Tapped {
+					t.Fatalf("Kaito did not enter tapped and attacking: %+v", p)
+				}
+			}},
+		{"Leyline of Mutation", "static#0.0", "AlternativeCost for your spells", poolEmpty(0)},
+		{"Kíli the Resourceful", "static#0.0", "AlternativeCost {0} equip under an enduring story", nil},
+		{"Agatha's Soul Cauldron", "static#0.1", "abilities of cards exiled with the source on countered creatures",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				if life := lifeOf(res, 1); life != 19 {
+					t.Fatalf("p1 at %d life, want 19 from the gained ping", life)
+				}
+			}},
+		{"Elvish Refueler", "static#0.0", "Activations MinLimit$ -1: exhaust re-activated next turn",
+			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
+				p, ok := permByNameIn(res, "Elvish Refueler")
+				if !ok || p.Counters["P1P1"] != 2 {
+					t.Fatalf("Elvish Refueler holds %v, want two exhaust activations' P1P1=2", p.Counters)
+				}
+			}},
 		{"Aven Interrupter", "static#0.0", "RaiseCost on an opponent's graveyard cast", poolEmpty(1)},
 		{"Skyseer's Chariot", "static#0.0", "RaiseCost on the chosen name's activated abilities", poolEmpty(0)},
 		{"Arachne, Psionic Weaver", "static#0.0", "RaiseCost on the chosen card type", poolEmpty(0)},

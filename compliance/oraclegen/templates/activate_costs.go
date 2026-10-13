@@ -234,8 +234,40 @@ func returnCreatureFixture(tok string) string {
 	switch strings.ToLower(strings.TrimSpace(parts[1])) {
 	case "creature.tapped", "creature.youctrl.tapped", "creature.other.tapped":
 		return "Grizzly Bears"
+	case unblockedAttackerFilter:
+		return unblockedAttacker
 	}
 	return ""
+}
+
+// unblockedAttackerFilter is Ninjutsu's minted return cost filter
+// (cards/kw_ninjutsu.go: "Return an unblocked attacker you control to hand").
+const unblockedAttackerFilter = "creature.youctrl+attacking+unblocked"
+
+// unblockedAttacker is the p0 creature that attacks p1 unblocked to pay it: a
+// vanilla creature no baseline permanent shares a name with.
+const unblockedAttacker = "Hill Giant"
+
+// returnUnblockedPrelude declares the unblocked attack a Ninjutsu return cost
+// needs: p0's fixture attacks p1 and p1 declares no blockers, leaving p0 with
+// priority in the declare blockers step (CR 702.49a's activation window).
+// ok is false for a cost without that part.
+func returnUnblockedPrelude(cost string) (conditionPrelude, bool) {
+	for _, tok := range costTokens(cost) {
+		if !strings.HasPrefix(tok, "Return<") {
+			continue
+		}
+		if payload, ok := bracketPayload(tok); ok {
+			parts := strings.Split(payload, "/")
+			if len(parts) >= 2 && strings.EqualFold(strings.TrimSpace(parts[1]), unblockedAttackerFilter) {
+				return conditionPrelude{steps: []oraclegen.Step{
+					{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + unblockedAttacker}},
+					{Op: "block", Seat: 1},
+				}}, true
+			}
+		}
+	}
+	return conditionPrelude{}, false
 }
 
 // namedSelfCount reports n when an ExileFromGrave token's filter names the

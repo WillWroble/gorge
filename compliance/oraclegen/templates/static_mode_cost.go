@@ -119,12 +119,11 @@ func cantAttackUnlessTaxItem(reg *cards.Registry, f *cards.Face, name string, re
 			{Op: "pass_to", Seat: 0, Decision: "attackers",
 				Expect: []oraclegen.Expect{{CanAttack: &oraclegen.CanAttack{Attacker: "p0:" + unlessAttacker}, Want: boolPtr(want)}}},
 		}
-		if withCard {
-			// With the tax live the attackers decision is not posed until p0
-			// passes the priority the step opens with, so the pair of passes
-			// reaches it.
-			steps = append([]oraclegen.Step{{Op: "pass_to", Seat: 0, Step: "declare-attackers"}}, steps...)
-		}
+		// One pass_to reaches the attackers decision with or without the tax
+		// live. A leading pass_to to declare-attackers made the XMage driver
+		// fold the pair into one checkpoint ("step 0 (pass_to)" vs "step 1
+		// (pass_to)" on both engines, the H8 harness Archangel of Tithes
+		// showed), so the observation is a single step.
 		sc := staticScenario(f, name, nil, nil, steps)
 		p1 := sc.Setup["p1"]
 		if withCard {
