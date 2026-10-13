@@ -964,7 +964,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 queuePassCommands(i);
                 step(st, op, i);
                 String cp = "step " + i + " (" + op + ")";
-                runCode(cp, turn, phase, playerA, (info, p, g) -> snaps.add(snapshot(info, g)));
+                runCode(cp, turn, phase, checkpointSeat(op, st), (info, p, g) -> snaps.add(snapshot(info, g)));
                 queuedA.add(new ArrayList<>(playerA.getActions().subList(beforeA, playerA.getActions().size())));
                 queuedB.add(new ArrayList<>(playerB.getActions().subList(beforeB, playerB.getActions().size())));
                 choicesA.add(new ArrayList<>(playerA.getChoices().subList(beforeChoicesA, playerA.getChoices().size())));
@@ -1030,6 +1030,30 @@ public class ScenarioReplay extends CardTestPlayerBase {
         }
         res.add("snapshots", arr);
         return res;
+    }
+
+    /**
+     * The seat whose code action carries a step's checkpoint. XMage runs one
+     * player's queued actions at a priority before the other player acts, so
+     * a checkpoint queued on the wrong seat sees the wrong side of the step:
+     *
+     *  - pass_to only moves the clock. Its checkpoint belongs to the seat that
+     *    has priority first on the turn it reached, ahead of that step's
+     *    actions; on seat 0 it would run after the opponent's NEXT cast or
+     *    loyalty activation (Found Footage's hand, Ajani's loyalty).
+     *  - resolve by seat 1 waits on seat 1's queue (waitStackResolved), so a
+     *    checkpoint on seat 0 would run while the spell is still on the stack.
+     *
+     * Every other op keeps seat 0, which acts last on the turn it is on.
+     */
+    private TestPlayer checkpointSeat(String op, JsonObject st) {
+        if (op.equals("pass_to")) {
+            return seat(activeSeat);
+        }
+        if (op.equals("resolve")) {
+            return seat(st.has("seat") ? st.get("seat").getAsInt() : 0);
+        }
+        return playerA;
     }
 
     private boolean skippedActionsMatch(int first, List<List<PlayerAction>> queuedA,
@@ -2870,7 +2894,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 for (String t : targets(st)) {
                     queueCastTarget(p, t);
                 }
-                activateAbility(turn, phase, p, text);
+                activateAbility(turn, phase, p, boundActivationText(p, str(st, "card"), text, stepIdx));
                 return;
             }
             case "play":
@@ -3166,6 +3190,34 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * registered before execute()). So bind an alias to the pending
      * ability's id with a code action registered just ahead of the
      * activation or cast, and queue that alias. */
+    /**
+     * XMage matches an activated command by a prefix of the ability's rule
+     * text across every permanent the player controls, so two planeswalkers
+     * that share "+1: ..." text activate whichever XMage lists first (Ajani
+     * Unrelenting beside Ajani Goldmane). The scenario names the card: bind a
+     * space-free alias to that setup object just ahead of the activation and
+     * prefix the command with it ("@ref text from ref object"). A card with no
+     * setup alias (a token, a permanent that entered later) keeps the plain
+     * text.
+     */
+    private String boundActivationText(TestPlayer p, String ref, String text, int stepIdx) {
+        String alias = refAlias.get(ref);
+        if (alias == null || text.startsWith("@")) {
+            return text;
+        }
+        String key = "act" + stepIdx;
+        runCode("bind " + ref, turn, phase, p, (info, pl, g) -> {
+            UUID id = p.getAliasByName(alias);
+            if (id == null) {
+                throw new IllegalArgumentException("activate " + ref + ": no setup object bound to " + alias);
+            }
+            for (int j = 0; j < 2; j++) {
+                seat(j).addAlias(key, id);
+            }
+        });
+        return "@" + key + " " + text;
+    }
+
     private void queueAbilityTarget(TestPlayer p, String ref) {
         String key = ref + "~" + (++abilityAliasSeq);
         runCode("bind " + ref, turn, phase, p, (info, pl, g) -> bindPendingAbility(g, ref, key));
@@ -3481,7 +3533,85 @@ public class ScenarioReplay extends CardTestPlayerBase {
             stack.add(o);
         }
         s.add("stack", stack);
+        if (wantsOffered()) {
+            s.add("offered", offered(g));
+        }
         return (JsonObject) gorgeSpellings(s);
+    }
+
+    /** Whether the scenario opts the "offered" field into the comparison
+     * (Item.Compare). Only then do the snapshots carry it, so every other
+     * scenario's wire bytes stay what they were. */
+    private boolean wantsOffered() {
+        if (sc0 == null || !sc0.has("compare") || !sc0.get("compare").isJsonArray()) {
+            return false;
+        }
+        for (JsonElement e : sc0.getAsJsonArray("compare")) {
+            if (e.isJsonPrimitive() && e.getAsString().equals("offered")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What the player holding priority may play, in gorge's snapshot
+     * vocabulary (rules.OracleSnapOffered): the source's scenario ref, the
+     * kind ("cast", "play" for a land, otherwise "activate" -- mana abilities
+     * included, CR 605.3a: a mana ability is activatable whenever its
+     * controller has priority), and the ability's rule text. The comparer
+     * strips the display prefixes. No priority player (the game ended, or the
+     * checkpoint is a skipped-step label recorded after the turn) offers
+     * nothing.
+     */
+    private JsonArray offered(Game g) {
+        JsonArray out = new JsonArray();
+        UUID holder = g.getPriorityPlayerId();
+        if (holder == null || g.hasEnded()) {
+            return out;
+        }
+        Player pr = g.getPlayer(holder);
+        if (pr == null) {
+            return out;
+        }
+        for (Ability a : pr.getPlayable(g, true)) {
+            mage.MageObject src = g.getObject(a.getSourceId());
+            if (src == null) {
+                continue;
+            }
+            JsonObject o = new JsonObject();
+            o.addProperty("source", offeredRef(g, a, src));
+            String kind = "activate";
+            if (a instanceof mage.abilities.PlayLandAbility) {
+                kind = "play";
+            } else if (a instanceof mage.abilities.SpellAbility) {
+                kind = "cast";
+            }
+            o.addProperty("kind", kind);
+            o.addProperty("label", a.toString());
+            out.add(o);
+        }
+        return out;
+    }
+
+    /** The scenario ref of an offered ability's source: the setup alias of
+     * that object when one exists (duplicate names keep their "#n"), else
+     * "pN:name" by its controller (owner, for a card outside the battlefield). */
+    private String offeredRef(Game g, Ability a, mage.MageObject src) {
+        UUID who = a.getControllerId();
+        if (src instanceof Card && !(src instanceof Permanent) && ((Card) src).getOwnerId() != null) {
+            who = ((Card) src).getOwnerId();
+        }
+        String name = setupName(src);
+        String best = null;
+        for (java.util.Map.Entry<String, UUID> en : seat(0).getAliases().entrySet()) {
+            String key = en.getKey();
+            if (en.getValue().equals(src.getId()) && isScenarioRef(key) && refName(key).equals(name)
+                    && (best == null || key.compareTo(best) < 0)) {
+                best = key;
+            }
+        }
+        return best != null ? best : "p" + seatIndex(g, who) + ":" + name;
     }
 
     private static JsonArray sortedNames(java.util.Collection<Card> cs) {
