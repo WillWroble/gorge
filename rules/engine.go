@@ -92,16 +92,18 @@ type Config struct {
 	// WindowDiagnostics opts this table into per-priority-option withholding
 	// reasons. It is observer-only and emits no events.
 	WindowDiagnostics bool
-	// PaidManaCensus (default off) lets the payment census count mana
-	// sources whose activation cost is more than a bare tap when the engine
-	// can pay that cost deterministically: a self-sacrifice (Treasure, Lotus
-	// Petal) or a fixed PayLife<N> that leaves the payer alive. The attack-
-	// tax, unless-cost and AvailableMana readers then see them (the cast
-	// window already prices both), and a pool-short activated ability the
-	// untapped sources can pay is offered and auto-paid (CR 602.2b). Off,
-	// every census, option list and event is unchanged. Genesis
-	// configuration like WindowDiagnostics; replay must pass the same value.
-	PaidManaCensus bool
+	// DisablePaidManaCensus turns OFF the paid-cost mana census, which is ON
+	// by default. The census counts mana sources whose activation cost is
+	// more than a bare tap when the engine can pay that cost deterministically:
+	// a self-sacrifice (Treasure, Lotus Petal) or a fixed PayLife<N> that
+	// leaves the payer alive. The attack-tax, unless-cost and AvailableMana
+	// readers see them (the cast window already prices both), and a pool-short
+	// activated ability the untapped sources can pay is offered and auto-paid
+	// (CR 602.2b). The zero value (false) leaves it on, so a Config that never
+	// sets it gets the widened census; setting it true restores the pre-flip
+	// narrow census (the A/B control). Genesis configuration like
+	// WindowDiagnostics; replay must pass the same value.
+	DisablePaidManaCensus bool
 	// Tokens is the token definitions the decks in this match can create --
 	// cards.Registry.Tokens. Adopted by reference as Game.Tokens in New (never
 	// copied, never written) so events.Apply's TokenCreate case has something
@@ -111,11 +113,12 @@ type Config struct {
 	// NameUniverse is the compiled corpus used by NameCard decisions.
 	NameUniverse *cards.Universe
 	// NamedCorpus is a compiled corpus consulted ONLY by the "copy the card
-	// named N" mechanic (CopyPermanent DefinedName$, state.Game.NamedCard),
-	// the oracle-compliance harness -- which must not gain NameCard asks
-	// its recorded verdicts predate -- supplies it without setting
-	// NameUniverse. NameUniverse is searched first, so an embedder that sets
-	// it needs no second field.
+	// named N" mechanic (CopyPermanent DefinedName$, state.Game.NamedCard).
+	// The oracle-compliance harness supplies it for every scenario, and sets
+	// NameUniverse only for a scenario that seats a card-name choice -- to
+	// that scenario's own cards (rules/oracle_name_universe.go), so its name
+	// asks honour ValidCards$ and name a card XMage knows. NameUniverse is
+	// searched first, so an embedder that sets it needs no second field.
 	NamedCorpus *cards.Universe
 	// NameUniverseNames pins a persisted match's sorted name list. A live
 	// match leaves it nil and derives it from NameUniverse at genesis.

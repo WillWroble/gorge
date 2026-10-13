@@ -28,6 +28,12 @@ import (
 // ended before the ability resolves. A source that has left the battlefield
 // degrades to a nil table.
 func (e *Engine) abilityResolutionSVars(id state.ObjID, o *state.Object) map[string]string {
+	if isStationAbility(o.Ability) {
+		// The Station body (cards.KeywordPushAbility) reads only its bound X
+		// (bindStationAmount); a Spacecraft's own SVar:X (Fell Gravship,
+		// Warmaker Gunship) must not shadow it.
+		return nil
+	}
 	var svars map[string]string
 	if src := e.G.Obj(o.Source); src != nil {
 		if _, mf, ok := e.findTriggerForAbilityFace(o.Source, o.Ability); ok && mf != nil {
@@ -66,6 +72,17 @@ func bindNinjutsuDefender(ctx *effects.Ctx, o *state.Object) {
 		if rem.Obj != 0 {
 			ctx.DefendingBattle = rem.Obj
 		}
+	}
+}
+
+// bindStationAmount binds a resolving Station ability's X -- its CounterNum$
+// -- to the tapped creature's tap-power value at resolution (CR 702.184a,
+// rules/station.go stationAmount). Both Ctx builders call it AFTER their X
+// reads, so it wins over the stack object's (unpaid) X. Any other ability is
+// untouched.
+func (e *Engine) bindStationAmount(ctx *effects.Ctx, o *state.Object) {
+	if n, ok := e.stationAmount(o); ok {
+		ctx.X = n
 	}
 }
 

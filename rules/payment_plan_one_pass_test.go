@@ -35,22 +35,30 @@ func paymentActionsReference(e *Engine, p state.PlayerID, seq uint64) []decision
 	legacy := e.legalActions(p)
 	var out []decision.PaymentAction
 	for _, opt := range candidates {
-		if opt.Kind != "cast" || opt.Mode != "" || opt.AltCostIndex != 0 {
+		// The one other plain shape is the untyped may-play cast of an
+		// exile/graveyard card (Mode "mayplay", no MayPlayPerm), which the
+		// production builder admits with its zone's origin.
+		mayPlay := planCastPaymentCheckedCodes.Code(opt.Mode) == planCastPaymentCheckedMayPlayMode && opt.MayPlayPerm == ""
+		if opt.Kind != "cast" || (opt.Mode != "" && !mayPlay) || opt.AltCostIndex != 0 {
 			continue
 		}
 		// The origin comes from the object's actual zone, mirroring the
-		// production builder: only a hand or command-zone object can ever
-		// carry a plain (Mode "" AltCostIndex 0) cast; anything else is
-		// skipped.
+		// production builder: a hand or command-zone object carries a plain
+		// (Mode "" AltCostIndex 0) cast, an exile/graveyard one a may-play
+		// cast; anything else is skipped.
 		originObj := e.G.Obj(opt.Obj)
 		if originObj == nil {
 			continue
 		}
 		var origin string
-		switch originObj.Zone {
-		case state.ZHand:
+		switch {
+		case mayPlay && plannedMayPlayZone(originObj.Zone):
+			origin = plannedMayPlayOrigin(originObj.Zone)
+		case mayPlay:
+			continue
+		case originObj.Zone == state.ZHand:
 			origin = "hand"
-		case state.ZCommand:
+		case originObj.Zone == state.ZCommand:
 			origin = "command_zone"
 		default:
 			continue
@@ -72,7 +80,7 @@ func paymentActionsReference(e *Engine, p state.PlayerID, seq uint64) []decision
 		}
 		a := decision.PaymentAction{ID: aid, Cast: cast, Label: opt.Label, Plans: []decision.PaymentPlan{plan}}
 		for i := range legacy {
-			if legacy[i].Kind == "cast" && legacy[i].Obj == opt.Obj && legacy[i].Mode == "" && legacy[i].AltCostIndex == 0 {
+			if legacy[i].Kind == "cast" && legacy[i].Obj == opt.Obj && legacy[i].Mode == opt.Mode && legacy[i].MayPlayPerm == "" && legacy[i].AltCostIndex == 0 {
 				idx := legacy[i].Index
 				a.BaseOptionIndex = &idx
 				break

@@ -564,6 +564,9 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		}
 	}
 	cfg := Config{Seed: 42, Names: []string{"a", "b"}, Decks: decks, Tokens: r.reg.Tokens, NamedCorpus: r.reg.Universe()}
+	// A scenario seating a card-name choice ranges it over the scenario's own
+	// cards (oracleNameUniverse); every other scenario is unchanged.
+	cfg.NameUniverse = oracleNameUniverse(decks, sideboards)
 	for p := range sideboards {
 		if len(sideboards[p]) > 0 {
 			// Only a scenario that names a sideboard sets the field, so every
@@ -989,10 +992,10 @@ func altPayableCount(pc *pendingCast, d *decision.Decision, castable func(state.
 
 // oracleActivateKind reports whether an option's Kind names an action the
 // `activate` scenario op may select. Besides the ordinary "ability" and the
-// engine's generic "activate" composite, the engine poses three special
-// actions under their own option kinds -- Station (rules/legal.go
-// "station"), Room unlock ("unlock") and morph-family turn face up
-// ("turn_face_up") -- each already offered and performed rules-side. A
+// engine's generic "activate" composite, the engine poses three actions
+// under their own option kinds -- Station (an activated ability whose offer
+// and tap cost are rules-side, CR 702.184a, "station"), Room unlock
+// ("unlock") and morph-family turn face up ("turn_face_up"). A
 // scenario drives them through `activate` plus the option's label, exactly
 // as a named ability is driven; they are not a separate op.
 func oracleActivateKind(kind string) bool {

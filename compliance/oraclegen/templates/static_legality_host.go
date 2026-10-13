@@ -324,8 +324,10 @@ func lookAtLibraryTopItem(reg *cards.Registry, f *cards.Face, name string, req l
 // (CantBeActivated ValidCard$ Card.NamedCard, the name chosen as it enters):
 // p0 casts the card and names the activated probe, whose ability is offered
 // at the cast's checkpoint (the control) and absent once the card resolves.
-// The probe's name sits on top of p0's library, which is the name gorge's
-// legacy no-universe NameCard picks; XMage is scripted the same name.
+// The resolve step names the probe (the oracle runner's scenario name
+// universe offers every seated card); the probe also stays on top of p0's
+// library, the one name the pre-universe fallback offered. XMage is scripted
+// the same name.
 func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
 	const mode = "CantBeActivated"
 	if req.Face > 0 {
@@ -341,7 +343,9 @@ func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, r
 	}
 	steps := []oraclegen.Step{
 		{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: mana, Expect: offered(true)},
-		{Op: "resolve"},
+		// Spyglass's as-enters chain asks the opponent to look at first (one
+		// option), then the card name.
+		{Op: "resolve", Answers: append([]oraclegen.Answer{{Kind: "choose", Pick: []string{"p1"}}}, namedProbeAnswer(activatedProbe)...)},
 		{Op: "pass_to", Seat: 0, Decision: "priority", Expect: offered(false)},
 	}
 	sc := staticScenario(f, name, []string{activatedProbe}, []string{name}, steps)
@@ -352,15 +356,9 @@ func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, r
 	if skip != nil {
 		return it, skip
 	}
-	// gorge's runner has no name universe, so its NameCard offers one name
-	// (the caster's library top) and the answer generator drops it as a
-	// forced one-option ask; XMage offers every card name, so the chosen
-	// name is scripted at the resolve step that poses it.
+	// XMage offers every card name, so the chosen name is scripted at the
+	// resolve step that poses it (scriptNamedAnswers, once).
 	res, _ := runStatic(reg, sc)
-	for _, d := range res.Decisions {
-		if d.Step >= 0 && d.Step < len(it.XAnswers) && len(d.PickKinds) == 1 && d.PickKinds[0] == "name" && len(d.Picks) == 1 {
-			it.XAnswers[d.Step] = append(it.XAnswers[d.Step], oraclegen.XAnswer{Seat: d.Seat, Kind: "choice", Value: d.Picks[0]})
-		}
-	}
+	scriptNamedAnswers(res, &it)
 	return it, nil
 }

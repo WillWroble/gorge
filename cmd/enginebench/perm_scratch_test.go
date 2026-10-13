@@ -24,13 +24,16 @@ func TestRandomIntentScratchKeepsTheStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	// fixed seeds and a fixed game budget: the draws inside each game are
-	// deterministic, so the totals are too.
+	// deterministic, so the totals are too. Re-pinned for the paid-cost mana
+	// census default flip (2026-10-13; was 1600/38249, 1621/38800, 1648/40117):
+	// the census offers more options, so the random games move. Forcing
+	// rules/genesis.go's paidManaCensus to false restores the old totals.
 	want := []struct {
 		games, turns, decisions, rejected int
 	}{
-		{40, 1600, 38249, 0},
-		{40, 1621, 38800, 0},
-		{40, 1648, 40117, 0},
+		{40, 1616, 38711, 0},
+		{40, 1651, 39748, 0},
+		{40, 1620, 39304, 0},
 	}
 	for i, w := range want {
 		cfg := rules.Config{

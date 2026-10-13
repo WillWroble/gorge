@@ -748,7 +748,7 @@ func (w *legalWalk) battlefieldWalk() {
 			}
 		}
 
-		// kw:Station (CR 702.150, rules/station.go): each Spacecraft the player
+		// kw:Station (CR 702.184a, rules/station.go): each Spacecraft the player
 		// controls may be stationed as a sorcery by tapping another creature.
 		// The offer is gated on the sorcery window (Station only as a sorcery)
 		// and on a legal tap candidate existing, so an unpayable station is

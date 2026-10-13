@@ -98,7 +98,7 @@
    "cr": [
     "602.2b"
    ],
-   "why": "The cost is {4}.",
+   "why": "The cost is {4}. With the land already tapped for {C} the pool holds three and no untapped source remains to pay the fourth (an untapped land could tap itself for it, CR 602.2b).",
    "setup": {
     "p0": {
      "battlefield": [
@@ -108,12 +108,22 @@
    },
    "steps": [
     {
+     "op": "activate",
+     "seat": 0,
+     "card": "p0:Soulstone Sanctuary",
+     "ability": "Add C"
+    },
+    {
      "op": "mana",
      "seat": 0,
-     "mana": "CCC"
+     "mana": "CC"
     }
    ],
    "expect": [
+    {
+     "card": "p0:Soulstone Sanctuary",
+     "tapped": true
+    },
     {
      "offered": {
       "seat": 0,

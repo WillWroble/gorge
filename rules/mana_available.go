@@ -78,9 +78,9 @@ func (e *Engine) AvailableMana(p state.PlayerID) state.Mana {
 		// report its five alternatives through ProducedCounts; a permanent with
 		// several distinct abilities is omitted because the vector cannot encode
 		// which ability the tap will select.
-		// Config.PaidManaCensus extends "free" with the paid abilities the
-		// shared paid-cost census counts (paid_mana_census.go): a
-		// self-sacrifice or a PayLife<N> that leaves the payer alive.
+		// The paid-cost census (on by default) extends "free" with the paid
+		// abilities it counts (paid_mana_census.go): a self-sacrifice or a
+		// PayLife<N> that leaves the payer alive.
 		if e.paidManaCensus {
 			paid, lc := e.availablePaidAbilities(p, id, o, e.G.Players[p].Life-committed)
 			if len(paid) > 0 {

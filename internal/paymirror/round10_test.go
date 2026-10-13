@@ -38,11 +38,13 @@ import (
 //     longer offered there, so the game moves; the pin is that no planned
 //     cast in it falls back or mismatches. (The report's control route was
 //     equivalent: the source_changed was run A's fallback, not the clone.)
-//   - 12603 seq 2298 (Mana Vault), commander4: Treasonous Ogre's "Pay 3
+//   - 12603 seq 2291 (Mana Vault), commander4: Treasonous Ogre's "Pay 3
 //     life: Add {R}" cast plan remains equivalent after the speed gain moved
 //     to its triggered-ability timing (CR 702.179d), shifting the cast
 //     earlier; the lifePaymentConsequences harness gap is fixed in
-//     paymirror.go, so the witness no longer trips on it.
+//     paymirror.go, so the witness no longer trips on it. The paid-cost census
+//     default-on flip (cli-20261012T170859Z) then moved this cast from
+//     seq 2298 to 2291.
 //   - 10877 seq 2873 (Infernal Plunge), commander4-r9 a_witness:wrong_production:
 //     the plan's Ogre paid life for R and was then the creature sacrificed
 //     for the spell's additional cost (CR 601.2h); the witness read that
@@ -70,7 +72,7 @@ import (
 var roundTenWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
 	12468: {},
 	11828: {},
-	12603: {2298: ""},
+	12603: {2291: ""},
 	10877: {2834: ""},
 }
 

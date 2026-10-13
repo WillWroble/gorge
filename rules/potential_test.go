@@ -709,10 +709,11 @@ func TestPotentialActionsJitteThaliaCorpusScriptIsNotCastable(t *testing.T) {
 
 // TestPotentialActionsMountDoomDamageAbility pins the engine half of
 // fb-20260923T033148Z-877b8f8f ("mount doom -- can only play tap for mana").
-// Measured: with Mount Doom untapped beside enough other mana, the empty-pool
-// priority window offers Mount Doom ONLY its mana activation (the
-// float-then-cast model, pinned by TestLanderTokenAbilityOfferedOnlyWhenPool
-// Funded), while the potential-action projection carries its
+// Measured then: with Mount Doom untapped beside enough other mana, the
+// empty-pool priority window offered Mount Doom ONLY its mana activation (the
+// float-then-cast model). The window now also offers the damage ability as an
+// autopay offer (the paid-cost census, legal_walk_autopay.go); the
+// potential-action projection carries its
 // "{1}{B}{R}, {T}: deal 1 damage" ability. The client's card affordance reads
 // that projection so the player is not left with a one-click tap that spends
 // the {T} the damage ability needs; this test holds the engine contract the
@@ -745,8 +746,10 @@ func TestPotentialActionsMountDoomDamageAbility(t *testing.T) {
 			live = append(live, o.Kind)
 		}
 	}
-	if len(live) != 1 || live[0] != "activate" {
-		t.Fatalf("empty-pool offers on Mount Doom = %v, want only its mana activation", live)
+	// The mana activation, and the damage ability as an autopay offer
+	// (legal_walk_autopay.go): the other four lands pay {1}{B}{R}.
+	if len(live) != 2 || live[0] != "activate" || live[1] != "ability" {
+		t.Fatalf("empty-pool offers on Mount Doom = %v, want its mana activation and its autopaid damage ability", live)
 	}
 	found := false
 	for _, a := range e.PotentialActions(0) {
