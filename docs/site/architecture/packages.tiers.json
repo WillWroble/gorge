@@ -162,6 +162,10 @@
       "tier": "cmd",
       "status": "TOOL"
     },
+    "cmd/manamodelstats": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
     "cmd/mtgsim": {
       "tier": "cmd",
       "status": "TOOL"
