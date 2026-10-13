@@ -1,0 +1,1404 @@
+{
+  "code": "FDN",
+  "name": "Foundations",
+  "pack_size": 14,
+  "main_max": 271,
+  "sheets": {
+    "common": [
+      {
+        "name": "Armasaur Guide",
+        "number": "3",
+        "rarity": "C"
+      },
+      {
+        "name": "Dazzling Angel",
+        "number": "9",
+        "rarity": "C"
+      },
+      {
+        "name": "Felidar Savior",
+        "number": "12",
+        "rarity": "C"
+      },
+      {
+        "name": "Fleeting Flight",
+        "number": "13",
+        "rarity": "C"
+      },
+      {
+        "name": "Hare Apparent",
+        "number": "15",
+        "rarity": "C"
+      },
+      {
+        "name": "Helpful Hunter",
+        "number": "16",
+        "rarity": "C"
+      },
+      {
+        "name": "Inspiring Paladin",
+        "number": "18",
+        "rarity": "C"
+      },
+      {
+        "name": "Luminous Rebuke",
+        "number": "20",
+        "rarity": "C"
+      },
+      {
+        "name": "Prideful Parent",
+        "number": "21",
+        "rarity": "C"
+      },
+      {
+        "name": "Squad Rallier",
+        "number": "24",
+        "rarity": "C"
+      },
+      {
+        "name": "Vanguard Seraph",
+        "number": "28",
+        "rarity": "C"
+      },
+      {
+        "name": "Bigfin Bouncer",
+        "number": "31",
+        "rarity": "C"
+      },
+      {
+        "name": "Elementalist Adept",
+        "number": "36",
+        "rarity": "C"
+      },
+      {
+        "name": "Erudite Wizard",
+        "number": "37",
+        "rarity": "C"
+      },
+      {
+        "name": "Icewind Elemental",
+        "number": "42",
+        "rarity": "C"
+      },
+      {
+        "name": "Refute",
+        "number": "48",
+        "rarity": "C"
+      },
+      {
+        "name": "Strix Lookout",
+        "number": "52",
+        "rarity": "C"
+      },
+      {
+        "name": "Uncharted Voyage",
+        "number": "53",
+        "rarity": "C"
+      },
+      {
+        "name": "Crypt Feaster",
+        "number": "59",
+        "rarity": "C"
+      },
+      {
+        "name": "Gutless Plunderer",
+        "number": "60",
+        "rarity": "C"
+      },
+      {
+        "name": "Hungry Ghoul",
+        "number": "62",
+        "rarity": "C"
+      },
+      {
+        "name": "Infestation Sage",
+        "number": "64",
+        "rarity": "C"
+      },
+      {
+        "name": "Sanguine Syphoner",
+        "number": "68",
+        "rarity": "C"
+      },
+      {
+        "name": "Soul-Shackled Zombie",
+        "number": "70",
+        "rarity": "C"
+      },
+      {
+        "name": "Stab",
+        "number": "71",
+        "rarity": "C"
+      },
+      {
+        "name": "Vampire Soulcaller",
+        "number": "75",
+        "rarity": "C"
+      },
+      {
+        "name": "Courageous Goblin",
+        "number": "82",
+        "rarity": "C"
+      },
+      {
+        "name": "Crackling Cyclops",
+        "number": "83",
+        "rarity": "C"
+      },
+      {
+        "name": "Goblin Boarders",
+        "number": "87",
+        "rarity": "C"
+      },
+      {
+        "name": "Gorehorn Raider",
+        "number": "89",
+        "rarity": "C"
+      },
+      {
+        "name": "Incinerating Blast",
+        "number": "90",
+        "rarity": "C"
+      },
+      {
+        "name": "Sower of Chaos",
+        "number": "95",
+        "rarity": "C"
+      },
+      {
+        "name": "Ambush Wolf",
+        "number": "98",
+        "rarity": "C"
+      },
+      {
+        "name": "Apothecary Stomper",
+        "number": "99",
+        "rarity": "C"
+      },
+      {
+        "name": "Beast-Kin Ranger",
+        "number": "100",
+        "rarity": "C"
+      },
+      {
+        "name": "Cackling Prowler",
+        "number": "101",
+        "rarity": "C"
+      },
+      {
+        "name": "Elfsworn Giant",
+        "number": "103",
+        "rarity": "C"
+      },
+      {
+        "name": "Treetop Snarespinner",
+        "number": "114",
+        "rarity": "C"
+      },
+      {
+        "name": "Quick-Draw Katana",
+        "number": "130",
+        "rarity": "C"
+      },
+      {
+        "name": "Banishing Light",
+        "number": "138",
+        "rarity": "C"
+      },
+      {
+        "name": "Cathar Commando",
+        "number": "139",
+        "rarity": "C"
+      },
+      {
+        "name": "Healer's Hawk",
+        "number": "142",
+        "rarity": "C"
+      },
+      {
+        "name": "Make Your Move",
+        "number": "143",
+        "rarity": "C"
+      },
+      {
+        "name": "Aegis Turtle",
+        "number": "150",
+        "rarity": "C"
+      },
+      {
+        "name": "Fleeting Distraction",
+        "number": "155",
+        "rarity": "C"
+      },
+      {
+        "name": "Lightshell Duo",
+        "number": "157",
+        "rarity": "C"
+      },
+      {
+        "name": "Mocking Sprite",
+        "number": "159",
+        "rarity": "C"
+      },
+      {
+        "name": "Run Away Together",
+        "number": "162",
+        "rarity": "C"
+      },
+      {
+        "name": "Think Twice",
+        "number": "165",
+        "rarity": "C"
+      },
+      {
+        "name": "Tolarian Terror",
+        "number": "167",
+        "rarity": "C"
+      },
+      {
+        "name": "Witness Protection",
+        "number": "168",
+        "rarity": "C"
+      },
+      {
+        "name": "Bake into a Pie",
+        "number": "169",
+        "rarity": "C"
+      },
+      {
+        "name": "Burglar Rat",
+        "number": "170",
+        "rarity": "C"
+      },
+      {
+        "name": "Eaten Alive",
+        "number": "172",
+        "rarity": "C"
+      },
+      {
+        "name": "Fake Your Own Death",
+        "number": "174",
+        "rarity": "C"
+      },
+      {
+        "name": "Macabre Waltz",
+        "number": "177",
+        "rarity": "C"
+      },
+      {
+        "name": "Marauding Blight-Priest",
+        "number": "178",
+        "rarity": "C"
+      },
+      {
+        "name": "Pilfer",
+        "number": "181",
+        "rarity": "C"
+      },
+      {
+        "name": "Axgard Cavalry",
+        "number": "189",
+        "rarity": "C"
+      },
+      {
+        "name": "Burst Lightning",
+        "number": "192",
+        "rarity": "C"
+      },
+      {
+        "name": "Fanatical Firebrand",
+        "number": "195",
+        "rarity": "C"
+      },
+      {
+        "name": "Firebrand Archer",
+        "number": "196",
+        "rarity": "C"
+      },
+      {
+        "name": "Goblin Surprise",
+        "number": "200",
+        "rarity": "C"
+      },
+      {
+        "name": "Involuntary Employment",
+        "number": "203",
+        "rarity": "C"
+      },
+      {
+        "name": "Spitfire Lagac",
+        "number": "208",
+        "rarity": "C"
+      },
+      {
+        "name": "Sure Strike",
+        "number": "209",
+        "rarity": "C"
+      },
+      {
+        "name": "Thrill of Possibility",
+        "number": "210",
+        "rarity": "C"
+      },
+      {
+        "name": "Bite Down",
+        "number": "212",
+        "rarity": "C"
+      },
+      {
+        "name": "Broken Wings",
+        "number": "214",
+        "rarity": "C"
+      },
+      {
+        "name": "Bushwhack",
+        "number": "215",
+        "rarity": "C"
+      },
+      {
+        "name": "Dwynen's Elite",
+        "number": "218",
+        "rarity": "C"
+      },
+      {
+        "name": "Giant Growth",
+        "number": "223",
+        "rarity": "C"
+      },
+      {
+        "name": "Gnarlid Colony",
+        "number": "224",
+        "rarity": "C"
+      },
+      {
+        "name": "Grow from the Ashes",
+        "number": "225",
+        "rarity": "C"
+      },
+      {
+        "name": "Llanowar Elves",
+        "number": "227",
+        "rarity": "C"
+      },
+      {
+        "name": "Wary Thespian",
+        "number": "235",
+        "rarity": "C"
+      },
+      {
+        "name": "Campus Guide",
+        "number": "251",
+        "rarity": "C"
+      },
+      {
+        "name": "Gleaming Barrier",
+        "number": "252",
+        "rarity": "C"
+      },
+      {
+        "name": "Goldvein Pick",
+        "number": "253",
+        "rarity": "C"
+      },
+      {
+        "name": "Evolving Wilds",
+        "number": "262",
+        "rarity": "C"
+      }
+    ],
+    "land": [
+      {
+        "name": "Bloodfell Caves",
+        "number": "259",
+        "rarity": "L"
+      },
+      {
+        "name": "Blossoming Sands",
+        "number": "260",
+        "rarity": "L"
+      },
+      {
+        "name": "Dismal Backwater",
+        "number": "261",
+        "rarity": "L"
+      },
+      {
+        "name": "Jungle Hollow",
+        "number": "263",
+        "rarity": "L"
+      },
+      {
+        "name": "Rugged Highlands",
+        "number": "265",
+        "rarity": "L"
+      },
+      {
+        "name": "Scoured Barrens",
+        "number": "266",
+        "rarity": "L"
+      },
+      {
+        "name": "Swiftwater Cliffs",
+        "number": "268",
+        "rarity": "L"
+      },
+      {
+        "name": "Thornwood Falls",
+        "number": "269",
+        "rarity": "L"
+      },
+      {
+        "name": "Tranquil Cove",
+        "number": "270",
+        "rarity": "L"
+      },
+      {
+        "name": "Wind-Scarred Crag",
+        "number": "271",
+        "rarity": "L"
+      }
+    ],
+    "mythic": [
+      {
+        "name": "Sire of Seven Deaths",
+        "number": "1",
+        "rarity": "M"
+      },
+      {
+        "name": "Herald of Eternal Dawn",
+        "number": "17",
+        "rarity": "M"
+      },
+      {
+        "name": "Valkyrie's Call",
+        "number": "27",
+        "rarity": "M"
+      },
+      {
+        "name": "Kaito, Cunning Infiltrator",
+        "number": "44",
+        "rarity": "M"
+      },
+      {
+        "name": "Sphinx of Forgotten Lore",
+        "number": "51",
+        "rarity": "M"
+      },
+      {
+        "name": "Bloodthirsty Conqueror",
+        "number": "58",
+        "rarity": "M"
+      },
+      {
+        "name": "Chandra, Flameshaper",
+        "number": "81",
+        "rarity": "M"
+      },
+      {
+        "name": "Rite of the Dragoncaller",
+        "number": "92",
+        "rarity": "M"
+      },
+      {
+        "name": "Twinflame Tyrant",
+        "number": "97",
+        "rarity": "M"
+      },
+      {
+        "name": "Quilled Greatwurm",
+        "number": "111",
+        "rarity": "M"
+      },
+      {
+        "name": "Niv-Mizzet, Visionary",
+        "number": "123",
+        "rarity": "M"
+      },
+      {
+        "name": "Zimone, Paradox Sculptor",
+        "number": "126",
+        "rarity": "M"
+      },
+      {
+        "name": "Ajani, Caller of the Pride",
+        "number": "134",
+        "rarity": "M"
+      },
+      {
+        "name": "Omniscience",
+        "number": "161",
+        "rarity": "M"
+      },
+      {
+        "name": "Liliana, Dreadhorde General",
+        "number": "176",
+        "rarity": "M"
+      },
+      {
+        "name": "Rise of the Dark Realms",
+        "number": "183",
+        "rarity": "M"
+      },
+      {
+        "name": "Doubling Season",
+        "number": "216",
+        "rarity": "M"
+      },
+      {
+        "name": "Vivien Reid",
+        "number": "234",
+        "rarity": "M"
+      },
+      {
+        "name": "Muldrotha, the Gravetide",
+        "number": "243",
+        "rarity": "M"
+      },
+      {
+        "name": "Progenitus",
+        "number": "244",
+        "rarity": "M"
+      }
+    ],
+    "rare": [
+      {
+        "name": "Arahbo, the First Fang",
+        "number": "2",
+        "rarity": "R"
+      },
+      {
+        "name": "Celestial Armor",
+        "number": "5",
+        "rarity": "R"
+      },
+      {
+        "name": "Crystal Barricade",
+        "number": "7",
+        "rarity": "R"
+      },
+      {
+        "name": "Exemplar of Light",
+        "number": "11",
+        "rarity": "R"
+      },
+      {
+        "name": "Raise the Past",
+        "number": "22",
+        "rarity": "R"
+      },
+      {
+        "name": "Skyknight Squire",
+        "number": "23",
+        "rarity": "R"
+      },
+      {
+        "name": "Archmage of Runes",
+        "number": "30",
+        "rarity": "R"
+      },
+      {
+        "name": "Curator of Destinies",
+        "number": "34",
+        "rarity": "R"
+      },
+      {
+        "name": "Drake Hatcher",
+        "number": "35",
+        "rarity": "R"
+      },
+      {
+        "name": "High Fae Trickster",
+        "number": "40",
+        "rarity": "R"
+      },
+      {
+        "name": "Homunculus Horde",
+        "number": "41",
+        "rarity": "R"
+      },
+      {
+        "name": "Kiora, the Rising Tide",
+        "number": "45",
+        "rarity": "R"
+      },
+      {
+        "name": "Lunar Insight",
+        "number": "46",
+        "rarity": "R"
+      },
+      {
+        "name": "Abyssal Harvester",
+        "number": "54",
+        "rarity": "R"
+      },
+      {
+        "name": "Blasphemous Edict",
+        "number": "57",
+        "rarity": "R"
+      },
+      {
+        "name": "High-Society Hunter",
+        "number": "61",
+        "rarity": "R"
+      },
+      {
+        "name": "Nine-Lives Familiar",
+        "number": "66",
+        "rarity": "R"
+      },
+      {
+        "name": "Tinybones, Bauble Burglar",
+        "number": "72",
+        "rarity": "R"
+      },
+      {
+        "name": "Zul Ashur, Lich Lord",
+        "number": "77",
+        "rarity": "R"
+      },
+      {
+        "name": "Electroduplicate",
+        "number": "85",
+        "rarity": "R"
+      },
+      {
+        "name": "Kellan, Planar Trailblazer",
+        "number": "91",
+        "rarity": "R"
+      },
+      {
+        "name": "Searslicer Goblin",
+        "number": "93",
+        "rarity": "R"
+      },
+      {
+        "name": "Loot, Exuberant Explorer",
+        "number": "106",
+        "rarity": "R"
+      },
+      {
+        "name": "Mossborn Hydra",
+        "number": "107",
+        "rarity": "R"
+      },
+      {
+        "name": "Preposterous Proportions",
+        "number": "109",
+        "rarity": "R"
+      },
+      {
+        "name": "Spinner of Souls",
+        "number": "112",
+        "rarity": "R"
+      },
+      {
+        "name": "Sylvan Scavenging",
+        "number": "113",
+        "rarity": "R"
+      },
+      {
+        "name": "Alesha, Who Laughs at Fate",
+        "number": "115",
+        "rarity": "R"
+      },
+      {
+        "name": "Anthem of Champions",
+        "number": "116",
+        "rarity": "R"
+      },
+      {
+        "name": "Ashroot Animist",
+        "number": "117",
+        "rarity": "R"
+      },
+      {
+        "name": "Elenda, Saint of Dusk",
+        "number": "119",
+        "rarity": "R"
+      },
+      {
+        "name": "Koma, World-Eater",
+        "number": "121",
+        "rarity": "R"
+      },
+      {
+        "name": "Kykar, Zephyr Awakener",
+        "number": "122",
+        "rarity": "R"
+      },
+      {
+        "name": "Banner of Kinship",
+        "number": "127",
+        "rarity": "R"
+      },
+      {
+        "name": "Leyline Axe",
+        "number": "129",
+        "rarity": "R"
+      },
+      {
+        "name": "Scrawling Crawler",
+        "number": "132",
+        "rarity": "R"
+      },
+      {
+        "name": "Soulstone Sanctuary",
+        "number": "133",
+        "rarity": "R"
+      },
+      {
+        "name": "Authority of the Consuls",
+        "number": "137",
+        "rarity": "R"
+      },
+      {
+        "name": "Day of Judgment",
+        "number": "140",
+        "rarity": "R"
+      },
+      {
+        "name": "Giada, Font of Hope",
+        "number": "141",
+        "rarity": "R"
+      },
+      {
+        "name": "Extravagant Replication",
+        "number": "154",
+        "rarity": "R"
+      },
+      {
+        "name": "Time Stop",
+        "number": "166",
+        "rarity": "R"
+      },
+      {
+        "name": "Painful Quandary",
+        "number": "179",
+        "rarity": "R"
+      },
+      {
+        "name": "Phyrexian Arena",
+        "number": "180",
+        "rarity": "R"
+      },
+      {
+        "name": "Rune-Scarred Demon",
+        "number": "184",
+        "rarity": "R"
+      },
+      {
+        "name": "Brass's Bounty",
+        "number": "190",
+        "rarity": "R"
+      },
+      {
+        "name": "Drakuseth, Maw of Flames",
+        "number": "193",
+        "rarity": "R"
+      },
+      {
+        "name": "Etali, Primal Storm",
+        "number": "194",
+        "rarity": "R"
+      },
+      {
+        "name": "Flamewake Phoenix",
+        "number": "198",
+        "rarity": "R"
+      },
+      {
+        "name": "Krenko, Mob Boss",
+        "number": "204",
+        "rarity": "R"
+      },
+      {
+        "name": "Slagstorm",
+        "number": "207",
+        "rarity": "R"
+      },
+      {
+        "name": "Elvish Archdruid",
+        "number": "219",
+        "rarity": "R"
+      },
+      {
+        "name": "Genesis Wave",
+        "number": "221",
+        "rarity": "R"
+      },
+      {
+        "name": "Ghalta, Primal Hunger",
+        "number": "222",
+        "rarity": "R"
+      },
+      {
+        "name": "Scavenging Ooze",
+        "number": "232",
+        "rarity": "R"
+      },
+      {
+        "name": "Consuming Aberration",
+        "number": "238",
+        "rarity": "R"
+      },
+      {
+        "name": "Lathril, Blade of the Elves",
+        "number": "242",
+        "rarity": "R"
+      },
+      {
+        "name": "Swiftblade Vindicator",
+        "number": "246",
+        "rarity": "R"
+      },
+      {
+        "name": "Thousand-Year Storm",
+        "number": "248",
+        "rarity": "R"
+      },
+      {
+        "name": "Solemn Simulacrum",
+        "number": "257",
+        "rarity": "R"
+      }
+    ],
+    "uncommon": [
+      {
+        "name": "Cat Collector",
+        "number": "4",
+        "rarity": "U"
+      },
+      {
+        "name": "Claws Out",
+        "number": "6",
+        "rarity": "U"
+      },
+      {
+        "name": "Dauntless Veteran",
+        "number": "8",
+        "rarity": "U"
+      },
+      {
+        "name": "Divine Resilience",
+        "number": "10",
+        "rarity": "U"
+      },
+      {
+        "name": "Guarded Heir",
+        "number": "14",
+        "rarity": "U"
+      },
+      {
+        "name": "Joust Through",
+        "number": "19",
+        "rarity": "U"
+      },
+      {
+        "name": "Sun-Blessed Healer",
+        "number": "25",
+        "rarity": "U"
+      },
+      {
+        "name": "Twinblade Blessing",
+        "number": "26",
+        "rarity": "U"
+      },
+      {
+        "name": "Arcane Epiphany",
+        "number": "29",
+        "rarity": "U"
+      },
+      {
+        "name": "Cephalid Inkmage",
+        "number": "32",
+        "rarity": "U"
+      },
+      {
+        "name": "Clinquant Skymage",
+        "number": "33",
+        "rarity": "U"
+      },
+      {
+        "name": "Faebloom Trick",
+        "number": "38",
+        "rarity": "U"
+      },
+      {
+        "name": "Grappling Kraken",
+        "number": "39",
+        "rarity": "U"
+      },
+      {
+        "name": "Inspiration from Beyond",
+        "number": "43",
+        "rarity": "U"
+      },
+      {
+        "name": "Mischievous Mystic",
+        "number": "47",
+        "rarity": "U"
+      },
+      {
+        "name": "Rune-Sealed Wall",
+        "number": "49",
+        "rarity": "U"
+      },
+      {
+        "name": "Skyship Buccaneer",
+        "number": "50",
+        "rarity": "U"
+      },
+      {
+        "name": "Arbiter of Woe",
+        "number": "55",
+        "rarity": "U"
+      },
+      {
+        "name": "Billowing Shriekmass",
+        "number": "56",
+        "rarity": "U"
+      },
+      {
+        "name": "Infernal Vessel",
+        "number": "63",
+        "rarity": "U"
+      },
+      {
+        "name": "Midnight Snack",
+        "number": "65",
+        "rarity": "U"
+      },
+      {
+        "name": "Revenge of the Rats",
+        "number": "67",
+        "rarity": "U"
+      },
+      {
+        "name": "Seeker's Folly",
+        "number": "69",
+        "rarity": "U"
+      },
+      {
+        "name": "Tragic Banshee",
+        "number": "73",
+        "rarity": "U"
+      },
+      {
+        "name": "Vampire Gourmand",
+        "number": "74",
+        "rarity": "U"
+      },
+      {
+        "name": "Vengeful Bloodwitch",
+        "number": "76",
+        "rarity": "U"
+      },
+      {
+        "name": "Battlesong Berserker",
+        "number": "78",
+        "rarity": "U"
+      },
+      {
+        "name": "Boltwave",
+        "number": "79",
+        "rarity": "U"
+      },
+      {
+        "name": "Bulk Up",
+        "number": "80",
+        "rarity": "U"
+      },
+      {
+        "name": "Dragon Trainer",
+        "number": "84",
+        "rarity": "U"
+      },
+      {
+        "name": "Fiery Annihilation",
+        "number": "86",
+        "rarity": "U"
+      },
+      {
+        "name": "Goblin Negotiation",
+        "number": "88",
+        "rarity": "U"
+      },
+      {
+        "name": "Slumbering Cerberus",
+        "number": "94",
+        "rarity": "U"
+      },
+      {
+        "name": "Strongbox Raider",
+        "number": "96",
+        "rarity": "U"
+      },
+      {
+        "name": "Eager Trufflesnout",
+        "number": "102",
+        "rarity": "U"
+      },
+      {
+        "name": "Elvish Regrower",
+        "number": "104",
+        "rarity": "U"
+      },
+      {
+        "name": "Felling Blow",
+        "number": "105",
+        "rarity": "U"
+      },
+      {
+        "name": "Needletooth Pack",
+        "number": "108",
+        "rarity": "U"
+      },
+      {
+        "name": "Quakestrider Ceratops",
+        "number": "110",
+        "rarity": "U"
+      },
+      {
+        "name": "Dreadwing Scavenger",
+        "number": "118",
+        "rarity": "U"
+      },
+      {
+        "name": "Fiendish Panda",
+        "number": "120",
+        "rarity": "U"
+      },
+      {
+        "name": "Perforating Artist",
+        "number": "124",
+        "rarity": "U"
+      },
+      {
+        "name": "Wardens of the Cycle",
+        "number": "125",
+        "rarity": "U"
+      },
+      {
+        "name": "Fishing Pole",
+        "number": "128",
+        "rarity": "U"
+      },
+      {
+        "name": "Ravenous Amulet",
+        "number": "131",
+        "rarity": "U"
+      },
+      {
+        "name": "Ajani's Pridemate",
+        "number": "135",
+        "rarity": "U"
+      },
+      {
+        "name": "Angel of Finality",
+        "number": "136",
+        "rarity": "U"
+      },
+      {
+        "name": "Mischievous Pup",
+        "number": "144",
+        "rarity": "U"
+      },
+      {
+        "name": "Resolute Reinforcements",
+        "number": "145",
+        "rarity": "U"
+      },
+      {
+        "name": "Savannah Lions",
+        "number": "146",
+        "rarity": "U"
+      },
+      {
+        "name": "Serra Angel",
+        "number": "147",
+        "rarity": "U"
+      },
+      {
+        "name": "Stroke of Midnight",
+        "number": "148",
+        "rarity": "U"
+      },
+      {
+        "name": "Youthful Valkyrie",
+        "number": "149",
+        "rarity": "U"
+      },
+      {
+        "name": "Aetherize",
+        "number": "151",
+        "rarity": "U"
+      },
+      {
+        "name": "Brineborn Cutthroat",
+        "number": "152",
+        "rarity": "U"
+      },
+      {
+        "name": "Essence Scatter",
+        "number": "153",
+        "rarity": "U"
+      },
+      {
+        "name": "Imprisoned in the Moon",
+        "number": "156",
+        "rarity": "U"
+      },
+      {
+        "name": "Micromancer",
+        "number": "158",
+        "rarity": "U"
+      },
+      {
+        "name": "An Offer You Can't Refuse",
+        "number": "160",
+        "rarity": "U"
+      },
+      {
+        "name": "Self-Reflection",
+        "number": "163",
+        "rarity": "U"
+      },
+      {
+        "name": "Spectral Sailor",
+        "number": "164",
+        "rarity": "U"
+      },
+      {
+        "name": "Diregraf Ghoul",
+        "number": "171",
+        "rarity": "U"
+      },
+      {
+        "name": "Exsanguinate",
+        "number": "173",
+        "rarity": "U"
+      },
+      {
+        "name": "Hero's Downfall",
+        "number": "175",
+        "rarity": "U"
+      },
+      {
+        "name": "Reassembling Skeleton",
+        "number": "182",
+        "rarity": "U"
+      },
+      {
+        "name": "Stromkirk Bloodthief",
+        "number": "185",
+        "rarity": "U"
+      },
+      {
+        "name": "Vampire Nighthawk",
+        "number": "186",
+        "rarity": "U"
+      },
+      {
+        "name": "Zombify",
+        "number": "187",
+        "rarity": "U"
+      },
+      {
+        "name": "Abrade",
+        "number": "188",
+        "rarity": "U"
+      },
+      {
+        "name": "Brazen Scourge",
+        "number": "191",
+        "rarity": "U"
+      },
+      {
+        "name": "Firespitter Whelp",
+        "number": "197",
+        "rarity": "U"
+      },
+      {
+        "name": "Frenzied Goblin",
+        "number": "199",
+        "rarity": "U"
+      },
+      {
+        "name": "Heartfire Immolator",
+        "number": "201",
+        "rarity": "U"
+      },
+      {
+        "name": "Hidetsugu's Second Rite",
+        "number": "202",
+        "rarity": "U"
+      },
+      {
+        "name": "Seismic Rupture",
+        "number": "205",
+        "rarity": "U"
+      },
+      {
+        "name": "Shivan Dragon",
+        "number": "206",
+        "rarity": "U"
+      },
+      {
+        "name": "Affectionate Indrik",
+        "number": "211",
+        "rarity": "U"
+      },
+      {
+        "name": "Blanchwood Armor",
+        "number": "213",
+        "rarity": "U"
+      },
+      {
+        "name": "Dwynen, Gilt-Leaf Daen",
+        "number": "217",
+        "rarity": "U"
+      },
+      {
+        "name": "Garruk's Uprising",
+        "number": "220",
+        "rarity": "U"
+      },
+      {
+        "name": "Inspiring Call",
+        "number": "226",
+        "rarity": "U"
+      },
+      {
+        "name": "Mild-Mannered Librarian",
+        "number": "228",
+        "rarity": "U"
+      },
+      {
+        "name": "Nessian Hornbeetle",
+        "number": "229",
+        "rarity": "U"
+      },
+      {
+        "name": "Overrun",
+        "number": "230",
+        "rarity": "U"
+      },
+      {
+        "name": "Reclamation Sage",
+        "number": "231",
+        "rarity": "U"
+      },
+      {
+        "name": "Snakeskin Veil",
+        "number": "233",
+        "rarity": "U"
+      },
+      {
+        "name": "Wildwood Scourge",
+        "number": "236",
+        "rarity": "U"
+      },
+      {
+        "name": "Balmor, Battlemage Captain",
+        "number": "237",
+        "rarity": "U"
+      },
+      {
+        "name": "Empyrean Eagle",
+        "number": "239",
+        "rarity": "U"
+      },
+      {
+        "name": "Good-Fortune Unicorn",
+        "number": "240",
+        "rarity": "U"
+      },
+      {
+        "name": "Heroic Reinforcements",
+        "number": "241",
+        "rarity": "U"
+      },
+      {
+        "name": "Ruby, Daring Tracker",
+        "number": "245",
+        "rarity": "U"
+      },
+      {
+        "name": "Tatyova, Benthic Druid",
+        "number": "247",
+        "rarity": "U"
+      },
+      {
+        "name": "Adventuring Gear",
+        "number": "249",
+        "rarity": "U"
+      },
+      {
+        "name": "Burnished Hart",
+        "number": "250",
+        "rarity": "U"
+      },
+      {
+        "name": "Heraldic Banner",
+        "number": "254",
+        "rarity": "U"
+      },
+      {
+        "name": "Juggernaut",
+        "number": "255",
+        "rarity": "U"
+      },
+      {
+        "name": "Meteor Golem",
+        "number": "256",
+        "rarity": "U"
+      },
+      {
+        "name": "Swiftfoot Boots",
+        "number": "258",
+        "rarity": "U"
+      },
+      {
+        "name": "Rogue's Passage",
+        "number": "264",
+        "rarity": "U"
+      },
+      {
+        "name": "Secluded Courtyard",
+        "number": "267",
+        "rarity": "U"
+      }
+    ]
+  },
+  "slots": [
+    {
+      "sheet": "common",
+      "count": 7,
+      "balance_colours": true
+    },
+    {
+      "sheet": "uncommon",
+      "count": 3
+    },
+    {
+      "count": 1,
+      "rare_mythic": {
+        "rare_weight": 2,
+        "mythic_weight": 1
+      }
+    },
+    {
+      "sheet": "land",
+      "count": 1
+    },
+    {
+      "count": 2,
+      "wildcard": {
+        "common": 0.571,
+        "uncommon": 0.417,
+        "rare_mythic": 0.012
+      }
+    }
+  ],
+  "source": "compliance/manifests/FDN.json (XMage-derived, MIT) + gorge header"
+}

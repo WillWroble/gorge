@@ -1,0 +1,1374 @@
+{
+  "code": "BLB",
+  "name": "Bloomburrow",
+  "pack_size": 14,
+  "main_max": 261,
+  "sheets": {
+    "common": [
+      {
+        "name": "Banishing Light",
+        "number": "1",
+        "rarity": "C"
+      },
+      {
+        "name": "Brave-Kin Duo",
+        "number": "3",
+        "rarity": "C"
+      },
+      {
+        "name": "Carrot Cake",
+        "number": "7",
+        "rarity": "C"
+      },
+      {
+        "name": "Crumb and Get It",
+        "number": "8",
+        "rarity": "C"
+      },
+      {
+        "name": "Intrepid Rabbit",
+        "number": "17",
+        "rarity": "C"
+      },
+      {
+        "name": "Lifecreed Duo",
+        "number": "20",
+        "rarity": "C"
+      },
+      {
+        "name": "Nettle Guard",
+        "number": "23",
+        "rarity": "C"
+      },
+      {
+        "name": "Pileated Provisioner",
+        "number": "25",
+        "rarity": "C"
+      },
+      {
+        "name": "Rabbit Response",
+        "number": "26",
+        "rarity": "C"
+      },
+      {
+        "name": "Sonar Strike",
+        "number": "32",
+        "rarity": "C"
+      },
+      {
+        "name": "Thistledown Players",
+        "number": "35",
+        "rarity": "C"
+      },
+      {
+        "name": "Warren Elder",
+        "number": "37",
+        "rarity": "C"
+      },
+      {
+        "name": "Wax-Wane Witness",
+        "number": "39",
+        "rarity": "C"
+      },
+      {
+        "name": "Bellowing Crier",
+        "number": "42",
+        "rarity": "C"
+      },
+      {
+        "name": "Dazzling Denial",
+        "number": "45",
+        "rarity": "C"
+      },
+      {
+        "name": "Dire Downdraft",
+        "number": "46",
+        "rarity": "C"
+      },
+      {
+        "name": "Finch Formation",
+        "number": "50",
+        "rarity": "C"
+      },
+      {
+        "name": "Lightshell Duo",
+        "number": "56",
+        "rarity": "C"
+      },
+      {
+        "name": "Mind Spiral",
+        "number": "59",
+        "rarity": "C"
+      },
+      {
+        "name": "Nightwhorl Hermit",
+        "number": "62",
+        "rarity": "C"
+      },
+      {
+        "name": "Pearl of Wisdom",
+        "number": "64",
+        "rarity": "C"
+      },
+      {
+        "name": "Run Away Together",
+        "number": "67",
+        "rarity": "C"
+      },
+      {
+        "name": "Shore Up",
+        "number": "69",
+        "rarity": "C"
+      },
+      {
+        "name": "Skyskipper Duo",
+        "number": "71",
+        "rarity": "C"
+      },
+      {
+        "name": "Thought Shucker",
+        "number": "77",
+        "rarity": "C"
+      },
+      {
+        "name": "Waterspout Warden",
+        "number": "80",
+        "rarity": "C"
+      },
+      {
+        "name": "Agate-Blade Assassin",
+        "number": "82",
+        "rarity": "C"
+      },
+      {
+        "name": "Bonebind Orator",
+        "number": "84",
+        "rarity": "C"
+      },
+      {
+        "name": "Daggerfang Duo",
+        "number": "89",
+        "rarity": "C"
+      },
+      {
+        "name": "Diresight",
+        "number": "91",
+        "rarity": "C"
+      },
+      {
+        "name": "Early Winter",
+        "number": "93",
+        "rarity": "C"
+      },
+      {
+        "name": "Glidedive Duo",
+        "number": "96",
+        "rarity": "C"
+      },
+      {
+        "name": "Nocturnal Hunger",
+        "number": "102",
+        "rarity": "C"
+      },
+      {
+        "name": "Psychic Whorl",
+        "number": "105",
+        "rarity": "C"
+      },
+      {
+        "name": "Ravine Raider",
+        "number": "106",
+        "rarity": "C"
+      },
+      {
+        "name": "Savor",
+        "number": "109",
+        "rarity": "C"
+      },
+      {
+        "name": "Scales of Shale",
+        "number": "110",
+        "rarity": "C"
+      },
+      {
+        "name": "Starlit Soothsayer",
+        "number": "115",
+        "rarity": "C"
+      },
+      {
+        "name": "Thornplate Intimidator",
+        "number": "117",
+        "rarity": "C"
+      },
+      {
+        "name": "Agate Assault",
+        "number": "122",
+        "rarity": "C"
+      },
+      {
+        "name": "Alania's Pathmaker",
+        "number": "123",
+        "rarity": "C"
+      },
+      {
+        "name": "Conduct Electricity",
+        "number": "130",
+        "rarity": "C"
+      },
+      {
+        "name": "Frilled Sparkshooter",
+        "number": "136",
+        "rarity": "C"
+      },
+      {
+        "name": "Kindlespark Duo",
+        "number": "142",
+        "rarity": "C"
+      },
+      {
+        "name": "Might of the Meek",
+        "number": "144",
+        "rarity": "C"
+      },
+      {
+        "name": "Raccoon Rallier",
+        "number": "148",
+        "rarity": "C"
+      },
+      {
+        "name": "Roughshod Duo",
+        "number": "150",
+        "rarity": "C"
+      },
+      {
+        "name": "Sazacap's Brew",
+        "number": "151",
+        "rarity": "C"
+      },
+      {
+        "name": "Steampath Charger",
+        "number": "153",
+        "rarity": "C"
+      },
+      {
+        "name": "Take Out the Trash",
+        "number": "156",
+        "rarity": "C"
+      },
+      {
+        "name": "War Squeak",
+        "number": "160",
+        "rarity": "C"
+      },
+      {
+        "name": "Whiskerquill Scribe",
+        "number": "161",
+        "rarity": "C"
+      },
+      {
+        "name": "Bakersbane Duo",
+        "number": "163",
+        "rarity": "C"
+      },
+      {
+        "name": "Cache Grab",
+        "number": "167",
+        "rarity": "C"
+      },
+      {
+        "name": "Druid of the Spade",
+        "number": "170",
+        "rarity": "C"
+      },
+      {
+        "name": "Heaped Harvest",
+        "number": "175",
+        "rarity": "C"
+      },
+      {
+        "name": "High Stride",
+        "number": "176",
+        "rarity": "C"
+      },
+      {
+        "name": "Longstalk Brawl",
+        "number": "182",
+        "rarity": "C"
+      },
+      {
+        "name": "Polliwallop",
+        "number": "189",
+        "rarity": "C"
+      },
+      {
+        "name": "Rust-Shield Rampager",
+        "number": "190",
+        "rarity": "C"
+      },
+      {
+        "name": "Stickytongue Sentinel",
+        "number": "193",
+        "rarity": "C"
+      },
+      {
+        "name": "Sunshower Druid",
+        "number": "195",
+        "rarity": "C"
+      },
+      {
+        "name": "Three Tree Rootweaver",
+        "number": "198",
+        "rarity": "C"
+      },
+      {
+        "name": "Treeguard Duo",
+        "number": "200",
+        "rarity": "C"
+      },
+      {
+        "name": "Treetop Sentries",
+        "number": "201",
+        "rarity": "C"
+      },
+      {
+        "name": "Cindering Cutthroat",
+        "number": "208",
+        "rarity": "C"
+      },
+      {
+        "name": "Corpseberry Cultivator",
+        "number": "210",
+        "rarity": "C"
+      },
+      {
+        "name": "Head of the Homestead",
+        "number": "216",
+        "rarity": "C"
+      },
+      {
+        "name": "Junkblade Bruiser",
+        "number": "220",
+        "rarity": "C"
+      },
+      {
+        "name": "Mind Drill Assailant",
+        "number": "225",
+        "rarity": "C"
+      },
+      {
+        "name": "Moonrise Cleric",
+        "number": "226",
+        "rarity": "C"
+      },
+      {
+        "name": "Pond Prophet",
+        "number": "229",
+        "rarity": "C"
+      },
+      {
+        "name": "Seedpod Squire",
+        "number": "232",
+        "rarity": "C"
+      },
+      {
+        "name": "Tempest Angler",
+        "number": "235",
+        "rarity": "C"
+      },
+      {
+        "name": "Veteran Guardmouse",
+        "number": "237",
+        "rarity": "C"
+      },
+      {
+        "name": "Barkform Harvester",
+        "number": "243",
+        "rarity": "C"
+      },
+      {
+        "name": "Bumbleflower's Sharepot",
+        "number": "244",
+        "rarity": "C"
+      },
+      {
+        "name": "Fountainport Bell",
+        "number": "245",
+        "rarity": "C"
+      },
+      {
+        "name": "Three Tree Mascot",
+        "number": "251",
+        "rarity": "C"
+      },
+      {
+        "name": "Hidden Grotto",
+        "number": "254",
+        "rarity": "C"
+      },
+      {
+        "name": "Uncharted Haven",
+        "number": "261",
+        "rarity": "C"
+      }
+    ],
+    "land": [
+      {
+        "name": "Plains",
+        "number": "262",
+        "rarity": "L"
+      },
+      {
+        "name": "Island",
+        "number": "266",
+        "rarity": "L"
+      },
+      {
+        "name": "Swamp",
+        "number": "270",
+        "rarity": "L"
+      },
+      {
+        "name": "Mountain",
+        "number": "274",
+        "rarity": "L"
+      },
+      {
+        "name": "Forest",
+        "number": "278",
+        "rarity": "L"
+      }
+    ],
+    "mythic": [
+      {
+        "name": "Beza, the Bounding Spring",
+        "number": "2",
+        "rarity": "M"
+      },
+      {
+        "name": "Season of the Burrow",
+        "number": "29",
+        "rarity": "M"
+      },
+      {
+        "name": "Warren Warleader",
+        "number": "38",
+        "rarity": "M"
+      },
+      {
+        "name": "Eluge, the Shoreless Sea",
+        "number": "49",
+        "rarity": "M"
+      },
+      {
+        "name": "Kitsa, Otterball Elite",
+        "number": "54",
+        "rarity": "M"
+      },
+      {
+        "name": "Season of Weaving",
+        "number": "68",
+        "rarity": "M"
+      },
+      {
+        "name": "Maha, Its Feathers Night",
+        "number": "100",
+        "rarity": "M"
+      },
+      {
+        "name": "Rottenmouth Viper",
+        "number": "107",
+        "rarity": "M"
+      },
+      {
+        "name": "Season of Loss",
+        "number": "112",
+        "rarity": "M"
+      },
+      {
+        "name": "Dragonhawk, Fate's Tempest",
+        "number": "132",
+        "rarity": "M"
+      },
+      {
+        "name": "Season of the Bold",
+        "number": "152",
+        "rarity": "M"
+      },
+      {
+        "name": "Stormsplitter",
+        "number": "154",
+        "rarity": "M"
+      },
+      {
+        "name": "Lumra, Bellow of the Woods",
+        "number": "183",
+        "rarity": "M"
+      },
+      {
+        "name": "Season of Gathering",
+        "number": "192",
+        "rarity": "M"
+      },
+      {
+        "name": "Glarb, Calamity's Augur",
+        "number": "215",
+        "rarity": "M"
+      },
+      {
+        "name": "Helga, Skittish Seer",
+        "number": "217",
+        "rarity": "M"
+      },
+      {
+        "name": "Hugs, Grisly Guardian",
+        "number": "218",
+        "rarity": "M"
+      },
+      {
+        "name": "The Infamous Cruelclaw",
+        "number": "219",
+        "rarity": "M"
+      },
+      {
+        "name": "Ral, Crackling Wit",
+        "number": "230",
+        "rarity": "M"
+      },
+      {
+        "name": "Ygra, Eater of All",
+        "number": "241",
+        "rarity": "M"
+      }
+    ],
+    "rare": [
+      {
+        "name": "Caretaker's Talent",
+        "number": "6",
+        "rarity": "R"
+      },
+      {
+        "name": "Dawn's Truce",
+        "number": "9",
+        "rarity": "R"
+      },
+      {
+        "name": "Essence Channeler",
+        "number": "12",
+        "rarity": "R"
+      },
+      {
+        "name": "Jackdaw Savior",
+        "number": "18",
+        "rarity": "R"
+      },
+      {
+        "name": "Salvation Swan",
+        "number": "28",
+        "rarity": "R"
+      },
+      {
+        "name": "Starfall Invocation",
+        "number": "34",
+        "rarity": "R"
+      },
+      {
+        "name": "Valley Questcaller",
+        "number": "36",
+        "rarity": "R"
+      },
+      {
+        "name": "Whiskervale Forerunner",
+        "number": "40",
+        "rarity": "R"
+      },
+      {
+        "name": "Azure Beastbinder",
+        "number": "41",
+        "rarity": "R"
+      },
+      {
+        "name": "Dour Port-Mage",
+        "number": "47",
+        "rarity": "R"
+      },
+      {
+        "name": "Kitnap",
+        "number": "53",
+        "rarity": "R"
+      },
+      {
+        "name": "Mockingbird",
+        "number": "61",
+        "rarity": "R"
+      },
+      {
+        "name": "Portent of Calamity",
+        "number": "66",
+        "rarity": "R"
+      },
+      {
+        "name": "Stormchaser's Talent",
+        "number": "75",
+        "rarity": "R"
+      },
+      {
+        "name": "Thundertrap Trainer",
+        "number": "78",
+        "rarity": "R"
+      },
+      {
+        "name": "Valley Floodcaller",
+        "number": "79",
+        "rarity": "R"
+      },
+      {
+        "name": "Wishing Well",
+        "number": "81",
+        "rarity": "R"
+      },
+      {
+        "name": "Coiling Rebirth",
+        "number": "86",
+        "rarity": "R"
+      },
+      {
+        "name": "Cruelclaw's Heist",
+        "number": "88",
+        "rarity": "R"
+      },
+      {
+        "name": "Darkstar Augur",
+        "number": "90",
+        "rarity": "R"
+      },
+      {
+        "name": "Iridescent Vinelasher",
+        "number": "99",
+        "rarity": "R"
+      },
+      {
+        "name": "Osteomancer Adept",
+        "number": "103",
+        "rarity": "R"
+      },
+      {
+        "name": "Scavenger's Talent",
+        "number": "111",
+        "rarity": "R"
+      },
+      {
+        "name": "Valley Rotcaller",
+        "number": "119",
+        "rarity": "R"
+      },
+      {
+        "name": "Wick, the Whorled Mind",
+        "number": "120",
+        "rarity": "R"
+      },
+      {
+        "name": "Artist's Talent",
+        "number": "124",
+        "rarity": "R"
+      },
+      {
+        "name": "Byway Barterer",
+        "number": "129",
+        "rarity": "R"
+      },
+      {
+        "name": "Emberheart Challenger",
+        "number": "133",
+        "rarity": "R"
+      },
+      {
+        "name": "Festival of Embers",
+        "number": "134",
+        "rarity": "R"
+      },
+      {
+        "name": "Hearthborn Battler",
+        "number": "139",
+        "rarity": "R"
+      },
+      {
+        "name": "Hired Claw",
+        "number": "140",
+        "rarity": "R"
+      },
+      {
+        "name": "Manifold Mouse",
+        "number": "143",
+        "rarity": "R"
+      },
+      {
+        "name": "Sunspine Lynx",
+        "number": "155",
+        "rarity": "R"
+      },
+      {
+        "name": "Valley Flamecaller",
+        "number": "158",
+        "rarity": "R"
+      },
+      {
+        "name": "Fecund Greenshell",
+        "number": "171",
+        "rarity": "R"
+      },
+      {
+        "name": "For the Common Good",
+        "number": "172",
+        "rarity": "R"
+      },
+      {
+        "name": "Innkeeper's Talent",
+        "number": "180",
+        "rarity": "R"
+      },
+      {
+        "name": "Keen-Eyed Curator",
+        "number": "181",
+        "rarity": "R"
+      },
+      {
+        "name": "Mistbreath Elder",
+        "number": "184",
+        "rarity": "R"
+      },
+      {
+        "name": "Pawpatch Recruit",
+        "number": "187",
+        "rarity": "R"
+      },
+      {
+        "name": "Scrapshooter",
+        "number": "191",
+        "rarity": "R"
+      },
+      {
+        "name": "Tender Wildguide",
+        "number": "196",
+        "rarity": "R"
+      },
+      {
+        "name": "Thornvault Forager",
+        "number": "197",
+        "rarity": "R"
+      },
+      {
+        "name": "Valley Mightcaller",
+        "number": "202",
+        "rarity": "R"
+      },
+      {
+        "name": "Alania, Divergent Storm",
+        "number": "204",
+        "rarity": "R"
+      },
+      {
+        "name": "Baylen, the Haymaker",
+        "number": "205",
+        "rarity": "R"
+      },
+      {
+        "name": "Camellia, the Seedmiser",
+        "number": "207",
+        "rarity": "R"
+      },
+      {
+        "name": "Clement, the Worrywort",
+        "number": "209",
+        "rarity": "R"
+      },
+      {
+        "name": "Dreamdew Entrancer",
+        "number": "211",
+        "rarity": "R"
+      },
+      {
+        "name": "Finneas, Ace Archer",
+        "number": "212",
+        "rarity": "R"
+      },
+      {
+        "name": "Gev, Scaled Scorch",
+        "number": "214",
+        "rarity": "R"
+      },
+      {
+        "name": "Kastral, the Windcrested",
+        "number": "221",
+        "rarity": "R"
+      },
+      {
+        "name": "Lunar Convocation",
+        "number": "223",
+        "rarity": "R"
+      },
+      {
+        "name": "Mabel, Heir to Cragflame",
+        "number": "224",
+        "rarity": "R"
+      },
+      {
+        "name": "Muerra, Trash Tactician",
+        "number": "227",
+        "rarity": "R"
+      },
+      {
+        "name": "Vren, the Relentless",
+        "number": "239",
+        "rarity": "R"
+      },
+      {
+        "name": "Zoraline, Cosmos Caller",
+        "number": "242",
+        "rarity": "R"
+      },
+      {
+        "name": "Fabled Passage",
+        "number": "252",
+        "rarity": "R"
+      },
+      {
+        "name": "Fountainport",
+        "number": "253",
+        "rarity": "R"
+      },
+      {
+        "name": "Three Tree City",
+        "number": "260",
+        "rarity": "R"
+      }
+    ],
+    "uncommon": [
+      {
+        "name": "Brightblade Stoat",
+        "number": "4",
+        "rarity": "U"
+      },
+      {
+        "name": "Builder's Talent",
+        "number": "5",
+        "rarity": "U"
+      },
+      {
+        "name": "Dewdrop Cure",
+        "number": "10",
+        "rarity": "U"
+      },
+      {
+        "name": "Driftgloom Coyote",
+        "number": "11",
+        "rarity": "U"
+      },
+      {
+        "name": "Feather of Flight",
+        "number": "13",
+        "rarity": "U"
+      },
+      {
+        "name": "Flowerfoot Swordmaster",
+        "number": "14",
+        "rarity": "U"
+      },
+      {
+        "name": "Harvestrite Host",
+        "number": "15",
+        "rarity": "U"
+      },
+      {
+        "name": "Hop to It",
+        "number": "16",
+        "rarity": "U"
+      },
+      {
+        "name": "Jolly Gerbils",
+        "number": "19",
+        "rarity": "U"
+      },
+      {
+        "name": "Mabel's Mettle",
+        "number": "21",
+        "rarity": "U"
+      },
+      {
+        "name": "Mouse Trapper",
+        "number": "22",
+        "rarity": "U"
+      },
+      {
+        "name": "Parting Gust",
+        "number": "24",
+        "rarity": "U"
+      },
+      {
+        "name": "Repel Calamity",
+        "number": "27",
+        "rarity": "U"
+      },
+      {
+        "name": "Seasoned Warrenguard",
+        "number": "30",
+        "rarity": "U"
+      },
+      {
+        "name": "Shrike Force",
+        "number": "31",
+        "rarity": "U"
+      },
+      {
+        "name": "Star Charter",
+        "number": "33",
+        "rarity": "U"
+      },
+      {
+        "name": "Calamitous Tide",
+        "number": "43",
+        "rarity": "U"
+      },
+      {
+        "name": "Daring Waverider",
+        "number": "44",
+        "rarity": "U"
+      },
+      {
+        "name": "Eddymurk Crab",
+        "number": "48",
+        "rarity": "U"
+      },
+      {
+        "name": "Gossip's Talent",
+        "number": "51",
+        "rarity": "U"
+      },
+      {
+        "name": "Into the Flood Maw",
+        "number": "52",
+        "rarity": "U"
+      },
+      {
+        "name": "Knightfisher",
+        "number": "55",
+        "rarity": "U"
+      },
+      {
+        "name": "Long River Lurker",
+        "number": "57",
+        "rarity": "U"
+      },
+      {
+        "name": "Long River's Pull",
+        "number": "58",
+        "rarity": "U"
+      },
+      {
+        "name": "Mindwhisker",
+        "number": "60",
+        "rarity": "U"
+      },
+      {
+        "name": "Otterball Antics",
+        "number": "63",
+        "rarity": "U"
+      },
+      {
+        "name": "Plumecreed Escort",
+        "number": "65",
+        "rarity": "U"
+      },
+      {
+        "name": "Shoreline Looter",
+        "number": "70",
+        "rarity": "U"
+      },
+      {
+        "name": "Spellgyre",
+        "number": "72",
+        "rarity": "U"
+      },
+      {
+        "name": "Splash Lasher",
+        "number": "73",
+        "rarity": "U"
+      },
+      {
+        "name": "Splash Portal",
+        "number": "74",
+        "rarity": "U"
+      },
+      {
+        "name": "Sugar Coat",
+        "number": "76",
+        "rarity": "U"
+      },
+      {
+        "name": "Bandit's Talent",
+        "number": "83",
+        "rarity": "U"
+      },
+      {
+        "name": "Bonecache Overseer",
+        "number": "85",
+        "rarity": "U"
+      },
+      {
+        "name": "Consumed by Greed",
+        "number": "87",
+        "rarity": "U"
+      },
+      {
+        "name": "Downwind Ambusher",
+        "number": "92",
+        "rarity": "U"
+      },
+      {
+        "name": "Feed the Cycle",
+        "number": "94",
+        "rarity": "U"
+      },
+      {
+        "name": "Fell",
+        "number": "95",
+        "rarity": "U"
+      },
+      {
+        "name": "Hazel's Nocturne",
+        "number": "97",
+        "rarity": "U"
+      },
+      {
+        "name": "Huskburster Swarm",
+        "number": "98",
+        "rarity": "U"
+      },
+      {
+        "name": "Moonstone Harbinger",
+        "number": "101",
+        "rarity": "U"
+      },
+      {
+        "name": "Persistent Marshstalker",
+        "number": "104",
+        "rarity": "U"
+      },
+      {
+        "name": "Ruthless Negotiation",
+        "number": "108",
+        "rarity": "U"
+      },
+      {
+        "name": "Sinister Monolith",
+        "number": "113",
+        "rarity": "U"
+      },
+      {
+        "name": "Stargaze",
+        "number": "114",
+        "rarity": "U"
+      },
+      {
+        "name": "Starscape Cleric",
+        "number": "116",
+        "rarity": "U"
+      },
+      {
+        "name": "Thought-Stalker Warlock",
+        "number": "118",
+        "rarity": "U"
+      },
+      {
+        "name": "Wick's Patrol",
+        "number": "121",
+        "rarity": "U"
+      },
+      {
+        "name": "Blacksmith's Talent",
+        "number": "125",
+        "rarity": "U"
+      },
+      {
+        "name": "Blooming Blast",
+        "number": "126",
+        "rarity": "U"
+      },
+      {
+        "name": "Brambleguard Captain",
+        "number": "127",
+        "rarity": "U"
+      },
+      {
+        "name": "Brazen Collector",
+        "number": "128",
+        "rarity": "U"
+      },
+      {
+        "name": "Coruscation Mage",
+        "number": "131",
+        "rarity": "U"
+      },
+      {
+        "name": "Flamecache Gecko",
+        "number": "135",
+        "rarity": "U"
+      },
+      {
+        "name": "Harnesser of Storms",
+        "number": "137",
+        "rarity": "U"
+      },
+      {
+        "name": "Heartfire Hero",
+        "number": "138",
+        "rarity": "U"
+      },
+      {
+        "name": "Hoarder's Overflow",
+        "number": "141",
+        "rarity": "U"
+      },
+      {
+        "name": "Playful Shove",
+        "number": "145",
+        "rarity": "U"
+      },
+      {
+        "name": "Quaketusk Boar",
+        "number": "146",
+        "rarity": "U"
+      },
+      {
+        "name": "Rabid Gnaw",
+        "number": "147",
+        "rarity": "U"
+      },
+      {
+        "name": "Reptilian Recruiter",
+        "number": "149",
+        "rarity": "U"
+      },
+      {
+        "name": "Teapot Slinger",
+        "number": "157",
+        "rarity": "U"
+      },
+      {
+        "name": "Valley Rally",
+        "number": "159",
+        "rarity": "U"
+      },
+      {
+        "name": "Wildfire Howl",
+        "number": "162",
+        "rarity": "U"
+      },
+      {
+        "name": "Bark-Knuckle Boxer",
+        "number": "164",
+        "rarity": "U"
+      },
+      {
+        "name": "Brambleguard Veteran",
+        "number": "165",
+        "rarity": "U"
+      },
+      {
+        "name": "Bushy Bodyguard",
+        "number": "166",
+        "rarity": "U"
+      },
+      {
+        "name": "Clifftop Lookout",
+        "number": "168",
+        "rarity": "U"
+      },
+      {
+        "name": "Curious Forager",
+        "number": "169",
+        "rarity": "U"
+      },
+      {
+        "name": "Galewind Moose",
+        "number": "173",
+        "rarity": "U"
+      },
+      {
+        "name": "Hazardroot Herbalist",
+        "number": "174",
+        "rarity": "U"
+      },
+      {
+        "name": "Hivespine Wolverine",
+        "number": "177",
+        "rarity": "U"
+      },
+      {
+        "name": "Honored Dreyleader",
+        "number": "178",
+        "rarity": "U"
+      },
+      {
+        "name": "Hunter's Talent",
+        "number": "179",
+        "rarity": "U"
+      },
+      {
+        "name": "Overprotect",
+        "number": "185",
+        "rarity": "U"
+      },
+      {
+        "name": "Pawpatch Formation",
+        "number": "186",
+        "rarity": "U"
+      },
+      {
+        "name": "Peerless Recycling",
+        "number": "188",
+        "rarity": "U"
+      },
+      {
+        "name": "Stocking the Pantry",
+        "number": "194",
+        "rarity": "U"
+      },
+      {
+        "name": "Three Tree Scribe",
+        "number": "199",
+        "rarity": "U"
+      },
+      {
+        "name": "Wear Down",
+        "number": "203",
+        "rarity": "U"
+      },
+      {
+        "name": "Burrowguard Mentor",
+        "number": "206",
+        "rarity": "U"
+      },
+      {
+        "name": "Fireglass Mentor",
+        "number": "213",
+        "rarity": "U"
+      },
+      {
+        "name": "Lilysplash Mentor",
+        "number": "222",
+        "rarity": "U"
+      },
+      {
+        "name": "Plumecreed Mentor",
+        "number": "228",
+        "rarity": "U"
+      },
+      {
+        "name": "Seedglaive Mentor",
+        "number": "231",
+        "rarity": "U"
+      },
+      {
+        "name": "Starseer Mentor",
+        "number": "233",
+        "rarity": "U"
+      },
+      {
+        "name": "Stormcatch Mentor",
+        "number": "234",
+        "rarity": "U"
+      },
+      {
+        "name": "Tidecaller Mentor",
+        "number": "236",
+        "rarity": "U"
+      },
+      {
+        "name": "Vinereap Mentor",
+        "number": "238",
+        "rarity": "U"
+      },
+      {
+        "name": "Wandertale Mentor",
+        "number": "240",
+        "rarity": "U"
+      },
+      {
+        "name": "Patchwork Banner",
+        "number": "247",
+        "rarity": "U"
+      },
+      {
+        "name": "Short Bow",
+        "number": "248",
+        "rarity": "U"
+      },
+      {
+        "name": "Starforged Sword",
+        "number": "249",
+        "rarity": "U"
+      },
+      {
+        "name": "Tangle Tumbler",
+        "number": "250",
+        "rarity": "U"
+      },
+      {
+        "name": "Lilypad Village",
+        "number": "255",
+        "rarity": "U"
+      },
+      {
+        "name": "Lupinflower Village",
+        "number": "256",
+        "rarity": "U"
+      },
+      {
+        "name": "Mudflat Village",
+        "number": "257",
+        "rarity": "U"
+      },
+      {
+        "name": "Oakhollow Village",
+        "number": "258",
+        "rarity": "U"
+      },
+      {
+        "name": "Rockface Village",
+        "number": "259",
+        "rarity": "U"
+      }
+    ]
+  },
+  "slots": [
+    {
+      "sheet": "common",
+      "count": 7,
+      "balance_colours": true
+    },
+    {
+      "sheet": "uncommon",
+      "count": 3
+    },
+    {
+      "count": 1,
+      "rare_mythic": {
+        "rare_weight": 2,
+        "mythic_weight": 1
+      }
+    },
+    {
+      "sheet": "land",
+      "count": 1
+    },
+    {
+      "count": 2,
+      "wildcard": {
+        "common": 0.571,
+        "uncommon": 0.417,
+        "rare_mythic": 0.012
+      }
+    }
+  ],
+  "source": "compliance/manifests/BLB.json (XMage-derived, MIT) + gorge header"
+}
