@@ -31,6 +31,7 @@ The import direction is one-way. `internal/archtest`'s
 | `protocol` | Versioned wire types for host↔client. Types only; never imports `rules`. |
 | `host` | Tables (one goroutine each), sessions, snapshots, persistence, undo, the hosted bot-policy vocabulary (`host/bot_policy.go`). Its only clock is an injected sleep. |
 | `host/httpapi` | `net/http` JSON + SSE + the embedded web client. Every seat route goes through `claimForTable`. |
+| `eventhost` | Hosted draft events inside gorged: event store (`event.json` + `log.jsonl`), lobby/join, draft with synchronous bots, per-event SSE frames; build and games in later E1 tickets. |
 
 ## The draft stack
 
