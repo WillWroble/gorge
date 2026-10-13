@@ -93,6 +93,12 @@ func compareHolds(cmp string, v int32) bool {
 // the present spec, or "" when the spec is not one the resolver fields.
 func gateCountFixture(spec, zone string) string {
 	if zone == "Graveyard" || zone == "Exile" {
+		// A typed spec needs a card of that type: a Plains is no Lesson
+		// (Platypus-Bear's "a Lesson card in your graveyard", The
+		// Lion-Turtle's "three or more Lesson cards").
+		if hasWord(affectedWords(spec), "Lesson") {
+			return gateLessonFixture
+		}
 		return "Plains"
 	}
 	low := strings.ToLower(spec)
@@ -272,8 +278,21 @@ func gateFromSVarBody(g *gateSides, f *cards.Face, body, cmp string) string {
 				{Op: "resolve"},
 			}
 			g.on.value, g.off.value, g.on.known, g.off.known = 1, 0, true, true
-		case strings.HasPrefix(rest, "ValidGraveyard"):
-			return "CheckSVar " + body + " needs fixtures this build cannot set up"
+		case strings.HasPrefix(rest, "ValidGraveyard "):
+			// Count$ValidGraveyard <spec>: the number of p0's graveyard
+			// cards the spec accepts. Each side holds the smallest count
+			// of the spec's fixture the compare puts on its side.
+			spec := strings.TrimSpace(strings.TrimPrefix(rest, "ValidGraveyard "))
+			fixture := gateCountFixture(spec, "Graveyard")
+			if fixture == "Plains" && !strings.HasPrefix(spec, "Card") {
+				return "CheckSVar " + body + " needs fixtures this build cannot set up"
+			}
+			on, off, ok := gateGraveyardCounts(cmp)
+			if !ok {
+				return "compare " + cmp + " does not separate the setups"
+			}
+			g.on.grave, g.off.grave = repeatFixture(fixture, on), repeatFixture(fixture, off)
+			g.on.value, g.off.value, g.on.known, g.off.known = int32(on), int32(off), true, true
 		default:
 			return "CheckSVar " + body
 		}
@@ -765,4 +784,33 @@ func canBlockExpectMax(blocker, attacker string, want bool, max *int) oraclegen.
 // MustAttack requirement at the pending declare-attackers decision.
 func attackRequiredExpect(attacker string, want bool) oraclegen.Expect {
 	return oraclegen.Expect{AttackRequired: &oraclegen.AttackRequired{Attacker: attacker}, Want: &want}
+}
+
+// gateLessonFixture is the graveyard card a Lesson count reads: an instant
+// Lesson both engines print.
+const gateLessonFixture = "Firebending Lesson"
+
+// gateGraveyardCounts are the smallest card counts, up to four, on which the
+// compare holds (on) and fails (off).
+func gateGraveyardCounts(cmp string) (on, off int, ok bool) {
+	on, off = -1, -1
+	for n := 0; n <= 4; n++ {
+		holds := compareHolds(cmp, int32(n))
+		if holds && on < 0 {
+			on = n
+		}
+		if !holds && off < 0 {
+			off = n
+		}
+	}
+	return on, off, on >= 0 && off >= 0
+}
+
+// repeatFixture is n copies of name.
+func repeatFixture(name string, n int) []string {
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, name)
+	}
+	return out
 }

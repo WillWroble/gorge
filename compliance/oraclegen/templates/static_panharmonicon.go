@@ -248,6 +248,23 @@ func panharmoniconETBRuns(reg *cards.Registry) []panharmoniconRun {
 // static: cast from hand, the probe is its own listener. Candidates come from
 // the corpus in (mana value, name) order, so the choice is deterministic.
 func panharmoniconCreatureRuns(reg *cards.Registry, name, filter string) ([]panharmoniconRun, string) {
+	runs, why := panharmoniconCreatureRunsWith(reg, name, filter, panharmoniconSimpleETB)
+	if len(runs) == 0 && why != "" {
+		// A filter no plain draw/life probe satisfies (Splinter, Radical
+		// Rat's Creature.Ninja+YouCtrl: no Ninja has a simple enters
+		// trigger) retries with the changeling token makers
+		// (panharmoniconChangelingETB). A second pass only, so a row the
+		// plain pool serves keeps its probe.
+		if alt, _ := panharmoniconCreatureRunsWith(reg, name, filter, panharmoniconChangelingETB); len(alt) != 0 {
+			return alt, ""
+		}
+	}
+	return runs, why
+}
+
+// panharmoniconCreatureRunsWith is panharmoniconCreatureRuns over the probe
+// predicate simple.
+func panharmoniconCreatureRunsWith(reg *cards.Registry, name, filter string, simple func(*cards.Face) bool) ([]panharmoniconRun, string) {
 	fp := newFilterProbe(filter, state.ZBattlefield)
 	if !fp.decided {
 		return nil, "filter " + filter + " is not decidable by the matcher"
@@ -262,7 +279,7 @@ func panharmoniconCreatureRuns(reg *cards.Registry, name, filter string) ([]panh
 			continue
 		}
 		f := c.Faces[0]
-		if f.Name == name || !panharmoniconSimpleETB(f) || !oraclegen.XMageKnown(f.Name) {
+		if f.Name == name || !simple(f) || !oraclegen.XMageKnown(f.Name) {
 			continue
 		}
 		if _, why := oraclegen.PoolFor(f.ManaCost); why != "" {
@@ -343,4 +360,31 @@ func listenerAbilities(snap rules.OracleSnapshot, ref string) (own, others int) 
 		}
 	}
 	return own, others
+}
+
+// panharmoniconChangelingETB is the fallback probe predicate: a changeling
+// (every creature type, CR 702.73a, so any subtype filter accepts it) whose
+// only printed feature is an untargeted, unconditional self-ETB that makes a
+// token -- Irregular Cohort. Changeling adds no cast-time decision and the
+// token body asks nothing, so the probe is as answer-free as the plain pool.
+func panharmoniconChangelingETB(f *cards.Face) bool {
+	if !f.HasKeyword("Changeling") || !f.IsCreature() || len(f.Triggers) != 1 ||
+		len(f.Abilities) != 0 || len(f.Statics) != 0 || len(f.Repls) != 0 || f.ManaCost == "" {
+		return false
+	}
+	for _, k := range f.Keywords {
+		if k != "Changeling" && !panharmoniconSafeKeywords[k] {
+			return false
+		}
+	}
+	tr := &f.Triggers[0]
+	if tr.Mode != "ChangesZone" || !strings.EqualFold(tr.ParamStr(cards.PKDestination), "Battlefield") ||
+		!strings.EqualFold(tr.ParamStr(cards.PKValidCard), "Card.Self") ||
+		tr.HasParam(cards.PKOptional) || tr.HasParam(cards.PKOptionalDecider) || tr.HasParam(cards.PKCondition) ||
+		tr.HasParam(cards.PKIsPresent) || tr.HasParam(cards.PKCheckSVar) || tr.HasParam(cards.PKNumLimitEachTurn) {
+		return false
+	}
+	e := tr.Effect
+	return e != nil && e.Sub == nil && e.API == "Token" && !e.HasParam(cards.PKValidTgts) &&
+		!e.HasParam(cards.PKOptional) && !e.HasParam(cards.PKSubAbility) && !e.HasParam(cards.PKCondition)
 }

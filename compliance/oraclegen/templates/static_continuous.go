@@ -356,6 +356,33 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticSpellLifelinkItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A split-second grant is observed by what its caster is no longer
+	// offered while the granted spell is on the stack
+	// (static_granted_split_second.go).
+	if it, ok := staticSplitSecondItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A granted web-slinging alternative cost is observed as the probe's
+	// offered cast (static_granted_webslinging.go).
+	if it, ok := staticWebSlingingGrantItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
+	// Protection from opponents granted to the controller is observed by the
+	// combat damage it prevents (static_player_protection.go).
+	if it, ok := staticPlayerProtectionItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
+	// A colour hexproof-from grant is compared under its own opt-in fold
+	// (static_hexproof_from.go).
+	if it, ok := staticHexproofFromItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A stack-scoped grant of a cast-trigger keyword (storm, cascade) is
+	// observed by the trigger it puts on the stack above a probe spell
+	// (static_granted_spell_trigger.go).
+	if it, ok := staticGrantedSpellTriggerItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
 	if gap := staticProbeCapGap(probePlan); gap != "" {
 		return skip(gap)
 	}

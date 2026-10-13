@@ -36,6 +36,22 @@ func (w *legalWalk) autoPayOffer(p state.PlayerID, id state.ObjID, idx int, base
 	if !w.e.offerCastableUsing(statics, p, id, &probe, scope, true, &bound) {
 		return false
 	}
+	// The exact fast path (autoPayFast): when it proves the planner would
+	// accept, skip the planner. Under verify mode it still runs the planner
+	// and panics on disagreement, so the two can never silently drift.
+	if w.autoPayFast(p, id, base, ab, statics) {
+		if autoPayFastVerify && !w.autoPayPlan(p, id, idx, base, scope, statics) {
+			panic("rules: autopay fast path accepted where the planner declined")
+		}
+		return true
+	}
+	return w.autoPayPlan(p, id, idx, base, scope, statics)
+}
+
+// autoPayPlan is the ordinary autopay path: run the payment planner and
+// confirm its witness with the engine's own offer gate, exactly as autoPayOffer
+// always did before the fast path existed.
+func (w *legalWalk) autoPayPlan(p state.PlayerID, id state.ObjID, idx int, base Cost, scope costScope, statics costStaticViews) bool {
 	out := w.e.planAbilityPayment(p, id, idx)
 	if out.Plan == nil || out.Reason != "" || len(out.Plan.Activations) == 0 {
 		return false
@@ -46,7 +62,7 @@ func (w *legalWalk) autoPayOffer(p state.PlayerID, id state.ObjID, idx int, base
 			pool[c] += int32(n)
 		}
 	}
-	probe = base
+	probe := base
 	return w.e.offerCastableUsing(statics, p, id, &probe, scope, true, &pool)
 }
 

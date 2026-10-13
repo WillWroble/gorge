@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"resolve","field":"p0.graveyard","diff":"gorge+[] xmage+[Hill Giant]"},"key":"static | resolve | p0.graveyard | gorge+[] xmage+[Hill Giant]","cards":1}
-{"card":"Pyrrhic Strike","template":"static#0.0","status":"diverge","api":"Charm","sets":["ECL"],"detail":"step 1 (resolve) p0.graveyard: gorge \"[Pyrrhic Strike]\", xmage \"[Hill Giant, Pyrrhic Strike]\""}

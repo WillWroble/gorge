@@ -674,6 +674,10 @@ func (e *Engine) pushTrigger(pt pendingTrigger) {
 	// TriggeredSpellAbility reads the triggering spell off it. The trailing
 	// colon keeps the payload from aliasing the "__kwDemonstrate" SVar a
 	// printed bare K:Demonstrate line mints.
+	if pt.Storm {
+		e.pushGrantedStorm(pt)
+		return
+	}
 	if pt.Demonstrate {
 		if int(pt.Controller) >= len(e.G.Players) || e.G.Players[pt.Controller].Lost {
 			return
@@ -1721,6 +1725,15 @@ func (e *Engine) triggerLabel(pt pendingTrigger) string {
 			}
 		}
 		return name + ": demonstrate copy trigger"
+	}
+	if pt.Storm {
+		name := "a spell"
+		if o := e.G.Obj(pt.Source); o != nil {
+			if f := o.Face(); f != nil && f.Name != "" {
+				name = f.Name
+			}
+		}
+		return name + ": storm copy trigger"
 	}
 	if pt.Gift {
 		name := "it"

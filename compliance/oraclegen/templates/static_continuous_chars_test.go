@@ -85,14 +85,16 @@ func TestStaticContinuousTypeChange(t *testing.T) {
 }
 
 // TestStaticContinuousUnobservedStaysSkipped: a keyword-grant static outside
-// both vocabularies still skips (Teval, Arbiter of Virtue grants Delve;
+// both vocabularies still skips (Raiding Schemes grants Conspire to spells,
+// whose observation needs the optional tap cost paid;
 // agent-20261009T153027Z-7c702026 served Colossal Rattlewurm's Flash grant by
-// adding "flash" to the named vocabulary, so it is no longer in this skip
-// set). Living Conundrum left this set when the empty-library fixture served
-// it (TestStaticLibraryEmpty).
+// adding "flash" to the named vocabulary, and lb4-g7 served Teval, Arbiter of
+// Virtue's Delve grant through the offered cast once the engine priced a
+// stack-scoped Delve grant). Living Conundrum left this set when the
+// empty-library fixture served it (TestStaticLibraryEmpty).
 func TestStaticContinuousUnobservedStaysSkipped(t *testing.T) {
-	if got := staticSkipReason(t, "Teval, Arbiter of Virtue", "static#0.0"); !strings.Contains(got, "keywords outside the compared evergreen set") {
-		t.Fatalf("Teval, Arbiter of Virtue skip = %q, want the keyword gap", got)
+	if got := staticSkipReason(t, "Raiding Schemes", "static#0.0"); !strings.Contains(got, "keywords outside the compared evergreen set") {
+		t.Fatalf("Raiding Schemes skip = %q, want the keyword gap", got)
 	}
 }
 
@@ -100,10 +102,11 @@ func TestStaticContinuousUnobservedStaysSkipped(t *testing.T) {
 // cannot reach carry their own reason rather than the generic one. Sunbird
 // Standard's Effigy face left this table with
 // levelb-static-count-attachments (agent-20261009T055718Z-661990d1): its
-// ExiledWith$Colors CDA is served by the Craft prelude.
+// ExiledWith$Colors CDA is served by the Craft prelude. Lumbering Worldwagon
+// left it with lb4-g7: the crew prelude animates the Vehicle, so its CDA
+// power prints (staticCrewCDAFixture).
 func TestStaticContinuousNamedGaps(t *testing.T) {
 	for _, row := range []struct{ card, key, want string }{
-		{"Lumbering Worldwagon", "static#0.0", "characteristic-defining P/T of a non-creature"},
 		{"Midnight Oil", "static#0.0", "static hand size is not observable"},
 	} {
 		if got := staticSkipReason(t, row.card, row.key); !strings.Contains(got, row.want) {

@@ -116,26 +116,23 @@ func TestClashPicksOpponentThenBooleans(t *testing.T) {
 // "you may pay {2}" with one Llanowar Elves): gorge closes its mana window
 // with "done" and declines on a decline-only ask; XMage, which has no mana
 // window, poses DoIfCostPaid's chooseUse, so the pair scripts one "no". A
-// window that tapped a source keeps the ordinary routing.
+// window that tapped a source scripts the same single "no" (its taps are
+// XMage's own payment).
 func TestUnpayableCostWindowRoutesNo(t *testing.T) {
 	window := rules.OracleDecision{Step: 1, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Options: 2, Min: 1, Max: 1,
 		Picks: []string{"Done"}, PickIdx: []int{1}, PickKinds: []string{"done"}, PickRefs: []string{"Done"},
 		First: "Tap Llanowar Elves for mana", Via: "resolve fallback"}
 	decline := rules.OracleDecision{Step: 1, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Options: 1, Min: 1, Max: 1,
 		Picks: []string{"Do not pay"}, PickIdx: []int{0}, PickKinds: []string{"trigger_cost_decline"},
-		PickRefs: []string{"p0:Esoteric Duplicator"}, First: "Do not pay", Via: "resolve fallback"}
+		PickRefs: []string{"p0:Esoteric Duplicator"}, First: "Do not pay", Via: "resolve fallback", TriggerCostMana: true}
 	if got, want := routed(t, []rules.OracleDecision{window, decline}, 2), []XAnswer{{0, "choice", "no"}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unpayable window + decline scripts %v, want %v", got, want)
 	}
+	// A window that tapped a source before the decline scripts no tap (XMage
+	// pays its own mana) and the one chooseUse "no".
 	tapped := window
 	tapped.Picks, tapped.PickIdx, tapped.PickKinds = []string{"Tap Llanowar Elves for mana"}, []int{0}, []string{"activate"}
-	if got := xanswers([]rules.OracleDecision{tapped, decline}, 2, nil, nil); got != nil {
-		for _, s := range got {
-			for _, a := range s {
-				if a.Value == "no" {
-					t.Fatalf("a tapped window must not script the decline \"no\": %v", got)
-				}
-			}
-		}
+	if got, want := routed(t, []rules.OracleDecision{tapped, decline}, 2), []XAnswer{{0, "choice", "no"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tapped window + decline scripts %v, want %v", got, want)
 	}
 }

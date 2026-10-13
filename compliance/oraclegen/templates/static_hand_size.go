@@ -62,6 +62,17 @@ func staticMaxHandSizeLiteralItem(reg *cards.Registry, f *cards.Face, name strin
 		return oraclegen.Item{}, false
 	}
 	sc := withBackFace(staticScenario(f, name, []string{name}, nil, step(want)), name, req)
+	if c, ok := reg.Lookup(name); ok && req.Face > 0 && levelb.IsRoomCard(c) {
+		// A Room's second door is cast, not placed: no engine unlocks a
+		// setup-placed door (CR 709.5), so Steaming Sauna's "You have no
+		// maximum hand size" rides the door's level-A cast.
+		base, why := staticBase(reg, c, f, name, req, staticProbePlan{}, nil)
+		if why != "" {
+			return oraclegen.Item{}, false
+		}
+		sc = base.Scenario
+		sc.Steps = append(append([]oraclegen.Step(nil), base.Steps...), step(want)...)
+	}
 	it, skip := finishLegalityItem(reg, f, name, "MaxHandSize", req, sc, []string{"514.1"})
 	if skip != nil {
 		return oraclegen.Item{}, false

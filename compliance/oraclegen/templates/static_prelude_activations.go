@@ -276,3 +276,35 @@ func exiledWithColorsCount(f *cards.Face, st cards.Static) bool {
 	}
 	return false
 }
+
+// staticCrewCDAFixture is the fixture for a Vehicle's characteristic-defining
+// P/T (Lumbering Worldwagon's "This Vehicle's power is equal to the number of
+// lands you control"): neither engine's snapshot prints a non-creature's P/T,
+// so the crew prelude animates it (CR 702.122a) and the computed P/T prints
+// on the creature it became. The crew activation's cost answers ride the
+// fixture the way staticCrewFixture's do.
+func staticCrewCDAFixture(f *cards.Face, name string, st cards.Static) (staticFixture, bool) {
+	if !staticSelfCDA(st) || f.IsCreature() || !strings.Contains(f.PT, "*") {
+		return staticFixture{}, false
+	}
+	steps, xab, taps, cost, ok := crewPrelude(f, name)
+	if !ok {
+		return staticFixture{}, false
+	}
+	// The crew tap election names the fixture creatures: the runner's
+	// fallback would tap the first offered creature (the probe), short of a
+	// Crew N above its power.
+	steps = append([]oraclegen.Step(nil), steps...)
+	for i := range steps {
+		if steps[i].Op == "activate" {
+			steps[i].Answers = append(append([]oraclegen.Answer(nil), steps[i].Answers...), oraclegen.Answer{Kind: "choose", Pick: taps})
+		}
+	}
+	return staticFixture{
+		conditionPrelude: conditionPrelude{battlefield: taps},
+		afterSteps:       steps,
+		afterXab:         xab,
+		reanswers:        true,
+		activationCost:   cost,
+	}, true
+}

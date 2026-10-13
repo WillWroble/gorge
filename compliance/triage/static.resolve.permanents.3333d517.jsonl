@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"resolve","field":"permanents","diff":"$CARD gorge+[kw=flying] xmage+[]"},"key":"static | resolve | permanents | $CARD gorge+[kw=flying] xmage+[]","cards":1}
-{"card":"Beast, Erudite Aerialist","template":"static#0.0","status":"diverge","api":"DamageDone:Draw","sets":["MSH"],"detail":"step 3 (resolve) permanents: gorge \"c0 o0 Beast, Erudite Aerialist [creature hero legendary mutant scientist] {UG} 4/4 counters=P1P1=1 kw=flying\", xmage \"c0 o0 Beast, Erudite Aerialist [creature hero legendary mutant scientist] {UG} 4/4 counters=P1P1=1\""}
