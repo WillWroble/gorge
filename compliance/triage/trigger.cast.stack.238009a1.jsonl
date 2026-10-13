@@ -1,2 +1,0 @@
-{"shape":{"template":"trigger","op":"cast","field":"stack","diff":"gorge=[spell:Widow's Walk@p0] xmage=[spell:$CARD@p0]"},"key":"trigger | cast | stack | gorge=[spell:Widow's Walk@p0] xmage=[spell:$CARD@p0]","cards":1}
-{"card":"Derelict Attic","template":"trigger#1.0","status":"diverge","api":"UnlockDoor:Draw","detail":"step 0 (cast) stack: gorge \"[spell:Widow's Walk@p0]\", xmage \"[spell:Derelict Attic@p0]\""}

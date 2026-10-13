@@ -18,9 +18,10 @@ import (
 // door?" and Left is face 0, so the pair collapses to choice "yes" when gorge
 // picked the front face and "no" for the back.
 //
-// gorge spells every card object by its front face (the driver's
-// gorgeSpellingRule), so the door pick's scenario ref IS the front face: a
-// picked label equal to the ref's name is face 0. A ref that still spells a
+// A scenario ref spells a Room card by its front face (setup deals it under
+// that name and the driver binds the front-half ref, frontHalfScenarioRef),
+// so the door pick's scenario ref IS the front face: a picked label equal to
+// the ref's name is face 0. A ref that still spells a
 // whole "A // B" name (a Room the scenario named by its whole name, which the
 // alias bindings also keep) carries no front-face convention, so its pair is
 // left untouched rather than guessed.

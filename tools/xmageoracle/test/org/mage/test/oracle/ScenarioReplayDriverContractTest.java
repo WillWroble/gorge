@@ -530,7 +530,10 @@ public final class ScenarioReplayDriverContractTest {
         // Snapshot values: XMage's whole object name for a probe (xmageName
         // empty) and for the under-test card both read as the front; the
         // under-test card's back half -- the face-1 cast's spell name --
-        // reads as the front too; ordinary names pass through.
+        // reads as the front too when the card is not known to be a Room
+        // (the three-argument form); ordinary names pass through. A Room's
+        // door spell and a fully unlocked Room permanent keep their CR 709.5
+        // names: ScenarioReplayRoomSpellingTest pins those.
         check(ScenarioReplay.gorgeSpellingRule(front, "", whole).equals(front),
                 "probe whole object name did not rewrite to the front half");
         check(ScenarioReplay.gorgeSpellingRule(front, whole, whole).equals(front),

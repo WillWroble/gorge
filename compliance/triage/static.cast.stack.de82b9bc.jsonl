@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"cast","field":"stack","diff":"gorge=[spell:Porcelain Gallery@p0] xmage=[spell:$CARD@p0]"},"key":"static | cast | stack | gorge=[spell:Porcelain Gallery@p0] xmage=[spell:$CARD@p0]","cards":1}
-{"card":"Dollmaker's Shop","template":"static#1.0","status":"diverge","api":"AttackersDeclaredOneTarget:Token","detail":"step 0 (cast) stack: gorge \"[spell:Porcelain Gallery@p0]\", xmage \"[spell:Dollmaker's Shop@p0]\""}
