@@ -162,6 +162,11 @@ func foldControlPlayerChange(g *state.Game, e *Event) {
 func foldLifeChange(g *state.Game, e *Event) {
 	if validPlayer(g, e.Player) {
 		g.Players[e.Player].Life += e.Amount
+		if e.Amount > 0 {
+			g.Players[e.Player].LifeGainedThisTurn += e.Amount
+		} else if e.Amount < 0 {
+			g.Players[e.Player].LifeLostThisTurn -= e.Amount
+		}
 	}
 }
 

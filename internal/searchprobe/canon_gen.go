@@ -182,6 +182,10 @@ func (e *canonEncoder) encview_PlayerView(v *view.PlayerView) error {
 	} else {
 		e.buf = append(e.buf, 0)
 	}
+	e.buf = binary.AppendVarint(e.buf, int64(v.SpellsCastThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.LifeGainedThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.LifeLostThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.TokensCreatedThisTurn))
 	e.buf = binary.AppendVarint(e.buf, int64(v.LibrarySize))
 	e.buf = binary.AppendVarint(e.buf, int64(v.HandSize))
 	if len(v.PlanarDeck) == 0 {
