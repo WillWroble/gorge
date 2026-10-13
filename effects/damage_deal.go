@@ -226,7 +226,14 @@ func effDealDamage(h Host, c *Ctx, sa *cards.SA) {
 	// mark faithfully -- a DividedAsYouChoose distribution or a multi-source
 	// DamageSource$ arm, neither of which any DamageMap line in the corpus
 	// carries -- falls through to the immediate-deal path unchanged.
-	if dp.DamageMap && !divided && len(multiSources) < 2 {
+	// A DealDamage later in a chain whose root already opened the damage map
+	// shares it (Forge SpellAbility.getDamageMap walks to the root SA): Char's
+	// "and 2 damage to you" sub carries no DamageMap$ of its own yet lands in
+	// the same simultaneous batch as the root's 4. The inheriting call only
+	// marks when it has no per-call riders (RememberDamaged$/
+	// ReplaceDyingDefined$) the flush could not honour.
+	inherits := len(c.PendingDamage) > 0 && !remember && dp.ReplaceDyingDefined == ""
+	if (dp.DamageMap || inherits) && !divided && len(multiSources) < 2 {
 		for _, t := range Defined(h, c, sa) {
 			if t.IsPlayer {
 				c.PendingDamage = append(c.PendingDamage, PendingDamage{rider: rider,

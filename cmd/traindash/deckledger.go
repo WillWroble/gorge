@@ -200,9 +200,7 @@ func wilsonPoint(wins, n int) float64 {
 	return float64(wins) / float64(n)
 }
 
-// wilson95 is the Wilson score interval for a binomial rate (the same form
-// internal/hindsight.Wilson95 uses; duplicated so the dashboard keeps its
-// zero-engine-dependency build).
+// wilson95 is the Wilson score interval for a binomial rate (95%, z=1.96).
 func wilson95(wins, n int) (lo, hi float64) {
 	if n <= 0 {
 		return 0, 1

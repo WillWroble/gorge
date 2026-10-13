@@ -48,13 +48,14 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 			c.TriggerResultMax = maxResult
 		}
 	case cards.TriggerBecomesTarget, cards.TriggerBecomesTargetOnce:
-		// This matcher fires only for its own source being targeted, even when
-		// the causing spell chose several targets. ev.Obj is that spell/ability.
+		// ev.Obj is the targeting spell/ability. TriggerTarget is the TARGETED
+		// object the trigger matched (CR 603.3d), which for a ValidTarget$
+		// watcher (Pawpatch Recruit) is not the trigger's source.
 		// BecomesTargetOnce carries the same roles -- its batch latch is the
 		// queue-time gate, not this capture -- so the plural-mode body
 		// resolves TriggeredSourceSA/TriggeredSourceSAController exactly as
 		// the per-target mode does (Leyline of Combustion's payout).
-		c.TriggerTarget = state.Target{Obj: source}
+		c.TriggerTarget = e.becomesTargetReferent(t, source, ev)
 		c.TriggerSource = e.protectionSource(ev.Obj)
 		c.TriggerStack = ev.Obj
 	case cards.TriggerDamageDone, cards.TriggerDamageDealtOnce, cards.TriggerDamageDoneOnce, cards.TriggerDamageAll, cards.TriggerExcessDamageAll:
@@ -72,6 +73,13 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		}
 		if o := e.G.Obj(e.inFlightDamageSource()); o != nil && o.IsAttacking {
 			c.DefendingPlayer = player(o.Attacking)
+			// The attacking player is the attacker's controller (Contested
+			// Game Ball's NewController$ TriggeredAttackingPlayer), bound
+			// beside the defending player from the same combat source. Read
+			// through controllerOf so the recurring-Effect overlay, the ONE
+			// home for a source-controller read, is honoured here as at every
+			// sibling capture site (trigger_blocks.go, trigger_granted.go).
+			c.AttackingPlayer = player(e.controllerOf(o.ID))
 		}
 	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll:
 		// The batch size the body reads as TriggerCount$Amount (Simic
@@ -165,6 +173,10 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		c.TriggerActivator = player(trigmatch.TapActor(boardOf(e), ev))
 	case cards.TriggerChangesZone, cards.TriggerLandPlayed:
 		c.TriggerCard = ev.Obj
+	case cards.TriggerChangesZoneAll, cards.TriggerPhaseOutAll:
+		// An unbatched event is a batch of one; closeZoneBatch overrides the
+		// amount with the batch's moved count (TriggerCount$Amount).
+		c.TriggerAmount = 1
 	case cards.TriggerMilled, cards.TriggerMilledAll:
 		// The milled card is ev.Obj (what ValidCard$ matched) and the player
 		// whose library was milled is ev.Player (what ValidPlayer$ matched),
@@ -600,6 +612,9 @@ func (e *Engine) targetSpecContext(source, stack state.ObjID, you state.PlayerID
 		srcLKI: srcLKI, srcLKIValid: srcLKIValid, resolveFn: env.resolveFn}
 	sc := effects.NewSpecContext(you, source)
 	sc.TriggerContext, sc.Remembered, sc.Resolve = tcx, remembered, env.resolveFn
+	if srcLKIValid {
+		sc.SourceLKIValid, sc.SourceChosenType, sc.SourceChosenColor = true, srcLKI.chosenType, srcLKI.chosenColor
+	}
 	// The stack object's Remembered and fire-time LKI are bound above, beside
 	// TriggerContext, so placement-time numeric SVars read the same captured
 	// referents the resolving Ctx receives later.
@@ -609,4 +624,28 @@ func (e *Engine) targetSpecContext(source, stack state.ObjID, you state.PlayerID
 	// Goblin-killer would not offer a creature a static made a Goblin (the
 	// AGENTS.md row this closes).
 	return e.withNames(sc)
+}
+
+// becomesTargetReferent is the "that creature/player" a BecomesTarget(Once)
+// trigger refers to: the first target of the causing TargetsChosen event that
+// satisfies the line's ValidTarget$ (the same test the matcher ran), a player
+// target when only the player half matched, and the trigger's own source for
+// a line with no ValidTarget$ (the Card.Self / ward shapes) or when nothing
+// matches. Pawpatch Recruit's "other than that creature" reads this role.
+func (e *Engine) becomesTargetReferent(t cards.Trigger, source state.ObjID, ev events.Event) state.Target {
+	v, ok := t.Param(cards.PKValidTarget)
+	if !ok {
+		return state.Target{Obj: source}
+	}
+	you := e.controllerOf(source)
+	for _, id := range ev.IDs {
+		if e.matchesSpecFrom(v, id, you, source) {
+			return state.Target{Obj: id}
+		}
+	}
+	if (ev.Amount == 1 || ev.Amount == 3) &&
+		effects.MatchesPlayerSpecCtx(e.G, v, ev.Player, you, e.playerSpecCtx(source)) {
+		return state.Target{Player: ev.Player, IsPlayer: true}
+	}
+	return state.Target{Obj: source}
 }

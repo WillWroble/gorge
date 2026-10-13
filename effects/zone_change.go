@@ -206,6 +206,55 @@ func hasRememberedDestroyedLand(g *state.Game, ts []state.Target) bool {
 	return false
 }
 
+// changeZoneMoveSkip repeats the mover loop's per-object skip guards.
+// Origin$, when given, is a precondition: the object must actually be where
+// the script expects, or the movement does not happen. This is also this
+// build's only CR 608.2b guard for ChangeZone: a target moved away by an
+// earlier effect in the same resolution, or by a response that has already
+// resolved, is simply skipped rather than moved a second time or moved from
+// the wrong zone. A CantExile restriction (The Master, Multiplied: "Triggered
+// abilities you control can't cause you to ... exile creature tokens you
+// control") withholds the object from an exile entirely: it never leaves the
+// battlefield, no MoveZone is emitted and none of the inlined riders
+// (exiled-with, RememberChanged, exile-return) run. The shared settle path
+// (settleChangeZoneMoveAs) carries the same guard for every other ChangeZone
+// mover, and effChangeZone's departure-batch pre-pass
+// (changeZoneDepartureBatch) shares this predicate so its victim list cannot
+// drift from the moves.
+func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
+	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
+		return true
+	}
+	return to == state.ZExile && h.ExileBlocked(o.ID, false)
+}
+
+// changeZoneDepartureBatch lists the mover loop's battlefield departures for
+// ONE simultaneous departure batch (CR 614.6/616.1 with 603.10): the members
+// leave as one event, so a departing replacement source among them (Kalitas,
+// Traitor of Ghet) keeps its ActiveZones$ Battlefield replacement for the
+// later members (rules' batchMemberReplActive) and their
+// leaves-the-battlefield triggers see one pre-departure board. A battlefield
+// ENTRY (to == battlefield) departs nothing. The read uses the loop's own
+// skip guards; a member the loop then skips (it re-reads the zone live) is a
+// straggler EndBatchDepartures discards.
+func changeZoneDepartureBatch(h Host, cz *ChangeZoneParams, targets []state.Target, to state.Zone, originAll bool) []state.ObjID {
+	if to == state.ZBattlefield {
+		return nil
+	}
+	var departing []state.ObjID
+	for _, t := range targets {
+		if t.IsPlayer {
+			continue
+		}
+		o := h.Game().Obj(t.Obj)
+		if o == nil || o.Zone != state.ZBattlefield || changeZoneMoveSkip(h, cz, o, to, originAll) {
+			continue
+		}
+		departing = append(departing, o.ID)
+	}
+	return departing
+}
+
 func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 	cz := ChangeZoneOf(sa)
 	to, stop := changeZonePrelude(h, c, cz)
@@ -590,7 +639,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			// the spell/ability that registered it -- so end every Effect-created
 			// registration from that source. The ender's FromEffect marker keeps
 			// the source's printed statics out of it.
-			h.EndEffectSource(f.Source)
+			h.EndEffectSource(f.Source, f.Spare)
 		}
 		return
 	}
@@ -616,6 +665,12 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		cz.DefinedImprinted {
 		h.EndImprintedEffects(c.Source)
 	}
+	// The battlefield departures of the move loop below are one simultaneous
+	// departure batch; see changeZoneDepartureBatch.
+	if departing := changeZoneDepartureBatch(h, cz, targets, to, originAll); len(departing) > 0 {
+		h.BatchDepartures(departing)
+		defer h.EndBatchDepartures()
+	}
 	// The objects the move loop actually moved, in move order: ChangeZone's
 	// AtEOT$ affected set is the MOVED objects (some carriers carry
 	// RememberChanged$ and some do not, so the moved set is collected here
@@ -633,23 +688,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		if o == nil {
 			continue
 		}
-		// Origin$, when given, is a precondition: the object must actually be
-		// where the script expects, or the movement does not happen. This is
-		// also this build's only CR 608.2b guard for ChangeZone: a target
-		// moved away by an earlier effect in the same resolution, or by a
-		// response that has already resolved, is simply skipped rather than
-		// moved a second time or moved from the wrong zone.
-		if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
-			continue
-		}
-		// A CantExile restriction (The Master, Multiplied: "Triggered abilities
-		// you control can't cause you to ... exile creature tokens you
-		// control") withholds the object from this exile entirely: it never
-		// leaves the battlefield, no MoveZone is emitted and none of the
-		// inlined riders (exiled-with, RememberChanged, exile-return) run. The
-		// shared settle path (settleChangeZoneMoveAs) carries the same guard
-		// for every other ChangeZone mover.
-		if to == state.ZExile && h.ExileBlocked(o.ID, false) {
+		// Origin$ precondition and CantExile guard, shared with the
+		// departure-batch pre-pass above: see changeZoneMoveSkip.
+		if changeZoneMoveSkip(h, cz, o, to, originAll) {
 			continue
 		}
 		// Inlined rather than routed through settleChangeZoneMove: this loop
@@ -672,7 +713,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		if cz.RememberLKI {
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: o.ID, Controller: o.Controller, Owner: o.Owner})
 		}
-		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+		if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 			ev.IDs = []state.ObjID{c.Source}
 		}
 		applyMoveFaceDown(h, c, &cz.Riders.FaceDownRiders, &ev, to)
@@ -684,7 +725,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			applyTransformed(h, c, cz.Riders.Transformed, o.ID)
 		}
 		markChangeZoneAttach(h, c, sa, cz, &ev)
-		h.Emit(ev)
+		emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 		moved = append(moved, o.ID)
 		exiledWithAssociation(h, c, o.ID, to)
 		if to == state.ZExile {
@@ -715,7 +756,6 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		// unconditional on the move landing on the battlefield, the same as
 		// settleChangeZoneMoveAs's own tail call.
 		if to == state.ZBattlefield {
-			applyGainControlFor(h, c, cz.Riders.GainControl, o.ID)
 			changeZoneAttachedTo(h, c, sa, cz, o.ID)
 		}
 		// Tapped$ True (CR 110.5's entry state): the moved permanent enters
@@ -1257,15 +1297,52 @@ func gainControlOf(h Host, c *Ctx, gc ParamText) (state.PlayerID, bool, bool) {
 	return 0, false, true
 }
 
-// applyGainControlFor is applyGainControl over a compiled GainControl$.
-func applyGainControlFor(h Host, c *Ctx, gc ParamText, id state.ObjID) {
-	p, ok, present := gainControlOf(h, c, gc)
-	if !present || !ok {
+// digGainControl is the GainControl$ selector a Dig/DigUntil bool stands for:
+// those two compile the rider to "under your control" only.
+func digGainControl(on bool) ParamText {
+	if !on {
+		return ParamText{}
+	}
+	return ParamText{Text: "True", Present: true}
+}
+
+// emitEntryMove emits a MoveZone and settles the GainControl$ rider of the
+// move that carries it ("put onto the battlefield under your control", CR
+// 110.2a: a permanent enters under the control of the player an effect names).
+// The new controller is folded onto the card BEFORE the battlefield entry, so
+// the entry's replacement effects, ETB triggers (CR 603.3a: controlled by the
+// permanent's controller as it enters) and "enters under your control" matchers
+// all see the right seat. A move to any other zone is emitted unchanged: only a
+// battlefield entry can carry a control change (CR 701.22a).
+//
+// A card that was already a permanent keeps the post-move ControlChange, and a
+// pre-move change the move did not turn into a battlefield entry (a prevented
+// or redirected move) is handed back to the owner, so no off-battlefield card
+// is left under a foreign controller.
+func emitEntryMove(h Host, c *Ctx, gc ParamText, to state.Zone, ev events.Event) {
+	if to != state.ZBattlefield {
+		h.Emit(ev)
 		return
 	}
-	if o := h.Game().Obj(id); o != nil && o.Controller != p {
-		h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: p,
-			Text: "GainControl"})
+	p, ok, present := gainControlOf(h, c, gc)
+	if !present || !ok {
+		h.Emit(ev)
+		return
+	}
+	g := h.Game()
+	pre := false
+	if o := g.Obj(ev.Obj); o != nil && o.Zone != state.ZBattlefield && o.Controller != p {
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: p, Text: "GainControl"})
+		pre = true
+	}
+	h.Emit(ev)
+	o := g.Obj(ev.Obj)
+	switch {
+	case o == nil:
+	case o.Zone == state.ZBattlefield && o.Controller != p:
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: p, Text: "GainControl"})
+	case pre && o.Zone != state.ZBattlefield && o.Controller != o.Owner:
+		h.Emit(events.Event{Kind: events.ControlChange, Obj: ev.Obj, Player: o.Owner, Text: "GainControl"})
 	}
 }
 
@@ -1409,7 +1486,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 			c.Snap.ChangeZone = append(c.Snap.ChangeZone, state.LKIObject{Obj: id, Controller: o.Controller, Owner: o.Owner})
 		}
 	}
-	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint) {
+	if to == state.ZExile && len(ev.IDs) == 0 && (faceNamesExiledWithSource(h, c.Source) || cz.Imprint || cz.ExiledWithEffectSource) {
 		// The S: static spelling of the same provenance need: a source whose
 		// own Static lines name ExiledWithSource (Intellect Devourer's
 		// MayPlay+ExiledWithSource grant) tracks its exiles exactly like the
@@ -1430,7 +1507,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 		applyTransformed(h, c, cz.Riders.Transformed, id)
 	}
 	markChangeZoneAttach(h, c, sa, cz, &ev)
-	h.Emit(ev)
+	emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 	if to == state.ZExile {
 		recordExileReturnFor(h, c, cz.Riders.Duration, id, from, to)
 	}
@@ -1478,7 +1555,6 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 	// permanents); a card moved to a hidden or public non-battlefield zone
 	// keeps its owner.
 	if to == state.ZBattlefield {
-		applyGainControlFor(h, c, cz.Riders.GainControl, id)
 		// Tapped$ True (CR 110.5's entry state) for the hand-origin movers:
 		// the same "entered tapped" Tap the object path, the library search's
 		// library-origin branch and the Dig windows emit. Gated on the hand

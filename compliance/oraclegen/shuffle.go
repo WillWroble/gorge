@@ -16,6 +16,12 @@ const CompareNoLibraryOrder = "no_library_order"
 // shuffle-then-draw fixture cannot make the draw uniform.
 const CompareHandCount = "hand_count"
 
+// CompareGraveyardCount compares only the number of cards in each graveyard
+// when a shuffle-then-read fixture (shuffle a card into a library, then
+// manifest dread or mill) sends a randomly chosen card off the library top
+// to the graveyard.
+const CompareGraveyardCount = "graveyard_count"
+
 // intoLibraryText matches prose that moves a card into a library ("shuffle it
 // into its owner's library", "puts it into their library").
 var intoLibraryText = regexp.MustCompile(`\binto (?:\S+ ){0,3}?library`)

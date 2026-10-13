@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -33,16 +32,7 @@ const (
 
 func labelTestArgs(t *testing.T, labels string, workers int) []string {
 	t.Helper()
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("resolving repo root for the corpus dir: %v", err)
-	}
-	corpus := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(corpus); err != nil {
-		t.Skipf("no .cards/ corpus at %s", corpus)
-	}
+	corpus := testutil.CorpusDirOrSkip(t)
 	return []string{
 		"-games", "2",
 		"-pairs", labelTestA + ":" + labelTestB,

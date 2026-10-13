@@ -37,7 +37,7 @@ import (
 // longer has, and are left unapplied. The token's own Moved lines are not
 // read here: token scripts carry none, and its own entry counters ride the
 // entry-counter pass.
-func (e *Engine) applyTokenEntryUpdates(id state.ObjID) {
+func (e *Engine) applyTokenEntryUpdates(id state.ObjID, absorbed []string) {
 	o := e.G.Obj(id)
 	if o == nil || o.Zone != state.ZBattlefield {
 		return
@@ -87,6 +87,12 @@ func (e *Engine) applyTokenEntryUpdates(id state.ObjID) {
 	for _, m := range matches {
 		if o := e.G.Obj(id); o == nil || o.Zone != state.ZBattlefield {
 			return
+		}
+		if bodyAbsorbed(absorbed, m) {
+			// Its PutCounter|ETB$ True placement rode the mint's Pairs
+			// payload (rules/entry_counters.go), settled with the token's
+			// other entry counters as one event.
+			continue
 		}
 		e.runReplaceWith(e.replCtx(m, ev), id, m.repl.With, nil)
 	}

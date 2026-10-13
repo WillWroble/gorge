@@ -413,3 +413,13 @@ type ETBRecords struct {
 	// permanent, so this invocation must not ask a second time.
 	EvenOddRecorded bool
 }
+
+// PaidCostLists is the cast's/activation's cost-PAID object lists (Forge's
+// SpellAbility.getPaidList rows), carried on Ctx.Paid: the cards an Exile
+// part removed ("Exiled"), a Reveal part showed ("Revealed"), and the
+// creatures a Blight part put -1/-1 counters on ("CounterPut"). See Ctx.Paid.
+type PaidCostLists struct {
+	Exiled     []state.ObjID
+	Revealed   []state.ObjID
+	CounterPut []state.ObjID
+}

@@ -180,10 +180,12 @@ func TestLedgerMarksCaretaker(t *testing.T) {
 	t.Parallel()
 	const skipN = 2
 	o := testOptions(t)
-	// 200ms: comfortably longer than one driver iteration, so a submitted
-	// decision can never lose the race to the timeout under parallel load —
-	// a fire the driver caused would break the exact count below.
-	o.ThinkTimeout = 200 * time.Millisecond
+	// 2s: far longer than one driver iteration even on a saturated box, so a
+	// submitted decision can never lose the race to the timeout — a fire the
+	// driver caused would break the exact count below. 200ms lost that race
+	// at load ~60 (postmerge RED 91501ef4c, 12:37 c625a82be: 4 fires, want 2);
+	// only the two withheld decisions wait it out, so the test pays ~4s.
+	o.ThinkTimeout = 2 * time.Second
 	r := undoTable(t, o, "t1")
 	deadline := time.Now().Add(60 * time.Second)
 	skipped := map[uint64]bool{}

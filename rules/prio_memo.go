@@ -238,7 +238,7 @@ func (e *Engine) prioBoardFlags() (modes, combat bool) {
 			if len(o.ModeChoices) != 0 {
 				modes = true
 			}
-			if o.IsAttacking || o.AttackingBattle != 0 || len(o.BlockedBy) != 0 {
+			if o.IsAttacking || o.AttackingBattle != 0 || len(o.BlockedBy) != 0 || o.IsBlocking {
 				combat = true
 			}
 		}

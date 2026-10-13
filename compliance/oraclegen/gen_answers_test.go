@@ -185,6 +185,15 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			want: []XAnswer{{0, "target", "[target_skip]"}},
 		},
 		{
+			// One castable card: XMage skips its "which card" target ask and
+			// goes straight to chooseUse, so the decline is the "no" (a
+			// target skip would be unused and XMage would cast).
+			name: "declined optional play after look, one castable card: no",
+			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
+			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "mode", GorgeKind: "mode", Resume: "play", Options: 1, Min: 0, Max: 1, First: "Play Grizzly Bears", OptionRefs: []string{"p0:Grizzly Bears#2"}},
+			want: []XAnswer{{0, "choice", "no"}},
+		},
+		{
 			// A declined two-option look pick is not scripted from the pair
 			// branch: SearchPicks forces the first card and the serving
 			// template retargets the answer onto XMage's mandatory

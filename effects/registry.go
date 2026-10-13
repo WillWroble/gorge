@@ -78,6 +78,18 @@ type DamageSourceLKI struct {
 type EffectFrame struct {
 	Source state.ObjID
 	Stamp  uint32
+	// Spare, on a source-scoped frame (Stamp 0), is the game clock at the
+	// moment a NESTED api:Effect began registering inside an outer Effect's
+	// own body (Soulfire Grand Master's Static$ trigger body creates the
+	// replacement Effect, then its `ExileSelf` sub exiles the OUTER carrier).
+	// The source-scoped ender spares every registration stamped after it, so
+	// the idiom ends the carrier and not the replacement just created. Zero
+	// means no sparing (the ordinary self-ending one-shot).
+	Spare uint32
+	// Carrier marks the frame rules binds for an Effect-created delayed
+	// trigger's body (the carrier's own Triggers$ execution), as opposed to
+	// the one effEffect binds after a registration in the same chain.
+	Carrier bool
 }
 
 type Ctx struct {
@@ -224,7 +236,7 @@ type Ctx struct {
 	// directly so a SubAbility$ chained after it can read it. The
 	// Sacrificed$<Property> heads in count.go read it.
 	Sacrificed []state.SacrificedInfo
-	// Exiled / Revealed carry the cards PAID as part of this cast's or
+	// Paid.Exiled / Paid.Revealed carry the cards PAID as part of this cast's or
 	// activation's cost: the `ExileFromHand`/`ExileFromGrave`/`Exile` parts
 	// (Forge's CostExile, paid list keyed "Exiled") and the `Reveal` parts
 	// (CostReveal, keyed "Revealed"). They are NOT the source's persistent
@@ -238,8 +250,11 @@ type Ctx struct {
 	// a copy of the spell was never cast and carries none. Empty means "no
 	// paid list" -- a legitimate zero, never a fallback to the source or the
 	// chosen targets.
-	Exiled   []state.ObjID
-	Revealed []state.ObjID
+	// CounterPut (Forge's paid list "CounterPut", the `Defined$
+	// CounterPutCards` selector) is the creatures a Blight<N> cost put its
+	// -1/-1 counters on (Grub, Notorious Auntie's "a copy of the blighted
+	// creature"), recorded by the same per-stack-object capture.
+	Paid PaidCostLists
 	// ResolvingObj is the stack-object WRAPPER of the spell/ability currently
 	// resolving -- rules' e.resolvingObj (resolveTop's ability and spell
 	// branches) and rp.obj (resumeResolution) -- set at those two ctx

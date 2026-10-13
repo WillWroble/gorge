@@ -15,7 +15,7 @@ import (
 // merged counters show real offers; the run's own -out json report is
 // byte-identical with the flag off and on, because the sink only observes.
 func TestPaymentStatsFlag(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	pairs, err := parsePairs("mono-red-goblins:tron", testutil.RepoDeckNames())
 	if err != nil {
 		t.Fatalf("parsePairs: %v", err)

@@ -33,8 +33,8 @@ func TestPaidCostExiledAndRevealedValidCountThePaidCards(t *testing.T) {
 	if MatchesObjectCtx(h.g, "Thrull", h.g.Obj(snow), c.SpecContext(c.Controller)) {
 		t.Fatal("precondition: snow land must not match Thrull")
 	}
-	c.Exiled = []state.ObjID{snow, creature, plain}
-	c.Revealed = []state.ObjID{creature, plain}
+	c.Paid.Exiled = []state.ObjID{snow, creature, plain}
+	c.Paid.Revealed = []state.ObjID{creature, plain}
 
 	if got := EvalCount(h, c, "Exiled$Valid Land.Snow"); got != 1 {
 		t.Errorf("Exiled$Valid Land.Snow = %d, want 1", got)
@@ -69,8 +69,8 @@ func TestPaidCostRefsReadThePaidCardsNotTheSource(t *testing.T) {
 	if int32(h.g.Obj(paid).Face().Power()) == int32(src.Face().Power()) {
 		t.Fatal("precondition: paid card and source must differ in power")
 	}
-	c.Exiled = []state.ObjID{paid}
-	c.Revealed = []state.ObjID{paid}
+	c.Paid.Exiled = []state.ObjID{paid}
+	c.Paid.Revealed = []state.ObjID{paid}
 	if got := EvalCount(h, c, "Exiled$CardManaCost"); got != 6 {
 		t.Errorf("Exiled$CardManaCost = %d, want 6", got)
 	}
@@ -117,19 +117,19 @@ func TestDefinedPaidCostSelectorsReadThePaidList(t *testing.T) {
 	h, c := fixtureHost(t)
 	paid := h.g.AddObject(mkCard(t, "Name:PaidOne\nManaCost:1\nTypes:Creature\nPT:2/2\nOracle:x\n"), 0).ID
 	other := h.g.AddObject(mkCard(t, "Name:PaidTwo\nManaCost:1\nTypes:Creature\nPT:2/2\nOracle:x\n"), 0).ID
-	c.Exiled = []state.ObjID{paid, other}
+	c.Paid.Exiled = []state.ObjID{paid, other}
 	ts, ok := definedSpec(h, c, "Exiled")
 	if !ok || len(ts) != 2 || ts[0].Obj != paid || ts[1].Obj != other {
 		t.Fatalf("definedSpec Exiled = %v ok=%v, want [%d %d]", ts, ok, paid, other)
 	}
-	c.Revealed = []state.ObjID{other}
+	c.Paid.Revealed = []state.ObjID{other}
 	ts, ok = definedSpec(h, c, "Revealed")
 	if !ok || len(ts) != 1 || ts[0].Obj != other {
 		t.Fatalf("definedSpec Revealed = %v ok=%v, want [%d]", ts, ok, other)
 	}
 	// Absent paid list: known-empty (ok=true), never the targets.
 	c.Targets = []state.Target{{Obj: paid}}
-	c.Exiled = nil
+	c.Paid.Exiled = nil
 	ts, ok = definedSpec(h, c, "Exiled")
 	if !ok || len(ts) != 0 {
 		t.Fatalf("definedSpec Exiled with no paid list = %v ok=%v, want empty ok", ts, ok)
@@ -185,9 +185,9 @@ func TestPaidCostRefsReadTheRealCorpusSVars(t *testing.T) {
 			}
 		}
 		if strings.HasPrefix(tc.body, "Revealed") {
-			c.Revealed = ids
+			c.Paid.Revealed = ids
 		} else {
-			c.Exiled = ids
+			c.Paid.Exiled = ids
 		}
 		if got := EvalCount(h, c, tc.body); got != tc.want {
 			t.Errorf("real %s SVar = %d, want %d", tc.card, got, tc.want)

@@ -101,13 +101,13 @@ func TestRainOfRichesTreasureManaCastCascades(t *testing.T) {
 	// window carries one Treasure-tagged unit.
 	bears := searchMoveByName(t, e, "Grizzly Bears", state.ZHand)
 	treasureUnit(t, e)
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure"); got != 0 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure", noTC); got != 0 {
 		t.Fatalf("pre-cast treasure-cast count = %d, want 0", got)
 	}
 	submitCastOption(t, e, bears)
 	// The count head reads the cast's own spend window: one Treasure unit
 	// was spent on THIS cast.
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure"); got != 1 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure", noTC); got != 1 {
 		t.Fatalf("treasure-cast count = %d, want 1", got)
 	}
 	if !cascadeQueuedFor(e, bears) {
@@ -135,7 +135,7 @@ func TestRainOfRichesPlainCastDoesNotCascade(t *testing.T) {
 	addMana(t, e, 0, "GG")
 	submitCastOption(t, e, bears)
 	passUntilStackEmpty(t, e, 60)
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure"); got != 0 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure", noTC); got != 0 {
 		t.Fatalf("plain-cast treasure-cast count = %d, want 0", got)
 	}
 	if cascadeQueuedFor(e, bears) {
@@ -177,7 +177,7 @@ func TestRainOfRichesSecondTreasureCastDoesNotCascade(t *testing.T) {
 	bears2 := searchMoveByName(t, e, "Grizzly Bears", state.ZHand)
 	treasureUnit(t, e)
 	submitCastOption(t, e, bears2)
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure"); got != 2 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+CastSa Spell.ManaFromTreasure", noTC); got != 2 {
 		t.Fatalf("treasure-cast count = %d, want 2", got)
 	}
 	if cascadeQueuedFor(e, bears2) {
@@ -214,7 +214,7 @@ func TestWildMagicSorcererFirstExileCastCascades(t *testing.T) {
 	if !e.WasCastFromExile(dbf) {
 		t.Fatal("the foretell cast's provenance is not exile")
 	}
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+wasCastFromExile"); got != 1 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+wasCastFromExile", noTC); got != 1 {
 		t.Fatalf("exile-cast count = %d, want 1", got)
 	}
 	if !cascadeQueuedFor(e, dbf) {
@@ -251,7 +251,7 @@ func TestSatoruEntryReadsNoManaSpentCastSa(t *testing.T) {
 	if got := len(e.G.Zone(state.ZHand, 0)); got != baseline {
 		t.Fatalf("hand after the {0} cast = %d, want %d (the no-mana-spent entry draws)", got, baseline)
 	}
-	if got := e.SpellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaSpent EQ0"); got != 1 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaSpent EQ0", noTC); got != 1 {
 		t.Fatalf("no-mana-spent count = %d, want 1", got)
 	}
 	// A paid cast matches neither alternative: no trigger, no draw.
@@ -263,7 +263,7 @@ func TestSatoruEntryReadsNoManaSpentCastSa(t *testing.T) {
 	if got := len(e.G.Zone(state.ZHand, 0)); got != baseline-1 {
 		t.Fatalf("hand after the paid cast = %d, want %d (a paid entry draws nothing)", got, baseline-1)
 	}
-	if got := e.SpellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaSpent EQ0"); got != 1 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaSpent EQ0", noTC); got != 1 {
 		t.Fatalf("no-mana-spent count after a paid cast = %d, want 1", got)
 	}
 }
@@ -279,7 +279,7 @@ func TestCountStaysInclusiveOutsideTheGrantWalk(t *testing.T) {
 	addMana(t, e, 0, "GG")
 	castMode(t, e, bear, "")
 	finishCast(t, e, bear)
-	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl"); got != 1 {
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl", noTC); got != 1 {
 		t.Fatalf("post-cast count = %d, want 1 (the cast itself counts outside the grant walk)", got)
 	}
 	drainEtb(t, e)

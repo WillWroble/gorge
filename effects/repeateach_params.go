@@ -105,7 +105,7 @@ var repeatEachKnownKeys = [...]string{
 	"TargetsAtRandom", "TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType",
 	"TargetsWithSharedCardType", "TargetsWithSharedTypes", "TgtPrompt", "TgtZone",
 	"TokenScript", "TriggerDescription", "Type", "Ultimate", "UnlessAI",

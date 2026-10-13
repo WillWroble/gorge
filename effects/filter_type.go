@@ -145,11 +145,11 @@ func typePredicate(p string, g *state.Game, o *state.Object, sc SpecContext) (bo
 	case typePredicateNonBasic:
 		return !hasTypeCtx(o, "Basic", sc), true
 	case typePredicateChosenType:
-		s := g.Obj(sc.Source)
-		return s != nil && s.ChosenType != "" && hasTypeCtx(o, s.ChosenType, sc), true
+		t, _ := sourceChosen(g, sc)
+		return t != "" && hasTypeCtx(o, t, sc), true
 	case typePredicateIsNotChosenType:
-		s := g.Obj(sc.Source)
-		return s != nil && s.ChosenType != "" && !hasTypeCtx(o, s.ChosenType, sc), true
+		t, _ := sourceChosen(g, sc)
+		return t != "" && !hasTypeCtx(o, t, sc), true
 	case typePredicateChosenCtrl:
 		return chosenCtrlMatches(g, o, sc.Source), true
 	}

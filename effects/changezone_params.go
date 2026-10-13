@@ -160,29 +160,32 @@ type ChangeZoneParams struct {
 	SpellDescription string
 
 	// Flags.
-	Hidden              bool
-	Unimprint           bool
-	Imprint             bool
-	ImprintLast         bool
-	RememberLKI         bool
-	RememberChanged     bool
-	RememberTargets     bool
-	RememberSearched    bool
-	ForgetOtherTargets  bool
-	Tapped              bool
-	AtRandom            bool
-	NoLooking           bool
-	Reveal              bool
-	NoReveal            bool
-	DifferentNames      bool
-	Exactly             bool
-	ShareLandType       bool
-	ShuffleTrue         bool // Shuffle$ True
-	ShuffleFalse        bool // Shuffle$ False
-	NoShuffle           bool
-	ShuffleNonMandatory bool
-	RandomOrder         bool
-	Reorder             bool
+	Hidden    bool
+	Unimprint bool
+	Imprint   bool
+	// ExiledWithEffectSource tags an exile as exiled-with the Effect's source
+	// (Forger's Foundry's redirect body), the same provenance Imprint$ records.
+	ExiledWithEffectSource bool
+	ImprintLast            bool
+	RememberLKI            bool
+	RememberChanged        bool
+	RememberTargets        bool
+	RememberSearched       bool
+	ForgetOtherTargets     bool
+	Tapped                 bool
+	AtRandom               bool
+	NoLooking              bool
+	Reveal                 bool
+	NoReveal               bool
+	DifferentNames         bool
+	Exactly                bool
+	ShareLandType          bool
+	ShuffleTrue            bool // Shuffle$ True
+	ShuffleFalse           bool // Shuffle$ False
+	NoShuffle              bool
+	ShuffleNonMandatory    bool
+	RandomOrder            bool
+	Reorder                bool
 
 	// Unread are the parameters present on the ability that no ChangeZone
 	// reader consumes (changeZoneUnread): the resolver Notes them once per
@@ -234,7 +237,7 @@ var changeZoneKnownKeys = [...]string{
 	"CostDesc", "Defined", "DefinedCards",
 	"DefinedPlayer", "DefinedTarget", "Description", "DestAltSVar", "DestAltSVarCompare",
 	"Destination", "DestinationAlternative", "DifferentNames", "Duration",
-	"Exactly", "Exclude", "Exhaust", "ExileFaceDown", "FaceDown", "FaceDownPower",
+	"Exactly", "Exclude", "Exhaust", "ExileFaceDown", "ExiledWithEffectSource", "FaceDown", "FaceDownPower",
 	"FaceDownSetType", "FaceDownToughness", "Foretold", "ForgetChanged",
 	"ForgetOtherRemembered", "ForgetOtherTargets", "GainControl", "GameActivationLimit",
 	"Hidden", "Image", "Imprint", "ImprintCards", "ImprintLast", "ImprintPlayed",
@@ -257,7 +260,7 @@ var changeZoneKnownKeys = [...]string{
 	"TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType", "TargetsWithSharedTypes",
 	"TgtPrompt", "TgtZone", "ThisDefinedAndTgts", "TokenScript", "Transformed", "TriggerDescription",
 	"Type", "Ultimate", "Unearth",
@@ -484,6 +487,7 @@ func compileChangeZone(sa *cards.SA, tp *TargetParams, dr *DefinedParams) *Chang
 	p.Hidden = isTrue(sa.ParamStr(cards.PKHidden))
 	p.Unimprint = isTrue(sa.ParamStr(cards.PKUnimprint))
 	p.Imprint = isTrue(sa.ParamStr(cards.PKImprint))
+	p.ExiledWithEffectSource = isTrue(sa.ParamStr(cards.PKExiledWithEffectSource))
 	p.ImprintLast = isTrue(sa.ParamStr(cards.PKImprintLast))
 	p.RememberLKI = isTrue(sa.ParamStr(cards.PKRememberLKI))
 	p.RememberChanged = isTrue(sa.ParamStr(cards.PKRememberChanged))

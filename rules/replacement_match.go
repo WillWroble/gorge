@@ -470,8 +470,30 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// gate is never silently widened onto a die of another size.
 		return e.replacementConditionHolds(r, source, you)
 	case cards.ReplDraw, cards.ReplDrawCards:
-		if ev.Kind != events.Draw {
+		// The batch proposal is the DrawCards class's own held event
+		// (Forge's Player.drawCards(n) DrawCards pass, XMage's
+		// DRAW_TWO_OR_MORE_CARDS): only a R:Event$ DrawCards line matches
+		// it, so a "draw two cards instead" line never swallows a whole
+		// batch. A per-card Draw matches both spellings -- the historical
+		// alias (replacementEventNameMatches) -- with the batch amount read
+		// as 1, so Alms Collector's Number$ GE2 rejects a single card draw
+		// exactly as Forge's Number$ gate does.
+		if ev.Kind == events.DrawBatchProposal {
+			if r.EventKind() != cards.ReplDrawCards {
+				return false
+			}
+		} else if ev.Kind != events.Draw {
 			return false
+		}
+		// Number$ <op><n> gates the class on the size of the draw being
+		// replaced (Alms Collector's "two or more cards"; the corpus's one
+		// Number$ Draw line). The amount is the batch's card count on the
+		// proposal and 1 on a per-card draw (drawMatchAmount).
+		if n, ok := r.Param(cards.PKNumber); ok {
+			op, want, parsed := splitCompare(strings.TrimSpace(n))
+			if !parsed || !applyCompare(int(drawMatchAmount(ev)), op, want) {
+				return false
+			}
 		}
 		// CR 611.3b: the ActiveZones gate above applies (a Draw replacement's
 		// source is already on the battlefield — there is no entering case,
@@ -851,9 +873,9 @@ func (e *Engine) replacementConditionHolds(r cards.Repl, source state.ObjID, you
 			return false
 		}
 	}
-	if _, ok := r.Param(cards.PKCheckDefinedPlayer); ok {
-		// The only corpus shape is You.isMonarch. Monarch state is not yet
-		// represented, so fail closed instead of preventing damage always.
+	if spec, ok := r.Param(cards.PKCheckDefinedPlayer); ok && !e.checkDefinedPlayerHolds(spec, source, you) {
+		// The trigger gate's one evaluator (Jared Carthalion's "while you're
+		// the monarch"); an unreadable predicate fails closed.
 		return false
 	}
 	if check, ok := r.Param(cards.PKCheckSVar); ok {

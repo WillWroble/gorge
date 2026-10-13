@@ -51,6 +51,10 @@ type ManaParams struct {
 	AmountLit   int
 	AmountIsLit bool
 
+	// Each$ (Brigid, Doun's Mind: "Add X {G} or X {W}"): the per-colour
+	// multiplier on every produced colour unit. Absent = 1.
+	Each ParamText
+
 	// RestrictValid$, trimmed.
 	RestrictValid string
 	// The production riders, trimmed ("" = absent).
@@ -121,6 +125,9 @@ func compileMana(sa *cards.SA, dp *DefinedParams) *ManaParams {
 		p.AmountLit, p.AmountIsLit = v, true
 	}
 
+	each, eachOK := sa.Param(cards.PKEach)
+	p.Each = ParamText{Text: each, Present: eachOK && strings.TrimSpace(each) != ""}
+
 	p.RestrictValid = strings.TrimSpace(sa.ParamStr(cards.PKRestrictValid))
 	p.AddsNoCounter = strings.TrimSpace(sa.ParamStr(cards.PKAddsNoCounter))
 	p.AddsCounters = strings.TrimSpace(sa.ParamStr(cards.PKAddsCounters))
@@ -186,7 +193,7 @@ var manaKnownKeys = [...]string{
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
 	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
 	"ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc", "Defined", "DefinedCards",
-	"DefinedTarget", "Description", "Exclude", "Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image",
+	"DefinedTarget", "Description", "Each", "Exclude", "Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image",
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IsCurse", "IsPresent", "KW",
 	"Keyword", "KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor",
 	"ModeCost", "Monstrosity", "NewController", "OpponentTurn", "PersistentMana",
@@ -201,7 +208,7 @@ var manaKnownKeys = [...]string{
 	"TargetsAtRandom", "TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType", "TargetsWithSharedTypes",
 	"TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription", "TriggersWhenSpent",
 	"Type", "Ultimate", "UnlessAI", "UnlessCost", "UnlessPayer", "UnlessResolveSubs",

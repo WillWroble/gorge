@@ -71,8 +71,7 @@
      "eq": 1
     }
    ],
-   "xmage": "DefiantVanguardTest#testAllDestroyed",
-   "known_bug": "B10: DestroyAll ValidCards$ Card.blockedBySourceThisTurn matches nothing: effects/filter_word.go:1471 knows only blockedBySource (live o.BlockedBy, :898-901), so Defiant Vanguard's end-of-combat delayed trigger destroys itself but not the creature it blocked."
+   "xmage": "DefiantVanguardTest#testAllDestroyed"
   }
  ]
 }

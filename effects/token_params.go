@@ -101,7 +101,7 @@ var tokenKnownKeys = [...]string{
 	"TargetValidTargeting", "TargetingPlayer", "TargetingPlayerControls", "TargetsAtRandom",
 	"TargetsForEachPlayer", "TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
-	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenAmount", "TokenAttacking",
 	"TokenOwner", "TokenPower", "TokenRemembered", "TokenScript", "TokenTapped",

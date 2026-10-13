@@ -173,10 +173,6 @@ func TestStaticExileUnservedRowsKeepTheNamedGap(t *testing.T) {
 		{"Veteran Survivor", "static#0.0", "static the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"},
 		{"Maralen, Fae Ascendant", "static#0.0", "static cards exiled by the source's Dig carry no exiled-with association (engine gap)"},
 		{"The Enigma Jewel", "static#1.0", "static needs the craft activation (the driver has no craft op)"},
-		{"Azula, Cunning Usurper", "static#0.0", "static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)"},
-		// Null Summoner is the same class outside the ticket's nine rows: the
-		// opponent-owned shape gets the same named reason.
-		{"Null Summoner", "static#0.0", "static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)"},
 	} {
 		t.Run(tc.card+"/"+tc.key, func(t *testing.T) {
 			it, skip := zoneItem(t, tc.card, tc.key)

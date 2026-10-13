@@ -369,7 +369,17 @@ func (e *Engine) mayPlaySpellIdsBoard(p state.PlayerID, board bool) []mayPlaySpe
 					}
 				}
 				o := e.G.Obj(id)
-				if o == nil || o.Controller != p || o.Face() == nil || o.Face().IsLand() {
+				if o == nil || o.Face() == nil || o.Face().IsLand() {
+					continue
+				}
+				// A card in another seat's public zone is controlled by its
+				// owner (CR 108.4a), yet a battlefield grant of p's can name
+				// it (Azula, Cunning Usurper's "cast cards exiled with
+				// Azula" covers the cards its ETB made an OPPONENT exile).
+				// Only a board-side grant can reach such a card -- its own
+				// self-grant belongs to its owner (mayPlayOwnStatics) --
+				// so with the board closed it is skipped outright.
+				if o.Controller != p && !board {
 					continue
 				}
 				addCard(z, id)
