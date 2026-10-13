@@ -239,7 +239,7 @@ func SharedTypeLabels(g *state.Game, source state.ObjID) []string {
 	n := 0
 	for i := range g.Objs {
 		o := &g.Objs[i]
-		if o.ExiledWith != source || o.Face() == nil {
+		if !exiledBySource(g, o, source) || o.Face() == nil {
 			continue
 		}
 		n++

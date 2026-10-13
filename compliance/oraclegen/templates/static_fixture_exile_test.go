@@ -169,8 +169,6 @@ func TestStaticExileDonorRowServesTerritoryForge(t *testing.T) {
 // the generic "counts cards exiled with the source" the family replaced.
 func TestStaticExileUnservedRowsKeepTheNamedGap(t *testing.T) {
 	for _, tc := range []struct{ card, key, want string }{
-		{"Valgavoth, Terror Eater", "static#0.0", "static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"},
-		{"Veteran Survivor", "static#0.0", "static the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"},
 		{"The Enigma Jewel", "static#1.0", "static needs the craft activation (the driver has no craft op)"},
 	} {
 		t.Run(tc.card+"/"+tc.key, func(t *testing.T) {

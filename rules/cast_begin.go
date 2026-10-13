@@ -154,7 +154,16 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 	// flashback/alternative recast would drop the modifiers entirely.
 	cost := pay.RawBaseCost(asPayer(e), p, id)
 	var announceAlt *altCostView
-	if opt.AltCostIndex > 0 {
+	if opt.AltCostIndex > 0 && opt.Mode == "mayplay" {
+		// A may-play cast at one of its permission's alternatives
+		// (mayPlayCastAlts, the list the may-play spell walk offered the
+		// index from: Valgavoth's life payment, Warped Space's {0}). The
+		// castModeMayplay arm below keeps the permission's RaiseCost$ and
+		// skips its free-cast read; the extras fold below still applies.
+		if alts := e.mayPlayCastAlts(p, id, e.mayPlayPlainGrant(p, id)); opt.AltCostIndex-1 < len(alts) {
+			cost = alts[opt.AltCostIndex-1]
+		}
+	} else if opt.AltCostIndex > 0 {
 		if alts := e.alternativeCosts(p, id); opt.AltCostIndex-1 < len(alts) {
 			cost = alts[opt.AltCostIndex-1].cost
 			announceAlt = &alts[opt.AltCostIndex-1]
@@ -331,7 +340,7 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 		// static's riders (mayPlayPermFreeRaise); an untyped option keeps
 		// the aggregate read.
 		free, raise, hasRaise, priced := e.mayPlayPermFreeRaise(p, id, opt.MayPlayPerm)
-		if free {
+		if free && opt.AltCostIndex == 0 {
 			cost = Cost{}
 		}
 		if hasRaise && priced {
@@ -546,7 +555,7 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 		cost = cost.Plus(parts[opt.AltCostIndex-1])
 		optionalCost = parts[opt.AltCostIndex-1]
 	}
-	if opt.AltCostIndex == 0 && (opt.Mode == "" || opt.Mode == "mayplay" || opt.Mode == "modal_spell" || opt.Mode == "room_alt" ||
+	if (opt.AltCostIndex > 0 && opt.Mode == "mayplay") || opt.AltCostIndex == 0 && (opt.Mode == "" || opt.Mode == "mayplay" || opt.Mode == "modal_spell" || opt.Mode == "room_alt" ||
 		opt.Mode == "adventure_alt" || opt.Mode == "aftermath" || opt.Mode == "split_alt" || opt.Mode == "conspired" || castAnswerCodes.Code(opt.Mode) == castAnswerTeamworkMode || opt.Mode == "casualty" || castModeCodes.Code(opt.Mode) == castModeBargained || opt.Mode == "mayflash" || opt.Mode == "retrace" || opt.Mode == "jumpstart" ||
 		// CR 702.34a/601.2f: flashback replaces only the mana cost; the
 		// spell's own additional cost (Eviscerator's Insight's sacrifice,
