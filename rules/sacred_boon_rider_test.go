@@ -127,6 +127,12 @@ func TestScarsOfTheVeteranRider(t *testing.T) {
 	t.Run("creature", func(t *testing.T) {
 		e, _, lion := boonSetup(t, "Scars of the Veteran", func(l state.ObjID) state.Target { return state.Target{Obj: l} })
 		boonDamage(t, e, lion, 2)
+		if got := len(e.G.Delayed); got != 1 {
+			t.Fatalf("precondition: registrations = %d, want 1", got)
+		}
+		if spec := e.G.Delayed[0].PresentSpec; spec != "Creature.IsRemembered" {
+			t.Fatalf("precondition: PresentSpec = %q, want Creature.IsRemembered (the IsPresent$ must be threaded into the registration)", spec)
+		}
 		fireEndStep(e)
 		if got := e.G.Obj(lion).Counter("P0P1"); got != 2 {
 			t.Fatalf("P0P1 counters = %d, want 2", got)
@@ -143,10 +149,42 @@ func TestScarsOfTheVeteranRider(t *testing.T) {
 		if got := e.G.Players[0].Life; got != 20 {
 			t.Fatalf("life = %d, want 20 (damage prevented)", got)
 		}
+		if got := len(e.G.Players[0].Counters); got != 0 {
+			t.Fatalf("precondition: player counters before the end step = %v, want none", e.G.Players[0].Counters)
+		}
 		fireEndStep(e)
-		if got := e.G.Obj(lion).Counter("P0P1"); got != 0 {
-			t.Fatalf("lion counters = %d, want 0", got)
+		if got := e.G.Players[0].Counter("P0P1"); got != 0 {
+			t.Fatalf("player P0P1 counters = %d, want 0: the player is not a creature", got)
+		}
+		if got := len(e.G.Players[0].Counters); got != 0 {
+			t.Fatalf("player counters = %v, want none", e.G.Players[0].Counters)
 		}
 		assertNoUnimplementedNotes(t, e)
 	})
+}
+
+// TestScarsOfTheVeteranRiderCreatureGoneGetsNothing: Scars has no
+// ExileOnMoved$, so the registration survives its target leaving the
+// battlefield; only the IsPresent$ Creature.IsRemembered gate (threaded
+// through the Effect Phase trigger path) stops the +0/+1 counters landing on
+// the card in its new zone.
+func TestScarsOfTheVeteranRiderCreatureGoneGetsNothing(t *testing.T) {
+	t.Parallel()
+	e, _, lion := boonSetup(t, "Scars of the Veteran", func(l state.ObjID) state.Target { return state.Target{Obj: l} })
+	boonDamage(t, e, lion, 2)
+	if got := len(e.G.Delayed); got != 1 {
+		t.Fatalf("precondition: registrations = %d, want 1", got)
+	}
+	if spec := e.G.Delayed[0].PresentSpec; spec != "Creature.IsRemembered" {
+		t.Fatalf("precondition: PresentSpec = %q, want Creature.IsRemembered (the IsPresent$ must be threaded into the registration)", spec)
+	}
+	e.emit(events.Event{Kind: events.MoveZone, Obj: lion, From: state.ZBattlefield, To: state.ZGraveyard})
+	if e.G.Obj(lion).Zone == state.ZBattlefield {
+		t.Fatal("precondition: lion left the battlefield")
+	}
+	fireEndStep(e)
+	if got := e.G.Obj(lion).Counter("P0P1"); got != 0 {
+		t.Fatalf("P0P1 counters on the graveyard card = %d, want 0: it is no longer a creature on the battlefield", got)
+	}
+	assertNoUnimplementedNotes(t, e)
 }

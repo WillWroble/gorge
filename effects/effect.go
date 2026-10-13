@@ -481,6 +481,21 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 			if vp := tl.ValidPlayer; vp != "" {
 				text += "|VP=" + vp
 			}
+			// IsPresent$/PresentZone$/PresentCompare$ (Scars of the Veteran's
+			// "if it's a creature"): the Phase registration's presence
+			// condition, decoded by rules' delayed scan exactly like the
+			// DelayedTrigger SA path's PhaseText (delayedtrigger_params.go).
+			// Appended before |RN= so the decoder's reverse strip order sees
+			// the amount suffix at the tail.
+			if tl.IsPresent != "" {
+				text += "|IP=" + tl.IsPresent
+				if tl.PresentZone != "" {
+					text += "|PZ=" + tl.PresentZone
+				}
+				if tl.PresentCompare != "" {
+					text += "|PC=" + tl.PresentCompare
+				}
+			}
 			// A prevention rider's delayed counter body (Sacred Boon) reads the
 			// amount this application prevented as Count$TriggerRememberAmount;
 			// "|RN=" rides last so the decode strips it first.
