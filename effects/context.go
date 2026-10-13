@@ -758,7 +758,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return nil, true
 	case definedSpecRememberedController:
-		return controllersOf(g, hostRemembered(h, c)), true // persistent-aware, capture-excluded
+		return rememberedControllersLKI(h, c), true
 	case definedSpecNonRememberedController:
 		// These selectors name living players other than the controller of a
 		// remembered CARD. A remembered player is not a card anchor, and an
@@ -1571,6 +1571,39 @@ func lkiControllerFor(c *Ctx, id state.ObjID) (state.PlayerID, bool) {
 		}
 	}
 	return 0, false
+}
+
+// rememberedControllersLKI is the controller read of a Remembered$ group,
+// with CR 608.2h look-back: a remembered object that is no longer on the
+// battlefield answers with the controller RememberLKI$ captured before its
+// departure (events.Apply's Move resets the live controller to the owner),
+// falling back to the live controller when no capture exists.
+//
+// When the resolution carries a ChangeZone capture, its own body wrote the
+// memory, so the group is the capture-excluded one (rememberedWithSource,
+// the set ConditionDefined$ Remembered gates read): the trigger's seeded
+// referent -- Unyielding Gatekeeper itself, in Ctx.Remembered because
+// resolvedRemembered returns an ordinary trigger's context unchanged -- is
+// not remembered by that body, and counting its controller made the Token
+// line mint a second Detective for the Gatekeeper's controller.
+func rememberedControllersLKI(h Host, c *Ctx) []state.Target {
+	g := h.Game()
+	if c == nil || len(c.Snap.ChangeZone) == 0 {
+		return controllersOf(g, hostRemembered(h, c)) // persistent-aware, capture-excluded
+	}
+	ts := rememberedWithSource(h, c)
+	rewritten := make([]state.Target, 0, len(ts))
+	for _, t := range ts {
+		if !t.IsPlayer {
+			if o := g.Obj(t.Obj); o != nil && o.Zone != state.ZBattlefield {
+				if p, ok := lkiControllerFor(c, t.Obj); ok {
+					t = state.Target{Player: p, IsPlayer: true}
+				}
+			}
+		}
+		rewritten = append(rewritten, t)
+	}
+	return controllersOf(g, rewritten)
 }
 
 // objectsOf returns Remembered's object entries (IsPlayer false) as a fresh
