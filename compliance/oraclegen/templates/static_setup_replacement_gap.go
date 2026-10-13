@@ -16,6 +16,11 @@ import (
 // ends in exile (measured: exile=[Shock], graveyard=[]), where the permission
 // never sees it; a hand-built engine with the probe already in the graveyard
 // offers the cast. "" when the face has no such replacement.
+//
+// Emet-Selch itself no longer reaches this gap: a fixture's setup graveyard
+// placement runs no replacement (placeSetupCard), and the offer path's
+// back-face retry (offerTry.backFace) serves the row. The reason stays for a
+// card the offer path still cannot serve.
 func staticSetupReplacementGap(f *cards.Face, st cards.Static) string {
 	if !st.HasParam(cards.PKMayPlay) ||
 		!strings.Contains(strings.ToLower(st.ParamStr(cards.PKAffectedZone)), "graveyard") {
