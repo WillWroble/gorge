@@ -89,8 +89,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testCreatureDamageTargetAndYou",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testCreatureDamageTargetAndYou"
   },
   {
    "name": "test-creature-damage-target-and-self",
@@ -184,8 +183,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testCreatureDamageTargetAndSelf",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testCreatureDamageTargetAndSelf"
   },
   {
    "name": "test-spell-damage-target-and-target",
@@ -266,8 +264,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndTarget",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndTarget"
   },
   {
    "name": "test-spell-damage-three-targets",
@@ -353,8 +350,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testSpellDamageThreeTargets",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testSpellDamageThreeTargets"
   },
   {
    "name": "test-spell-damage-target-and-you",
@@ -426,8 +422,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndYou",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndYou"
   },
   {
    "name": "test-spell-damage-target-and-controller",
@@ -499,8 +494,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndController",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testSpellDamageTargetAndController"
   },
   {
    "name": "test-spell-damage-player-and-controlled",
@@ -572,8 +566,7 @@
      }
     }
    ],
-   "xmage": "DamageMultiTriggerTest#testSpellDamagePlayerAndControlled",
-   "known_bug": "B15: one source dealing damage to several recipients at once fires Tamanoa/Spirit Link's \"deals damage, gain that much life\" once PER recipient, so Ajani's Pridemate sees several life-gain events instead of one. CR 120.2, 603.2c."
+   "xmage": "DamageMultiTriggerTest#testSpellDamagePlayerAndControlled"
   }
  ]
 }
