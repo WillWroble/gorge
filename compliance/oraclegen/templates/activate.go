@@ -247,6 +247,15 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 		p0.Battlefield = appendFixtureUnique(p0.Battlefield, name)
 	}
 	x := activationX(cost, saXMin(f.Abilities[abilityIndex]))
+	if tx, ok := targetManaValueX(reg, f.Abilities[abilityIndex], cost, fx.Targets()); ok {
+		// The announced X is the fixture target's mana value ("target
+		// creature card in your graveyard with mana value X"): any other X
+		// leaves the ability without a legal target, so neither engine
+		// can activate it. Price the pool at that X too.
+		if pool, gap := activationCostIn(cost, zone, name, tx); gap == "" {
+			x, mana = tx, pool
+		}
+	}
 	addActivationCostFixtures(&p0, name, cost, x)
 	addActivationCounterFixtures(&p0, f, name, cost)
 	etbCostGuardFixtures(&p0, f, cost, x)
@@ -355,6 +364,14 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	sc, targetSteps := oraclegen.ChooseTargets(sc, res.Decisions)
 	res, ok = oraclegen.PlaysThrough(reg, sc)
 	if !ok {
+		return oraclegen.Item{}, false
+	}
+	if f.Abilities[idx].API == "Charm" && charmModeTargetUnchosen(res.Decisions) {
+		// The fixture left the chosen mode without a legal target (Lost
+		// Jitte's "Untap target land." on a board with no land). XMage
+		// chooses the mode and its target on activation (CR 602.2b, 601.2b-c)
+		// and offers no mode whose targets are missing, so the scenario
+		// cannot activate there: try the next, target-seeded slot set.
 		return oraclegen.Item{}, false
 	}
 	// A hidden library search gorge's fallback declined: re-run taking the
@@ -638,6 +655,68 @@ func bracketPayload(tok string) (string, bool) {
 	return tok[i+1 : len(tok)-1], true
 }
 
+// charmModeTargetUnchosen reports a charm mode pick whose label names a
+// target ("Untap target land.") with no target picked at the same step.
+func charmModeTargetUnchosen(ds []rules.OracleDecision) bool {
+	for _, d := range ds {
+		if d.Kind != "mode" || d.Step < 0 || len(d.Picks) == 0 ||
+			!strings.Contains(strings.ToLower(strings.Join(d.Picks, " ")), "target") {
+			continue
+		}
+		chosen := false
+		for _, t := range ds {
+			// A resolution-time charm target is posed as a target or as a
+			// choose ("tgts", "choice"): any pick at the step counts.
+			if t.Step == d.Step && t.Kind != "mode" && len(t.Picks) > 0 {
+				chosen = true
+			}
+		}
+		if !chosen {
+			return true
+		}
+	}
+	return false
+}
+
+// targetManaValueX is the X a bare-X cost announces when the ability's target
+// filter compares mana value to X (Likeness Looter's Creature.YouOwn+cmcEQX,
+// Rydia's Saga.YouOwn+cmcEQX): the mana value of the fixture's first target.
+func targetManaValueX(reg *cards.Registry, sa *cards.SA, cost string, targets []string) (int, bool) {
+	bare := false
+	for _, tok := range costTokens(cost) {
+		bare = bare || tok == "X"
+	}
+	if !bare || len(targets) == 0 || !strings.Contains(strings.ToLower(sa.ParamStr(cards.PKValidTgts)), "cmceqx") {
+		return 0, false
+	}
+	ref := targets[0]
+	if i := strings.IndexByte(ref, ':'); i >= 0 {
+		ref = ref[i+1:]
+	}
+	if i := strings.LastIndexByte(ref, '#'); i >= 0 {
+		ref = ref[:i]
+	}
+	c, ok := reg.Lookup(ref)
+	if !ok || len(c.Faces) == 0 {
+		return 0, false
+	}
+	mv := int(c.Faces[0].ManaValue())
+	return mv, mv > 0
+}
+
+// hasNamedSelfExile reports a grave-exile cost token whose filter names the
+// source card itself (namedSelfCount).
+func hasNamedSelfExile(cost, name string) bool {
+	for _, tok := range costTokens(cost) {
+		if strings.HasPrefix(tok, "ExileFromGrave<") {
+			if _, ok := namedSelfCount(tok, name, 0); ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // addActivationCostAnswers scripts XMage's cost selector with the same
 // deterministic fixture objects used by the engine-side payment path.
 func addActivationCostAnswers(answers [][]oraclegen.XAnswer, step int, cost, name string, decisions []rules.OracleDecision, x ...int) {
@@ -659,13 +738,24 @@ func addActivationCostAnswers(answers [][]oraclegen.XAnswer, step int, cost, nam
 			}
 			picks = discardCostPlacement(tok)
 		case "ExileFromGrave", "ExileCtrlOrGrave", "CollectEvidence", "Exile":
+			// A self-named grave exile (Say Its Name's "two other cards
+			// named Say Its Name") gets no catalogue answer: gorge's observed
+			// exilecost picks already ride XMage's target queue (xmQueue).
+			// Its companion "exile this card" token gets none either: a stray
+			// choice is consumed first by that named target and rejected.
+			if head == "ExileFromGrave" && selfZoneCost(tok) && hasNamedSelfExile(cost, name) {
+				break
+			}
 			picks = activationCostFixturesX(tok, xv)
-			if len(picks) == 0 {
-				if n, ok := namedSelfCount(tok, name, xv); ok {
-					for i := 0; i < n; i++ {
-						picks = append(picks, name)
-					}
-				}
+		case "SubCounter", "RemoveAnyCounter":
+			// A counter removed from ANOTHER permanent ("Remove a +1/+1
+			// counter from a creature you control", Sunstar Chaplain):
+			// XMage's RemoveCounterCost picks the permanent with its own
+			// TargetPermanent, answered from the choice queue even when only
+			// one candidate exists (gorge pays it silently), so name the
+			// fixture holding the counters.
+			if _, _, fixture, ok := otherCounterCost(tok); ok {
+				picks = []string{fixture}
 			}
 		case "Return":
 			// The engine's observed returncost pick is authoritative (a broad
@@ -744,7 +834,25 @@ func addActivationCostAnswers(answers [][]oraclegen.XAnswer, step int, cost, nam
 		}
 	}
 	answers[step] = appendTokenAnswers(answers[step], 0, tokenPicks...)
+	if n := tapXAnnounced(cost, xv); n > 0 {
+		// "Tap X untapped artifacts you control" (Secluded Starforge):
+		// XMage's TapVariableTargetCost announces X on the choice queue
+		// (TestPlayer.announceX reads "X=<n>") before it pays the tap
+		// selection the observed picks script below.
+		answers[step] = append(answers[step], oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: "X=" + strconv.Itoa(n)})
+	}
 	addTapXTypeAnswers(answers, step, cost, decisions)
+}
+
+// tapXAnnounced is the X a tapXType<X/...> cost announces (x, the template's
+// tap count), or 0 when the cost has no such part.
+func tapXAnnounced(cost string, x int) int {
+	for _, tok := range costTokens(cost) {
+		if strings.HasPrefix(tok, "tapXType<X/") {
+			return x
+		}
+	}
+	return 0
 }
 
 // dropUnproducedManaColours removes the activate step's colour choice when
@@ -830,7 +938,14 @@ func addActivationCostFixtures(p0 *oraclegen.Seat, name, cost string, x ...int) 
 			// attached Aura/Equipment is placed here and attached by
 			// sacAttachSteps in the prelude.
 			if card, ok := sacAttachedFixture(tok); ok {
-				p0.Battlefield = appendFixtureUnique(p0.Battlefield, card)
+				if card == attachedAuraFixture {
+					// Cast onto the source by sacAttachSteps: XMage puts an
+					// unattached Aura into the graveyard at the first state-based
+					// check (CR 704.5m), before an attach step could run.
+					p0.Hand = appendFixtureUnique(p0.Hand, card)
+				} else {
+					p0.Battlefield = appendFixtureUnique(p0.Battlefield, card)
+				}
 			} else if cards, ok := sacFilterFixtures(tok, xv); ok {
 				for _, card := range cards {
 					p0.Battlefield = appendFixtureUnique(p0.Battlefield, card)

@@ -216,7 +216,7 @@ func sacAttachedFixture(tok string) (string, bool) {
 		case "equipment":
 			return "Bonesplitter", true
 		case "aura":
-			return "Unholy Strength", true
+			return attachedAuraFixture, true
 		}
 	}
 	return "", false
@@ -307,12 +307,27 @@ func sacAttachSteps(name, cost, zone string) []oraclegen.Step {
 	}
 	var out []oraclegen.Step
 	for _, tok := range costTokens(cost) {
-		if card, ok := sacAttachedFixture(tok); ok {
+		card, ok := sacAttachedFixture(tok)
+		switch {
+		case !ok:
+		case card == attachedAuraFixture:
+			// The Aura is cast onto the source from p0's hand: a battlefield
+			// placement is an unattached Aura, which XMage's state-based
+			// check (CR 704.5m) bins before an attach step runs, so XMage's
+			// "attach" step finds no permanent to attach.
+			out = append(out,
+				oraclegen.Step{Op: "cast", Seat: 0, Card: "p0:" + card, Mana: "B", Targets: []string{"p0:" + name}},
+				oraclegen.Step{Op: "resolve"})
+		default:
 			out = append(out, oraclegen.Step{Op: "attach", Seat: 0, Card: "p0:" + card, AttachedTo: "p0:" + name})
 		}
 	}
 	return out
 }
+
+// attachedAuraFixture is the Aura an attached-Aura Sac cost sacrifices
+// ({B} Unholy Strength, cast onto the source in the prelude).
+const attachedAuraFixture = "Unholy Strength"
 
 // sacFixtureSupported reports whether a Sac token is cellable (self, a
 // fixture the table names, an attached Aura/Equipment, or a token a maker

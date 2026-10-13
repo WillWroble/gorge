@@ -198,7 +198,7 @@ func staticScenario(f *cards.Face, name string, battlefield []string, hand []str
 	p1 := oraclegen.Seat{}
 	sc := oraclegen.Scenario{
 		Setup:        map[string]oraclegen.Seat{"p0": p0, "p1": p1},
-		SetupAnswers: oraclegen.OpeningHandAnswers(f),
+		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), faceKeepAnswers(f)...),
 		Steps:        append([]oraclegen.Step(nil), steps...),
 	}
 	oraclegen.Baseline(sc.Setup, f)

@@ -233,6 +233,9 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 			if cond.reanswers {
 				base.XAnswers = oraclegen.XAnswersForScenario(res, base.Scenario,
 					oraclegen.ModeNumbers(f), castStepIndices(base.Scenario.Steps))
+				if cond.beholdPick != "" {
+					beholdFromHand(base.XAnswers, base.Scenario.Steps, name, cond.beholdPick)
+				}
 				if cond.activationCost != "" {
 					for i := len(base.Scenario.Steps) - len(cond.afterSteps); i < len(base.Scenario.Steps); i++ {
 						if i < 0 || i >= len(base.Scenario.Steps) || base.Scenario.Steps[i].Op != "activate" {
