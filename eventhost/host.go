@@ -144,7 +144,9 @@ func New(o Options) (*Host, error) {
 }
 
 // prepare loads the set spec and builds the run's drafters and builders.
-// The caller has filled meta.
+// Every seat gets a builder (a human's is its suggestion; its drafter is
+// never driven, advanceDraft only reads bot seats' drafters). The caller
+// has filled meta.
 func (r *run) prepare(lookup pickbotCardLookup) error {
 	spec, err := setdata.Load(r.meta.Set)
 	if err != nil {
@@ -152,10 +154,11 @@ func (r *run) prepare(lookup pickbotCardLookup) error {
 	}
 	r.spec = spec
 	for s, ms := range r.meta.Seats {
-		if ms.Kind != "bot" {
-			continue
+		persona := ms.Drafter
+		if persona == "" {
+			persona = "rating-colour"
 		}
-		d, b, err := r.h.newPersona(ms.Drafter, lookup)
+		d, b, err := r.h.newPersona(persona, lookup)
 		if err != nil {
 			return fmt.Errorf("seat %d: %w", s, err)
 		}

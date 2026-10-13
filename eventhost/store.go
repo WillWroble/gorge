@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/event"
 )
 
@@ -42,8 +43,9 @@ type metaSeat struct {
 
 // memEvent is one in-memory event of a memory-mode store.
 type memEvent struct {
-	m   meta
-	log []event.Entry
+	m     meta
+	log   []event.Entry
+	decks map[[2]int]deck.File // key {seat, rev}
 }
 
 // Store persists draft events under a directory, one subdirectory per
