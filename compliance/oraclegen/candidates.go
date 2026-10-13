@@ -479,6 +479,9 @@ type cand struct {
 	// "creature with a +1/+1 counter on it" filter).
 	counterKind string
 	counterN    int
+	// equipment is an Equipment placed beside the candidate on its seat and
+	// attached to it by an attach prelude (an "equipped creature" filter).
+	equipment string
 }
 
 // It reads the registry for subtype and qualifier filters the fixed type list
@@ -655,6 +658,18 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 		}
 		if kind, n, ok := counterDemand(filter); ok {
 			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Grizzly Bears", counterKind: kind, counterN: n}})
+		}
+		// An "equipped creature" (Item Shopkeep's "target attacking equipped
+		// creature") carries a quiet Equipment the setup attaches; a
+		// "modified creature" (Silver Sable's, CR 700.9) is served by the
+		// simplest modification, a +1/+1 counter placed at setup. Hill Giant,
+		// not the Grizzly Bears Baseline already puts on p1, so the target
+		// ref names one object.
+		if filterPredicate(filter, "equipped") {
+			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Hill Giant", equipment: quietEquipment}})
+		}
+		if filterPredicate(filter, "modified") {
+			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Hill Giant", counterKind: "P1P1", counterN: 1}})
 		}
 	}
 	// A combat-role filter over a subtype or a token (Totentanz, Swarm
@@ -874,7 +889,16 @@ func filterSubtypeWord(alt string) (string, bool) {
 		case "youctrl", "youown", "oppcrtl", "oppctrl", "oppown", "you", "opponent", "opponents",
 			"white", "blue", "black", "red", "green", "colorless", "multicolour",
 			"token", "enchanted", "attacking", "blocking", "tapped", "untapped",
-			"noabilities", "legendary", "thisturnentered", "other", "self", "noncreature", "nonland":
+			"noabilities", "legendary", "thisturnentered", "other", "self", "noncreature", "nonland",
+			// Board-state qualifiers the predicate block in candidatesFor
+			// arranges (a counter, an attached Equipment), not subtypes.
+			"modified", "equipped":
+			continue
+		}
+		// A relational exclusion ("other than the triggered card / target",
+		// NotDefinedTriggeredCard) is met by any candidate that is not that
+		// object, so it names no subtype.
+		if strings.HasPrefix(lower, "notdefined") {
 			continue
 		}
 		if strings.HasPrefix(lower, "non") || strings.HasPrefix(lower, "!") || strings.HasPrefix(lower, "with") ||
@@ -942,6 +966,12 @@ func enchantedCandidates(mine bool) []cand {
 		},
 	}}
 }
+
+// quietEquipment is the Equipment an "equipped creature" candidate carries:
+// Bonesplitter ({1}, equipped creature gets +2/+0, Equip {1}) has no trigger
+// and no target of its own, so attaching it at setup adds nothing but the
+// equipped state.
+const quietEquipment = "Bonesplitter"
 
 func seatIndex(seat string) int {
 	if seat == "p0" {
@@ -1318,6 +1348,9 @@ func buildFixtures(reg *cards.Registry, slots []Slot, serveStack bool, stackTarg
 					if c.attachTo != "" {
 						n.pre = append(n.pre, Step{Op: "attach", Seat: seatIndex(c.seat), Card: ref, AttachedTo: c.attachTo})
 					}
+					if c.equipment != "" {
+						n.pre = append(n.pre, Step{Op: "attach", Seat: seatIndex(c.seat), Card: c.seat + ":" + c.equipment, AttachedTo: ref})
+					}
 					switch c.role {
 					case roleAttacker:
 						n.combat.attackers = append(n.combat.attackers, ref)
@@ -1405,6 +1438,9 @@ func place(fx *fixture, c cand) {
 		switch c.zone {
 		case "battlefield":
 			s.Battlefield = append(s.Battlefield, c.card)
+			if c.equipment != "" {
+				s.Battlefield = append(s.Battlefield, c.equipment)
+			}
 			if c.counterN > 0 {
 				*s = WithCounters(*s, c.card, c.counterKind, int32(c.counterN))
 			}
