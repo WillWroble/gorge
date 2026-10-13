@@ -83,6 +83,9 @@ type pendingTrigger struct {
 	// Execute is the Execute$ SVar name (which events.Apply's DelayedPush case
 	// resolves from the source's SVar table).
 	Delayed bool
+	// DelayedStatic marks a Delayed registration that carried Static$ True:
+	// resolveStaticTriggers runs its body off the stack (Gideon Jura).
+	DelayedStatic bool
 	// Chapter marks a Saga chapter ability: it is a triggered ability even
 	// though its delayed-shape stack object has no T: line to record.
 	Chapter   bool
