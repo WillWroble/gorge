@@ -17,10 +17,11 @@ import (
 const (
 	wantBackFaceETBServed = 5  // Craft front faces: the craft cause serves them
 	wantBackFaceETBNamed  = 11 // no Craft (disturb, return-transformed) or an unplaceable craft cost
-	// wantManaFromCardSkips is every "spell cast using mana produced by
+	// wantManaFromCardServed is every "spell cast using mana produced by
 	// CARDNAME" trigger (Tecutlan, The Myriad Pools, Barracks of the
-	// Thousand): gorge reads no mana provenance, so each is a named skip.
-	wantManaFromCardSkips = 3
+	// Thousand): spellCastSourceManaCause serves each (the producing-source
+	// provenance, rules/cast_mana_sources.go).
+	wantManaFromCardServed = 3
 )
 
 // TestBackFaceSelfETBCensus is the corpus-wide ratchet for the back-face
@@ -52,9 +53,8 @@ func TestBackFaceSelfETBCensus(t *testing.T) {
 			tr := &f.Triggers[idx]
 			key := c.Faces[0].Name + " " + r.Key
 			if strings.Contains(strings.ToLower(tr.ParamStr(cards.PKValidSA)), "manafromcard") {
-				_, skip := GenerateB(reg, c.Faces[0].Name, r)
-				if skip == nil || !strings.Contains(skip.Reason, "mana-from-source provenance") {
-					t.Errorf("%s: want the mana-from-source named skip, got %+v", key, skip)
+				if _, skip := GenerateB(reg, c.Faces[0].Name, r); skip != nil {
+					t.Errorf("%s: want the mana-from-source cause to serve it, got %+v", key, skip)
 				}
 				manaFrom++
 				continue
@@ -81,7 +81,7 @@ func TestBackFaceSelfETBCensus(t *testing.T) {
 		}
 	}
 	sort.Strings(bare)
-	t.Logf("back-face self-ETB: %d served by craft, %d named skips; %d mana-from-source skips", len(served), len(named), manaFrom)
+	t.Logf("back-face self-ETB: %d served by craft, %d named skips; %d mana-from-source served", len(served), len(named), manaFrom)
 	for _, want := range []string{"Clay-Fired Bricks", "Idol of the Deep King", "Jade Seedstones", "Paleontologist's Pick-Axe", "Visage of Dread"} {
 		if !served[want+" trigger#1.0"] {
 			t.Errorf("%s trigger#1.0 is not served by the craft cause", want)
@@ -93,7 +93,7 @@ func TestBackFaceSelfETBCensus(t *testing.T) {
 	if len(served) != wantBackFaceETBServed || len(named) != wantBackFaceETBNamed {
 		t.Errorf("back-face self-ETB split = %d served / %d named, want %d / %d", len(served), len(named), wantBackFaceETBServed, wantBackFaceETBNamed)
 	}
-	if manaFrom != wantManaFromCardSkips {
-		t.Errorf("mana-from-source triggers = %d, want %d", manaFrom, wantManaFromCardSkips)
+	if manaFrom != wantManaFromCardServed {
+		t.Errorf("mana-from-source triggers = %d, want %d", manaFrom, wantManaFromCardServed)
 	}
 }

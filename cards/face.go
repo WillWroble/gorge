@@ -285,6 +285,25 @@ func (f *Face) textualManaReflectedAbilities() []*SA {
 	return out
 }
 
+// ReadsSpentManaSource reports whether a trigger of this face reads the
+// producing source of the mana a cast spent: a ValidSA$ naming the
+// Spell.ManaFromCard property ("whenever you cast a ... spell using mana
+// produced by CARDNAME": Tecutlan, the Searing Rift; The Myriad Pools;
+// Barracks of the Thousand). A producer whose face answers yes keeps its
+// mana's source identity in the pool (effects.ManaSourceObserved). A walk
+// over the face's own trigger lines; nil-safe and allocation-free.
+func (f *Face) ReadsSpentManaSource() bool {
+	if f == nil {
+		return false
+	}
+	for i := range f.Triggers {
+		if v, ok := f.Triggers[i].Param(PKValidSA); ok && strings.Contains(v, "ManaFromCard") {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Face) Power() int     { return int(f.power) }
 func (f *Face) Toughness() int { return int(f.toughness) }
 

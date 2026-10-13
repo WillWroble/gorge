@@ -291,12 +291,11 @@ func spellCastNarrowSkip(t *cards.Trigger) string {
 		}
 	}
 	// "Whenever you cast a spell using mana produced by CARDNAME" (Tecutlan,
-	// The Myriad Pools, Barracks of the Thousand): gorge reads no spell-cast
-	// mana provenance, so the trigger stays inert on a cast the source paid
-	// for (rules/spellcast_permanent_test.go pins it fail-closed) and no
-	// cause can make it fire.
+	// The Myriad Pools, Barracks of the Thousand) is served by
+	// spellCastSourceManaCause; a carrier it could not serve (no bare-{T}
+	// mana ability of its own) is named here rather than "did not fire".
 	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromcard") {
-		return "spell-cast unsupported mana-from-source provenance (ValidSA$ ManaFromCard)"
+		return "spell-cast mana-from-source provenance: no own {T} mana ability to produce the spent mana"
 	}
 	// No OpponentTurn$ branch: levelb routes every OpponentTurn$ True row to
 	// the trigger.spell-cast-opponent-turn sub, whose cast-family cause

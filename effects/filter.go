@@ -898,8 +898,8 @@ func init() {
 	// Dead, Necromancy, Genesis, ...) and 4 `ValidCard$ Card.StrictlySelf` --
 	// where the live id read is the whole meaning. The 3
 	// `ValidSA$ Spell.ManaFromCard.StrictlySelf` spellcast-provenance
-	// carriers stay fail closed on their own unread ManaFromCard word, so
-	// this alias cannot reach them.
+	// carriers never reach this alias: rules/trigmatch reads that whole
+	// clause as the producing-source provenance (Object.ManaSpentSources).
 	predicates["StrictlySelf"] = predicates["Self"]
 	// EffectSource is the Effect-delivered spelling of Self: the effect's own
 	// source object (Card.EffectSource in a StaticAbilities$ body's

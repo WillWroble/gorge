@@ -485,6 +485,21 @@ const (
 	// (CR 707.10), so it must not inherit the bit. Appended after
 	// FlagTeamworkPaid to preserve all bits already in main.
 	FlagPreparedCopy
+	// FlagManaSourcesSpent marks a cast whose pay-time CastInfo carries the
+	// producing SOURCES of the mana the payment spent: the deduplicated ids
+	// of every permanent whose source-attributed pool batch
+	// (state.ManaRestriction.Source) paid for the spell ride the event's IDs
+	// into Object.ManaSpentSources. It is what the SpellCast trigger's
+	// `ValidSA$ Spell.ManaFromCard.StrictlySelf` reads ("whenever you cast a
+	// permanent spell using mana produced by CARDNAME": Tecutlan, the Searing
+	// Rift; The Myriad Pools; Barracks of the Thousand). Only a cast that
+	// spent the mana of a producer carrying such a reader emits it
+	// (rules' manaSourcesCastInfo), so every unrelated cast stays
+	// byte-identical. It IS a CastProvenanceFlag: "cast using mana produced
+	// by" is a statement about the cast, so a stack copy -- put on the stack,
+	// never cast (CR 707.10) -- must not inherit it. Appended after
+	// FlagPreparedCopy to preserve all bits already in main.
+	FlagManaSourcesSpent
 )
 
 // CastProvenanceFlags is the ONE home for the CastFlags bits whose reader
@@ -536,7 +551,7 @@ const (
 // statement about the cast, and the prepared designation's exile copy is the
 // only object that was CAST with the grant; a copy OF that copy is put on the
 // stack, never cast (CR 707.10), so it must not re-fire Codie's trigger.
-const CastProvenanceFlags = FlagMayFlashSac | FlagMayhem | FlagMayPlay | FlagPromisedGift | FlagRebound | FlagBlitzed | FlagAddsCounters | FlagWebSlinged | FlagSneaked | FlagManaColorSpent | FlagImpending | FlagBargained | FlagPreparedCopy
+const CastProvenanceFlags = FlagMayFlashSac | FlagMayhem | FlagMayPlay | FlagPromisedGift | FlagRebound | FlagBlitzed | FlagAddsCounters | FlagWebSlinged | FlagSneaked | FlagManaColorSpent | FlagImpending | FlagBargained | FlagPreparedCopy | FlagManaSourcesSpent
 
 // ExilesLeavingStack reports whether a cast carrying these flags is a
 // keyword cast whose card is exiled as it leaves the stack, whichever way it
@@ -1177,6 +1192,17 @@ type Object struct {
 	// in events.Move; a COPY of the spell was never convoked for and reads
 	// empty.
 	Convoked []ObjID
+	// ManaSpentSources is the ids of the permanents whose mana paid for the
+	// spell's cast, as far as the pool attributes units to a source (a
+	// source-bearing pool batch, state.ManaRestriction.Source), carried by
+	// the pay-time CastInfo's FlagManaSourcesSpent IDs in deterministic batch
+	// order, deduplicated. The SpellCast `ValidSA$ Spell.ManaFromCard.
+	// StrictlySelf` provenance reads it (rules/trigmatch). It rides the same
+	// provenance window as X/CastFlags and resets alongside them in
+	// events.Move; a COPY of the spell was never cast and reads empty. The
+	// fold assigns a fresh slice and nothing mutates it in place, so a clone
+	// may share it (the Convoked convention).
+	ManaSpentSources []ObjID
 	// ManaSpent is the TOTAL mana actually spent to cast the spell (CR
 	// 601.2h's payment -- the spent delta's pips summed over every slot),
 	// carried by the pay-time CastInfo's FlagManaSpent Amount (the
@@ -1650,7 +1676,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [50]byte
+	_ [26]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
