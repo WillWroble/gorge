@@ -2383,6 +2383,8 @@ public class ScenarioReplay extends CardTestPlayerBase {
     static final String CMD_REQUIRE_STACK = "pass pair needs a stack object";
     static final String CMD_WAIT_RESOLVE_ONE = "waitStackResolved:1";
     static final String CMD_YIELD_PRIORITY = "pass handoff to the opponent";
+    static final String CMD_REQUIRE_EMPTY_STACK = "opening pass pair needs an empty stack";
+    static final String CMD_ADVANCE_STEP = "opening pass pair advances the step";
 
     private static boolean isOp(JsonArray steps, int index, String op) {
         return index >= 0 && index < steps.size() && str(steps.get(index).getAsJsonObject(), "op").equals(op);
@@ -2464,10 +2466,39 @@ public class ScenarioReplay extends CardTestPlayerBase {
             cmds.add(CMD_YIELD_PRIORITY);
         }
         if (passHere && passAction(steps, index) == PASS_PAIR_SECOND) {
-            cmds.add(CMD_REQUIRE_STACK);
-            cmds.add(CMD_WAIT_RESOLVE_ONE);
+            if (pairOpensScenario(steps, index)) {
+                cmds.add(CMD_REQUIRE_EMPTY_STACK);
+                cmds.add(CMD_ADVANCE_STEP);
+            } else {
+                cmds.add(CMD_REQUIRE_STACK);
+                cmds.add(CMD_WAIT_RESOLVE_ONE);
+            }
         }
         return cmds;
+    }
+
+    /** Whether the pass pair whose second pass is step {@code second} is the
+     * scenario's first two steps AND its only steps. Setup then puts nothing
+     * on the stack: the CantBeCast/CantBeActivated opponent-priority probes
+     * (static_cant_be.go) are exactly that pair, so both seats pass in
+     * succession on an empty stack and the game moves to the next step (CR
+     * 500.2), as gorge's does. A pair with any step after it is a prelude to
+     * those steps -- a beginning-of-step trigger is still on the stack there
+     * (Shadow of the Goblin's setupResolvePrelude emits the pair before a
+     * cast) -- so it resolves the top object like any other pair, even though
+     * it is also the scenario's first two steps. */
+    static boolean pairOpensScenario(JsonArray steps, int second) {
+        return second == 1 && steps.size() == 2;
+    }
+
+    /** The step an opening pass pair moves the game to: the step after the
+     * one it was passed in. Only main1, where every scenario starts, is
+     * mapped; anything else fails loudly rather than being guessed at. */
+    static PhaseStep stepAfterEmptyPass(PhaseStep from) {
+        if (from == PhaseStep.PRECOMBAT_MAIN) {
+            return PhaseStep.BEGIN_COMBAT;
+        }
+        throw new IllegalArgumentException("opening pass pair in " + from + " is unsupported");
     }
 
     /** A pass_to for decision "priority" that directly follows a pass_to for
@@ -2504,6 +2535,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     break;
                 case CMD_YIELD_PRIORITY:
                     runCode(cmd, turn, phase, playerA, (info, pl, g) -> pl.pass(g));
+                    break;
+                case CMD_REQUIRE_EMPTY_STACK:
+                    runCode(cmd, turn, phase, playerA, (info, pl, g) -> {
+                        if (!g.getStack().isEmpty()) {
+                            throw new IllegalStateException(cmd + ": the stack holds " + g.getStack().size());
+                        }
+                    });
+                    break;
+                case CMD_ADVANCE_STEP:
+                    // Both seats pass on the empty stack, so the pair's
+                    // checkpoint is the next step's first priority.
+                    phase = stepAfterEmptyPass(phase);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown pass command " + cmd);
@@ -2549,8 +2592,12 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     phase = PhaseStep.DECLARE_ATTACKERS;
                     return;
                 }
+                List<String> attackNames = new ArrayList<>();
                 for (String a : attackers) {
-                    attack(turn, p, combatName(a), seat(seatOf(str(st, "defender"))));
+                    attackNames.add(combatName(a));
+                }
+                for (String a : attackCommandOrder(attackNames)) {
+                    attack(turn, p, a, seat(seatOf(str(st, "defender"))));
                 }
                 phase = PhaseStep.DECLARE_ATTACKERS;
                 return;
@@ -3212,6 +3259,46 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
         }
         return n;
+    }
+
+    /** The attack commands in the order XMage can consume them. TestPlayer
+     * finds a "Name:k" attacker as the k-th UNTAPPED creature of that name
+     * (FilterCreatureForCombat), and declaring an attacker taps it at once
+     * (Combat.declareAttacker), so after "Goblin Token" is declared
+     * "Goblin Token:1" names a creature that is no longer there and the
+     * command is left over. Declaring same-name duplicates highest index
+     * first never shifts a lower index, with or without vigilance. Each
+     * name's commands keep the positions that name held; other names are
+     * untouched. */
+    static List<String> attackCommandOrder(List<String> combatNames) {
+        Map<String, List<Integer>> positions = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < combatNames.size(); i++) {
+            positions.computeIfAbsent(combatBaseName(combatNames.get(i)), k -> new ArrayList<>()).add(i);
+        }
+        List<String> out = new ArrayList<>(combatNames);
+        for (List<Integer> at : positions.values()) {
+            List<String> group = new ArrayList<>();
+            for (int i : at) {
+                group.add(combatNames.get(i));
+            }
+            group.sort(java.util.Comparator.comparingInt(ScenarioReplay::combatIndex).reversed());
+            for (int k = 0; k < at.size(); k++) {
+                out.set(at.get(k), group.get(k));
+            }
+        }
+        return out;
+    }
+
+    /** "Goblin Token:1" -> "Goblin Token"; a name with no index unchanged. */
+    static String combatBaseName(String combatName) {
+        int c = combatName.lastIndexOf(':');
+        return c >= 0 && combatName.substring(c + 1).matches("[0-9]+") ? combatName.substring(0, c) : combatName;
+    }
+
+    /** "Goblin Token:1" -> 1; a name with no index is index 0. */
+    static int combatIndex(String combatName) {
+        int c = combatName.lastIndexOf(':');
+        return c >= 0 && combatName.substring(c + 1).matches("[0-9]+") ? Integer.parseInt(combatName.substring(c + 1)) : 0;
     }
 
     /** Whether every named attacker is a card XMage forces to attack (an
