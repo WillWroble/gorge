@@ -69,6 +69,38 @@ func TestModalTriggerWithNoTargetableModeIsRemoved(t *testing.T) {
 	replayCheck(t, e, cfg)
 }
 
+// TestOptionalModalTriggerWithNoTargetableModeIsRemoved: a "choose up to
+// one" (Optional$, minimum 0) modal trigger whose every mode needs a target
+// on an empty board has no choosable mode; it is removed, never posing a
+// zero-option mode ask (which the asking layer rejects with a panic).
+func TestOptionalModalTriggerWithNoTargetableModeIsRemoved(t *testing.T) {
+	t.Parallel()
+	src := strings.Replace(ferocificationSrc, "Choices$ DBPump,DBPumpKW",
+		"Choices$ DBPump,DBPumpKW | Optional$ True", 1)
+	e, cfg, _ := newFixtureDeck(t, 7103, src)
+	s := putCreature(t, e, 0, src)
+	face := e.G.Obj(s).Face()
+	charm := cards.ResolveSVar(face.SVars, "TrigCharm")
+	if charm == nil || !effects.CharmOf(charm).OptionalTrue {
+		t.Fatalf("fixture precondition: TrigCharm not Optional$: %+v", charm)
+	}
+	for _, m := range []string{"DBPump", "DBPumpKW"} {
+		if n := len(e.legalTargetCandidates(0, s, s, cards.ResolveSVar(face.SVars, m))); n != 0 {
+			t.Fatalf("fixture precondition: %s has %d targets, want zero", m, n)
+		}
+	}
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepBeginCombat})
+	e.putTriggersOnStack()
+	ab := triggerObjOf(t, e, s)
+	if d := e.Pending(); d != nil && (d.Kind == decision.KModes || d.Kind == decision.KTarget) {
+		t.Fatalf("posed %s for a trigger with no choosable mode: %+v", d.Kind, d)
+	}
+	if ab.Zone != state.ZExile || len(e.G.Stack) != 0 {
+		t.Fatalf("trigger zone = %s stack = %v, want removed (exile), empty stack", ab.Zone, e.G.Stack)
+	}
+	replayCheck(t, e, cfg)
+}
+
 func TestModalTriggerOffersOnlyTargetableModes(t *testing.T) {
 	t.Parallel()
 	src := "Name:Half Targetable Charm\nManaCost:2 R\nTypes:Enchantment\n" +

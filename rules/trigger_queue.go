@@ -1922,11 +1922,14 @@ func (e *Engine) askTriggerModes(p state.PlayerID, obj state.ObjID, sa *cards.SA
 	// list is filtered before the bounds clamp and the options are built. With
 	// every mode exhausted, the min-over-modes guard below removes the
 	// trigger. CR 700.2a: a mode whose mandatory targets have no legal
-	// candidate can't be chosen either, so it is filtered the same way.
+	// candidate can't be chosen either, so it is filtered the same way. With
+	// no mode left at all the trigger is removed even when its minimum is 0
+	// (Optional$): CR 603.3c, no mode chosen, and a zero-option ask is never
+	// posted.
 	eligible := effects.CharmEligibleModes(e, source, sa, choices)
 	eligible = triggerModesWithTargets(e, p, obj, svars, eligible)
 	min, max, repeat := effects.CharmModeBounds(e, ctx, sa, len(eligible))
-	if (min > len(eligible) && !repeat) || (min > 0 && len(eligible) == 0) {
+	if len(eligible) == 0 || (min > len(eligible) && !repeat) {
 		removeModelessTrigger(e, obj)
 		return true
 	}
