@@ -41,6 +41,7 @@ type fingerprintFile struct {
 var fingerprintCensus = map[string]fingerprintFile{
 	"ability_class.go":        {true, "IsManaAbilitySA/requiresTarget classify abilities during compile"},
 	"affected_defined.go":     {true, "NormalizeAffectedDefined rewrites static params during compile"},
+	"ateot_values.go":         {true, "atEOTValues feeds Primitives, so which AtEOT$ values are unsupported is part of the compiled IR"},
 	"breakdown.go":            {false, "coverage-report grouping (CoverageGroup); report time only, nothing compiled"},
 	"cache_canon.go":          {true, "canonical gob encoding of the cache and segment bytes"},
 	"cache_lock.go":           {false, "single-flight lock around compile+Save; never changes the bytes written"},
@@ -146,6 +147,7 @@ var fingerprintCensus = map[string]fingerprintFile{
 	"primitive.go":            {false, "coverage Primitives computed on demand, not stored"},
 	"registry.go":             {true, "Registry, CompileDir, Save/LoadRegistry and cacheVersion"},
 	"registry_lazy.go":        {true, "AllCards (Save's input) dispatches through lazyCards; kept conservatively"},
+	"rider_shape.go":          {true, "prevention rider param shape; kept in the compiler fingerprint"},
 	"saga.go":                 {false, "runtime SagaChapters parse of K:Chapter"},
 	"slot.go":                 {false, "runtime memo slots held in unexported fields gob never encodes"},
 	"strtab.go":               {true, "interned string tables used by compiled params"},

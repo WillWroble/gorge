@@ -39,7 +39,7 @@ const card = (id: number, name: string): CardView => ({
 });
 
 const player = (hand: CardView[]): PlayerView => ({
-  seat: 0, name: 'You', life: 40, lost: false, library_size: 60, hand_size: hand.length,
+  seat: 0, name: 'You', life: 40, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 60, hand_size: hand.length,
   graveyard_size: 6, hand, battlefield: [], graveyard: [], exile: [],
   completed_dungeons: 0,
   pool: {}, command: [], commanders: [], commander_casts: [],

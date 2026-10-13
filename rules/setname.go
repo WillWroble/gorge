@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/rules/chars"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -160,8 +161,9 @@ func (e *Engine) refreshRenames() {
 			if o == nil || o.Zone != state.ZBattlefield || o.Face() == nil {
 				continue
 			}
-			if name := e.derivedName(id); name != "" && name != o.Face().Name {
-				buf = append(buf, effects.ObjectName{ID: id, Name: name})
+			name, nameSet := e.derivedName(id)
+			if ent, ok := renameEntry(o, name, nameSet); ok {
+				buf = append(buf, ent)
 			}
 		}
 		e.renames = buf
@@ -177,17 +179,38 @@ func (e *Engine) refreshRenames() {
 		if o.Zone != state.ZBattlefield {
 			continue
 		}
-		f := o.Face()
-		if f == nil {
+		if o.Face() == nil {
 			continue
 		}
-		name := e.derivedName(o.ID)
-		if name == "" || name == f.Name {
-			continue
+		name, nameSet := e.derivedName(o.ID)
+		if ent, ok := renameEntry(o, name, nameSet); ok {
+			buf = append(buf, ent)
 		}
-		buf = append(buf, effects.ObjectName{ID: o.ID, Name: name})
 	}
 	e.renames = buf
+}
+
+// renameEntry reports whether o's derived name is an entry the rename table
+// must carry, and the entry. The table binds an object's name to exactly ONE
+// string, which is the layer-3 SetName$ shape; the CR 709.5 Room rule is
+// deliberately NOT carried, because a Room's name characteristics are the
+// unlocked doors' individual names -- zero, one or two of them -- and the
+// effects tier answers those itself (nameCharacteristics). A Room that also
+// carries a SetName$ effect is carried when that effect names something other
+// than the plain Room string, since it then overrides the printed-name rule
+// (and may legitimately equal the printed face name). nameSet false (a
+// printed name) is never an entry.
+func renameEntry(o *state.Object, name string, nameSet bool) (effects.ObjectName, bool) {
+	if !nameSet || name == "" || o == nil || o.Face() == nil {
+		return effects.ObjectName{}, false
+	}
+	if rn, room := chars.RoomName(o); room {
+		return effects.ObjectName{ID: o.ID, Name: name}, name != rn
+	}
+	if name == o.Face().Name {
+		return effects.ObjectName{}, false
+	}
+	return effects.ObjectName{ID: o.ID, Name: name}, true
 }
 
 // setNameBoundedReach is layer4BoundedReach for the live SetName effects:
@@ -230,8 +253,9 @@ func (e *Engine) verifyBoundedRenames() {
 		if o.Zone != state.ZBattlefield || o.Face() == nil {
 			continue
 		}
-		if name := e.derivedName(o.ID); name != "" && name != o.Face().Name {
-			want = append(want, effects.ObjectName{ID: o.ID, Name: name})
+		name, nameSet := e.derivedName(o.ID)
+		if ent, ok := renameEntry(o, name, nameSet); ok {
+			want = append(want, ent)
 		}
 	}
 	if !slices.Equal(want, e.renames) {

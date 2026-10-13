@@ -323,6 +323,13 @@ func (e *Engine) printedReach(id state.ObjID) (*state.Object, *cards.Face) {
 	if f == nil || (o.FaceDown && o.Zone == state.ZBattlefield) {
 		return nil, nil
 	}
+	if o.Zone == state.ZBattlefield && isRoom(o) {
+		// CR 709.5: a battlefield Room's derived name and text come from its
+		// unlocked doors, not from the printed front face, so the printed
+		// fast path must not answer for it (its printed keywords and P/T
+		// still match the walk, but this path answers all four facts at once).
+		return nil, nil
+	}
 	s := &e.charsSum
 	if !s.hit(e, e.activeBuf) {
 		s = e.charsSummaryBuild(e.activeBuf)

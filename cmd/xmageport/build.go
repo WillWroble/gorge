@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -189,6 +190,16 @@ func (t *translator) build() (*portScenario, []*group, *refusal) {
 	if r := em.stopAt(t.stop[0], t.stop[1]); r != nil {
 		return nil, nil, r
 	}
+	if len(t.tailChoices) > 0 {
+		g, r := t.tailGroup()
+		if r != nil {
+			return nil, nil, r
+		}
+		groups = append(groups, g)
+	}
+	if r := t.manaSideEffects(em.steps); r != nil {
+		return nil, nil, r
+	}
 	for _, c := range t.asserts {
 		xs, r := t.mapAssert(c)
 		if r != nil {
@@ -329,6 +340,9 @@ func (t *translator) targetRef(name string) (string, *refusal) {
 	if _, tok := isTokenName(n); tok {
 		return "", refuse("token-target", "%s", n)
 	}
+	if t.copied[n] {
+		return "", refuse("copy-ambiguous-ref", "target %s after a copy of it", n)
+	}
 	r0, r1 := t.anyRefs(0, n), t.anyRefs(1, n)
 	switch {
 	case len(r0) > 0 && len(r1) > 0:
@@ -355,8 +369,18 @@ func (t *translator) choicePick(s string) string {
 	if len(r1) > 0 && len(r0) == 0 {
 		return r1[0]
 	}
+	if _, ok := t.lookup(n); !ok {
+		// XMage words an as-enters P/T choice by its result ("a 3/3
+		// artifact creature"); gorge labels it "CARDNAME is 3/3.": the
+		// P/T is the part both share.
+		if pt := rePTChoice.FindString(s); pt != "" {
+			return pt
+		}
+	}
 	return s
 }
+
+var rePTChoice = regexp.MustCompile(`\b\d+/\d+\b`)
 
 // ---- mana ----
 
@@ -382,8 +406,12 @@ func manaFromCostX(cost string, x int) (string, *refusal) {
 			b.WriteString(tok)
 		case tok == "S":
 			b.WriteString("C")
-		case len(tok) >= 2 && strings.ContainsAny(tok[:1], "WUBRG"):
-			b.WriteByte(tok[0]) // hybrid / phyrexian: first colour
+		case reHybrid.MatchString(tok) && strings.HasSuffix(tok, "P"):
+			// XMage's test player pays Phyrexian mana with life; the
+			// runner's pool cannot say which.
+			return "", refuse("phyrexian-mana", "cost %q", cost)
+		case reHybrid.MatchString(tok):
+			b.WriteByte(tok[0]) // hybrid: first colour
 		case len(tok) == 2 && tok[0] == '2' && strings.ContainsAny(tok[1:], "WUBRG"):
 			b.WriteByte(tok[1])
 		case tok == "no" || tok == "cost" || tok == "0":
@@ -393,6 +421,9 @@ func manaFromCostX(cost string, x int) (string, *refusal) {
 	}
 	return b.String(), nil
 }
+
+// reHybrid is a hybrid or Phyrexian mana token ("GW", "W/U", "UP", "G/P").
+var reHybrid = regexp.MustCompile(`^[WUBRG](/?[WUBRGP])+$`)
 
 func allDigits(s string) bool {
 	if s == "" {
@@ -410,6 +441,7 @@ func allDigits(s string) bool {
 
 type abilityPick struct {
 	ref   string
+	refs  []string // every same-named source, setup order
 	index int
 	sa    *cards.SA
 	face  *cards.Face
@@ -506,7 +538,7 @@ func (t *translator) findAbility(p int, text string) (*abilityPick, *refusal) {
 	if len(refs) == 0 {
 		return nil, refuse("ability-unresolved", "%q source", text)
 	}
-	return &abilityPick{ref: refs[0], index: c.index, sa: c.sa, face: c.face}, nil
+	return &abilityPick{ref: refs[0], refs: refs, index: c.index, sa: c.sa, face: c.face}, nil
 }
 
 // ---- asserts ----
@@ -563,6 +595,13 @@ func (t *translator) assertRef(p int, name string) (string, *refusal) {
 		if rs := t.anyRefs(p, n); len(rs) > 0 {
 			return rs[0], nil
 		}
+		if t.copied[n] {
+			// p's copy of the other seat's card: the copy's own ref
+			if r := t.copyRef[fmt.Sprintf("%d|%s", p, n)]; r != "" && r != "-" {
+				return r, nil
+			}
+			return "", refuse("copy-ambiguous-ref", "assert on p%d's copy of %s", p, n)
+		}
 		if rs := t.anyRefs(1-p, n); len(rs) > 0 {
 			// A copy of the other seat's card is named for the original
 			// but owned by p: bind the assert to p's object, not the original.
@@ -585,10 +624,19 @@ func (t *translator) assertRef(p int, name string) (string, *refusal) {
 	return "", refuse("assert-not-in-setup", "%s", n)
 }
 
+// runnerLibrary is the filler library the scenario runner deals each seat
+// (rules/oracle_run.go).
+const runnerLibrary = 40
+
 func countExpect(p int, zone, name string, n int) (*expect, *refusal) {
 	nm, r := xmageName(name)
 	if r != nil {
 		return nil, r
+	}
+	if nm == "" && n >= runnerLibrary && zone != "battlefield" && zone != "hand" {
+		// a seat-wide count this large counts XMage's test library, which
+		// is not the runner's 40 filler cards
+		return nil, refuse("library-size", "%s count %d", zone, n)
 	}
 	c := &count{Seat: p, Zone: zone, Name: nm}
 	if base, tok := isTokenName(nm); tok {
@@ -806,6 +854,7 @@ type emitter struct {
 	declared       map[int]bool
 	blocked        map[int]bool
 	hasStepExpects bool
+	tappedAt       map[string]int // {T}-cost source ref -> turn last tapped
 }
 
 func (em *emitter) add(s *step) *step {
@@ -1059,6 +1108,13 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		if r := attach(s, len(s.Targets) > 0); r != nil {
 			return nil, r
 		}
+		if a.kind == "cast" && t.isCopyCard(a.card) {
+			if !t.isPermanentCard(a.card) {
+				t.markCopied(a, "") // a spell's copies are tokens
+			} else {
+				t.markCopied(a, ref) // the clone itself is the copy
+			}
+		}
 		if a.kind == "cast" && a.resolveAfter {
 			em.resolve()
 		}
@@ -1070,6 +1126,10 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		if r != nil {
 			return nil, r
 		}
+		if t.copied[refName(pick.ref)] {
+			return nil, refuse("copy-ambiguous-ref", "activate %s after a copy of it", refName(pick.ref))
+		}
+		pick.ref = em.untappedSource(pick, a.turn)
 		if pick.sa.API == "Mana" {
 			return nil, refuse("mana-payment", "mana ability %q", a.ability)
 		}
@@ -1099,6 +1159,9 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		if r := attach(s, len(s.Targets) > 0); r != nil {
 			return nil, r
 		}
+		if saCopies(pick.sa) {
+			t.markCopied(a, "")
+		}
 	case "wait":
 		if r := em.gotoClock(a.turn, a.step); r != nil {
 			return nil, r
@@ -1119,6 +1182,9 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		used := map[string]int{}
 		var refs []string
 		for _, n := range a.attackers {
+			if t.copied[n] {
+				return nil, refuse("copy-ambiguous-ref", "attack with %s after a copy of it", n)
+			}
 			rs := t.permRefs(a.seat, n)
 			k := used[n]
 			used[n]++
@@ -1374,4 +1440,204 @@ func (em *emitter) modeLabel(a *action, n int) (string, *refusal) {
 		}
 	}
 	return "", refuse("mode-choice", "no Charm on %s", a.card)
+}
+
+// untappedSource picks which same-named source an activation uses. XMage
+// activates the first one that can pay, so a {T} ability already used by
+// an untapped-since copy moves on to the next copy (two Rushwood
+// Herbalists regenerating twice in one turn).
+func (em *emitter) untappedSource(pick *abilityPick, turn int) string {
+	if !hasTapCost(pick.sa.ParamStr(cards.PKCost)) {
+		return pick.ref
+	}
+	if em.tappedAt == nil {
+		em.tappedAt = map[string]int{}
+	}
+	seat := int(pick.ref[1] - '0')
+	free := func(ref string) bool {
+		k, ok := em.tappedAt[ref]
+		if !ok {
+			return true
+		}
+		for u := k + 1; u <= turn; u++ {
+			if active(u) == seat {
+				return true
+			}
+		}
+		return false
+	}
+	ref := pick.ref
+	for _, r := range pick.refs {
+		if free(r) {
+			ref = r
+			break
+		}
+	}
+	em.tappedAt[ref] = turn
+	return ref
+}
+
+func hasTapCost(cost string) bool {
+	for _, tok := range strings.Fields(cost) {
+		if tok == "T" {
+			return true
+		}
+	}
+	return false
+}
+
+// isCopyCard reports whether casting name makes a copy of a permanent: a
+// Clone or CopyPermanent ability, direct or through an SVar (an ETB
+// "enter as a copy" replacement).
+func (t *translator) isCopyCard(name string) bool {
+	c, ok := t.lookup(name)
+	if !ok {
+		return false
+	}
+	for _, f := range c.Faces {
+		if f == nil {
+			continue
+		}
+		for _, sa := range f.Abilities {
+			if sa != nil && (sa.API == "Clone" || sa.API == "CopyPermanent") {
+				return true
+			}
+		}
+		for _, v := range f.SVars {
+			if strings.Contains(v, "$ Clone") || strings.Contains(v, "$ CopyPermanent") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isPermanentCard reports whether name's front face is a permanent card.
+func (t *translator) isPermanentCard(name string) bool {
+	c, ok := t.lookup(name)
+	if !ok || len(c.Faces) == 0 || c.Faces[0] == nil {
+		return true
+	}
+	for _, ty := range c.Faces[0].Types {
+		if ty == "Instant" || ty == "Sorcery" {
+			return false
+		}
+	}
+	return true
+}
+
+// saCopies reports whether activating sa makes a permanent copy.
+func saCopies(sa *cards.SA) bool {
+	for x := sa; x != nil; x = x.Sub {
+		if x.API == "Clone" || x.API == "CopyPermanent" {
+			return true
+		}
+	}
+	return false
+}
+
+// markCopied records the names a copy action's choices and targets name:
+// from here on that name may belong to two permanents. The copy itself is
+// the cast card (ref) or, for an ability, a token of the acting seat.
+func (t *translator) markCopied(a *action, ref string) {
+	mark := func(n string) {
+		t.copied[n] = true
+		k := fmt.Sprintf("%d|%s", a.seat, n)
+		switch {
+		case t.copyRef[k] != "":
+			t.copyRef[k] = "-" // two copies of one name: no single ref
+		case ref != "":
+			t.copyRef[k] = ref
+		default:
+			t.copyRef[k] = fmt.Sprintf("p%d:token:%s", a.seat, n)
+		}
+	}
+	for _, ch := range a.choices {
+		if n, ok := strings.CutPrefix(ch.pick, "name:"); ok {
+			if x, r := xmageName(n); r == nil {
+				mark(x)
+			}
+		}
+	}
+	for _, x := range a.targets {
+		if n, r := xmageName(x); r == nil && x != "p0" && x != "p1" {
+			mark(n)
+		}
+	}
+}
+
+// tailGroup places choices no action consumes (a trigger on the walk to the
+// stop step) from step 0; the runner moves them on to the step that asks.
+func (t *translator) tailGroup() (*group, *refusal) {
+	g := &group{tail: true}
+	for _, ch := range t.tailChoices {
+		if ch.x >= 0 || ch.mode > 0 {
+			return nil, refuse("amount-choice", "unbound %q", ch.pick)
+		}
+		pick, kind := ch.pick, "any"
+		if n, ok := strings.CutPrefix(pick, "name:"); ok {
+			if ch.target {
+				r, rr := t.targetRef(n)
+				if rr != nil {
+					return nil, rr
+				}
+				pick, kind = r, "target"
+			} else {
+				pick = t.choicePick(n)
+			}
+		} else if ch.target {
+			kind = "target"
+		}
+		xk := "choice"
+		if ch.target {
+			xk = "target"
+		}
+		g.xvals = append(g.xvals, xans{Seat: ch.seat, Kind: xk, Value: pick})
+		g.answers = append(g.answers, answer{Kind: kind, Pick: []string{pick}})
+	}
+	return g, nil
+}
+
+// manaSideEffects refuses a scenario whose spells are paid from the pool
+// while a card in it cares how mana was made: XMage taps lands to pay, so a
+// "whenever a land is tapped for mana" trigger or a land whose mana ability
+// does more (Undiscovered Paradise) acts there and not here.
+func (t *translator) manaSideEffects(steps []*step) *refusal {
+	paid := false
+	for _, s := range steps {
+		if s.Mana != "" {
+			paid = true
+			break
+		}
+	}
+	if !paid {
+		return nil
+	}
+	for p := 0; p < 2; p++ {
+		for _, ac := range t.setup[p] {
+			c, ok := t.lookup(ac.name)
+			if !ok {
+				continue
+			}
+			for _, f := range c.Faces {
+				if f == nil {
+					continue
+				}
+				for _, tr := range f.Triggers {
+					if tr.Mode == "TapsForMana" || tr.Mode == "ManaAdded" {
+						return refuse("mana-payment", "%s triggers on mana", ac.name)
+					}
+				}
+				if ac.zone != "battlefield" {
+					continue
+				}
+				for _, sa := range f.Abilities {
+					if sa != nil && sa.API == "Mana" && sa.Sub != nil {
+						return refuse("mana-payment", "%s's mana ability does more", ac.name)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -13,16 +13,25 @@ import (
 // choice-shaped alternative the planner expands into one concrete colour
 // each (pay.PaymentPlanUnitAlternatives). ok is false when the ability is
 // not that shape or reflects no colour.
-func paymentPlanReflectedAlt(h effects.Host, p state.PlayerID, id state.ObjID, ma *cards.SA, amt int32) (windowManaAlt, bool) {
+func paymentPlanReflectedAlt(e *Engine, p state.PlayerID, id state.ObjID, ma *cards.SA, amt int32) (windowManaAlt, bool) {
 	if !pay.PaymentPlanReflectedShape(ma) {
 		return windowManaAlt{}, false
 	}
 	var svars map[string]string
-	if o := h.Game().Obj(id); o != nil && o.Face() != nil {
+	if o := e.Game().Obj(id); o != nil && o.Face() != nil {
 		svars = o.Face().SVars
 	}
 	ctx := effects.NewCtxPtr(id, p, effects.CtxInit{SVars: svars})
-	counts, ok := pay.PaymentPlanReflectedCounts(effects.ManaReflectedCandidates(h, ctx, ma))
+	// Only objects no planned step can remove contribute: an own reflected
+	// land whose mana ability sacrifices or returns it could be gone before
+	// the reflected step runs (the executor would then fall back mid-payment).
+	var kept []state.ObjID
+	for _, rid := range effects.ManaReflectedObjects(e, ctx, ma) {
+		if !paymentPlanReflectedObjectRemovable(e, rid) {
+			kept = append(kept, rid)
+		}
+	}
+	counts, ok := pay.PaymentPlanReflectedCounts(effects.ManaReflectedFold(e, ma, kept))
 	if !ok {
 		return windowManaAlt{}, false
 	}
@@ -35,8 +44,8 @@ func paymentPlanReflectedAlt(h effects.Host, p state.PlayerID, id state.ObjID, m
 // did. The ability's text alone reads as a blank Produced$ -- the executor's
 // colourless default for AB$ Mana -- which would drop every coloured cast
 // only an Exotic Orchard pays from the planner's candidate walk.
-func addPotentialReflected(h effects.Host, m *state.Mana, p state.PlayerID, id state.ObjID, ma *cards.SA) bool {
-	alt, ok := paymentPlanReflectedAlt(h, p, id, ma, 1)
+func addPotentialReflected(e *Engine, m *state.Mana, p state.PlayerID, id state.ObjID, ma *cards.SA) bool {
+	alt, ok := paymentPlanReflectedAlt(e, p, id, ma, 1)
 	if !ok {
 		return false
 	}
@@ -63,4 +72,24 @@ func setPaymentPlanUnitAlt(units []windowManaUnit, idx int, id state.ObjID, alt 
 	}
 	units[idx].Alts = append(units[idx].Alts, alt)
 	return units, idx
+}
+
+// paymentPlanReflectedObjectRemovable reports whether a payment step could
+// remove battlefield object rid before a later reflected step runs: one of
+// its own mana abilities classifies as a plannable (non-deferred) step whose
+// consequence sacrifices it or returns it to hand. Objects outside the
+// battlefield (an imprinted card, a graveyard or exiled card) have no
+// plannable mana ability and are never removed by a step.
+func paymentPlanReflectedObjectRemovable(e *Engine, rid state.ObjID) bool {
+	o := e.Game().Obj(rid)
+	if o == nil || o.Zone != state.ZBattlefield || o.Face() == nil {
+		return false
+	}
+	for _, ma := range o.Face().ManaAbilities() {
+		tier, c, _ := pay.PaymentPlanAbilityTier(asPayer(e), o.Controller, rid, ma)
+		if tier != pay.TierDeferred && (c.Sacrifice || c.ReturnToHand) {
+			return true
+		}
+	}
+	return false
 }

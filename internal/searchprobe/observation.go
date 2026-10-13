@@ -143,9 +143,10 @@ func (c noPotentialChars) EndDerivedReads() {
 }
 
 // viewCharacteristics is view's optional one-call characteristics read
-// (rules.Engine.ViewCharacteristics).
+// (rules.Engine.ViewCharacteristics). The second return is the name's bound
+// flag (effects.Chars.NameSet).
 type viewCharacteristics interface {
-	ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+	ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 }
 
 // ViewCharacteristics forwards the projection's one-call read of a card's
@@ -156,16 +157,16 @@ type viewCharacteristics interface {
 // what is declared here: without this method the engine's own
 // ViewCharacteristics was silently dropped.
 //
-// The name is withheld (""), so the projector keeps the printed name: this
-// wrapper has never forwarded the engine's Name either (the observation
+// The name is withheld ("", false), so the projector keeps the printed name:
+// this wrapper has never forwarded the engine's Name either (the observation
 // projects printed names, and every frame and probe compares under that
-// rule).
-func (c noPotentialChars) ViewCharacteristics(id state.ObjID) (string, []string, int32, int32) {
+// rule), and an unbound name is exactly the "no override" reading.
+func (c noPotentialChars) ViewCharacteristics(id state.ObjID) (string, bool, []string, int32, int32) {
 	if vc, ok := c.Chars.(viewCharacteristics); ok {
-		_, kw, p, t := vc.ViewCharacteristics(id)
-		return "", kw, p, t
+		_, _, kw, p, t := vc.ViewCharacteristics(id)
+		return "", false, kw, p, t
 	}
-	return "", c.Chars.Keywords(id), c.Chars.Power(id), c.Chars.Toughness(id)
+	return "", false, c.Chars.Keywords(id), c.Chars.Power(id), c.Chars.Toughness(id)
 }
 
 // SuppressOwnLibrary tells view.Project not to build the own-library CONTENTS

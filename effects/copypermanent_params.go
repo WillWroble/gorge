@@ -147,7 +147,7 @@ var copyPermanentKnownKeys = [...]string{
 	"ImprintCards", "ImprintPlayed", "ImprintTokens", "InstantSpeed",
 	"IsCurse", "IsPresent", "KW", "Keyword", "KeywordLine",
 	"MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity",
-	"NewController", "NonLegendary", "NumCopies", "NumDmg", "OpponentTurn",
+	"NewController", "NonLegendary", "NumCopies", "OpponentTurn",
 	"Pawprint", "Planeswalker", "PlayCost", "PlayerTurn", "Populate", "PowerUp",
 	"PrecostDesc", "PresentCompare", "PresentDefined", "PresentZone", "PumpDuration",
 	"PumpKeywords", "RandomCopied", "RandomNum", "RandomNumTargets", "ReduceAmount", "ReduceCost",

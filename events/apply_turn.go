@@ -137,6 +137,7 @@ func foldTurnChange(g *state.Game, e *Event) {
 		g.Players[e.Player].LandsPlayed = 0
 		for i := range g.Players {
 			g.Players[i].CoinFlipsThisTurn = 0
+			resetTurnWatchers(&g.Players[i])
 		}
 		// g.Zone(ZBattlefield, e.Player) can only ever hold IDs that Move
 		// already confirmed are real objects, so this nil check is

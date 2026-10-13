@@ -144,7 +144,7 @@ var putCounterKnownKeys = [...]string{
 	"InstantSpeed", "IsCurse", "IsPresent", "KW",
 	"Keyword", "KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor",
 	"MinChoiceAmount", "ModeCost", "Monstrosity", "NewController",
-	"NumDmg", "OnlyNewKind", "OpponentTurn", "Optional", "PerDefined",
+	"OnlyNewKind", "OpponentTurn", "Optional", "PerDefined",
 	"Placer", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "PutOnDefined", "PutOnEachOther", "RandomNumTargets", "RandomType", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberCards", "RememberCostMana", "RememberObjects",
@@ -219,6 +219,12 @@ func compilePutCounter(sa *cards.SA) *PutCounterParams {
 	// Each key is read by its literal name (the parameter census attributes
 	// a read by the key the call spells).
 	num, numOK := sa.Param(cards.PKCounterNum)
+	if strings.EqualFold(strings.TrimSpace(num), "PreventedDamage") {
+		// A prevention rider's delayed body (Sacred Boon, Scars of the
+		// Veteran): the registration's remembered number is the prevented
+		// amount.
+		num = "Count$TriggerRememberAmount"
+	}
 	p.CounterNum, p.CounterNumSet = paramTextSet(num, numOK)
 	adapt, adaptOK := sa.Param(cards.PKAdapt)
 	p.Adapt, p.AdaptSet = paramTextSet(adapt, adaptOK)

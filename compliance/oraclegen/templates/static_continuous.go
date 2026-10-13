@@ -111,6 +111,16 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 		}
 		gatedGrantWhy = why
 	}
+	// A counter-gated self static that also grants a ReplaceDamage prevention
+	// (Hedron-Field Purists' LEVEL bands) is observed by the damage it
+	// prevents BEFORE the generic probe paths: those serve the same row on
+	// its SetPower/SetToughness alone and never exercise the grant. The
+	// snapshot the item compares still carries the card's own P/T.
+	if st.HasParam(cards.PKAddReplacementEffect) {
+		if it, ok := staticGrantedPreventItem(reg, f, name, req, st); ok {
+			return it, nil
+		}
+	}
 	plans := []staticProbePlan{{}}
 	probePlan := staticPlanFor(affected)
 	if !probePlan.empty() {
@@ -359,6 +369,17 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	// through to its named gap.
 	if st.HasParam(cards.PKAddStaticAbility) {
 		if it, ok := staticGrantedStaticItem(reg, f, name, req, st); ok {
+			return it, nil
+		}
+	}
+	// A static whose AddReplacementEffect$ grants a REPLACEMENT effect is
+	// observed by causing the event the granted replacement rewrites
+	// (static_granted_replacement.go). Tried after every probe, fixture,
+	// offered, granted-trigger and granted-static path so an already-served
+	// row keeps its scenario bytes; an unserved grant falls through to its
+	// named gap.
+	if st.HasParam(cards.PKAddReplacementEffect) {
+		if it, ok := staticGrantedReplacementItem(reg, f, name, req, st); ok {
 			return it, nil
 		}
 	}

@@ -302,6 +302,12 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 	if ev.Kind == events.Damage {
 		matches = append(matches, e.grantedPreventMatches(ev)...)
 	}
+	// A GRANTED static replacement (AddReplacementEffect$ on a Mode$
+	// Continuous static, rules/replacement_granted.go): appended after the
+	// printed and granted-keyword scans for the same deterministic
+	// composition reason bloodthirst/sunburst are, so a card's own lines
+	// always precede the ones it grants.
+	matches = append(matches, e.grantedStaticReplacementMatches(ev, event)...)
 	matches = e.dropAppliedReplacements(matches)
 	if ev.Kind == events.ManaAdd {
 		return e.continueManaReplacements(ev, manaCandidates, nil, false, e.manaFromTap, e.manaProducer)
@@ -552,6 +558,15 @@ type replMatch struct {
 	// granting ability; later source control changes cannot redefine You.
 	controller       state.PlayerID
 	frozenController bool
+	// svars is the SVar table that resolves a GRANTED static replacement's
+	// body (state.ContinuousEffect.SVars, the GRANTING face's table). replCtx
+	// prefers it over the host object's own face: a cross-object grant
+	// (Scion of Halaster's "first draw each turn" body lives on Scion, the
+	// host is the commander it affects) would otherwise resolve the body's
+	// SVars -- and its ReplaceWith$ SubAbility$ chain -- from the host. Nil
+	// on every printed, keyword and Effect-created match, whose table comes
+	// from the match's face or the source object's face as before.
+	svars map[string]string
 }
 
 // rememberedSpecContext builds the match context a ValidCard$/ValidLKI$
@@ -915,7 +930,12 @@ func (e *Engine) replCtx(m replMatch, ev events.Event) *effects.Ctx {
 		ctx.Repl.Player = state.Target{Player: ev.Player, IsPlayer: true}
 		ctx.Remembered, ctx.Captured = nil, nil
 	}
-	if f != nil {
+	if m.svars != nil {
+		// A GRANTED static replacement: the granting face's table, not the
+		// host's (replMatch.svars). Preferred over f, whose fallback is the
+		// host object's own face for a cross-object grant.
+		effects.SetSVars(ctx, m.svars)
+	} else if f != nil {
 		effects.SetSVars(ctx, f.SVars)
 	}
 	if o != nil && m.repl != nil && m.repl.ParamStr(cards.PKKeyword) == "ETBReplacement" && m.repl.With != nil && m.repl.With.API == "Clone" {
@@ -1024,6 +1044,12 @@ func replacementBodyRewritesHeldEvent(with *cards.SA, svars map[string]string) b
 // replacements); passing it derives the action automatically rather than
 // making every caller compute it.
 func (e *Engine) runReplaceWith(ctx *effects.Ctx, replaced state.ObjID, with *cards.SA, ev *events.Event) {
+	// A declined (or no longer legal) as-enters copy election is the optional
+	// replacement NOT applied (CR 614.1c): neither the copy nor its SubAbility$
+	// rider (Altered Ego's X additional counters) runs.
+	if effects.CloneETBNoCopy(e.G, ctx, with) {
+		return
+	}
 	// An Effect-created replacement body is a fresh parse (replacementBodySA)
 	// whose SubAbility$ chain was never linked -- only cards.Link links a
 	// printed body. Resolve it from the source's own SVar table so a body

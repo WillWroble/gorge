@@ -15,7 +15,7 @@ const card = (id: number, name: string, manaCost?: string): CardView => ({
 function players(...ps: Partial<PlayerView>[]): PlayerView[] {
   return ps.map((p, i) => ({
     seat: p.seat ?? i, name: p.name ?? `P${i}`, life: 20, lost: false,
-    library_size: 30, hand_size: 7, graveyard_size: 0,
+    spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 30, hand_size: 7, graveyard_size: 0,
     completed_dungeons: 0,
     hand: p.hand ?? [], battlefield: p.battlefield ?? [], graveyard: p.graveyard ?? [],
     exile: p.exile ?? [], pool: {}, command: p.command ?? [], commanders: p.commanders ?? [],

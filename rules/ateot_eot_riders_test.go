@@ -331,14 +331,15 @@ func TestAtEOTKrovikanElementalistSacrifices(t *testing.T) {
 	replayCheck(t, e, cfg)
 }
 
-// TestAtEOTOutOfScopeValueStaysLoud pins the loud degrade: a body carrying an
-// out-of-scope value (here the end-of-combat family, on Kari Zev's real Token
-// trigger) records exactly one Note naming the value while the token is still
-// minted.
-func TestAtEOTOutOfScopeValueStaysLoud(t *testing.T) {
+// TestAtEOTKariZevExileCombatTokenIsExiled pins the end-of-combat rider
+// (AtEOT$ ExileCombat) on Kari Zev's real Token trigger: the Monkey token is
+// minted, the loud-degrade path does NOT run (the value is implemented), and
+// the shared reader schedules its exile at this turn's end-of-combat step.
+// Driving to end of combat exiles the token while Kari Zev stays.
+func TestAtEOTKariZevExileCombatTokenIsExiled(t *testing.T) {
 	t.Parallel()
 	reg := searchTestRegistry(t)
-	e, _ := ateotEngine(t, reg, "Kari Zev, Skyship Raider")
+	e, cfg := ateotEngine(t, reg, "Kari Zev, Skyship Raider")
 	kari := ateotFind(t, e, "Kari Zev, Skyship Raider", 0)
 	ateotTo(t, e, kari, state.ZLibrary, state.ZBattlefield)
 	card := searchCorpusCard(t, reg, "Kari Zev, Skyship Raider")
@@ -349,25 +350,53 @@ func TestAtEOTOutOfScopeValueStaysLoud(t *testing.T) {
 	before := len(e.G.Objs)
 	effects.Resolve(e, &effects.Ctx{Source: kari, Controller: 0,
 		SVars: card.Faces[0].SVars}, sa)
-	notes := 0
-	for _, ev := range e.L.Events {
-		if ev.Kind == events.Note && strings.Contains(ev.Text, "AtEOT$ ExileCombat is not implemented") {
-			notes++
-		}
-	}
-	if notes != 1 {
-		t.Fatalf("AtEOT$ ExileCombat produced %d notes, want exactly 1", notes)
-	}
+
+	// Precondition: the token was minted.
 	minted := 0
+	var token state.ObjID
 	for i := range e.G.Objs {
 		o := &e.G.Objs[i]
 		if o.IsToken && o.Zone == state.ZBattlefield {
 			minted++
+			token = o.ID
 		}
 	}
-	if minted == 0 || len(e.G.Objs) <= before {
-		t.Fatalf("the out-of-scope AtEOT$ suppressed the token mint (objs %d -> %d)", before, len(e.G.Objs))
+	if minted != 1 || len(e.G.Objs) <= before {
+		t.Fatalf("Kari Zev minted %d tokens (objs %d -> %d), want exactly 1", minted, before, len(e.G.Objs))
 	}
+	// ExileCombat is implemented: the loud-degrade Note must NOT fire.
+	for _, ev := range e.L.Events {
+		if ev.Kind == events.Note && strings.Contains(ev.Text, "AtEOT$ ExileCombat is not implemented") {
+			t.Fatalf("ExileCombat is implemented but the loud-degrade Note fired: %q", ev.Text)
+		}
+	}
+	// The handler ran: the rider scheduled the token's end-of-combat exile.
+	scheduled := false
+	for i := range e.G.Delayed {
+		dt := &e.G.Delayed[i]
+		if dt.Source == token && dt.Phase == state.StepEndCombat && dt.Execute == "__kwWarpExile" {
+			scheduled = true
+		}
+	}
+	if !scheduled {
+		t.Fatalf("no end-of-combat exile scheduled for token %d: %+v", token, e.G.Delayed)
+	}
+	replayCheck(t, e, cfg)
+
+	// End of combat exiles the token; Kari Zev stays.
+	ateotDriveToStep(t, e, e.G.Turn, e.G.Active, state.StepEndCombat)
+	for e.putTriggersOnStack() {
+		answerTriggerOrders(t, e)
+		passUntilStackEmpty(t, e, 20)
+	}
+	passUntilStackEmpty(t, e, 20)
+	if z := e.G.Obj(token).Zone; z == state.ZBattlefield {
+		t.Fatalf("Kari Zev's token survived end of combat (zone %s), want it exiled", z)
+	}
+	if z := e.G.Obj(kari).Zone; z != state.ZBattlefield {
+		t.Fatalf("Kari Zev itself was exiled (zone %s), want it kept", z)
+	}
+	replayCheck(t, e, cfg)
 }
 
 // TestAtEOTCrazedArmodonDestroysItself pins the Destroy rider, the one value

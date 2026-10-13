@@ -25,7 +25,7 @@ const card = (id: number, name: string, types = 'Creature', manaCost?: string): 
 });
 
 const player = (over: Partial<PlayerView> = {}): PlayerView => ({
-  seat: 0, name: 'P0', life: 40, lost: false, library_size: 90, hand_size: 7, graveyard_size: 0,
+  seat: 0, name: 'P0', life: 40, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 90, hand_size: 7, graveyard_size: 0,
   completed_dungeons: 0,
   hand: [], battlefield: [], graveyard: [], exile: [], pool: {},
   command: [], commanders: [], commander_casts: [], ...over,

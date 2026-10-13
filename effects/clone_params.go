@@ -148,7 +148,7 @@ var cloneKnownKeys = [...]string{
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IntoPlayTapped", "IsCurse",
 	"IsPresent", "KW", "KeepFacedown", "Keyword", "KeywordLine", "MaxTotalTargetCMC",
 	"MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity", "NewController", "NewName",
-	"NonLegendary", "NumDmg", "OpponentTurn", "Optional", "Planeswalker", "PlayCost",
+	"NonLegendary", "OpponentTurn", "Optional", "Planeswalker", "PlayCost",
 	"PlayerTurn", "PowerUp", "PrecostDesc", "PresentCompare", "PresentDefined",
 	"PresentZone", "PumpDuration", "PumpKeywords", "RandomNumTargets", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberCostMana", "RememberObjects", "RememberTargets", "RemoveCardTypes",
@@ -264,7 +264,8 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 
 // cloneETBShapeOK is ETBShapeOK's computation: rules' etbCloneWhitelist's
 // POSITIVE key whitelist (Choices$, AddKeywords$, AddTypes$,
-// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$) plus its
+// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$, AddTriggers$,
+// AddSVars$) plus its
 // text-only value checks. The key scan only answers a boolean, so the map's
 // iteration order cannot reach an event.
 func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
@@ -291,7 +292,9 @@ func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
 func CloneKnownKeys() []string { return slices.Clone(cloneKnownKeys[:]) }
 
 // cloneETBShapeKeys are the keys the implemented as-enters Clone shape carries.
+// SubAbility$ is admitted as a key only; its chain's shape is
+// CloneETBSubChainOK's (the "enters with additional counters" rider).
 var cloneETBShapeKeys = state.NewNameSet(
 	"Choices", "AddKeywords", "AddTypes", "SpellDescription",
-	"AddStaticAbilities", "IntoPlayTapped",
+	"AddStaticAbilities", "IntoPlayTapped", "AddTriggers", "AddSVars", "SubAbility",
 )
