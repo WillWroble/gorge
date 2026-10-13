@@ -15,19 +15,21 @@ import (
 // .seg) bytes and even different file sizes. The decoded registry was always
 // equal, so this was a cache-hygiene/determinism defect only.
 //
-// The map-bearing types (SA, Trigger, Static, Repl, Face) and cacheFile
-// therefore carry explicit GobEncode/GobDecode pairs that emit every map as a
-// key-sorted []kv. The methods are on the pointer receiver, so gob uses them
-// for both pointer fields (`Sub *SA`, `[]*SA`, `[]*Face`) and value elements
-// (`[]Trigger`, `[]Static`, `[]Repl`) -- gob detects a pointer-only GobEncoder
-// via indir == -1 and takes the address of the addressable value.
+// The map-bearing types therefore carry explicit GobEncode/GobDecode pairs
+// that emit every map in sorted key order. A Card reaches them only through
+// []*Face, and Face encodes its whole subtree (SAs, Triggers, Statics, Repls)
+// with the flat face codec in cache_codec.go -- one byte string per face, no
+// nested gob stream per object. SA, Trigger, Static and Repl keep gob pairs
+// of their own (a key-sorted []kv per map) for a caller that gob-encodes one
+// directly. The methods are on the pointer receiver, so gob uses them for
+// both pointer fields and value elements -- gob detects a pointer-only
+// GobEncoder via indir == -1 and takes the address of the addressable value.
+// The cache file itself is the gob stream of cacheFileWire (cacheFile.wire),
+// whose Tokens are a key-sorted slice.
 //
-// A wire struct handed to gob must list EVERY exported field of its type:
-// once GobEncode is defined, gob no longer reflects over the live struct, so
-// a field omitted here is silently dropped from the cache.
-//
-// Adding a new exported, gob-encoded field to one of these types means adding
-// it to the matching wire struct below as well.
+// Once GobEncode is defined, gob no longer reflects over the live struct, so
+// adding a new exported, gob-encoded field to one of these types means adding
+// it to the matching wire struct below and to the face codec as well.
 
 // kv is one key/value entry of a canonicalised map, in sorted-key order.
 type kv struct {
@@ -166,78 +168,20 @@ func (r *Repl) GobDecode(data []byte) error {
 	return nil
 }
 
-// faceWire canonically encodes a Face. Every exported Face field is listed
-// here; the unexported derived fields are rebuilt by derive/link after decode,
-// exactly as they are on the existing gob path.
-type faceWire struct {
-	SpecializeColor string
-	CopyFaceFrom    string
-	Name            string
-	ManaCost        string
-	Types           []string
-	PT              string
-	Loyalty         string
-	Defense         string
-	Colors          string
-	Oracle          string
-	Keywords        []string
-	Aliases         []string
-	Abilities       []*SA
-	Triggers        []Trigger
-	Statics         []Static
-	Repls           []Repl
-	SVars           []kv
-}
-
-// GobEncode encodes f with its SVars map in sorted key order.
+// GobEncode encodes f, maps in sorted key order, with the flat face codec
+// (cache_codec.go): one byte string for the whole face subtree, not a nested
+// gob stream per SA/Trigger/Static/Repl.
 func (f *Face) GobEncode() ([]byte, error) {
-	var b bytes.Buffer
-	err := gob.NewEncoder(&b).Encode(faceWire{
-		SpecializeColor: f.SpecializeColor,
-		CopyFaceFrom:    f.CopyFaceFrom,
-		Name:            f.Name,
-		ManaCost:        f.ManaCost,
-		Types:           f.Types,
-		PT:              f.PT,
-		Loyalty:         f.Loyalty,
-		Defense:         f.Defense,
-		Colors:          f.Colors,
-		Oracle:          f.Oracle,
-		Keywords:        f.Keywords,
-		Aliases:         f.Aliases,
-		Abilities:       f.Abilities,
-		Triggers:        f.Triggers,
-		Statics:         f.Statics,
-		Repls:           f.Repls,
-		SVars:           sortedKV(f.SVars),
-	})
-	return b.Bytes(), err
+	var e faceEncoder
+	e.face(f)
+	return e.b, nil
 }
 
 // GobDecode restores a Face encoded by GobEncode.
 func (f *Face) GobDecode(data []byte) error {
-	var w faceWire
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&w); err != nil {
-		return err
-	}
-	f.SpecializeColor = w.SpecializeColor
-	f.CopyFaceFrom = w.CopyFaceFrom
-	f.Name = w.Name
-	f.ManaCost = w.ManaCost
-	f.Types = w.Types
-	f.PT = w.PT
-	f.Loyalty = w.Loyalty
-	f.Defense = w.Defense
-	f.Colors = w.Colors
-	f.Oracle = w.Oracle
-	f.Keywords = w.Keywords
-	f.Aliases = w.Aliases
-	f.Abilities = w.Abilities
-	f.Triggers = w.Triggers
-	f.Statics = w.Statics
-	f.Repls = w.Repls
-	f.SVars = mapFromKV(w.SVars)
-	return nil
+	d := faceDecoder{b: data}
+	d.face(f)
+	return d.err
 }
 
 // tokenEntry is one corpus token in the canonical cacheFile encoding: the
@@ -256,9 +200,13 @@ type cacheFileWire struct {
 	Tokens  []tokenEntry
 }
 
-// GobEncode encodes cf with its Tokens map in sorted key order.
-func (cf *cacheFile) GobEncode() ([]byte, error) {
-	w := cacheFileWire{Version: cf.Version, Cards: cf.Cards}
+// wire returns cf's canonical on-disk shape. The cache is the gob stream of
+// this struct ITSELF (saveGob, canonicalCorpusGob), not a cacheFile
+// GobEncoder: wrapping the whole corpus as one GobEncode blob made a load
+// materialise the 67 MB stream as a single []byte and copy it again in the
+// inner decoder before decoding a card.
+func (cf *cacheFile) wire() *cacheFileWire {
+	w := &cacheFileWire{Version: cf.Version, Cards: cf.Cards}
 	if cf.Tokens != nil {
 		w.Tokens = make([]tokenEntry, 0, len(cf.Tokens))
 		for k, c := range cf.Tokens {
@@ -266,26 +214,17 @@ func (cf *cacheFile) GobEncode() ([]byte, error) {
 		}
 		sort.Slice(w.Tokens, func(i, j int) bool { return w.Tokens[i].Key < w.Tokens[j].Key })
 	}
-	var b bytes.Buffer
-	err := gob.NewEncoder(&b).Encode(w)
-	return b.Bytes(), err
+	return w
 }
 
-// GobDecode restores a cacheFile encoded by GobEncode.
-func (cf *cacheFile) GobDecode(data []byte) error {
-	var w cacheFileWire
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&w); err != nil {
-		return err
+// cacheFile restores the cacheFile w encodes.
+func (w *cacheFileWire) cacheFile() cacheFile {
+	cf := cacheFile{Version: w.Version, Cards: w.Cards}
+	if w.Tokens != nil {
+		cf.Tokens = make(map[string]*Card, len(w.Tokens))
+		for _, e := range w.Tokens {
+			cf.Tokens[e.Key] = e.Card
+		}
 	}
-	cf.Version = w.Version
-	cf.Cards = w.Cards
-	if w.Tokens == nil {
-		cf.Tokens = nil
-		return nil
-	}
-	cf.Tokens = make(map[string]*Card, len(w.Tokens))
-	for _, e := range w.Tokens {
-		cf.Tokens[e.Key] = e.Card
-	}
-	return nil
+	return cf
 }

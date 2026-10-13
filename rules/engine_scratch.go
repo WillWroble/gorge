@@ -143,9 +143,13 @@ type engineScratch struct {
 	// decArena backs posed priority decisions for an engine whose decisions
 	// all die with it (SetDecisionArena, decision_arena.go); nil or off
 	// everywhere else.
-	decArena      *decisionArena `clone:"reset"`
-	lookBackOwner *Engine        `clone:"reset"`
-	lookBackBusy  bool           `clone:"reset"`
+	decArena *decisionArena `clone:"reset"`
+	// arenaHeapAsks counts the priority decisions e posed on the heap
+	// because it had no arena yet (activeArena's lazy-creation deferral,
+	// decision_arena.go); a clone starts it at zero.
+	arenaHeapAsks uint16  `clone:"reset"`
+	lookBackOwner *Engine `clone:"reset"`
+	lookBackBusy  bool    `clone:"reset"`
 	// preview is entryPreview's reusable preview Engine struct, owned and
 	// guarded exactly like lookBack (previewOwner, previewBusy): a preview
 	// lives for one entry's plan and is zeroed when released

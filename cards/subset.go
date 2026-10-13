@@ -528,10 +528,11 @@ func decodeCacheFile(path string) (*cacheFile, error) {
 		return nil, err
 	}
 	defer zr.Close()
-	var cf cacheFile
-	if err := gob.NewDecoder(zr).Decode(&cf); err != nil {
+	var w cacheFileWire
+	if err := gob.NewDecoder(zr).Decode(&w); err != nil {
 		return nil, err
 	}
+	cf := w.cacheFile()
 	return &cf, nil
 }
 
