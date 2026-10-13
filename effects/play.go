@@ -90,6 +90,19 @@ func effPlay(h Host, c *Ctx, sa *cards.SA) {
 		if id := c.Play; id != 0 && strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKForgetPlayed)), "True") {
 			forgetRememberedOne(h, c, id)
 		}
+		// RememberPlayed$ True (Forge PlayEffect's host.addRemembered on each
+		// played card): the card the answer began to play joins both halves
+		// of the remembered state through the same rememberTarget body every
+		// RememberObjects$ write uses. Planetarium of Wan Shi Tong's "Do this
+		// only once each turn" is exactly this record: its trigger's
+		// PresentDefined$ Remembered gate and the Play's ConditionDefined$
+		// Remembered gate read it until the TurnBegin cleanup clears it. A
+		// decline leaves ctx.Play at 0, so nothing is remembered. An
+		// Amount$ Play that begins several cards remembers the first only
+		// (ctx.Play holds one card), the boundary ForgetPlayed$ keeps.
+		if id := c.Play; id != 0 && strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberPlayed)), "True") {
+			rememberTarget(h, c, state.Target{Obj: id})
+		}
 		c.PlayDone = false
 		c.Play = 0
 		return
