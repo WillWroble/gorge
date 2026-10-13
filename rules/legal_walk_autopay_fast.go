@@ -64,11 +64,11 @@ func (w *legalWalk) autoPayFast(p state.PlayerID, id state.ObjID, base Cost, ab 
 	}
 	scope := abilityScope(ab)
 	composed := w.e.offerCostForUsing(statics, p, id, base, scope)
-	// Only a plain mana cost, plus the ability's own tap (which the activation
-	// itself pays and which withholds id from the census). Anything else
-	// (life, X, hybrid, phyrexian, snow, sacrifice, tap-a-permanent, ...) is
-	// the planner's.
-	if !autoPayFastPlain(&composed) {
+	// Only a plain mana cost, plus the ability's own tap and a sacrifice or
+	// exile of the source itself (each withholds id from the census below).
+	// Anything else (life, X, hybrid, phyrexian, snow, sacrificing another
+	// permanent, tap-a-permanent, ...) is the planner's.
+	if !autoPayFastPlain(&composed, id) {
 		return false
 	}
 	if global, _ := w.e.paymentPlanGlobalManaEffect(p, id); global {
@@ -85,7 +85,7 @@ func (w *legalWalk) autoPayFast(p state.PlayerID, id state.ObjID, base Cost, ab 
 	for i := range units {
 		u := &units[i]
 		if u.ID == id {
-			continue // the ability's own tap withholds its mana ability
+			continue // the ability's own tap or self-sacrifice withholds its mana ability
 		}
 		best := -1
 		var bestMana state.Mana
@@ -124,12 +124,37 @@ func (w *legalWalk) autoPayFast(p state.PlayerID, id state.ObjID, base Cost, ab 
 	return true
 }
 
-// autoPayFastPlain reports whether composed's only non-mana part is the
-// ability's own tap. Every other field must be zero (Cost.Equal compares
-// every field, so a new field cannot silently slip past).
-func autoPayFastPlain(composed *Cost) bool {
+// autoPayFastPlain reports whether composed's only non-mana parts are the
+// ability's own tap and a sacrifice or exile of the source id itself. Every
+// other field must be zero (Cost.Equal compares every field, so a new field
+// cannot silently slip past).
+//
+// A self-sacrifice is exact here: planComposedCost keeps id out of every
+// consuming alternative (kept) and adds no reservation part, and
+// planLeavesCostPayable then rejects only a plan that consumes id, which the
+// fast path's witness never touches (the cover loop skips id). planComposedCost
+// does not model an Exile part at all, so the confirming offer gate is the only
+// reader of a self-exile on both paths.
+func autoPayFastPlain(composed *Cost, id state.ObjID) bool {
 	plain := Cost{Colored: composed.Colored, Generic: composed.Generic, Tap: composed.Tap}
+	if autoPaySelfParts(composed.Sac, id) {
+		plain.Sac = composed.Sac
+	}
+	if autoPaySelfParts(composed.Exile, id) {
+		plain.Exile = composed.Exile
+	}
 	return composed.Equal(&plain)
+}
+
+// autoPaySelfParts reports whether every part names the source itself once
+// (pay.PlanSelfCost) with a fixed amount.
+func autoPaySelfParts(parts []CostPart, id state.ObjID) bool {
+	for _, part := range parts {
+		if part.Announced || part.Dyn != "" || !pay.PlanSelfCost(part, id) {
+			return false
+		}
+	}
+	return true
 }
 
 // autoPlainUnits is the walk's lazily built payment-window census

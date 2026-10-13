@@ -1,6 +1,6 @@
 package rules
 
-// paid_mana_census_test.go -- Config.PaidManaCensus (rules/paid_mana_census.go):
+// paid_mana_census_test.go -- the paid-cost census (rules/paid_mana_census.go):
 // a mana source whose activation cost is a deterministic self-sacrifice
 // (Treasure, Lotus Petal) or a fixed PayLife<N> is counted by the attack-tax
 // budget, the unless-cost windows, AvailableMana and the pool-short ability
@@ -66,7 +66,7 @@ func pmcClasses() []pmcClass {
 // class's source. Baird charges {1} per attacker.
 func pmcAttackSeat(t *testing.T, flag bool, c pmcClass, spoil bool) (*Engine, state.ObjID, state.ObjID) {
 	t.Helper()
-	cfg := Config{Seed: 716, Names: []string{"a", "b", "c"}, PaidManaCensus: flag,
+	cfg := Config{Seed: 716, Names: []string{"a", "b", "c"}, DisablePaidManaCensus: !flag,
 		Tokens: testutil.CorpusRegistry(t).Tokens,
 		Decks:  [][]*cards.Card{mountainDeck(t, 40), mountainDeck(t, 40), mountainDeck(t, 40)}}
 	e := New(cfg)
@@ -291,7 +291,7 @@ func TestPaidManaCensusCastUnchangedByFlag(t *testing.T) {
 // unpayable while a {1} tax is.
 func TestPaidManaCensusLifeBudgetIsCumulative(t *testing.T) {
 	t.Parallel()
-	cfg := Config{Seed: 716, Names: []string{"a", "b"}, PaidManaCensus: true,
+	cfg := Config{Seed: 716, Names: []string{"a", "b"}, DisablePaidManaCensus: false,
 		Decks: [][]*cards.Card{mountainDeck(t, 40), mountainDeck(t, 40)}}
 	e := New(cfg)
 	onBoardCard(t, e, 1, card(t, pmcPainRock))

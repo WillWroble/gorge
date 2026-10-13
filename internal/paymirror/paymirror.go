@@ -1561,12 +1561,15 @@ func answerManaAsks(b *rules.Engine, p state.PlayerID, act decision.PaymentActiv
 		if b.G.Over || d == nil || d.Kind != decision.KChoose || d.Player != p || !manaAsk(d, act.Source) {
 			return ""
 		}
-		cands := matchProductions(d, act.Produces, printedManaRank(b, act))
-		if _, single := singleColour(act.Produces); single && !labelExact(d, act.Produces) {
+		prefer := printedManaRank(b, act)
+		cands := matchProductions(d, act.Produces, prefer)
+		if _, single := singleColour(act.Produces); single && (!labelExact(d, act.Produces) || preferLifted(d, prefer, act.Produces)) {
 			// Only a loose class matched (an any-colour or "X or Y"
-			// label, whose amount the wheel may not spell) or none did:
-			// the option proven on a clone to produce the witness wins.
-			// A single-colour witness bounds the proof: the colour ask
+			// label, whose amount the wheel may not spell), none did, or
+			// the plan's own printed ability was offered but its label
+			// understates the witness (a TapsForMana extra): the option
+			// proven on a clone to produce the witness wins. A
+			// single-colour witness bounds the proof: the colour ask
 			// after a stage-1 pick names the colour (labelExact), so the
 			// clone's own answerManaAsks never verifies again.
 			if v := verifiedProductions(b, p, act, d, cands); len(v) > 0 {
@@ -1605,6 +1608,28 @@ func labelExact(d *decision.Decision, want decision.ManaAmount) bool {
 		if single && len(o.ManaSymbol) == 1 && state.ManaIndex(o.ManaSymbol[0]) == col {
 			return true
 		}
+	}
+	return false
+}
+
+// preferLifted reports whether the plan's own printed ability is offered as a
+// wheel option whose exact label production differs from the witness. A
+// TapsForMana extra (Forsaken Monument's "whenever you tap a permanent for
+// {C}, add an additional {C}") lifts the tapped ability's true production
+// above its label, so an exact label match on a DIFFERENT option can be a
+// false positive: the witness is only reachable through the plan's ability.
+// Only a clone proves which option produces the witness (verifiedProductions),
+// so preferLifted widens the proof beyond labelExact's loose-class trigger.
+func preferLifted(d *decision.Decision, prefer int, want decision.ManaAmount) bool {
+	if prefer < 0 {
+		return false
+	}
+	for _, o := range d.Options {
+		if o.Ability != prefer || o.ManaSymbol != "" {
+			continue
+		}
+		amt, any, combo, ok := labelProduction(o.Label)
+		return ok && !any && combo == nil && amt != want
 	}
 	return false
 }

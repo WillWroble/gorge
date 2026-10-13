@@ -112,7 +112,7 @@ func runPlay(args []string) int {
 	fs.IntVar(&remoteCache, "remote-cache", remoteCache, "cached remote evaluations (states)")
 	fs.IntVar(&gonetCache, "gonet-cache", gonetCache, "cached gonet= evaluations (states; 0 = none)")
 	fs.IntVar(&gonetCardCache, "gonet-card-cache", gonetCardCache, "cached gonet= card vectors (0 = none)")
-	fs.BoolVar(&paidManaCensus, "paid-mana-census", false, "Config.PaidManaCensus: the payment census counts payable paid-cost mana sources (rules/paid_mana_census.go)")
+	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (rules/paid_mana_census.go)")
 	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
 	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
 	fs.Parse(args)
@@ -442,8 +442,8 @@ func score(a, b, half int) float64 {
 
 var sparePool sync.Pool
 
-// paidManaCensus is play -paid-mana-census; mmStatsOn is play -mm-stats.
-var paidManaCensus, mmStatsOn bool
+// noPaidManaCensus is play -no-paid-mana-census; mmStatsOn is play -mm-stats.
+var noPaidManaCensus, mmStatsOn bool
 
 func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, maxTurns, maxIntents, mulligans int, record bool) (gameRec, []byte) {
 	rec := gameRec{Game: jb.game, Pair: jb.pair, Leg: jb.leg, Seed: jb.seed, Decks: jb.decks, Winner: -1}
@@ -481,7 +481,7 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 	cfg := rules.Config{
 		Seed: jb.seed, Names: []string{"p0", "p1"}, Decks: [][]*cards.Card{d0, d1},
 		Tokens: reg.Tokens, NameUniverse: reg.Universe(), Mulligans: mulligans,
-		PaidManaCensus: paidManaCensus,
+		DisablePaidManaCensus: noPaidManaCensus,
 	}
 	spare, _ := sparePool.Get().(*rules.Spare)
 	if spare == nil {
@@ -513,7 +513,7 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 				if rec.MM[seatIdx] == nil {
 					rec.MM[seatIdx] = mmStats{}
 				}
-				rec.MM[seatIdx].observe(eng, paidManaCensus, auto[seatIdx], d, in)
+				rec.MM[seatIdx].observe(eng, !noPaidManaCensus, auto[seatIdx], d, in)
 			}
 			if d.Kind == decision.KMulligan && len(d.Options) > 0 && d.Options[0].Kind != "bottom" &&
 				len(in.Choices) > 0 && optionKind(d, in.Choices[0]) == "mulligan" {

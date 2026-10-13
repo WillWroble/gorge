@@ -84,6 +84,14 @@ type matchJSON struct {
 	// recorded name choice exactly as long as the corpus pin has not moved
 	// (the documented DIVERGED cause, see AGENTS.md).
 	NameUniverseNames []string `json:"name_universe_names,omitempty"`
+	// PaidManaCensus is the match MODE bit for the widened paid-cost mana
+	// census: true when the live match ran with it (rules.Config.
+	// DisablePaidManaCensus false). config() must restore it or the rebuilt
+	// engine takes the other census, whose offer list differs, and every
+	// recorded intent from the first census-sensitive decision misaligns.
+	// Absent (a pre-flip capture) is the narrow census, the value those
+	// matches played with, so nothing migrates.
+	PaidManaCensus bool `json:"paid_mana_census,omitempty"`
 }
 
 // logJSON is log.json's shape, mirroring host.FeedbackLog: the embedded
@@ -288,6 +296,10 @@ func config(m matchJSON, reg *cards.Registry, tokens map[string]*cards.Card) (ru
 		cfg.NameUniverse = reg.Universe()
 		cfg.NameUniverseNames = append([]string(nil), m.NameUniverseNames...)
 	}
+	// The paid-cost census is the other match MODE: a capture made with it
+	// records the bit, and a pre-flip capture carries none, which reads back
+	// as the narrow census those matches ran.
+	cfg.DisablePaidManaCensus = !m.PaidManaCensus
 	return cfg, nil
 }
 
