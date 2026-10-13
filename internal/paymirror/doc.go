@@ -192,8 +192,8 @@
 //	trigQueueStale                     the drained trigger queue's stale-prefix watermark
 //	snapPool, lookBack, lookBackOwner, recycled storage one engine owns (snapshot arenas, the
 //	lookBackBusy, decArena,            look-back observer Engine, the decision arena, the entry
-//	preview, previewOwner/Busy         preview Engine): capacity,
-//	                                   never game state; Clone leaves them nil or adopts a
+//	preview, previewOwner/Busy,        preview Engine, the arena's heap-ask count): capacity,
+//	arenaHeapAsks                      never game state; Clone leaves them nil or adopts a
 //	                                   Spare's cleared ones
 //	castIssued, castFree               the pendingCast recycling pair: capacity, never game state
 //	legalScratch                       the offer walk's log-derived indexes: a pure function of
