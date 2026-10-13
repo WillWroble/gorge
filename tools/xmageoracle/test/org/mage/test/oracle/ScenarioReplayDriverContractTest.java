@@ -247,13 +247,74 @@ public final class ScenarioReplayDriverContractTest {
         check(ScenarioReplay.passAction(pair, 1) == ScenarioReplay.PASS_PAIR_SECOND, "second pass of a pair");
         JsonArray handoff = steps("[{op:'pass',seat:0},{op:'cast',seat:1,card:'p1:Lightning Bolt'}]");
         check(ScenarioReplay.passAction(handoff, 0) == ScenarioReplay.PASS_HANDOFF, "lone p0 pass before a p1 cast");
+
+        // p0 hands priority off, p1 casts at instant speed and passes (CR
+        // 117.3c), p0 passes to resolve (CR 117.4). The pair is p1-first: its
+        // first pass queues nothing (the checkpoint still sees the spell) and
+        // its second queues the one-object resolution.
+        JsonArray p1Pair = steps("[{op:'pass',seat:0},{op:'cast',seat:1,card:'p1:King Cheetah'},"
+                + "{op:'pass',seat:1},{op:'pass',seat:0},{op:'resolve',seat:0}]");
+        check(ScenarioReplay.passAction(p1Pair, 0) == ScenarioReplay.PASS_HANDOFF,
+                "step 0 is the lone p0 handoff pass");
+        check(ScenarioReplay.passAction(p1Pair, 2) == ScenarioReplay.PASS_P1_PAIR_FIRST,
+                "step 2 is the first pass of a p1-first pair");
+        check(ScenarioReplay.passAction(p1Pair, 3) == ScenarioReplay.PASS_PAIR_SECOND,
+                "step 3 is the second pass of a p1-first pair");
+        TestPlayer ap = bare("A");
+        TestPlayer bp = bare("B");
+        ScenarioReplay rp = queueingDriver(p1Pair, ap, bp);
+        loopStep(rp, ap, p1Pair, 0);
+        check(names(ap).equals(Arrays.asList("step 0 (pass)")),
+                "the handoff pass queues only its checkpoint; got " + names(ap));
+        queue(rp, "queuePassCommands", 1);
+        check(names(ap).equals(Arrays.asList("step 0 (pass)", ScenarioReplay.CMD_YIELD_PRIORITY)),
+                "the p1 cast step yields priority before its checkpoint; got " + names(ap));
+        loopStep(rp, ap, p1Pair, 2);
+        check(names(ap).equals(Arrays.asList("step 0 (pass)", ScenarioReplay.CMD_YIELD_PRIORITY, "step 2 (pass)")),
+                "the p1-first pair's first pass queues only its checkpoint; got " + names(ap));
+        loopStep(rp, ap, p1Pair, 3);
+        check(names(ap).equals(Arrays.asList("step 0 (pass)", ScenarioReplay.CMD_YIELD_PRIORITY, "step 2 (pass)",
+                        ScenarioReplay.CMD_REQUIRE_STACK, ScenarioReplay.CMD_WAIT_RESOLVE_ONE, "step 3 (pass)")),
+                "the p1-first pair's second pass queues the one-object resolution before its checkpoint; got " + names(ap));
+        check(names(bp).isEmpty(), "the p1-first pair queues nothing for the opponent; got " + names(bp));
+
+        // The pair can be followed by a pass_to (Entropic Battlecruiser's
+        // static probe answers at the next priority): classification and queue
+        // order must not depend on what follows.
+        JsonArray p1PairTail = steps("[{op:'pass',seat:0},{op:'cast',seat:1,card:'p1:Occult Epiphany'},"
+                + "{op:'pass',seat:1},{op:'pass',seat:0},{op:'pass_to',decision:'priority'},{op:'resolve',seat:0}]");
+        check(ScenarioReplay.passAction(p1PairTail, 2) == ScenarioReplay.PASS_P1_PAIR_FIRST,
+                "the first pass of a pass_to-suffixed p1-first pair");
+        check(ScenarioReplay.passAction(p1PairTail, 3) == ScenarioReplay.PASS_PAIR_SECOND,
+                "the second pass of a pass_to-suffixed p1-first pair");
+        TestPlayer at = bare("A");
+        ScenarioReplay rt = queueingDriver(p1PairTail, at, bare("B"));
+        loopStep(rt, at, p1PairTail, 2);
+        check(names(at).equals(Arrays.asList("step 2 (pass)")),
+                "a pass_to-suffixed p1-first pair's first pass queues only its checkpoint; got " + names(at));
+        loopStep(rt, at, p1PairTail, 3);
+        check(names(at).equals(Arrays.asList("step 2 (pass)", ScenarioReplay.CMD_REQUIRE_STACK,
+                        ScenarioReplay.CMD_WAIT_RESOLVE_ONE, "step 3 (pass)")),
+                "a pass_to-suffixed p1-first pair's second pass queues the one-object resolution before its checkpoint; got " + names(at));
+
         // Every other shape fails loudly rather than being guessed at.
         check(rejects(steps("[{op:'pass',seat:0}]"), 0), "a lone trailing pass must be rejected");
         check(rejects(steps("[{op:'pass',seat:0},{op:'resolve'}]"), 0), "a pass before a non-cast must be rejected");
-        check(rejects(steps("[{op:'pass',seat:1},{op:'pass',seat:0}]"), 0), "a p1-first pair must be rejected");
+        check(rejects(steps("[{op:'pass',seat:1},{op:'pass',seat:0}]"), 0),
+                "a bare p1-first pair with no preceding seat-1 cast must be rejected");
         check(rejects(steps("[{op:'pass',seat:0},{op:'pass',seat:0}]"), 0), "a same-seat pair must be rejected");
         check(rejects(steps("[{op:'pass',seat:0},{op:'pass',seat:1},{op:'pass',seat:0}]"), 1),
                 "a three-pass run must be rejected");
+
+        // The p1-first pair needs seat 0 to own the checkpoints: at active
+        // seat 1 the pair's first pass is rejected like any other pair.
+        boolean p1Threw = false;
+        try {
+            ScenarioReplay.passCommands(p1Pair, 2, 1);
+        } catch (IllegalArgumentException expected) {
+            p1Threw = true;
+        }
+        check(p1Threw, "a p1-first pair at active seat 1 must be rejected");
 
         // Queue order on the active player (the checkpoint owner). Cast and
         // pass pair: the spell is on the stack at the first-pass checkpoint,
@@ -321,8 +382,24 @@ public final class ScenarioReplayDriverContractTest {
             threw = true;
         }
         check(threw, "a pass on seat 1's turn must be rejected");
+
+        // The empty-stack failure names the turn, step, priority holder and the
+        // stack the driver last saw, so a pair that met an empty stack (an
+        // end-step trigger that resolved early, or a pair run at the wrong
+        // step) is self-diagnosing without a re-run.
+        String diag = ScenarioReplay.emptyStackDiagnostic(
+                ScenarioReplay.CMD_REQUIRE_STACK, 1, "END_TURN", "A", "[Ultimecia, Time Sorceress]");
+        check(diag.startsWith(ScenarioReplay.CMD_REQUIRE_STACK),
+                "the empty-stack diagnostic must keep the command prefix; got " + diag);
+        check(diag.contains("turn 1"), "the empty-stack diagnostic must name the turn; got " + diag);
+        check(diag.contains("END_TURN"), "the empty-stack diagnostic must name the step; got " + diag);
+        check(diag.contains("priority A"), "the empty-stack diagnostic must name the priority holder; got " + diag);
+        check(diag.contains("[Ultimecia, Time Sorceress]"),
+                "the empty-stack diagnostic must name the last checkpoint stack; got " + diag);
+
         System.out.println("PASS pass mapping and queue order (pair resolves after its second pass; "
-                + "lone p0 pass yields before the p1 cast checkpoint; other shapes rejected)");
+                + "lone p0 pass yields before the p1 cast checkpoint; p1-first pair resolves after its "
+                + "second pass; other shapes rejected; empty-stack failure self-diagnosing)");
     }
 
     private static void mustAttack() {
