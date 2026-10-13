@@ -950,6 +950,11 @@ func (e *Engine) castModeAsk() bool {
 	// CR 702.194b-c: the mode count is fixed by the declared Teamwork
 	// election at 601.2b, before the optional tap payment is answered.
 	ctx.Kicker.PendingTeamwork = castAnswerCodes.Code(pc.mode) == castAnswerTeamworkMode
+	// CR 601.2b: the optional additional cost is announced with the modes,
+	// so a CharmNum$ over Count$OptionalGenericCostPaid (Pyrrhic Strike's
+	// "if this spell's additional cost was paid, choose both instead") reads
+	// the election, not the hand card's unpaid object flag.
+	ctx.Num.OptionalCostElected = castModeCodes.Code(pc.mode) == castModeOptionalcost
 	effects.SetSVars(ctx, f.SVars)
 	if effects.CharmRandomChosen(e, ctx, sa) {
 		// param:api:Charm.Random: a random Charm's mode announcement is not
