@@ -521,6 +521,9 @@ func (e *Engine) payCast() {
 	// keeps one record per spent unit, so a cast that spent ordinary (or only
 	// restricted) mana emits no rider event and stays byte-identical.
 	pc.addsCounterGrants = append([]state.ManaAddsCounterGrant(nil), e.ManaSpentAddsCounters...)
+	// The spent mana's producing sources, from the same capture (it is
+	// consumed by fireManaSpentTriggers below, so it is read here).
+	e.captureManaSources(pc)
 	if pc.PayLife != 0 {
 		e.emit(events.Event{Kind: events.LifeChange, Player: pc.player, Amount: -pc.PayLife, Text: "paylife proposal"})
 	}
@@ -861,6 +864,9 @@ func (e *Engine) payCast() {
 		}
 		cvFlags := events.FlagsString(events.FlagsFrom(flags) | state.FlagConvoked)
 		e.emit(events.Event{Kind: events.CastInfo, Obj: pc.card, Amount: int32(len(ids)), Counter: cvFlags, IDs: ids})
+	}
+	if ev, ok := manaSourcesCastInfo(pc, flags); ok {
+		e.emit(ev)
 	}
 	// AddsCounters$ (task opalp): the producing abilities' rider grants this
 	// cast earned ride their own TRAILING pay-time CastInfo's Text payload --
