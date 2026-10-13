@@ -87,8 +87,7 @@
      "pt": "2/5"
     }
    ],
-   "xmage": "SacredBoonTest#testSacredBoonBigDamage",
-   "known_bug": "XP[preventdamage-shieldeffecttarget-targeted-unsupported]: PreventDamage only implements ShieldEffectTarget$ ParentTarget; Sacred Boon's ShieldEffectTarget$ Targeted emits a Note and installs no PreventionSubAbility rider (effects/prevent_damage.go:93-98), so the end-step +0/+1 counters (BoonEffect) never happen -- prevention itself works (damage 1 matches), Lion stays 2/2 not 2/5. Card-script gap: sacred_boon.txt ShieldEffectTarget$ Targeted. CR 615.5, 603.7."
+   "xmage": "SacredBoonTest#testSacredBoonBigDamage"
   },
   {
    "name": "test-sacred-boon-small-damage",
@@ -176,8 +175,7 @@
      "pt": "2/4"
     }
    ],
-   "xmage": "SacredBoonTest#testSacredBoonSmallDamage",
-   "known_bug": "XP[preventdamage-shieldeffecttarget-targeted-unsupported]: same as testSacredBoonBigDamage: ShieldEffectTarget$ Targeted unimplemented (effects/prevent_damage.go:93-98), no +0/+1 counters (2/2 vs 2/4). CR 615.5, 603.7."
+   "xmage": "SacredBoonTest#testSacredBoonSmallDamage"
   }
  ]
 }
