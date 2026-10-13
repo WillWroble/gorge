@@ -57,6 +57,10 @@ type Options struct {
 	// offered set, so the response is pure configuration: it carries no live
 	// table or match state. nil serves the empty listing with status 200.
 	BotPolicies *protocol.BotPolicyList
+	// Events, when non-nil, arms the draft-event API under /api/events
+	// (eventhost.Host implements it; cmd/gorged wires it). nil — the default —
+	// leaves every /api/events path the JSON 404 it is today.
+	Events EventService
 }
 
 func (o Options) withDefaults() Options {
@@ -112,6 +116,7 @@ func newHandler(r *host.Registry, o Options) (*handler, http.Handler) {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})
+	h.mountEvents(mux)
 	h.mountStream(mux) // Task 15
 	h.mountStatic(mux) // Task 15
 	return h, h.authorized(mux)
