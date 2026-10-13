@@ -79,6 +79,14 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 		if !containsString(entry.Formats, req.Format.String()) {
 			return httpapi.CreateGameResponse{}, fmt.Errorf("bot policy %q does not support the %s format (formats: %s)", policy, req.Format, strings.Join(entry.Formats, ", "))
 		}
+		// Operator ruling 2026-10-13: a policy that reads opponents'
+		// decklists (bots.Info.Env) never plays a vs-bot table — this
+		// request always seats a human. It covers both an explicit client
+		// pick and the reserved-pool picker above, whose reservedFor hit
+		// would otherwise name az-c3 here.
+		if entry.Env {
+			return httpapi.CreateGameResponse{}, fmt.Errorf("bot policy %q reads opponents' decklists and cannot play at a table with a human", policy)
+		}
 		pool, otherPool := conPool, cmdPool
 		otherFormat := host.FormatCommander
 		if req.Format == host.FormatCommander {

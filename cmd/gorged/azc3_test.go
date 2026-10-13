@@ -34,7 +34,7 @@ func enableAZ(t *testing.T) string {
 		t.Fatal(err)
 	}
 	azc3Once.Do(func() {
-		if err := (config{az3Net: path, az3Decks: dir, vsbot: true, autoMana: true, botAutoPayMana: true}).enableAZC3(); err != nil {
+		if err := (config{az3Net: path, az3Decks: dir, vsbot: true, allowDecklistBots: true, autoMana: true, botAutoPayMana: true}).enableAZC3(); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -47,7 +47,7 @@ func enableAZ(t *testing.T) string {
 // The flags come as a pair and need what az-c3 needs; every refusal happens
 // before anything registers.
 func TestAZC3FlagsValidate(t *testing.T) {
-	ok := config{az3Net: "n.dzgw", az3Decks: "d", vsbot: true, autoMana: true, botAutoPayMana: true}
+	ok := config{az3Net: "n.dzgw", az3Decks: "d", vsbot: true, allowDecklistBots: true, autoMana: true, botAutoPayMana: true}
 	cases := []struct {
 		name string
 		mut  func(*config)
@@ -55,7 +55,7 @@ func TestAZC3FlagsValidate(t *testing.T) {
 	}{
 		{"decks without a network", func(c *config) { c.az3Net = "" }, "-az-c3-decks needs -az-c3-net"},
 		{"network without decks", func(c *config) { c.az3Decks = "" }, "needs -az-c3-decks"},
-		{"no -vsbot", func(c *config) { c.vsbot = false }, "needs -vsbot"},
+		{"no -allow-decklist-bots", func(c *config) { c.allowDecklistBots = false }, "needs -allow-decklist-bots"},
 		{"no -auto-mana", func(c *config) { c.autoMana = false }, "-auto-mana"},
 		{"no -bot-auto-mana", func(c *config) { c.botAutoPayMana = false }, "-bot-auto-mana"},
 	}
@@ -96,24 +96,27 @@ func azConfig() config {
 		policyPools: map[string][]string{azc3.Policy: {"a", "b"}}}
 }
 
-// A game against az-c3 deals from its pool for BOTH seats, and from nothing
-// else; an ordinary game never deals a reserved deck.
-func TestCreateGameKeepsAZC3ToItsPool(t *testing.T) {
+// Operator ruling 2026-10-13: az-c3 reads opponents' decklists, so the
+// vs-bot flow — which always seats a human — refuses it, however it is
+// picked: explicitly, or through a deck reserved for it. Its pool stays
+// reserved: an ordinary game deals from the ordinary pool and nothing else.
+func TestCreateGameRefusesAZC3AndKeepsItsPoolReserved(t *testing.T) {
 	enableAZ(t)
 	r, gate := freshGameLock(t)
 	create := azConfig().createGame(r, gate, nil, []string{"c", "d"}, view.Omniscient)
 
-	for i := 0; i < 6; i++ {
-		resp, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy})
-		if err != nil {
-			t.Fatalf("game %d: %v", i, err)
+	for i := 0; i < 2; i++ {
+		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy})
+		if err == nil || !strings.Contains(err.Error(), "reads opponents' decklists") {
+			t.Fatalf("explicit az-c3 pick: error %v, want the decklist refusal", err)
 		}
-		ms := waitSeatDecks(t, r, resp.Table)
-		for _, d := range ms {
-			if d != "a" && d != "b" {
-				t.Fatalf("an az-c3 game dealt %q, outside its pool {a,b}", d)
-			}
+		_, err = create(httpapi.CreateGameOptions{Format: host.FormatConstructed, HumanDeck: "a"})
+		if err == nil || !strings.Contains(err.Error(), "reads opponents' decklists") {
+			t.Fatalf("reserved-deck pick: error %v, want the decklist refusal", err)
 		}
+	}
+	if n := len(r.Tables()); n != 0 {
+		t.Fatalf("refused requests created %d table(s)", n)
 	}
 	for i := 0; i < 6; i++ {
 		resp, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: host.BotPolicy})
@@ -137,8 +140,6 @@ func TestCreateGameRefusesDecksOutsideThePolicysPool(t *testing.T) {
 		req  httpapi.CreateGameOptions
 		want string
 	}{
-		{"human deck outside the pool", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy, HumanDeck: "c"}, "human deck \"c\" is not in the az-c3 pool"},
-		{"bot deck outside the pool", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy, BotDeck: "d"}, "bot deck \"d\" is not in the az-c3 pool"},
 		{"reserved deck, other policy", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: host.BotPolicy, HumanDeck: "a"}, "reserved for bot policy \"az-c3\""},
 		{"reserved bot deck, other policy", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: host.BotPolicy, BotDeck: "b"}, "reserved for bot policy \"az-c3\""},
 	} {
@@ -149,19 +150,12 @@ func TestCreateGameRefusesDecksOutsideThePolicysPool(t *testing.T) {
 	if n := len(r.Tables()); n != 0 {
 		t.Errorf("refused requests created %d table(s)", n)
 	}
-	// Explicit picks inside the pool are honoured.
-	resp, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy, HumanDeck: "a", BotDeck: "b"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := waitSeatDecks(t, r, resp.Table); !reflect.DeepEqual(got, []string{"a", "b"}) && !reflect.DeepEqual(got, []string{"b", "a"}) {
-		t.Errorf("explicit pool picks dealt %v", got)
-	}
 }
 
-// A server whose tables lack payment plans cannot build az-c3: the request is
-// refused, and no match is started to crash on its first seat.
-func TestCreateGameRefusesAZC3WithoutAutoPay(t *testing.T) {
+// The decklist refusal precedes the payment-plan gate on the vs-bot flow,
+// so a mispaid az-c3 request names the decklist rule. The bot-only table's
+// own payment-plan refusal is host's TestHostRefusesAZC3WithoutAutoPay.
+func TestCreateGameRefusesAZC3BeforeItsPaymentPlans(t *testing.T) {
 	enableAZ(t)
 	for _, mut := range []func(*config){func(c *config) { c.autoMana = false }, func(c *config) { c.botAutoPayMana = false }} {
 		r, gate := freshGameLock(t)
@@ -169,8 +163,8 @@ func TestCreateGameRefusesAZC3WithoutAutoPay(t *testing.T) {
 		mut(&c)
 		create := c.createGame(r, gate, nil, []string{"c", "d"}, view.Omniscient)
 		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy})
-		if err == nil || !strings.Contains(err.Error(), "automatic mana payment") {
-			t.Errorf("error %v, want the automatic-payment refusal", err)
+		if err == nil || !strings.Contains(err.Error(), "reads opponents' decklists") {
+			t.Errorf("error %v, want the decklist refusal", err)
 		}
 		if n := len(r.Tables()); n != 0 {
 			t.Errorf("refused request created %d table(s)", n)
@@ -280,9 +274,11 @@ func TestAZC3PoolLoading(t *testing.T) {
 	})
 }
 
-// The web client names no bot policy, so a deck reserved for one picks it:
-// choose an FDN deck and the opponent is az-c3, dealt from the same pool.
-func TestCreateGameChoosesAZC3FromAPooledDeck(t *testing.T) {
+// The web client names no bot policy, so a deck reserved for one used to
+// pick it. Operator ruling 2026-10-13: az-c3 reads opponents' decklists, so
+// a pooled deck can no longer seat a human against it — every such request
+// is refused, naming the rule.
+func TestCreateGameRefusesAPooledDeckPickOfAZC3(t *testing.T) {
 	enableAZ(t)
 	r, gate := freshGameLock(t)
 	c := azConfig()
@@ -294,18 +290,15 @@ func TestCreateGameChoosesAZC3FromAPooledDeck(t *testing.T) {
 		{Format: host.FormatConstructed, BotDeck: "b"},
 		{Format: host.FormatConstructed, HumanDeck: "b", BotDeck: "a"},
 	} {
-		resp, err := create(req)
-		if err != nil {
-			t.Fatalf("%+v: %v", req, err)
+		_, err := create(req)
+		if err == nil {
+			t.Errorf("%+v: the pooled deck seated az-c3 against a human", req)
+		} else if !strings.Contains(err.Error(), "reads opponents' decklists") {
+			t.Errorf("%+v: error %v, want the decklist refusal", req, err)
 		}
-		if resp.BotPolicy != azc3.Policy {
-			t.Errorf("%+v: opponent %q, want az-c3", req, resp.BotPolicy)
-		}
-		for _, d := range waitSeatDecks(t, r, resp.Table) {
-			if d != "a" && d != "b" {
-				t.Errorf("%+v dealt %q, outside the pool", req, d)
-			}
-		}
+	}
+	if n := len(r.Tables()); n != 0 {
+		t.Errorf("refused requests created %d table(s)", n)
 	}
 	// No decks named: the server's own default, from the ordinary pool.
 	resp, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed})
@@ -315,10 +308,11 @@ func TestCreateGameChoosesAZC3FromAPooledDeck(t *testing.T) {
 	if resp.BotPolicy != host.BotPolicy {
 		t.Errorf("no decks named: opponent %q, want the server default %q", resp.BotPolicy, host.BotPolicy)
 	}
-	// A pooled deck beside an ordinary one is refused, naming the pool.
+	// A pooled deck beside an ordinary one is refused too — now by the
+	// decklist rule the pick would have selected az-c3 for.
 	if _, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, HumanDeck: "a", BotDeck: "c"}); err == nil ||
-		!strings.Contains(err.Error(), "not in the az-c3 pool") {
-		t.Errorf("mixed pooled and ordinary decks: error %v", err)
+		!strings.Contains(err.Error(), "reads opponents' decklists") {
+		t.Errorf("mixed pooled and ordinary decks: error %v, want the decklist refusal", err)
 	}
 }
 
@@ -330,7 +324,8 @@ func TestAZC3DemoTable(t *testing.T) {
 		t.Fatal("no demo table")
 	}
 	if got.ID != "t5" || got.Seats != 2 || got.BotPolicy != azc3.Policy || got.Format != host.FormatConstructed ||
-		!reflect.DeepEqual(got.Decks, pool) || len(got.Humans) != 0 || !got.Perpetual || !got.AutoMana || !got.BotAutoPayMana {
+		!reflect.DeepEqual(got.Decks, pool) || len(got.Humans) != 0 || !got.Perpetual || !got.AutoMana || !got.BotAutoPayMana ||
+		!got.AllowDecklistBots {
 		t.Errorf("demo table %+v", got)
 	}
 	for name, mut := range map[string]func(*config){

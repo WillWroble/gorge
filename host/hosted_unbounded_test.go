@@ -26,7 +26,9 @@ import (
 // the real ones play built.
 func TestDeterminismGateBuildsUnboundedSearchSeats(t *testing.T) {
 	const seed = uint64(20260928)
-	cfg := TableConfig{ID: "t1", Seats: 2, Decks: []string{"a", "b"}, Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: azRedealPolicy}
+	cfg := TableConfig{ID: "t1", Seats: 2, Decks: []string{"a", "b"}, Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: azRedealPolicy,
+		// az-redeal reads every seat's real decklist (Info.Env); the table is bot-only and opts in.
+		AllowDecklistBots: true}
 
 	slotsOf := func(t *testing.T, unbounded bool) {
 		t.Helper()

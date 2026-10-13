@@ -3,6 +3,7 @@ package host
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,7 +74,15 @@ func (r *Registry) load() error {
 		}
 		cfg, err := rec.Config.validated(r.opts.LoadDeck)
 		if err != nil {
-			return err
+			// A table written by an older binary can fail validation the
+			// new process enforces — e.g. a decklist-reading bot policy
+			// (bots.Info.Env) persisted before the allow_decklist_bots
+			// opt-in existed. Skipping it (and rewriting the file below,
+			// with the rest of the dropped tables) beats failing the whole
+			// start over one stale table.
+			log.Printf("host: restart: skipping table %s: %v", rec.Config.ID, err)
+			dropped = true
+			continue
 		}
 		rec.Config = cfg
 		t := newTable(cfg)
