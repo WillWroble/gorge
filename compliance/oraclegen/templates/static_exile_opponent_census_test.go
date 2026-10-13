@@ -36,12 +36,15 @@ import (
 // lacked a library-origin fixture. It now serves Maralen, Fae Ascendant (an
 // enters Dig of a targeted opponent's library), and the other 14 rows name
 // the real gap: no fixture exiles an opponent's card with their source.
+// lb5-exileperm served Valgavoth, Terror Eater: the engine now opens a
+// MayPlayAltManaCost$ static's zone permission and prices the cast at the
+// alternative, and static_offer_altcost.go observes the offered cast and its
+// life payment.
 var wantOpponentExiledWithCensus = map[string]int{
-	"served": 4,
+	"served": 5,
 	"skip:static no fixture exiles an opponent's card with the source (its exile is not an enters ChangeZone or Dig of a targeted opponent's cards)": 14,
 	"skip:static look-at not observable": 2,
 	"skip:static no mana cost":           1,
-	"skip:static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)": 1,
 }
 
 // opponentExiledWithStatic reports whether st is the census class.
