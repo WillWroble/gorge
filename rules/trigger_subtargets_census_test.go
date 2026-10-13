@@ -14,7 +14,11 @@ import (
 // chain triggerChainPreAsks announces at placement (CR 603.3d): a non-modal
 // trigger body with at least one SubAbility$ link the cast flow's own
 // collectSubTargetPreAsks walk recognises as a target declaration. Measured
-// 2026-10-03 at FORGE_REF over every face's T: lines. The whole point of the
+// 2026-10-03 at FORGE_REF over every face's T: lines. lb-chainsubtgt
+// (2026-10-12) added the eight Defined$ target-reuse chains (a link naming an
+// earlier target in Defined$ that also declares its own ValidTgts$: Iroh, Tea
+// Master's GainControl and seven ExchangeControl pairs), whose own target was
+// asked nowhere before. The whole point of the
 // widening is that every one of these now asks its link targets while the
 // ability is put on the stack -- before any player gets priority -- instead of
 // mid-resolution. The one chain the walk finds but the scope excludes is
@@ -43,12 +47,14 @@ var triggerChainPreAskCarriers = []string{
 	"Capricious Efreet",
 	"Captain Ripley Vance",
 	"Celestial Gatekeeper",
+	"Chromeshell Crab",
 	"Cloak and Dagger, Entwined",
 	"Clockwork Hydra",
 	"Coveted Falcon",
 	"Cragganwick Cremator",
 	"Dai Li Agents",
 	"Dalek Intensive Care",
+	"Daring Thief",
 	"Decimator Beetle",
 	"Descendant of Masumaro",
 	"Don & Leo, Problem Solvers",
@@ -60,6 +66,7 @@ var triggerChainPreAskCarriers = []string{
 	"Fiendlash",
 	"Filigree Vector",
 	"Gimli's Reckless Might",
+	"Glen Elendra",
 	"Gloom Ripper",
 	"Goblin Grenadiers",
 	"Greatsword of Tyr",
@@ -77,6 +84,7 @@ var triggerChainPreAskCarriers = []string{
 	"Into the Earthen Maw",
 	"Invasion of Muraganda",
 	"Invasion of Regatha",
+	"Iroh, Tea Master",
 	"Iron Hills Stalwart",
 	"Jaheira, Harper Emissary",
 	"Jon Irenicus, Shattered One",
@@ -107,9 +115,11 @@ var triggerChainPreAskCarriers = []string{
 	"Persistent Constrictor",
 	"Phantom Blade",
 	"Portal Manipulator",
+	"Power Struggle",
 	"Prime Minister's Cabinet Room",
 	"Prismwake Merrow",
 	"Psychic Symbiont",
+	"Puca's Mischief",
 	"Rakdos Firewheeler",
 	"Raubahn, Bull of Ala Mhigo",
 	"Raven's Run",
@@ -120,6 +130,7 @@ var triggerChainPreAskCarriers = []string{
 	"Sinister Concierge",
 	"Soul Echo",
 	"Soul Seizer",
+	"Spawnbroker",
 	"Sphinx-Bone Wand",
 	"Sting, Bilbo's Sword",
 	"Strategic Intervention",
@@ -139,6 +150,7 @@ var triggerChainPreAskCarriers = []string{
 	"Trygon Prime",
 	"Uldaros Theorix",
 	"Vanille, Cheerful l'Cie",
+	"Vedalken Plotter",
 	"Viconia, Nightsinger's Disciple",
 	"Volatile Arsonist",
 	"Volcano Hellion",
@@ -161,17 +173,6 @@ var triggerChainPreAskExclusions = map[string]string{
 	// reason (collectSubTargetPreAsks). ModeTargets carries the per-mode
 	// groups instead, so the two bindings stay disjoint.
 	"My Will Is Irresistible": "modal root (Choices$): CR 603.3c mode election owns the ask",
-	// Defined$ target-reuse links use a prior target rather than asking for
-	// another one; chosenTargetsFor suppresses their duplicate ask, so
-	// placement must not invent one.
-	"Chromeshell Crab": "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Daring Thief":     "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Glen Elendra":     "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Iroh, Tea Master": "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Power Struggle":   "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Puca's Mischief":  "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Spawnbroker":      "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
-	"Vedalken Plotter": "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask",
 	// No current trigger chain names TargetingPlayer$. If one enters the
 	// corpus, the census reports it as unpinned: its link ask belongs to the
 	// named seat, but trig_sub currently only resumes the trigger controller.
@@ -278,9 +279,6 @@ func exclusionReason(root *cards.SA) string {
 				return "ChangeZone Defined$: effect uses its named referent instead of asking"
 			}
 			continue
-		}
-		if effects.DefinedIsTargetReuse(effects.DefinedRefOf(sa).Text) && sa.API != "Fight" {
-			return "Defined$ target reuse: chosenTargetsFor suppresses the duplicate ask"
 		}
 		return "unrecognised exclusion shape"
 	}
