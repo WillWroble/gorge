@@ -28,19 +28,19 @@ func TestHostLegalityRowsServed(t *testing.T) {
 	}
 }
 
-// The Spyglass item scripts XMage's card-name answer, which gorge's
-// one-name legacy NameCard never poses as a choice.
+// The Spyglass item scripts XMage's card-name answer -- the probe the
+// scenario's resolve step names -- exactly once.
 func TestNamedCardItemScriptsTheName(t *testing.T) {
 	it := generateBKey(t, "Sorcerous Spyglass", "static#0.0")
-	found := false
+	found := 0
 	for _, step := range it.XAnswers {
 		for _, a := range step {
 			if a == (oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: activatedProbe}) {
-				found = true
+				found++
 			}
 		}
 	}
-	if !found {
-		t.Fatalf("no %q name answer in %+v", activatedProbe, it.XAnswers)
+	if found != 1 {
+		t.Fatalf("%d %q name answers in %+v, want exactly one", found, activatedProbe, it.XAnswers)
 	}
 }
