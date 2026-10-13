@@ -11,9 +11,21 @@ def load(path):
     out = {}
     with open(path) as f:
         for line in f:
-            g = json.loads(line)
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                g = json.loads(line)
+            except json.JSONDecodeError:
+                # A job still being written leaves a partial last line; ignore it.
+                continue
             out[(g["pair"], g["leg"])] = g
     return out
+
+def done(out, name):
+    """A job is complete once its summary json exists (the driver's own resume test)."""
+    p = f"{out}/{name}.jsonl"
+    return os.path.exists(p) and os.path.exists(p + ".summary.json")
 
 def score(r):
     return {"A": 1.0, "B": 0.0}.get(r, 0.5)
@@ -44,6 +56,8 @@ def side_stats(games):
                 c["games_with_chosen"] += 1
     return agg
 
+TB = ["1-4", "5-8", "9-16", "17+"]
+
 def pct(a, b):
     return f"{100.0 * a / b:.2f}%" if b else "-"
 
@@ -58,9 +72,9 @@ def main():
     print("|---|---|---|---|---|---|---|---|---|---|")
     for s in names:
         for r in runs:
-            po, pn = f"{out}/{s}-{r}-off.jsonl", f"{out}/{s}-{r}-on.jsonl"
-            if not (os.path.exists(po) and os.path.exists(pn)):
+            if not (done(out, f"{s}-{r}-off") and done(out, f"{s}-{r}-on")):
                 continue
+            po, pn = f"{out}/{s}-{r}-off.jsonl", f"{out}/{s}-{r}-on.jsonl"
             off, on = load(po), load(pn)
             keys = sorted(set(off) & set(on))
             pairs = collections.defaultdict(list)
@@ -91,9 +105,9 @@ def main():
         for flag in ("off", "on"):
             tot = collections.defaultdict(collections.Counter)
             for r in runs:
-                p = f"{out}/{s}-{r}-{flag}.jsonl"
-                if not os.path.exists(p):
+                if not done(out, f"{s}-{r}-{flag}"):
                     continue
+                p = f"{out}/{s}-{r}-{flag}.jsonl"
                 for pol, c in side_stats(load(p)).items():
                     tot[pol].update(c)
             for pol in sorted(tot):
@@ -113,6 +127,13 @@ def main():
         w, o = c["windows"], c["ownmain:windows"]
         print(f"| {s} | `{pol}` | {flag} | {w} | {c['list:all:sum'] / w:.3f} | {pct(c['list:all:1'], w)} | {pct(c['list:all:0'], w)} | "
               f"{o} | {c['ownmain:list:all:sum'] / max(o, 1):.3f} | {pct(c['ownmain:list:all:1'], o)} | {pct(c['ownmain:list:all:0'], o)} |")
+    print("\n### When the new options appear: priority windows with a new option, and those chosen, by turn bucket (turn counts both players; `:explore` samples turns 1-4)\n")
+    print("| set | policy | flag | " + " | ".join(f"windows T{b} (new / all)" for b in TB) + " | " + " | ".join(f"chosen T{b}" for b in TB) + " |")
+    print("|---|---|---|" + "---|" * (2 * len(TB)))
+    for s, pol, flag, c in vis:
+        cells = [f"{c['new:turn:' + b]} / {c['turn:' + b]} ({pct(c['new:turn:' + b], c['turn:' + b])})" for b in TB]
+        ch = [str(c["new:chosen:turn:" + b]) if flag == "on" else "n/a" for b in TB]
+        print(f"| {s} | `{pol}` | {flag} | " + " | ".join(cells) + " | " + " | ".join(ch) + " |")
     if js:
         with open(js, "w") as f:
             json.dump(summary, f, indent=1, sort_keys=True)
