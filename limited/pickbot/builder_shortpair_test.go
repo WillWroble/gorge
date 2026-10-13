@@ -43,12 +43,7 @@ func shortPairPool(t *testing.T) []limited.CardRef {
 	if err != nil {
 		t.Fatalf("setdata FDN: %v", err)
 	}
-	rarity := map[string]limited.Rarity{}
-	for sheet, cs := range spec.Sheets {
-		for _, c := range cs {
-			rarity[c.Name] = limited.Rarity(sheet[0])
-		}
-	}
+	rarity := sheetRarities(t, spec)
 	pool := make([]limited.CardRef, 0, len(shortPairPoolNames))
 	for i, n := range shortPairPoolNames {
 		card := lookupCard(t, reg, n)
