@@ -2373,6 +2373,20 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return cmds;
     }
 
+    /** A pass_to for decision "priority" that directly follows a pass_to for
+     * decision "choose": gorge posed a mid-resolution ask at the first and
+     * answers it at the second, so XMage must resolve the stack's top object
+     * before this step's checkpoint (planCounterCauses' proliferate recipe). */
+    static boolean passToResolvesTop(JsonArray steps, int index) {
+        if (index < 1 || index >= steps.size()) {
+            return false;
+        }
+        JsonObject cur = steps.get(index).getAsJsonObject();
+        JsonObject prev = steps.get(index - 1).getAsJsonObject();
+        return str(cur, "op").equals("pass_to") && str(cur, "decision").equals("priority")
+                && str(prev, "op").equals("pass_to") && str(prev, "decision").equals("choose");
+    }
+
     private void queuePassCommands(int stepIdx) {
         for (String cmd : passCommands(steps(sc0), stepIdx, activeSeat)) {
             switch (cmd) {
@@ -2452,6 +2466,16 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 // beginStep before any priority), so this is for completeness.
                 String stepName = str(st, "step");
                 String decision = str(st, "decision");
+                if (passToResolvesTop(steps(sc0), stepIdx)) {
+                    // gorge's two-step "choose" then "priority" reaches a
+                    // mid-resolution ask and answers it; XMage cannot stop
+                    // inside a resolution, so the spell or ability stays on
+                    // its stack until the second step resolves its top object
+                    // (the answers are consumed by that resolution).
+                    waitStackResolved(turn, phase, p, true);
+                    dropLastCast();
+                    return;
+                }
                 if (st.has("active")) {
                     String active = str(st, "active");
                     int nextActiveSeat = active.equals("p1") ? 1 : active.equals("p0") ? 0 : -1;
