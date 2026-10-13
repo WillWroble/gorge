@@ -39,7 +39,9 @@ func TestActivateCostTokenShapes(t *testing.T) {
 		{"tapXType<10/Elf/Elves>", "", ""},
 		{"tapXType<X/Artifact/artifacts>", "", ""},
 		{"2 R Discard<1/NICKNAME>", "", "Discard<...>"}, // NICKNAME is a self-discard only from hand
-		{"1 T Discard<1/Card.Legendary+sharesNameWith Valid Permanent.Legendary+YouCtrl/legendary card>", "", "Discard<...>"},
+		// Key to the Side-Door: the namesake legendary permanent is placed
+		// beside the hand card (discardCostBattlefield).
+		{"1 T Discard<1/Card.Legendary+sharesNameWith Valid Permanent.Legendary+YouCtrl/legendary card>", "C", ""},
 		{"1 R Discard<0/Hand> Sac<1/CARDNAME>", "CR", ""},
 		{"Discard<1/Card.namedPage, Loose Leaf>", "", ""},
 		{"Return<1/CARDNAME>", "", ""},

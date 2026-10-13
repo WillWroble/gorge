@@ -1332,6 +1332,11 @@ func contextPredicateBound(g *state.Game, kind wordKind, key string, sc SpecCont
 		base := strings.TrimSuffix(key, ".YouCtrl")
 		return base == "Card" || base == "Giant" || base == "Spider"
 	case wordSharesNameWith:
+		if _, sweep := sharesNameValidBattlefield(key); sweep {
+			// A battlefield sweep needs no context referent: the board is
+			// always there to compare against.
+			return true
+		}
 		return len(sharesTypeReferents(g, sc, key)) > 0
 	case wordBlockedByValid, wordBlockedValid, wordBlockedByRemembered, wordBlockedRemembered, wordBlockedBySourceLKI:
 		return blockHistoryBound(g, kind, key, &sc)

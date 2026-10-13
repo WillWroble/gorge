@@ -1,6 +1,9 @@
 package rules
 
-import "github.com/adams-shaun/gorge/state"
+import (
+	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/state"
+)
 
 // oracle_run_faces.go binds an oracle scenario's step ref that names an
 // ALTERNATE spell face of a physical card. A scenario deals the physical
@@ -45,4 +48,21 @@ func oracleCastWantMode(st oracleStep, o *state.Object) string {
 		return ""
 	}
 	return oracleAltFaceMode(o, name)
+}
+
+// oracleAltCostMode is the cast_mode that selects the first
+// AlternativeCost-static cast option (Leyline of Mutation's "You may pay
+// {W}{U}{B}{R}{G} rather than pay the mana cost"): the engine offers it as its
+// own "cast" option with no Mode and AltCostIndex 1 (rules/legal_walk_hand.go),
+// so the Mode match alone can never tell it from the plain cast.
+const oracleAltCostMode = "alternative"
+
+// oracleCastModeMatches reports whether a cast option is the one a step's
+// wanted mode names: the alternative-cost option for oracleAltCostMode, the
+// option whose Mode equals want for every other mode.
+func oracleCastModeMatches(o decision.Option, want string) bool {
+	if want == oracleAltCostMode {
+		return o.Mode == "" && o.AltCostIndex == 1
+	}
+	return o.Mode == want
 }

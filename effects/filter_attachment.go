@@ -196,7 +196,41 @@ func sharesNameWithArg(p string) (string, bool) {
 		sharesTypeReferentsSelf:
 		return arg, true
 	}
+	if _, ok := sharesNameValidBattlefield(arg); ok {
+		return arg, true
+	}
 	return "", false
+}
+
+// sharesNameValidBattlefield reads Forge's battlefield-sweep referent
+// `Valid <filter>` (CardProperty sharesNameWith's "Valid" restriction, read
+// over the battlefield): Key to the Side-Door's `Discard<1/Card.Legendary+
+// sharesNameWith Valid Permanent.Legendary+YouCtrl>` and Pattern Matcher's
+// `Card.sharesNameWith Valid Creature.YouCtrl+Other`. The spec splitter cuts
+// the outer '+' before this token is read, so the inner filter carries only
+// what survives in the token itself (Forge splits the same way). The zone-
+// suffixed ValidExile/ValidGraveyard forms stay unbound and fail closed.
+func sharesNameValidBattlefield(arg string) (string, bool) {
+	inner, ok := strings.CutPrefix(arg, "Valid ")
+	inner = strings.TrimSpace(inner)
+	return inner, ok && inner != ""
+}
+
+// sharesNameValidMatches is the `sharesNameWith Valid <filter>` body: some
+// permanent on the battlefield matching filter (in the evaluating context)
+// shares a name with o. A phased-out permanent is treated as though it does
+// not exist (CR 702.26b).
+func sharesNameValidMatches(g *state.Game, o *state.Object, sc SpecContext, filter string) bool {
+	for i := range g.Objs {
+		other := &g.Objs[i]
+		if other.Zone != state.ZBattlefield || other.PhasedOut || other.ID == o.ID {
+			continue
+		}
+		if MatchesObjectCtx(g, filter, other, sc) && sharesNameWithObject(o, other, sc) {
+			return true
+		}
+	}
+	return false
 }
 
 func isTargetedCardBase(base string) bool {
@@ -204,6 +238,9 @@ func isTargetedCardBase(base string) bool {
 }
 
 func sharesNameReferentMatches(g *state.Game, o *state.Object, sc SpecContext, key string) bool {
+	if filter, ok := sharesNameValidBattlefield(key); ok {
+		return sharesNameValidMatches(g, o, sc, filter)
+	}
 	for _, target := range sharesTypeReferents(g, sc, key) {
 		if !target.IsPlayer {
 			if referent := g.Obj(target.Obj); referent != nil && sharesNameWithObject(o, referent, sc) {

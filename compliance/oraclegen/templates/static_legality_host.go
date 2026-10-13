@@ -233,6 +233,40 @@ func cantGainLifeItem(reg *cards.Registry, f *cards.Face, name string, req level
 	return finishLegalityItem(reg, f, name, mode, req, sc, []string{"119.7"})
 }
 
+// cantGainLifeEnchantedItem serves "Enchanted player can't gain life"
+// (Grievous Wound, an Enchant player Aura): the card starts in p0's hand and
+// is cast onto p0 (CR 303.4a: an Aura with enchant player attaches to the
+// player it targeted), then p0 casts the life-gain probe and stays at 20. The
+// control casts the probe with no Aura and gains its life.
+func cantGainLifeEnchantedItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
+	const mode = "CantGainLife"
+	gain, ok := castProbe(reg, lifeGainProbe)
+	if !ok {
+		return staticSkip(name, mode, "life-gain probe has no mana pool")
+	}
+	aura, ok := castProbe(reg, name, "p0")
+	if !ok {
+		return staticSkip(name, mode, "the Aura has no castable mana cost")
+	}
+	life := func(res rules.OracleResult) int32 {
+		if len(res.Snapshots) == 0 || len(res.Snapshots[len(res.Snapshots)-1].Players) == 0 {
+			return -1
+		}
+		return res.Snapshots[len(res.Snapshots)-1].Players[0].Life
+	}
+	control := staticScenario(f, name, nil, []string{lifeGainProbe}, []oraclegen.Step{gain, {Op: "resolve"}})
+	if cres, ok := runStatic(reg, control); !ok || len(cres.Fails) != 0 || life(cres) != 25 {
+		return staticSkip(name, mode, fmt.Sprintf("control does not gain the probe's life (life %d, %v)", life(cres), cres.Fails))
+	}
+	sc := staticScenario(f, name, nil, []string{name, lifeGainProbe},
+		[]oraclegen.Step{aura, {Op: "resolve"}, gain, {Op: "resolve"}})
+	res, ok := runStatic(reg, sc)
+	if !ok || len(res.Fails) != 0 || life(res) != 20 {
+		return staticSkip(name, mode, fmt.Sprintf("life still changes with the Aura on p0 (life %d, %v)", life(res), res.Fails))
+	}
+	return finishLegalityItem(reg, f, name, mode, req, sc, []string{"119.7", "303.4a"})
+}
+
 // manaConvertProbe is a creature spell with a green pip; offColourMana pays
 // its cost only "as though it were mana of any type".
 const (
