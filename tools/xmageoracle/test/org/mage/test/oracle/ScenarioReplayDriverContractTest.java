@@ -340,15 +340,12 @@ public final class ScenarioReplayDriverContractTest {
         check(rejects(steps("[{op:'pass',seat:0},{op:'pass',seat:1},{op:'pass',seat:0}]"), 1),
                 "a three-pass run must be rejected");
 
-        // The p1-first pair needs seat 0 to own the checkpoints: at active
-        // seat 1 the pair's first pass is rejected like any other pair.
-        boolean p1Threw = false;
-        try {
-            ScenarioReplay.passCommands(p1Pair, 2, 1);
-        } catch (IllegalArgumentException expected) {
-            p1Threw = true;
-        }
-        check(p1Threw, "a p1-first pair at active seat 1 must be rejected");
+        // At active seat 1 the p1-first pair after a seat-1 cast is the
+        // active player's OWN pair (Zidane, Wan Shi Tong): its first pass
+        // queues nothing and its second resolves one object on seat 1's
+        // queue (ScenarioReplayWave4DriverTest pins the commands).
+        check(ScenarioReplay.passCommands(p1Pair, 2, 1).isEmpty(),
+                "the active seat 1's own p1-first pair queues nothing at its first pass");
 
         // Queue order on the active player (the checkpoint owner). Cast and
         // pass pair: the spell is on the stack at the first-pass checkpoint,

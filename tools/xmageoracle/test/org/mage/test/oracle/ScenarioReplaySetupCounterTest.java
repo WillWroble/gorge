@@ -120,6 +120,9 @@ public final class ScenarioReplaySetupCounterTest {
         Map<UUID, String> setupNames = new HashMap<>();
         setupNames.put(perm.getId(), "Grizzly Bears");
         set(driver, "setupNames", setupNames);
+        // allocateInstance skips field initializers; applySetupState reads
+        // the enters-with-counters set (empty: no placement applied any).
+        set(driver, "enterWithCountersApplied", new java.util.HashSet<UUID>());
 
         // Preconditions the assertion depends on: the permanent is a real
         // battlefield creature with no counter yet, and its printed P/T is

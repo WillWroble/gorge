@@ -27,7 +27,7 @@ func TestDriverStepSwitchCoversLevelBPass(t *testing.T) {
 		"PASS_ACTIVE_OWN",
 		"PASS_P1_PAIR_FIRST",
 		"static List<String> passCommands(JsonArray steps, int index, int activeSeat)",
-		"waitStackResolved(turn, phase, playerA, true)",
+		"waitStackResolved(turn, phase, active, true)",
 		"(info, pl, g) -> pl.pass(g)",
 		"PASS_HANDOFF",
 		"PASS_PAIR_SECOND",
