@@ -17,10 +17,11 @@
    * board clips the lower half (the peek): a hand card shows its top 50%
    * until it is hovered or keyboard-focused, when it rises the same half back
    * into the board (see the .handfan/.card:hover notes in the style block).
-   * It is NOT the rail's HandList (see the note in
-   * lib/cardoptions.ts' sibling, HandList.svelte), which stays text because it
-   * has to fit four hands in a rail (survey #24); that reasoning is about the
-   * rail and four hands, and has no purchase on the one hand you own.
+   * It is NOT PassiveHandFan, the spectator's read-only view of a hand drawn
+   * in that seat's own panel on the board: the two share the face rendering
+   * (CardImage), the overlap maths (lib/handfan) and the inspector contract,
+   * but only this fan carries the decision's card options, the CAST/PLAY
+   * shortcuts and the options menu.
    *
    * It renders ONLY for the seated player's own seat — `player` here is the
    * viewer's own PlayerView, whose hand is never redacted (view.go fills Hand
@@ -129,7 +130,7 @@
   const peek = $derived(Math.max(0, Math.min(1, 1 - visible)));
   const peekMode = $derived(visible >= 1 ? 'always' : raise ? 'hover' : 'never');
 
-  // One hover state for the whole fan, same contract as CardTile/HandList.
+  // One hover state for the whole fan, same contract as CardTile/PassiveHandFan.
   const hover = new HoverCard();
   let hovered = $state<CardView | null>(null);
   let anchor = $state<AnchorRect | null>(null);

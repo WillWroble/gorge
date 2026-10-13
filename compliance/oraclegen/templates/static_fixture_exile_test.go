@@ -164,22 +164,8 @@ func TestStaticExileDonorRowServesTerritoryForge(t *testing.T) {
 	}
 }
 
-// TestStaticExileUnservedRowsKeepTheNamedGap locks the measured engine gaps
-// the family cannot serve: each row must keep a precise named reason, never
-// the generic "counts cards exiled with the source" the family replaced.
-func TestStaticExileUnservedRowsKeepTheNamedGap(t *testing.T) {
-	for _, tc := range []struct{ card, key, want string }{
-		{"Valgavoth, Terror Eater", "static#0.0", "static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"},
-		{"Veteran Survivor", "static#0.0", "static the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"},
-	} {
-		t.Run(tc.card+"/"+tc.key, func(t *testing.T) {
-			it, skip := zoneItem(t, tc.card, tc.key)
-			if skip == nil {
-				t.Fatalf("served (%s), want the named engine gap", it.ID)
-			}
-			if skip.Reason != tc.want {
-				t.Fatalf("skip = %q, want %q", skip.Reason, tc.want)
-			}
-		})
-	}
-}
+// TestStaticExileUnservedRowsKeepTheNamedGap once locked the family's
+// measured engine gaps; every row is served now: Valgavoth and Veteran
+// Survivor by lb5-exileperm, The Enigma Jewel static#1.0 by lb5-driver's
+// craft-then-activate observation (static_crafted_gains.go,
+// TestCraftedGainsCensus).

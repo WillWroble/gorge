@@ -1,3 +1,21 @@
+<script lang="ts" module>
+  import type { CardView } from '../protocol';
+
+  /**
+   * PassiveHandSpec is a spectator's passive hand for this seat, sized by
+   * Board (lib/passivehand): the exposed cards, one face's height, the band's
+   * extent taken from the panel (a height at the rim, a width at a strip's
+   * side) and the room the fan may use.
+   */
+  export interface PassiveHandSpec {
+    cards: CardView[];
+    faceH: number;
+    band: number;
+    at: 'top' | 'bottom' | 'side';
+    width: number;
+  }
+</script>
+
 <script lang="ts">
   import type { PlayerView, StackView } from '../protocol';
   import type { CardOptions } from '../lib/cardoptions';
@@ -11,6 +29,7 @@
   import CommandArea from './CommandArea.svelte';
   import SeatHeader from './SeatHeader.svelte';
   import ZonePiles from './ZonePiles.svelte';
+  import PassiveHandFan from './PassiveHandFan.svelte';
 
   /**
    * Quadrant is ONE seat's panel on the table (the name predates the 2–8
@@ -32,6 +51,12 @@
    * The keyed-each key is each group's RENDER key (the lead object's id), not
    * the mutable stacking key: a changing DOM key unmounts the tile and closes
    * an inspector the reader had open (fb-20260915T182335Z).
+   *
+   * `passiveHand` is a spectator's view of this seat's hand (Board decides who
+   * gets one and sizes it): a band of read-only card faces along the seat's
+   * rim — under the header for a seat across the table, along the bottom for
+   * the seat drawn at the bottom — or at the right end of a focus side strip.
+   * The band is a sibling of the rows, never over them.
    */
   let {
     player,
@@ -48,6 +73,7 @@
     priority = false,
     glow = { target: false, attacked: false },
     onFocus = null,
+    passiveHand = null,
   }: {
     player: PlayerView;
     colour: string;
@@ -65,6 +91,7 @@
     priority?: boolean;
     glow?: SeatGlow;
     onFocus?: (() => void) | null;
+    passiveHand?: PassiveHandSpec | null;
   } = $props();
 
   const profile = $derived(layoutStore.profile);
@@ -107,6 +134,11 @@
   {#if header}
     <SeatHeader {player} name={who} {colour} {active} {priority} {glow} {options} {onFocus} />
   {/if}
+  {#if passiveHand && passiveHand.at === 'top'}
+    <div class="hand-band" style:height="{passiveHand.band}px">
+      <PassiveHandFan seat={player.seat} name={who} cards={passiveHand.cards} faceH={passiveHand.faceH} width={passiveHand.width} />
+    </div>
+  {/if}
   <div class="body">
     {#if sz.pileW > 0 && !strip}
       <ZonePiles {player} {who} width={sz.pileW} {options} />
@@ -145,7 +177,17 @@
         </div>
       {/each}
     </div>
+    {#if passiveHand && passiveHand.at === 'side'}
+      <div class="hand-side" style:width="{passiveHand.band}px">
+        <PassiveHandFan seat={player.seat} name={who} cards={passiveHand.cards} faceH={passiveHand.faceH} width={passiveHand.width} />
+      </div>
+    {/if}
   </div>
+  {#if passiveHand && passiveHand.at === 'bottom'}
+    <div class="hand-band" style:height="{passiveHand.band}px">
+      <PassiveHandFan seat={player.seat} name={who} cards={passiveHand.cards} faceH={passiveHand.faceH} width={passiveHand.width} />
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -174,6 +216,20 @@
     pointer-events: none;
     background: color-mix(in srgb, var(--felt-sunk) 62%, transparent);
     backdrop-filter: grayscale(0.9) brightness(0.62);
+  }
+  /* A spectator's passive hand: a fixed band Board already took out of the
+     panel's height (or, in a side strip, its width), so the rows keep the
+     room they were sized for. */
+  .hand-band {
+    flex: none;
+    box-sizing: border-box;
+    padding: 0 6px;
+    min-height: 0;
+  }
+  .hand-side {
+    flex: none;
+    min-width: 0;
+    align-self: stretch;
   }
   .body {
     flex: 1;

@@ -43,7 +43,7 @@ func staticSubs(sub string) bool {
 		"static.unspent-mana", "static.no-cleanup-damage", "static.ignore-legend-rule", "static.cant-be-copied", "static.cant-put-counter",
 		"static.activate-as-if-haste", "static.activations-powerup", "static.plot-zone", "static.ignore-hexproof", "static.cant-be-suspected",
 		"static.cant-prevent-damage", "static.cant-prevent-damage-combat", "static.cant-attack-unless-tax", "static.cant-block-unless-tax",
-		"static.mana-convert-case-spells", "static.mana-convert-abilities":
+		"static.mana-convert-case-spells", "static.mana-convert-abilities", "static.flip-coin-mod":
 		return true
 	}
 	return false
@@ -181,6 +181,8 @@ func staticRequirement(reg *cards.Registry, f *cards.Face, name string, req leve
 		return manaConvertCaseItem(reg, f, name, req)
 	case "static.mana-convert-abilities":
 		return manaConvertAbilityItem(reg, f, name, req)
+	case "static.flip-coin-mod":
+		return flipCoinModItem(reg, f, name, req)
 	}
 	return skip("no observation for " + req.Sub)
 }

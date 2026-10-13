@@ -322,6 +322,11 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticOfferItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A MayPlay static that prices the cast it permits is observed as the
+	// offered cast and its price (static_offer_altcost.go).
+	if it, ok := staticMayPlayAltCostItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
 	// A has-all-abilities-of static (GainsAbilitiesOf$) is observed by using a
 	// donor card's activated ability on the recipient (static_granted_donor.go).
 	if it, ok := staticDonorItem(reg, f, name, req, st); ok {

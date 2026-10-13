@@ -191,7 +191,7 @@
   // is now rendering and HoverCard closes a panel opened for another object
   // or re-points an armed dwell. superviseRendering is the rendering half of
   // the contract; supervise ("the object left the visible set") still serves
-  // HandList, whose triggers are keyed per card and never re-used.
+  // the hand fans, whose triggers are keyed per card and never re-used.
   $effect(() => {
     hover.superviseRendering(card.id);
   });

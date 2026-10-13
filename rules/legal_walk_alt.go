@@ -120,6 +120,13 @@ func (w *legalWalk) mayPlaySpellWalk() {
 			continue
 		}
 		if plain && e.castTargetsAvailable(p, id, f.SpellAbility()) {
+			// printed: some permission over the card lets it be cast at its
+			// printed (or free) cost. A card covered ONLY by statics that
+			// price their own cast (Valgavoth, Terror Eater's "pay life equal
+			// to its mana value rather than pay its mana cost", CR 118.9) is
+			// offered only at those alternatives, below; a typed offer is
+			// never such a static (mayPlayPermText).
+			printed := off.key != "" || e.mayPlayPlainGrant(p, id)
 			base := pay.RawBaseCost(asPayer(e), p, id)
 			// A MayPlayText$-typed offer carries its own permission's riders
 			// (mayPlayPermissions); an untyped offer keeps the aggregate read
@@ -156,8 +163,7 @@ func (w *legalWalk) mayPlaySpellWalk() {
 				}
 				base = base.Plus(off.raise)
 			}
-			cost := pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, base, spellScope("mayplay")))
-			if w.affordable(p, id, cost, false) {
+			if printed && w.affordable(p, id, pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, base, spellScope("mayplay"))), false) {
 				label := "Cast " + f.Name
 				if off.text != "" {
 					// MayPlayText$ is the permission's label, so a card matching
@@ -174,7 +180,7 @@ func (w *legalWalk) mayPlaySpellWalk() {
 			// Bargain reduction to make this one legal. Compose modifiers once,
 			// in Bargain scope (the prior plain cost was already composed in
 			// MayPlay scope and must not be fed back through offerCastable).
-			if bg := &optionalSacrifices[optSacBargain]; e.stackKeywordPossibleH(id, kwhBargain) &&
+			if bg := &optionalSacrifices[optSacBargain]; printed && e.stackKeywordPossibleH(id, kwhBargain) &&
 				len(e.optionalSacrificeCandidates(bg, p, id, 0)) > 0 {
 				bargainedCost := pay.WithSpellAbilityExtras(f,
 					w.offerCostFor(p, id, base, spellScope(bg.mode)))
@@ -182,6 +188,26 @@ func (w *legalWalk) mayPlaySpellWalk() {
 					*out = append(*out, decision.Option{Index: len(*out), Kind: "cast",
 						Label: "Cast " + f.Name + " (" + bg.mode + ")", Obj: id,
 						Mode: bg.mode, MayPlayPerm: off.key})
+				}
+			}
+			// The may-play alternatives (mayPlayCastAlts): each its own
+			// "mayplay" option whose AltCostIndex names the entry beginCast
+			// charges. The alternative REPLACES the mana cost only; the
+			// permission's RaiseCost$ surcharge and the spell's own
+			// additional costs still apply (CR 118.9 / 601.2f), composed
+			// exactly as the printed offer's are.
+			if off.key == "" {
+				// An unpriceable raise already left this card above.
+				var raise Cost
+				if r, hasRaise, _ := e.mayPlayRaiseCost(p, id); hasRaise {
+					raise = r
+				}
+				for i, alt := range e.mayPlayCastAlts(p, id, printed) {
+					altCost := pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, alt.Plus(raise), spellScope("mayplay")))
+					if w.affordable(p, id, altCost, false) {
+						*out = append(*out, decision.Option{Index: len(*out), Kind: "cast",
+							Label: altCostLabel(f.Name, i), Obj: id, Mode: "mayplay", AltCostIndex: i + 1})
+					}
 				}
 			}
 		}

@@ -314,16 +314,19 @@ func (m *match) sidecar() sidecar {
 
 // defaultSeats is PL-14: one bot per seat, seeded from the match seed.
 func defaultSeats(policy string, names []string, seed uint64) []seat.Seat {
-	return defaultSeatsWithAutoPayMana(policy, false, names, seed, 0, bots.Deps{}, hostedDecisionDeadlineMS)
+	return defaultSeatsWithAutoPayMana(policy, false, false, names, seed, 0, bots.Deps{}, hostedDecisionDeadlineMS)
 }
 
 // defaultSeatsWithAutoPayMana builds every table bot with the persisted
-// auto-payment setting, the registry's search parallelism and the embedder's
-// card dependency (BP-13: deps rides bots.Options.Deps into every factory,
-// so a policy that reads card facts builds on a served table). Keeping the
-// legacy wrapper preserves embedders and tests that intentionally exercise
-// the historical manual-mana policy.
-func defaultSeatsWithAutoPayMana(policy string, autoPayMana bool, names []string, seed uint64, searchParallelism int, deps bots.Deps, deadlineMS int) []seat.Seat {
+// auto-payment and CommonSense settings (bots.Options.AutoPayMana and
+// bots.Options.CommonSense — the bots/sanity guard; both are part of the
+// table's configuration, so a restart rebuilds the same seats), the
+// registry's search parallelism and the embedder's card dependency (BP-13:
+// deps rides bots.Options.Deps into every factory, so a policy that reads
+// card facts builds on a served table). Keeping the legacy wrapper preserves
+// embedders and tests that intentionally exercise the historical manual-mana
+// policy.
+func defaultSeatsWithAutoPayMana(policy string, autoPayMana, commonSense bool, names []string, seed uint64, searchParallelism int, deps bots.Deps, deadlineMS int) []seat.Seat {
 	out := make([]seat.Seat, len(names))
 	for i := range names {
 		// BP-10: BotSearchParallelism rides bots.Options.SearchParallelism so a
@@ -331,9 +334,9 @@ func defaultSeatsWithAutoPayMana(policy string, autoPayMana bool, names []string
 		// policy wrapper (bot_policy.go NewBotPolicySeatWithAutoPayMana) stays
 		// untouched — its public signature is used by cmd/cardfuzz and the
 		// tests; the table path builds through bots.New with Seed,
-		// AutoPayMana, SearchParallelism and BotDeps, exactly what the
-		// wrapper would thread.
-		bot, err := bots.New(policy, bots.Options{Seed: seed ^ uint64(i+1), AutoPayMana: autoPayMana, SearchParallelism: searchParallelism, Deps: deps, DecisionDeadlineMS: deadlineMS})
+		// AutoPayMana, SearchParallelism, BotDeps and CommonSense, exactly what
+		// the wrapper would thread.
+		bot, err := bots.New(policy, bots.Options{Seed: seed ^ uint64(i+1), AutoPayMana: autoPayMana, CommonSense: commonSense, SearchParallelism: searchParallelism, Deps: deps, DecisionDeadlineMS: deadlineMS})
 		if err != nil {
 			panic(err) // policy was normalized before the table was registered.
 		}
@@ -655,7 +658,7 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	if r.opts.BotUnboundedDecisions {
 		budget = 0
 	}
-	seats := defaultSeatsWithAutoPayMana(t.cfg.BotPolicy, autoPayMana, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	seats := defaultSeatsWithAutoPayMana(t.cfg.BotPolicy, autoPayMana, t.cfg.BotCommonSense, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
 	if r.opts.Seats != nil {
 		seats = r.opts.Seats(m.cfg.Names, m.seed)
 	}
@@ -688,7 +691,7 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	// never races a Decide.
 	for i, s := range seats {
 		if hs, ok := s.(*HumanSeat); ok {
-			caretaker, err := newCaretakerSeat(t.cfg.BotPolicy, m.seed^uint64(i+1), autoPayMana, r.opts.BotDeps)
+			caretaker, err := newCaretakerSeat(t.cfg.BotPolicy, m.seed^uint64(i+1), autoPayMana, t.cfg.BotCommonSense, r.opts.BotDeps)
 			if err != nil {
 				return r.crash(t, m, err)
 			}

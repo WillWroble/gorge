@@ -85,6 +85,15 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # (bots.Info.Formats/MaxSeats), so neither could serve the commander half of
 # the demo at all. Before that (2026-09-28): lethal-pressure (AR7).
 BOT_POLICY=${BOT_POLICY:-bot}
+# false -- the demo serves every policy UNWRAPPED by the bots/sanity
+# CommonSense guard. COMMON_SENSE=true opts the `bot` and `sb-tactical`
+# seats into the guard (hostile self-removal dropped from the option list,
+# the London mulligan answered by botpolicy.MulliganConstructed); measured
+# 2026-10-09 on constructed games only (docs/superpowers/reports/2026-10-09-
+# common-sense-rules-evaluation.md: `bot` 52.6% [50.9, 54.3], `sb-tactical`
+# 51.3% [49.6, 53.0], hostile self-hits 17% -> 0.4%), so it stays opt-in
+# until a commander measurement lands (cli-20261013T173521Z-a00fec60).
+COMMON_SENSE=${COMMON_SENSE:-false}
 # constructed,commander -- table i takes formats[(i-1) mod 2], so TABLES=2
 # deals t1 constructed and t2 commander.
 FORMATS=${FORMATS:-constructed,commander}
@@ -297,6 +306,7 @@ start_one() {
 		-spectator "$spectator" \
 		-vsbot-spectator "$vsbot_spectator" \
 		-bot-policy "$BOT_POLICY" \
+		-bot-common-sense="$COMMON_SENSE" \
 		-dir "$dir" \
 		-decks "$DECKS" \
 		-tables "$TABLES" \

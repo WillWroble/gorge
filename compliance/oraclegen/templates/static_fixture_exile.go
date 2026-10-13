@@ -43,6 +43,9 @@ func staticExileFixtures(reg *cards.Registry, f *cards.Face, st cards.Static, af
 	if fx, ok := staticExiledCardTypesFixture(f, st, affected); ok {
 		out = append(out, fx)
 	}
+	if fx, ok := staticExiledWithCountFixture(f, st); ok {
+		out = append(out, fx)
+	}
 	return out
 }
 
@@ -155,9 +158,9 @@ func staticExileOfferItem(reg *cards.Registry, f *cards.Face, name string, req l
 		return oraclegen.Item{}, false
 	}
 	if st.HasParam(cards.PKMayPlayAltManaCost) {
-		// The alt-cost delivery is an engine gap (staticExileWithGap names
-		// it); the fixture must not paper over it with a scenario the engine
-		// cannot price.
+		// The permission's own alternative is the cast's price, observed by
+		// static_offer_altcost.go; this printed-cost offer fixture would pay
+		// the wrong price.
 		return oraclegen.Item{}, false
 	}
 	victim, ok := staticExileFilterVictim(reg, affected)
@@ -387,16 +390,20 @@ func staticExileWithGap(f *cards.Face, st cards.Static) string {
 		// craft materials, and the driver has no craft op.
 		return "needs the craft activation (the driver has no craft op)"
 	case strings.Contains(all, "exiledwith$amount"):
-		// Veteran Survivor: the ExiledWith$Amount count reads only the
-		// reverse scalar, which this source's own exile never stamps.
-		return "the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"
+		// The count itself reads the shared exiled-with association
+		// (forward and reverse links, every seat); what is left is a source
+		// whose exile is not the Survival trigger
+		// staticExiledWithCountFixture runs (Veteran Survivor is served).
+		return "no fixture runs the source's own exile for an ExiledWith$Amount count (its exile is not a Survival trigger)"
 	case st.HasParam(cards.PKMayPlay) && strings.Contains(st.ParamStr(cards.PKAffected), "ExiledWithSource"):
 		switch {
 		case st.HasParam(cards.PKMayPlayAltManaCost):
-			// Valgavoth, Terror Eater: mayPlayStatic withholds the zone
-			// permission from a cost-carrying static, and mayPlayAltCosts
-			// delivers the alternative only on the ordinary hand cast.
-			return "a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"
+			// The engine prices the permission's own alternative
+			// (Valgavoth, Terror Eater is served by
+			// static_offer_altcost.go); what is left is a source whose
+			// exile is not the graveyard replacement that fixture runs, or
+			// an alternative other than the life payment it observes.
+			return "no fixture runs the source's exile for a MayPlayAltManaCost$ permission (its exile is not a graveyard replacement, or the alternative is not PayLife<ConvertedManaCost>)"
 		case !strings.Contains(st.ParamStr(cards.PKAffected), "YouOwn"):
 			// Azula, Cunning Usurper / Null Summoner (an enters ChangeZone)
 			// and Maralen, Fae Ascendant (an enters Dig) are served by
