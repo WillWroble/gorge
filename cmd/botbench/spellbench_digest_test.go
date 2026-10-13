@@ -50,7 +50,16 @@ import (
 // Re-pinned for CR 103.8a's turn-1 draw STEP skip (2026-10-06): the
 // starting player's first turn no longer has a draw step, so every game's
 // intent stream (and the per-game rows recording it) moves.
-const smokeDigestGolden = "dc4be0b6d55cb345962cc8f2f97c9e12fb49fac7981e5d234cded66cf62f467f"
+//
+// Re-pinned for the paid-cost mana census defaulting ON
+// (cli-20261012T170859Z-8fbcbbcf): the census now counts a payable paid-cost
+// source (a self-sacrificing Treasure/Lotus Petal, a fixed PayLife that leaves
+// the payer alive) without pre-tapping it, so a seat is offered an activated
+// ability the floating pool alone could not pay and auto-pays it; every game's
+// option list and intent stream moves. Attributed: reverting only
+// rules/genesis.go's `paidManaCensus: !cfg.DisablePaidManaCensus` to `false`
+// reproduces the pre-flip golden dc4be0b6 byte for byte.
+const smokeDigestGolden = "9a58cae449938b0e9e9d64484a66fdf797b359110b2ba762afefd70db77bd497"
 
 // TestSpellbenchSmokeDigestIsStable plays the smoke run and compares its
 // games.jsonl digest against the golden above.
