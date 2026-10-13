@@ -55,6 +55,11 @@ func TestStaticG7ClassServed(t *testing.T) {
 		{"Roaring Furnace // Steaming Sauna", "static#1.0", `"card":"p0:Steaming Sauna"`},
 		// Unlocked Room doors (static_unlocked_doors.go).
 		{"Rampaging Soulrager", "static#0.0", `"card":"p0:Prop Room"`},
+		// Protection from opponents on the controller, seen as prevented
+		// combat damage (static_player_protection.go).
+		{"Absolute Virtue", "static#0.0", `"p1":{"battlefield":["Grizzly Bears","Absolute Virtue"]}`},
+		// A granted web-slinging alternative cost (static_granted_webslinging.go).
+		{"Peter Parker", "static#1.0", `"card":"p0:Krenko, Mob Boss"},"want":true`},
 		// A Vehicle's CDA P/T printed by crewing it.
 		{"Lumbering Worldwagon", "static#0.0", `"xmage_ability":["","","Crew 4",""]`},
 	} {

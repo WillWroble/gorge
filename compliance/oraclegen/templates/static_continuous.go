@@ -353,6 +353,16 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticSplitSecondItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A granted web-slinging alternative cost is observed as the probe's
+	// offered cast (static_granted_webslinging.go).
+	if it, ok := staticWebSlingingGrantItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
+	// Protection from opponents granted to the controller is observed by the
+	// combat damage it prevents (static_player_protection.go).
+	if it, ok := staticPlayerProtectionItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
 	// A colour hexproof-from grant is compared under its own opt-in fold
 	// (static_hexproof_from.go).
 	if it, ok := staticHexproofFromItem(reg, c, f, name, req, st); ok {
