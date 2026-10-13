@@ -1,2 +1,0 @@
-{"shape":{"template":"trigger","op":"harness","field":"xmage","diff":"AssertionError: Found wrong choice command (invalid target or miss skip command):"},"key":"trigger | harness | xmage | AssertionError: Found wrong choice command (invalid target or miss skip command):","cards":1}
-{"card":"Choco, Seeker of Paradise","template":"trigger#0.0","status":"harness","api":"AttackersDeclared:Dig+ChangesZone:Pump","sets":["FIN"],"detail":"xmage: AssertionError: Found wrong choice command (invalid target or miss skip command):"}
