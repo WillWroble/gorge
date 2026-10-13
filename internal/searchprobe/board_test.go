@@ -27,13 +27,19 @@ import (
 // equivalence itself stays held on every prefix of a real game by
 // TestHistoryChainEqualsTheLegacyEncodingOnEveryPrefix; these goldens are
 // the new fixture's chained digests.
+//
+// Re-pinned 2026-10-12 (eng-turnwatch): view.PlayerView gained the four
+// per-turn watcher fields (SpellsCastThisTurn, LifeGainedThisTurn,
+// LifeLostThisTurn, TokensCreatedThisTurn), which every board's JSON and
+// canonical encoding now carries, so every prefix digest moves; the
+// legacy-encoding equivalence tests above still hold.
 func TestHistoryDigestMatchesTheJSONBoardEncoding(t *testing.T) {
 	f := benchRoot(t)
 	golden := map[int]string{
-		1:   "30ebca40b220967de92f19a45f0bbe2e31f48e73e4084312eaa2342d8819be02",
-		2:   "a91770a6a1eafae58bfaea2b3d9b096723c1f740052484ee021fae69f4a3d873",
-		17:  "801ca0af241882edec3e717fcc007eca5103b36a4f33f4c39ac463fdc1094f24",
-		120: "8b22aa8b2a2d703807d19b42c14ed677b823914796efccae73355339184b7bf2",
+		1:   "075723d1bac50ba3df5a1547700b5a30de3340086919d628c529a89c6498204f",
+		2:   "078427bf090de5ac830f3aced397bc4e5921eaf3da5d84751870ca37b370d264",
+		17:  "de6cee347a4446d4fc3ca9982dc3f8986e8ef185c57b882d5dc5060f36302de0",
+		120: "9f9bf8ed9a42c6bae48991f4f7f39e23842a185abdf9199d9243183fa04ce45b",
 	}
 	if len(f.h.Frames) != 120 {
 		t.Fatalf("bench fixture has %d frames, the goldens were measured on 120", len(f.h.Frames))

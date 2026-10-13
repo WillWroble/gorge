@@ -12,7 +12,18 @@ type Player struct {
 	// CoinFlipsThisTurn counts canonical flip-result Notes. Folded by
 	// events.Apply and cleared at TurnChange; clone copies this scalar.
 	CoinFlipsThisTurn int32
-	Pool              Mana
+	// SpellsCastThisTurn, LifeGainedThisTurn, LifeLostThisTurn and
+	// TokensCreatedThisTurn are the per-seat turn watchers: spells put on
+	// the stack, life gained, life lost (damage to the player included,
+	// infect poison excluded) and tokens minted since the last TurnChange.
+	// Folded only by events.Apply (events/apply_turnwatch.go) and cleared at
+	// TurnChange, so a log-only replay rebuilds them exactly; clone copies
+	// these scalars with the Player struct.
+	SpellsCastThisTurn    int32
+	LifeGainedThisTurn    int32
+	LifeLostThisTurn      int32
+	TokensCreatedThisTurn int32
+	Pool                  Mana
 
 	// RestrictedMana retains the spend restriction on mana produced by a
 	// RestrictValid$ mana ability. It is cleared with the pool at step/phase

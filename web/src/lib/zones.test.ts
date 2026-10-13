@@ -14,7 +14,7 @@ const card = (id: number, name: string): CardView => ({
 // array to prove the length is preferred where present. Exile has no
 // `_size` field on the wire at all, so its fallback is 0.
 const player = (gy: CardView[] | null, ex: CardView[] | null, size = 2): PlayerView => ({
-  seat: 0, name: 'p', life: 20, lost: false, library_size: 30, hand_size: 7,
+  seat: 0, name: 'p', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 30, hand_size: 7,
   graveyard_size: size,
   completed_dungeons: 0,
   hand: [], battlefield: [], graveyard: gy as CardView[], exile: ex as CardView[], pool: {}, command: [], commanders: [], commander_casts: [],

@@ -58,7 +58,7 @@ const blade: CardView = {
   power: 0, toughness: 0, damage: 0, attacking: false, controller: 0, owner: 0, summon_sick: false,
 };
 const player = (seat: number, battlefield: CardView[] = [], potential?: PotentialAction[]): PlayerView => ({
-  seat, name: `P${seat}`, life: 20, lost: false, library_size: 30, hand_size: 0, graveyard_size: 0,
+  seat, name: `P${seat}`, life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 30, hand_size: 0, graveyard_size: 0,
   completed_dungeons: 0,
   hand: [], battlefield, graveyard: [], exile: [], pool: {}, command: [], commanders: [], commander_casts: [],
   ...(potential ? { potential_actions: potential } : {}),

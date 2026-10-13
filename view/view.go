@@ -196,14 +196,20 @@ func dungeonRoomName(face *cards.Face, key string) string {
 // CardView's object id and a PlayerView's seat number indistinguishable by
 // key name alone.
 type PlayerView struct {
-	ID            state.PlayerID `json:"seat"`
-	Name          string         `json:"name"`
-	Life          int32          `json:"life"`
-	Lost          bool           `json:"lost"`
-	LibrarySize   int            `json:"library_size"`
-	HandSize      int            `json:"hand_size"`
-	PlanarDeck    []CardView     `json:"planar_deck,omitempty"`
-	GraveyardSize int            `json:"graveyard_size"`
+	ID   state.PlayerID `json:"seat"`
+	Name string         `json:"name"`
+	Life int32          `json:"life"`
+	Lost bool           `json:"lost"`
+	// Per-turn watchers (state.Player's *ThisTurn tallies): public counts
+	// for this seat since the last turn change, for every viewer.
+	SpellsCastThisTurn    int32      `json:"spells_cast_this_turn"`
+	LifeGainedThisTurn    int32      `json:"life_gained_this_turn"`
+	LifeLostThisTurn      int32      `json:"life_lost_this_turn"`
+	TokensCreatedThisTurn int32      `json:"tokens_created_this_turn"`
+	LibrarySize           int        `json:"library_size"`
+	HandSize              int        `json:"hand_size"`
+	PlanarDeck            []CardView `json:"planar_deck,omitempty"`
+	GraveyardSize         int        `json:"graveyard_size"`
 	// LibraryTop is the player's own library's top card, revealed only when
 	// a live Continuous MayLookAt grant covers it (Oracle of Mul Daya's
 	// "play with the top card of your library revealed") and only to that
@@ -634,6 +640,8 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 		}
 		*pv = PlayerView{
 			ID: p.ID, Name: displayName(p), Life: p.Life, Lost: p.Lost,
+			SpellsCastThisTurn: p.SpellsCastThisTurn, LifeGainedThisTurn: p.LifeGainedThisTurn,
+			LifeLostThisTurn: p.LifeLostThisTurn, TokensCreatedThisTurn: p.TokensCreatedThisTurn,
 			LibrarySize:       len(g.Zone(state.ZLibrary, p.ID)),
 			HandSize:          len(g.Zone(state.ZHand, p.ID)),
 			PlanarDeck:        pr.listViews(noLists, prev.PlanarDeck, g.Zone(state.ZPlanarDeck, p.ID), false, p.ID, &m.alsoVisible),
