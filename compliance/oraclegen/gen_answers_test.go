@@ -149,8 +149,9 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			// measured pair at the routing level: the same decision shape
 			// agrees with it on a cast item (Break Out's cast-resolve row),
 			// so the XMage pose follows the card, not the decision. The
-			// trigger template re-scripts the card-side-proven look chooser
-			// (Whiskervale Forerunner) to the lone target skip.
+			// trigger template forces the card-side-proven look chooser's
+			// pick instead (Whiskervale Forerunner: XMage's 1..1 makeChoose
+			// rejects every skip token).
 			name: "declined look pick max 1: the measured pair at routing",
 			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "choice", Options: 1, Min: 0, Max: 1, OptionRefs: []string{"p0:Grizzly Bears"}},
@@ -175,14 +176,17 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 		},
 		{
 			// A declined optional Play after a hidden-zone look: XMage poses
-			// the "cast from among them" ask on the target queue only
-			// (measured driver error on Cosmic Cube: "Found wrong choice
-			// command" for the chooseUse "no"). A plain Play carrier
+			// the "cast from among them" ask as player.choose over a
+			// TargetCard(0, 1), which TestPlayer serves from the CHOICE queue
+			// (makeChoose), so the up-to skip token is a [choice_skip].
+			// Measured on Cosmic Cube: a chooseUse "no" there is "Found wrong
+			// choice command", and a [target_skip] is left unused ("Missing
+			// CHOICE def") while the AI casts. A plain Play carrier
 			// (Discover, Cascade — no look) stays with the "no".
-			name: "declined optional play after look: target skip only",
+			name: "declined optional play after look: choice skip only",
 			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "mode", GorgeKind: "mode", Resume: "play", Options: 2, Min: 0, Max: 1, First: "Play Grizzly Bears", OptionRefs: []string{"p0:Grizzly Bears#2", "p0:Shock"}},
-			want: []XAnswer{{0, "target", "[target_skip]"}},
+			want: []XAnswer{{0, "choice", "[choice_skip]"}},
 		},
 		{
 			// One castable card: XMage skips its "which card" target ask and

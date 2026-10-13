@@ -505,13 +505,14 @@ func TestCloakedLeavesBattlefieldReveals(t *testing.T) {
 
 // TestCloakOutOfScopeShapesStayLoud pins the fail-loud contract: a Cloak
 // whose shape this build does not implement (the Choices$ cloak-from-hand
-// chooser, Defined$ ValidLibrary) emits the SAME "unimplemented API Cloak"
-// note the unimplemented fallback always emitted, and moves nothing.
+// chooser, a Defined$ selector outside the implemented set) emits the SAME "unimplemented API Cloak" note the unimplemented fallback
+// always emitted, and moves nothing. The readable ValidLibrary shape (Etrata,
+// Deadly Fugitive) is implemented: TestEtrataCloaksTheDamagedOpponentsTopCard.
 func TestCloakOutOfScopeShapesStayLoud(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct{ name, sa string }{
 		{"choices", "A:SP$ Cloak | Choices$ Card.YouCtrl"},
-		{"valid-library", "A:SP$ Cloak | Defined$ ValidLibrary Card.TopLibrary"},
+		{"unknown-defined", "A:SP$ Cloak | Defined$ ChosenCard"},
 	} {
 		src := "Name:Loud Cloak\nManaCost:0\nTypes:Instant\n" + tt.sa + "\nOracle:x\n"
 		e, cfg, id := newFixtureDeck(t, 4410, src)

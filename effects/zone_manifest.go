@@ -237,8 +237,9 @@ func manifestDreadMove(h Host, c *Ctx, p state.PlayerID, window []state.ObjID, c
 // affected player's library afterwards) and RememberCloaked$ (each cloaked
 // object joins the resolution's Remembered -- cryptic_coat's chained attach)
 // are implemented. SubAbility$ is free (the ordinary chain). Every other
-// shape -- the Choices$ cloak-from-hand chooser (vannifar), Defined$
-// ValidLibrary (etrata), an unresolvable Amount$ body -- emits the SAME loud
+// shape -- the Choices$ cloak-from-hand chooser (vannifar), a Defined$
+// selector outside the TopOfLibrary/Remembered/ValidLibrary set, an
+// unresolvable Amount$ body -- emits the SAME loud
 // "unimplemented API Cloak" note the unimplemented fallback emits and moves
 // nothing: fail loud, never silently move the wrong card. Turning a cloaked
 // card face up (CR 708.6) is not implemented anywhere (the
@@ -249,8 +250,7 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 			Text: "unimplemented API Cloak"})
 	}
 	defined := DefinedRefOf(sa).Text
-	if strings.TrimSpace(sa.ParamStr(cards.PKChoices)) != "" ||
-		strings.Contains(defined, "ValidLibrary") {
+	if strings.TrimSpace(sa.ParamStr(cards.PKChoices)) != "" {
 		loud()
 		return
 	}
@@ -278,7 +278,7 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 	remember := strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberCloaked)), "True")
 	g := h.Game()
 	shuffled := make(map[state.PlayerID]bool)
-	cloak := func(id state.ObjID) {
+	cloak := func(id state.ObjID, cloaker state.PlayerID) {
 		o := g.Obj(id)
 		if o == nil || o.Zone == state.ZBattlefield {
 			// A missing object moves nothing; a card already on the
@@ -287,11 +287,23 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 			return
 		}
 		from := o.Zone
+		// The cloaking player puts the card onto the battlefield, so it
+		// enters under THAT player's control (CR 110.2a) -- Etrata, Deadly
+		// Fugitive cloaks the top card of the damaged OPPONENT's library
+		// under its own controller, while Unexplained Absence's "its
+		// controller cloaks the top card of their library" names each listed
+		// player as the cloaker. The pre-move ControlChange is
+		// emitEntryMove's GainControl$ shape: an out-of-battlefield
+		// controller survives a move whose destination is the battlefield.
+		// A cloaker taking its own card emits nothing extra.
+		if o.Controller != cloaker {
+			h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: cloaker, Text: "cloak"})
+		}
 		// Player rides the CLOAKED card's controller: Secret is what keeps
 		// the event's Obj out of every other seat's projection (redaction
 		// rule 1), and the seat that may look at a face-down card is its
 		// controller (CR 708.5).
-		h.Emit(events.Event{Kind: events.MoveZone, Obj: id, Player: o.Controller,
+		h.Emit(events.Event{Kind: events.MoveZone, Obj: id, Player: cloaker,
 			From: from, To: state.ZBattlefield,
 			Counter: "entered_cloaked", Secret: true})
 		if remember {
@@ -324,8 +336,22 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 				// The MoveZone fold removes the object as it lands, so the
 				// zone is re-read each iteration.
 				top := g.Zone(state.ZLibrary, p)[0]
-				cloak(top)
+				cloak(top, p)
 			}
+		}
+	} else if strings.HasPrefix(defined, "ValidLibrary ") {
+		// The library-filter shape (Etrata, Deadly Fugitive's "cloak the
+		// top card of that player's library": Defined$ ValidLibrary
+		// Card.TopLibrary+OwnedBy TriggeredTarget). The selector is the
+		// shared zone-Valid Defined$ grammar (definedSpec), so the card set
+		// is exactly what any other ValidLibrary reader resolves. An empty
+		// library resolves to no card and cloaks nothing.
+		targets, _ := definedSpec(h, c, defined)
+		for _, t := range targets {
+			if t.IsPlayer {
+				continue
+			}
+			cloak(t.Obj, c.Controller)
 		}
 	} else {
 		switch effCloakCodes.Code(string(defined)) {
@@ -342,7 +368,7 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 				if t.IsPlayer {
 					continue
 				}
-				cloak(t.Obj)
+				cloak(t.Obj, c.Controller)
 			}
 		case effCloakRemembered:
 			// The Remembered-object shape (become_anonymous,
@@ -350,7 +376,7 @@ func effCloak(h Host, c *Ctx, sa *cards.SA) {
 			// object cloaks from wherever it sits now (library top, exile,
 			// hand).
 			for _, t := range objectsOf(copyTargets(c.Remembered)) {
-				cloak(t.Obj)
+				cloak(t.Obj, c.Controller)
 			}
 		default:
 			loud()

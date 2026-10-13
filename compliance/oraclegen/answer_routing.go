@@ -384,19 +384,23 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
 	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && r.lookedFirst(i):
 		// A declined optional Play after a hidden-zone look (Cosmic Cube's
-		// "you may play one of these"). XMage's
-		// CardUtil.castSpellWithAttributes asks a TargetCard "which card"
-		// pick only when MORE THAN ONE card is castable, so the skip token
-		// declines it there. With exactly one castable card it goes straight
-		// to chooseUse "Cast spell ...?": a target skip would be left unused
-		// and the scripted player would say yes (Cosmic Cube trigger#0.0:
-		// xmage library 37, gorge 38), so the decline is the "no". The
-		// plain Play carriers (Discover, Cascade) have no look and stay
-		// with the measured chooseUse "no" below.
+		// "you may cast a spell from among them"). XMage's
+		// CardUtil.castSpellWithAttributes asks a TargetCard(0, 1) "which
+		// card" pick only when MORE THAN ONE card is castable, and asks it
+		// through player.choose(outcome, cards, target, ...): TestPlayer
+		// serves that from the CHOICE queue (makeChoose), never the target
+		// queue, so the decline is the choice skip token, legal on an up-to
+		// target (measured: a [target_skip] there was left unused, strict
+		// mode reported "Missing CHOICE def" and the AI cast Grizzly Bears --
+		// Cosmic Cube trigger#0.0, xmage library 37, gorge 38). With exactly
+		// one castable card it goes straight to chooseUse "Cast spell ...?",
+		// so the decline is the "no". The plain Play carriers (Discover,
+		// Cascade) have no look and stay with the measured chooseUse "no"
+		// below.
 		if distinctRefs(d.OptionRefs) == 1 {
 			return append(as, XAnswer{d.Seat, "choice", "no"}), true
 		}
-		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}), true
 	case declinedChoice(d) && !r.lookedFirst(i):
 		// One makeChoose "up to" ask however many type slots gorge posed; its
 		// own skip token ends it. (A boolean "no" is not an answer to it.)
