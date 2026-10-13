@@ -2057,9 +2057,17 @@ func (e *Engine) closeDamageBatch() {
 	}
 	e.damageBatchOpen = false
 	var dead []bool
-	for _, ent := range e.damageBatchLog {
+	for li, ent := range e.damageBatchLog {
 		if ent.idx >= len(e.pendingTriggers) {
 			continue
+		}
+		// end bounds this entry's own slots: entries are appended in queue
+		// order, so the next entry's idx starts the next referent's slots.
+		// Without it a failing per-referent entry would kill (or patch) the
+		// adjacent slots of a later entry of the same trigger line.
+		end := len(e.pendingTriggers)
+		if li+1 < len(e.damageBatchLog) && e.damageBatchLog[li+1].idx < end {
+			end = e.damageBatchLog[li+1].idx
 		}
 		// DamageAmount$ on a batch mode compares the accumulated TOTAL: a
 		// queued entry whose total fails it never triggered (CR 603.2).
@@ -2067,7 +2075,7 @@ func (e *Engine) closeDamageBatch() {
 			if dead == nil {
 				dead = make([]bool, len(e.pendingTriggers))
 			}
-			for i := ent.idx; i < len(e.pendingTriggers); i++ {
+			for i := ent.idx; i < end; i++ {
 				pt := &e.pendingTriggers[i]
 				if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
 					break
@@ -2080,7 +2088,7 @@ func (e *Engine) closeDamageBatch() {
 		// Panharmonicon echo copies appended right after the original share
 		// the queue slot sequence and would otherwise resolve a partial
 		// amount and no batch sets.
-		for i := ent.idx; i < len(e.pendingTriggers); i++ {
+		for i := ent.idx; i < end; i++ {
 			pt := &e.pendingTriggers[i]
 			if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
 				break
