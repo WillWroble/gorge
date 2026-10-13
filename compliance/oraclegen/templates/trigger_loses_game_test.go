@@ -136,12 +136,13 @@ func TestLosesGameThreeSeatZenos(t *testing.T) {
 
 // TestTwoSeatItemShaUnchanged: the seat-count field is omitempty, so a
 // two-seat item's bytes, and the scenario sha its verdict row records, are
-// what they were before the field existed. Zenos's own trigger#0.1 item --
-// the board the three-seat row replays -- keeps its committed sha.
+// what they were before the field existed. Zenos's own two-seat rows keep
+// their committed shas (compliance/verdicts/z.jsonl).
 func TestTwoSeatItemShaUnchanged(t *testing.T) {
 	reg := loadGenRegistry(t)
 	for _, tc := range []struct{ key, sha string }{
-		{"trigger#0.1", "d132abea890e9fdb2fdc40bea2af6d53320fe808aeef930e4b18814efa6fd014"},
+		{"combat#1.attack", "3d844f3558666ee65676fbec86d930c78cc9d7f2824334bb37240421bf07c2f2"},
+		{"combat#1.block", "ab52e15f22ed2204d809d219754dae70e0ef6de7cbdc4286ef57f137dd8b38b9"},
 	} {
 		c, _ := reg.Lookup("Zenos yae Galvus")
 		var it oraclegen.Item
