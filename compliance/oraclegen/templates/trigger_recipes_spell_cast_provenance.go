@@ -47,6 +47,12 @@ func spellCastProvenanceCauses(reg *cards.Registry, f *cards.Face, name string, 
 			out = append(out, c)
 		}
 	}
+	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromcard") {
+		if c, ok := spellCastSourceManaCause(reg, f, name); ok {
+			c.prelude = prelude
+			out = append(out, c)
+		}
+	}
 	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromtreasure") {
 		if c, ok := spellCastTreasureManaCause(reg); ok {
 			c.prelude = prelude
@@ -93,6 +99,57 @@ func spellCastTreasureManaCause(reg *cards.Registry) (triggerCause, bool) {
 			{Op: "cast", Seat: 0, Card: "p0:" + probe},
 		},
 	}, true
+}
+
+// spellCastSourceManaCause is the cast a producing-source provenance
+// (ValidSA$ Spell.ManaFromCard.StrictlySelf: "whenever you cast a permanent
+// spell using mana produced by CARDNAME" -- Tecutlan, the Searing Rift; The
+// Myriad Pools; Barracks of the Thousand) needs: p0 taps the card under test
+// for mana with its own {T} mana ability, then casts a probe that spends that
+// pool mana. The probe is Sol Ring ({1}, an artifact: a permanent spell and
+// an artifact-or-creature spell, so every carrier's ValidCard$ accepts it),
+// payable by whichever single colour the card adds. The pool is empty
+// otherwise, so the cast spends the card's mana in both engines. The
+// land-paid control (the trigger must stay silent) is pinned by
+// TestSpellCastSourceManaCauseServesAndControls.
+func spellCastSourceManaCause(reg *cards.Registry, f *cards.Face, name string) (triggerCause, bool) {
+	idx := sourceManaAbilityIndex(f)
+	if idx < 0 || !oraclegen.XMageKnown(sourceManaProbe) {
+		return triggerCause{}, false
+	}
+	if _, ok := reg.Lookup(sourceManaProbe); !ok {
+		return triggerCause{}, false
+	}
+	// The XMage driver selects the activated ability by its rule text. The
+	// mana ability lives on the face under test (a back face for every
+	// corpus carrier), which the front-face xmage_ability fill cannot see,
+	// so the cause names it itself.
+	prefixes, why := oraclegen.XMageAbility(f)
+	if why != "" || prefixes[idx] == "" {
+		return triggerCause{}, false
+	}
+	return triggerCause{
+		hand: []string{sourceManaProbe},
+		steps: []oraclegen.Step{
+			{Op: "activate", Seat: 0, Card: "p0:" + name, AbilityIndex: &idx},
+			{Op: "cast", Seat: 0, Card: "p0:" + sourceManaProbe},
+		},
+		xability: []string{prefixes[idx], ""},
+	}, true
+}
+
+// sourceManaProbe is the permanent spell the producing-source cause casts.
+const sourceManaProbe = "Sol Ring"
+
+// sourceManaAbilityIndex is the face's own bare-{T} mana ability (the one
+// whose mana the provenance reads), or -1.
+func sourceManaAbilityIndex(f *cards.Face) int {
+	for i, sa := range f.Abilities {
+		if sa.API == "Mana" && strings.TrimSpace(sa.ParamStr(cards.PKCost)) == "T" {
+			return i
+		}
+	}
+	return -1
 }
 
 // spellCastYouDontOwnCause builds the exile-and-grant cast for the ownership

@@ -127,6 +127,29 @@ func manaChoiceProduced(chosen []decision.Option) (produced string, allocation, 
 	return produced, true, produced != ""
 }
 
+// ManaSourceObserved reports whether the mana a source produces must keep its
+// producing-source identity in the pool: the source's current face carries a
+// SpellCast trigger whose ValidSA$ reads that identity ("Spell.ManaFromCard",
+// e.g. Tecutlan, the Searing Rift's `Spell.ManaFromCard.StrictlySelf`:
+// "whenever you cast a permanent spell using mana produced by CARDNAME").
+// Such a producer's units are added as a source-bearing provenance batch (an
+// empty-Valid state.ManaRestriction, the TriggersWhenSpent$ shape), so the
+// payment that spends them can attribute the spend to the source
+// (rules/pay emitRestrictedManaSpend's ManaSpentSources capture).
+//
+// Every other producer stays plain, so its ManaAdd events are byte-identical
+// and its units take the ordinary pool path. The test is a walk over the
+// face's own trigger lines (cards.Face.ReadsSpentManaSource: no allocation; a
+// land with no trigger costs one length check), so the plain-mana fast path
+// can call it on every activation.
+func ManaSourceObserved(h Host, source state.ObjID) bool {
+	o := h.Game().Obj(source)
+	if o == nil {
+		return false
+	}
+	return o.Face().ReadsSpentManaSource()
+}
+
 // ManaProducerTag encodes producer provenance in one exclusive unit tag.
 // The Artifact bit composes with Treasure/Cave/Desert rather than replacing
 // their historical type: a Treasure Artifact emits ArtifactTreasure, while
@@ -428,7 +451,10 @@ func effMana(h Host, c *Ctx, sa *cards.SA) {
 	// grammar); an absent or empty value is not a rider and produces ordinary
 	// mana, the fail-closed direction.
 	addsCounters := mp.AddsCounters
-	provenanceOnly := (triggersWhenSpent != "" || addsCounters != "") && restriction == "" && noCounter == ""
+	// A producer whose own face reads the spent mana's source identity
+	// (ManaSourceObserved: Spell.ManaFromCard) needs the same source-bearing
+	// batch, so the payment can attribute the units it spends to the source.
+	provenanceOnly := (triggersWhenSpent != "" || addsCounters != "" || ManaSourceObserved(h, c.Source)) && restriction == "" && noCounter == ""
 	for _, p := range ManaRecipients(h, c, sa) {
 		var emitted [256]bool
 		for _, r := range runes {

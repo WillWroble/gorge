@@ -386,6 +386,15 @@ type pendingCast struct {
 	// so Clone carries it like converge.
 	addsCounterGrants []state.ManaAddsCounterGrant `clone:"share"`
 
+	// manaSources captures, right after payment, the producing sources of
+	// the mana the cast spent (emitRestrictedManaSpend's ManaSpentSources),
+	// but only when one of them reads that identity (captureManaSources):
+	// the pay-time CastInfo's FlagManaSourcesSpent IDs carry it onto the
+	// cast object for the Spell.ManaFromCard provenance. Nil for every other
+	// cast, so unrelated casts stay byte-identical. Written once and never
+	// mutated, so Clone may share it.
+	manaSources []state.ObjID `clone:"share"`
+
 	// emerge / emergeDone mark an Emerge cast (CR 702.118a): beginCast's
 	// "emerged" arm sets emerge and composes the printed K:Emerge cost with
 	// the mandatory Sac<1/Creature> part; sacAsk then folds the chosen
