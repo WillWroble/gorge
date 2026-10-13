@@ -359,7 +359,8 @@ func permKeys(ps []rules.OracleSnapPerm) []string {
 // when it names "keywords_named" it gains the wider named vocabulary
 // (spec 2026-10-05-compliance-level-b section 2.3).
 func permKeysOpts(ps []rules.OracleSnapPerm, compare []string) []string {
-	wantNamed := wantsCompare(compare, CompareKeywordsNamed)
+	wantHexFrom := wantsCompare(compare, CompareKeywordsHexproofFrom)
+	wantNamed := wantHexFrom || wantsCompare(compare, CompareKeywordsNamed)
 	wantKeywords := wantNamed || wantsCompare(compare, CompareKeywords)
 	// attached_to names its host the way XMage's driver does: the host
 	// permanent's CURRENT name (its layer-3 SetName$ name, or "" while face
@@ -392,7 +393,11 @@ func permKeysOpts(ps []rules.OracleSnapPerm, compare []string) []string {
 			k += " counters=" + c
 		}
 		if wantKeywords {
-			if kw := ComparedKeywords(p.Keywords, wantNamed); kw != "" {
+			kw := ComparedKeywords(p.Keywords, wantNamed)
+			if wantHexFrom {
+				kw = ComparedKeywordsHexproofFrom(p.Keywords, p.Colors)
+			}
+			if kw != "" {
 				k += " kw=" + kw
 			}
 		}

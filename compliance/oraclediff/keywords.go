@@ -16,6 +16,9 @@ const (
 	CompareHandCount      = "hand_count"
 	// CompareGraveyardCount compares each graveyard's size, not its names.
 	CompareGraveyardCount = "graveyard_count"
+	// CompareKeywordsHexproofFrom is the named vocabulary plus the colour
+	// qualities of hexproof-from (keywords_hexproof_from.go).
+	CompareKeywordsHexproofFrom = "keywords_hexproof_from"
 )
 
 // ValidateCompare rejects any Compare field outside the closed opt-in vocabulary.
@@ -23,8 +26,8 @@ const (
 // comparator's wantsCompare readers) before an item may name it.
 func ValidateCompare(compare []string) error {
 	for _, c := range compare {
-		if c != CompareKeywords && c != CompareKeywordsNamed && c != CompareOffered && c != CompareNoLibraryOrder && c != CompareHandCount && c != CompareGraveyardCount {
-			return fmt.Errorf("unknown compare field %q (recognised: %q, %q, %q, %q, %q, %q)", c, CompareKeywords, CompareKeywordsNamed, CompareOffered, CompareNoLibraryOrder, CompareHandCount, CompareGraveyardCount)
+		if c != CompareKeywords && c != CompareKeywordsNamed && c != CompareOffered && c != CompareNoLibraryOrder && c != CompareHandCount && c != CompareGraveyardCount && c != CompareKeywordsHexproofFrom {
+			return fmt.Errorf("unknown compare field %q (recognised: %q, %q, %q, %q, %q, %q, %q)", c, CompareKeywords, CompareKeywordsNamed, CompareOffered, CompareNoLibraryOrder, CompareHandCount, CompareGraveyardCount, CompareKeywordsHexproofFrom)
 		}
 	}
 	return nil
