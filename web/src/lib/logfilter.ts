@@ -77,3 +77,26 @@ export function visibleLog<T extends { kind: string }>(
       (revealAll || (!isHiddenKind(l.event.kind) && (revealSteps || !isStepKind(l.event.kind)))),
   );
 }
+
+/**
+ * visibleTail is visibleLog's newest `n` lines, found by walking back from
+ * the end instead of filtering the whole list, so a live transcript's
+ * per-event cost does not grow with the log it holds. `more` reports
+ * whether any earlier line would also be visible.
+ */
+export function visibleTail<T extends { kind: string }>(
+  lines: { line: string; event: T }[],
+  revealAll: boolean,
+  revealSteps: boolean,
+  n: number,
+): { lines: { line: string; event: T }[]; more: boolean } {
+  const shows = (l: { line: string; event: T }) =>
+    Boolean(l.line) &&
+    (revealAll || (!isHiddenKind(l.event.kind) && (revealSteps || !isStepKind(l.event.kind))));
+  const out: { line: string; event: T }[] = [];
+  let i = lines.length - 1;
+  for (; i >= 0 && out.length < n; i--) if (shows(lines[i])) out.push(lines[i]);
+  let more = false;
+  for (; i >= 0 && !more; i--) more = shows(lines[i]);
+  return { lines: out.reverse(), more };
+}

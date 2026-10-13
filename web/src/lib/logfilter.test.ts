@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hiddenKinds, isHiddenKind, isStepKind, visibleLog, type LogLine } from './logfilter';
+import { hiddenKinds, isHiddenKind, isStepKind, visibleLog, visibleTail, type LogLine } from './logfilter';
 import { dvrReducer, initialDvr } from './dvr';
 
 // Realistic mixed event list: the noise kinds among real game actions, plus a
@@ -146,5 +146,20 @@ describe('visibleLog', () => {
       expect(s.cursor).toBe(h); // landed on the hidden seq
       expect(s.live).toBe(false);
     }
+  });
+});
+
+describe('visibleTail', () => {
+  const l = (seq: number, kind: string, line = `x${seq}`) => ({ line, event: { seq, kind } });
+  const log = [l(1, 'cast'), l(2, 'priority'), l(3, 'cast'), l(4, 'cast', ''), l(5, 'cast'), l(6, 'priority'), l(7, 'cast')];
+
+  it('equals the tail of visibleLog, and says whether earlier visible lines exist', () => {
+    for (const n of [0, 1, 2, 3, 4, 10]) {
+      const all = visibleLog(log, false);
+      const t = visibleTail(log, false, false, n);
+      expect(t.lines).toEqual(all.slice(Math.max(0, all.length - n)));
+      expect(t.more).toBe(all.length > n);
+    }
+    expect(visibleTail(log, true, false, 10).lines).toEqual(visibleLog(log, true));
   });
 });
