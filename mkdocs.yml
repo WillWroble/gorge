@@ -1,0 +1,88 @@
+# Public documentation site, published to GitHub Pages by
+# .github/workflows/docs.yml. Only docs/site/ is published: docs/agents/ and
+# docs/superpowers/ are internal working documents and are linked on GitHub
+# instead.
+#
+# Local preview (needs only uv or a virtualenv):
+#   uvx --with mkdocs-material==9.7.7 mkdocs serve
+site_name: gorge
+site_description: A deterministic, event-sourced Magic rules engine in pure Go.
+site_url: https://adams-shaun.github.io/gorge/
+repo_url: https://github.com/adams-shaun/gorge
+repo_name: adams-shaun/gorge
+edit_uri: edit/main/docs/site/
+docs_dir: docs/site
+site_dir: site
+strict: true
+
+# Generated at build time and included by sets.md / packages.md through
+# snippets; never pages of their own.
+exclude_docs: |
+  support/_generated_sets.md
+  architecture/_generated_packages.md
+  architecture/packages.tiers.json
+  requirements.txt
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      base_path: [docs/site]
+      check_paths: false
+
+extra_javascript:
+  - javascripts/perf-tracking.js
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Packages: architecture/packages.md
+      - Invariants: architecture/invariants.md
+      - Cleanup roadmap: architecture/cleanup.md
+  - Performance:
+      - Engine speed: performance/engine.md
+      - Bots and learned policies: performance/bots.md
+      - Tracking over time: performance/tracking.md
+  - Card support:
+      - Support by set: support/sets.md
+      - Regenerating the tables: support/regenerating.md

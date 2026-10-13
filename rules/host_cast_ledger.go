@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -39,8 +40,8 @@ func (e *Engine) CastThisTurn() int {
 // the stack this turn whose object matches the Forge spec. When the spec
 // carries a You* qualifier the count scopes to YOU's casts; otherwise it
 // counts everyone's. Derived from the event log like CastThisTurn.
-func (e *Engine) SpellsCastThisTurnMatching(you state.PlayerID, spec string) int {
-	return len(e.spellsCastThisTurnMatching(you, spec, 0))
+func (e *Engine) SpellsCastThisTurnMatching(you state.PlayerID, spec string, tc effects.TriggerContext) int {
+	return len(e.spellsCastThisTurnMatching(you, spec, 0, tc))
 }
 
 // SpellsCastThisTurnMatchingExcluding is SpellsCastThisTurnMatching with one
@@ -48,19 +49,24 @@ func (e *Engine) SpellsCastThisTurnMatching(you state.PlayerID, spec string) int
 // reading (the count's "other than the spell being cast" device; effects
 // stripBareCastSaSource strips the token and routes here with the ctx
 // source). Derived from the event log like CastThisTurn.
-func (e *Engine) SpellsCastThisTurnMatchingExcluding(you state.PlayerID, spec string, exclude state.ObjID) int {
-	return len(e.spellsCastThisTurnMatching(you, spec, exclude))
+func (e *Engine) SpellsCastThisTurnMatchingExcluding(you state.PlayerID, spec string, exclude state.ObjID, tc effects.TriggerContext) int {
+	return len(e.spellsCastThisTurnMatching(you, spec, exclude, tc))
 }
 
 // EachSpellCastThisTurnMatching satisfies effects.Host's method of the same
 // name: the matching casts' OBJECT IDS (the ARGUMENTED !CastSaSource$<Prop>
 // aggregate forms' engine side; effects' aggregateCastProperty sums the
 // property over them). Derived from the event log like the count forms.
-func (e *Engine) EachSpellCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID) []state.ObjID {
-	return e.spellsCastThisTurnMatching(you, spec, exclude)
+func (e *Engine) EachSpellCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID, tc effects.TriggerContext) []state.ObjID {
+	return e.spellsCastThisTurnMatching(you, spec, exclude, tc)
 }
 
-func (e *Engine) spellsCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID) []state.ObjID {
+// spellsCastThisTurnMatching walks the cast ledger. tc is the resolving
+// ability's trigger provenance (zero outside a trigger): it is bound into the
+// per-cast filter's SpecContext so a role-relative qualifier such as
+// ControlledBy TriggeredActivator (Magebane Lizard) resolves against the
+// trigger that is being resolved instead of failing closed.
+func (e *Engine) spellsCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID, tc effects.TriggerContext) []state.ObjID {
 	youScoped := strings.Contains(spec, "You")
 	// The CastSa count specs (Rain of Riches' gate) are evaluated per cast
 	// event against THAT cast's spend window, not the object's latest one —
@@ -185,7 +191,9 @@ func (e *Engine) spellsCastThisTurnMatching(you state.PlayerID, spec string, exc
 		if !ok {
 			continue
 		}
-		if e.matchesSpecFrom(matchSpec, ev.Obj, you, ev.Obj) {
+		sc := e.specCtx(ev.Obj, you)
+		sc.TriggerContext = tc
+		if e.matchesSpec(matchSpec, ev.Obj, sc) {
 			out = append(out, ev.Obj)
 		}
 	}

@@ -49,7 +49,7 @@ func castSuffixSpell(t *testing.T, e *Engine, src string) state.ObjID {
 	if o := e.G.Obj(id); o == nil || o.Zone == state.ZStack || o.Zone == state.ZHand {
 		t.Fatalf("spell %s did not resolve off the stack: %+v", srcName(t, src), o)
 	}
-	if len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0)) == 0 {
+	if len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0, noTC)) == 0 {
 		t.Fatal("no cast this turn recorded in the log -- the count would read vauously")
 	}
 	return id
@@ -102,7 +102,7 @@ func TestRoothaGreatestManaValueAmongInstantsAndSorceries(t *testing.T) {
 			if got := e.G.Obj(sorc).Face().ManaValue(); got != tc.sorceryMV {
 				t.Fatalf("precondition: sorcery MV = %d, want %d", got, tc.sorceryMV)
 			}
-			if n := len(e.EachSpellCastThisTurnMatching(0, "Instant.YouCtrl,Sorcery.YouCtrl", 0)); n != 2 {
+			if n := len(e.EachSpellCastThisTurnMatching(0, "Instant.YouCtrl,Sorcery.YouCtrl", 0, noTC)); n != 2 {
 				t.Fatalf("precondition: matching casts this turn = %d, want 2 (the spec must see both)", n)
 			}
 			ctx := &effects.Ctx{Controller: 0}
@@ -131,7 +131,7 @@ func TestAprilOneilCardTypesAmongSpellsCast(t *testing.T) {
 		castSuffixSpell(t, e, creatureSrc)
 		// Precondition: the two casts are genuinely different card types, so a
 		// distinct-type count differs from the cast count.
-		if n := len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0)); n != 2 {
+		if n := len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0, noTC)); n != 2 {
 			t.Fatalf("precondition: matching casts this turn = %d, want 2", n)
 		}
 		got, ok := effects.EvalCountOK(e, &effects.Ctx{Controller: 0}, aprilXBody)
@@ -145,7 +145,7 @@ func TestAprilOneilCardTypesAmongSpellsCast(t *testing.T) {
 	t.Run("one_card_type", func(t *testing.T) {
 		e := handEngine(t, card(t, "Name:Probe Spark\nManaCost:U\nTypes:Instant\nOracle:x\n"))
 		castSuffixSpell(t, e, "Name:Probe Spark\nManaCost:U\nTypes:Instant\nOracle:x\n")
-		if n := len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0)); n != 1 {
+		if n := len(e.EachSpellCastThisTurnMatching(0, "Card.YouCtrl", 0, noTC)); n != 1 {
 			t.Fatalf("precondition: matching casts this turn = %d, want 1", n)
 		}
 		got, ok := effects.EvalCountOK(e, &effects.Ctx{Controller: 0}, aprilXBody)

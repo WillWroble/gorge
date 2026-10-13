@@ -38,10 +38,17 @@ type CopyPermanentParams struct {
 	Blocked     bool
 	// SupportsChoice is set for the Choices$ shapes the chooser ask
 	// implements: the measured Zndrsplt Choices$/Chooser$/Controller$ shape
-	// (ChooserRemembered), and a bare Choices$ filter over the creatures that
-	// saddled the source this turn (Calamity, Galloping Inferno), whose
-	// chooser and controller are the ability's controller. ChoiceFilter is
-	// the Choices$ filter the ask offers.
+	// (ChooserRemembered), and every bare Choices$ filter (no Chooser$, no
+	// Controller$, no WithDifferentNames$) whose chooser and controller are
+	// the ability's controller -- Forge's CopyPermanentEffect "choose one of
+	// the Choices$ pool" arm (Twilight Diviner's Card.TriggeredCards, Calamity
+	// Galloping Inferno's SaddledThisTurn, Summon: Good King Mog XII's
+	// token+nonSaga). The pool is the battlefield filtered by Choices$, or,
+	// when Defined$ is also present, the Defined$ objects filtered by it
+	// (Mimic Vat's `Defined$ Imprinted.ExiledWithSource | Choices$ Card`).
+	// WithDifferentNames$ ("choose any number ... with different names") is a
+	// multi-pick this single-pick ask does not model, so it stays blocked.
+	// ChoiceFilter is the Choices$ filter the ask offers.
 	SupportsChoice    bool
 	ChooserRemembered bool
 	ChoiceFilter      string
@@ -152,7 +159,7 @@ var copyPermanentKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenAttacking",
 	"TokenRemembered", "TokenScript", "TokenTapped", "TriggerDescription", "Type",
@@ -229,8 +236,9 @@ func compileCopyPermanent(sa *cards.SA, dp *DefinedParams) *CopyPermanentParams 
 	choiceFilter := strings.TrimSpace(choices)
 	p.ChooserRemembered = choiceFilter == "Creature.RememberedPlayerCtrl" &&
 		strings.TrimSpace(chooser) == "Remembered" && p.Controller == "Remembered"
+	_, differentNames := sa.Param(cards.PKWithDifferentNames)
 	p.SupportsChoice = p.ChooserRemembered ||
-		(choicesOK && strings.Contains(choiceFilter, "SaddledThisTurn") && !chooserOK && p.Controller == "")
+		(choicesOK && choiceFilter != "" && !chooserOK && p.Controller == "" && !differentNames)
 	if p.SupportsChoice {
 		p.ChoiceFilter = choiceFilter
 	}
@@ -238,7 +246,7 @@ func compileCopyPermanent(sa *cards.SA, dp *DefinedParams) *CopyPermanentParams 
 		note("Choices$")
 		p.Blocked = true
 	}
-	if _, ok := sa.Param(cards.PKWithDifferentNames); ok {
+	if differentNames {
 		note("WithDifferentNames$")
 	}
 	if chooserOK && !p.SupportsChoice {

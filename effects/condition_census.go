@@ -48,7 +48,7 @@ var conditionSupportedDefined = newConditionNames(
 	"Imprinted", "Discarded", "Targeted", "Returned", "ChosenCard",
 	"TriggeredSourceLKICopy", "RememberedLKI", "ParentTarget", "Sacrificed",
 	"ThisTargetedCard", "TriggeredSpellAbility",
-	"Collected", "CastSA>Collected",
+	"Collected", "CastSA>Collected", "TriggeredTargetLKICopy",
 )
 
 // conditionUnmodelledDefined is every ConditionDefined$ group the corpus
@@ -59,7 +59,6 @@ var conditionUnmodelledDefined = newConditionNames(
 	"DelayTriggerRememberedLKI", // 6
 	"Equipped",                  // 5
 	"DelayTriggerRemembered",    // 5
-	"TriggeredTargetLKICopy",    // 4
 	"TriggeredNewCardLKICopy",   // 4
 	"ReplacedSource",            // 3
 	"TopOfLibrary",              // 2

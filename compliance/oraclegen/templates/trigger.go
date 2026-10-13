@@ -89,7 +89,7 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	causes, why, room := roomTriggerCauses(reg, name, req)
 	if !room {
 		causes, why = triggerRecipe(reg, f, name, &f.Triggers[idx], req.Sub)
-		causes = roomSecondDoorCauses(reg, name, req, causes)
+		causes = roomDoorCauses(reg, name, req, causes)
 	}
 	if why != "" {
 		return skip("no recipe: " + why)
@@ -166,6 +166,9 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 				return skip(reason)
 			}
 		}
+		if reason := zeroToughnessTargetSkip(f, req.Sub); reason != "" {
+			return skip(reason)
+		}
 		if triggerFromGraveyard(f, req) {
 			// The card sat in the graveyard, where the trigger functions,
 			// and its own condition (a threshold, an event count) still
@@ -175,6 +178,22 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 		return skip("did not fire")
 	}
 	return skip("no fixture gorge can play")
+}
+
+// zeroToughnessTargetSkip names the reason a "becomes the target of" trigger
+// (Ward on Famished Worldsire, a 0/0 with Devour) never fires in a generated
+// scenario: the source is a printed x/0 creature that enters with no counters,
+// so it is put into the graveyard as a state-based action (CR 704.5f) before
+// anything can target it. Only a Devour/counter fixture, which the generator
+// does not build, keeps it on the battlefield.
+func zeroToughnessTargetSkip(f *cards.Face, sub string) string {
+	if sub != "trigger.becomes-target" || !f.IsCreature() || strings.Contains(f.PT, "*") {
+		return ""
+	}
+	if _, toughness, ok := strings.Cut(f.PT, "/"); ok && strings.TrimSpace(toughness) == "0" {
+		return "creature enters with toughness 0 and dies before it can be targeted"
+	}
+	return ""
 }
 
 func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requirement, steps []oraclegen.Step, fx *oraclegen.Fixture) oraclegen.Scenario {

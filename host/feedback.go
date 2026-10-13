@@ -197,7 +197,31 @@ func (r *Registry) SnapshotForFeedback(id TableID, seat *state.PlayerID) (Feedba
 	if m == nil {
 		return FeedbackSnapshot{}, fmt.Errorf("host: table %s has no match", id)
 	}
+	return snapshotOf(id, m, seat)
+}
 
+// SnapshotMatch is SnapshotForFeedback for match k of table id, named
+// explicitly through lookup (HD-3, design §5.3): the current match, a
+// retired one in the table's history, or an archived one rebuilt from disk.
+// SnapshotForFeedback snapshots whichever match is current, so a caller that
+// runs after the table has moved on to match k+1 (the divergence worker
+// runs at match end, on its own goroutine) would capture the wrong one; this
+// entry point removes that race for every table shape. Both go through
+// snapshotOf, so the two cannot drift. seat nil skips the view.json half,
+// which the divergence capture never wants (the end-of-game view is useless
+// there and the review UI asks for historical views by seq).
+func (r *Registry) SnapshotMatch(id TableID, k int, seat *state.PlayerID) (FeedbackSnapshot, error) {
+	_, m, err := r.lookup(id, k)
+	if err != nil {
+		return FeedbackSnapshot{}, fmt.Errorf("host: table %s match %d: %w", id, k, err)
+	}
+	return snapshotOf(id, m, seat)
+}
+
+// snapshotOf is the copy section SnapshotForFeedback and SnapshotMatch
+// share: it copies what a snapshot needs out of m under its lock and
+// projects the seat's view outside it.
+func snapshotOf(id TableID, m *match, seat *state.PlayerID) (FeedbackSnapshot, error) {
 	m.mu.Lock()
 	l := m.e.L.Clone()
 	// reconcileLog's trim is for crash-cut FILES, and this clone is not one:

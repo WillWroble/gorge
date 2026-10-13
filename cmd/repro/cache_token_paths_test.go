@@ -9,7 +9,6 @@ import (
 
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
 )
 
 // decodeLiveCaptureTokens reads a captured match.json back into host's own
@@ -59,20 +58,11 @@ func decodeLiveCaptureTokens(t *testing.T, dir string) (map[string]string, []str
 // silently degrading to tokens_unread.
 func TestReproCorpusCachedTokenPathsReadable(t *testing.T) {
 	requireCorpus(t)
-	root, err := feedback.Root()
-	if err != nil {
-		t.Fatalf("no repo root: %v", err)
-	}
-	// The registry below is opened through testutil.SharedCorpusDir, which in
-	// a task worktree is the git common dir's .cards, not the worktree's own
-	// symlink path. The "opened corpus" whose paths the reroot must produce is
-	// therefore THAT directory; comparing against <worktree>/.cards would fail
-	// on every worktree even though the bytes are identical.
-	corpus, ok := testutil.SharedCorpusDir(root)
-	if !ok {
-		t.Fatalf("no corpus directory for %s", root)
-	}
-	tokenscripts := filepath.Join(corpus, "tokenscripts")
+	// Expect the SAME corpus the registry below opens: CorpusRegistry uses
+	// testutil.SharedCorpusDir, which resolves the main checkout's .cards, not
+	// this worktree's symlink (fixed by f5f897898). feedback.Root()/.cards here
+	// would name the worktree's symlink and fail in every worktree.
+	tokenscripts := filepath.Join(testutil.CorpusDirOrSkip(t), "tokenscripts")
 	info, err := os.Stat(tokenscripts)
 	if err != nil || !info.IsDir() {
 		t.Fatalf("no tokenscripts directory under the opened corpus %s: %v", tokenscripts, err)

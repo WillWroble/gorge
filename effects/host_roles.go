@@ -253,7 +253,9 @@ type HostContinuous interface {
 	// with a zero Stamp). Only registrations created by api:Effect are ended
 	// (state.ContinuousEffect.FromEffect); the same source's printed statics
 	// are untouched.
-	EndEffectSource(source state.ObjID)
+	// spareAfter, when non-zero, spares registrations whose Timestamp is
+	// later than it (Ctx.EffectFrame.Spare).
+	EndEffectSource(source state.ObjID, spareAfter uint32)
 	// EndImprintedEffects ends every live continuous-effect registration
 	// that an ImprintOnHost$ True Effect imprinted on the named host card
 	// (state.ContinuousEffect.ImprintOnHost): the analogue of Forge's
@@ -430,7 +432,7 @@ type HostCastLedger interface {
 	// like CastThisTurn, so a replay derives the same number. This is the
 	// Count$ThisTurnCast_<spec> backing (the "first/second spell you cast"
 	// cost modifiers and triggers).
-	SpellsCastThisTurnMatching(you state.PlayerID, spec string) int
+	SpellsCastThisTurnMatching(you state.PlayerID, spec string, tc TriggerContext) int
 	// SpellsCastThisTurnMatchingExcluding is SpellsCastThisTurnMatching with
 	// one object's own cast excluded from the count -- the bare !CastSaSource
 	// qualifier's engine reading. Every bare-form carrier's oracle says
@@ -440,7 +442,7 @@ type HostCastLedger interface {
 	// PutOnStack is unavoidably in the window when an ETB gate reads the
 	// count, so the qualifier is the count's exclusion of its own ctx source.
 	// Derived from the event log like SpellsCastThisTurnMatching.
-	SpellsCastThisTurnMatchingExcluding(you state.PlayerID, spec string, exclude state.ObjID) int
+	SpellsCastThisTurnMatchingExcluding(you state.PlayerID, spec string, exclude state.ObjID, tc TriggerContext) int
 	// EachSpellCastThisTurnMatching is the ARGUMENTED !CastSaSource forms'
 	// engine side (task castprov2): the object ids of the spells put on the
 	// stack this turn matching spec (with the same You*-qualifier scoping
@@ -448,7 +450,7 @@ type HostCastLedger interface {
 	// SpellsCastThisTurnMatchingExcluding), in reverse log order (newest
 	// first) — the order is irrelevant to the aggregate reads (a sum).
 	// Derived from the event log like SpellsCastThisTurnMatching.
-	EachSpellCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID) []state.ObjID
+	EachSpellCastThisTurnMatching(you state.PlayerID, spec string, exclude state.ObjID, tc TriggerContext) []state.ObjID
 	// CommanderCastsFromCommandZone counts how many times player p has cast
 	// one of THEIR OWN commanders from the command zone this game — the
 	// same provenance the CR 903.8 commander tax counts (rules/cast.go's

@@ -19,6 +19,10 @@ type OracleResult struct {
 	Transcript []string         `json:"transcript,omitempty"`
 	Snapshots  []OracleSnapshot `json:"snapshots"`
 	Decisions  []OracleDecision `json:"decisions"`
+	// PendingTriggerAsks counts checkpoints taken with a trigger-order or
+	// triggered-cost ask still pending (XMage has answered it by then). A
+	// ratchet at zero; omitted when zero so existing results are unchanged.
+	PendingTriggerAsks int `json:"pending_trigger_asks,omitempty"`
 }
 
 // decodeOracleScenario decodes one scenario object (the elements of an
@@ -45,8 +49,9 @@ func RunOracleScenarioJSON(reg *cards.Registry, raw []byte) (OracleResult, error
 	fails, transcript, run := runOracleScenarioSpare(reg, sc, false, sp)
 	res := OracleResult{
 		Fails: fails, Transcript: transcript,
-		Snapshots: append([]OracleSnapshot{}, run.snaps...),
-		Decisions: append([]OracleDecision{}, run.decisions...),
+		Snapshots:          append([]OracleSnapshot{}, run.snaps...),
+		Decisions:          append([]OracleDecision{}, run.decisions...),
+		PendingTriggerAsks: run.askedAtCheckpoint,
 	}
 	// The result holds only strings and fresh slices, never the engine's
 	// arrays, so the finished game's storage goes back to the pool. A run
