@@ -36,11 +36,39 @@ func TestAutoPayFastAcceptMatchesPlanner(t *testing.T) {
 	}
 }
 
+// TestAutoPayFastAcceptsSelfSacrifice: Expedition Map's "{2}, {T}, Sacrifice
+// Expedition Map: Search ..." over two untapped Islands. The self-sacrifice
+// competes with no mana source, so the fast path accepts it, with verify on so
+// the planner must agree (sequential: it toggles the verify flag).
+func TestAutoPayFastAcceptsSelfSacrifice(t *testing.T) {
+	old := autoPayFastVerify
+	autoPayFastVerify = true
+	defer func() { autoPayFastVerify = old }()
+
+	e, _, _ := newFixtureDeck(t, 9615, ppFiller)
+	e.paidManaCensus = true
+	mapID := onBoardCard(t, e, 0, corpusCard(t, "Expedition Map"))
+	for i := 0; i < 2; i++ {
+		onBoard(t, e, 0, lrIsland)
+	}
+	before := autoPayFastAccepts.Load()
+	d := ppPriority(t, e)
+	if _, ok := autopayAbilityOffer(d, mapID); !ok {
+		t.Fatalf("Expedition Map not offered with two untapped Islands: %+v", d.Options)
+	}
+	if delta := autoPayFastAccepts.Load() - before; delta == 0 {
+		t.Fatal("fast path did not accept the self-sacrifice ability (planner-only accept)")
+	}
+}
+
 // TestAutoPayFastDeclinesWhenSourcesCannotPay: three Islands cannot pay
 // {3}{U}, so the fast path must decline (the planner then declines too, and no
 // option is offered).
+//
+// Sequential: it asserts the package-global accept counter did not move, and
+// parallel census tests (ability_autopay_test.go, paid_mana_census_test.go)
+// bump that counter concurrently. A sequential test never overlaps them.
 func TestAutoPayFastDeclinesWhenSourcesCannotPay(t *testing.T) {
-	t.Parallel()
 	e, _, _ := newFixtureDeck(t, 9614, ppFiller)
 	e.paidManaCensus = true
 	sailor := onBoardCard(t, e, 0, corpusCard(t, "Spectral Sailor"))
