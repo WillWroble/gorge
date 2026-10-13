@@ -4,6 +4,8 @@
   import { versionWatch } from './lib/versioncheck.svelte';
   import { installConsoleBreadcrumbs } from './lib/breadcrumbs';
   import { getSeat } from './lib/seat';
+  // Imported for its side effect: applies the saved/`?fx=` visual-effects mode to <html> at load.
+  import './lib/visualfx.svelte';
   import FeedbackButton from './components/FeedbackButton.svelte';
   import Overview from './routes/Overview.svelte';
   import Table from './routes/Table.svelte';

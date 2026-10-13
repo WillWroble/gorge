@@ -349,6 +349,12 @@
     color: var(--ink-inst);
     overflow: hidden;
   }
+  /* Visual effects off (lib/visualfx). The transform above still makes the
+     panel the containing block the NOTE describes. */
+  :global(html.fx-off) .seat-panel {
+    backdrop-filter: none;
+    background: var(--instrument);
+  }
   /* Warm: the table is stopped until this seat answers, and there is no pass.
      Cool: a window is open and passing is a legal answer. Neither: the wait
      is on someone else, and the panel says nothing louder than its hairline. */

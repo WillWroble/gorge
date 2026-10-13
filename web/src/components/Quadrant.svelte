@@ -217,6 +217,11 @@
     background: color-mix(in srgb, var(--felt-sunk) 62%, transparent);
     backdrop-filter: grayscale(0.9) brightness(0.62);
   }
+  /* Visual effects off (lib/visualfx): the scrim's tint alone still reads as greyed out. */
+  :global(html.fx-off) .quadrant.lost::after {
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--felt-sunk) 78%, transparent);
+  }
   /* A spectator's passive hand: a fixed band Board already took out of the
      panel's height (or, in a side strip, its width), so the rows keep the
      room they were sized for. */
