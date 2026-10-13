@@ -1293,6 +1293,7 @@ func Resolve(h Host, c *Ctx, sa *cards.SA) {
 		}
 		imprint(h, c, sa)
 		if strings.EqualFold(sa.ParamStr(cards.PKClearImprinted), "True") && c.Source != 0 {
+			releaseImprintedEffects(h, c.Source)
 			// Only a real clear is an event (the ClearRemembered$
 			// discipline effCleanup documents): clearing lists that are
 			// already empty is a no-op, and logging it as a state change hid
