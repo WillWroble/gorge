@@ -72,6 +72,11 @@ func GenerateB(reg *cards.Registry, name string, req levelb.Requirement) (item o
 				item.Compare = append(item.Compare, oraclegen.CompareHandCount)
 			}
 		}
+		// A permanent shuffled back from the battlefield before a draw can be
+		// drawn again in XMage's random order: compare the hand's size.
+		if oraclegen.ShufflesPermanentThenDraws(c.Faces[req.Face]) && !hasCompareOption(item.Compare, oraclegen.CompareHandCount) {
+			item.Compare = append(item.Compare, oraclegen.CompareHandCount)
+		}
 	}()
 	if req.Gap != "" {
 		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "level B: " + req.Gap}

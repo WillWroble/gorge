@@ -93,7 +93,7 @@ func TestShuffleEmittedItemCensus(t *testing.T) {
 					routes := drawRoutes[set]
 					routes[route]++
 					drawRoutes[set] = routes
-				} else if hasCompare(item.Compare, oraclegen.CompareHandCount) {
+				} else if hasCompare(item.Compare, oraclegen.CompareHandCount) && !oraclegen.ShufflesPermanentThenDraws(card.Faces[req.Face]) {
 					t.Fatalf("%s: hand-count compare on an item that does not shuffle then draw", item.ID)
 				}
 				got[set]++
