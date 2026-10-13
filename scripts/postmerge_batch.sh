@@ -106,6 +106,15 @@ last_green=$(git rev-parse origin/main)
 red_fails=""     # "<pkg> <regex>" lines still failing on main
 flaky_reruns=0   # consecutive all-flaky full reruns at one head
 FLAKY_RERUNS_MAX=2
+# Cadence (2026-10-12): a full run is ~8-12 min on up to 16 cores, so on a
+# GREEN pipeline it starts only once BATCH_MIN_AHEAD commits are unpushed or
+# the oldest unpushed commit is BATCH_MAX_AGE_S old. Any non-green state (red
+# failures outstanding, our pause marker, a pending confirming rerun) runs on
+# every head change, as before.
+BATCH_MIN_AHEAD=${BATCH_MIN_AHEAD:-4}
+BATCH_MAX_AGE_S=${BATCH_MAX_AGE_S:-1800}
+need_run=0       # 1 from a RED/ALL FLAKY until the next GREEN: never defer
+last_deferred="" # head whose DEFER line was already logged
 while true; do
   git fetch -q origin main 2>/dev/null || true
   head=$(git rev-parse main)
@@ -115,7 +124,23 @@ while true; do
   # requiring an unpushed commit here kept the pause up forever (2026-10-12:
   # 6025ab05c, the caretaker-flake fix, was pushed by hand at 15:4x with this
   # loop's pause in place; the promised confirming rerun never started).
-  if [ "$head" != "$last_tested" ] && { [ "$(git rev-list --count origin/main..main)" -gt 0 ] || our_pause; }; then
+  go_run=0
+  if [ "$head" != "$last_tested" ]; then
+    ahead=$(git rev-list --count origin/main..main)
+    if [ -n "$red_fails" ] || [ "$need_run" = 1 ] || our_pause; then
+      { [ "$ahead" -gt 0 ] || our_pause; } && go_run=1
+    elif [ "$ahead" -gt 0 ]; then
+      oldest=$(git log --reverse --format=%ct origin/main..main | head -n1)
+      age=$(( $(date +%s) - ${oldest:-$(date +%s)} ))
+      if [ "$ahead" -ge "$BATCH_MIN_AHEAD" ] || [ "$age" -ge "$BATCH_MAX_AGE_S" ]; then
+        go_run=1
+      elif [ "$head" != "$last_deferred" ]; then
+        last_deferred=$head
+        say "DEFER ahead=$ahead oldest=${age}s (min $BATCH_MIN_AHEAD / max ${BATCH_MAX_AGE_S}s)"
+      fi
+    fi
+  fi
+  if [ "$go_run" = 1 ]; then
     # Still red? Re-check only the failing tests before paying for a full run.
     still=""
     while read -r pkg re; do
@@ -132,21 +157,21 @@ while true; do
       if gorge_heavy_run -g "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
         last_tested=$head
         if git push -q origin "$head:refs/heads/main"; then
-          last_green=$head; flaky_reruns=0
+          last_green=$head; flaky_reruns=0; need_run=0
           say "GREEN ${head:0:9} pushed ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         elif git fetch -q origin main && git merge-base --is-ancestor "$head" origin/main; then
           # Someone pushed main past the green head first (a direct push):
           # the green commit is already on origin, so the pause must lift --
           # with nothing left to push this loop would never run again.
-          last_green=$head; flaky_reruns=0
+          last_green=$head; flaky_reruns=0; need_run=0
           say "GREEN ${head:0:9} already on origin ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         else
           say "GREEN ${head:0:9} push FAILED"
         fi
       else
-        last_tested=$head
+        last_tested=$head; need_run=1
         pause_pipeline "$head"
         say "RED ${head:0:9} ($(( $(date +%s) - s ))s): $(/usr/bin/grep -E '^(--- FAIL|FAIL|panic)' "$OUT" | head -n5 | tr '\n' ' ')"
         red_fails=$(parse_fails "$OUT")

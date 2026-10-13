@@ -2041,6 +2041,14 @@ func (e *Engine) settleTriggeredMandatory(tc *triggeredEffectCost) {
 	// A cost can select the same creature for Blight and a zone-changing
 	// component, so place its counters before settling sacrifices/exiles.
 	pay.EmitBlightCounters(asPayer(e), tc.blights, &tc.amount, tc.xPaid)
+	// The blighted creatures are this body's "CounterPut" paid list (the
+	// castCounterPut discipline): `Defined$ CounterPutCards` reads them.
+	if len(tc.blights) > 0 {
+		if e.castCounterPut == nil {
+			e.castCounterPut = make(map[state.ObjID][]state.ObjID)
+		}
+		e.castCounterPut[rp.obj] = append(e.castCounterPut[rp.obj], tc.blights...)
+	}
 	var sacrificedLKI []state.SacrificedInfo
 	for _, id := range tc.sacs {
 		if o := e.G.Obj(id); o != nil && o.Zone == state.ZBattlefield {

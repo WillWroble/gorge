@@ -55,8 +55,16 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 		}
 		// Register the first listed phase still ahead; firing consumes the
 		// registration, so a multi-step Phase$ value remains one-shot.
+		// A registration armed at a LATER turn (DelayedTriggerDefinedPlayer$,
+		// UpcomingTurn$) waits for that turn's first listed step, not the
+		// first one still ahead in this turn ("Upkeep->" is Upkeep, never
+		// this turn's beginning of combat).
+		from := h.Game().Step
+		if dp.DefinedPlayer != "" || dp.UpcomingTurn {
+			from = state.Step(255)
+		}
 		var ok bool
-		step, ok = state.EarliestAfter(set, h.Game().Step)
+		step, ok = state.EarliestAfter(set, from)
 		if !ok {
 			h.Emit(events.Event{Kind: events.Note, Obj: c.Source,
 				Text: "registers a delayed trigger with no Phase"})
@@ -89,7 +97,7 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 	// upkeep would otherwise hit. An absent flag keeps the unbounded fire
 	// every earlier registration had (Amount zero).
 	amount := int32(0)
-	if dp.NextTurn {
+	if dp.NextTurn || dp.UpcomingTurn {
 		amount = int32(h.Game().Turn + 1)
 	}
 	// The registration's ValidPlayer$ rides the event's Text next to the
@@ -156,6 +164,28 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 		h.Emit(events.Event{Kind: events.Note, Obj: c.Source,
 			Text: "registers a delayed trigger with no Execute"})
 		return
+	}
+	// DelayedTriggerDefinedPlayer$ (Gideon Jura's "During target opponent's
+	// next turn"): the registration is armed only from the defined player's
+	// NEXT turn start, so the first one of that player is the gate the
+	// rules-side scan reads. Forge takes the first defined player. It rides
+	// "|DP=<seat+1>" (zero = none), with a bare "|TD" after it for ThisTurn$,
+	// appended before |RN= so |RN= strips first.
+	if dp.DefinedPlayer != "" {
+		if ts, known := knownDefinedTargets(h, c, dp.DefinedPlayer); known {
+			for _, t := range ts {
+				if t.IsPlayer {
+					text += "|DP=" + strconv.Itoa(int(t.Player)+1)
+					if dp.ThisTurn {
+						text += "|TD"
+					}
+					break
+				}
+			}
+		} else {
+			h.Emit(events.Event{Kind: events.Note, Obj: c.Source,
+				Text: "unmodelled DelayedTrigger DelayedTriggerDefinedPlayer$ " + dp.DefinedPlayer})
+		}
 	}
 	// RememberNumber$ True (Mana Drain, Plasm Capture, Scattering Stroke):
 	// Forge's DelayedTriggerEffect copies the host's remembered Integers onto

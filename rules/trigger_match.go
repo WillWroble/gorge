@@ -83,6 +83,9 @@ type pendingTrigger struct {
 	// Execute is the Execute$ SVar name (which events.Apply's DelayedPush case
 	// resolves from the source's SVar table).
 	Delayed bool
+	// DelayedStatic marks a Delayed registration that carried Static$ True:
+	// resolveStaticTriggers runs its body off the stack (Gideon Jura).
+	DelayedStatic bool
 	// Chapter marks a Saga chapter ability: it is a triggered ability even
 	// though its delayed-shape stack object has no T: line to record.
 	Chapter   bool
@@ -349,9 +352,13 @@ type damageBatchKey struct {
 // TriggeredPlayersTargets$Amount count and the Defined$ TriggeredTargets /
 // TriggeredSourcesController plural selectors read at resolution.
 type damageBatchEntry struct {
-	key     damageBatchKey
-	idx     int
-	amount  int32
+	key    damageBatchKey
+	idx    int
+	amount int32
+	// gate is the trigger line when it carries DamageAmount$: closeDamageBatch
+	// drops the queued trigger when the batch TOTAL fails the comparison.
+	gate    *cards.Trigger
+	gateSrc state.ObjID
 	sources []state.ObjID
 	targets []state.Target
 }
@@ -448,7 +455,10 @@ type combatFires struct {
 // trigger every time (72 lines over 68 scripts at the FORGE_REF pin) --
 // Exemplar of Light drew on every counter. The entry
 // comments below that cite ActivationLimit$ as a membership reason predate
-// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half.
+// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half. The
+// CheckDefinedPlayer$ half is no longer scoped either: an unreadable
+// predicate fails closed on every mode (checkDefinedPlayerHolds, lb-crime),
+// so the entries citing it now explain only PlayerTurn$.
 var actionTriggerModes = map[string]bool{
 	// Clashed joins them for the same reason: it is an event mode registered
 	// with its own marker Kind (events.Clash, task clash1), so the
@@ -1506,6 +1516,9 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 							ent := damageBatchEntry{
 								key: bk, idx: len(e.pendingTriggers), amount: damageAmount,
 							}
+							if _, ok := t.Param(cards.PKDamageAmount); ok {
+								ent.gate, ent.gateSrc = &fc.face.Triggers[ti], id
+							}
 							if bk.all {
 								ent.sources = batchAppendSource(ent.sources, allSrc)
 								ent.targets = batchAppendTarget(ent.targets, allTgt)
@@ -1515,6 +1528,10 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 							// in the stream it queued at before this gate was
 							// batch-scoped; closeDamageBatch patches its referent
 							// amount to the batch total.
+						} else if !trigmatch.DamageAmountMatches(boardOf(e), t, id, ev.Obj, damageAmount) {
+							// No batch open: this event is its own batch, so
+							// DamageAmount$ reads its amount now.
+							continue
 						}
 					}
 				}
@@ -2042,15 +2059,39 @@ func (e *Engine) closeDamageBatch() {
 		return
 	}
 	e.damageBatchOpen = false
-	for _, ent := range e.damageBatchLog {
+	var dead []bool
+	for li, ent := range e.damageBatchLog {
 		if ent.idx >= len(e.pendingTriggers) {
+			continue
+		}
+		// end bounds this entry's own slots: entries are appended in queue
+		// order, so the next entry's idx starts the next referent's slots.
+		// Without it a failing per-referent entry would kill (or patch) the
+		// adjacent slots of a later entry of the same trigger line.
+		end := len(e.pendingTriggers)
+		if li+1 < len(e.damageBatchLog) && e.damageBatchLog[li+1].idx < end {
+			end = e.damageBatchLog[li+1].idx
+		}
+		// DamageAmount$ on a batch mode compares the accumulated TOTAL: a
+		// queued entry whose total fails it never triggered (CR 603.2).
+		if ent.gate != nil && !trigmatch.DamageAmountMatches(boardOf(e), *ent.gate, ent.gateSrc, 0, ent.amount) {
+			if dead == nil {
+				dead = make([]bool, len(e.pendingTriggers))
+			}
+			for i := ent.idx; i < end; i++ {
+				pt := &e.pendingTriggers[i]
+				if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
+					break
+				}
+				dead[i] = true
+			}
 			continue
 		}
 		// Every queued copy of this (trigger, referent) entry is patched: the
 		// Panharmonicon echo copies appended right after the original share
 		// the queue slot sequence and would otherwise resolve a partial
 		// amount and no batch sets.
-		for i := ent.idx; i < len(e.pendingTriggers); i++ {
+		for i := ent.idx; i < end; i++ {
 			pt := &e.pendingTriggers[i]
 			if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
 				break
@@ -2065,6 +2106,15 @@ func (e *Engine) closeDamageBatch() {
 				}
 			}
 		}
+	}
+	if dead != nil {
+		kept := e.pendingTriggers[:0]
+		for i, pt := range e.pendingTriggers {
+			if !dead[i] {
+				kept = append(kept, pt)
+			}
+		}
+		e.pendingTriggers = kept
 	}
 	e.damageBatchIdx = nil
 	e.damageBatchLog = nil

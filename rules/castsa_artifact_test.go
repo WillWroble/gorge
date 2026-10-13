@@ -95,7 +95,7 @@ func TestCastSaManaFromArtifactAllSites(t *testing.T) {
 		t.Fatal("matchesWithTypes rejected the artifact-paid cast for Shadow's real Affected$ spec")
 	}
 	// 4. Count$ThisTurnCast_.
-	counted := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0)
+	counted := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0, noTC)
 	if len(counted) != 1 || counted[0] != spell {
 		t.Fatalf("spellsCastThisTurnMatching = %v, want [%d]", counted, spell)
 	}
@@ -132,7 +132,7 @@ func TestCastSaManaFromArtifactAllSites(t *testing.T) {
 	if e.matchesWithTypes(&ce, o2.ID, nil, state.ZStack) {
 		t.Fatal("matchesWithTypes admitted a plain-paid cast")
 	}
-	if got := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0); len(got) != 1 {
+	if got := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0, noTC); len(got) != 1 {
 		t.Fatalf("spellsCastThisTurnMatching = %v, want only the artifact-paid cast", got)
 	}
 	move2 := events.Event{Kind: events.MoveZone, Obj: o2.ID, From: state.ZStack, To: state.ZGraveyard}

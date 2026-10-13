@@ -170,7 +170,7 @@ this snapshot.
 
 - **`make sim`:** 20/20 `replay OK` over 20 verified 4-seat games (last
   measured 2026-09-28; not re-run for this snapshot).
-- **Corpus coverage** at the pin `25a608a4fc5fe837314a263e4ac6600a01d7c348`
+- **Corpus coverage** at the pin `1dc038bc620c7802fc4337cd04028aef50356096`
   (`FORGE_REF`): `make report` prints `cards: 34074  playable: 32089 (94.2%)`
   and `tokens: 854`. Since
   fuzz-cov3 (2026-09-24) the gate also counts the `count:<head>` value heads

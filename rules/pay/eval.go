@@ -32,8 +32,12 @@ type Eval interface {
 	// facts, or read now for an ability outside the configured set).
 	ManaStatic(ab *cards.SA) ManaStatic
 	// SourceInterference is the planner's check of the triggers and
-	// replacements that can observe tapping id for ma's mana.
-	SourceInterference(id state.ObjID, ma *cards.SA) (Tier, Consequence, string)
+	// replacements that can observe tapping id for ma's mana. With produced
+	// empty it is the whole verdict (extra is zero); with produced set it
+	// answers only the additional mana the deterministic static TapsForMana
+	// triggers add to one tap declaring that production (Forsaken
+	// Monument), which the verdict already admitted.
+	SourceInterference(id state.ObjID, ma *cards.SA, produced string) (tier Tier, c Consequence, detail string, extra state.Mana)
 	// ManaUnits is p's payment-plan source census: one unit per mana
 	// ability activation the planner may schedule.
 	ManaUnits(p state.PlayerID) []WindowUnit

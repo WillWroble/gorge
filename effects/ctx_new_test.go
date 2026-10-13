@@ -141,11 +141,11 @@ func TestChildCarriesResolutionTables(t *testing.T) {
 // private copies, so the spawning resolution appending to its own cannot
 // rewrite them.
 func TestForTriggerCopiesCostLists(t *testing.T) {
-	c := &Ctx{Source: 3, Controller: 1, Exiled: []state.ObjID{5}}
+	c := &Ctx{Source: 3, Controller: 1, Paid: PaidCostLists{Exiled: []state.ObjID{5}}}
 	tc := TriggerContext{TriggerCard: 8}
 	k := c.ForTrigger(tc)
-	c.Exiled[0] = 6
-	if k.Exiled[0] != 5 || k.TriggerCard != 8 || k.Source != 3 || k.Controller != 1 {
-		t.Errorf("ForTrigger = source %d controller %d exiled %v trigger card %d", k.Source, k.Controller, k.Exiled, k.TriggerCard)
+	c.Paid.Exiled[0] = 6
+	if k.Paid.Exiled[0] != 5 || k.TriggerCard != 8 || k.Source != 3 || k.Controller != 1 {
+		t.Errorf("ForTrigger = source %d controller %d exiled %v trigger card %d", k.Source, k.Controller, k.Paid.Exiled, k.TriggerCard)
 	}
 }

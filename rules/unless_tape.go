@@ -108,7 +108,7 @@ func settleUnlessElection(e *Engine, ctx *effects.Ctx, sa *cards.SA, obj state.O
 	}
 	if e.payUnlessCost(payOption.Player, paid, ctx, obj) {
 		ctx.UnlessPay = "pay"
-	} else if paid.HasManaPayment() && len(e.windowManaUnits(payOption.Player)) > 0 {
+	} else if paid.HasManaPayment() && len(e.windowManaUnitsPaid(payOption.Player)) > 0 {
 		// A failed pool-only attempt is not a decline: the continuation lets
 		// the payer assemble enough floating mana. The offer gate proved the
 		// budget reachable before Pay was offered, so sources remain while

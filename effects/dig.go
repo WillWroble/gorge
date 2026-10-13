@@ -306,7 +306,7 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 			// applyFaceDownMarker preserves ExileFaceDown$'s source-carrying
 			// payload (Counter, Amount and nil IDs), while also stamping
 			// battlefield FaceDown$ entries.
-			h.Emit(ev)
+			emitEntryMove(h, c, digGainControl(dp.GainControl), dest, ev)
 			if dp.Imprint && c.Source != 0 {
 				if moved := g.Obj(id); moved != nil && moved.Zone == dest && !moved.IsToken {
 					h.Emit(events.Event{Kind: events.Imprint, Obj: c.Source, IDs: []state.ObjID{id}})
@@ -317,9 +317,6 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 				h.Emit(events.Event{Kind: events.Tap, Obj: id, Player: p, Text: "entered tapped"})
 			}
 			rider.apply(h, c, id, p, dest)
-			if dest == state.ZBattlefield && dp.GainControl {
-				h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: c.Controller})
-			}
 			// StaticEffect$ on a battlefield take (Arbiter of the Ideal's
 			// "put it onto the battlefield ... it's an enchantment"): the same
 			// rider registration every ChangeZone mover applies.
@@ -488,6 +485,7 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 				chooser = cp
 			}
 		}
+		allOrNothing := dp.ChangeNumAll && (optional || promptToSkipOptional) && !hasBudget && len(budgetEligible) > 0
 		if arrangeThrough < 0 && changeNum > 0 && (takeChoice || optionalChoice || askBudget) {
 			// A real choice: record the look, then ask the library's owner.
 			// Reveal$ True makes the record a PUBLIC reveal of the window (the
@@ -572,7 +570,27 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 				}
 				d.Options = append(d.Options, opt)
 			}
-			if ans, ok := AskTape(h, d); ok {
+			if allOrNothing {
+				// ChangeNum$ All moves every matching card or none
+				// (CR 608.2d: the optional action is one choice), so the
+				// election is one yes/no, never a subset.
+				dest := digDestPhrase(dest)
+				d = &decision.Decision{Player: chooser, Kind: decision.KChoose, Min: 1, Max: 1,
+					Source: c.Source, ResumeKind: "dig_all", ResumeSA: sa, ResumeTarget: targetIndex,
+					Prompt: look + ": put all matching card(s) into " + dest + "?",
+					Options: []decision.Option{
+						{Index: 0, Kind: "yes", Label: "Yes — put all matching card(s) into " + dest, Player: chooser},
+						{Index: 1, Kind: "no", Label: "No", Player: chooser},
+					}}
+				if ans, ok := AskTape(h, d); ok {
+					if answerYes(ans) {
+						takeAnswered(budgetEligible)
+					} else if !promptToSkipOptional {
+						takeAnswered(nil)
+					}
+					continue
+				}
+			} else if ans, ok := AskTape(h, d); ok {
 				// An empty answer to the optional-ability election declines
 				// the whole Dig for this target: the looked-at window stays in
 				// place, with no remainder, reveal or destination side effects.

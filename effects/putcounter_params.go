@@ -81,6 +81,12 @@ type PutCounterParams struct {
 	// kind of counter on ..."), else one existing kind is chosen.
 	ExistingCounter     bool
 	EachExistingCounter bool
+	// PutOnDefined$ (trimmed), PutOnEachOther$ (trimmed spec) and
+	// OnlyNewKind$ True: the recipients and the skip rule of the
+	// ExistingCounter + Choices$ shape (Aven Courier, Contractual Safeguard).
+	PutOnDefined   string
+	PutOnEachOther string
+	OnlyNewKind    bool
 	// CounterTypePerDefined$ True, RandomType$ True, a non-empty
 	// ChooseDifferent$.
 	CounterTypePerDefined bool
@@ -138,9 +144,9 @@ var putCounterKnownKeys = [...]string{
 	"InstantSpeed", "IsCurse", "IsPresent", "KW",
 	"Keyword", "KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor",
 	"MinChoiceAmount", "ModeCost", "Monstrosity", "NewController",
-	"NumDmg", "OpponentTurn", "Optional", "PerDefined",
+	"NumDmg", "OnlyNewKind", "OpponentTurn", "Optional", "PerDefined",
 	"Placer", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
-	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "RandomType", "ReduceAmount",
+	"PresentCompare", "PresentDefined", "PresentZone", "PutOnDefined", "PutOnEachOther", "RandomNumTargets", "RandomType", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberCards", "RememberCostMana", "RememberObjects",
 	"RememberPut", "RememberTargets", "Renown", "ReplaceColor", "ReplaceGraveyard",
 	"ReplaceGraveyardValid", "ReplaceMana", "ReplaceOnly", "ReplaceType",
@@ -152,7 +158,7 @@ var putCounterKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript",
 	"TriggerDescription", "Type", "Ultimate",
@@ -266,6 +272,9 @@ func compilePutCounter(sa *cards.SA) *PutCounterParams {
 	p.EachFromSource = strings.TrimSpace(eachFrom)
 	p.ExistingCounter = strings.EqualFold(strings.TrimSpace(p.Kind), "ExistingCounter")
 	p.EachExistingCounter = isTrue(sa.ParamStr(cards.PKEachExistingCounter))
+	p.PutOnDefined = strings.TrimSpace(rawParamText(sa, "PutOnDefined").Text)
+	p.PutOnEachOther = strings.TrimSpace(rawParamText(sa, "PutOnEachOther").Text)
+	p.OnlyNewKind = isTrue(rawParamText(sa, "OnlyNewKind").Text)
 	perType, perTypeOK := sa.Param(cards.PKCounterTypePerDefined)
 	p.CounterTypePerDefined = isTrue(perType)
 	random, randomOK := sa.Param(cards.PKRandomType)

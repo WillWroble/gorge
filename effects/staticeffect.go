@@ -48,6 +48,7 @@ type staticGrant struct {
 	allCreatureTypes    bool
 	removeCreatureTypes bool
 	removeCardTypes     bool
+	removeLandTypes     bool // RemoveLandTypes$ (strip every land subtype, layer 4)
 	addColors           []string
 	setColors           []string // SetColor$ overwrites (layer 5)
 	addKeywords         []string
@@ -113,6 +114,7 @@ func parseStaticEffectGrant(params map[string]string, rememberedAsSelf bool) (st
 	g.allCreatureTypes = strings.EqualFold(strings.TrimSpace(params["AddAllCreatureTypes"]), "True")
 	g.removeCreatureTypes = strings.EqualFold(strings.TrimSpace(params["RemoveCreatureTypes"]), "True")
 	g.removeCardTypes = strings.EqualFold(strings.TrimSpace(params["RemoveCardTypes"]), "True")
+	g.removeLandTypes = strings.EqualFold(strings.TrimSpace(params["RemoveLandTypes"]), "True")
 	if raw, isAdd := params["AddColor"]; isAdd || params["AddColors"] != "" {
 		if !isAdd {
 			raw = params["AddColors"]
@@ -400,7 +402,7 @@ func registerStaticEffectGrant(h Host, c *Ctx, id state.ObjID, affects string, g
 			types = append(types, o.ChosenType)
 		}
 	}
-	if len(types) > 0 || g.removeCardTypes || g.removeCreatureTypes || g.allCreatureTypes {
+	if len(types) > 0 || g.removeCardTypes || g.removeLandTypes || g.removeCreatureTypes || g.allCreatureTypes {
 		add(state.ContinuousEffect{
 			Source: id, Affects: affects, Controller: c.Controller,
 			Layer:               state.LType,
@@ -408,6 +410,7 @@ func registerStaticEffectGrant(h Host, c *Ctx, id state.ObjID, affects string, g
 			AddAllCreatureTypes: g.allCreatureTypes,
 			RemoveCreatureTypes: g.removeCreatureTypes,
 			RemoveCardTypes:     g.removeCardTypes,
+			RemoveLandTypes:     g.removeLandTypes,
 			AffectedZone:        g.affectedZone,
 			Duration:            g.duration, Permanent: g.permanent, UntilEOT: g.untilEOT,
 			SVars: c.SVars,
@@ -514,4 +517,4 @@ func AffectedXStaticAmount(expr string) bool {
 	return expr == "AffectedX"
 }
 
-var effectStaticGrantReadableKeys = state.NewNameSet("Mode", "Affected", "AffectedZone", "Description", "AddTypes", "AddType", "AddAllCreatureTypes", "RemoveCreatureTypes", "RemoveCardTypes", "AddColor", "AddColors", "SetColor", "SetColors", "AddKeyword", "AddAbility", "AddAbilities", "RemoveAllAbilities", "SetPower", "SetToughness", "AddPower", "AddToughness")
+var effectStaticGrantReadableKeys = state.NewNameSet("Mode", "Affected", "AffectedZone", "Description", "AddTypes", "AddType", "AddAllCreatureTypes", "RemoveCreatureTypes", "RemoveCardTypes", "RemoveLandTypes", "AddColor", "AddColors", "SetColor", "SetColors", "AddKeyword", "AddAbility", "AddAbilities", "RemoveAllAbilities", "SetPower", "SetToughness", "AddPower", "AddToughness")
