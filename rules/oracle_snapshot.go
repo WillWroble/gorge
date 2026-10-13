@@ -200,6 +200,14 @@ type OracleDecision struct {
 	// Nil for every other ask, including a produced-Any one, so the
 	// generator's existing routing is untouched.
 	ManaColours []string `json:"mana_colours,omitempty"`
+	// CostPosed marks a triggered optional cost's decline-only ask (option
+	// kind "trigger_cost_decline" alone: gorge could not pay) whose cost XMage
+	// still asks about. XMage's DoIfCostPaid skips its chooseUse only when the
+	// cost's canPay is false, and a mana cost ("it's true all the time") or a
+	// discard-your-hand cost always passes, so its AI answers yes and pays
+	// what gorge declined. A decline-only ask over any other cost stays
+	// unmarked: XMage's canPay is false there too and it poses nothing.
+	CostPosed bool `json:"cost_posed,omitempty"`
 }
 
 const oracleLibraryTopN = 5
@@ -361,11 +369,17 @@ func stackTriggerSlot(src *state.Object, sa *cards.SA) string {
 // the characteristics of the door it was cast as, so the setup ref's whole
 // "Left // Right" name is replaced by the cast door's name, whichever door
 // that is (FaceIdx 0 included).
+//
+// An Adventure spell on the stack is the same case (CR 715.3b, 715.4): the
+// card was cast as its Adventure face and has only that face's
+// characteristics, so XMage names the stack object by the Adventure's own
+// name ("Stomp"), not the card's.
 func stackSourceRef(ref string, o *state.Object) string {
 	if o == nil || o.CopyFace != nil || o.Face() == nil {
 		return ref
 	}
-	onStackRoom := o.Zone == state.ZStack && o.Ability == nil && chars.IsRoomCard(o)
+	onStackRoom := o.Zone == state.ZStack && o.Ability == nil &&
+		(chars.IsRoomCard(o) || adventureSpellFace(o) == o.Face())
 	if !onStackRoom && (o.Zone != state.ZBattlefield || o.FaceIdx == 0) {
 		return ref
 	}

@@ -384,6 +384,17 @@ func searchPicks(sc Scenario, ds []rules.OracleDecision, look bool) (Scenario, b
 			// Experiment shape the measured declined pair answers, so it is
 			// excluded here.
 			pick = d.OptionRefs[0]
+		case look && declinedLookedOnePick(d) && lookedAck(ds, i):
+			// A declined one-card chooser after a hidden-zone look the served
+			// trigger chain proves (Whiskervale Forerunner's "You may reveal a
+			// creature card ... from among them"): XMage's ask is
+			// player.choose(cards, TargetCardInLibrary(filter)) -- a
+			// mandatory 1..1 makeChoose that rejects the skip token -- so
+			// gorge must take the lone eligible card too. The pick stays on
+			// XMage's choice queue (no RetargetForcedLookPicks: that is the
+			// two-option exile form), and the chooseUse that follows the
+			// pick is scripted from the rerun's own decisions.
+			pick = d.OptionRefs[0]
 		default:
 			continue
 		}
@@ -401,6 +412,14 @@ func searchPicks(sc Scenario, ds []rules.OracleDecision, look bool) (Scenario, b
 func declinedLookPick(d rules.OracleDecision) bool {
 	return d.Resume == "choice" && d.Options == 2 && d.Min == 0 && d.Max == 1 &&
 		len(d.OptionRefs) == 2 && d.First == ""
+}
+
+// declinedLookedOnePick is the declined shape of a one-card look chooser:
+// "choose a card" over exactly one looked-at eligible object, up to one,
+// nothing picked, no option label (the option is the object).
+func declinedLookedOnePick(d rules.OracleDecision) bool {
+	return d.Resume == "choice" && d.Options == 1 && d.Min == 0 && d.Max == 1 &&
+		len(d.OptionRefs) == 1 && d.First == ""
 }
 
 // lookedAck reports a look_ack by the same seat in decision i's step earlier
@@ -1438,6 +1457,14 @@ func forcedSingleOption(d rules.OracleDecision) bool {
 	if d.Kind == "target" || d.Kind == "order" || d.Kind == "mode" {
 		return false
 	}
+	if loneTriggerCostDecline(d) {
+		// A triggered optional cost gorge could not pay (a "may discard your
+		// hand" over an empty hand, a "may pay {2}" over an empty pool) is
+		// offered decline-only, but XMage's DoIfCostPaid still poses its
+		// chooseUse and its AI answers yes, paying the cost gorge declined
+		// (Byway Barterer, Esoteric Duplicator). The decline is a real ask.
+		return false
+	}
 	if hasTargetPick(d) {
 		return false
 	}
@@ -1860,6 +1887,13 @@ func modeNumbers(f *cards.Face) map[string]int {
 			out[effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)] = ModeChoiceQueue
 		}
 	}
+	// A plain GenericChoice XMage poses as a Choice dialog over the labels
+	// (choice_dialog.go): the choice queue, by label, like SetChosenMode.
+	for _, label := range choiceDialogLabels(f) {
+		if _, taken := out[label]; !taken {
+			out[label] = ModeChoiceQueue
+		}
+	}
 	for _, sa := range f.Abilities {
 		if sa.API == "Charm" {
 			addCharm(sa.Params["Choices"], sa.Params["ChoiceRestriction"])
@@ -1880,15 +1914,27 @@ func modeNumbers(f *cards.Face) map[string]int {
 // "Yes — discard" are ordinary makeChoose picks, not boolean answers. Older
 // snapshots without PickKinds use the same exact-label/ref rule.
 func yesNo(d rules.OracleDecision) (string, bool) {
-	if d.Options != 2 || len(d.Picks) != 1 || len(d.PickRefs) != 1 {
+	if (d.Options != 2 && !loneTriggerCostDecline(d)) || len(d.Picks) != 1 || len(d.PickRefs) != 1 {
 		return "", false
 	}
 	switch kind := pickKind(d, 0); kind {
+	case "trigger_cost_decline":
+		// The "do not pay" side of a triggered optional cost is XMage's
+		// DoIfCostPaid chooseUse answered no; its AI defaults to yes and
+		// would pay what gorge declined.
+		return "no", true
 	case "yes", "no":
 		// The engine's own boolean option ("Yes — shuffle", a may
 		// trigger): XMage's chooseUse.
 		return kind, true
-	case "altaddcost", "gift_decline", "gift_promise", "primary":
+	case "gift_promise":
+		// The promise side is chooseUse yes whichever option index the
+		// engine listed it at (Jolly Gerbils' Blooming Blast offers "Don't
+		// promise a gift" first, so the promise is option 1).
+		return "yes", true
+	case "gift_decline":
+		return "no", true
+	case "altaddcost", "primary":
 		// An optional additional cost, a gift promise and a two-way
 		// primary/secondary pick are chooseUse asks in XMage too
 		// (measured: Silence the Echo, Kitnap, Lost in Space agree only
@@ -1911,6 +1957,16 @@ func yesNo(d rules.OracleDecision) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// loneTriggerCostDecline is a triggered-cost ask offered with only its
+// decline option (rules/cumulative.go: the cost is unpayable for gorge),
+// answered with it, over a cost XMage's DoIfCostPaid asks about regardless
+// (rules.OracleDecision.CostPosed). A decline-only ask over any other cost is
+// not posed by XMage and stays forced away.
+func loneTriggerCostDecline(d rules.OracleDecision) bool {
+	return d.CostPosed && d.Kind == "choose_n" && d.Options == 1 && len(d.Picks) == 1 &&
+		len(d.PickKinds) == 1 && d.PickKinds[0] == "trigger_cost_decline"
 }
 
 // hasTargetPick reports whether any picked option reaches XMage's target

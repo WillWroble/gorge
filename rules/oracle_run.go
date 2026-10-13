@@ -893,6 +893,9 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 				od.ManaColours = manaAskColours(d)
 			}
 		}
+		if len(d.Options) == 1 && d.Options[0].Kind == "trigger_cost_decline" && r.e.triggerCost != nil {
+			od.CostPosed = xmageAlwaysAsksCost(r.e.triggerCost.announcedCost())
+		}
 		if len(d.Options) > 0 {
 			od.First = d.Options[0].Label
 			if d.Options[0].Kind == "altaddcost" {
