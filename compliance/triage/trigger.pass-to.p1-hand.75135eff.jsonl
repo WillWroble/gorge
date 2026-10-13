@@ -1,2 +1,0 @@
-{"shape":{"template":"trigger","op":"pass_to","field":"p1.hand","diff":"gorge+[Shock] xmage+[]"},"key":"trigger | pass_to | p1.hand | gorge+[Shock] xmage+[]","cards":1}
-{"card":"Unstable Glyphbridge","template":"trigger#1.0","status":"diverge","api":"ChangesZone:RepeatEach","sets":["LCI"],"detail":"step 0 (pass_to) p1.hand: gorge \"[Shock, Wastes]\", xmage \"[Wastes]\""}
