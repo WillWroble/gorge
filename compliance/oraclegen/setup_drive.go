@@ -48,6 +48,9 @@ func setupDriveAnswers(d rules.OracleDecision, modes map[string]int) []XAnswer {
 		// card in the graveyard: script the keep-on-top the runner took.
 		return []XAnswer{{d.Seat, "setup_choice", "[choice_skip]"}}
 	}
+	if v := triggerCostAnswer(d); v != "" {
+		return []XAnswer{{d.Seat, "setup_choice", v}}
+	}
 	return nil
 }
 

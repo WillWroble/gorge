@@ -51,6 +51,49 @@ func ShufflesThenDraws(f *cards.Face) bool {
 	return false
 }
 
+// ShufflesPermanentThenDraws reports a face with an effect chain that
+// shuffles a permanent from the battlefield into a library and then draws
+// (Gandalf, Wandering Wizard: "Gandalf's owner shuffles him into their
+// library and draws three cards"). The shuffled card is a battlefield
+// object, which UniformShuffledZones deliberately does not count, and XMage
+// may or may not draw it back, so the drawn hand is compared by size.
+func ShufflesPermanentThenDraws(f *cards.Face) bool {
+	if f == nil {
+		return false
+	}
+	chain := func(sa *cards.SA) bool {
+		shuffled := false
+		seen := map[*cards.SA]bool{}
+		for ; sa != nil && !seen[sa]; sa = sa.Sub {
+			seen[sa] = true
+			switch strings.ToLower(sa.API) {
+			case "changezone", "changezoneall":
+				if strings.Contains(sa.ParamStr(cards.PKOrigin), "Battlefield") &&
+					strings.EqualFold(sa.ParamStr(cards.PKDestination), "Library") &&
+					strings.EqualFold(sa.ParamStr(cards.PKShuffle), "True") {
+					shuffled = true
+				}
+			case "draw":
+				if shuffled {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for _, sa := range f.Abilities {
+		if chain(sa) {
+			return true
+		}
+	}
+	for i := range f.Triggers {
+		if chain(f.Triggers[i].Effect) {
+			return true
+		}
+	}
+	return false
+}
+
 // ShufflesThenReadsLibrary reports a face whose Oracle text shuffles a card
 // into a library and, in the same sentence, then reads or moves cards off its
 // top (Stay Hidden, Stay Silent: "shuffle enchanted creature into its owner's

@@ -520,7 +520,10 @@ func (e *Engine) paymentManaAskClass(player state.PlayerID, source state.ObjID, 
 	}
 	var sources []state.ObjID
 	for _, id := range e.G.Zone(state.ZBattlefield, player) {
-		if e.untappedManaSource(player, id) {
+		// A source that would add no mana cannot help pay
+		// (windowSourceYields): with no source left the window does not
+		// open and the payer goes straight to the pay/decline ask.
+		if e.untappedManaSource(player, id) && e.windowSourceYields(player, id) {
 			sources = append(sources, id)
 		}
 	}

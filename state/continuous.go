@@ -165,13 +165,14 @@ type ContinuousEffect struct {
 	// timestamp order). With it false AddColors extends.
 	OverwriteColors bool
 	// RemoveCreatureTypes is Forge's Animate RemoveCreatureTypes$ True: while
-	// this effect applies, the affected object loses every creature-type
-	// SUBTYPE (its face's types that are neither card types nor supertypes)
-	// BEFORE this same effect's AddTypes apply -- so an animated creature's
-	// own new creature type lands on a stripped base, and the printed types
-	// return the moment the animation expires because Derived recomputes from
-	// the face. A printed planeswalker's name-subtype ("Sarkhan") is stripped
-	// with the rest while the walker is animated as a creature.
+	// this effect applies, the affected object loses every CREATURE subtype
+	// (the CR 205.3m vocabulary) BEFORE this same effect's AddTypes apply --
+	// so an animated creature's own new creature type lands on a stripped
+	// base, and the printed types return the moment the animation expires
+	// because Derived recomputes from the face. Subtypes of the object's
+	// other card types (Equipment, a land type, a planeswalker's "Sarkhan")
+	// stay, since setting creature types replaces only creature types
+	// (CR 205.1a).
 	RemoveCreatureTypes bool
 	// RemoveSubTypes strips every subtype (creature, land and other kinds)
 	// before this effect's AddTypes are applied.

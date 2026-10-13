@@ -593,11 +593,12 @@ func applyTypeEffect(b Board, ce *state.ContinuousEffect, ty []string, allCreatu
 				if IsCardType(t) || IsSupertype(t) {
 					kept = append(kept, t)
 				}
-			} else if ce.SetCreatureTypes {
-				if !effects.CreatureTypeWords(t) {
-					kept = append(kept, t)
-				}
-			} else if !IsCreatureSubtype(t) {
+			} else if !effects.CreatureTypeWords(t) {
+				// SetCreatureTypes and RemoveCreatureTypes$ strip only the
+				// CREATURE subtypes: an artifact, land or planeswalker
+				// subtype stays while its card type does (CR 205.1a), so an
+				// animated Equipment (Iron Man Armor's "becomes a 0/0
+				// Construct Hero artifact creature") is still an Equipment.
 				kept = append(kept, t)
 			}
 		}
