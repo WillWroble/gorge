@@ -34,6 +34,13 @@ func comboManaColourPrefix(sa *cards.SA, cost string, step int, res rules.Oracle
 		return "", false
 	}
 	pool := res.Snapshots[step+1].Players[0].Pool
+	if pool == "" && strings.TrimSpace(sa.Params["Each"]) != "" {
+		// Each$ evaluated to 0 (no other creatures in the scenario): gorge
+		// adds nothing and asks no colour, and every per-colour XMage ability
+		// adds nothing too, so the first produced colour's selector is as
+		// good as any.
+		return "{T}: Add X {" + produced[1] + "}", true
+	}
 	if len(pool) == 0 || !allowed[string(pool[0])] {
 		return "", false
 	}
