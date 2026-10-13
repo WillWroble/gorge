@@ -779,6 +779,9 @@ const (
 	// Mode$ AttackerBlocked's "blocked by two or more creatures" comparator
 	// (Seifer, Balamb Rival; append-only).
 	PKValidBlockerAmount
+	// ChangeZone's ExiledWithEffectSource$ rider: the exile is tagged as
+	// exiled-with the Effect's source (Forger's Foundry; append-only).
+	PKExiledWithEffectSource
 	paramKeyCount
 )
 
@@ -1154,6 +1157,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKImprintFound:                     "ImprintFound",
 	PKImprintChosen:                    "ImprintChosen",
 	PKValidBlockerAmount:               "ValidBlockerAmount",
+	PKExiledWithEffectSource:           "ExiledWithEffectSource",
 	PKInvalidTypes:                     "InvalidTypes",
 	PKKeywords:                         "Keywords",
 	PKLeftRightPile:                    "LeftRightPile",

@@ -658,7 +658,7 @@ func effectDelayedFrame(dt *state.DelayedTrigger) effects.EffectFrame {
 	if dt == nil || !dt.EffectRepeat {
 		return effects.EffectFrame{}
 	}
-	return effects.EffectFrame{Source: dt.Source}
+	return effects.EffectFrame{Source: dt.Source, Carrier: true}
 }
 
 // delayedEventModeHandled names the modes delayedEventMatches evaluates with
