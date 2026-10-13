@@ -209,7 +209,9 @@ types. A test pins its ordering on a handful of named FDN cards.
   seat's rating-weighted picks so far. Colourless cards get 0.5 of the
   maximum.
 - `k` ramps linearly from 0 at pack 1 pick 1 to its full value by pack 1
-  pick 10, then holds.
+  pick 10, then holds. The full value is `ColourFitMax`; the default is 8
+  (E4-2: any k from 6 to 12 measured the same, and 8 commits the drafter to
+  its colours — at the old 4 the pools spread across all five).
 - Ties are broken with the seeded rng.
 - The constants live in one struct, tuned with draftsim (§4.8).
 

@@ -8,7 +8,6 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/event"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/limited/pickbot"
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
 
@@ -199,11 +198,15 @@ func newTestRunner(dir, players string) (*runner, error) {
 	}
 	list := strings.Split(players, ",")
 	lookup := func(name string) *cards.Card { c, _ := reg.Lookup(name); return c }
+	drafter, builder, err := personaPair("rating-colour", "best23", lookup)
+	if err != nil {
+		return nil, err
+	}
 	return &runner{
 		reg:     reg,
 		spec:    spec,
-		drafter: &pickbot.RatingColour{Lookup: lookup},
-		builder: &pickbot.Best23{Lookup: lookup},
+		drafter: drafter,
+		builder: builder,
 		players: list,
 		out:     &strings.Builder{},
 	}, nil

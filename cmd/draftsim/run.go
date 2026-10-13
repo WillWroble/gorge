@@ -25,6 +25,11 @@ type runner struct {
 	builder pickbot.Builder
 	players []string
 	verbose bool
+	// noGames stops an event after the build phase (the draft-only mode
+	// the pool-shape tests use): the series stay pending, no EventEnded is
+	// applied and runOneEvent returns the built event and decks. run()
+	// never sets it.
+	noGames bool
 	out     io.Writer
 }
 
@@ -97,11 +102,13 @@ func run(o options, out io.Writer) (*result, error) {
 	r := &runner{
 		reg:     reg,
 		spec:    spec,
-		drafter: &pickbot.RatingColour{Lookup: lookup},
-		builder: &pickbot.Best23{Lookup: lookup},
 		players: players,
 		verbose: o.verbose,
 		out:     out,
+	}
+	r.drafter, r.builder, err = personaPair(o.drafter, o.builder, lookup)
+	if err != nil {
+		return nil, err
 	}
 
 	var csvOut *os.File
@@ -188,6 +195,24 @@ func personaNamesOK(drafter, builder string) error {
 		return fmt.Errorf("unknown -builder %q (known: %s)", builder, pickbot.Names())
 	}
 	return nil
+}
+
+// personaPair builds the drafter and builder the -drafter and -builder
+// flags name: fresh instances from the pickbot registry with the corpus
+// lookup injected, so the flags choose the persona instead of the tool
+// hard-coding the v1 types. personaNamesOK has already validated the names
+// before the corpus opens; the errors here keep the function total for
+// direct callers.
+func personaPair(drafter, builder string, lookup pickbot.CardLookup) (pickbot.Drafter, pickbot.Builder, error) {
+	d, _, ok := pickbot.New(drafter, lookup)
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown -drafter %q (known: %s)", drafter, pickbot.Names())
+	}
+	_, b, ok := pickbot.New(builder, lookup)
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown -builder %q (known: %s)", builder, pickbot.Names())
+	}
+	return d, b, nil
 }
 
 // sheetNames is the set's sheet-card universe, sorted: the pack_card_ and
