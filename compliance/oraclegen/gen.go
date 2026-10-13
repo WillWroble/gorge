@@ -1080,7 +1080,7 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			any = true
 			continue
 		}
-		if forcedSingleOption(d) && !forcedChoicePosed(ds, i) {
+		if forcedSingleOption(d) && !forcedChoicePosed(ds, i) && !announcesSacrificeX(ds, i) {
 			// A forced one-option ask: XMage does not pose it. A forced
 			// target-kind pick is the exception -- one legal opponent is still
 			// a chooseTarget XMage asks for -- and so is a mode ask, which
@@ -1483,14 +1483,44 @@ func forcedSingleOption(d rules.OracleDecision) bool {
 // XMage's unscripted announce does not pay the repeated X when the pool leaves
 // one legal value (Gogo's unspent CC), so it is scripted. A forced announce of
 // a single-X cost stays unscripted: XMage's default agrees there and the
-// committed rows (Rottenmouth Viper, Saheeli's Lattice, The Enigma Jewel)
-// would re-hash for nothing.
+// committed rows (Saheeli's Lattice, The Enigma Jewel) would re-hash for
+// nothing. A forced announce that sizes a sacrifice cost is the exception
+// (announcesSacrificeX).
 func announcesX(d rules.OracleDecision) bool {
 	if !d.XMulti || len(d.Picks) != 1 || pickKind(d, 0) != "x" {
 		return false
 	}
 	n, err := strconv.Atoi(strings.TrimPrefix(d.Picks[0], "X = "))
 	return err == nil && n > 0 && strings.HasPrefix(d.Picks[0], "X = ")
+}
+
+// announcesSacrificeX reports a forced positive "X = <n>" announcement that
+// sizes a Sac<X/...> additional cost: the same seat's next decision in the
+// step picks exactly n objects to sacrifice (Rottenmouth Viper's "sacrifice
+// any number of nonland permanents", X = the count). Gorge offers only the X
+// the pool can then afford, but XMage's announce ranges over every
+// sacrificeable count and its AI picks its own (measured: X = 0, the cost
+// paid with Sol Ring's mana and nothing sacrificed), leaving the scripted
+// sacrifice unused. Such an announce is scripted.
+func announcesSacrificeX(ds []rules.OracleDecision, i int) bool {
+	d := ds[i]
+	if len(d.Picks) != 1 || pickKind(d, 0) != "x" || !strings.HasPrefix(d.Picks[0], "X = ") {
+		return false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(d.Picks[0], "X = "))
+	if err != nil || n <= 0 || i+1 >= len(ds) {
+		return false
+	}
+	next := ds[i+1]
+	if next.Step != d.Step || next.Seat != d.Seat || len(next.Picks) != n {
+		return false
+	}
+	for k := range next.Picks {
+		if pickKind(next, k) != "sacrifice" {
+			return false
+		}
+	}
+	return true
 }
 
 // forcedChoicePosed reports whether a forced one-option choose_n ask is still
@@ -1801,6 +1831,26 @@ func allocationColour(d rules.OracleDecision, k int) (byte, bool) {
 	return 0, false
 }
 
+// tokenChoiceNames returns a GenericChoice's Choices$ names when there are at
+// least two and every one names a DB$ Token body on the face, else nil.
+func tokenChoiceNames(f *cards.Face, choices string) []string {
+	var names []string
+	for _, name := range strings.Split(choices, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if svarParams(f.SVars[name])["DB"] != "Token" {
+			return nil
+		}
+		names = append(names, name)
+	}
+	if len(names) < 2 {
+		return nil
+	}
+	return names
+}
+
 // yesNo recognises a bare two-way boolean choice. The engine's option kind
 // and exact label/ref identity must both agree; composed choices such as
 
@@ -1870,6 +1920,45 @@ func modeNumbers(f *cards.Face) map[string]int {
 				sentinel = ModeYesQueue
 			}
 			out[effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)] = sentinel
+		}
+	}
+	// "Create your choice of a <token> or a <token>" (a DB$ GenericChoice
+	// whose every Choices$ entry is a DB$ Token body, no SetChosenMode$ and
+	// no AILogic$ Timetwister): XMage writes the card's own OneShotEffect,
+	// never a modal ability. Measured over the 20 Standard sets' four
+	// carriers: the two-token form is player.chooseUse with the first token
+	// as the yes label (Tireless Provisioner, Ant-Man's Army: "Food" /
+	// "Treasure"), the three-token form a ChoiceImpl over the token names
+	// (Transmutation Font's Blood/Clue/Food, The Third Doctor's
+	// Clue/Food/Treasure), whose labels are the bodies' SpellDescription$.
+	// The choice is an activated ability's own body (Transmutation Font's
+	// AB$ GenericChoice) or a trigger's DB$ SVar body (Tireless Provisioner).
+	var tokenChoices []map[string]string
+	for _, sa := range f.Abilities {
+		if sa.API == "GenericChoice" {
+			tokenChoices = append(tokenChoices, sa.Params)
+		}
+	}
+	for _, body := range f.SVars {
+		if p := svarParams(body); p["DB"] == "GenericChoice" {
+			tokenChoices = append(tokenChoices, p)
+		}
+	}
+	for _, p := range tokenChoices {
+		if p["SetChosenMode"] != "" || strings.EqualFold(p["AILogic"], "Timetwister") {
+			continue
+		}
+		names := tokenChoiceNames(f, p["Choices"])
+		for i, name := range names {
+			label := effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)
+			switch {
+			case len(names) > 2:
+				out[label] = ModeChoiceQueue
+			case i == 0:
+				out[label] = ModeYesQueue
+			default:
+				out[label] = ModeNoQueue
+			}
 		}
 	}
 	// The SetChosenMode labels first, so a real Charm mode of the same
