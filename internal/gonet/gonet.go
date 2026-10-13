@@ -1,15 +1,13 @@
-package main
+package gonet
 
 import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"hash/maphash"
 	"math"
 	"os"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/adams-shaun/gorge/internal/policynet"
 )
@@ -34,34 +32,58 @@ import (
 // loops; scratch buffers come from a sync.Pool, so the hot path allocates only the
 // returned score slice.
 
-// gonet knobs (play's -gonet-* flags).
+// Cache knobs, read when a network is loaded (dzgorge play's -gonet-* flags).
 var (
-	gonetCache     = 1 << 20 // cached evaluations (values and score lists); 0 = none
-	gonetCardCache = 1 << 14 // cached card vectors (and their projections); 0 = none
+	CacheSize     = 1 << 20 // cached evaluations (values and score lists); 0 = none
+	CardCacheSize = 1 << 14 // cached card vectors (and their projections); 0 = none
 )
+
+// Clock, when set, supplies nanoseconds for the per-evaluation timing counter
+// (Stats' gonet_us_per_eval). Nil, the hosted default, times nothing: this
+// package may not read the wall clock (internal/archtest), so the command that
+// wants the number injects it.
+var Clock func() int64
+
+// hashBytes is the cache-key hash: deterministic 8-byte-word multiply-xorshift.
+// The cache is transparent (a hit returns what a miss would compute), so the
+// hash only has to spread keys; it must not be randomly seeded per process
+// (the engine's no-ambient-randomness rule), which hash/maphash is.
+func hashBytes(b []byte) uint64 {
+	h := uint64(0x9E3779B97F4A7C15)
+	for len(b) >= 8 {
+		h = (h ^ binary.LittleEndian.Uint64(b)) * 0xBF58476D1CE4E5B9
+		h ^= h >> 31
+		b = b[8:]
+	}
+	for _, c := range b {
+		h = (h ^ uint64(c)) * 0x94D049BB133111EB
+		h ^= h >> 29
+	}
+	return h
+}
 
 var (
 	gonetsMu sync.Mutex
-	gonets   = map[string]*goNet{}
+	gonets   = map[string]*Net{}
 )
 
-// gonetModel is the shared network at path wrapped as a policynet.Model encoding under
+// Model is the shared network at path wrapped as a policynet.Model encoding under
 // the entity feature set.
-func gonetModel(path string) (*policynet.Model, error) {
-	g, err := sharedGoNet(path)
+func Model(path string) (*policynet.Model, error) {
+	g, err := Shared(path)
 	if err != nil {
 		return nil, err
 	}
 	return policynet.NewExternal(g, policynet.FeaturesEntity), nil
 }
 
-func sharedGoNet(path string) (*goNet, error) {
+func Shared(path string) (*Net, error) {
 	gonetsMu.Lock()
 	defer gonetsMu.Unlock()
 	g, ok := gonets[path]
 	if !ok {
 		var err error
-		if g, err = loadGoNet(path); err != nil {
+		if g, err = Load(path); err != nil {
 			return nil, err
 		}
 		gonets[path] = g
@@ -69,8 +91,8 @@ func sharedGoNet(path string) (*goNet, error) {
 	return g, nil
 }
 
-// gonetStats sums every network's counters (for the run summary).
-func gonetStats() map[string]any {
+// Stats sums every network's counters (for the run summary).
+func Stats() map[string]any {
 	gonetsMu.Lock()
 	defer gonetsMu.Unlock()
 	if len(gonets) == 0 {
@@ -121,7 +143,7 @@ type gnBlock struct {
 	fc1, fc2 gnLinear
 }
 
-type goNet struct {
+type Net struct {
 	path                string
 	d, ff, dEmb, cd, hh int
 	table               []float32 // TableRows×dEmb
@@ -143,11 +165,10 @@ type goNet struct {
 
 	htab  []float32 // TableRows×d: hproj(table[r])
 	pool  sync.Pool // *gnScratch
-	cache *evalCache
+	cache *EvalCache
 	cards *cardCache // card entries [c ‖ W_sum(group)·c]
 	pas   *cardCache // ea_proj(c)
 	pbs   *cardCache // eb_proj(c)
-	seed  maphash.Seed
 
 	calls, hits, evals, cardHits, cardMiss, ns atomic.Int64
 	scoreCalls, scoreHits, scoreSeen           atomic.Int64 // scoreSeen: a Score miss whose state's value was cached
@@ -177,7 +198,7 @@ type gnHeader struct {
 	} `json:"tensors"`
 }
 
-func loadGoNet(path string) (*goNet, error) {
+func Load(path string) (*Net, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -186,7 +207,8 @@ func loadGoNet(path string) (*goNet, error) {
 		return nil, fmt.Errorf("gonet %s: not a .dzgw file (python -m dzg.export)", path)
 	}
 	hl := int64(binary.LittleEndian.Uint64(raw[8:16]))
-	if hl <= 0 || 16+hl > int64(len(raw)) {
+	// Compared as len-16 so a header length near MaxInt64 cannot wrap the sum.
+	if hl <= 0 || hl > int64(len(raw))-16 {
 		return nil, fmt.Errorf("gonet %s: bad header length %d", path, hl)
 	}
 	var h gnHeader
@@ -212,9 +234,17 @@ func loadGoNet(path string) (*goNet, error) {
 	for _, t := range h.Tensors {
 		n := int64(1)
 		for _, d := range t.Shape {
+			if d < 0 || d > 1<<30 {
+				return nil, fmt.Errorf("gonet %s: tensor %s: bad shape %v", path, t.Name, t.Shape)
+			}
 			n *= int64(d)
+			if n > 1<<31 {
+				return nil, fmt.Errorf("gonet %s: tensor %s: shape %v is too large", path, t.Name, t.Shape)
+			}
 		}
-		if t.NBytes != 4*n || start+t.Offset+t.NBytes > int64(len(raw)) || t.Offset < 0 {
+		// Extents are compared against the room left after start, never summed,
+		// so a hostile Offset or NBytes cannot wrap past the file's end.
+		if t.Offset < 0 || t.NBytes != 4*n || t.Offset > int64(len(raw))-start-t.NBytes {
 			return nil, fmt.Errorf("gonet %s: tensor %s: bad extent", path, t.Name)
 		}
 		b := raw[start+t.Offset : start+t.Offset+t.NBytes]
@@ -225,8 +255,7 @@ func loadGoNet(path string) (*goNet, error) {
 		tensors[t.Name], shapes[t.Name] = f, t.Shape
 	}
 	cfg := func(k string) int { return int(h.Config[k]) }
-	g := &goNet{path: path, d: cfg("d"), ff: cfg("ff"), dEmb: cfg("d_emb"), cd: cfg("card_d"), hh: cfg("head_hidden"),
-		seed: maphash.MakeSeed()}
+	g := &Net{path: path, d: cfg("d"), ff: cfg("ff"), dEmb: cfg("d_emb"), cd: cfg("card_d"), hh: cfg("head_hidden")}
 	var errs []error
 	get := func(name string, shape ...int) []float32 {
 		t, ok := tensors[name]
@@ -313,13 +342,13 @@ func loadGoNet(path string) (*goNet, error) {
 	g.noneA, g.noneB = make([]float32, d), make([]float32, d)
 	g.eaProj.apply(g.noneA, noneA)
 	g.ebProj.apply(g.noneB, noneB)
-	if gonetCache > 0 {
-		g.cache = newEvalCache(gonetCache)
+	if CacheSize > 0 {
+		g.cache = NewEvalCache(CacheSize)
 	}
-	if gonetCardCache > 0 {
-		g.cards = newCardCache(gonetCardCache, cd+d)
-		g.pas = newCardCache(gonetCardCache, d)
-		g.pbs = newCardCache(gonetCardCache, d)
+	if CardCacheSize > 0 {
+		g.cards = newCardCache(CardCacheSize, cd+d)
+		g.pas = newCardCache(CardCacheSize, d)
+		g.pbs = newCardCache(CardCacheSize, d)
 	}
 	// hproj(table[r]) for every row: an option's hashed rows become row gathers
 	g.htab = make([]float32, gnRows*d)
@@ -331,7 +360,7 @@ func loadGoNet(path string) (*goNet, error) {
 // ---- policynet.External ------------------------------------------------------
 
 // Score is the option logits for st's options.
-func (g *goNet) Score(st policynet.State, opts []policynet.Option) []float32 {
+func (g *Net) Score(st policynet.State, opts []policynet.Option) []float32 {
 	g.calls.Add(1)
 	g.scoreCalls.Add(1)
 	sc := g.pool.Get().(*gnScratch)
@@ -340,41 +369,60 @@ func (g *goNet) Score(st policynet.State, opts []policynet.Option) []float32 {
 	if g.cache != nil {
 		sh = g.hashState(sc, &st)
 		key = g.hashOpts(sc, sh, opts)
-		if s, ok := g.cache.scores(key); ok {
+		if s, ok := g.cache.Scores(key); ok {
 			g.hits.Add(1)
 			g.scoreHits.Add(1)
 			return s
 		}
-		if _, ok := g.cache.value(sh); ok {
+		if _, ok := g.cache.Value(sh); ok {
 			g.scoreSeen.Add(1)
 		}
 	}
 	out := make([]float32, len(opts))
-	v := sigmoid32(g.eval(sc, &st, opts, out))
+	v := Sigmoid32(g.eval(sc, &st, opts, out))
 	if g.cache != nil {
-		g.cache.put(sh, key, v, out)
+		g.cache.Put(sh, key, v, out)
 	}
 	return out
 }
 
 // Value is the searching seat's win probability at st.
-func (g *goNet) Value(st policynet.State) float32 {
+func (g *Net) Value(st policynet.State) float32 {
 	g.calls.Add(1)
 	sc := g.pool.Get().(*gnScratch)
 	defer g.pool.Put(sc)
 	var sh uint64
 	if g.cache != nil {
 		sh = g.hashState(sc, &st)
-		if v, ok := g.cache.value(sh); ok {
+		if v, ok := g.cache.Value(sh); ok {
 			g.hits.Add(1)
 			return v
 		}
 	}
-	v := sigmoid32(g.eval(sc, &st, nil, nil))
+	v := Sigmoid32(g.eval(sc, &st, nil, nil))
 	if g.cache != nil {
-		g.cache.put(sh, 0, v, nil)
+		g.cache.Put(sh, 0, v, nil)
 	}
 	return v
+}
+
+// Eval runs the network once on st with no result cache and writes the option
+// logits into scores (len(opts)); it returns the value logit. Score and Value
+// are cached wrappers over the same forward pass; Eval exists for benchmarks.
+func (g *Net) Eval(st *policynet.State, opts []policynet.Option, scores []float32) float32 {
+	sc := g.pool.Get().(*gnScratch)
+	defer g.pool.Put(sc)
+	return g.eval(sc, st, opts, scores)
+}
+
+// SetCardCaches turns the card-vector caches off (false) or back on with the
+// default capacity (true); a benchmark compares a cold and a warm network.
+func (g *Net) SetCardCaches(on bool) {
+	if !on {
+		g.cards, g.pas, g.pbs = nil, nil, nil
+		return
+	}
+	g.cards, g.pas, g.pbs = newCardCache(1<<14, g.cd+g.d), newCardCache(1<<14, g.d), newCardCache(1<<14, g.d)
 }
 
 // ---- the forward pass --------------------------------------------------------
@@ -411,12 +459,15 @@ func growB(s []bool, n int) []bool {
 	return s
 }
 
-func sigmoid32(x float32) float32 { return float32(1 / (1 + math.Exp(-float64(x)))) }
+func Sigmoid32(x float32) float32 { return float32(1 / (1 + math.Exp(-float64(x)))) }
 
 // eval runs the network on st, writes the option logits into scores (len(opts)) and
 // returns the value logit.
-func (g *goNet) eval(sc *gnScratch, st *policynet.State, opts []policynet.Option, scores []float32) float32 {
-	t0 := time.Now()
+func (g *Net) eval(sc *gnScratch, st *policynet.State, opts []policynet.Option, scores []float32) float32 {
+	var t0 int64
+	if Clock != nil {
+		t0 = Clock()
+	}
 	g.evals.Add(1)
 	g.evalOpts.Add(int64(len(opts)))
 	g.evalCards.Add(int64(len(st.Cards)))
@@ -489,12 +540,14 @@ func (g *goNet) eval(sc *gnScratch, st *policynet.State, opts []policynet.Option
 	if len(opts) > 0 {
 		g.options(sc, st, s, opts, scores)
 	}
-	g.ns.Add(int64(time.Since(t0)))
+	if Clock != nil {
+		g.ns.Add(Clock() - t0)
+	}
 	return v
 }
 
 // mlp runs a head (Linear, ReLU, ..., Linear to 1) on x and returns the scalar.
-func (g *goNet) mlp(sc *gnScratch, layers []gnLinear, x []float32) float32 {
+func (g *Net) mlp(sc *gnScratch, layers []gnLinear, x []float32) float32 {
 	sc.vh = grow(sc.vh, g.hh)
 	sc.vh2 = grow(sc.vh2, g.hh)
 	a, b := sc.vh, sc.vh2
@@ -513,7 +566,7 @@ func (g *goNet) mlp(sc *gnScratch, layers []gnLinear, x []float32) float32 {
 }
 
 // options writes the logit of each option.
-func (g *goNet) options(sc *gnScratch, st *policynet.State, s []float32, opts []policynet.Option, scores []float32) {
+func (g *Net) options(sc *gnScratch, st *policynet.State, s []float32, opts []policynet.Option, scores []float32) {
 	d, hh := g.d, g.hh
 	nc, no := len(st.Cards), len(opts)
 	sc.hs = grow(sc.hs, g.pol0s.out)
@@ -595,7 +648,7 @@ func (g *goNet) options(sc *gnScratch, st *policynet.State, s []float32, opts []
 }
 
 // cardProj writes l(c_k) into p, from cache when it has it (keyed by the card).
-func (g *goNet) cardProj(sc *gnScratch, l *gnLinear, cache *cardCache, k int, p []float32) {
+func (g *Net) cardProj(sc *gnScratch, l *gnLinear, cache *cardCache, k int, p []float32) {
 	if cache != nil && cache.get(sc.keys[k], p) {
 		return
 	}
@@ -608,7 +661,7 @@ func (g *goNet) cardProj(sc *gnScratch, l *gnLinear, cache *cardCache, k int, p 
 
 // cardVectors fills sc.ent with each card's entry [c ‖ W_sum(group)·c], from the card
 // cache when it has it.
-func (g *goNet) cardVectors(sc *gnScratch, cards []policynet.EntityCard) {
+func (g *Net) cardVectors(sc *gnScratch, cards []policynet.EntityCard) {
 	cd, e, d := g.cd, g.dEmb, g.d
 	cw := cd + d
 	nc := len(cards)
@@ -679,7 +732,7 @@ func (g *goNet) cardVectors(sc *gnScratch, cards []policynet.EntityCard) {
 }
 
 // bag is Σ table[row]·value over fs (rows outside the table are skipped).
-func (g *goNet) bag(dst []float32, fs []policynet.Feature) {
+func (g *Net) bag(dst []float32, fs []policynet.Feature) {
 	clear(dst)
 	e := g.dEmb
 	for _, f := range fs {
@@ -877,7 +930,7 @@ func appendFeats(b []byte, fs []policynet.Feature) []byte {
 }
 
 // hashState hashes every encoded field the network reads (as remote.go's).
-func (g *goNet) hashState(sc *gnScratch, st *policynet.State) uint64 {
+func (g *Net) hashState(sc *gnScratch, st *policynet.State) uint64 {
 	b := sc.buf[:0]
 	b = binary.LittleEndian.AppendUint32(b, uint32(len(st.Dense)))
 	b = appendF32s(b, st.Dense)
@@ -891,10 +944,10 @@ func (g *goNet) hashState(sc *gnScratch, st *policynet.State) uint64 {
 		b = appendFeats(b, c.Rows)
 	}
 	sc.buf = b
-	return maphash.Bytes(g.seed, b)
+	return hashBytes(b)
 }
 
-func (g *goNet) hashOpts(sc *gnScratch, sh uint64, opts []policynet.Option) uint64 {
+func (g *Net) hashOpts(sc *gnScratch, sh uint64, opts []policynet.Option) uint64 {
 	b := binary.LittleEndian.AppendUint64(sc.buf[:0], sh)
 	b = binary.LittleEndian.AppendUint32(b, uint32(len(opts)))
 	for i := range opts {
@@ -912,17 +965,17 @@ func (g *goNet) hashOpts(sc *gnScratch, sh uint64, opts []policynet.Option) uint
 		b = binary.LittleEndian.AppendUint32(b, uint32(o.EntB))
 	}
 	sc.buf = b
-	return maphash.Bytes(g.seed, b) | 1 // never 0: 0 is evalCache.put's "no scores"
+	return hashBytes(b) | 1 // never 0: 0 is evalCache.put's "no scores"
 }
 
 // hashCard hashes what a card's entry reads: raw, the identity rows and the group.
-func (g *goNet) hashCard(sc *gnScratch, c *policynet.EntityCard) uint64 {
+func (g *Net) hashCard(sc *gnScratch, c *policynet.EntityCard) uint64 {
 	b := append(sc.buf[:0], c.Group)
 	b = binary.LittleEndian.AppendUint32(b, uint32(len(c.Raw)))
 	b = appendF32s(b, c.Raw)
 	b = appendFeats(b, c.Rows)
 	sc.buf = b
-	return maphash.Bytes(g.seed, b)
+	return hashBytes(b)
 }
 
 // cardCache maps a card's hash to w floats (in one slab per shard). A full shard
@@ -970,11 +1023,4 @@ func (c *cardCache) put(k uint64, v []float32) {
 		s.slab = append(s.slab, v[:c.w]...)
 	}
 	s.mu.Unlock()
-}
-
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

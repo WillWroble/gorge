@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
 )
 
@@ -26,9 +27,9 @@ func runGonetCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, "gonet-check: -net and -parity are required")
 		return 2
 	}
-	gonetCache, gonetCardCache = 0, 0 // parity runs every forward from scratch
+	gonet.CacheSize, gonet.CardCacheSize = 0, 0 // parity runs every forward from scratch
 	t0 := time.Now()
-	g, err := loadGoNet(*netPath)
+	g, err := gonet.Load(*netPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -39,16 +40,15 @@ func runGonetCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	sc := new(gnScratch)
 	var maxScore, maxLogit, maxValue float64
 	var worstScore, worstValue, nopt int
 	for i, r := range recs {
 		scores := make([]float32, len(r.opts))
-		logit := g.eval(sc, &r.st, r.opts, scores)
+		logit := g.Eval(&r.st, r.opts, scores)
 		if d := math.Abs(float64(logit) - r.valueLogit); d > maxLogit {
 			maxLogit = d
 		}
-		if d := math.Abs(float64(sigmoid32(logit)) - r.value); d > maxValue {
+		if d := math.Abs(float64(gonet.Sigmoid32(logit)) - r.value); d > maxValue {
 			maxValue, worstValue = d, i
 		}
 		for j := range scores {
@@ -58,8 +58,8 @@ func runGonetCheck(args []string) int {
 		}
 		nopt += len(scores)
 		// the public path (cache off here) answers the same
-		if v := g.Value(r.st); v != sigmoid32(logit) {
-			fmt.Fprintf(os.Stderr, "gonet-check: record %d: Value %v != eval %v\n", i, v, sigmoid32(logit))
+		if v := g.Value(r.st); v != gonet.Sigmoid32(logit) {
+			fmt.Fprintf(os.Stderr, "gonet-check: record %d: Value %v != eval %v\n", i, v, gonet.Sigmoid32(logit))
 			return 1
 		}
 	}
@@ -84,27 +84,26 @@ func runGonetCheck(args []string) int {
 // gonetBench times n evaluations cycling over recs on one goroutine: Score (the trunk,
 // the value head and every option) and Value (the trunk and the value head), first
 // with no card cache, then with a warm one (a search's states share most cards).
-func gonetBench(g *goNet, recs []parityRec, n int) map[string]any {
-	sc := new(gnScratch)
+func gonetBench(g *gonet.Net, recs []parityRec, n int) map[string]any {
 	scores := make([]float32, 64)
 	run := func(withOpts bool) float64 {
 		t0 := time.Now()
 		for i := 0; i < n; i++ {
 			r := &recs[i%len(recs)]
 			if withOpts {
-				g.eval(sc, &r.st, r.opts, scores[:len(r.opts)])
+				g.Eval(&r.st, r.opts, scores[:len(r.opts)])
 			} else {
-				g.eval(sc, &r.st, nil, nil)
+				g.Eval(&r.st, nil, nil)
 			}
 		}
 		return float64(time.Since(t0).Microseconds()) / float64(n)
 	}
 	out := map[string]any{"bench_evals": n}
 	run(true) // warm up
-	g.cards, g.pas, g.pbs = nil, nil, nil
+	g.SetCardCaches(false)
 	out["us_per_score_cold_cards"] = run(true)
 	out["us_per_value_cold_cards"] = run(false)
-	g.cards, g.pas, g.pbs = newCardCache(1<<14, g.cd+g.d), newCardCache(1<<14, g.d), newCardCache(1<<14, g.d)
+	g.SetCardCaches(true)
 	run(true)
 	out["us_per_score_warm_cards"] = run(true)
 	out["us_per_value_warm_cards"] = run(false)

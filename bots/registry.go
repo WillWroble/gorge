@@ -40,6 +40,12 @@ type Info struct {
 	Formats                  []string
 	MaxSeats                 int
 	Caretaker                string
+	// NeedsAutoPay marks a policy that plays through the engine's automatic
+	// mana payment plans and has no manual-tap mode (its factory refuses
+	// Options.AutoPayMana == false). The host refuses a table that names it
+	// without payment plans when the table is registered, rather than letting
+	// the factory's refusal crash the match at its first seat.
+	NeedsAutoPay bool
 }
 
 type Options struct {

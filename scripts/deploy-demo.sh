@@ -96,6 +96,12 @@ DEMO_GOMEMLIMIT=${DEMO_GOMEMLIMIT:-8GiB}
 # it. Set PPROF=true for one deploy to profile it, then redeploy without.
 PPROF=${PPROF:-false}
 
+# AZ_C3_NET / AZ_C3_DECKS (both or neither) serve the az-c3 bot: its .dzgw network
+# and the directory of the FDN decks it was trained on (docs/superpowers/reports/
+# 2026-10-09-az-c3-hosted.md). Set, the demo gains an az-c3 vs az-c3 table and the
+# play-vs-bot deck list gains the FDN decks, whose opponent is az-c3.
+AZ_C3_NET=${AZ_C3_NET-}
+AZ_C3_DECKS=${AZ_C3_DECKS-}
 PUB_PORT=${PUB_PORT:-8080}
 # OMNI_PORT empty (the default) runs no second server.
 OMNI_PORT=${OMNI_PORT-}
@@ -174,6 +180,12 @@ ART_FILL_CEILING=${ART_FILL_CEILING:-230s}
 # With no timeout at all, gorged's own -prewarm-art-budget is the only bound.
 TIMEOUT=$(command -v gnutimeout || command -v timeout || true)
 
+AZ_ARGS=()
+if [ -n "$AZ_C3_NET$AZ_C3_DECKS" ]; then
+	[ -n "$AZ_C3_NET" ] && [ -n "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET and AZ_C3_DECKS go together" >&2; exit 1; }
+	[ -r "$AZ_C3_NET" ] && [ -d "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET is not a file or AZ_C3_DECKS is not a directory" >&2; exit 1; }
+	AZ_ARGS=(-az-c3-net "$AZ_C3_NET" -az-c3-decks "$AZ_C3_DECKS")
+fi
 say() { printf 'deploy-demo: %s\n' "$*"; }
 
 # SWEEP=ports (default) stops only the gorged serving the two demo ports —
@@ -336,9 +348,16 @@ if [ "$art_rc" -ne 0 ]; then
 	say "!!! art fill INCOMPLETE (exit $art_rc; 124/137 = the $ART_FILL_CEILING hard ceiling under GNU timeout; 125 = uutils timeout gave up after TERM and cannot force-kill a wedged fill) — see the summary above; starting the servers anyway, their background prewarm finishes the cache"
 fi
 
+if [ -n "$AZ_C3_DECKS" ]; then
+	say "filling card-art cache for the az-c3 decks in $AZ_C3_DECKS"
+	${TIMEOUT:+"$TIMEOUT" -k 5s "$ART_FILL_CEILING"} "$BIN" -prewarm-art-only \
+		-prewarm-art-budget "$ART_FILL_BUDGET" \
+		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
+		-decks "$AZ_C3_DECKS" -art-dir "$ART_DIR" || say "!!! az-c3 art fill incomplete (exit $?); the demo still starts"
+fi
 stop_all
-start_one "$PUB_PORT" "$SPECTATOR" "$PUB_DIR" "$PUB_LOG" "$VSBOT_SPECTATOR"
-if [ -n "$OMNI_PORT" ]; then start_one "$OMNI_PORT" omniscient "$OMNI_DIR" "$OMNI_LOG" public; fi
+start_one "$PUB_PORT" "$SPECTATOR" "$PUB_DIR" "$PUB_LOG" "$VSBOT_SPECTATOR" ${AZ_ARGS[@]+"${AZ_ARGS[@]}"}
+if [ -n "$OMNI_PORT" ]; then start_one "$OMNI_PORT" omniscient "$OMNI_DIR" "$OMNI_LOG" public ${AZ_ARGS[@]+"${AZ_ARGS[@]}"}; fi
 if [ -n "$MB_PORT" ]; then start_one "$MB_PORT" "$SPECTATOR" "$MB_DIR" "$MB_LOG" "$VSBOT_SPECTATOR" -manabrew; fi
 wait_ready "$PUB_PORT"
 [ -z "$OMNI_PORT" ] || wait_ready "$OMNI_PORT"

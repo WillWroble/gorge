@@ -40,7 +40,17 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 		// vocabulary's own default, so a demo can change who you play.
 		name := req.BotPolicy
 		if name == "" {
+			// The client names no policy (the web picker's empty "server
+			// default" choice), so a deck reserved for one is what picks it:
+			// choose an FDN deck and you play az-c3. Both decks omitted keeps
+			// the server's default.
 			name = c.botPolicy
+			for _, id := range []string{req.HumanDeck, req.BotDeck} {
+				if owner := c.reservedFor(id); id != "" && owner != "" {
+					name = owner
+					break
+				}
+			}
 		}
 		policy, err := host.NormalizeBotPolicy(name)
 		if err != nil {
@@ -75,6 +85,13 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 			pool, otherPool = cmdPool, conPool
 			otherFormat = host.FormatConstructed
 		}
+		// A policy with a reserved pool (az-c3) deals from it and from nothing
+		// else, for both seats: the network saw only those decks, and the
+		// human's deck shapes the states it reads as much as its own does.
+		reservedPool, hasPool := c.policyPools[policy]
+		if hasPool {
+			pool, otherPool = reservedPool, nil
+		}
 		if len(pool) == 0 {
 			return httpapi.CreateGameResponse{}, fmt.Errorf("no %s deck is available to deal (decks dir supplies none)", req.Format)
 		}
@@ -87,6 +104,12 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 			}
 			if containsDeck(pool, pick.id) {
 				continue
+			}
+			if hasPool {
+				return httpapi.CreateGameResponse{}, fmt.Errorf("%s deck %q is not in the %s pool: that bot plays only the decks it was trained on", pick.role, pick.id, policy)
+			}
+			if owner := c.reservedFor(pick.id); owner != "" {
+				return httpapi.CreateGameResponse{}, fmt.Errorf("%s deck %q is reserved for bot policy %q", pick.role, pick.id, owner)
 			}
 			if containsDeck(otherPool, pick.id) {
 				return httpapi.CreateGameResponse{}, fmt.Errorf("%s deck %q belongs to %s, not requested format %s", pick.role, pick.id, otherFormat, req.Format)

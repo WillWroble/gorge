@@ -39,6 +39,10 @@
       "tier": "bots",
       "status": "SUPP"
     },
+    "bots/azc3": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "bots/azredeal": {
       "tier": "bots",
       "status": "EXT"
@@ -354,6 +358,14 @@
     "internal/gamepool": {
       "tier": "bots",
       "status": "EXT"
+    },
+    "internal/gonet": {
+      "tier": "bots",
+      "status": "EXT"
+    },
+    "internal/gonet/gonettest": {
+      "tier": "tooling",
+      "status": "TOOL"
     },
     "internal/manabrew": {
       "tier": "host",

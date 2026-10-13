@@ -25,6 +25,7 @@ import (
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	gbench "github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
@@ -110,8 +111,8 @@ func runPlay(args []string) int {
 	fs.IntVar(&remoteBatch, "remote-batch", remoteBatch, "most states in one remote request")
 	fs.DurationVar(&remoteWait, "remote-wait", remoteWait, "how long a remote request waits for more states")
 	fs.IntVar(&remoteCache, "remote-cache", remoteCache, "cached remote evaluations (states)")
-	fs.IntVar(&gonetCache, "gonet-cache", gonetCache, "cached gonet= evaluations (states; 0 = none)")
-	fs.IntVar(&gonetCardCache, "gonet-card-cache", gonetCardCache, "cached gonet= card vectors (0 = none)")
+	fs.IntVar(&gonet.CacheSize, "gonet-cache", gonet.CacheSize, "cached gonet= evaluations (states; 0 = none)")
+	fs.IntVar(&gonet.CardCacheSize, "gonet-card-cache", gonet.CardCacheSize, "cached gonet= card vectors (0 = none)")
 	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (rules/paid_mana_census.go)")
 	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
 	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
@@ -415,7 +416,7 @@ func runPlay(args []string) int {
 	for k, v := range remoteStats() {
 		sum[k] = v
 	}
-	for k, v := range gonetStats() {
+	for k, v := range gonet.Stats() {
 		sum[k] = v
 	}
 	if os.Getenv("GORGE_PRIO_MEMO_STATS") != "" {
@@ -674,3 +675,7 @@ func tuneGC() {
 		debug.SetMemoryLimit(6 << 30)
 	}
 }
+
+// The in-process network times its evaluations for the run summary; the
+// package itself may not read the clock, so the command injects it.
+func init() { gonet.Clock = func() int64 { return time.Now().UnixNano() } }
