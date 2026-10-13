@@ -91,7 +91,7 @@ func TestCostOnlyManaClass(t *testing.T) {
 		{"4 W W Exile<1/Creature>", false},
 		{"2 B B Sac<1/Creature>", false},
 		{"2 B G PayLife<X>", false},
-		{"2 G ChooseCreatureType<1>", false}, // Unknown head, priced as generic
+		{"2 G ChooseCreatureType<1>", false}, // a creature-type choice (Cost.ChooseType) is non-mana
 		{"CollectEvidence<X> 2 B G", false},  // non-mana, absent from HasNonMana
 		{"RollDice<1/6/X>", false},           // non-mana, absent from HasNonMana
 	}

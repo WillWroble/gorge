@@ -208,6 +208,14 @@ func NonManaCastableP(e Engine, p state.PlayerID, id state.ObjID, cost *costvoca
 		}
 	}
 	for _, part := range cost.Behold {
+		// A Behold of a creature type the same cost chooses (Celestial
+		// Reunion): payable when some type leaves enough candidates.
+		if BeholdChosenTypeOpen(e, id, cost, part) {
+			if !BeholdChosenTypeFeasible(e, p, id, part) {
+				return false
+			}
+			continue
+		}
 		n := len(CostCandidates(e, p, id, state.ZHand, part.Spec, true, false)) +
 			len(CostCandidates(e, p, id, state.ZBattlefield, part.Spec, false, false))
 		if n < int(part.N) {
@@ -455,6 +463,15 @@ func exilePartsPayable(g *state.Game, matches func(string, state.ObjID, state.Pl
 			}
 		}
 		if int32(len(avail)) < part.N {
+			return false
+		}
+		// An open-ended "N or more" part (Exile<1+/...>): a set-level
+		// withTotal* floor must be reachable from the candidates. An
+		// announced right-hand side (withTotalCMCEQX) is chosen by the
+		// announcement, which xAsk bounds to the reachable totals, so N
+		// candidates are enough here. Only the minimum N is reserved.
+		if part.AtLeast && part.Group.Active() && part.Group.Var == "" &&
+			!GroupFeasible(GroupValues(g, avail, part.Group), int(part.N), part.Group, part.Group.N) {
 			return false
 		}
 		if wholeZone {

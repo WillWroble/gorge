@@ -4,7 +4,7 @@ import "slices"
 
 // costFieldCount is the number of fields Cost has; TestCostEqualCoversEveryField
 // (equal_test.go) fails when Cost grows without Equal growing with it.
-const costFieldCount = 43
+const costFieldCount = 44
 
 // sliceEqual is reflect.DeepEqual's slice semantics for comparable elements:
 // a nil slice equals only a nil slice, and two non-nil slices are equal when
@@ -43,6 +43,7 @@ func (c *Cost) Equal(o *Cost) bool {
 		sliceEqual(c.Reveal, o.Reveal) &&
 		sliceEqual(c.RevealOrChoose, o.RevealOrChoose) &&
 		sliceEqual(c.RevealChosen, o.RevealChosen) &&
+		c.ChooseType == o.ChooseType &&
 		sliceEqual(c.Behold, o.Behold) &&
 		sliceEqual(c.TapPermanent, o.TapPermanent) &&
 		sliceEqual(c.UntapPermanent, o.UntapPermanent) &&

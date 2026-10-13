@@ -306,6 +306,12 @@ type pendingCast struct {
 	teamworkDone bool `clone:"deep"`
 	teamworkPaid bool `clone:"deep"`
 
+	// chooseTypeDone marks the ChooseCreatureType<N> cost part answered
+	// (chooseTypeCostAsk); preChosenType is the card's ChosenType before the
+	// answer's Choose event, restored by abortCast (CR 733.1).
+	chooseTypeDone bool   `clone:"deep"`
+	preChosenType  string `clone:"deep"`
+
 	// Casualty's optional additional cost is a single power-qualified sacrifice.
 	// The chosen object is settled with the other sacrifice costs at payment.
 	// casualtyDone marks the optional-sacrifice election already posed for

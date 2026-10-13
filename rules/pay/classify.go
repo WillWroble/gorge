@@ -134,6 +134,8 @@ func PlanCostDetail(c Cost) string {
 		return "cost:roll_dice"
 	case len(c.Exert) != 0:
 		return "cost:exert"
+	case c.ChooseType != 0:
+		return "cost:choose_type"
 	case len(c.Unknown) != 0:
 		return "cost:unknown"
 	case len(c.Withheld) != 0:
@@ -185,7 +187,8 @@ func PlanCostOK(c Cost) bool {
 		len(c.Exile) == 0 && len(c.Reveal) == 0 && len(c.RevealOrChoose) == 0 && len(c.RevealChosen) == 0 && len(c.Behold) == 0 &&
 		len(c.TapPermanent) == 0 && len(c.Blight) == 0 && !c.Forage && len(c.Draw) == 0 && len(c.Energy) == 0 &&
 		len(c.LifeX) == 0 && !c.LifeHalfUp && len(c.DamageYou) == 0 && len(c.GainLife) == 0 && len(c.Return) == 0 &&
-		len(c.PutToLib) == 0 && len(c.MoveToGrave) == 0 && len(c.Mill) == 0 && len(c.Evidence) == 0 && len(c.RollDice) == 0 && len(c.Unknown) == 0 && len(c.Exert) == 0
+		len(c.PutToLib) == 0 && len(c.MoveToGrave) == 0 && len(c.Mill) == 0 && len(c.Evidence) == 0 && len(c.RollDice) == 0 && len(c.Unknown) == 0 && len(c.Exert) == 0 &&
+		c.ChooseType == 0
 }
 
 // PlanPoolOK reports whether p's floating mana is plain: no snow,

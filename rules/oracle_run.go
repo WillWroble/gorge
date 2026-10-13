@@ -1386,6 +1386,9 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 		for i := 0; i < d.Min && i < len(d.Options); i++ {
 			choices = append(choices, d.Options[i].Index)
 		}
+		if fit, ok := oracleSumFitChoices(d, choices); ok {
+			choices = fit
+		}
 		if choices == nil {
 			choices = []int{}
 		}

@@ -407,6 +407,9 @@ func (e *Engine) targetAsk() bool {
 	// engine's decision type cannot express cross-option dependencies, and
 	// withholding is safer than offering an illegal transaction.
 	candidates = e.affordableTargetCandidates(pc, candidates)
+	// A target whose bound X leaves a target-bound Sac/Discard part
+	// unpayable is withheld the same way (cost_target_bound.go).
+	candidates = e.targetBoundCandidates(pc.player, pc.card, &pc.cost, pc.isAbility(), candidates)
 	// MaxTotalTargetPower$ (Reunion of the House): the running total-power
 	// cap over the selection. Prune the candidates that can provably join
 	// no legal selection (individually over the cap unless a negative-power
@@ -753,7 +756,12 @@ func (e *Engine) postTargetAsks(pc *pendingCast) bool {
 	if e.subTargetAsk(pc) {
 		return true
 	}
-	return e.evidenceAsk()
+	if e.evidenceAsk() {
+		return true
+	}
+	// A Sac/Discard part whose spec reads an X the targets fix is paid now
+	// that they exist (cost_target_bound.go).
+	return e.targetBoundCostAsks(pc)
 }
 
 // subTargetAsk poses the next un-answered chain sub's target ask, collecting

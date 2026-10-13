@@ -732,7 +732,8 @@ func quietCostUnclassified(c *Cost) bool {
 		len(c.Energy) > 0 || len(c.LifeX) > 0 || c.LifeHalfUp || len(c.DamageYou) > 0 ||
 		len(c.GainLife) > 0 || len(c.Return) > 0 || len(c.PutToLib) > 0 ||
 		len(c.MoveToGrave) > 0 || len(c.Mill) > 0 || len(c.Evidence) > 0 ||
-		len(c.RollDice) > 0 || len(c.Withheld) > 0 || len(c.Unknown) > 0
+		len(c.RollDice) > 0 || len(c.Withheld) > 0 || len(c.Unknown) > 0 ||
+		c.ChooseType != 0
 }
 
 // quietCostFloor is the §2.4 cost classifier over a compiled cost: the mana
@@ -901,7 +902,9 @@ func quietExilePart(part *CostPart) (quietPart, bool) {
 	if part.Announced || part.N <= 0 {
 		return quietPart{}, true
 	}
-	if part.ZoneSet != 0 || part.Referent != 0 {
+	if part.ZoneSet != 0 || part.Referent != 0 || part.Group.Active() {
+		// A set-level withTotal* constraint (CostPart.Group) is not a
+		// per-object count the bound can price.
 		return quietPart{}, false
 	}
 	var kind quietPartKind
@@ -1064,7 +1067,8 @@ var quietCostFieldNames = map[string]bool{
 	"Exile": true, "ExileFromTop": true, "Reveal": true, "RevealOrChoose": true,
 	"RevealChosen": true, "Behold": true, "TapPermanent": true, "UntapPermanent": true,
 	"Blight": true, "Exert": true, "Forage": true, "Draw": true, "Energy": true,
-	"LifeX": true, "LifeHalfUp": true, "DamageYou": true, "GainLife": true,
+	"ChooseType": true,
+	"LifeX":      true, "LifeHalfUp": true, "DamageYou": true, "GainLife": true,
 	"Return": true, "PutToLib": true, "MoveToGrave": true, "Mill": true,
 	"Evidence": true, "RollDice": true, "Withheld": true, "Unknown": true,
 }

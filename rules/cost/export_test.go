@@ -44,6 +44,8 @@ var matcherCases = func() []MatcherCase {
 		{Name: "returnCost", Grammar: returnCost, Match: wrapMatcher(matchReturnCost)},
 		{Name: "putCardToLibCost", Grammar: putCardToLibCost, Match: wrapMatcher(matchPutCardToLibCost)},
 		{Name: "exileBattlefieldCost", Grammar: exileBattlefieldCost, Match: wrapMatcher(matchExileBattlefieldCost)},
+		{Name: "groupExileCost", Grammar: groupExileCost, Match: wrapMatcher(matchGroupExileCost)},
+		{Name: "chooseCreatureTypeCost", Grammar: chooseCreatureTypeCost, Match: wrapMatcher(matchChooseCreatureTypeCost)},
 		{Name: "exiledMoveToGraveCost", Grammar: exiledMoveToGraveCost, Match: wrapMatcher(matchExiledMoveToGraveCost)},
 		{Name: "millCost", Grammar: millCost, Match: wrapMatcher(matchMillCost)},
 		{Name: "evidenceCost", Grammar: evidenceCost, Match: wrapMatcher(matchEvidenceCost)},
