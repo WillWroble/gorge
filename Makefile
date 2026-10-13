@@ -54,7 +54,9 @@ FORGE_REPO ?= https://github.com/adams-shaun/forge.git
 # 1dc038bc6 (Bullseye, Death Dealer, Ghostly Dancers ETB Origin$ Any |
 # Destination$ Battlefield; Reckless Detective UnlessResolveSubs$ WhenPaid;
 # Card-Forge/forge#12243/#12245).
-FORGE_REF  ?= 1dc038bc620c7802fc4337cd04028aef50356096
+# 098b05531 = 1dc038bc6 + The Earth Crystal targets only creatures you control
+# (ValidTgts$ Creature.YouCtrl; Card-Forge/forge#12255/#12256).
+FORGE_REF  ?= 098b055313459c4b36c9e1f1d4e81a2c8aef815e
 # The XMage commit the compliance oracle (manifests, out-of-tree driver)
 # is pinned to. XMage is MIT; nothing from it is a build dependency.
 # docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md
