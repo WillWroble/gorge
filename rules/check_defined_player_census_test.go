@@ -35,15 +35,12 @@ var readDefinedPlayerSpecs = map[string]bool{
 	"Player.withMostTypeCreatureOnly":           true, // Wild Mammoth
 	"Player.withMostTypeWizardOnly":             true, // Thoughtbound Primoc
 	"Player.IsRemembered+counters_EQ0_Contract": true, // Miss Highwater's effect
+	"You.damageDoneSingleSource GE5":            true, // Dragon Cultist
 }
 
 // knownUnsupportedDefinedPlayer is the ratchet: spellings no home reads yet.
 // Each must fail closed. Delete an entry only with a test proving it is read.
-var knownUnsupportedDefinedPlayer = map[string]bool{
-	// Dragon Cultist: "if a source you controlled dealt 5 or more damage
-	// this turn" needs a per-source damage-this-turn ledger.
-	"You.damageDoneSingleSource GE5": true,
-}
+var knownUnsupportedDefinedPlayer = map[string]bool{}
 
 // definedPlayerCensusFloor guards a vacuous census: 25 carrier lines over 9
 // spellings measured at the 2026-10-12 pin.

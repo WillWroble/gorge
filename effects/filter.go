@@ -377,7 +377,7 @@ var predicates = map[string]predFn{
 	// survive-end-of-combat / clear-on-turn-and-exit lifetimes as
 	// blockedByThisTurn above.
 	"blockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o != nil && o.BlockedThisTurn
+		return o != nil && len(o.BlockedThisTurn) != 0
 	},
 	// blockedBySourceThisTurn is the this-turn twin of blockedBySource (the
 	// word-predicate at effects/filter_word.go): the object was blocked by
@@ -2255,19 +2255,12 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		// capture added this walk, the "each card exiled this way" follow-up
 		// shape), and the source object's event-backed Remembered (what an
 		// earlier resolution remembered durably, Forge's persistent host list).
-		for _, t := range sc.Remembered {
-			if !t.IsPlayer && t.Obj == o.ID {
-				return true, true
-			}
-		}
-		if src := g.Obj(sc.Source); src != nil {
-			for _, t := range src.Remembered {
-				if !t.IsPlayer && t.Obj == o.ID {
-					return true, true
-				}
-			}
-		}
-		return false, true
+		// A trigger's fire-time capture is a fallback referent, not memory:
+		// anyRemembered's resolution half goes through selectRemembered (the
+		// one home Defined$ Remembered shares), so once the body has
+		// remembered cards of its own (Avatar Destiny's RememberMilled$) the
+		// creature whose death fired the trigger no longer matches.
+		return anyRemembered(g, &sc, func(id state.ObjID) bool { return id == o.ID }), true
 	}
 	if rest, has := strings.CutPrefix(p, "greatestPower"); has {
 		// Forge's greatestPower[ControlledBy <players>] (CardProperty): the
@@ -2516,6 +2509,12 @@ func matchPredicate(g *state.Game, p string, o *state.Object, sc SpecContext) (r
 }
 
 func isBlocking(g *state.Game, id state.ObjID) bool {
+	// The blocker's own record (CR 506.4/509.1h): it stays blocking after
+	// the attacker it blocked left combat; the scan below covers objects a
+	// test seeded by writing BlockedBy directly.
+	if o := g.Obj(id); o != nil && o.IsBlocking {
+		return true
+	}
 	for i := range g.Objs {
 		for _, b := range g.Objs[i].BlockedBy {
 			if b == id {
@@ -2675,6 +2674,11 @@ type SpecContext struct {
 	// prefix's context referent (contextReferent): Eradicate's
 	// `ChangeType$ Remembered.sameName` shares names with the captured card.
 	Remembered []state.Target
+	// Captured is the resolution's fire-time trigger seed (Ctx.Captured),
+	// carried beside Remembered so Card.IsRemembered applies the same
+	// capture-as-fallback selection Defined$ Remembered does
+	// (selectRemembered). Empty outside a trigger resolution.
+	Captured []state.Target
 	// RememberedPlayers is the CONSULTATION-time binding for a registered
 	// restriction's captured players (state.ContinuousEffect
 	// .RememberedPlayers). Resolution-time callers leave it zero -- their

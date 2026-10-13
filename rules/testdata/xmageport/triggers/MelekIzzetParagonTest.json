@@ -73,8 +73,7 @@
      }
     }
    ],
-   "xmage": "MelekIzzetParagonTest#testCopyZenith",
-   "known_bug": "B19: Melek, Izzet Paragon's \"whenever you cast an instant or sorcery spell from your library, copy it\" never triggers on a spell cast from the library top. CR 603.2, 707.10."
+   "xmage": "MelekIzzetParagonTest#testCopyZenith"
   }
  ]
 }

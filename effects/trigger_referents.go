@@ -279,6 +279,25 @@ func TriggeredCardController(g *state.Game, tc TriggerContext, remembered []stat
 	return 0, false
 }
 
+// TriggeredSourceController is the one resolver for "the controller of the
+// source the causing event recorded": Defined$
+// TriggeredSourceController/TriggeredSourceSAController and OptionalDecider$
+// TriggeredSourceController all read it here. The captured event role
+// (TriggerSource) is preferred, because for a DamageDone trigger Remembered
+// holds the DAMAGED object -- its controller is exactly wrong for the source
+// form. Remembered[0]'s controller is the fallback for a trigger that
+// captured no source role. ok is false when no live object resolves.
+func TriggeredSourceController(g *state.Game, tc TriggerContext, remembered []state.Target) (state.PlayerID, bool) {
+	ref := tc.TriggerSource
+	if ref == 0 && len(remembered) > 0 {
+		ref = remembered[0].Obj
+	}
+	if o := g.Obj(ref); o != nil {
+		return o.Controller, true
+	}
+	return 0, false
+}
+
 // spawnerChain strips Forge's "Spawner>" chain prefix from one ref argument,
 // reporting whether the prefix was present, with the inner ref trimmed.
 // Shared by the control/ownership referent grammar (controlReferent and

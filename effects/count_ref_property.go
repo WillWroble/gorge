@@ -21,8 +21,10 @@ import (
 // The per-object answers mirror evalCountBody's own source-anchored heads:
 // CardPower/CardToughness read the face plus marked P1P1 counters
 // (battlefield layer output for a battlefield object; a graveyard object's
-// face), CardManaCost the face's converted cost, CardCounters.<KIND> one
-// counter kind, Valid the count of referenced objects matching a card spec
+// face), CardManaCost the face's converted cost, ChromaSource.<Colour> the
+// face's printed mana-cost symbols of that colour (a hybrid symbol once),
+// CardCounters.<KIND> one counter kind, Valid the count of referenced objects
+// matching a card spec
 // (unknown predicates fail closed inside the matcher, so an unreadable
 // filter counts zero, never everything). Several references sum -- Forge's
 // Count$ reads the same way -- and the /Op suffix applies through
@@ -40,6 +42,21 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 	}
 	prop, op, hasOp := strings.Cut(prop, "/")
 	prop = strings.TrimSpace(prop)
+	// ChromaSource[.<Colour>] (task lb-chroma): the referenced objects'
+	// coloured mana symbols, the ref half of Forge's AbilityUtils Chroma
+	// block (handlePaid routes each referenced card through the same
+	// ChromaSource count the plain head reads off the source). Parsed once
+	// here so the per-object loop only accumulates; an unreadable colour
+	// fails the whole body closed.
+	chromaMask, isChroma := uint8(0), false
+	if rest, ok := strings.CutPrefix(prop, "ChromaSource"); ok {
+		var okm bool
+		chromaMask, okm = chromaSourceMask(rest)
+		if !okm {
+			return 0, false
+		}
+		isChroma = true
+	}
 	var ts []state.Target
 	if ref == "TriggerObjectsCards" {
 		ts = c.Captured
@@ -192,6 +209,21 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 			// snapshot above, whose Face points at the unchanged card) -- so
 			// the two spellings cannot disagree about one object.
 			n += int32(len(h.ObjectColors(o)))
+		case isChroma:
+			// The referenced objects' coloured mana symbols (task lb-chroma),
+			// summed over the referent set the way Forge's handlePaid sums
+			// per referenced card: Namor the Sub-Mariner's
+			// TriggeredCard$ChromaSource.Blue (the cast spell's blue pips),
+			// Phosphorescent Feast's and Sanity Grinding's Remembered$
+			// spellings and Omnath, Locus of All's bare Remembered$ChromaSource
+			// (every colour). The per-object value is cards.ManaCostChroma's
+			// per-symbol read -- a hybrid or Phyrexian symbol counts once --
+			// and a face-down battlefield permanent contributes nothing (CR
+			// 708.5), the same rule the plain head's chromaObjectCount
+			// applies. The lki/Remembered substitution above has already
+			// bound the snapshot when the referent left its zone, and a
+			// snapshot's face is the unchanged printed card.
+			n += chromaObjectCount(o, chromaMask)
 		case strings.HasPrefix(prop, "CardCounters."):
 			// ALL is the sum over every kind (the same wildcard the plain
 			// Count$CardCounters.ALL head reads -- Kinsbaile Borderguard's

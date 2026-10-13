@@ -985,7 +985,8 @@ func (e *Engine) candidatesForLimitInto(dst []targetCandidate, p state.PlayerID,
 		// so the census must not stop at limit before the whole search space
 		// (battlefield included) has been walked and filtered.
 		tp.Has(effects.TgtPlayerControlsSet) ||
-		tp.SharedCardType != "") {
+		tp.SharedCardType != "" ||
+		tp.RelatedProperty != "") {
 		limit = 0
 	}
 	spec := tp.ValidTgts
@@ -1150,6 +1151,7 @@ zoneLoop:
 	out = e.filterTargetsWithDefinedController(out, sa, sc)
 	out = e.filterTargetControllerProperty(out, sa)
 	out = e.filterTargetsWithSharedCardType(out, sa, source, sc)
+	out = e.filterTargetsWithRelatedProperty(out, sa, source, sc)
 	out = e.filterTargetValidTargeting(out, sa, sc)
 	if targeting {
 		// tpc1: TargetingPlayerControls$ True -- the answering seat's

@@ -1006,28 +1006,26 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// (Leyline of Combustion's 2 damage and Ashenmoor Liege's 4 life are
 		// paid to the targeting spell's controller, never the Leyline's or
 		// the Liege's); the trigger captures that source in TriggerSource,
-		// so it resolves through the identical read. The role is preferred
-		// when the trigger captured one (a DamageDone trigger's Remembered
-		// is the DAMAGED object, whose controller is exactly wrong for the
-		// source form); the fallback -- Remembered[0]'s controller -- is
-		// deciderFromSpec's convention for the same spellings on
-		// OptionalDecider$ lines, so both reads of one spelling agree
-		// wherever the role is absent.
-		ref := c.TriggerSource
+		// so it resolves through the identical read. The source spellings
+		// share TriggeredSourceController -- the same resolver the
+		// OptionalDecider$ consumer reads (rules/trigger_queue.go
+		// deciderFromSpec) -- so both reads of one spelling agree wherever
+		// the role is absent.
 		if spec == "TriggeredTargetController" {
-			if c.TriggerTarget.Obj != 0 || c.TriggerTarget.IsPlayer {
-				if c.TriggerTarget.IsPlayer {
-					return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
-				}
-				ref = c.TriggerTarget.Obj
-			} else if len(c.Remembered) > 0 {
+			if c.TriggerTarget.IsPlayer {
+				return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
+			}
+			ref := c.TriggerTarget.Obj
+			if ref == 0 && len(c.Remembered) > 0 {
 				ref = c.Remembered[0].Obj
 			}
-		} else if ref == 0 && len(c.Remembered) > 0 {
-			ref = c.Remembered[0].Obj
+			if o := g.Obj(ref); o != nil {
+				return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+			}
+			return nil, true
 		}
-		if o := g.Obj(ref); o != nil {
-			return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+		if p, ok := TriggeredSourceController(g, c.TriggerContext, c.Remembered); ok {
+			return []state.Target{{Player: p, IsPlayer: true}}, true
 		}
 		return nil, true
 	case definedSpecTriggeredTargets:
@@ -1977,13 +1975,35 @@ func copyTargets(s []state.Target) []state.Target {
 //     (rules/trigger_delayed.go), so it is filtered like an ordinary written
 //     list -- the firing referent is not a card-list read even when the source
 //     has written nothing else.
+//
+// The capture is a FALLBACK referent, never memory added to what the body
+// itself wrote (task lb-rempollute, CR 603.7). In the second shape, once the
+// resolution has remembered something of its own (Avatar Destiny's
+// RememberMilled$ before its `ChangeType$ Creature.IsRemembered` return) the
+// seeded capture occurrence is dropped: Forge's host list holds the milled
+// cards only, never the creature whose death fired the trigger. Only a
+// context holding nothing but the capture keeps it.
 func resolvedRemembered(h Host, c *Ctx) []state.Target {
-	if len(c.Captured) > 0 && len(c.DelayedRemembered) == 0 && len(sourceRemembered(h, c)) == 0 {
-		// The ordinary trigger whose source wrote nothing: the capture is
-		// all the context has (the second shape above).
-		return copyTargets(c.Remembered)
+	return selectRemembered(c.Remembered, c.Captured, c.DelayedRemembered, sourceRemembered(h, c))
+}
+
+// selectRemembered is resolvedRemembered over plain slices -- the ONE home of
+// the selection rule, shared with the Card.IsRemembered filter predicate
+// (filter.go), which reads a SpecContext rather than a Ctx. remembered is the
+// resolution's set, captured its fire-time seed, delayedRemembered a delayed
+// registration's saved set, persistent the source object's event-backed list.
+// The result never aliases remembered or persistent.
+func selectRemembered(remembered, captured, delayedRemembered, persistent []state.Target) []state.Target {
+	if len(captured) > 0 && len(delayedRemembered) == 0 && len(persistent) == 0 {
+		// The ordinary trigger whose source wrote nothing (the second shape
+		// above): the capture is a fallback, kept only when the resolution
+		// wrote nothing of its own.
+		if written := excludeCaptureOccurrences(remembered, captured); len(written) > 0 {
+			return written
+		}
+		return copyTargets(remembered)
 	}
-	return captureFilteredRemembered(h, c)
+	return filterCapturedRemembered(remembered, captured, delayedRemembered, persistent)
 }
 
 // hostRemembered is Forge's host remembered list: resolvedRemembered
@@ -2005,26 +2025,25 @@ func hostRemembered(h Host, c *Ctx) []state.Target {
 	if c.RepeatSubject != (state.Target{}) {
 		return copyTargets(c.Remembered)
 	}
-	return captureFilteredRemembered(h, c)
+	return filterCapturedRemembered(c.Remembered, c.Captured, c.DelayedRemembered, sourceRemembered(h, c))
 }
 
-// captureFilteredRemembered is the shared tail of resolvedRemembered and
+// filterCapturedRemembered is the shared tail of selectRemembered and
 // hostRemembered: the capture entries the source's written list does not
 // hold are dropped (the first and third shapes above).
-func captureFilteredRemembered(h Host, c *Ctx) []state.Target {
-	if len(c.Captured) == 0 {
-		return copyTargets(c.Remembered)
+func filterCapturedRemembered(remembered, captured, delayedRemembered, persistent []state.Target) []state.Target {
+	if len(captured) == 0 {
+		return copyTargets(remembered)
 	}
-	if len(c.DelayedRemembered) > 0 && sameTargets(c.Captured, c.DelayedRemembered) {
-		return copyTargets(c.Remembered)
+	if len(delayedRemembered) > 0 && sameTargets(captured, delayedRemembered) {
+		return copyTargets(remembered)
 	}
-	persistent := sourceRemembered(h, c)
-	if sameTargets(c.Remembered, c.Captured) && len(persistent) > 0 {
+	if sameTargets(remembered, captured) && len(persistent) > 0 {
 		return copyTargets(persistent)
 	}
-	out := make([]state.Target, 0, len(c.Remembered))
-	for _, t := range c.Remembered {
-		if containsTarget(c.Captured, t) && !containsTarget(persistent, t) {
+	out := make([]state.Target, 0, len(remembered))
+	for _, t := range remembered {
+		if containsTarget(captured, t) && !containsTarget(persistent, t) {
 			continue
 		}
 		out = append(out, t)

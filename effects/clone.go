@@ -400,6 +400,16 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 			setColorPresent = true
 		}
 	}
+	// AddColors$ is additive (CR 707.9b); an unparseable list is loud.
+	var addColorsL []string
+	if cp.AddColors != "" {
+		if cp.AddColorsOK {
+			addColorsL = cp.AddColorsL
+		} else {
+			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
+				Text: "Clone AddColors$ " + cp.AddColors + " is not a colour this build can add; the copy keeps its colours"})
+		}
+	}
 	// Unknown rider values stay loud rather than pretending to apply.
 	var unread []string
 	var lostSVars, lostTriggers []string
@@ -592,6 +602,9 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 		}
 		if setColorPresent {
 			reg(state.ContinuousEffect{Layer: state.LColor, AddColors: slices.Clone(setColors), OverwriteColors: true})
+		}
+		if len(addColorsL) > 0 {
+			reg(state.ContinuousEffect{Layer: state.LColor, AddColors: slices.Clone(addColorsL)})
 		}
 		if len(addKeywords) > 0 {
 			reg(state.ContinuousEffect{Layer: state.LAbilities, AddKeywords: slices.Clone(addKeywords)})
