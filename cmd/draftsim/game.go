@@ -124,7 +124,17 @@ func driveGame(r *runner, seed uint64, a, b int, deckA, deckB []*cards.Card) (be
 		}
 		seats[i] = st
 	}
-	oc, eng, err := bench.PlayGame(gameConfig(r, seed, a, b, deckA, deckB), seats, gameMaxTurns, gameMaxIntents, bench.Hooks{})
+	oc, eng, err := bench.PlayGame(gameConfig(r, seed, a, b, deckA, deckB), seats, gameMaxTurns, gameMaxIntents, bench.Hooks{
+		// The pregame ask, the way cmd/mtgsim's playOne poses it (the
+		// brief's Facts line): the engine is built with
+		// rules.NewStartingPlayerChoice, which defers the pregame rounds,
+		// and Setup poses CR 103.1's winner-chooses decision before the
+		// first Advance. botpolicy.Decide answers it deterministically
+		// (the toss winner names itself), so the recorded Intent replays
+		// through the log's DecisionAsk.
+		NewEngine: rules.NewStartingPlayerChoice,
+		Setup:     func(e *rules.Engine) { e.AskStartingPlayer() },
+	})
 	if err != nil {
 		return bench.Outcome{}, nil, fmt.Errorf("seed %d: %w", seed, err)
 	}

@@ -151,6 +151,12 @@ type Hooks struct {
 	// state at the ask point). Inline answers are not counted in
 	// Outcome.Intents. With the kernel off it changes nothing.
 	SyncAnswer bool
+	// NewEngine builds the engine, in place of the default rules.New: the
+	// place a caller that needs a different constructor (cmd/draftsim's
+	// rules.NewStartingPlayerChoice, which defers the pregame rounds and
+	// lets Setup pose the CR 103.1 ask) selects it. Nil (the zero value) is
+	// exactly rules.New, so every existing caller's shape is unchanged.
+	NewEngine func(rules.Config) *rules.Engine
 }
 
 // PlayGame plays one game between the given per-seat seats to completion, or
@@ -163,7 +169,11 @@ type Hooks struct {
 // The outcome is a pure function of (cfg, seats): the seats own their RNG,
 // the engine replays from cfg.Seed, and nothing reads the wall clock.
 func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hooks Hooks) (Outcome, *rules.Engine, error) {
-	e := rules.New(cfg)
+	newEng := hooks.NewEngine
+	if newEng == nil {
+		newEng = rules.New
+	}
+	e := newEng(cfg)
 	if hooks.Setup != nil {
 		hooks.Setup(e)
 	}
