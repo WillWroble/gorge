@@ -66,21 +66,21 @@ func TestStaticNamedKeywordGrant(t *testing.T) {
 }
 
 // TestStaticNamedKeywordGrantStillSkips pins the other direction: a static
-// granting a keyword outside BOTH vocabularies to a PERMANENT keeps the named
-// skip, so widening the set did not swallow every keyword grant. Norman
-// Osborn's Green Goblin face grants mayhem to graveyard cards, whose
-// keywords neither snapshot carries and whose cast needs a card discarded
-// this turn. (Samut, Tyrant of Naktamun, the earlier pin, is served by the
-// split-second observation since lb4-g7, and Absolute Virtue by the
-// player-protection observation.)
+// granting a keyword outside BOTH vocabularies keeps the named skip, so
+// widening the set did not swallow every keyword grant. Raiding Schemes
+// grants conspire to the spells its controller casts, a keyword neither
+// snapshot carries. (Samut, Tyrant of Naktamun, the earlier pin, is served by
+// the split-second observation since lb4-g7, Absolute Virtue by the
+// player-protection observation, and Norman Osborn's Green Goblin mayhem
+// grant by the discard-this-turn offer since lb4w2-diverge.)
 func TestStaticNamedKeywordGrantStillSkips(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	_, skip := GenerateB(reg, "Norman Osborn",
-		probeRequirement(t, reg, "Norman Osborn", "static#1.1"))
+	_, skip := GenerateB(reg, "Raiding Schemes",
+		probeRequirement(t, reg, "Raiding Schemes", "static#0.0"))
 	if skip == nil {
-		t.Fatal("Norman Osborn static#1.1 served, want a keyword skip")
+		t.Fatal("Raiding Schemes static#0.0 served, want a keyword skip")
 	}
 	if !strings.Contains(skip.Reason, "outside the compared") {
-		t.Fatalf("Norman Osborn skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
+		t.Fatalf("Raiding Schemes skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
 	}
 }

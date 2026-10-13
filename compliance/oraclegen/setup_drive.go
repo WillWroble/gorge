@@ -13,7 +13,8 @@ import (
 // transcriber used to drop every Step<0 decision that was not an as-enters
 // colour/type choice (IsSetupChoice), a declined optional target
 // (IsSetupTargetDecline) or a setup-placed trigger order
-// (triggerOrderSetupPosed). XMage then answered the dropped ask with its own
+// (triggerOrderSetupPosed); an as-enters "choose a number" is scripted by
+// SetupNumberChoice. XMage then answered the dropped ask with its own
 // AI, so the two engines diverged before the card's real behaviour was ever
 // judged (Zuko, Conflicted's turn-1 charm; Gathering Stone's mill/reveal
 // pair).
@@ -29,10 +30,9 @@ import (
 // The kinds deliberately left unscripted, all of which XMage answers without
 // the setup drive's help or whose ask this generator cannot yet place: an
 // "opening_*" pregame ask (a Leyline's "begin with this?" -- XMage's own
-// start-of-game handling) and an as-enters "choose a number" (neither is a
-// bare yesNo), and a "mode" whose label resolves to no charm position (a
-// plain GenericChoice on XMage's CHOICE dialog, or an unless-pay XMage does
-// not pose at all).
+// start-of-game handling; not a bare yesNo), and a "mode" whose label
+// resolves to no charm position (a plain GenericChoice on XMage's CHOICE
+// dialog, or an unless-pay XMage does not pose at all).
 func setupDriveAnswers(d rules.OracleDecision, modes map[string]int) []XAnswer {
 	if d.GorgeKind == "modes" {
 		return setupModeAnswers(d, modes)

@@ -72,6 +72,10 @@ func staticGrantedStaticItem(reg *cards.Registry, f *cards.Face, name string, re
 			if it, ok := grantedContinuousItem(reg, f, name, req, st, inner, gate); ok {
 				return it, true
 			}
+		case strings.EqualFold(inner.Mode, "CantSacrifice"):
+			if it, ok := grantedCantSacrificeItem(reg, f, name, req, st); ok {
+				return it, true
+			}
 		}
 	}
 	return oraclegen.Item{}, false
