@@ -35,6 +35,8 @@ const (
 	KindGameEnded     Kind = "GameEnded"
 	KindSeriesEnded   Kind = "SeriesEnded"
 	KindEventEnded    Kind = "EventEnded"
+	KindGameStarted   Kind = "GameStarted"
+	KindGameAborted   Kind = "GameAborted"
 )
 
 // Entry is one log entry: a Kind discriminator plus the fields of that
@@ -85,6 +87,17 @@ type Entry struct {
 	// Standings is the EventEnded final table, computed by Apply and
 	// validated against the caller's value when the caller supplies one.
 	Standings []Standing `json:"standings,omitempty"`
+
+	// Attempt is the 1-based attempt of a series game (GameStarted, GameAborted,
+	// and optionally GameEnded). A game replayed after a restart or a crash
+	// gets the next attempt and a new seed.
+	Attempt int `json:"attempt,omitempty"`
+	// Table is the host table id a GameStarted attempt is played on.
+	Table string `json:"table,omitempty"`
+	// GameSeed is a GameStarted attempt's table seed.
+	GameSeed uint64 `json:"game_seed,omitempty"`
+	// Reason says why a GameAborted attempt produced no result.
+	Reason string `json:"reason,omitempty"`
 }
 
 // cloneEntry deep-copies an entry's slice and pointer fields so the log
@@ -138,7 +151,7 @@ func ParseLog(data []byte) ([]Entry, error) {
 		switch en.Kind {
 		case KindEventCreated, KindPackOpened, KindPicked, KindDeckSaved,
 			KindReady, KindSeriesStarted, KindGameEnded, KindSeriesEnded,
-			KindEventEnded:
+			KindEventEnded, KindGameStarted, KindGameAborted:
 		default:
 			return nil, fmt.Errorf("event: parse log line %d: unknown kind %q", i+1, en.Kind)
 		}
