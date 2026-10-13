@@ -181,7 +181,7 @@ func TestActivateExilePreludeRows(t *testing.T) {
 			t.Fatalf("precondition: no graveyard card for the ETB to exile: %v", p0.Graveyard)
 		}
 		playStep := false
-		passTo := 0
+		passTo, sameSeatPassTo := 0, 0
 		for _, st := range it.Scenario.Steps {
 			if st.Op == "play" && st.Card == "p0:Pit of Offerings" {
 				if !hasName(st.Targets, "p0:Grizzly Bears") {
@@ -191,15 +191,21 @@ func TestActivateExilePreludeRows(t *testing.T) {
 			}
 			if st.Op == "pass_to" {
 				passTo++
+				if st.Active == "p0" {
+					sameSeatPassTo++
+				}
 			}
 		}
 		if !playStep {
 			t.Fatalf("precondition: no play step for Pit of Offerings in %v", it.Scenario.Steps)
 		}
-		if passTo < 2 {
-			t.Fatalf("precondition: want the two pass_to steps that untap the land, got %d", passTo)
+		if passTo != 2 || sameSeatPassTo > 1 {
+			t.Fatalf("want two pass_to steps that untap the land, only the first naming p0 (the driver reads each same-seat pass_to as that seat's next turn), got %d (%d naming p0)", passTo, sameSeatPassTo)
 		}
 		snap := play(t, row, it)
+		if snap.Turn != 3 {
+			t.Fatalf("activation turn = %d, want 3 (p0's next turn)", snap.Turn)
+		}
 		// The ETB exiled the green creature; the reflect ability then added a
 		// green mana of its colour.
 		if !hasName(snap.Players[0].Exile, "Grizzly Bears") {

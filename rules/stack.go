@@ -337,6 +337,12 @@ func (e *Engine) resolveTop() {
 			// ordinary printed trigger.
 			EffectFrame: e.triggerEffectFrames[id]})
 		ctx.Grantor = o.GrantedBy
+		// CR 608.2h: a source that left the battlefield (sacrificed as the
+		// cost) answers "the chosen type" from its last-known choices.
+		if snap, ok := e.sourceCharLKI[id]; ok && o.Source != 0 {
+			ctx.TriggerContext.SourceLKIValid = true
+			ctx.TriggerContext.SourceChosenType, ctx.TriggerContext.SourceChosenColor = snap.chosenType, snap.chosenColor
+		}
 		ctx.ModeTargets = charmModeTargets
 		// Forge's Count$ResolvedThisTurn reads the per-ability tally the
 		// Resolve event's Apply folded: the count INCLUDES this resolution,

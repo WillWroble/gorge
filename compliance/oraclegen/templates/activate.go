@@ -68,6 +68,14 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	if !ok {
 		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "activate xmage text ambiguous"}
 	}
+	// XMage renders A Killer Among Us's reveal cost as "Reveal the creature
+	// type you chose", not the Oracle's "Reveal the chosen creature type";
+	// the sacrifice part alone selects the card's one activated ability.
+	if _, reveal := revealChosenTokenShape(f, sa); reveal {
+		if i := strings.Index(prefix, ", Reveal"); i > 0 {
+			prefix = prefix[:i]
+		}
+	}
 	zone := activationZone(req.Sub)
 	pool, gap := activationCostIn(sa.ParamStr(cards.PKCost), zone, name, saXMin(sa))
 	if gap != "" {
@@ -103,6 +111,11 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	if pre, ok := returnTappedPrelude(reg, sa.ParamStr(cards.PKCost)); ok {
 		restriction = append(restriction, pre)
 	}
+	// Ninjutsu's "Return an unblocked attacker" needs the attack declared
+	// and no block (returnUnblockedPrelude).
+	if pre, ok := returnUnblockedPrelude(sa.ParamStr(cards.PKCost)); ok {
+		restriction = append(restriction, pre)
+	}
 	// A charm whose root names no ValidTgts$ (an activated AB$ Charm) has no
 	// slots from AbilitySlotSpecs; its modes' own ValidTgts$ live in the
 	// Choices$ SVars. Try the plain (empty-slot) fixture first -- it serves
@@ -110,6 +123,13 @@ func activateAbility(reg *cards.Registry, f *cards.Face, name string, req levelb
 	// set (charmSlotSets), because the engine chooses an activated charm's
 	// mode and target at RESOLUTION (rules/cast_asks.go), so only the board
 	// needs a legal target.
+	if castFixtureShape(f, sa) && zone == "battlefield" {
+		// The target is made by a real cast, not by a fixture
+		// (activate_exiled_with_cast.go).
+		if it, ok := activateWithFixture(reg, f, name, req, idx, prefix, pool, sa.ParamStr(cards.PKCost), zone, oraclegen.Fixture{}, conditionPrelude{}, nil, nil); ok {
+			return it, nil
+		}
+	}
 	slotSets := [][]oraclegen.Slot{slots}
 	if len(slots) == 0 {
 		slotSets = append(slotSets, charmSlotSets(f, sa)...)
@@ -194,7 +214,7 @@ func activateWith(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	if plan != nil {
 		return activateWithAbilityStack(reg, f, name, req, idx, prefix, mana, cost, zone, slots, restrictions, plan)
 	}
-	preludes := withTokenCostPrelude(reg, cost, append([]conditionPrelude{{}}, restrictions...))
+	preludes := withSuspectCostPrelude(reg, cost, withTokenCostPrelude(reg, cost, append([]conditionPrelude{{}}, restrictions...)))
 	// Stack slots are served here by a prelude cast the scenario holds at
 	// this step's priority; every other template family keeps the plain
 	// fixtures, whose stack slots stay the caller's own precast.
@@ -254,6 +274,10 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	// Pit of Offerings' reflect ability needs its real ETB trigger to have
 	// exiled a card; the source is played from hand, then untaps.
 	mrPlay, _ := manaReflectedPlayPrelude(f.Abilities[idx], name, &p0)
+	// A target only a real cast makes (Mimeoplasm's exiled-with card, a
+	// face-down probe; activate_exiled_with_cast.go) replaces the fixture's.
+	exCast, exTargets, exOK := castFixturePrelude(reg, f, f.Abilities[idx], name, &p0)
+	mrPlay = append(mrPlay, exCast...)
 	// A requirement on a back face whose front face has a Craft ability
 	// (Sunbird Effigy) is reached by crafting the front face, not by a
 	// back-face setup: the Craft prelude populates the ExiledWith set.
@@ -290,6 +314,8 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	targets := fx.Targets()
 	if plan != nil {
 		targets = plan.targets
+	} else if exOK {
+		targets = exTargets
 	}
 	// An activated charm's mode and target are chosen at RESOLUTION, not on
 	// activation: a Targets list on the activate step is rejected by the
@@ -773,6 +799,9 @@ func addActivationCostFixtures(p0 *oraclegen.Seat, name, cost string, x ...int) 
 			}
 			for _, name := range discardCostPlacement(tok) {
 				p0.Hand = appendFixtureUnique(p0.Hand, name)
+			}
+			for _, name := range discardCostBattlefield(tok) {
+				p0.Battlefield = appendFixtureUnique(p0.Battlefield, name)
 			}
 		case "ExileFromGrave", "ExileCtrlOrGrave", "CollectEvidence":
 			if n, ok := namedSelfCount(tok, name, xv); ok {

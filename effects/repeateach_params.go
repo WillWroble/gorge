@@ -85,7 +85,7 @@ var repeatEachKnownKeys = [...]string{
 	"ClearImprinted", "ClearRememberedBeforeLoop", "Condition",
 	"ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn",
 	"ConditionPresent", "ConditionPresent2", "ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc",
 	"DamageMap", "Defined", "DefinedCards", "DefinedTarget", "Description",
 	"Exclude", "Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image", "ImprintCards",

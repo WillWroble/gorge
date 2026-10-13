@@ -25,6 +25,7 @@ func TestDriverStepSwitchCoversLevelBPass(t *testing.T) {
 		"static int passAction(JsonArray steps, int index)",
 		"static int passAction(JsonArray steps, int index, int activeSeat)",
 		"PASS_ACTIVE_OWN",
+		"PASS_P1_PAIR_FIRST",
 		"static List<String> passCommands(JsonArray steps, int index, int activeSeat)",
 		"waitStackResolved(turn, phase, playerA, true)",
 		"(info, pl, g) -> pl.pass(g)",

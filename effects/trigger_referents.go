@@ -15,8 +15,21 @@ import (
 // active player, a damage recipient and a damage source are not interchangeable.
 // Unsupported/ambiguous event roles stay absent rather than guessing.
 type TriggerContext struct {
-	TriggerTarget state.Target
-	TriggerSource state.ObjID
+	// SourceLKIValid binds SourceChosenType/SourceChosenColor: the source's
+	// "as this enters" choices as they were when it last stood on the
+	// battlefield (CR 113.7a/608.2h). rules sets it for an ability whose
+	// source has since left -- Dawn-Blessed Pennant's target offer, and A
+	// Killer Among Us's resolution ("If target attacking creature token is
+	// the chosen type", the enchantment sacrificed as the cost) -- because
+	// the live object has had its choices cleared by then. It is source
+	// provenance rather than event provenance, carried here so the resolving
+	// Ctx's SpecContext inherits it through the embedded struct. Read
+	// through sourceChosen only.
+	SourceLKIValid    bool
+	SourceChosenType  string
+	SourceChosenColor string
+	TriggerTarget     state.Target
+	TriggerSource     state.ObjID
 	// TriggerStack is the actual spell/ability object that caused a targeting
 	// event. Unlike TriggerSource it is not unwrapped to its source permanent,
 	// because Ward must counter that stack object itself.

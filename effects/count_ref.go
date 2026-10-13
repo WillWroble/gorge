@@ -460,6 +460,24 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 			return []state.Target{{Obj: c.Source}}, true
 		}
 		return nil, false
+	case refTargetsCollected:
+		// The cards the cast collected as evidence (CR 701.59a), the count
+		// spelling of the ConditionDefined$ Collected group: Behind the
+		// Mask's Z:Collected$Amount (read while the spell resolves) and the
+		// CastSA>Collected$Amount ETB gates (Vitu-Ghazi Inspector, Spotlight
+		// Falcon). The same activation-window read collectedGroup makes, so
+		// the count and the condition cannot disagree. An intervening-if
+		// CheckSVar$ evaluated as the trigger fires has no resolving wrapper
+		// yet; its window is anchored on the source itself, the permanent the
+		// cast spell became (the stack->battlefield move keeps its id, so the
+		// scan crosses that cast's own PutOnStack exactly as it does from the
+		// trigger wrapper).
+		if c.ResolvingObj == 0 && c.Source != 0 {
+			sc := *c
+			sc.ResolvingObj = c.Source
+			return collectedGroup(h, &sc), true
+		}
+		return collectedGroup(h, c), true
 	case refTargetsRemembered:
 		// Forge's plain Remembered$ form reads the executing ability's shared
 		// host-card remembered list: the ctx walk's set UNIONED with the
@@ -776,6 +794,7 @@ const (
 	refTargetsTargetedObjects
 	refTargetsSpellTargeted
 	refTargetsTriggerObjectsAttackers
+	refTargetsCollected
 )
 
 var refTargetsCodes = state.NewStrCodes(
@@ -814,6 +833,8 @@ var refTargetsCodes = state.NewStrCodes(
 	state.StrEntry[refTargetsCode]{Key: "TargetedObjectsDistinct", Val: refTargetsTargetedObjects},
 	state.StrEntry[refTargetsCode]{Key: "SpellTargeted", Val: refTargetsSpellTargeted},
 	state.StrEntry[refTargetsCode]{Key: "TriggerObjectsAttackers", Val: refTargetsTriggerObjectsAttackers},
+	state.StrEntry[refTargetsCode]{Key: "Collected", Val: refTargetsCollected},
+	state.StrEntry[refTargetsCode]{Key: "CastSA>Collected", Val: refTargetsCollected},
 )
 
 type countRefTagCode uint16

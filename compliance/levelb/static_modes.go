@@ -17,9 +17,8 @@ import (
 // crews Vehicles as though its power were N greater" (Cloudspire Captain) --
 // ValidSA$ names only Crew/Saddle actions, ValidCard$ is Card.Self, Value$ is
 // a plain integer, and no other parameter scopes it. Tapestry Warden's
-// Station shape (Value$ Toughness, ValidCard$ powerLTtoughness) is a real
-// shape the engine reads, but its observation needs the Station tap-pick
-// decision, which no template scripts yet: it stays a named gap.
+// Station shape (Value$ Toughness, ValidCard$ powerLTtoughness) is
+// TapPowerValueStationShape's, served by the station-counter template.
 func TapPowerValueShape(st *cards.Static) bool {
 	if !strings.EqualFold(st.Mode, "TapPowerValue") {
 		return false
@@ -151,6 +150,33 @@ func UntapOtherPlayerShape(st *cards.Static) bool {
 	for k := range st.Params {
 		switch k {
 		case "Mode", "Description", "ValidCard":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// TapPowerValueStationShape reports whether st is a Station-only
+// TapPowerValue static the station-counter template observes: ValidSA$
+// exactly Activated.Station, Value$ Toughness, and a ValidCard$ scope over
+// creatures you control (Tapestry Warden's "stations permanents using its
+// toughness rather than its power"). A mixed Crew/Station scope and a numeric
+// Value$ stay with the crew-offer template or a gap.
+func TapPowerValueStationShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.Mode, "TapPowerValue") ||
+		!strings.EqualFold(strings.TrimSpace(st.ParamStr(cards.PKValidSA)), "Activated.Station") ||
+		!strings.EqualFold(strings.TrimSpace(st.ParamStr(cards.PKValue)), "Toughness") {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(st.ParamStr(cards.PKValidCard))) {
+	case "card.self", "creature.youctrl", "creature.powerlttoughness+youctrl":
+	default:
+		return false
+	}
+	for k := range st.Params {
+		switch k {
+		case "Mode", "Description", "ValidSA", "ValidCard", "Value":
 		default:
 			return false
 		}

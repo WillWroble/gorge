@@ -10,6 +10,7 @@ package templates
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -121,15 +122,20 @@ func cantAttackUnlessTaxItem(reg *cards.Registry, f *cards.Face, name string, re
 		if withCard {
 			// With the tax live the attackers decision is not posed until p0
 			// passes the priority the step opens with, so the pair of passes
-			// reaches it.
+			// reaches it. (A single pass_to runs gorge into p1's turn-2
+			// attackers decision, where the want=false check is vacuous.)
 			steps = append([]oraclegen.Step{{Op: "pass_to", Seat: 0, Step: "declare-attackers"}}, steps...)
 		}
 		sc := staticScenario(f, name, nil, nil, steps)
+		p1 := sc.Setup["p1"]
 		if withCard {
-			p1 := sc.Setup["p1"]
 			p1.Battlefield = append(p1.Battlefield, name)
-			sc.Setup["p1"] = p1
 		}
+		// Dáin's Condition$ EnduringStory: the card's controller (p1) holds
+		// the Storied fixture's two artifacts in both runs, so the card itself
+		// is the only difference and its arrival completes the three.
+		p1.Battlefield = append(p1.Battlefield, unlessStoryFixture(f, req)...)
+		sc.Setup["p1"] = p1
 		p0 := sc.Setup["p0"]
 		p0.Battlefield = appendFixtureUnique(p0.Battlefield, unlessAttacker)
 		sc.Setup["p0"] = p0
@@ -155,6 +161,18 @@ func cantAttackUnlessTaxItem(reg *cards.Registry, f *cards.Face, name string, re
 // unlessBlocker is the blocker both CantBlockUnless runs check at p1's
 // declare-blockers decision.
 const unlessBlocker = "Grizzly Bears"
+
+// unlessStoryFixture is the enduring-story board an unless-tax static gated
+// on Condition$ EnduringStory needs beside its Storied source (CR 702.175a:
+// three artifacts, legendaries and/or Sagas); nil for every other gate.
+func unlessStoryFixture(f *cards.Face, req levelb.Requirement) []string {
+	i, err := strconv.Atoi(req.Slot)
+	if err != nil || i < 0 || i >= len(f.Statics) ||
+		!strings.EqualFold(f.Statics[i].ParamStr(cards.PKCondition), "EnduringStory") {
+		return nil
+	}
+	return []string{"Sol Ring", "Arcane Signet"}
+}
 
 // cantBlockUnlessTaxItem keeps Archangel of Tithes's attacking static a named
 // gap: the blockers decision is not posed when the {1} tax leaves no

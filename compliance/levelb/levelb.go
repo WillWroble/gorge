@@ -357,9 +357,13 @@ func classifyStatic(f *cards.Face, st *cards.Static) (sub, gap string) {
 			return "static.cost", ""
 		}
 		if strings.EqualFold(activator, "Opponent") || strings.EqualFold(activator, "Player.Opponent") {
-			if strings.EqualFold(f.Name, "Aven Interrupter") {
-				return "static.cost", "opponent-cast cost static: graveyard/exile cast zone unsupported"
-			}
+			// A graveyard/exile-cast recipient (Aven Interrupter) is served
+			// by an opponent's flashback cast (templates/cost_raise_chosen.go).
+			return "static.cost", ""
+		}
+		if vc := st.ParamStr(cards.PKValidCard); strings.EqualFold(vc, "Card.ChosenType") || strings.EqualFold(vc, "Card.NamedCard") {
+			// The as-enters choice is led at setup and the probe is of the
+			// chosen type or name (templates/cost_raise_chosen.go).
 			return "static.cost", ""
 		}
 		if vc := st.ParamStr(cards.PKValidCard); strings.Contains(vc, "NamedCard") || strings.Contains(vc, "ChosenType") {
@@ -374,6 +378,9 @@ func classifyStatic(f *cards.Face, st *cards.Static) (sub, gap string) {
 	}
 	if TapPowerValueShape(st) {
 		return "static.tap-power-value", ""
+	}
+	if TapPowerValueStationShape(st) {
+		return "static.tap-power-value-station", ""
 	}
 	if CastWithFlashShape(st) {
 		return "static.cast-with-flash", ""
@@ -449,6 +456,12 @@ func supportedLegalityStatic(f *cards.Face, st *cards.Static) (string, bool) {
 			}
 			if len(st.Params) == allowed {
 				return "static.cant-gain-life", true
+			}
+		case "player.enchantedby":
+			// Grievous Wound's "Enchanted player can't gain life": an
+			// Enchant player Aura cast onto p0, then the life-gain probe.
+			if f.HasKeyword("Enchant") && len(st.Params) == 3 && st.HasParam(cards.PKDescription) {
+				return "static.cant-gain-life-enchanted", true
 			}
 		}
 	case "cantattack":

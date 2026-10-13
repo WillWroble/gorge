@@ -1586,7 +1586,7 @@ func oraclePickStepOption(r *oracleRun, st oracleStep, seat state.PlayerID, id s
 			continue
 		}
 		if op == oracleOpCast && o.Kind == "cast" {
-			if o.Mode == wantMode {
+			if oracleCastModeMatches(o, wantMode) {
 				idx = o.Index
 				break
 			}
