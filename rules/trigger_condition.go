@@ -368,7 +368,10 @@ func (e *Engine) checkDefinedPlayerHolds(spec string, source state.ObjID, you st
 	if !ok || property == "" {
 		return false
 	}
-	code := definedPlayerPropertyCodes.Code(string(property))
+	// A property may carry a comparator ("damageDoneSingleSource GE5"); the
+	// word picks the code, the unsplit string stays the shared-filter spelling.
+	word, cmp, _ := strings.Cut(strings.TrimSpace(property), " ")
+	code := definedPlayerPropertyCodes.Code(string(word))
 	var filter string
 	var pc effects.PlayerSpecCtx
 	if code == 0 {
@@ -387,6 +390,10 @@ func (e *Engine) checkDefinedPlayerHolds(spec string, source state.ObjID, you st
 			// CR 700.13: the per-turn crime ledger the TargetsChosen fold
 			// maintains (Servant of the Stinger).
 			return e.CommittedCrimeThisTurn(p)
+		case definedPlayerPropertyDamageDoneSingleSource:
+			// Dragon Cultist: the per-source damage ledger; an absent or
+			// malformed comparator holds for nobody.
+			return compareLife(maxDamageBySingleSourceThisTurn(e.G, p), strings.TrimSpace(cmp))
 		}
 		return effects.MatchesPlayerSpecCtx(e.G, filter, p, you, pc)
 	}
@@ -629,12 +636,14 @@ const (
 	definedPlayerPropertyIsMonarch definedPlayerPropertyCode = iota + 1
 	definedPlayerPropertyHasInitiative
 	definedPlayerPropertyCommittedCrimeThisTurn
+	definedPlayerPropertyDamageDoneSingleSource
 )
 
 var definedPlayerPropertyCodes = state.NewStrCodes(
 	state.StrEntry[definedPlayerPropertyCode]{Key: "isMonarch", Val: definedPlayerPropertyIsMonarch},
 	state.StrEntry[definedPlayerPropertyCode]{Key: "hasInitiative", Val: definedPlayerPropertyHasInitiative},
 	state.StrEntry[definedPlayerPropertyCode]{Key: "committedCrimeThisTurn", Val: definedPlayerPropertyCommittedCrimeThisTurn},
+	state.StrEntry[definedPlayerPropertyCode]{Key: "damageDoneSingleSource", Val: definedPlayerPropertyDamageDoneSingleSource},
 )
 
 type definedPlayerBaseCode uint16
