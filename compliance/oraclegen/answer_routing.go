@@ -425,23 +425,22 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 	return nil, false
 }
 
-// triggerCostAnswer is XMage's chooseUse answer to a triggered-cost
-// pay/decline ask: "yes" for the pay pick, "no" for the decline, "" for any
-// other decision. A decline-only ask (gorge found the cost unpayable) is
-// answered only for a mana cost: XMage's DoIfCostPaid still asks then, but
-// checks canPay first for a non-mana cost (an unpayable forage or sacrifice
-// is never asked, and a scripted "no" would be left over).
+// triggerCostAnswer is XMage's chooseUse answer to the pay/decline ask of a
+// triggered MANA cost ("you may pay {W}. If you do, ..."): "yes" for the pay
+// pick, "no" for the decline, "" for any other decision. XMage's
+// DoIfCostPaid poses that chooseUse for a mana cost even when it cannot be
+// paid (gorge then offers only the decline). A non-mana cost keeps the
+// generic routing: XMage checks canPay first (an unpayable forage is never
+// asked) and a blight goes straight to its creature target (measured:
+// Scuzzback Scrounger's "yes" met "Select a creature you control").
 func triggerCostAnswer(d rules.OracleDecision) string {
-	if d.Kind != "choose_n" || len(d.Picks) != 1 {
+	if d.Kind != "choose_n" || len(d.Picks) != 1 || !d.TriggerCostMana {
 		return ""
 	}
 	switch pickKind(d, 0) {
 	case "trigger_cost_pay":
 		return "yes"
 	case "trigger_cost_decline":
-		if d.Options < 2 && !d.TriggerCostMana {
-			return ""
-		}
 		return "no"
 	}
 	return ""
