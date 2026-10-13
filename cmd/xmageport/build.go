@@ -526,6 +526,26 @@ func titleEnum(s string) string {
 	return strings.Join(parts, " ")
 }
 
+// canCopy reports whether seat p has a setup card that can become a copy of
+// another permanent (a face SVar resolving `DB$ Clone`: Clone, Altered Ego,
+// Phantasmal Image).
+func (t *translator) canCopy(p int) bool {
+	for _, pl := range t.places[p] {
+		c, ok := t.lookup(pl.name)
+		if !ok {
+			continue
+		}
+		for _, f := range c.Faces {
+			for _, body := range f.SVars {
+				if strings.Contains(body, "DB$ Clone") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // assertRef maps an asserted card name to a ref: tokens by controller, cards
 // by the asserting player's objects first, then the other seat's.
 func (t *translator) assertRef(p int, name string) (string, *refusal) {
@@ -544,6 +564,11 @@ func (t *translator) assertRef(p int, name string) (string, *refusal) {
 			return rs[0], nil
 		}
 		if rs := t.anyRefs(1-p, n); len(rs) > 0 {
+			// A copy of the other seat's card is named for the original
+			// but owned by p: bind the assert to p's object, not the original.
+			if t.canCopy(p) {
+				return fmt.Sprintf("p%d:%s", p, n), nil
+			}
 			return rs[0], nil
 		}
 		return "", refuse("assert-not-in-setup", "%s", n)

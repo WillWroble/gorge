@@ -101,13 +101,13 @@
      "eq": 1
     },
     {
-     "card": "p0:Sylvan Advocate",
+     "card": "p1:Sylvan Advocate",
      "counters": {
       "P1P1": 0
      }
     },
     {
-     "card": "p0:Sylvan Advocate",
+     "card": "p1:Sylvan Advocate",
      "pt": "2/3"
     }
    ],
