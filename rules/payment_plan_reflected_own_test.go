@@ -14,6 +14,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
@@ -170,9 +171,15 @@ func TestPaymentPlanReflectedColourlessIsLeftToRealSources(t *testing.T) {
 	t.Parallel()
 	e, _, spell := newFixtureDeck(t, 9705, reflGenProbe)
 	wastes := onBoardCard(t, e, 0, choiceCard(t, "Wastes"))
-	pool := onBoardCard(t, e, 0, choiceCard(t, "Reflecting Pool"))
+	poolCard := choiceCard(t, "Reflecting Pool")
+	pool := onBoardCard(t, e, 0, poolCard)
 	if o := e.G.Obj(wastes); o.Zone != state.ZBattlefield || o.Tapped {
 		t.Fatal("precondition: Wastes not untapped on the battlefield")
+	}
+	// The Pool's shape must be admitted, or this test would pass with the
+	// whole own-reflection feature unregistered.
+	if ma := poolCard.Faces[0].Abilities[0]; !pay.PaymentPlanReflectedShape(ma) {
+		t.Fatal("precondition: Reflecting Pool shape not admitted (own-reflection absent)")
 	}
 	if got := choiceAlts(t, e, pool); len(got) != 0 {
 		t.Fatalf("Pool alternatives = %v, want none (colourless reflects stay out)", got)
@@ -237,9 +244,18 @@ const reflRedProbeOwn = reflectedRedProbe
 func TestPaymentPlanReflectedTwoPoolsReflectNothing(t *testing.T) {
 	t.Parallel()
 	e, spell, _, _ := reflOwnBoard(t, 9708, reflGreenProbe, "Reflecting Pool")
-	p2 := onBoardCard(t, e, 0, choiceCard(t, "Reflecting Pool"))
+	poolCard := choiceCard(t, "Reflecting Pool")
+	p2 := onBoardCard(t, e, 0, poolCard)
 	if o := e.G.Obj(p2); o.Zone != state.ZBattlefield || o.Tapped {
 		t.Fatal("precondition: second Pool not untapped on the battlefield")
+	}
+	// The walk must run and see both Pools, or this test would pass with the
+	// whole own-reflection feature unregistered.
+	if ma := poolCard.Faces[0].Abilities[0]; !pay.PaymentPlanReflectedShape(ma) {
+		t.Fatal("precondition: Reflecting Pool shape not admitted (own-reflection absent)")
+	}
+	if cols := effects.ManaReflectedCandidates(e, effects.NewCtxPtr(p2, 0, effects.CtxInit{}), poolCard.Faces[0].Abilities[0]); len(cols) != 0 {
+		t.Fatalf("two Pools reflected %v, want none (the walk ran and reflected nothing)", cols)
 	}
 	if got := e.PlanCastPayment(0, paymentCast(spell)); got.Plan != nil {
 		t.Fatalf("two Pools planned %+v", got.Plan)
