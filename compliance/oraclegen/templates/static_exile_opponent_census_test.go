@@ -26,13 +26,16 @@ import (
 // wantOpponentExiledWithCensus is the measured split at lb-mayplayopp: 22
 // rows. Azula, Cunning Usurper and Null Summoner -- the two rows that carried
 // the "opponent-owned exiled card is not offered" gap -- are two of the three
-// served.
+// served. The 15 opponent-owned rows are the source's Dig-exile class
+// (Maralen, Fae Ascendant and the other Dig carriers): lb-digexiledwith made
+// the Dig exile record the exiled-with association, so the old "cards exiled
+// by the source's Dig carry no exiled-with association" reason no longer
+// holds, and those rows now name the remaining may-play walk gap.
 var wantOpponentExiledWithCensus = map[string]int{
 	"served": 3,
-	"skip:static cards exiled by the source's Dig carry no exiled-with association (engine gap)": 10,
-	"skip:static counts cards exiled with the source":                                            5,
-	"skip:static look-at not observable":                                                         2,
-	"skip:static no mana cost":                                                                   1,
+	"skip:static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)": 15,
+	"skip:static look-at not observable": 2,
+	"skip:static no mana cost":           1,
 	"skip:static a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)": 1,
 }
 
