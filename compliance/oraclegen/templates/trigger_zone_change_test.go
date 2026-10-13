@@ -96,7 +96,9 @@ func TestKayaTriggerNeedsATokenTarget(t *testing.T) {
 func TestZoneChangeResiduesHaveNamedSkips(t *testing.T) {
 	reg := loadGenRegistry(t)
 	for _, tc := range []struct{ name, key, want string }{
-		{"Zenos yae Galvus", "trigger#0.1", "trigger no recipe: zone-change filter ChosenCardStrict"},
+		// Zenos yae Galvus left this table in wave-4 lb4-gtrig: its
+		// ChosenCardStrict row is served by chosenCardLeavesCauses
+		// (TestChosenCardLeavesRowGenerates).
 		// Hedge Shredder left this table when main implemented
 		// ChangeType$ Card.TriggeredCards (merge ec0a97a7d): its
 		// library-to-graveyard row is served now, asserted by

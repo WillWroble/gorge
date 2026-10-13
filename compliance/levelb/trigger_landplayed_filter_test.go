@@ -23,7 +23,7 @@ func TestLandPlayedFilterClassification(t *testing.T) {
 		{"The Endstone", "trigger#0.0", "trigger.land-played", "youctrl"},
 		{"Recycle", "trigger#0.1", "trigger.land-played", "youctrl"},
 		{"Shanid, Sleepers' Scourge", "trigger#0.0", "trigger.gap:LandPlayed", "legendary"},
-		{"Gwen Stacy", "trigger#1.0", "trigger.gap:LandPlayed", ""},
+		{"Gwen Stacy", "trigger#1.0", "trigger.land-played-zone", ""},
 	} {
 		t.Run(tc.name+"/"+tc.key, func(t *testing.T) {
 			c, ok := reg.Lookup(tc.name)

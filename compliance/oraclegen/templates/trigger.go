@@ -37,7 +37,7 @@ func triggerSubs(sub string) bool {
 		"trigger.searched-library", "trigger.discarded-opponent", "trigger.changes-controller", "trigger.exiled-craft",
 		levelb.UnlockDoorSub, levelb.FullyUnlockSub, stateSelfCountersSub, levelb.CounterAddedSub,
 		levelb.TurnedFaceUpSub, levelb.TurnedFaceUpOtherSub, levelb.SacrificeSub, levelb.DamageSub,
-		levelb.ManaExpendSub, levelb.TapsForManaSub,
+		levelb.ManaExpendSub, levelb.TapsForManaSub, levelb.MayPlayRiderSub, levelb.LandPlayedZoneSub,
 		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub:
 		return true
 	case "trigger.forage", "trigger.give-gift", "trigger.explores", "trigger.collect-evidence",
@@ -80,6 +80,11 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	}
 	if req.CoveredByA {
 		return skip("covered by level A")
+	}
+	if req.Sub == levelb.MayPlayRiderSub {
+		// A Static$ True rider never reaches the stack: it is observed on the
+		// permanent the permitted cast puts onto the battlefield.
+		return mayPlayRiderFires(reg, f, name, req)
 	}
 	if req.Sub == levelb.TapsForManaSub {
 		// A triggered mana ability resolves off the stack, so it needs its own
