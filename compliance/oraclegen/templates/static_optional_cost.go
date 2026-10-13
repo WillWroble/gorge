@@ -33,6 +33,11 @@ type optionalCostSetup struct {
 	fixture func(*oraclegen.Fixture)
 	mana    string   // extra generic mana the cost spends from the pool
 	picks   []string // names XMage's cost selector is answered with when gorge poses no ask for it
+	// picksAfterX places the picks after the cast's X announcement instead
+	// of right after the "pay it?" yes: a cost XMage pays at CR 601.2h
+	// (Celestial Reunion's creature-type choice and behold) is asked after
+	// the 601.2b announcement, while the optional cost's yes precedes it.
+	picksAfterX bool
 }
 
 // optionalCostSetupFor maps the static's single cost token to its setup, or
@@ -113,12 +118,18 @@ func optionalCostItem(reg *cards.Registry, f *cards.Face, name string, req level
 		return skip("card has several OptionalCost statics: cast_mode cannot choose between them")
 	}
 	toks := costTokens(st.ParamStr(cards.PKCost))
-	if len(toks) != 1 {
-		return skip("compound cost " + st.ParamStr(cards.PKCost) + " needs an as-cast creature-type choice")
-	}
-	setup, why := optionalCostSetupFor(toks[0])
-	if why != "" {
-		return skip(why)
+	var setup optionalCostSetup
+	switch {
+	case len(toks) == 1:
+		var why string
+		if setup, why = optionalCostSetupFor(toks[0]); why != "" {
+			return skip(why)
+		}
+	default:
+		var ok bool
+		if setup, ok = chooseTypeBeholdSetup(toks); !ok {
+			return skip("compound cost " + st.ParamStr(cards.PKCost) + " is not modelled")
+		}
 	}
 	pool, why := oraclegen.PoolFor(f.ManaCost)
 	if why != "" {
@@ -202,9 +213,14 @@ func paidOptionalCostItem(reg *cards.Registry, f *cards.Face, name string, req l
 		it.XAnswers = grown
 	}
 	lead := []oraclegen.XAnswer{{Seat: 0, Kind: "choice", Value: "yes"}}
+	var picks []oraclegen.XAnswer
 	for _, p := range setup.picks {
-		lead = append(lead, oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: p})
+		picks = append(picks, oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: p})
 	}
-	it.XAnswers[castIdx] = append(lead, it.XAnswers[castIdx]...)
+	if setup.picksAfterX {
+		it.XAnswers[castIdx] = append(lead, afterXAnnouncement(it.XAnswers[castIdx], picks)...)
+	} else {
+		it.XAnswers[castIdx] = append(append(lead, picks...), it.XAnswers[castIdx]...)
+	}
 	return it, true
 }

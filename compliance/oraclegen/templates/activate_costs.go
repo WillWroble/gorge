@@ -57,6 +57,9 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 				continue
 			}
 		case "ExileFromGrave":
+			if _, ok := groupExileFixtures(tok); ok {
+				continue
+			}
 			if selfZoneCost(tok) {
 				if zone == "graveyard" {
 					continue
@@ -75,6 +78,9 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 				continue
 			}
 		case "Exile":
+			if _, ok := groupExileFixtures(tok); ok {
+				continue
+			}
 			if selfZoneCost(tok) || exileCreatureCostFixtures(tok) != nil {
 				continue
 			}
@@ -336,6 +342,9 @@ func activationCostFixturesX(tok string, x int) []string {
 	head := tok
 	if i := strings.IndexByte(tok, '<'); i >= 0 {
 		head = tok[:i]
+	}
+	if fixtures, ok := groupExileFixtures(tok); ok {
+		return fixtures
 	}
 	switch head {
 	case "Discard":

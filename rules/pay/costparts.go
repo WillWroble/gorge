@@ -321,6 +321,7 @@ func foldAdditionalCost(cost, extra costvocab.Cost) costvocab.Cost {
 	if len(extra.RevealOrChoose) > 0 {
 		cost.RevealOrChoose = append(append([]costvocab.CostPart(nil), cost.RevealOrChoose...), extra.RevealOrChoose...)
 	}
+	cost.ChooseType = costvocab.AddClampedGeneric(cost.ChooseType, int64(extra.ChooseType))
 	if len(extra.RevealChosen) > 0 {
 		cost.RevealChosen = append(append([]costvocab.CostPart(nil), cost.RevealChosen...), extra.RevealChosen...)
 	}

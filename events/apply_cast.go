@@ -109,12 +109,14 @@ func foldCastInfo(g *state.Game, e *Event) {
 		// conspired cast (and StackCopy propagated that onto its copies).
 		case FlagsFrom(e.Counter)&state.FlagConspired != 0:
 			// bool folded above; the Amount is deliberately unused
-		case FlagsFrom(e.Counter)&state.FlagOffspringPaid != 0:
-			// bool folded above; the Amount is deliberately unused
-		case FlagsFrom(e.Counter)&state.FlagTeamworkPaid != 0:
-			// bool folded above; the Amount is deliberately unused
-		case FlagsFrom(e.Counter)&state.FlagOptionalCostPaid != 0:
-			// bool folded above; the Amount is deliberately unused
+		// Offspring, Teamwork and OptionalCostPaid are cast MODE flags: they
+		// ride the main pay-time CastInfo (rules/cast_targets.go's
+		// modeFlags), whose Amount is the cast's X, and every trailing
+		// count event (mana spent, ...) carries them too. So they have NO
+		// arm here: the bools were folded above, and the Amount routes by
+		// the event's own count flag, or to X on the main event (an
+		// optional-cost Celestial Reunion keeps its {X}; a consuming arm
+		// here used to drop it, and every trailing count with it).
 		case FlagsFrom(e.Counter)&state.FlagManaSourcesSpent != 0:
 			// the source id list was folded above; the Amount is
 			// deliberately unused (the Conspired arm's consume shape)

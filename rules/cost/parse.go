@@ -762,6 +762,22 @@ func ParseCost(s string) Cost {
 				c.ExileFromTop = append(c.ExileFromTop, CostPart{N: int32(n), Spec: "Card", Desc: m[3]})
 				continue
 			}
+			if m, ok := matchGroupExileCost(t); ok {
+				appendGroupExileCost(&c, sym, m)
+				continue
+			}
+			if m, ok := matchChooseCreatureTypeCost(t); ok {
+				n, err := strconv.ParseInt(m[1], 10, 32)
+				if err != nil || n != 1 {
+					// Only the one-type choice is measured (Caller of the
+					// Hunt, Celestial Reunion).
+					c.Generic = AddClampedGeneric(c.Generic, 1)
+					c.reportUnknown(sym)
+					continue
+				}
+				c.ChooseType = AddClampedGeneric(c.ChooseType, n)
+				continue
+			}
 			if m, ok := matchExileBattlefieldCost(t); ok {
 				n, err := strconv.ParseInt(m[1], 10, 64)
 				if err != nil || n < 0 || n > int64(math.MaxInt32) {

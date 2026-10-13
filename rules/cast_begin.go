@@ -1069,6 +1069,12 @@ func (e *Engine) continueCast() {
 	if e.blightCostAsk() {
 		return
 	}
+	// CR 601.2h: a ChooseCreatureType<N> part is paid with the other costs,
+	// after the 601.2b announcements (X); a Behold of the chosen type in the
+	// same cost was deferred past the early behold stage until now.
+	if e.chooseTypeCostAsk() || e.beholdCostAsk() {
+		return
+	}
 	if e.delveAsk() {
 		return
 	}

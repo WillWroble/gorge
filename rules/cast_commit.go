@@ -244,9 +244,14 @@ func (e *Engine) payCast() {
 		// found it, but a From read from the object keeps a graveyard
 		// self-exile honest about where it moved from.
 		craftMaterials := craftExiledMaterials(e, pc)
+		groupLinked := costLinksGroupExiles(pc.cost)
 		for _, id := range pc.Exiles {
 			if o := e.G.Obj(id); o != nil {
-				e.emit(costExileEvent(o, craftMaterials, pc.card))
+				mv := costExileEvent(o, craftMaterials, pc.card)
+				if groupLinked {
+					mv.IDs = []state.ObjID{pc.card}
+				}
+				e.emit(mv)
 			}
 		}
 		rememberCraftMaterials(e, pc.card, craftMaterials)
@@ -1103,6 +1108,13 @@ func (e *Engine) abortCast(pc *pendingCast, text string, suppress bool) {
 	if pc.faceBefore != nil {
 		if o := e.G.Obj(pc.card); o != nil && o.FaceIdx != *pc.faceBefore {
 			e.emit(events.Event{Kind: events.FlipFace, Obj: pc.card, Amount: int32(*pc.faceBefore)})
+		}
+	}
+	// CR 733.1: a creature type chosen as a cost (ChooseCreatureType<N>) is
+	// undone with the proposal.
+	if pc.chooseTypeDone {
+		if o := e.G.Obj(pc.card); o != nil && o.ChosenType != pc.preChosenType {
+			e.emit(events.Event{Kind: events.Choose, Obj: pc.card, Counter: "type", Text: pc.preChosenType})
 		}
 	}
 	// CR 733.1 applies identically to a mode announced during the proposal.

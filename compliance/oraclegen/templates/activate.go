@@ -366,6 +366,12 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	if !ok {
 		return oraclegen.Item{}, false
 	}
+	// A group exile cost (activate_group_exile.go) must have been paid: a
+	// fixture whose target leaves no announcement the election can settle
+	// aborts the activation without a failure, which is no scenario.
+	if !groupExilePaid(cost, activateStepIndex(sc.Steps), res.Decisions) {
+		return oraclegen.Item{}, false
+	}
 	if f.Abilities[idx].API == "Charm" && charmModeTargetUnchosen(res.Decisions) {
 		// The fixture left the chosen mode without a legal target (Lost
 		// Jitte's "Untap target land." on a board with no land). XMage
@@ -407,6 +413,7 @@ func activateWithFixture(reg *cards.Registry, f *cards.Face, name string, req le
 	// choice must still lead the step, or XMage's dialog eats the cost answer.
 	oraclegen.HoistSetupChoices(it.XAnswers, activateStep)
 	dropCostCompound(it.XAnswers, activateStep, res.Decisions)
+	dropGroupExileTargets(it.XAnswers, activateStep, cost, res.Decisions)
 	dropUnproducedManaColours(it.XAnswers, activateStep, res)
 	it.XAnswers = scriptPreludeSacrifice(it.XAnswers, prelude, len(sc.Steps))
 	// A craft prelude's activation asks its own {N} and material-exile cost

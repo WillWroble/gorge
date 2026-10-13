@@ -296,6 +296,11 @@ func (e *Engine) beholdCostAsk() bool {
 	pc := e.cast
 	for pc.BeholdPart < len(pc.cost.Behold) {
 		part := pc.cost.Behold[pc.BeholdPart]
+		// A Behold of a creature type the same cost chooses waits for the
+		// choice (chooseTypeCostAsk, after the X announcement).
+		if !pc.chooseTypeDone && pay.BeholdChosenTypeOpen(asPayer(e), pc.card, &pc.cost, part) {
+			return false
+		}
 		candidates := append(pay.CostCandidates(asPayer(e), pc.player, pc.card, state.ZBattlefield, part.Spec, false, false),
 			pay.CostCandidates(asPayer(e), pc.player, pc.card, state.ZHand, part.Spec, true, false)...)
 		if len(candidates) < int(part.N) {
@@ -690,6 +695,9 @@ func (e *Engine) exAsk() bool {
 					}
 				}
 			}
+		}
+		if part.AtLeast {
+			return e.groupExileAsk(pc, part, zones, candidates)
 		}
 		n := int(part.N)
 		if part.Announced {
