@@ -115,7 +115,7 @@ var drawKnownKeys = [...]string{
 	"TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType", "TargetsWithSharedTypes",
 	"TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription", "Type", "Ultimate", "UnlessAI", "UnlessCost", "UnlessPayer", "UnlessResolveSubs",
 	"UnlessSwitched", "Upto", "ValidCard", "ValidCards", "ValidCardsDesc", "ValidChoices",

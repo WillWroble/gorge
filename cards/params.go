@@ -252,6 +252,7 @@ const (
 	PKTargetsWithSameCardType
 	PKTargetsWithSameController
 	PKTargetsWithSameCreatureType
+	PKTargetsWithRelatedProperty
 	PKTargetsWithSharedCardType
 	PKTgtPrompt
 	PKTgtZone
@@ -1039,6 +1040,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKTargetsWithSameCardType:          "TargetsWithSameCardType",
 	PKTargetsWithSameController:        "TargetsWithSameController",
 	PKTargetsWithSameCreatureType:      "TargetsWithSameCreatureType",
+	PKTargetsWithRelatedProperty:       "TargetsWithRelatedProperty",
 	PKTargetsWithSharedCardType:        "TargetsWithSharedCardType",
 	PKTgtPrompt:                        "TgtPrompt",
 	PKTgtZone:                          "TgtZone",

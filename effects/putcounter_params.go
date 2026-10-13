@@ -158,7 +158,7 @@ var putCounterKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript",
 	"TriggerDescription", "Type", "Ultimate",

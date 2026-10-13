@@ -159,7 +159,7 @@ var copyPermanentKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenAttacking",
 	"TokenRemembered", "TokenScript", "TokenTapped", "TriggerDescription", "Type",
