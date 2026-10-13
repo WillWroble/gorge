@@ -63,6 +63,31 @@ func draftCards(refs []limited.CardRef) []protocol.DraftCard {
 	return out
 }
 
+// pipsOf reports the coloured mana pips (W U B R G) of one maindeck card
+// id: the pool card's faces' ManaCostChroma, exactly the way pickbot reads
+// pips. An id the pool does not carry counts no pips.
+func (r *run) pipsOf(seat int) func(id string) [5]int {
+	return func(id string) [5]int {
+		var out [5]int
+		for _, ref := range r.ev.Pool(seat) {
+			if ref.ID != id {
+				continue
+			}
+			c, ok := r.h.opts.Cards.Lookup(ref.Name)
+			if !ok {
+				return out
+			}
+			for _, face := range c.Faces {
+				for i := 0; i < 5; i++ {
+					out[i] += int(cards.ManaCostChroma(face.ManaCost, 1<<i))
+				}
+			}
+			return out
+		}
+		return out
+	}
+}
+
 // packKey is the draft-pack change key a seat's subscribers are compared
 // against: the pack on offer, or "waiting".
 func (r *run) packKey(seat int) string {
