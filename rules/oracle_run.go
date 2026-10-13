@@ -1353,6 +1353,8 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 	case decision.KChoose:
 		if idx, ok := r.unpayableTriggerCostWindowDone(d); ok {
 			choices = []int{idx}
+		} else if idx, ok := legendKeepSurvivor(r.e, d); ok {
+			choices = []int{idx}
 		}
 	}
 	if choices == nil {
