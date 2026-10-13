@@ -200,6 +200,14 @@ type OracleDecision struct {
 	// Nil for every other ask, including a produced-Any one, so the
 	// generator's existing routing is untouched.
 	ManaColours []string `json:"mana_colours,omitempty"`
+	// CostPosed marks a triggered optional cost's decline-only ask (option
+	// kind "trigger_cost_decline" alone: gorge could not pay) whose cost XMage
+	// still asks about. XMage's DoIfCostPaid skips its chooseUse only when the
+	// cost's canPay is false, and a mana cost ("it's true all the time") or a
+	// discard-your-hand cost always passes, so its AI answers yes and pays
+	// what gorge declined. A decline-only ask over any other cost stays
+	// unmarked: XMage's canPay is false there too and it poses nothing.
+	CostPosed bool `json:"cost_posed,omitempty"`
 }
 
 const oracleLibraryTopN = 5

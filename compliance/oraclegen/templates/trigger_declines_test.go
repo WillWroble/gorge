@@ -71,13 +71,15 @@ func TestTriggerExileLookPickForcesFirstCard(t *testing.T) {
 }
 
 // Whiskervale Forerunner's "you may reveal a creature card ... you may put
-// it onto the battlefield": the declined one-card pick after the peek must
-// be scripted as the lone target skip — XMage poses the ask without a
-// chooseUse, so the pair's "no" boolean has nothing to answer ("Found wrong
-// choice command"). The cast-side twin of the same decision shape (Break
-// Out) keeps the measured pair; only the card-side-proven look chooser is
-// re-scripted.
-func TestTriggerLookedPickDeclineIsTargetSkipOnly(t *testing.T) {
+// it onto the battlefield": XMage poses the one-card pick as a mandatory 1..1
+// makeChoose over the looked-at eligible creatures (TargetCardInLibrary), which
+// rejects every skip token, so the scenario is re-run with gorge taking the
+// card and the choice queue names it, followed by the "put it onto the
+// battlefield?" chooseUse (lb-xdefaults; the old lone target skip left
+// XMage's AI to pick and moved its library count). The cast-side twin of the
+// decision shape (Break Out) keeps the measured pair; only the card-side-proven
+// look chooser is forced.
+func TestTriggerLookedPickDeclineIsForcedChoice(t *testing.T) {
 	reg := corpusReg(t)
 	c, ok := reg.Lookup("Whiskervale Forerunner")
 	if !ok {
@@ -101,20 +103,27 @@ func TestTriggerLookedPickDeclineIsTargetSkipOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replay: %v", err)
 	}
-	declined := 0
+	picked := 0
 	for _, d := range res.Decisions {
-		if d.Resume != "choice" || d.Options != 1 || d.Min != 0 || len(d.Picks) != 0 ||
-			d.Step < 0 || d.Step >= len(it.XAnswers) {
+		if d.Resume != "choice" || d.Options != 1 || d.Step < 0 || d.Step >= len(it.XAnswers) {
 			continue
 		}
-		declined++
+		if len(d.Picks) == 0 {
+			t.Fatalf("looked pick at step %d still declined: the replay must take the card", d.Step)
+		}
+		picked++
 		got := it.XAnswers[d.Step]
-		if len(got) != 1 || got[0] != (oraclegen.XAnswer{Seat: 0, Kind: "target", Value: "[target_skip]"}) {
-			t.Fatalf("looked-pick step %d answers %+v, want the lone target skip", d.Step, got)
+		if len(got) == 0 || got[0] != (oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: "Grizzly Bears"}) {
+			t.Fatalf("looked-pick step %d answers %+v, want the choice-queue pick of Grizzly Bears first", d.Step, got)
+		}
+		for _, a := range got {
+			if a.Value == "[target_skip]" || a.Value == "[choice_skip]" || a.Value == "no" && a.Kind == "choice" && len(got) == 1 {
+				t.Fatalf("step %d answers %+v carry a skip XMage's mandatory ask rejects", d.Step, got)
+			}
 		}
 	}
-	if declined == 0 {
-		t.Fatal("precondition: the replay carries no declined one-card look pick")
+	if picked == 0 {
+		t.Fatal("precondition: the replay carries no one-card look pick")
 	}
 }
 
