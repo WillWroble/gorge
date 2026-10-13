@@ -32,7 +32,7 @@ func TestCostGrammarRowsServed(t *testing.T) {
 			// The exiled artifact is the scripted choice; XMage announces no
 			// X (its cost elects any set reaching the target's mana value).
 			st := activateStepIndex(it.Scenario.Steps)
-			if !hasXAnswer(it.XAnswers, st, "choice", "Bonesplitter") || hasXAnswerPrefix(it.XAnswers, st, "X=") {
+			if !costGrammarHasAnswer(it.XAnswers, st, "choice", "Bonesplitter") || costGrammarHasAnswerPrefix(it.XAnswers, st, "X=") {
 				t.Fatalf("activate answers = %+v, want the Bonesplitter choice and no X announce", it.XAnswers[st])
 			}
 		}},
@@ -80,7 +80,7 @@ func TestCostGrammarRowsServed(t *testing.T) {
 	}
 }
 
-func hasXAnswer(as [][]oraclegen.XAnswer, step int, kind, value string) bool {
+func costGrammarHasAnswer(as [][]oraclegen.XAnswer, step int, kind, value string) bool {
 	for _, a := range as[step] {
 		if a.Kind == kind && a.Value == value {
 			return true
@@ -89,7 +89,7 @@ func hasXAnswer(as [][]oraclegen.XAnswer, step int, kind, value string) bool {
 	return false
 }
 
-func hasXAnswerPrefix(as [][]oraclegen.XAnswer, step int, prefix string) bool {
+func costGrammarHasAnswerPrefix(as [][]oraclegen.XAnswer, step int, prefix string) bool {
 	for _, a := range as[step] {
 		if strings.HasPrefix(a.Value, prefix) {
 			return true
