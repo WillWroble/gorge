@@ -564,6 +564,9 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		}
 	}
 	cfg := Config{Seed: 42, Names: []string{"a", "b"}, Decks: decks, Tokens: r.reg.Tokens, NamedCorpus: r.reg.Universe()}
+	// A scenario seating a card-name choice ranges it over the scenario's own
+	// cards (oracleNameUniverse); every other scenario is unchanged.
+	cfg.NameUniverse = oracleNameUniverse(decks, sideboards)
 	for p := range sideboards {
 		if len(sideboards[p]) > 0 {
 			// Only a scenario that names a sideboard sets the field, so every
