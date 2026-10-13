@@ -7,6 +7,7 @@
   import TableCell from '../components/TableCell.svelte';
   import Feed from '../components/Feed.svelte';
   import PlayVsBot from '../components/PlayVsBot.svelte';
+  import DraftEntry from '../components/DraftEntry.svelte';
   import DeckLeaderboard from '../components/DeckLeaderboard.svelte';
   import type { Widget } from '../protocol';
 
@@ -50,6 +51,9 @@
          path. The server decides whether the flow is enabled; a server that
          did not arm -vsbot answers 404 and the panel renders it. -->
     <div class="playstrip"><PlayVsBot /></div>
+    <!-- Draft events (E2): the pod entry point sits beside play-vs-bot; it
+         hides itself on a server without -events. -->
+    <div class="playstrip"><DraftEntry /></div>
     <div class="playstrip"><DeckLeaderboard /></div>
     <div class="sections">
       {#each sections as s (s.format)}

@@ -1,5 +1,6 @@
 import { openStream, type Stream } from './stream';
 import { subscribe, unsubscribe } from './api';
+import { eventApi } from './eventapi';
 import { withBase } from './basepath';
 import type { Frame } from '../protocol';
 
@@ -25,6 +26,9 @@ class Session {
   readonly stream: Stream;
   private wantOverview = false;
   private focused = new Set<string>();
+  // Draft events this page watches: event id -> the seat token ("" for a
+  // spectator). Re-subscribed on every hello like the table subscriptions.
+  private events = new Map<string, string>();
   #id = $state<string | null>(null);
   get id(): string | null { return this.#id; }
 
@@ -58,7 +62,11 @@ class Session {
     for (const t of this.focused) {
       if (!(await this.trySubscribe(id, t, 'focus'))) failed.push([t, 'focus']);
     }
-    if (failed.length === 0 || attempt >= RESUBSCRIBE_TRIES - 1) return;
+    let eventsFailed = false;
+    for (const [ev, token] of this.events) {
+      if (!(await this.trySubscribeEvent(id, ev, token))) eventsFailed = true;
+    }
+    if ((failed.length === 0 && !eventsFailed) || attempt >= RESUBSCRIBE_TRIES - 1) return;
     // A hello for a NEWER session has already re-entered this method; that
     // run owns the subscriptions now and this one must not fight it.
     await delay(RESUBSCRIBE_BACKOFF_MS * 2 ** attempt);
@@ -73,6 +81,27 @@ class Session {
     } catch {
       return false;
     }
+  }
+  private async trySubscribeEvent(id: string, ev: string, token: string): Promise<boolean> {
+    try {
+      await eventApi.subscribe(ev, token || null, id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * watchEvent binds this page's stream to one draft event (POST
+   * /api/events/{id}/subscribe) at the viewer's seat, and keeps it bound
+   * across reconnects. The server pushes the first event_state (and, while
+   * drafting, the seat's draft_pack) straight away.
+   */
+  async watchEvent(ev: string, token: string | null) {
+    this.events.set(ev, token ?? '');
+    if (this.#id) await this.trySubscribeEvent(this.#id, ev, token ?? '');
+  }
+  unwatchEvent(ev: string) {
+    this.events.delete(ev);
   }
   ensureOverview() {
     if (this.wantOverview) return;

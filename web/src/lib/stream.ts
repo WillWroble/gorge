@@ -15,7 +15,13 @@ export interface Stream {
   close(): void;
 }
 
-const FRAME_TYPES: FrameType[] = ['hello', 'widget', 'match_start', 'snapshot', 'event', 'decision', 'match_end', 'table_halted', 'overflow', 'error', 'rewind'];
+// The four draft-event frames (event_state, draft_pack, pod_progress,
+// series_update) ride the same session stream once POST
+// /api/events/{id}/subscribe binds the session to an event.
+const FRAME_TYPES: FrameType[] = [
+  'hello', 'widget', 'match_start', 'snapshot', 'event', 'decision', 'match_end', 'table_halted', 'overflow', 'error', 'rewind',
+  'event_state', 'draft_pack', 'pod_progress', 'series_update',
+];
 
 /** parseFrame decodes one SSE data line; anything malformed or from another protocol version is dropped. */
 export function parseFrame(data: string): Frame | null {
