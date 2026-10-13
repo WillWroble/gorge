@@ -11,9 +11,11 @@ import (
 // TestXMageStackOnlyCostReductionRuling pins the harness ruling for Swat
 // Away static#0.0: XMage's reduction is stack-only, so TestPlayer cannot
 // find the UU cast the scenario (correctly, CR 601.2f) pays. Lashwhip
-// Predator and Bite Down on Crime fail with the same harness shape for a
-// cause no one has triaged, so the ruling's API narrowing must leave them
-// unruled.
+// Predator's static is the same SpellCostReductionSourceEffect
+// .setCanWorksOnStackOnly(true) (operator-triaged 2026-10-13), so the ruling
+// covers it through its "-" API signature. Bite Down on Crime fails with the
+// same harness shape for another cause (XMage prices it with a cost
+// adjuster), so the API narrowing must leave it unruled.
 func TestXMageStackOnlyCostReductionRuling(t *testing.T) {
 	const rulingID = "xmage-stack-only-cost-reduction-unplayable"
 	const wantKey = "static | harness | xmage | AssertionError: Can't find ability to activate command: Cast $CARD"
@@ -55,9 +57,12 @@ func TestXMageStackOnlyCostReductionRuling(t *testing.T) {
 
 	// Same shape, different cards: the precondition is that their shape
 	// really is Swat Away's, so only the API narrowing keeps them out.
-	for _, c := range []struct{ card, tmpl string }{
-		{"Lashwhip Predator", "static#0.0"},
-		{"Bite Down on Crime", "static#0.1"},
+	for _, c := range []struct {
+		card, tmpl string
+		ruled      bool
+	}{
+		{"Lashwhip Predator", "static#0.0", true},
+		{"Bite Down on Crime", "static#0.1", false},
 	} {
 		r := row(c.card, c.tmpl, cant(c.card, ""))
 		if s, ok := Of(r); !ok || s.Key() != wantKey {
@@ -67,7 +72,11 @@ func TestXMageStackOnlyCostReductionRuling(t *testing.T) {
 		if a == swatAPI {
 			t.Fatalf("%s shares Swat Away's API %q", c.card, a)
 		}
-		if m, _, _ := Classify(&r, rs, a); m != nil {
+		m, _, _ := Classify(&r, rs, a)
+		switch {
+		case c.ruled && (m == nil || m.ID != rulingID):
+			t.Errorf("%s (api %s): not ruled %s", c.card, a, rulingID)
+		case !c.ruled && m != nil:
 			t.Errorf("%s (api %s): ruled %s; its cause is untriaged", c.card, a, m.ID)
 		}
 	}
