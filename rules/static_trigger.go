@@ -32,6 +32,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/events"
 )
 
 // staticTriggerLine returns the trigger line, the SVar table that owns its
@@ -50,6 +51,16 @@ func (e *Engine) staticTriggerLine(pt pendingTrigger) (cards.Trigger, map[string
 			return cards.Trigger{}, nil, nil, false
 		}
 		return pt.Trigger, pt.TriggerSVars, nil, true
+	}
+	if pt.Delayed && pt.DelayedStatic && pt.SA != nil {
+		// A Static$ True Mode$ Phase registration: no line was kept, so a
+		// synthetic bare one stands in (no Optional/Unless/cost riders).
+		src := e.G.Obj(pt.Source)
+		if src == nil || src.Face() == nil {
+			return cards.Trigger{}, nil, nil, false
+		}
+		f := src.Face()
+		return cards.Trigger{Mode: "Phase"}, f.SVars, f, true
 	}
 	if pt.Delayed || pt.SA == nil {
 		return cards.Trigger{}, nil, nil, false
@@ -126,6 +137,12 @@ func (e *Engine) resolveStaticTriggers() bool {
 			continue
 		}
 		e.removeTriggerAt(i)
+		if pt.Delayed {
+			// CR 603.7: consume the one-shot registration, no stack object.
+			e.emit(events.Event{Kind: events.DelayedPush, Obj: pt.Source,
+				Player: pt.Controller, Amount: int32(pt.DelayedID), Counter: pt.Execute,
+				Text: "static"})
+		}
 		e.resolveStaticTrigger(pt, svars)
 		resolved = true
 	}

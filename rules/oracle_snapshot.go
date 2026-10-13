@@ -150,6 +150,16 @@ type OracleDecision struct {
 	// unchanged for them.
 	PerPlayer bool `json:"per_player,omitempty"`
 	SeatCount int  `json:"seat_count,omitempty"`
+	// Retarget marks a ChangeTargets redirect pick (CR 115.7): a choose ask
+	// whose options are the legal NEW targets. XMage poses it as a
+	// chooseTarget on the target queue, not a makeChoose dialog, so the
+	// generator answers it as a target. False for every other choose ask.
+	Retarget bool `json:"retarget,omitempty"`
+	// XMulti marks an X announcement of a cost naming X more than once
+	// (Gogo's "XMin1 X X", {X}{X}): XMage's unscripted announce does not pay
+	// the repeated X even when the pool leaves one legal value, so it must be
+	// scripted.
+	XMulti bool `json:"x_multi,omitempty"`
 	// PerOpponent marks a per-player target ask whose filter admits only
 	// opponents' objects: XMage asks no target for the controller's seat.
 	PerOpponent bool `json:"per_opponent,omitempty"`

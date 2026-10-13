@@ -1433,7 +1433,29 @@ func forcedSingleOption(d rules.OracleDecision) bool {
 	if hasTargetPick(d) {
 		return false
 	}
+	if announcesX(d) {
+		// An X announcement is always posed (XMage's announceXMana), even
+		// when the available mana leaves one legal value: an "{X}{X}, {T}"
+		// activation (Gogo, Master of Mimicry) with CC offers only X = 1,
+		// and an unscripted announce left the cost unpaid.
+		return false
+	}
 	return d.Options == 1 && d.Min == 1 && d.Max == 1
+}
+
+// announcesX reports whether d is the single positive "X = <n>" announcement
+// of a cost that names X more than once ({X}{X}, the runner's XMulti mark).
+// XMage's unscripted announce does not pay the repeated X when the pool leaves
+// one legal value (Gogo's unspent CC), so it is scripted. A forced announce of
+// a single-X cost stays unscripted: XMage's default agrees there and the
+// committed rows (Rottenmouth Viper, Saheeli's Lattice, The Enigma Jewel)
+// would re-hash for nothing.
+func announcesX(d rules.OracleDecision) bool {
+	if !d.XMulti || len(d.Picks) != 1 || pickKind(d, 0) != "x" {
+		return false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(d.Picks[0], "X = "))
+	return err == nil && n > 0 && strings.HasPrefix(d.Picks[0], "X = ")
 }
 
 // forcedChoicePosed reports whether a forced one-option choose_n ask is still
@@ -1499,6 +1521,9 @@ func modeNumberFor(d rules.OracleDecision, k int, modes map[string]int) (int, bo
 // choice queue (makeChoose). A decision with a target or skipped pick is not
 // one makeChoose dialog and must not be joined with '^'.
 func allChoiceQueue(d rules.OracleDecision) bool {
+	if d.Retarget {
+		return false
+	}
 	for k, label := range d.Picks {
 		if xmQueue(pickKind(d, k), label) != "choice" {
 			return false
@@ -2476,6 +2501,13 @@ func openingHandAnswers(f *cards.Face) []Answer {
 // reaches XMage's choice queue: only a search of your own library is the
 // TargetCardInLibrary target ask (measured on the std pass).
 func pickQueue(d rules.OracleDecision, k int, label string) string {
+	if d.Retarget {
+		// A ChangeTargets redirect (Bolt Bend) is XMage's chooseTarget:
+		// the new target rides the target queue even though gorge poses it
+		// as a choose ask, so a "choice" answer is never consumed and the
+		// original target survives.
+		return "target"
+	}
 	q := xmQueue(pickKind(d, k), label)
 	if q == "target" && pickKind(d, k) == "search" && k < len(d.PickRefs) {
 		if s, ok := refSeat(d.PickRefs[k]); ok && s != d.Seat {
