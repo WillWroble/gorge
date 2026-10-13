@@ -635,6 +635,13 @@ func conditionDefinedMet(h Host, c *Ctx, sa *cards.SA, defined, present, compare
 			}
 			o = targetedPermanentLKI(c, present, o)
 		}
+		// CR 608.2h: a remembered object that RememberLKI$ moved off the
+		// battlefield is read with the controller it had there (Unyielding
+		// Gatekeeper's `ConditionPresent$ Card.YouCtrl`: the exile reset the
+		// live controller to the owner).
+		if defined == "Remembered" || defined == "RememberedLKI" {
+			o = rememberedControllerLKI(c, o)
+		}
 		if present == "" {
 			count++
 			continue
@@ -988,6 +995,22 @@ func targetedPermanentLKI(c *Ctx, present string, o *state.Object) *state.Object
 			oc.Controller = p
 		}
 	}
+	return &oc
+}
+
+// rememberedControllerLKI returns o carrying the controller RememberLKI$
+// captured for it when it is no longer on the battlefield; every other
+// characteristic stays the live read. Unchanged without a capture.
+func rememberedControllerLKI(c *Ctx, o *state.Object) *state.Object {
+	if c == nil || o == nil || o.Zone == state.ZBattlefield {
+		return o
+	}
+	p, ok := lkiControllerFor(c, o.ID)
+	if !ok || p == o.Controller {
+		return o
+	}
+	oc := *o
+	oc.Controller = p
 	return &oc
 }
 
