@@ -277,10 +277,11 @@ func TestAttachedDetachDoesNotFire(t *testing.T) {
 	replayCheck(t, e, cfg)
 }
 
-// TestAttachedErietteStaysSilent: Eriette's line carries only
-// TargetRelativeToSource$ (unread everywhere in this build) and no
-// ValidTarget$ -- the matcher fails closed, so her trigger never fires and
-// an Aura you control attaching to an opponent's permanent gains nothing.
+// TestAttachedErietteStaysSilent: Eriette's TargetRelativeToSource$ bearer
+// filter compares the bearer's mana value with the attaching Aura's: Rancor
+// (mana value 1) attaching to an opponent's two-mana Bear fails "mana value
+// less than or equal to that Aura's mana value", so nothing is gained. The
+// firing case is TestAttachedErietteGainsControl.
 func TestAttachedErietteStaysSilent(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)

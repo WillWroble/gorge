@@ -10,10 +10,11 @@ import (
 // TestSelfCauseTriggerClassification pins the routing the self-cause ticket
 // (agent-20261009T160853Z-c3e35453) added: a self-transform trigger, a self
 // cycling trigger and an origin-free land-play trigger now name a servable
-// sub-family, while the shapes their causes cannot produce stay gaps -- an
-// origin-scoped land play (Gwen Stacy's from-exile, Shadow of the Goblin's
-// not-from-hand and not-owned land) and Spider-Man 2099's Static$ True
-// LandPlayed trigger, which never reaches the stack to be observed.
+// sub-family, while the shapes their causes cannot produce stay gaps --
+// Shadow of the Goblin's not-owned hand land and Spider-Man 2099's Static$
+// True LandPlayed trigger, which never reaches the stack to be observed. The
+// origin-scoped land plays (Gwen Stacy's from-exile, Shadow of the Goblin's
+// not-from-hand) are served by trigger.land-played-zone (wave-4 lb4-gtrig).
 func TestSelfCauseTriggerClassification(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	for _, tc := range []struct{ name, key, sub string }{
@@ -25,8 +26,8 @@ func TestSelfCauseTriggerClassification(t *testing.T) {
 		{"Basri, Tomorrow's Champion", "trigger#0.0", "trigger.cycled"},
 		{"Webstrike Elite", "trigger#0.0", "trigger.cycled"},
 		{"The Endstone", "trigger#0.0", "trigger.land-played"},
-		{"Gwen Stacy", "trigger#1.0", "trigger.gap:LandPlayed"},
-		{"Shadow of the Goblin", "trigger#0.1", "trigger.gap:LandPlayed"},
+		{"Gwen Stacy", "trigger#1.0", "trigger.land-played-zone"},
+		{"Shadow of the Goblin", "trigger#0.1", "trigger.land-played-zone"},
 		{"Shadow of the Goblin", "trigger#0.2", "trigger.gap:LandPlayed"},
 		{"Spider-Man 2099", "trigger#0.1", "trigger.gap:LandPlayed"},
 	} {

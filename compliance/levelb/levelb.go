@@ -190,6 +190,9 @@ func classifyTrigger(f *cards.Face, t *cards.Trigger) (sub, gap string, covered 
 	if sub, ok := classifyEventTrigger(t); ok {
 		return sub, "", false
 	}
+	if sub, ok := classifyMayPlayRider(f, t); ok {
+		return sub, "", false
+	}
 	if sub, ok := classifyPhaseOther(t); ok {
 		return sub, "", false
 	}
@@ -210,6 +213,13 @@ func classifyTrigger(f *cards.Face, t *cards.Trigger) (sub, gap string, covered 
 		dest := t.ParamStr(cards.PKDestination)
 		origin := t.ParamStr(cards.PKOrigin)
 		self := namesSelf(t.ParamStr(cards.PKValidCard))
+		// A self line naming neither zone (Ghostly Dancers, Bullseye: "When
+		// CARDNAME enters") does not look back in time, so its source sees
+		// only the move that leaves it ON the battlefield: an enters trigger
+		// (rules/trigger_zone_gate.go zoneChangeNoLookBack).
+		if self && dest == "" && origin == "" {
+			dest = "Battlefield"
+		}
 		if strings.EqualFold(dest, "Battlefield") {
 			if !self {
 				return "trigger.etb-other", "", false

@@ -77,6 +77,7 @@ func morphFamilyCost(f *cards.Face) (raw, pool, mode string, megamorph bool, why
 		if !ok || strings.TrimSpace(raw) == "" {
 			continue
 		}
+		raw = morphCostWithoutReduction(f, raw)
 		pool, gap := oraclegen.PoolFor(raw)
 		if gap != "" {
 			return "", "", "", false, "turned-face-up: " + strings.ToLower(fam.head) + " cost " + gap
@@ -220,4 +221,20 @@ func xmageManaText(cost string) string {
 		}
 	}
 	return b.String()
+}
+
+// morphCostWithoutReduction strips a family cost's printed reduction rider:
+// Fugitive Codebreaker's "Disguise:5 R:X:This cost is reduced by {1} for
+// each instant and sorcery card in your graveyard." is the mana cost {5}{R},
+// then the SVar naming the reduction and its reminder text. The scenario's
+// graveyard holds no instant or sorcery, so the reduction is zero and the
+// printed cost is what both engines charge. Any other cost is unchanged.
+func morphCostWithoutReduction(f *cards.Face, raw string) string {
+	parts := strings.SplitN(raw, ":", 3)
+	if len(parts) == 3 {
+		if _, ok := f.SVars[strings.TrimSpace(parts[1])]; ok {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	return raw
 }

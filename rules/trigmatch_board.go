@@ -50,6 +50,7 @@ func (b *trigBoard) Facts() trigmatch.Facts {
 		LifeLossBatch:          b.lifeLossBatch,
 		FinishingLifeLossBatch: b.finishingLifeLossBatch,
 		TappedTurn:             b.tappedTurn,
+		PlayingLand:            b.playingLand(),
 	}
 }
 
@@ -146,3 +147,13 @@ func (b *trigBoard) SpellsCastThisTurn(p state.PlayerID) int {
 func (b *trigBoard) ManaExpendTotal(p state.PlayerID) int32 { return b.eng().manaExpendTotal(p) }
 
 func (b *trigBoard) IsLoyaltyAbility(ab *cards.SA) bool { return isLoyaltyAbility(ab) }
+
+// playingLand is the land whose land play is in flight (cast_commit.go's
+// payCast arms etbLandPlay before the move and finishLandPlay disarms it
+// after the move's triggers are checked), or 0.
+func (b *trigBoard) playingLand() state.ObjID {
+	if !b.etbLandPlay {
+		return 0
+	}
+	return b.etbLandObj
+}
