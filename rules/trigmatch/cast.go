@@ -712,6 +712,17 @@ const validSAManaFromPrefix = "Spell.ManaFrom"
 const validSATeamworkClause = "Spell.Teamwork"
 
 func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.PlayerID, clause string) bool {
+	if validSATargetingList(clause) {
+		// A comma list carrying the spaced `IsTargeting <spec>` alternative
+		// (Danitha, Sword of Hope: "Spell.Equipment,Spell.IsTargeting Valid
+		// Creature.YouCtrl" -- an Equipment spell OR a spell that targets a
+		// creature you control). The object matcher answers both forms at the
+		// alternative level (effects spellIsTargetingAlt), so the whole clause
+		// is one spec filter over the cast spell; splitting it on spaces
+		// below would read the argument's words as separate fields and fail
+		// the cast closed (CR 603.2: the trigger must see the cast).
+		return e.MatchesSpec(strings.TrimSpace(clause), ev.Obj, source, ctrl, SpecOpts{})
+	}
 	fields := strings.Fields(strings.TrimSpace(clause))
 	switch len(fields) {
 	case 1:
@@ -740,6 +751,12 @@ func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.Pla
 		return false
 	}
 	return false
+}
+
+// validSATargetingList reports a ValidSA$ comma list one of whose
+// alternatives is the spaced `IsTargeting <spec>` form.
+func validSATargetingList(clause string) bool {
+	return strings.Contains(clause, ",") && strings.Contains(clause, ".IsTargeting ")
 }
 
 // spellValidSAonCardMatches evaluates a SpellCast trigger's ValidSAonCard$

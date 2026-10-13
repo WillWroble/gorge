@@ -199,6 +199,12 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 			if f != nil {
 				n += int32(objectManaValue(o))
 			}
+		case prop == "NumTimesChoseMode":
+			// TriggeredSpellAbility$NumTimesChoseMode (Riku of Many Paths'
+			// "the number of times you chose a mode for that spell", CR
+			// 700.2): one per recorded mode choice on the referenced spell,
+			// a repeated mode (CR 700.2d) counted each time it was chosen.
+			n += int32(len(o.ChosenModes))
 		case prop == "CardNumColors":
 			// The referenced object's colour count (task rv2b-countheads):
 			// Mana Drain's drain (Lurking Spinecrawler's
