@@ -214,6 +214,19 @@ type TableConfig struct {
 	// loads as false, and restart skips a persisted table the new rule
 	// refuses rather than failing the whole process.
 	AllowDecklistBots bool `json:"allow_decklist_bots,omitempty"`
+	// SeatBotPolicies names a bot policy per seat index: seat i of every match
+	// is played by SeatBotPolicies[i] when that entry is non-empty, else by
+	// BotPolicy. Like PlayerNames it never rotates with the decks. An entry
+	// may not name a human seat, and may not name a policy that reads
+	// opponents' decklists (bots.Info.Env). nil — every table before E1 —
+	// builds every bot seat from BotPolicy exactly as before. Human-seat
+	// caretakers always use BotPolicy.
+	SeatBotPolicies []string `json:"seat_bot_policies,omitempty"`
+	// Event names the draft event (eventhost) that owns this table. An event
+	// table must be OnDemand and not Perpetual; it is exempt from
+	// Options.MaxOnDemandTables because eventhost bounds its own events.
+	// "" — every other table — changes nothing.
+	Event string `json:"event,omitempty"`
 }
 
 // autoPayManaEnabled is the effective hosted-bot setting. BotAutoPayMana is
@@ -304,6 +317,9 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 			}
 			seen[h] = true
 		}
+	}
+	if c, err = c.validatedSeatPolicies(); err != nil {
+		return TableConfig{}, err
 	}
 	for _, d := range c.Decks {
 		dd, err := load(d)
