@@ -350,7 +350,14 @@ func TestTeacherChoiceRealDeckGolden(t *testing.T) {
 	// [1,0.875,1,1], Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8
 	// TerminalByCandidate split are as measured. Attributed by hiding only the
 	// four view fields (json:"-"): the old digest returns byte-for-byte.
-	const want = "4389f2546ba846c5d6264d6a76585b8bfddfc01b4c4b575e824148ba24635452"
+	// Re-measured for the paid-cost mana census default flip (2026-10-13): the
+	// census offers pool-short abilities and counts paid-cost sources, so the
+	// rollouts' games move and Submits 3598 -> 3852 with WinsByCandidate
+	// [8,7,8,8] and LossesToBaseline [0,1,0,0]; Index 0, Values [1,0.875,1,1],
+	// Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8 TerminalByCandidate
+	// split as measured. Attributed by forcing rules/genesis.go's
+	// paidManaCensus to false: the old digest returns byte-for-byte.
+	const want = "05962e526c4fe336cd78dd10365d6b9b792fd919765d303bfba3361e039d4c12"
 	for _, parallelism := range []int{0, 4} {
 		res, err := TeacherChoice(worlds, cands, TeacherOptions{Seed: 99, MaxSubmits: 5000, Parallelism: parallelism})
 		if err != nil {

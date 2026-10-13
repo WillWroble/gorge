@@ -3,8 +3,10 @@ package rules
 import (
 	"fmt"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -13,21 +15,23 @@ import (
 // answer flow (handleChoose routes on the chooseFor below), and its own
 // effects:
 //
-//   - kw:Station (CR 702.150, "Station: Tap another creature you control: Put
-//     charge counters equal to its power on this Spacecraft. Station only as
-//     a sorcery."): the offer is gated on the sorcery window (sorcerySpeed)
-//     and on at least one legal candidate existing; the KChoose picks the
-//     creature to tap; the answer emits the Tap (the cost) and the CHARGE
-//     CounterChange (the effect, its amount read from the layer-derived
-//     power at answer time).
+//   - kw:Station (CR 702.184a, "Tap another untapped creature you control:
+//     Put a number of charge counters on this permanent equal to the tapped
+//     creature's power. Activate only as a sorcery."): the offer is gated on
+//     the sorcery window (sorcerySpeed) and on at least one legal candidate
+//     existing; the KChoose picks the creature to tap; the answer emits the
+//     Tap (the cost) and puts the Station ABILITY on the stack (it is an
+//     activated ability, not a special action), whose resolution places the
+//     CHARGE counters (the amount read from the tapped creature's tap-power
+//     value at resolution, stationAmount).
 //
 //   - Room unlock (CR 309.5, rules/rooms.go): the offer is gated on the
 //     sorcery window and on the locked half's mana cost being payable; the
 //     answer pays that cost and emits the DoorUnlock event.
 //
-// Both follow the cleanup-discard precedent: the decision suspends nothing
-// mid-resolution (no resolution is running), and the answer handler is the
-// flow's whole continuation.
+// Both asks follow the cleanup-discard precedent: the decision suspends
+// nothing mid-resolution (no resolution is running), and the answer handler
+// is the ask's whole continuation (for Station, up to the stack push).
 
 // chooseStation is the chooseFor for the Station tap pick. iota+13 is
 // pairwise distinct from the shared package set as of the mass-turn/
@@ -111,12 +115,17 @@ func (e *Engine) askStation(p state.PlayerID, opt decision.Option) {
 		Options: opts})
 }
 
-// handleStation applies the answered Station pick: the Tap is the cost (one
-// event), the CHARGE counters the effect, its amount the tapped creature's
-// tap-power value read at answer time (CR 702.150a's power, or the toughness
-// a stat:TapPowerValue static like Tapestry Warden's substitutes). A stale
-// answer (the creature left play, or is already tapped) degrades to a no-op
-// rather than wedging.
+// handleStation applies the answered Station pick. Station is an activated
+// ability (CR 702.184a: "Tap another untapped creature you control: Put a
+// number of charge counters on this permanent equal to the tapped creature's
+// power. Activate only as a sorcery."), so it uses the stack: the Tap is the
+// cost (one event), then events.KeywordAbilityPush mints the ability object
+// from the Spacecraft's K:Station line (cards.KeywordPushAbility), with the
+// tapped creature in its IDs so the resolution reads that creature's
+// tap-power value (stationAmount). The CHARGE counters are the RESOLVING
+// ability's effect, placed when every player has passed -- never here. A
+// stale answer (the creature left play, or is already tapped) degrades to a
+// no-op rather than wedging.
 func (e *Engine) handleStation(spacecraft state.ObjID, chosen []decision.Option) {
 	e.stationing = 0
 	if len(chosen) == 0 {
@@ -127,15 +136,61 @@ func (e *Engine) handleStation(spacecraft state.ObjID, chosen []decision.Option)
 	if o == nil || o.Zone != state.ZBattlefield || o.Tapped {
 		return
 	}
-	// The stationing player puts the CHARGE counters, and this is a
-	// turn-based special action with no stack cause, so publish the adder
-	// explicitly (chosen[0].Player is the station ask's own player).
-	prevAdder := e.SetCounterAdder(chosen[0].Player)
-	defer e.SetCounterAdder(prevAdder)
-	n := e.tapPowerValue(id, stationSAKind)
-	e.emit(events.Event{Kind: events.Tap, Obj: id})
-	if n > 0 {
-		e.emit(events.Event{Kind: events.CounterChange, Obj: spacecraft,
-			Counter: "CHARGE", Amount: n})
+	line := e.stationKeywordLine(spacecraft)
+	if line == "" {
+		return
 	}
+	e.emit(events.Event{Kind: events.Tap, Obj: id})
+	e.emit(events.Event{Kind: events.KeywordAbilityPush, Player: chosen[0].Player,
+		Obj: spacecraft, Counter: line, IDs: []state.ObjID{id}})
+}
+
+// stationKeywordLine is the Spacecraft's printed K:Station line ("Station:8"),
+// the Counter a KeywordAbilityPush carries so a replay re-synthesizes the
+// identical body. A Station keyword with no printed line (a grant) is the
+// bare head. "" when the object is gone.
+func (e *Engine) stationKeywordLine(spacecraft state.ObjID) string {
+	o := e.G.Obj(spacecraft)
+	if o == nil || o.Face() == nil {
+		return ""
+	}
+	if param, ok := o.Face().KeywordParam(kwhStation.S); ok && param != "" {
+		return kwhStation.S + ":" + param
+	}
+	return kwhStation.S
+}
+
+// isStationAbility reports whether ab is the Station ability's resolving
+// body (cards.KeywordPushAbility's Station arm, tagged Keyword$ Station).
+func isStationAbility(ab *cards.SA) bool {
+	return ab != nil && ab.API == "PutCounter" && pay.SaHasKeyword(ab, stationSAKind)
+}
+
+// stationAmount is the number of CHARGE counters a resolving Station ability
+// puts: the tapped creature's power (CR 702.184a), read through
+// tapPowerValue so a Station-scoped stat:TapPowerValue static (Tapestry
+// Warden's toughness) substitutes, at RESOLUTION -- the ability's effect
+// reads the creature's power as it resolves. The creature is the first
+// object the activation's push remembered. ok is false for any other ability.
+// A tapped creature that has since left the battlefield is read in its new
+// zone (its printed power there): an approximation of CR 608.2h's last known
+// information, which this build does not snapshot for a tap cost.
+func (e *Engine) stationAmount(o *state.Object) (int32, bool) {
+	if o == nil || !isStationAbility(o.Ability) {
+		return 0, false
+	}
+	for _, rem := range o.Remembered {
+		if rem.IsPlayer || rem.Obj == 0 {
+			continue
+		}
+		if e.G.Obj(rem.Obj) == nil {
+			return 0, true
+		}
+		n := e.tapPowerValue(rem.Obj, stationSAKind)
+		if n < 0 {
+			n = 0
+		}
+		return n, true
+	}
+	return 0, true
 }

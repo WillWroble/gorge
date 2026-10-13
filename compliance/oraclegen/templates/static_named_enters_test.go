@@ -13,9 +13,9 @@ import (
 
 // The two served rows of Petrified Hamlet (ticket levelb-static-named-enters):
 // a land that names a card while its ETB trigger resolves. Both scenarios
-// play the land, resolve the ETB trigger -- whose NameCard ask gorge's legacy
-// no-universe runner answers with p0's library top, which the setup pins to
-// the probe land -- and assert at p0's next priority. The control drops the
+// play the land, resolve the ETB trigger -- whose NameCard ask (over the
+// runner's scenario name universe) the resolve step answers with the probe
+// land -- and assert at p0's next priority. The control drops the
 // source from p0's hand and the play/resolve steps, so the same checkpoint
 // measures the board as if the land were never played.
 

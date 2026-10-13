@@ -9,13 +9,13 @@ import (
 )
 
 // mmStats is the paid-cost mana census A/B probe (play -mm-stats, with or
-// without -paid-mana-census): per seat, counters over its posed priority
+// without -no-paid-mana-census): per seat, counters over its posed priority
 // windows. They are written into each game's record and summed by the report
 // script (docs/superpowers/reports/2026-10-12-mana-model-ab.md).
 //
-// A "new" option is one the flag adds: present in the priority walk with
-// Config.PaidManaCensus on, absent with it off, at the same state. The other
-// flag value's list is derived on a clone (Engine.PriorityOptionsWithPaidManaCensus).
+// A "new" option is one the census adds: present in the priority walk with
+// the paid-cost census on, absent with it off, at the same state. The other
+// value's list is derived on a clone (Engine.PriorityOptionsWithPaidManaCensus).
 // In a flag-on game new options are those the seat was offered and chose
 // from; in a flag-off game they are the exposure (offered under on, not now).
 type mmStats map[string]int64
@@ -82,7 +82,8 @@ func mmVisibleList(d *decision.Decision, auto bool) (all, spells int) {
 }
 
 // observe folds one answered decision into m. engineFlag is the engine's
-// Config.PaidManaCensus; auto is whether the seat pays automatically.
+// paid-cost census setting (the inverse of Config.DisablePaidManaCensus);
+// auto is whether the seat pays automatically.
 func (m mmStats) observe(e *rules.Engine, engineFlag, auto bool, d *decision.Decision, in decision.Intent) {
 	if d.Kind != decision.KPriority {
 		return

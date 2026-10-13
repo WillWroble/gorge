@@ -122,6 +122,28 @@ func (e *Engine) composedOfferCostInto(dst *Cost, p state.PlayerID, id state.Obj
 	}
 }
 
+// creatureManaOfferCredit is the conservative generic credit Heirloom Epic's
+// `TapCreaturesForMana` ability grants: one per candidate creature not already
+// relied on as a mana source by the ordinary pool/window feasibility probe,
+// capped at the cost's generic. The offer gate prices the ability with it and
+// the plan composes the identical cost, so the witness and the gate agree on
+// what the activation owes before its creature contributions are elected.
+func (e *Engine) creatureManaOfferCredit(p state.PlayerID, id state.ObjID, base Cost) int32 {
+	if base.Generic <= 0 {
+		return 0
+	}
+	var credit int32
+	for _, oid := range pay.CreatureManaCandidates(e.G, p, id, base.Tap) {
+		if !e.untappedManaSource(p, oid) {
+			credit++
+		}
+	}
+	if credit > base.Generic {
+		credit = base.Generic
+	}
+	return credit
+}
+
 // offerCastable is THE offer-side gate every cast/activation option is gated
 // on. base is the RAW (pre-modifier) cost beginCast stores in pendingCast
 // for this exact option and scope the costScope its modifiers are collected
@@ -212,17 +234,8 @@ func (e *Engine) offerCastableUsing(statics costStaticViews, p state.PlayerID, i
 	// Offer only a conservative bound: never count a creature also relied on as
 	// a mana ability by the ordinary pool/window feasibility probe. The real
 	// cost is unchanged; the selected contributions are charged at payment.
-	if pay.TapCreaturesForMana(scope.Ab) && base.Generic > 0 {
-		var credit int32
-		for _, oid := range pay.CreatureManaCandidates(e.G, p, id, base.Tap) {
-			if !e.untappedManaSource(p, oid) {
-				credit++
-			}
-		}
-		if credit > base.Generic {
-			credit = base.Generic
-		}
-		if credit > 0 {
+	if pay.TapCreaturesForMana(scope.Ab) {
+		if credit := e.creatureManaOfferCredit(p, id, *base); credit > 0 {
 			mods.Reduces = append(append([]costMod(nil), mods.Reduces...), costMod{Generic: credit})
 		}
 	}

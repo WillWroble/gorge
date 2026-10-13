@@ -406,6 +406,7 @@ func (e *Engine) resolveTop() {
 		if ctx.X == 0 {
 			ctx.X = e.triggerPaidX(id, o)
 		}
+		e.bindStationAmount(ctx, o)
 		// A cost-paid sacrifice carried its objects' LKI snapshot on the
 		// engine (rules/cast.go commitCast), keyed by this stack object id;
 		// load it so the ability's Sacrificed$<Property> heads resolve against

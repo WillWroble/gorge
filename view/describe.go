@@ -765,7 +765,12 @@ func Describe(g *state.Game, ev events.Event) string {
 		// A keyword-granted activated ability went on the stack (a layer-6
 		// AddKeyword$ Cycling grant, CR 613.1f): the same "activates"
 		// phrasing the other grant pushes use -- the resolving ability's own
-		// line carries what it does.
+		// line carries what it does. Station's own activation (CR 702.184a)
+		// mints through the same event from the printed K:Station line, so
+		// it is named as what it is rather than as a grant.
+		if strings.HasPrefix(ev.Counter, "Station") {
+			return obj(g, ev.Obj) + " activates Station"
+		}
 		return obj(g, ev.Obj) + " activates (keyword-granted)"
 	case events.GainedTriggerPush:
 		// A has-all-abilities-of triggered ability went on the stack (Forge's

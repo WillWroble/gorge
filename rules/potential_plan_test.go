@@ -73,10 +73,10 @@ func TestPotentialPaymentPlansAbilityWitness(t *testing.T) {
 	plains := onBoard(t, e, 0, lrPlains)
 	island := onBoard(t, e, 0, lrIsland)
 	d := ppPriority(t, e)
-	for _, o := range d.Options {
-		if o.Kind == "ability" && o.Obj == relic {
-			t.Fatal("the ability is offered on an empty pool")
-		}
+	// The sources pay it, so the window carries it as an autopay offer
+	// (legal_walk_autopay.go) beside the witness the planner reports below.
+	if _, ok := autopayAbilityOffer(d, relic); !ok {
+		t.Fatal("the ability is not offered though the sources pay it")
 	}
 	mark, seq := len(e.L.Events), d.Seq
 	pps := e.PotentialPaymentPlans(0)

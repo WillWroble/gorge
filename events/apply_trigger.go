@@ -445,7 +445,7 @@ func foldKeywordAbilityPush(g *state.Game, e *Event) {
 	if src == nil {
 		return
 	}
-	sa := cards.GrantedKeywordAbility(e.Counter)
+	sa := cards.KeywordPushAbility(e.Counter)
 	if sa == nil {
 		return
 	}
