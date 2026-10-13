@@ -292,7 +292,9 @@ func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
 func CloneKnownKeys() []string { return slices.Clone(cloneKnownKeys[:]) }
 
 // cloneETBShapeKeys are the keys the implemented as-enters Clone shape carries.
+// SubAbility$ is admitted as a key only; its chain's shape is
+// CloneETBSubChainOK's (the "enters with additional counters" rider).
 var cloneETBShapeKeys = state.NewNameSet(
 	"Choices", "AddKeywords", "AddTypes", "SpellDescription",
-	"AddStaticAbilities", "IntoPlayTapped", "AddTriggers", "AddSVars",
+	"AddStaticAbilities", "IntoPlayTapped", "AddTriggers", "AddSVars", "SubAbility",
 )

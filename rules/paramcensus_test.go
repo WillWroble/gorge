@@ -1802,6 +1802,10 @@ var handEffectsRoots = []string{
 	// predicates in effects/filter.go registers this predicate as a function
 	// value; its Cost$ reads inspect a candidate card's printed spell cost.
 	"noAbilitiesPermanent",
+	// rules/cast_etbchoice.go calls this directly to admit an as-enters Clone
+	// body's SubAbility$ rider chain; it scans the rider links' own keys to
+	// fail closed on any key outside the implemented shape.
+	"CloneETBSubChainOK",
 }
 
 // apiSpecificRulesSA names the rules functions whose SA (bSA) reads execute

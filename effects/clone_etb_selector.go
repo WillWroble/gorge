@@ -58,6 +58,11 @@ func CloneETBOffered(sa *cards.SA, svars map[string]string) bool {
 	if !cp.ETBShapeOK || (SpecNeedsResolver(cp.Choices) && !CloneETBSpendSelector(cp.Choices, svars)) {
 		return false
 	}
+	// A SubAbility$ chain is offered only as Altered Ego's "enters with X
+	// additional +1/+1 counters" rider (CloneETBSubChainOK).
+	if !CloneETBSubChainOK(sa) {
+		return false
+	}
 	for _, name := range cp.StaticNames {
 		if !CloneStaticGrantReadable(svars, name) {
 			return false
