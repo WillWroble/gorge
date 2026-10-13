@@ -139,7 +139,7 @@ type compiledPred struct {
 
 	hasKP bool
 	kp    keywordPredicate
-	named bool // p == "NamedCard" (namePredicate)
+	named bool // p == "NamedCard" or "noName" (namePredicate)
 	fn    predFn
 	num   bool // numericPred recognises the shape (its ok is textual)
 	nonOK bool
@@ -205,7 +205,7 @@ func compilePred(raw string) compiledPred {
 		return c
 	}
 	c.kp, c.hasKP = keywordPredicateFor(p)
-	c.named = p == "NamedCard"
+	c.named = p == "NamedCard" || p == "noName"
 	c.fn = predicates[p]
 	_, c.num = numericPred(p, nil, &state.Object{}, NewSpecContext(0, 0))
 	c.nonK, c.nonV, c.nonOK = nonPredicate(p)
