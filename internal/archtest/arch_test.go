@@ -112,7 +112,11 @@ func set(s string) map[string]bool {
 // internal/gamepool and internal/inferbroker (both tag-gated schedulers) use
 // timers only to decide WHEN a ready batch is flushed and to report queue and
 // serve nanoseconds; which decisions are answered, and every answer, is a
-// pure function of the games' seeds. No game, event, view or
+// pure function of the games' seeds. eventhost (the draft-event runtime,
+// docs/superpowers/specs/2026-10-13-draft-events-design.md) uses time only
+// for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
+// event package as a logged auto-pick entry, so replaying an event's log
+// never reads the clock. No game, event, view or
 // replay reads the clock, and intents reach the engine only through
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
@@ -138,6 +142,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/internal/gamepool":    true,
 		module + "/internal/inferbroker": true,
 		module + "/host/manabrewhttp":    true,
+		module + "/eventhost":            true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
