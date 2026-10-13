@@ -97,7 +97,7 @@ var digKnownKeys = [...]string{
 	"ChoiceZone", "Choices", "ChooseFromList", "Choser", "ClassBand", "ClearImprinted",
 	"Condition", "ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
 	"ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc", "Defined", "DefinedCards",
 	"DefinedTarget", "Description", "DestinationZone", "DestinationZone2", "DigNum",
 	"Exclude", "Exhaust", "ExileFaceDown", "FaceDown", "FaceDownPower", "FaceDownSetType",

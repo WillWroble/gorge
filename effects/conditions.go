@@ -448,20 +448,23 @@ func conditionMetCore(h Host, c *Ctx, sa *cards.SA) (met bool, resolved bool) {
 	// holding four or more distinct core card types, through
 	// Host.DeliriumHolds (the same census the "Delirium —" activation,
 	// continuous and replacement gates read, so the spellings cannot drift);
-	// the other corpus values (OptionalCost, Threshold, Hellbent,
-	// Surge) are classified unmodelled (conditionUnmodelledBare) and so fail
-	// CLOSED with a Note at the walk, never running their rider. A bare
-	// Condition beside a group key or beside ConditionSVarCompare$ is a
-	// mixed shape no single evaluator covers (~11 corpus SAs).
+	// OptionalCost is the self-spell OptionalCost static's paid provenance,
+	// selected by ConditionOptionalPaid$; the other corpus values
+	// (Threshold, Hellbent, Surge) are classified unmodelled
+	// (conditionUnmodelledBare) and so fail CLOSED with a Note at the walk,
+	// never running their rider. A bare Condition beside a group key or
+	// beside ConditionSVarCompare$ is a mixed shape no single evaluator
+	// covers (~11 corpus SAs), and ConditionOptionalPaid$ means nothing
+	// beside any bare value but OptionalCost.
+	if cp.OptionalPaid != "" && !strings.EqualFold(bare, "OptionalCost") {
+		return false, false
+	}
 	if bare != "" {
 		if defined != "" || present != "" || notPresent != "" || compare != "" || svarCmp != "" ||
 			playerTurn != "" || phases != "" || firstCombat != "" {
 			return false, false
 		}
-		if strings.EqualFold(bare, "OptionalCost") {
-			return conditionOptionalCostMet(h, c, cp.OptionalPaid)
-		}
-		return conditionBareMet(h, c, bare)
+		return conditionBareMet(h, c, bare, cp.OptionalPaid)
 	}
 	if notPresent != "" {
 		// ConditionNotPresent$ (8 corpus lines, two shapes): met when NO object
@@ -915,9 +918,28 @@ func conditionDefinedGroup(h Host, c *Ctx, sa *cards.SA, defined string) ([]stat
 
 // conditionBareMet evaluates cast provenance and controller conditions independently
 // of the presence-group evaluator.
-func conditionBareMet(h Host, c *Ctx, bare string) (bool, bool) {
+func conditionBareMet(h Host, c *Ctx, bare, optionalPaid string) (bool, bool) {
 	g := h.Game()
 	switch {
+	case strings.EqualFold(bare, "OptionalCost"):
+		// CR 601.2b/601.2f: "If this spell's additional cost was paid" (Ruinous
+		// Waterbending's waterbend, the behold Exhales, Undergrowth's {2}{R}).
+		// The election is the self-spell OptionalCost static's pay-time
+		// provenance (state.Object.OptionalCostPaid, folded from the CastInfo's
+		// FlagOptionalCostPaid -- the bit Count$OptionalGenericCostPaid reads),
+		// read off the resolving spell. ConditionOptionalPaid$ selects the
+		// branch: True (every paid rider) or False (Undergrowth's and Secret
+		// of Bloodbending's unpaid half); any other spelling is unresolved.
+		want := true
+		switch {
+		case optionalPaid == "" || strings.EqualFold(optionalPaid, "True"):
+		case strings.EqualFold(optionalPaid, "False"):
+			want = false
+		default:
+			return false, false
+		}
+		o := g.Obj(c.Source)
+		return (o != nil && o.OptionalCostPaid) == want, true
 	case strings.EqualFold(bare, "Kicked"):
 		o := h.Game().Obj(c.Source)
 		return o != nil && o.CastFlags&state.FlagKicked != 0, true
@@ -1707,27 +1729,3 @@ var conditionNotPresentMetCodes = state.NewStrCodes(
 	state.StrEntry[conditionNotPresentMetCode]{Key: "Remembered", Val: conditionNotPresentMetRemembered},
 	state.StrEntry[conditionNotPresentMetCode]{Key: "Targeted", Val: conditionNotPresentMetTargeted},
 )
-
-// conditionOptionalCostMet is the bare Condition$ OptionalCost gate with its
-// ConditionOptionalPaid$ polarity (10 corpus lines over 8 files: Osseous
-// Exhale's "If a Dragon was beheld, you gain 2 life", Piercing Exhale's
-// beheld surveil, Draconic Fealty's beheld graveyard exile). CR 601.2b: the
-// optional additional cost is chosen and paid as the spell is cast; the
-// spell's own "if [the cost] was paid" text reads that payment, which is the
-// same pay-time provenance Count$OptionalGenericCostPaid reads
-// (state.Object.OptionalCostPaid). A copy was never cast (CR 707.10) and
-// reads unpaid. A polarity other than True/False is not a corpus shape and
-// stays unresolved (the walk fails it closed).
-func conditionOptionalCostMet(h Host, c *Ctx, polarity string) (bool, bool) {
-	want := true
-	switch {
-	case polarity == "" || strings.EqualFold(polarity, "True"):
-	case strings.EqualFold(polarity, "False"):
-		want = false
-	default:
-		return false, false
-	}
-	o := h.Game().Obj(c.Source)
-	paid := o != nil && o.OptionalCostPaid
-	return paid == want, true
-}
