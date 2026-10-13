@@ -951,6 +951,14 @@ type Object struct {
 	// wherever IsAttacking is.
 	AttackingBattle ObjID
 	BlockedBy       []ObjID
+	// IsBlocking marks a creature declared as a blocker this combat (CR
+	// 509.1g), recorded on the BLOCKER so it survives its attacker leaving
+	// combat: CR 506.4 / 509.1h keep a creature blocking after the creature
+	// it blocks is removed (Norin, Swift Survivalist exiles a blocked
+	// attacker; the blocker is still "blocking"). Set by events.Apply's
+	// DeclareBlockers case, cleared with IsAttacking (EndCombatReset, leaving
+	// the battlefield, a control change, phasing out).
+	IsBlocking bool
 	// BlockedByThisTurn records, on an attacking creature, the blockers that
 	// blocked it this turn (CR 509.1), in declaration order. Unlike the live
 	// BlockedBy list it survives the end-of-combat reset (events.EndCombatReset
@@ -1627,7 +1635,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [58]byte
+	_ [50]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
