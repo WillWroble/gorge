@@ -290,9 +290,13 @@ func costAttackPrelude(word string, count int) (conditionPrelude, bool) {
 	}
 	ref := fmt.Sprintf("p%d:%s", side, attackerFixture)
 	pre := conditionPrelude{steps: []oraclegen.Step{
-		{Op: "pass_to", Step: "declare-attackers", Active: fmt.Sprintf("p%d", side)},
 		{Op: "attack", Seat: side, Defender: defender, Attackers: oraclegen.Repeat(ref, count)},
 	}}
+	if side == 0 {
+		// p1's attack needs no pass_to: it passes p0's turn to p1's, and a
+		// pass_to checkpoint would already see XMage's declared attack.
+		pre.steps = append([]oraclegen.Step{{Op: "pass_to", Step: "declare-attackers", Active: "p0"}}, pre.steps...)
+	}
 	if side == 0 {
 		pre.battlefield = oraclegen.Repeat(attackerFixture, count)
 	} else {

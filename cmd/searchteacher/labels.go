@@ -93,6 +93,13 @@ type LabelRecord struct {
 	// finished (schema 2).
 	Outcome      float64 `json:"outcome"`
 	OutcomeKnown bool    `json:"outcome_known"`
+	// Explore (-explore only) marks a decision whose PLAYED answer was forced
+	// by coverage-directed exploration (corpuscov.ExploreSeat) rather than
+	// the teacher's choice. The candidates and values are still the teacher's
+	// own evaluation. Omitted when false, so a corpus without -explore is
+	// byte-identical. Policy imitation drops these rows; value and outcome
+	// learning keep them.
+	Explore bool `json:"explore,omitempty"`
 	// Extras is the pn12 extension (schema 3, -label-extras only); nil and
 	// omitted otherwise, so a schema 2 corpus is byte-identical to before.
 	Extras *policynet.LabelExtras `json:"extras,omitempty"`

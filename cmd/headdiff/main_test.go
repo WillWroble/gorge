@@ -11,12 +11,13 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/replay"
 )
 
 // repoRootOrSkip resolves the repo root with git (cards.GitEnv, so a hook's
 // exported GIT_DIR cannot redirect it; see internal/testutil/decks.go) and
-// Skips when .cards/ is absent, as cmd/mtgsim's corpusDirOrSkip does.
+// leaves the corpus to testutil.CorpusDirOrSkip.
 func repoRootOrSkip(t *testing.T) string {
 	t.Helper()
 	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
@@ -25,11 +26,7 @@ func repoRootOrSkip(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("could not resolve git repo root: %v", err)
 	}
-	root := strings.TrimSpace(string(out))
-	if _, err := os.Stat(filepath.Join(root, ".cards")); err != nil {
-		t.Skip("no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	return root
+	return strings.TrimSpace(string(out))
 }
 
 // TestDumpThenAgainst is the reviewer workflow end to end on one seat count:
@@ -41,7 +38,7 @@ func TestDumpThenAgainst(t *testing.T) {
 		t.Skip("plays an acceptance game")
 	}
 	root := repoRootOrSkip(t)
-	corpus := filepath.Join(root, ".cards")
+	corpus := testutil.CorpusDirOrSkip(t)
 	heads := filepath.Join(root, "rules", "testdata", "heads")
 	ref := filepath.Join(t.TempDir(), "ref.json")
 

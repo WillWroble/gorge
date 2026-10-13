@@ -31,7 +31,7 @@ func TestServesTablesOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config{cards: "../../.cards", decks: "../../internal/testutil/decks", tables: 1, seats: 2, pace: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", tables: 1, seats: 2, pace: 0,
 		cooldown: 0, dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, vsbot: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -131,7 +131,7 @@ func TestServesTablesOverHTTP(t *testing.T) {
 // floor is exactly the failure this test is meant to catch.
 func TestHostThreadsCorpusTokens(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	cfg := config{cards: "../../.cards", decks: "../../internal/testutil/decks", dir: t.TempDir()}
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", dir: t.TempDir()}
 	opts := cfg.hostOptions(reg, deckLoader(reg, cfg.decks))
 	if len(opts.Tokens) == 0 {
 		t.Fatalf("host.Options.Tokens empty: token corpus not threaded from %s", cfg.cards)
@@ -200,7 +200,7 @@ func startServe(t *testing.T, c config) (string, context.CancelFunc, <-chan erro
 		t.Fatal(err)
 	}
 	if c.cards == "" {
-		c.cards = "../../.cards"
+		c.cards = testutil.CorpusDirOrSkip(t)
 	}
 	if c.decks == "" {
 		c.decks = "../../internal/testutil/decks"
@@ -955,7 +955,7 @@ func TestCommanderTableDealtAnInvalidDeckFailsAtStartup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	cfg := config{cards: "../../.cards", decks: dir, tables: 1, seats: 2, pace: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: dir, tables: 1, seats: 2, pace: 0,
 		cooldown: 0, dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, formatsRaw: "commander"}
 	// serve is driven on a cancellable context so a neutralised validation
 	// — the very failure this test exists to catch — fails the test by

@@ -89,11 +89,24 @@ func endForgetOtherSnapshot(c *Ctx) {
 }
 
 func forgetOtherSpecContext(c *Ctx) SpecContext {
-	sc := c.SpecContext(c.Controller)
-	if c.Forget.Ready {
-		sc.Remembered = append(append([]state.Target(nil), sc.Remembered...), c.Forget.Snapshot...)
+	sel := *c
+	armForgetSelection(&sel, c)
+	return sel.SpecContext(c.Controller)
+}
+
+// armForgetSelection is the ONE place a ForgetOtherRemembered$ walk widens
+// its candidate selection with the armed pre-clear snapshot (a no-op while
+// unarmed). The snapshot is the authoritative pre-clear set: the live source
+// list it was unioned against is gone, so the selection also drops its
+// Captured seed -- otherwise the capture-as-fallback rule (selectRemembered)
+// would drop a pre-clear candidate the cleared persistent list no longer
+// holds.
+func armForgetSelection(sel, c *Ctx) {
+	if !c.Forget.Ready {
+		return
 	}
-	return sc
+	sel.Remembered = append(append([]state.Target(nil), sel.Remembered...), c.Forget.Snapshot...)
+	sel.Captured = nil
 }
 
 // forgetOtherPreClearContext is the ONE spec-context read every

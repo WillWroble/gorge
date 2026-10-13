@@ -45,7 +45,7 @@ func (e *Engine) removeNoncreatureCombatants() bool {
 			if o == nil || o.PhasedOut {
 				continue
 			}
-			if !o.IsAttacking && !containsObjID(blockers, id) {
+			if !o.IsAttacking && !o.IsBlocking && !containsObjID(blockers, id) {
 				continue
 			}
 			if e.IsCreature(id) {

@@ -62,6 +62,11 @@ type LoadOptions struct {
 	// Keep, when non-nil, filters records by (pair, game index) before they
 	// are decoded any further; a record it rejects is not counted as loaded.
 	Keep func(pair string, gameIndex int) bool
+	// KeepExplore keeps records flagged explore:true (forced exploration
+	// answers). The zero value drops them, as Load does: they are not the
+	// teacher's choices, so policy imitation must not learn them. Value and
+	// outcome learning set it, since the outcome label is still valid.
+	KeepExplore bool
 }
 
 // leanRecord is labelRecord without the board snapshot (the encoders never
@@ -84,6 +89,7 @@ type leanRecord struct {
 	Margin        float64           `json:"margin"`
 	Outcome       float64           `json:"outcome"`
 	OutcomeKnown  bool              `json:"outcome_known"`
+	Explore       bool              `json:"explore,omitempty"`
 	Extras        *LabelExtras      `json:"extras"`
 }
 
@@ -126,6 +132,10 @@ func LoadWith(path string, lo LoadOptions) ([]Example, Stats, error) {
 			return nil, stats, fmt.Errorf("label corpus record %d: unsupported schema_version %d, want one of %v", stats.Records, rec.SchemaVersion, AcceptedLabelSchemaVersions)
 		}
 		if lo.Keep != nil && !lo.Keep(rec.Pair, rec.GameIndex) {
+			continue
+		}
+		if rec.Explore && !lo.KeepExplore {
+			stats.Explored++
 			continue
 		}
 		if len(rec.Candidates) == 0 {

@@ -246,7 +246,7 @@ func cov3BranchHolds(h Host, c *Ctx, pred string, depth int) (holds, ok bool) {
 				return true, true
 			}
 		}
-		return h.SpellsCastThisTurnMatching(you, "Card.CastSa Spell.Warp") > 0, true
+		return h.SpellsCastThisTurnMatching(you, "Card.CastSa Spell.Warp", TriggerContext{}) > 0, true
 	}
 	return false, false
 }

@@ -28,24 +28,24 @@ import (
 //	   :cpuct=1.5 :fpu=0.1 :cands=N
 //	   :autopay                  mana paid automatically: every cast (and pass) at a priority stop is a
 //	                             candidate, so the search decides what to cast and when (the seat's own
-//	                             bot is gorge's auto-pay bot; needs gorge/patches/0002). bot:autopay is
+//	                             bot is gorge's auto-pay bot; azmcts Options.AutoPayment). bot:autopay is
 //	                             that bot alone
 //	   :topk=K                   the network chooses the candidates: every searched decision (the root
 //	                             and every one inside a simulation) is enumerated in full and the bot's
 //	                             answer is kept with the K-1 others the network's prior ranks highest,
 //	                             instead of the first cands= in enumeration order (under autopay the
 //	                             prior then also scores every cast). Needs net= or remote= and the
-//	                             net's prior (inert under prior=uniform or with no network); needs
-//	                             gorge/patches/0003
+//	                             net's prior (inert under prior=uniform or with no network);
+//	                             azmcts Options.PriorTopK
 //	   :oppnodes                 the opponent in the tree: its searched decisions inside a simulation
 //	                             (priority, attackers, blockers, single target, >= 2 candidates) are tree
 //	                             points where it picks what is worst for the seat (PUCT on 1 - Q), its
 //	                             prior the net's on the opponent's own view, instead of gorge's bot
-//	                             answering them (azmcts Options.OpponentNodes; needs gorge/patches/0004)
+//	                             answering them (azmcts Options.OpponentNodes)
 //	   :skippass                 simulation shortcut: rollout engines auto-pass every priority window
 //	                             outside a main phase with an empty stack (azmcts Options.SkipPass); the
 //	                             real game and the root decision are untouched
-//	   :mull                     the London mulligan by land count (gorge/patches/0005): keep 2-5 lands
+//	   :mull                     the London mulligan by land count (botpolicy/mulligan.go): keep 2-5 lands
 //	                             of 7 (also after one mulligan), after two keep unless 0 or 7, and
 //	                             bottom toward ceil(K/2) lands, highest mana value spells first. Any
 //	                             bot, az or prior seat; play -mull-heuristic sets it on every seat.

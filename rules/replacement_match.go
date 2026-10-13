@@ -73,7 +73,7 @@ func (e *Engine) activeZonesGateOK(r cards.Repl, source state.ObjID, ev events.E
 		currentlyActive := o != nil && zoneSpecContains(active, o.Zone)
 		enteringActive := ev.Kind == events.MoveZone && source == ev.Obj &&
 			zoneSpecContains(active, ev.To)
-		if !currentlyActive && !enteringActive {
+		if !currentlyActive && !enteringActive && !e.batchMemberReplActive(active, o) {
 			return false
 		}
 	}
@@ -482,8 +482,30 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// gate is never silently widened onto a die of another size.
 		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplDraw, cards.ReplDrawCards:
-		if ev.Kind != events.Draw {
+		// The batch proposal is the DrawCards class's own held event
+		// (Forge's Player.drawCards(n) DrawCards pass, XMage's
+		// DRAW_TWO_OR_MORE_CARDS): only a R:Event$ DrawCards line matches
+		// it, so a "draw two cards instead" line never swallows a whole
+		// batch. A per-card Draw matches both spellings -- the historical
+		// alias (replacementEventNameMatches) -- with the batch amount read
+		// as 1, so Alms Collector's Number$ GE2 rejects a single card draw
+		// exactly as Forge's Number$ gate does.
+		if ev.Kind == events.DrawBatchProposal {
+			if r.EventKind() != cards.ReplDrawCards {
+				return false
+			}
+		} else if ev.Kind != events.Draw {
 			return false
+		}
+		// Number$ <op><n> gates the class on the size of the draw being
+		// replaced (Alms Collector's "two or more cards"; the corpus's one
+		// Number$ Draw line). The amount is the batch's card count on the
+		// proposal and 1 on a per-card draw (drawMatchAmount).
+		if n, ok := r.Param(cards.PKNumber); ok {
+			op, want, parsed := splitCompare(strings.TrimSpace(n))
+			if !parsed || !applyCompare(int(drawMatchAmount(ev)), op, want) {
+				return false
+			}
 		}
 		// CR 611.3b: the ActiveZones gate above applies (a Draw replacement's
 		// source is already on the battlefield — there is no entering case,
@@ -872,9 +894,9 @@ func (e *Engine) replacementConditionHoldsWith(r cards.Repl, source state.ObjID,
 			return false
 		}
 	}
-	if _, ok := r.Param(cards.PKCheckDefinedPlayer); ok {
-		// The only corpus shape is You.isMonarch. Monarch state is not yet
-		// represented, so fail closed instead of preventing damage always.
+	if spec, ok := r.Param(cards.PKCheckDefinedPlayer); ok && !e.checkDefinedPlayerHolds(spec, source, you) {
+		// The trigger gate's one evaluator (Jared Carthalion's "while you're
+		// the monarch"); an unreadable predicate fails closed.
 		return false
 	}
 	if check, ok := r.Param(cards.PKCheckSVar); ok {
@@ -1231,3 +1253,51 @@ var replacementCauseQualCodes = state.NewStrCodes(
 	state.StrEntry[replacementCauseQualCode]{Key: "YouDontCtrl", Val: replacementCauseQualOppCtrl},
 	state.StrEntry[replacementCauseQualCode]{Key: "Modular", Val: replacementCauseQualModular},
 )
+
+// batchMemberReplActive reports whether source o, gated by an ActiveZones$
+// spec that names the battlefield, is a member of the open simultaneous
+// departure batch that the batch's own sequential emit loop has already
+// moved off the battlefield. Such a source was on the battlefield
+// immediately before the simultaneous event, so its replacement still
+// applies to the batch's remaining members (CR 614.6, 616.1, 603.10). A
+// token member has ceased to exist (o == nil) and cannot be reached; a
+// member back on the battlefield is gated normally.
+func (e *Engine) batchMemberReplActive(active string, o *state.Object) bool {
+	if o == nil || len(e.batchReplSources) == 0 || o.Zone == state.ZBattlefield ||
+		!zoneSpecContains(active, state.ZBattlefield) {
+		return false
+	}
+	for _, id := range e.batchReplSources {
+		if id == o.ID {
+			return true
+		}
+	}
+	return false
+}
+
+// beginReplBatch opens a simultaneous-departure batch for
+// batchMemberReplActive; nested batches share the outermost list.
+func (e *Engine) beginReplBatch() { e.replBatchDepth++ }
+
+// endReplBatch closes one beginReplBatch; the outermost close forgets the
+// batch's departures so none outlives the simultaneous event.
+func (e *Engine) endReplBatch() {
+	if e.replBatchDepth > 0 {
+		e.replBatchDepth--
+	}
+	if e.replBatchDepth == 0 {
+		e.batchReplSources = e.batchReplSources[:0]
+	}
+}
+
+// noteBatchDeparture records a battlefield departure inside an open batch.
+// Called from emit after the replacement pass settled and before the fold.
+func (e *Engine) noteBatchDeparture(ev events.Event) {
+	if e.replBatchDepth == 0 || ev.Kind != events.MoveZone ||
+		ev.From != state.ZBattlefield || ev.To == state.ZBattlefield {
+		return
+	}
+	if o := e.G.Obj(ev.Obj); o != nil && o.Zone == state.ZBattlefield {
+		e.batchReplSources = append(e.batchReplSources, ev.Obj)
+	}
+}

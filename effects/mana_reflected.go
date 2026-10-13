@@ -122,6 +122,20 @@ func ManaReflectedCandidates(h Host, c *Ctx, sa *cards.SA) []string {
 	return out
 }
 
+// ManaReflectedReadsSacrificed reports whether sa reflects the permanent its
+// own Sac<...> cost sacrifices (Valid$ Defined.Sacrificed -- Squandered
+// Resources). Nothing has been sacrificed when the ability is merely offered,
+// so rules' offer gate must probe the cost's candidates instead of reading
+// the empty Remembered list.
+func ManaReflectedReadsSacrificed(sa *cards.SA) bool {
+	rest, ok := strings.CutPrefix(ManaReflectedOf(sa).Valid, "Defined.")
+	if !ok {
+		return false
+	}
+	sel, _, _ := strings.Cut(strings.TrimSpace(rest), " ")
+	return reflectedDefinedExtrasCodes.Code(sel) == reflectedDefinedExtrasSacrificed
+}
+
 // producibleSymbols unions the mana symbols one permanent's mana abilities
 // could produce. It mirrors effMana's own classifier exactly: a blank or
 // "Any"/"Combo Any" Produced$ is every colour; a "Combo <colours>" shape is

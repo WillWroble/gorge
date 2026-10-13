@@ -252,6 +252,7 @@ const (
 	PKTargetsWithSameCardType
 	PKTargetsWithSameController
 	PKTargetsWithSameCreatureType
+	PKTargetsWithRelatedProperty
 	PKTargetsWithSharedCardType
 	PKTgtPrompt
 	PKTgtZone
@@ -269,6 +270,8 @@ const (
 	PKUnlessPayer
 	PKUnlessSwitched
 	PKUpTo
+	PKUpcomingTurn
+	PKDelayedTriggerDefinedPlayer
 	PKValid
 	PKValidActivatingPlayer
 	PKValidActivator
@@ -429,6 +432,7 @@ const (
 	PKRememberLoser
 	PKRememberManifested
 	PKRememberMilled
+	PKRememberNewCard
 	PKRememberNumber
 	PKRememberPeeked
 	PKRememberRemovedCards
@@ -635,6 +639,7 @@ const (
 	PKDamageSource
 	PKDefinedName
 	PKDestAltSVarCompare
+	PKEach
 	PKEachFromSource
 	PKEffectOwner
 	PKExactly
@@ -781,6 +786,9 @@ const (
 	// A Mode$ Continuous static's AddReplacementEffect$ grant (DFT Far
 	// Fortune, End Boss; Vnwxt, Verbose Host; append-only).
 	PKAddReplacementEffect
+	// ChangeZone's ExiledWithEffectSource$ rider: the exile is tagged as
+	// exiled-with the Effect's source (Forger's Foundry; append-only).
+	PKExiledWithEffectSource
 	paramKeyCount
 )
 
@@ -1035,6 +1043,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKTargetsWithSameCardType:          "TargetsWithSameCardType",
 	PKTargetsWithSameController:        "TargetsWithSameController",
 	PKTargetsWithSameCreatureType:      "TargetsWithSameCreatureType",
+	PKTargetsWithRelatedProperty:       "TargetsWithRelatedProperty",
 	PKTargetsWithSharedCardType:        "TargetsWithSharedCardType",
 	PKTgtPrompt:                        "TgtPrompt",
 	PKTgtZone:                          "TgtZone",
@@ -1052,6 +1061,8 @@ var paramKeyNames = [paramKeyCount]string{
 	PKUnlessPayer:                      "UnlessPayer",
 	PKUnlessSwitched:                   "UnlessSwitched",
 	PKUpTo:                             "UpTo",
+	PKUpcomingTurn:                     "UpcomingTurn",
+	PKDelayedTriggerDefinedPlayer:      "DelayedTriggerDefinedPlayer",
 	PKValid:                            "Valid",
 	PKValidActivatingPlayer:            "ValidActivatingPlayer",
 	PKValidActivator:                   "ValidActivator",
@@ -1156,6 +1167,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKImprintFound:                     "ImprintFound",
 	PKImprintChosen:                    "ImprintChosen",
 	PKValidBlockerAmount:               "ValidBlockerAmount",
+	PKExiledWithEffectSource:           "ExiledWithEffectSource",
 	PKInvalidTypes:                     "InvalidTypes",
 	PKKeywords:                         "Keywords",
 	PKLeftRightPile:                    "LeftRightPile",
@@ -1214,6 +1226,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKRememberLoser:                    "RememberLoser",
 	PKRememberManifested:               "RememberManifested",
 	PKRememberMilled:                   "RememberMilled",
+	PKRememberNewCard:                  "RememberNewCard",
 	PKRememberNumber:                   "RememberNumber",
 	PKRememberPeeked:                   "RememberPeeked",
 	PKRememberRemovedCards:             "RememberRemovedCards",
@@ -1422,6 +1435,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKDamageSource:                     "DamageSource",
 	PKDefinedName:                      "DefinedName",
 	PKDestAltSVarCompare:               "DestAltSVarCompare",
+	PKEach:                             "Each",
 	PKEachFromSource:                   "EachFromSource",
 	PKEffectOwner:                      "EffectOwner",
 	PKExactly:                          "Exactly",

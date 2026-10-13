@@ -44,8 +44,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/divergence"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
 	"github.com/adams-shaun/gorge/replay"
 	"github.com/adams-shaun/gorge/rules"
@@ -368,7 +368,7 @@ func listIntents(l *events.Log, cfg rules.Config, stdout, stderr io.Writer) int 
 			fmt.Fprintln(stderr, "repro: no decision pending at intent", i)
 			return 1
 		}
-		what := choiceSummary(d, it)
+		what := divergence.ChoiceSummary(d, it)
 		fmt.Fprintf(stdout, "%4d  seat %d  %s  %s\n", i, it.Player, d.Kind, what)
 		if err := e.Submit(it); err != nil {
 			fmt.Fprintf(stderr, "repro: intent %d rejected: %v\n", i, err)
@@ -388,17 +388,6 @@ func listIntents(l *events.Log, cfg rules.Config, stdout, stderr io.Writer) int 
 // choiceSummary renders one intent's answer against the decision it
 // answered: the chosen options' labels, or the raw indices when the
 // decision does not offer labels for them.
-func choiceSummary(d *decision.Decision, it decision.Intent) string {
-	chosen := d.Chosen(it)
-	if len(chosen) == 0 {
-		return fmt.Sprintf("choices %v — %s", it.Choices, d.Prompt)
-	}
-	labels := make([]string, len(chosen))
-	for i, o := range chosen {
-		labels[i] = o.Label
-	}
-	return fmt.Sprintf("%s — %s", strings.Join(labels, "; "), d.Prompt)
-}
 
 // emitTest copies the snapshot into <pkg>/testdata/feedback/<id>/ and
 // writes a failing test skeleton into <pkg> that loads the copy with

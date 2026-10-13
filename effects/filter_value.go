@@ -153,12 +153,12 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		if g == nil || o == nil {
 			return false, true
 		}
-		source := g.Obj(sc.Source)
-		if source == nil || (source.ChosenType != "odd" && source.ChosenType != "even") {
+		chosen, _ := sourceChosen(g, sc)
+		if chosen != "odd" && chosen != "even" {
 			return false, true
 		}
 		odd := objectManaValue(o)%2 == 1
-		return (source.ChosenType == "odd") == odd, true
+		return (chosen == "odd") == odd, true
 	}
 	resolve := sc.Resolve
 	if resolve == nil {

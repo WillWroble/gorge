@@ -38,7 +38,7 @@ func (s livelockSeat) Decide(context.Context, view.View, decision.Decision) (dec
 
 func livelockTestEngine(t *testing.T) *rules.Engine {
 	t.Helper()
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	reg, err := testutil.OpenCorpusRegistry(dir)
 	if err != nil {
 		t.Fatalf("corpus: %v", err)

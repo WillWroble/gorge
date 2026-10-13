@@ -112,7 +112,7 @@ func TestActionCoverageNeverAskedKindsUseTheDecisionUniverse(t *testing.T) {
 // the normal report, and with it off the report is unchanged (the
 // byte-identical default the flag promises).
 func TestRunAppendsCoverageReportWhenEnabled(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var with bytes.Buffer
 	old := actionCoverageEnabled
 	actionCoverageEnabled = true
@@ -147,7 +147,7 @@ var (
 func benchCorpus(t *testing.T) *cards.Registry {
 	t.Helper()
 	benchCorpusOnce.Do(func() {
-		benchCorpusReg, benchCorpusErr = testutil.OpenCorpusRegistry(corpusDirOrSkip(t))
+		benchCorpusReg, benchCorpusErr = testutil.OpenCorpusRegistry(testutil.CorpusDirOrSkip(t))
 	})
 	if benchCorpusErr != nil {
 		t.Fatalf("open corpus: %v", benchCorpusErr)

@@ -326,9 +326,7 @@ func discardAndRememberEvent(h Host, c *Ctx, r discardRiders, ev events.Event) {
 // absent there is nothing to dedup against and one write is correct.
 func rememberPlayerBothHalves(h Host, c *Ctx, p state.PlayerID) {
 	want := state.Target{Player: p, IsPlayer: true}
-	if !targetIn(c.Remembered, want) {
-		c.Remembered = append(c.Remembered, want)
-	}
+	rememberCtxOnce(h, c, want)
 	if o := h.Game().Obj(c.Source); o != nil && targetIn(o.Remembered, want) {
 		return
 	}

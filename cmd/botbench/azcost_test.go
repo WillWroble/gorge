@@ -6,6 +6,7 @@ import (
 
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // saveAZ restores every az package variable after the test.
@@ -159,7 +160,7 @@ func TestAZCostReportEmpty(t *testing.T) {
 // 2 -b bot -pairs <pair> -games 1` exits 0 and the seat reported decisions;
 // a checkpoint with no value head is refused at the front door.
 func TestAZPlaysPairMatrix(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	saveAZ(t)
 	azWorldArg = "clairvoyant"
 	azCfg.Search.Sims = 2

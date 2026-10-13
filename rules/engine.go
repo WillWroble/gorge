@@ -92,6 +92,16 @@ type Config struct {
 	// WindowDiagnostics opts this table into per-priority-option withholding
 	// reasons. It is observer-only and emits no events.
 	WindowDiagnostics bool
+	// PaidManaCensus (default off) lets the payment census count mana
+	// sources whose activation cost is more than a bare tap when the engine
+	// can pay that cost deterministically: a self-sacrifice (Treasure, Lotus
+	// Petal) or a fixed PayLife<N> that leaves the payer alive. The attack-
+	// tax, unless-cost and AvailableMana readers then see them (the cast
+	// window already prices both), and a pool-short activated ability the
+	// untapped sources can pay is offered and auto-paid (CR 602.2b). Off,
+	// every census, option list and event is unchanged. Genesis
+	// configuration like WindowDiagnostics; replay must pass the same value.
+	PaidManaCensus bool
 	// Tokens is the token definitions the decks in this match can create --
 	// cards.Registry.Tokens. Adopted by reference as Game.Tokens in New (never
 	// copied, never written) so events.Apply's TokenCreate case has something

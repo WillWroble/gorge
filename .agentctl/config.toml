@@ -357,6 +357,12 @@ env = { GOMEMLIMIT = "1GiB", GOMAXPROCS = "4", GOFLAGS = "-p=4 -trimpath" }
 # branch touched. Run from the BASE copy so a branch cannot edit its own gate.
 name = "go test (affected)"
 cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then lock=\"$GORGE_HEAVY_LOCK\"; else common=\"$(git rev-parse --path-format=absolute --git-common-dir)\"; lock=\"$(dirname \"$common\")/.ds4/heavy.lock\"; fi; lanes=${GORGE_HEAVY_LANES:-3}; mkdir -p \"$(dirname \"$lock\")\"; acquired=; deadline=$(( $(date +%s) + 1500 )); while [ -z \"$acquired\" ]; do i=1; while [ \"$i\" -le \"$lanes\" ]; do f=\"$lock\"; [ \"$i\" = 1 ] || f=\"$lock.lane$i\"; : >>\"$f\" 2>/dev/null || { i=$((i+1)); continue; }; exec 9>>\"$f\"; if flock -n 9 2>/dev/null; then acquired=\"$f\"; break; fi; i=$((i+1)); done; if [ -z \"$acquired\" ]; then now=$(date +%s); if [ \"$now\" -lt \"$deadline\" ]; then rem=$(( deadline - now )); [ \"$rem\" -gt 5 ] && rem=5; sleep \"$rem\" 9>&-; else echo \"gate: every heavy lane of $lock still held after 1500s; affected gate not run\" >&2; exit 75; fi; fi; done; systemd-run --user --scope -q -p MemoryMax=16G -p CPUQuota=1600% bash -c 'set -o pipefail; git show {base}:scripts/gate_affected.sh | bash -s {base}'; rc=$?; exit \"$rc\""]
+# 2026-10-12 (operator): exit 75 is "every heavy lane still held" -- an
+# infrastructure wait, not the ticket's defect. Requeue it with no fix round
+# (18 of 45 gate_fails 10-09..10-12 were this, each billed a paid round).
+on_fail = "requeue"
+requeue_exit = [75]
+requeue_max = 3
 # 2026-10-05 (operator): this gate is HEAVY-class work, so it takes a lane of
 # the repo heavy pool like postmerge_batch.sh and heavy.sh. The lane
 # acquisition is INLINED here: the path is derived inline from the shared git
@@ -502,6 +508,9 @@ staging_worktree = true
 strategy = "merge-push"
 remote = "origin"
 push = false
+# 2026-10-12 (operator): gate a burst of queued landings as one combined tip
+# (agentctl land.py merge train; a red train is halved and re-gated).
+merge_train = true
 # 2026-10-05 (operator): main is pushed by scripts/postmerge_batch.sh only
 # after the full suite passes, every 5 landings (or 60 min).
 # 2026-09-22 (operator): the demo is no longer redeployed on every merge --

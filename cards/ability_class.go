@@ -36,13 +36,14 @@ func IsManaAbilityAPI(api string) bool { return api == "Mana" || api == "ManaRef
 // ChooseColor carriers, and the generic CR-correct classification (the
 // loyalty gate) is a separate change.
 //
-// An ability whose own parameters declare ValidTgts$ requires a target and is
-// not a mana ability (CR 605.1a): Radiant Lotus, The Warring Triad and Jetfire
+// An ability that requires a target anywhere in its SubAbility$ chain is not
+// a mana ability (CR 605.1a): Radiant Lotus, The Warring Triad and Jetfire
+// declare ValidTgts$ on the head, Witch Engine's ChangeControl and the two
+// Chandra loyalty abilities' damage declare it on a sub-ability, and all six
 // stay on the ordinary stack path (the corpus population is pinned by
-// TestManaAbilityTargetGateMovesOnlyTheHeadTargetingCarriers). The gate reads
-// the head only. A target that lives on a SubAbility$ (Witch Engine's
-// ChangeControl, the two Chandra loyalty abilities' damage) is the separate
-// whole-chain change this classifier still owes.
+// TestManaAbilityTargetGateMovesTheTargetingCarriers). The walk is the one
+// isTriggeredManaAbility makes for a triggered mana ability, bounded by
+// manaChainDepth.
 func IsManaAbilitySA(sa *SA) bool {
 	if sa == nil || !sa.IsActivated() {
 		return false
@@ -53,10 +54,17 @@ func IsManaAbilitySA(sa *SA) bool {
 	return !requiresTarget(sa)
 }
 
-// requiresTarget reports whether sa itself declares ValidTgts$ (the head read
-// effects.TargetsOf(sa).Targeted() makes; CR 605.1a).
+// requiresTarget reports whether sa, or any SubAbility$ below it, declares
+// ValidTgts$ (the read effects.TargetsOf(sa).Targeted() makes, applied down
+// the chain like rules' isTriggeredManaAbility; CR 605.1a). The walk stops at
+// manaChainDepth so a cyclic runtime-built chain cannot hang it.
 func requiresTarget(sa *SA) bool {
-	return strings.TrimSpace(sa.ParamStr(PKValidTgts)) != ""
+	for s, d := sa, 0; s != nil && d < manaChainDepth; s, d = s.Sub, d+1 {
+		if strings.TrimSpace(s.ParamStr(PKValidTgts)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // ManaChainProduction returns the first DB$ Mana sub-ability reachable through

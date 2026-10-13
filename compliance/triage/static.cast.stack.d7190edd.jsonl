@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"cast","field":"stack","diff":"gorge=[spell:Lecture Hall@p0] xmage=[spell:$CARD@p0]"},"key":"static | cast | stack | gorge=[spell:Lecture Hall@p0] xmage=[spell:$CARD@p0]","cards":1}
+{"card":"Restricted Office","template":"static#1.0","status":"diverge","api":"UnlockDoor:DestroyAll","detail":"step 0 (cast) stack: gorge \"[spell:Lecture Hall@p0]\", xmage \"[spell:Restricted Office@p0]\""}

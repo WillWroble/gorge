@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/rules"
 )
 
@@ -129,7 +130,11 @@ func TestXAnswersSingleUnitManaIsNotAllocation(t *testing.T) {
 // and ~1 s and re-derived every card-keyed memo.
 func twinBoltRegistry(t *testing.T) *cards.Registry {
 	t.Helper()
-	reg, err := cards.SharedCorpus("../../.cards")
+	dir, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("the generator needs the corpus: could not resolve the repo root")
+	}
+	reg, err := cards.SharedCorpus(dir)
 	if err != nil {
 		t.Fatalf("the generator needs the corpus: %v", err)
 	}

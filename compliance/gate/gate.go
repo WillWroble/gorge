@@ -2,7 +2,7 @@
 // declared set, every manifest card must be fully supported and covered by
 // a passing verdict whose frozen expectation gorge still meets at this head
 // -- or by a hand-authored oracle scenario. The CI test
-// (TestDeclaredSetsCompliant) and `oraclediff status` share it.
+// (TestDeclaredSetsCompliantChunkNN) and `oraclediff status` share it.
 package gate
 
 import (

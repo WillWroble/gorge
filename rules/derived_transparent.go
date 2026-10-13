@@ -79,7 +79,7 @@ func derivedQuietKind(k events.Kind) bool {
 //   - Note, ModeChosen, ManaActivate: pure markers, Apply writes nothing;
 //   - Resolve: the per-turn resolved-ability tally;
 //   - DeclareAttackers, DeclareBlockers, EndCombatReset: the combat fields
-//     (IsAttacking, Attacking, AttackingBattle, AttacksThisTurn, BlockedBy)
+//     (IsAttacking, Attacking, AttackingBattle, AttacksThisTurn, BlockedBy, IsBlocking)
 //     and the blocker census -- no local predicate reads combat;
 //   - TargetsChosen: a stack object's chosen targets;
 //   - LandPlayed, LifeChange: a player's land count and life total;
@@ -350,6 +350,7 @@ func derivedEffectEqual(a, b *ContinuousEffect) bool {
 		a.AddPowerExpr == b.AddPowerExpr && a.AddToughnessExpr == b.AddToughnessExpr &&
 		a.AddPowerAffected == b.AddPowerAffected && a.AddToughnessAffected == b.AddToughnessAffected &&
 		a.SetPowerExpr == b.SetPowerExpr && a.SetToughnessExpr == b.SetToughnessExpr &&
+		a.SetPowerAffected == b.SetPowerAffected && a.SetToughnessAffected == b.SetToughnessAffected &&
 		a.SetName == b.SetName && a.TextFrom == b.TextFrom && a.TextTo == b.TextTo &&
 		a.TextSet == b.TextSet && a.TextSetSet == b.TextSetSet &&
 		a.OverwriteColors == b.OverwriteColors && a.RemoveCreatureTypes == b.RemoveCreatureTypes &&

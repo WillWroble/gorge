@@ -2087,13 +2087,16 @@ func (e *Engine) damageStep(firstStrike bool) {
 					}
 					remaining := pw
 					for i, bid := range blockers {
-						need := e.Toughness(bid)
-						if dt {
-							need = 1
-						}
+						need := e.lethalDamageNeed(bid, dt)
 						give := remaining
 						if (trample || i < len(blockers)-1) && give > need {
 							give = need
+						}
+						if give <= 0 {
+							// Already lethally damaged: nothing is owed to
+							// this blocker (CR 702.19c), so no zero-damage
+							// assignment is made and the excess moves on.
+							continue
 						}
 						as = append(as, assignment{toObj: bid, amount: give,
 							lifelink: a.Controller, hasLink: link, deathtouch: dt, from: aid, infect: inf, wither: wit})
@@ -2143,6 +2146,29 @@ func (e *Engine) damageStep(firstStrike bool) {
 	e.combatRound.damageNext = 0
 	e.combatRound.dealing = true
 	e.runCombatAssignments()
+}
+
+// lethalDamageNeed is the damage an attacker must assign to blocker bid before
+// it may assign to the next blocker or trample over (CR 510.1c, 702.19b/c):
+// the blocker's toughness less damage already marked on it, floored at zero.
+// A deathtouch source needs only 1 (CR 702.2c), or nothing once the blocker
+// already carries a Deathtouched mark (CR 704.5g).
+func (e *Engine) lethalDamageNeed(bid state.ObjID, deathtouch bool) int32 {
+	o := e.G.Obj(bid)
+	need := e.Toughness(bid)
+	if o != nil {
+		if deathtouch && o.Counter("Deathtouched") > 0 {
+			return 0
+		}
+		need -= o.Damage
+	}
+	if deathtouch && need > 1 {
+		need = 1
+	}
+	if need < 0 {
+		need = 0
+	}
+	return need
 }
 
 // runCombatAssignments applies the preserved pass from its first unfinished

@@ -6,6 +6,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // This census pins every corpus file carrying player-kind ValidTgts$ on a
@@ -13,10 +16,7 @@ import (
 // with player-zone selection (ChangeZoneAll, TapAll family) are audited
 // separately from battlefield object-controller sweeps.
 func TestPlayerKindValidTgtsAPICensus(t *testing.T) {
-	dir := "../.cards/cardsfolder"
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("corpus not fetched; run `make fetch-cards`")
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	got := map[string]map[string]bool{}
 	for _, api := range []string{"ChangeZoneAll", "PumpAll", "PutCounterAll", "TapAll", "DestroyAll", "TapOrUntapAll", "UntapAll", "AnimateAll", "DamageAll"} {
 		got[api] = map[string]bool{}
