@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -62,30 +63,52 @@ func TestStaticGrantedReplacementServed(t *testing.T) {
 }
 
 // TestStaticGrantedReplacementFailClosed: an AddReplacementEffect$ body this
-// template does not observe (Scion of Halaster's "first draw each turn"
-// Dig-and-draw replacement) is NOT served, so the row keeps its named
-// replacement-grant gap. This is the fail-closed direction the arm's generic
-// implementation must preserve for the out-of-census carriers.
+// template does not observe is NOT served, so the row keeps its named
+// replacement-grant gap. Scion of Halaster grants to a COMMANDER (the XMage
+// driver rejects command-zone setup, so no cross-engine fixture exists), and
+// Cloudsteel Kirin's grant is a bodyless Layer$ CantHappen line (its row is
+// served by the Flying grant it also carries, so only the replacement arm is
+// pinned unserved there, not the row's skip).
 func TestStaticGrantedReplacementFailClosed(t *testing.T) {
 	reg := loadGenRegistry(t)
-	const name = "Scion of Halaster"
-	req := counterReq(t, reg, name, "static#0.0")
-	c, ok := reg.Lookup(name)
-	if !ok || len(c.Faces) == 0 {
-		t.Fatalf("precondition: %s not in the corpus", name)
-	}
-	f := c.Faces[0]
-	st, _ := staticSlotOf(f, req)
-	// PRECONDITION: the slot really carries an AddReplacementEffect$ grant,
-	// so the assertion below is about a grant and not an empty slot.
-	if !st.HasParam(cards.PKAddReplacementEffect) {
-		t.Fatalf("precondition: %s %s does not grant a replacement effect: %v", name, req.Key, st.Params)
-	}
-	if _, served := staticGrantedReplacementItem(reg, f, name, req, st); served {
-		t.Fatal("a granted move replacement was served, want no observation")
-	}
-	_, skip := GenerateB(reg, name, req)
-	if skip == nil || !strings.Contains(skip.Reason, staticGrantReplacementReason) {
-		t.Fatalf("skip = %v, want the named replacement-grant gap %q", skip, staticGrantReplacementReason)
+	for _, tc := range []struct {
+		name, key string
+		namedGap  bool
+	}{
+		{"Scion of Halaster", "static#0.0", true},
+		{"Cloudsteel Kirin", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, ok := reg.Lookup(tc.name)
+			if !ok || len(c.Faces) == 0 {
+				t.Fatalf("precondition: %s not in the corpus", tc.name)
+			}
+			f := c.Faces[0]
+			key := tc.key
+			if key == "" {
+				for i, st := range f.Statics {
+					if st.HasParam(cards.PKAddReplacementEffect) {
+						key = "static#0." + strconv.Itoa(i)
+					}
+				}
+			}
+			req := counterReq(t, reg, tc.name, key)
+			st, _ := staticSlotOf(f, req)
+			// PRECONDITION: the slot really carries an AddReplacementEffect$
+			// grant, so the assertion is about a grant and not an empty slot.
+			if !st.HasParam(cards.PKAddReplacementEffect) {
+				t.Fatalf("precondition: %s %s does not grant a replacement effect: %v", tc.name, req.Key, st.Params)
+			}
+			if _, served := staticGrantedReplacementItem(reg, f, tc.name, req, st); served {
+				t.Fatal("a granted replacement was served, want no observation")
+			}
+			if !tc.namedGap {
+				return
+			}
+			_, skip := GenerateB(reg, tc.name, req)
+			if skip == nil || !strings.Contains(skip.Reason, staticGrantReplacementReason) {
+				t.Fatalf("skip = %v, want the named replacement-grant gap %q", skip, staticGrantReplacementReason)
+			}
+		})
 	}
 }

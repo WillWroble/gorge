@@ -38,6 +38,9 @@ func (f *Face) Primitives() []string {
 			// resolver cannot bind to a single attacker and a mandatory target.
 			set["api:MustBlock.OtherShape"] = struct{}{}
 		}
+		if v := strings.TrimSpace(sa.ParamStr(PKAtEOT)); v != "" && !AtEOTValueSupported(v) {
+			set["api:AtEOT."+v] = struct{}{}
+		}
 		if sa.API == "PreventDamage" && !PreventionRiderResolved(f.SVars, sa) {
 			// The PreventionSubAbility$ rider (Test of Faith's counters,
 			// Candles' Glow's life gain, Sacred Boon's delayed effect) is the
