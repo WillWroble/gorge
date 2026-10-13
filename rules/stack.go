@@ -905,6 +905,7 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 		sharedRef = e.sharedCardTypeReference(ref, source, sc)
 		sharedWhitelist = tp.SharedTypes
 	}
+	related := e.newRelatedPropertyRecheck(sa, source, sc)
 	for _, t := range targets {
 		if t.IsPlayer {
 			// CR 702.18 / CR 702.11 / CR 702.16c for players: a target that
@@ -970,6 +971,7 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 				e.mentorAdmits(sa, source, t.Obj) &&
 				(controllerProp == "" || e.targetControllerPropertyAdmits(controllerProp, t.Obj)) &&
 				(!hasSharedRef || e.sharedCardTypeAdmits(t.Obj, sharedRef, sharedWhitelist)) &&
+				related.admits(e, t.Obj) &&
 				(tpState == tpNone || e.tpControlsAdmits(o, you, tpChooser, tpState)) &&
 				!(o.Zone == state.ZBattlefield && e.restrictionBlocksTarget(t.Obj, you)) &&
 				!(o.Zone == state.ZBattlefield && e.shroudBlocksTarget(t.Obj)) &&
