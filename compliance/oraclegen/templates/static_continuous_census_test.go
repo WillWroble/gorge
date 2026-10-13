@@ -105,6 +105,10 @@ import (
 // keeps main's renamed exiled skip (an opponent-owned exiled card) and this
 // branch's served Tomik, so FRA is 36 served; DFT keeps 61 (main's 60 predates
 // the granted-static Racers' Scoreboard row).
+// Re-pinned by lb-mayplayopp: the may-play spell walk now offers an
+// opponent-owned card a board grant names, and the opponent-exile fixture
+// serves FRA Null Summoner by its own cast ETB (Threshold prelude), so FRA's
+// opponent-owned exiled skip becomes its 37th served row.
 // It fails in both directions.
 var wantStaticContinuousCensus = map[string]map[string]int{
 	"BIG": {
@@ -122,10 +126,9 @@ var wantStaticContinuousCensus = map[string]map[string]int{
 		"skip:static needs counters on the affected permanent":                                       1,
 	},
 	"FRA": {
-		"served": 36,
-		"skip:static effect not observable on a probe or the card":                                                                 1,
-		"skip:static an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)": 1,
-		"skip:static grants only keywords outside the compared evergreen set":                                                      1,
+		"served": 37,
+		"skip:static effect not observable on a probe or the card":            1,
+		"skip:static grants only keywords outside the compared evergreen set": 1,
 	},
 	// DFT includes the Surveyor cycle's graveyard AddAbility$ grant, served by
 	// the gated-grant observation's off-battlefield arm (agent-

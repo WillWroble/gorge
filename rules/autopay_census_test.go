@@ -31,7 +31,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -127,16 +126,6 @@ func censusChainHasMana(sa *cards.SA) bool {
 	return false
 }
 
-func censusRepoRoot(t *testing.T) string {
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("census: resolve repo root: %v", err)
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func TestAutopayManaCensus(t *testing.T) {
 	outDir := os.Getenv(censusEnv)
 	if outDir == "" {
@@ -144,7 +133,11 @@ func TestAutopayManaCensus(t *testing.T) {
 	}
 	// A census that silently skips is worse than none: with the env set, a
 	// missing corpus is a failure, not testutil.CorpusRegistry's Skip.
-	if _, err := os.Stat(filepath.Join(censusRepoRoot(t), ".cards")); err != nil {
+	corpus, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("census: could not resolve the repo root")
+	}
+	if _, err := os.Stat(cards.CorpusDir(corpus)); err != nil {
 		t.Fatalf("census: no .cards corpus in this checkout (%v); run scripts/agent-worktree.sh or make fetch-cards", err)
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {

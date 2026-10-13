@@ -82,7 +82,7 @@ func PaymentPlanAbilityTier(e Engine, p state.PlayerID, id state.ObjID, ma *card
 	if tier == TierLastResort && c == (Consequence{}) {
 		return TierDeferred, Consequence{}, "source:last_resort"
 	}
-	switch it, ic, idetail := e.Eval().SourceInterference(id, ma); it {
+	switch it, ic, idetail, _ := e.Eval().SourceInterference(id, ma, ""); it {
 	case TierDeferred:
 		return it, ic, idetail
 	case TierLastResort:
@@ -191,6 +191,11 @@ func appendUnitAlternatives(e Engine, dst []Alt, u WindowUnit) (grown, alts []Al
 		}
 		if PlanAltOK(alt) {
 			m := alt.Mana()
+			produced := params.ManaOf(alt.Ma).Produced
+			if mp := params.ManaOf(alt.Ma); mp.CountsAny {
+				produced = altSymbol(m)
+			}
+			m = addTapExtra(e, u.ID, alt.Ma, produced, m)
 			if out == nil {
 				out = make([]Alt, 0, len(u.Alts))
 			}
@@ -202,13 +207,14 @@ func appendUnitAlternatives(e Engine, dst []Alt, u WindowUnit) (grown, alts []Al
 		if !alt.Any || alt.Amt <= 0 {
 			continue
 		}
-		for _, col := range PaymentPlanChoiceColours(e, u.ID, alt.Ma) {
+		for _, col := range planAltChoiceColours(e, u.ID, alt) {
 			i := strings.IndexByte("WUBRG", col[0])
 			if i < 0 {
 				continue
 			}
 			var m state.Mana
 			m[i] = alt.Amt
+			m = addTapExtra(e, u.ID, alt.Ma, col, m)
 			if out == nil {
 				out = make([]Alt, 0, len(u.Alts))
 			}
@@ -316,4 +322,35 @@ func PaymentPlanQueryAlternatives(e Engine, u WindowUnit) []Alt {
 	}
 	q.Alts[u.ID] = alts
 	return alts
+}
+
+// addTapExtra adds the deterministic additional mana the static TapsForMana
+// triggers bring to one tap of id (ma must cost {T}: a sacrifice-only mana
+// ability never taps) declaring `produced` (Forsaken Monument's
+// {C} on a {C} production). The same Eval read drove the interference
+// verdict that admitted the source, so validation and execution agree.
+func addTapExtra(e Engine, id state.ObjID, ma *cards.SA, produced string, m state.Mana) state.Mana {
+	if produced == "" {
+		return m
+	}
+	_, _, _, extra := e.Eval().SourceInterference(id, ma, produced)
+	for i := range m {
+		m[i] += extra[i]
+	}
+	return m
+}
+
+// altSymbol is the single mana symbol of a one-colour production, or "".
+func altSymbol(m state.Mana) string {
+	sym := ""
+	for i, n := range m {
+		if n <= 0 {
+			continue
+		}
+		if sym != "" {
+			return ""
+		}
+		sym = string(cards.ManaSymbol(i))
+	}
+	return sym
 }

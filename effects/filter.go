@@ -355,6 +355,42 @@ var predicates = map[string]predFn{
 	"attackedThisTurn": func(g *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
 		return o != nil && o.AttackedCombat != 0 && o.AttackedTurn == g.Turn
 	},
+	// blockedByThisTurn and its Forge synonym gotBlockedThisTurn are "was
+	// blocked this turn" (attacker side, CR 509.1): Heat Stroke's "each
+	// creature that ... was blocked this turn" and Fyndhorn Druid's "if it
+	// was blocked this turn". They read the event-folded
+	// state.Object.BlockedByThisTurn history, which survives the
+	// end-of-combat BlockedBy reset, so an end-of-combat trigger still sees
+	// it; it is cleared on a battlefield exit (CR 400.7) like the attack
+	// stamp, so a re-entering creature reads false.
+	"blockedByThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && len(o.BlockedByThisTurn) != 0
+	},
+	"gotBlockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && len(o.BlockedByThisTurn) != 0
+	},
+	// blockedThisTurn is the blocker side: the creature blocked at least one
+	// attacker this turn (CR 509.1). Heat Stroke's "each creature that
+	// blocked ... this turn", Gideon's Triumph, Hezrou // Demonic Stench,
+	// Sizzling Barrage and the Lurker/Inferno Hellion `!blockedThisTurn`
+	// negations read it. Same event-folded history and same
+	// survive-end-of-combat / clear-on-turn-and-exit lifetimes as
+	// blockedByThisTurn above.
+	"blockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return o != nil && len(o.BlockedThisTurn) != 0
+	},
+	// blockedBySourceThisTurn is the this-turn twin of blockedBySource (the
+	// word-predicate at effects/filter_word.go): the object was blocked by
+	// the source at some point this turn. It is source-relative, so it reads
+	// sc.Source through this map's src parameter rather than the object
+	// alone; an unbound source (id 0) matches nothing, the same
+	// fail-closed direction blockedBySource keeps. Defiant Vanguard's
+	// end-of-combat delayed trigger is the corpus carrier: it destroys
+	// Card.Self plus every creature it blocked this turn, and the live
+	// BlockedBy list has already been cleared by then.
+	"blockedBySourceThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, src state.ObjID) bool {
+		return o != nil && src != 0 && slices.Contains(o.BlockedByThisTurn, src)
+	},
 	// IsSaddled is CR 702.171b's until-end-of-turn designation. The turn
 	// stamp makes it expire without a cleanup event and is preserved by
 	// controller changes.
@@ -1319,7 +1355,10 @@ func positiveRecognised(p string) bool {
 	if strings.HasPrefix(p, "greatestCMC_") || strings.HasPrefix(p, "lowestCMC") {
 		return true
 	}
-	if p == "TriggeredNewCard" || p == "TriggeredCard" || p == "TriggeredCards" || p == "TriggeredTarget" || p == "NotDefinedTriggeredTarget" || strings.HasPrefix(p, "ChosenMode") && len(p) > len("ChosenMode") {
+	if p == "TriggeredNewCard" || p == "TriggeredCard" || p == "TriggeredCards" || p == "TriggeredTarget" || strings.HasPrefix(p, "ChosenMode") && len(p) > len("ChosenMode") {
+		return true
+	}
+	if _, ok := notDefinedTriggerReferent(p); ok {
 		return true
 	}
 	// Forge's base-qualified `SharesColorWith <referent>` predicate (C.A.M.P.'s
@@ -1936,9 +1975,22 @@ func sharesNameWithObject(o, src *state.Object, sc SpecContext) bool {
 	return false
 }
 
-// matchTriggeredTarget evaluates Forge's bare TriggeredTarget /
-// NotDefinedTriggeredTarget property ("the object the triggering event
-// targeted") inside an ordinary filter spec -- Blade of Shared Souls'
+// notDefinedTriggerReferent classifies Forge's NotDefined<referent> spelling
+// of "other than that object" for the single-object trigger referents
+// (Pawpatch Recruit's NotDefinedTriggeredTarget, Jackdaw Savior's and Puca's
+// Covenant's NotDefinedTriggeredCard -- "another target ... card"). It returns
+// the positive twin, which matchPositive evaluates and negates in ONE place:
+// the twin's unbound fail-closed (ok=false) propagates, so the negation can
+// never invert an absent referent into a match. A NotDefined<X> whose twin is
+// not listed here stays unrecognised (TestNotDefinedPredicateCensus pins
+// which).
+func notDefinedTriggerReferent(p string) (base string, ok bool) {
+	base, ok = strings.CutPrefix(p, "NotDefined")
+	return base, ok && (base == "TriggeredCard" || base == "TriggeredTarget")
+}
+
+// matchTriggeredTarget evaluates Forge's bare TriggeredTarget property ("the
+// object the triggering event targeted") inside an ordinary filter spec -- Blade of Shared Souls'
 // `Creature.YouCtrl+!TriggeredTarget` ("another target creature you
 // control"), Toralf, God of Fury's
 // `Creature.!TriggeredTarget,Player,Planeswalker.!TriggeredTarget` ("any
@@ -1952,17 +2004,12 @@ func sharesNameWithObject(o, src *state.Object, sc SpecContext) bool {
 // causing event captured. A player-valued or absent binding fails CLOSED
 // (ok=false) -- the spec matches nothing, never an invented referent, and the
 // leading-'!' spelling cannot invert the absence into a match.
-// NotDefinedTriggeredTarget is the corpus's one positive-evaluation spelling
-// of the same exclusion, so negated=true inverts in place.
-func matchTriggeredTarget(o *state.Object, sc SpecContext, negated bool) (result, ok bool) {
+// NotDefinedTriggeredTarget negates it through notDefinedTriggerReferent.
+func matchTriggeredTarget(o *state.Object, sc SpecContext) (result, ok bool) {
 	if sc.TriggerTarget.IsPlayer || sc.TriggerTarget.Obj == 0 {
 		return false, false
 	}
-	match := o.ID == sc.TriggerTarget.Obj
-	if negated {
-		match = !match
-	}
-	return match, true
+	return o.ID == sc.TriggerTarget.Obj, true
 }
 
 // matchPositive evaluates a recognised positive-evaluation predicate token p
@@ -2078,6 +2125,13 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		return MatchesSpecCtx(g, TargetsOf(sa).ValidTgts, o.ID,
 			NewSpecContext(spell.Controller, spell.ID)), true
 	}
+	if base, ok := notDefinedTriggerReferent(p); ok {
+		match, bound := matchPositive(g, base, o, sc)
+		if !bound {
+			return false, false
+		}
+		return !match, true
+	}
 	if p == "TriggeredNewCard" || p == "TriggeredCard" {
 		// Forge's bare TriggeredNewCard / TriggeredCard property
 		// (CardProperty "the card that triggered this ability") inside an
@@ -2097,8 +2151,8 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		}
 		return o.ID == sc.TriggerCard, true
 	}
-	if p == "TriggeredTarget" || p == "NotDefinedTriggeredTarget" {
-		return matchTriggeredTarget(o, sc, p == "NotDefinedTriggeredTarget")
+	if p == "TriggeredTarget" {
+		return matchTriggeredTarget(o, sc)
 	}
 	if p == "TriggeredCards" {
 		// Forge's Card.TriggeredCards set property inside an ordinary filter
@@ -2201,19 +2255,7 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		// capture added this walk, the "each card exiled this way" follow-up
 		// shape), and the source object's event-backed Remembered (what an
 		// earlier resolution remembered durably, Forge's persistent host list).
-		for _, t := range sc.Remembered {
-			if !t.IsPlayer && t.Obj == o.ID {
-				return true, true
-			}
-		}
-		if src := g.Obj(sc.Source); src != nil {
-			for _, t := range src.Remembered {
-				if !t.IsPlayer && t.Obj == o.ID {
-					return true, true
-				}
-			}
-		}
-		return false, true
+		return anyRemembered(g, &sc, func(id state.ObjID) bool { return id == o.ID }), true
 	}
 	if rest, has := strings.CutPrefix(p, "greatestPower"); has {
 		// Forge's greatestPower[ControlledBy <players>] (CardProperty): the
@@ -2423,8 +2465,7 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 			return false, false
 		}
 		if kind == wordChosenColor {
-			src := g.Obj(sc.Source)
-			if src == nil || colourLetter(src.ChosenColor) == 0 {
+			if _, col := sourceChosen(g, sc); colourLetter(col) == 0 {
 				return false, false
 			}
 		}
@@ -2557,6 +2598,15 @@ type SpecContext struct {
 	// resolution-time predicates that refer to damage dealt by Source.
 	CombatDamageHits []CombatDamageHit
 	Resolve          func(name string) (int32, bool)
+	// SourceLKIValid binds SourceChosenType/SourceChosenColor: the source's
+	// "as this enters" choices as they were when it last stood on the
+	// battlefield (CR 113.7a/608.2h). rules sets it for an ability whose
+	// source has since left (Dawn-Blessed Pennant, sacrificed as a cost); the
+	// live object has had its choices cleared by then. Read through
+	// sourceChosen only.
+	SourceLKIValid    bool
+	SourceChosenType  string
+	SourceChosenColor string
 	// PredicatePrograms is an optional immutable compiled-text sidecar. A nil
 	// value keeps the textual matcher authoritative for synthetic fixtures and
 	// dynamic source strings.

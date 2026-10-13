@@ -114,17 +114,23 @@ func (e *Engine) bindReflexiveContext(id state.ObjID, pt *pendingTrigger) {
 		}
 		e.sacrificedLKI[id] = pt.Ctx.Sacrificed
 	}
-	if len(pt.Ctx.Exiled) > 0 {
+	if len(pt.Ctx.Paid.Exiled) > 0 {
 		if e.castExiled == nil {
 			e.castExiled = make(map[state.ObjID][]state.ObjID)
 		}
-		e.castExiled[id] = pt.Ctx.Exiled
+		e.castExiled[id] = pt.Ctx.Paid.Exiled
 	}
-	if len(pt.Ctx.Revealed) > 0 {
+	if len(pt.Ctx.Paid.Revealed) > 0 {
 		if e.castRevealed == nil {
 			e.castRevealed = make(map[state.ObjID][]state.ObjID)
 		}
-		e.castRevealed[id] = pt.Ctx.Revealed
+		e.castRevealed[id] = pt.Ctx.Paid.Revealed
+	}
+	if len(pt.Ctx.Paid.CounterPut) > 0 {
+		if e.castCounterPut == nil {
+			e.castCounterPut = make(map[state.ObjID][]state.ObjID)
+		}
+		e.castCounterPut[id] = pt.Ctx.Paid.CounterPut
 	}
 }
 

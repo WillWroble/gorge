@@ -16,10 +16,8 @@ package effects
 // primitive with a bound Remembered and pin the new pool -- the side effect
 // the registration has, asserted rather than assumed away.
 //
-// Twilight Diviner's `CopyPermanent Choices$ Card.TriggeredCards` is the
-// CONTROL: CopyPermanentOf blocks every Choices$ shape except the measured
-// ChooserRemembered / SaddledThisTurn families, so Twilight's ask never
-// reaches the filter grammar and the registration does NOT touch it.
+// Twilight Diviner's `CopyPermanent Choices$ Card.TriggeredCards` is the third
+// reader since lb-copyperm-sel; copypermanent_selectors_test.go pins it.
 
 import (
 	"testing"
@@ -150,58 +148,5 @@ func TestTriggeredCardsChooseCardChoicesPoolMatchesRemembered(t *testing.T) {
 	}
 	if ids[other] {
 		t.Fatalf("Choices$ pool %v includes an object outside the remembered set %d", ids, other)
-	}
-}
-
-// TestTriggeredCardsCopyPermanentChoicesStaysBlocked is the control for the
-// two carriers above: Twilight Diviner's real TrigCopy is
-// `CopyPermanent Choices$ Card.TriggeredCards`, but CopyPermanentOf blocks
-// every Choices$ shape outside the measured ChooserRemembered / SaddledThisTurn
-// families, so the body mints nothing and never reaches the filter grammar --
-// the registration does not change this card.
-func TestTriggeredCardsCopyPermanentChoicesStaysBlocked(t *testing.T) {
-	reg := testutil.CorpusRegistry(t)
-	twilight, ok := reg.Lookup("Twilight Diviner")
-	if !ok || twilight == nil {
-		t.Fatal("missing corpus card Twilight Diviner")
-	}
-	body := cards.ResolveSVar(twilight.Faces[0].SVars, "TrigCopy")
-	if body == nil || body.Params["Choices"] != "Card.TriggeredCards" {
-		t.Fatalf("precondition: Twilight TrigCopy shape %+v", body.Params)
-	}
-	cp := CopyPermanentOf(body)
-	if !cp.Blocked || cp.SupportsChoice {
-		t.Fatalf("precondition: Twilight CopyPermanent must stay blocked (Blocked=%v SupportsChoice=%v); if this changed the control is stale", cp.Blocked, cp.SupportsChoice)
-	}
-
-	h := &fakeHost{g: state.NewGame(names(2))}
-	src := h.g.AddObject(twilight, 0).ID
-	entered := h.g.AddObject(mkCard(t, "Name:Fixture Entered\nTypes:Creature Beast\nPT:2/2\nOracle:x\n"), 0).ID
-	h.g.SetZone(state.ZBattlefield, 0, []state.ObjID{src, entered})
-	h.g.Obj(src).Zone = state.ZBattlefield
-	h.g.Obj(entered).Zone = state.ZBattlefield
-
-	h.askResult = true
-	Resolve(h, &Ctx{Source: src, Controller: 0, Remembered: []state.Target{{Obj: entered}},
-		SVars: twilight.Faces[0].SVars}, body)
-	if h.askCount != 0 {
-		t.Fatalf("askCount = %d, want 0 (a blocked Choices$ must not reach the filter grammar)", h.askCount)
-	}
-	// The handler really ran: effCopyPermanent emits CopyPermanentOf's
-	// SkippedNote before its Blocked early-return. Without this the test would
-	// pass with the whole primitive unregistered.
-	handlerRan := false
-	for _, ev := range h.log {
-		if ev.Kind == events.Note && ev.Text == cp.SkippedNote && cp.SkippedNote != "" {
-			handlerRan = true
-		}
-	}
-	if !handlerRan {
-		t.Fatalf("effCopyPermanent did not run (no SkippedNote %q); log %+v", cp.SkippedNote, h.log)
-	}
-	for i := range h.g.Objs {
-		if h.g.Objs[i].IsToken {
-			t.Fatalf("a blocked CopyPermanent Choices$ minted a token: %+v", h.g.Objs[i].Face())
-		}
 	}
 }

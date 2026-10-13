@@ -33,7 +33,7 @@ func (livelockSeat) Decide(context.Context, view.View, decision.Decision) (decis
 
 func livelockCfg(t *testing.T) rules.Config {
 	t.Helper()
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	reg, err := testutil.OpenCorpusRegistry(dir)
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
@@ -137,7 +137,7 @@ func TestGrindContinuesAfterLivelockAndFails(t *testing.T) {
 	grindSeats = func(uint64) []seat.Seat { return []seat.Seat{livelockSeat{}, livelockSeat{}} }
 	defer func() { grindSeats = old }()
 
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	reg, err := testutil.OpenCorpusRegistry(dir)
 	if err != nil {
 		t.Fatalf("corpus: %v", err)

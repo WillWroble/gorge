@@ -68,6 +68,11 @@ type SacrificedInfo struct {
 	// cleared the live counters -- Zack Fair's self-sacrifice). Nil for the
 	// P/T-only readers the Sacrificed$<Property> heads are.
 	Counters []Counter
+	// Types is the object's card types at the instant of the sacrifice (the
+	// Sacrificed$CardTypes head reads the distinct set across the sacrificed
+	// objects). Printed face types here; effects.SacrificedLKI overwrites
+	// them with the layer-derived set for a battlefield permanent.
+	Types []string
 }
 
 // LKIObject is the last-known-information snapshot captured by a
@@ -961,6 +966,31 @@ type Object struct {
 	// wherever IsAttacking is.
 	AttackingBattle ObjID
 	BlockedBy       []ObjID
+	// BlockedByThisTurn records, on an attacking creature, the blockers that
+	// blocked it this turn (CR 509.1), in declaration order. Unlike the live
+	// BlockedBy list it survives the end-of-combat reset (events.EndCombatReset
+	// clears BlockedBy but not this), so a delayed "at end of combat" trigger
+	// can still ask which creatures blocked this attacker this turn -- Forge's
+	// Card.blockedByThisTurn / Card.gotBlockedThisTurn and the source-relative
+	// Card.blockedBySourceThisTurn. It is folded by events.Apply's
+	// DeclareBlockers case, reset in TurnChange's per-object loop (a per-turn
+	// fact) and cleared when the permanent leaves the battlefield (CR 400.7: a
+	// re-entering creature is a new object that blocked nothing this turn).
+	// Like BlockedBy it is a slice, so CloneDeep backs it independently.
+	BlockedByThisTurn []ObjID
+	// BlockedThisTurn is the blocker-side half of the same this-turn block
+	// history: the attackers this creature blocked this turn (CR 509.1), in
+	// declaration order. Like BlockedByThisTurn it survives the end-of-combat
+	// reset and is reset in TurnChange and on a battlefield exit (CR 400.7).
+	// It backs Forge's Card.blockedThisTurn ("each creature that blocked this
+	// turn": Heat Stroke, Gideon's Triumph, Hezrou // Demonic Stench, Sizzling
+	// Barrage, Lurker, Inferno Hellion, Vizier of Deferment, Glyph of Delusion)
+	// and, because it names the attackers rather than being a flag, the
+	// referent words blockedValidThisTurn / blockedRemembered: an attacker
+	// that has since died is not scanned for, so "blocked a Zombie that then
+	// died" still reads true. Set by events.Apply's DeclareBlockers fold; a
+	// slice, so CloneDeep backs it independently.
+	BlockedThisTurn []ObjID
 	// EncoreAttackTurn/Defender record "attacks that opponent this turn if
 	// able" on an encore token. Zero Turn means no requirement; turns begin
 	// at 1, so the zero value is unambiguous.
@@ -1612,7 +1642,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [106]byte
+	_ [58]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
@@ -2142,7 +2172,7 @@ func carveClone[T any](buf *[]T, src []T) []T {
 
 // cloneArenaNeed adds the element counts o's carved slices need to a.
 func (o *Object) cloneArenaNeed(ids, tgs, ctr *int) {
-	*ids += len(o.BlockedBy) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
+	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.BlockedThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
 		len(o.DamageTakenThisTurnBy) + len(o.ImprintTokens) + len(o.EncodedCards) + len(o.SeekFound) + len(o.ExiledCards)
 	*tgs += len(o.Targets) + len(o.SubTargets) + len(o.Remembered) + len(o.Chosen)
 	*ctr += len(o.Counters)
@@ -2161,6 +2191,8 @@ func (o *Object) cloneDeepIntoArena(c *Object, a *cloneArena) {
 	c.SubTargets = carveClone(&a.tgs, o.SubTargets)
 	c.Remembered = carveClone(&a.tgs, o.Remembered)
 	c.BlockedBy = carveClone(&a.ids, o.BlockedBy)
+	c.BlockedByThisTurn = carveClone(&a.ids, o.BlockedByThisTurn)
+	c.BlockedThisTurn = carveClone(&a.ids, o.BlockedThisTurn)
 	c.CrewedVehicles = carveClone(&a.ids, o.CrewedVehicles)
 	c.Chosen = carveClone(&a.tgs, o.Chosen)
 	if c.Chosen == nil && o.Chosen != nil {
@@ -2241,7 +2273,8 @@ func SacrificedInfoOf(g *Game, id ObjID) SacrificedInfo {
 		}
 	}
 	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(),
-		ManaCost: o.Face().ManaCost, FaceDown: o.FaceDown, Counters: counters}
+		ManaCost: o.Face().ManaCost, FaceDown: o.FaceDown, Counters: counters,
+		Types: append([]string(nil), o.Face().Types...)}
 }
 
 // CloneChosenModes copies a ChosenModes announcement, preserving the

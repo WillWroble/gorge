@@ -72,6 +72,20 @@ func evalCountBodyObjHeads(h Host, c *Ctx, g *state.Game, head, arg string, dept
 			}
 			return scratch.Counter(kind), true, true
 		}
+		// A leaves-the-battlefield trigger whose effect counts its own
+		// source's counters (CR 603.10a: such a trigger looks back in time):
+		// Move's fold already cleared the counters on the departed card, so
+		// read the trigger's LKI snapshot. A source that is still (or again)
+		// on the battlefield is read live, and an LKI snapshot for a
+		// different object is never substituted.
+		if o := g.Obj(c.Source); o == nil || o.Zone != state.ZBattlefield {
+			if lki := c.LKI; lki != nil && lki.ID == c.Source {
+				if strings.EqualFold(kind, "ALL") {
+					return sumCounters(lki.Counters), true, true
+				}
+				return lki.Counter(kind), true, true
+			}
+		}
 		if o := g.Obj(c.Source); o != nil {
 			if strings.EqualFold(kind, "ALL") {
 				return sumCounters(o.Counters), true, true

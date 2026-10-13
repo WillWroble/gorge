@@ -134,11 +134,14 @@ checks() {
     cd "$wt" || exit 1
     if [ -n "${DRB_CHECK_CMD:-}" ]; then $DRB_CHECK_CMD "$1"; exit; fi
     if [ "$1" = pre ]; then capped go build ./... || exit 1; fi
-    capped go test -timeout 2m ./compliance/oraclegen ./compliance/oraclegen/templates ./cmd/oraclediff || exit 1
-    if [ "$1" = post ]; then capped go test -timeout 2m ./compliance/adopt ./compliance/gate ./compliance || exit 1; fi
+    # -timeout is the PACKAGE wall, not the 1-minute per-test budget: oraclegen/
+    # templates takes 120-170 s even on a quiet box and lb-roomspell was parked
+    # "red alone" on a 2m timeout at load 76 (2026-10-12), so give it 10m.
+    capped go test -timeout 10m ./compliance/oraclegen ./compliance/oraclegen/templates ./cmd/oraclediff || exit 1
+    if [ "$1" = post ]; then capped go test -timeout 10m ./compliance/adopt ./compliance/gate ./compliance || exit 1; fi
     # Census guards too: a driver/runner branch that edits rules/ trips the
     # param census (50a74c19c went red on oracleRun.build). ~10s, 0.9 GB.
-    capped go test -timeout 2m -run 'Oracle|Census' ./rules || exit 1
+    capped go test -timeout 10m -run 'Oracle|Census' ./rules || exit 1
   ) >"$2" 2>&1
 }
 

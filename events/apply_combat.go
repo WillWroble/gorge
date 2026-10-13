@@ -43,10 +43,18 @@ func foldDeclareAttackers(g *state.Game, e *Event) {
 func foldDeclareBlockers(g *state.Game, e *Event) {
 	for _, pr := range e.Pairs {
 		a := g.Obj(pr[0])
-		if a == nil || g.Obj(pr[1]) == nil {
+		b := g.Obj(pr[1])
+		if a == nil || b == nil {
 			continue
 		}
 		a.BlockedBy = append(a.BlockedBy, pr[1])
+		// The this-turn history (state.Object.BlockedByThisTurn /
+		// BlockedThisTurn) rides the same fold so a delayed "at end of
+		// combat" trigger can still name the creatures that blocked or were
+		// blocked after EndCombatReset has emptied the live list (Defiant
+		// Vanguard, Heat Stroke).
+		a.BlockedByThisTurn = append(a.BlockedByThisTurn, pr[1])
+		b.BlockedThisTurn = append(b.BlockedThisTurn, pr[0])
 		g.NoteBlockers()
 	}
 }

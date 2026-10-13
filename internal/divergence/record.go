@@ -116,8 +116,7 @@ type Provenance struct {
 
 // Triage is one line of triage.jsonl (design §6.1): the offline teacher's
 // verdict over one divergence. Evaluations carries each arm's evaluation
-// JSON (hindsight.Evaluation, keyed by arm name — "honest", "omniscient")
-// verbatim; this package must not import hindsight's layer, so the records
+// JSON (keyed by arm name — "honest", "omniscient") verbatim; the records
 // keep the arms as raw JSON and export-labels reads only the honest arm.
 type Triage struct {
 	RecordType    string         `json:"record_type"`

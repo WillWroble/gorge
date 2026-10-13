@@ -353,7 +353,7 @@ func UniverseOf(cs []*Card) *Universe                // adapter: same answers ov
 
 ### 2.6 Cache format (S5)
 
-- **Files:** `ir-<fingerprint>.img` replaces both `ir-<fingerprint>.gob.gz` and `.seg`. The fingerprint already covers every non-test file in `cards/` (`cards/fingerprint.go:20`, `cards/fingerprint_sources.go`), and `TestCompilerSourcesListEveryNonTestFile` forces new `image*.go` files into the embed list.
+- **Files:** `ir-<fingerprint>.img` replaces both `ir-<fingerprint>.gob.gz` and `.seg`. The fingerprint covers every IR-affecting non-test file in `cards/` (`cards/fingerprint.go`, `cards/fingerprint_sources.go`); `TestCompilerSourcesFollowTheCensus` forces every new file to be classified in `fingerprintCensus`, and `image.go`/`image_build.go` are already classified IR-affecting because this step persists the Image.
 - **Encoding:** a header, a section table, then raw little-endian `uint32` arrays and the blob. The decoder uses `encoding/binary`, with no `unsafe` reinterpretation: one read, one allocation per section and no reflection. **ESTIMATE:** load time falls from ~1.8 s per process (§1.1 probe wall) to well under 0.1 s, and the transient load allocation from ~500 MB (`cards/subset.go:25` measured 525 MB) to ~35 MB. Every test binary that opens the corpus benefits.
 - **Relocatable:** `CardRec.Path` is stored relative to the corpus root. The registry joins it with the directory it actually opened, which replaces `rerootPaths` (`cards/open.go:236`), the c09b82ba0 cache-poisoning fix. A test pins it: build in dir A, copy to dir B, open from B, and every `Path` is under B.
 - **Staleness:** `cacheFresh`/`corpusInputNewerThan` (`cards/open.go:123-169`) are unchanged. `PruneCaches` learns `ir-*.img` and drops the `.seg` rule.
@@ -409,7 +409,7 @@ systemd-run --user --scope -q -p MemoryMax=2G -p CPUQuota=200% env GOMAXPROCS=2 
   4. `Path` round-trips relative.
 - **Budget:** the full sweep is ~34k cards; shard it by ordinal range into subtests if one exceeds 1 minute under `CAP`.
 - **Done means:** the oracle passes over the whole corpus; nothing outside `cards/*_test.go` calls the new code; heads untouched (no runtime change).
-- **Test:** `CAP -run 'TestImage' ./cards/`. Also `CAP -run 'TestCompilerSourcesListEveryNonTestFile|TestSubsetRegistryMatchesFull' ./cards/`.
+- **Test:** `CAP -run 'TestImage' ./cards/`. Also `CAP -run 'TestCompilerSourcesFollowTheCensus|TestSubsetRegistryMatchesFull' ./cards/`.
 - **Measure:** log the image size and the build time.
 - **Payoff:** none. This proves the representation.
 

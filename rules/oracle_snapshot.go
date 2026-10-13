@@ -8,6 +8,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/rules/chars"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -149,6 +150,16 @@ type OracleDecision struct {
 	// unchanged for them.
 	PerPlayer bool `json:"per_player,omitempty"`
 	SeatCount int  `json:"seat_count,omitempty"`
+	// Retarget marks a ChangeTargets redirect pick (CR 115.7): a choose ask
+	// whose options are the legal NEW targets. XMage poses it as a
+	// chooseTarget on the target queue, not a makeChoose dialog, so the
+	// generator answers it as a target. False for every other choose ask.
+	Retarget bool `json:"retarget,omitempty"`
+	// XMulti marks an X announcement of a cost naming X more than once
+	// (Gogo's "XMin1 X X", {X}{X}): XMage's unscripted announce does not pay
+	// the repeated X even when the pool leaves one legal value, so it must be
+	// scripted.
+	XMulti bool `json:"x_multi,omitempty"`
 	// PerOpponent marks a per-player target ask whose filter admits only
 	// opponents' objects: XMage asks no target for the controller's seat.
 	PerOpponent bool `json:"per_opponent,omitempty"`
@@ -337,8 +348,17 @@ func stackTriggerSlot(src *state.Object, sa *cards.SA) string {
 // face's name under its setup ref's seat prefix and "#n" ordinal: the setup
 // ref names the front face, but the ability on the stack is the back face's
 // (a "back_face" setup permanent), exactly as the XMage driver names it.
+//
+// A Room spell on the stack is the same case (CR 709.5, 601.2): it has only
+// the characteristics of the door it was cast as, so the setup ref's whole
+// "Left // Right" name is replaced by the cast door's name, whichever door
+// that is (FaceIdx 0 included).
 func stackSourceRef(ref string, o *state.Object) string {
-	if o == nil || o.Zone != state.ZBattlefield || o.FaceIdx == 0 || o.CopyFace != nil || o.Face() == nil {
+	if o == nil || o.CopyFace != nil || o.Face() == nil {
+		return ref
+	}
+	onStackRoom := o.Zone == state.ZStack && o.Ability == nil && chars.IsRoomCard(o)
+	if !onStackRoom && (o.Zone != state.ZBattlefield || o.FaceIdx == 0) {
 		return ref
 	}
 	seat, nth := "", ""

@@ -210,6 +210,9 @@ func (e *Engine) entryBodyCandidates(ev *events.Event) bool {
 			return true
 		}
 	}
+	if len(e.foreignEntryBodies(entrant.ID, *ev)) > 0 {
+		return true
+	}
 	// kw:Bloodthirst and kw:Sunburst are synthesised by the replacement
 	// dispatch rather than expanded onto the face (rules/replacement.go), so
 	// a granted or printed keyword carries no face Repl to scan.
@@ -247,14 +250,35 @@ func entryBodyKindEncodable(sa *cards.SA) bool {
 // ordinary body path -- the conservative direction, so a body this build
 // cannot fully fold never loses its own resolution.
 func entryBodyAbsorbable(sa *cards.SA) bool {
+	return entryBodyAbsorbableFor(sa, false)
+}
+
+// entryBodyAbsorbableFor is entryBodyAbsorbable with the referent made
+// explicit: the entering object's own body names Defined$ Self, a body that
+// another permanent's replacement lends it (Metallic Mimic's "enters with an
+// additional +1/+1 counter") names Defined$ ReplacedCard.
+func entryBodyAbsorbableFor(sa *cards.SA, foreign bool) bool {
 	if sa == nil || sa.API != "PutCounter" {
+		return false
+	}
+	// A condition-gated body stays on the ordinary body path: the live
+	// Resolve evaluates the gate and SKIPS the body when it is not met, a
+	// verdict the fold cannot reproduce by adding CounterNumResolved to the
+	// grant (Vampire Socialite's "as long as an opponent lost life this
+	// turn" rider folded unconditionally on a board where no opponent has).
+	if entryBodyConditionGated(sa) {
 		return false
 	}
 	pc := effects.PutCounterOf(sa)
 	if !pc.ETB || sa.Sub != nil {
 		return false
 	}
-	if !effects.DefinedRefOf(sa).Is(effects.RefSelf) {
+	ref := effects.DefinedRefOf(sa)
+	if foreign {
+		if ref.Text != "ReplacedCard" {
+			return false
+		}
+	} else if !ref.Is(effects.RefSelf) {
 		return false
 	}
 	if !pc.CounterNum.Present || pc.EntryFoldBlocked {
@@ -265,6 +289,34 @@ func entryBodyAbsorbable(sa *cards.SA) bool {
 		return false
 	}
 	return true
+}
+
+// entryBodyConditionGated reports whether a PutCounter|ETB$ True body carries
+// a resolution-condition gate: any Condition* key effects.Resolve's
+// conditionMet evaluates, the DB-body PresentDefined$/IsPresent$/
+// PresentCompare$ spellings conditionMetCore normalizes, or an unsupported
+// Condition* key (which Resolve skips loudly, effects/registry.go). The entry
+// fold must leave such a body on the ordinary body path -- the conservative
+// direction entryBodyAbsorbable promises -- because Resolve may skip it
+// entirely, a verdict the fold cannot reproduce from CounterNumResolved alone.
+// One reader, so every absorbability check shares it.
+func entryBodyConditionGated(sa *cards.SA) bool {
+	ap := effects.ActivationOf(sa)
+	return ap.Cond.Any() || ap.PresentDefined != "" || ap.IsPresent.Text != "" ||
+		ap.PresentCompare.Text != "" || ap.Has(effects.ActConditionOther)
+}
+
+// entryBodyAbsorbableMatch is the one selection predicate the entry fold's
+// walks share: a matched Moved replacement the live dispatch would run as an
+// Updated battlefield-entry counter (ReplacementResult$ Updated,
+// Destination$ Battlefield) whose body is the bare self/lent PutCounter shape
+// (entryBodyAbsorbableFor). foreignEntryBodies and absorbMatched both read it,
+// so the fold's selection cannot drift from the live dispatch's.
+func entryBodyAbsorbableMatch(r cards.Repl, foreign bool) bool {
+	if r.ParamStr(cards.PKReplacementResult) != "Updated" || r.ParamStr(cards.PKDestination) != "Battlefield" {
+		return false
+	}
+	return entryBodyAbsorbableFor(r.With, foreign)
 }
 
 // entryBodyKind is a PutCounter|ETB$ True body's counter kind as the entry
@@ -303,8 +355,9 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 	}
 	var grants []entryGrant
 	var ids []string
-	absorb := func(m replMatch) {
-		if !e.replacementMatches(*m.repl, m.id, matchEv) || !entryBodyAbsorbable(m.repl.With) ||
+	var absorb func(m replMatch)
+	absorbMatched := func(m replMatch, foreign bool) {
+		if !entryBodyAbsorbableMatch(*m.repl, foreign) ||
 			!entryBodyKindEncodable(m.repl.With) {
 			return
 		}
@@ -318,8 +371,32 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 			return
 		}
 		kind := entryBodyKind(pc)
-		grants = append(grants, entryGrant{kind: kind, amount: n, body: entrant})
+		body := entrant
+		if foreign {
+			body = m.id
+		}
+		// CR 614.1c / 122.6: every counter the object enters with is placed
+		// by ONE event, so a same-kind body (its own etbCounter and a
+		// Metallic Mimic rider) folds into one grant and a "that many plus
+		// one" AddCounter replacement (Hardened Scales) applies once. Only a
+		// lent (foreign) rider merges; an object's own separate bodies keep
+		// their one-grant-each shape (the staged order asks pin it).
+		if foreign {
+			for gi := range grants {
+				if grants[gi].kind == kind {
+					grants[gi].amount += n
+					return
+				}
+			}
+		}
+		grants = append(grants, entryGrant{kind: kind, amount: n, body: body})
 	}
+	absorb = func(m replMatch) {
+		if e.replacementMatches(*m.repl, m.id, matchEv) {
+			absorbMatched(m, false)
+		}
+	}
+	absorbForeign := func(m replMatch) { absorbMatched(m, true) }
 	for i := range f.Repls {
 		r := &f.Repls[i]
 		if r.Event != "Moved" || r.With == nil || r.With.API != "PutCounter" ||
@@ -328,6 +405,19 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 		}
 		absorb(replMatch{id: entrant, face: f, repl: r})
 	}
+	// A minted token's foreign entry bodies match the synthetic ZCeased-origin
+	// move applyTokenEntryUpdates reads, so an Origin$-scoped line absorbs
+	// exactly when its live run would have matched.
+	foreignEv := matchEv
+	if ev.Kind != events.MoveZone {
+		foreignEv.From = state.ZCeased
+	}
+	for _, m := range e.foreignEntryBodies(entrant, foreignEv) {
+		if !e.replacementMatches(*m.repl, m.id, foreignEv) {
+			continue
+		}
+		absorbForeign(m)
+	}
 	if m := e.bloodthirstEntryMatch(matchEv); m != nil {
 		absorb(*m)
 	}
@@ -335,6 +425,37 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 		absorb(*m)
 	}
 	return grants, ids
+}
+
+// foreignEntryBodies lists the mandatory Moved PutCounter|ETB$ True lines of
+// OTHER permanents that target the entering object as Defined$ ReplacedCard
+// (Metallic Mimic, Grumgully, Zameck-style "enters with an additional
+// counter" riders): candidates by shape only, in the replacement scan's
+// deterministic order. The caller matches them against the entry.
+func (e *Engine) foreignEntryBodies(entrant state.ObjID, ev events.Event) []replMatch {
+	var out []replMatch
+	e.forEachReplacementSourceFor(replEventBits[cards.ReplMoved], func(id state.ObjID) {
+		if id == entrant {
+			return
+		}
+		o := e.G.Obj(id)
+		if o == nil || o.Zone != state.ZBattlefield {
+			return
+		}
+		f := e.replacementFace(id, ev)
+		if f == nil {
+			return
+		}
+		for i := range f.Repls {
+			r := &f.Repls[i]
+			if r.Event != "Moved" || r.With == nil || r.OptionalValue() ||
+				!entryBodyAbsorbableMatch(*r, true) {
+				continue
+			}
+			out = append(out, replMatch{id: id, face: f, repl: r})
+		}
+	})
+	return e.dropAppliedReplacements(out)
 }
 
 // entryRiderCandidates reports whether an entry might carry an AddsCounters$

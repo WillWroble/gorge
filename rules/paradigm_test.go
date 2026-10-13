@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/internal/testutil"
@@ -59,10 +60,7 @@ func TestParadigmCensus(t *testing.T) {
 	}
 
 	// Corpus-tree census: exactly these files carry the keyword line.
-	dir := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("no corpus at %s: %v", dir, err)
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	got := map[string]bool{}
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil || d.IsDir() || filepath.Ext(path) != ".txt" {
