@@ -221,6 +221,8 @@ var kindInfo = [NumKinds]KindInfo{
 	CollectEvidenceAction: {Name: "collect_evidence_action", Trigger: TriggerFullMatch, Describe: "{player} collects evidence"},
 	AbilityTriggered:      {Name: "ability_triggered", Trigger: TriggerFullMatch, Describe: "{obj}'s ability was triggered"},
 	CastBattlefield:       {Name: "cast_battlefield", Trigger: TriggerNone, Describe: "{obj} was cast with the battlefield as it stood"},
+	DrawBatchProposal:     {Name: "draw_batch_proposal", Trigger: TriggerNone, Describe: "{player} would draw {amount} cards"},
+	SpellCastReversed:     {Name: "spell_cast_reversed", Trigger: TriggerNone, Describe: "{player} reverses a cast"}, // a CR 733.1 reversal: it decrements the spell-cast turn watcher, nothing triggers
 }
 
 // Info returns k's descriptor; ok is false for a value past the enum.

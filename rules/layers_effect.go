@@ -163,7 +163,7 @@ func (e *Engine) EndEffect(source state.ObjID, stamp uint32) {
 // state.ContinuousEffect.FromEffect are dropped, so the source's printed
 // statics survive. Engine-runtime only, rebuilt by re-execution on replay
 // exactly like EndEffect; it emits no event.
-func (e *Engine) EndEffectSource(source state.ObjID) {
+func (e *Engine) EndEffectSource(source state.ObjID, spareAfter uint32) {
 	if source == 0 {
 		return
 	}
@@ -184,7 +184,7 @@ func (e *Engine) EndEffectSource(source state.ObjID) {
 	kept := e.continuous[:0]
 	changed := false
 	for _, ce := range e.continuous {
-		if ce.Source == source && ce.FromEffect {
+		if ce.Source == source && ce.FromEffect && (spareAfter == 0 || ce.Timestamp <= spareAfter) {
 			changed = true
 			continue
 		}

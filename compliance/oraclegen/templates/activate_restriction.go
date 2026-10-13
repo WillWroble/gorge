@@ -441,6 +441,9 @@ func selfCounterFloor(group string) (n int, kind string, ok bool) {
 // ok is false when the filter names no such floor or the printed card already
 // clears it.
 func selfPowerFloorPrelude(group string, f *cards.Face) (conditionPrelude, bool) {
+	if f == nil {
+		return conditionPrelude{}, false
+	}
 	needPower, needToughness := 0, 0
 	for _, w := range affectedWords(group) {
 		lower := strings.ToLower(w)

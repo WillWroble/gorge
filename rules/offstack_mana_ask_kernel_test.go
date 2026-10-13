@@ -43,21 +43,27 @@ func TestOffStackManaTargetAskDoesNotResolveTheStack(t *testing.T) {
 	if d == nil || d.Kind != decision.KPriority || d.Player != 0 {
 		t.Fatalf("pending = %#v, want the caster's priority with the bear on the stack", d)
 	}
+	// CR 605.1a: the engine's mana ability targets (through its SubAbility$), so
+	// it is not a mana ability. It is offered as an ordinary stack ability and
+	// the mana window never lists it as "activate".
 	act := -1
 	for _, o := range d.Options {
-		if o.Kind == "activate" && o.Obj == engine {
+		if o.Obj == engine && o.Kind == "activate" {
+			t.Fatalf("targeting ability offered as a mana activation: %#v", o)
+		}
+		if o.Obj == engine && o.Kind == "ability" {
 			act = o.Index
 		}
 	}
 	if act < 0 {
-		t.Fatalf("no activate option for the engine in %#v", d.Options)
+		t.Fatalf("no ability option for the engine in %#v", d.Options)
 	}
 	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: 0, Choices: []int{act}}); err != nil {
 		t.Fatal(err)
 	}
 	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.ResumeKind != "tgts" {
-		t.Fatalf("mana rider ask = %#v, want the target decision", d)
+	if d == nil || d.Kind != decision.KTarget {
+		t.Fatalf("target ask = %#v, want the target decision", d)
 	}
 	if len(d.Options) != 1 || d.Options[0].Player != 1 {
 		t.Fatalf("target options = %#v, want the opponent", d.Options)
@@ -66,13 +72,16 @@ func TestOffStackManaTargetAskDoesNotResolveTheStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	if z := e.G.Obj(bear).Zone; z != state.ZStack {
-		t.Errorf("bear zone = %s after the mana ability's target answer, want stack: nobody passed priority", z)
+		t.Errorf("bear zone = %s after the target answer, want stack: nobody passed priority", z)
 	}
-	if got := e.G.Obj(engine).Controller; got != 1 {
-		t.Errorf("engine controller = %d, want the targeted opponent 1", got)
+	if len(e.G.Stack) != 2 {
+		t.Errorf("stack depth = %d, want the bear and the engine ability", len(e.G.Stack))
 	}
-	if got := e.G.Players[0].Pool[state.ManaIndex('B')]; got != 4 {
-		t.Errorf("black mana in pool = %d, want 4", got)
+	if got := e.G.Obj(engine).Controller; got != 0 {
+		t.Errorf("engine controller = %d, want 0: the ability has not resolved", got)
+	}
+	if got := e.G.Players[0].Pool[state.ManaIndex('B')]; got != 0 {
+		t.Errorf("black mana in pool = %d, want 0 before the ability resolves", got)
 	}
 }
 
@@ -367,26 +376,50 @@ func TestOffStackManaTargetThenNameAskCommitsOnce(t *testing.T) {
 	d = e.Pending()
 	act := -1
 	for _, o := range d.Options {
-		if o.Kind == "activate" && o.Obj == engine {
+		if o.Obj == engine && o.Kind == "activate" {
+			t.Fatalf("targeting ability offered as a mana activation: %#v", o)
+		}
+		if o.Obj == engine && o.Kind == "ability" {
 			act = o.Index
 		}
 	}
 	if act < 0 {
-		t.Fatalf("no activate option for the engine in %#v", d.Options)
+		t.Fatalf("no ability option for the engine in %#v", d.Options)
 	}
 	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: 0, Choices: []int{act}}); err != nil {
 		t.Fatal(err)
 	}
-	// Ask 1: the rider's target; it must offer the single opponent.
+	// Ask 1: the ability's target (CR 605.1a: it uses the stack); it must offer
+	// the single opponent.
 	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.ResumeKind != "tgts" {
-		t.Fatalf("first rider ask = %#v, want the target decision", d)
+	if d == nil || d.Kind != decision.KTarget {
+		t.Fatalf("first ask = %#v, want the target decision", d)
 	}
 	if len(d.Options) != 1 || d.Options[0].Player != 1 {
 		t.Fatalf("target options = %#v, want exactly the opponent", d.Options)
 	}
 	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{d.Options[0].Index}}); err != nil {
 		t.Fatal(err)
+	}
+	// Pass priority until the ability resolves and poses the name ask; the
+	// bear below it must still be on the stack when it does.
+	for i := 0; i < 4; i++ {
+		d = e.Pending()
+		if d == nil || d.Kind != decision.KPriority {
+			break
+		}
+		pass := -1
+		for _, o := range d.Options {
+			if o.Kind == "pass" {
+				pass = o.Index
+			}
+		}
+		if pass < 0 {
+			t.Fatalf("no pass option in %#v", d.Options)
+		}
+		if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{pass}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Ask 2: the name. Answering it must not re-pose the target.
 	d = e.Pending()
@@ -411,9 +444,6 @@ func TestOffStackManaTargetThenNameAskCommitsOnce(t *testing.T) {
 	}
 	if namesChosen != 1 {
 		t.Errorf("name Choose events = %d, want exactly 1", namesChosen)
-	}
-	if z := e.G.Obj(bear).Zone; z != state.ZStack {
-		t.Errorf("bear zone = %s after the rider answered, want stack", z)
 	}
 	if got := e.G.Players[0].Pool[state.ManaIndex('B')]; got != 4 {
 		t.Errorf("black mana in pool = %d, want 4", got)

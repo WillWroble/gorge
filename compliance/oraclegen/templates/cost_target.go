@@ -21,8 +21,10 @@ func costTargetProbe(reg *cards.Registry, f *cards.Face, st cards.Static, p cost
 	if strings.Contains(lower, "attacking") {
 		creature := "Grizzly Bears"
 		p.opponentBattlefield = appendUnique(p.opponentBattlefield, creature)
+		// No pass_to: an opponent attack passes p0's turn to p1's, and XMage
+		// declares attackers in the declare-attackers beginStep, so a
+		// pass_to checkpoint would already see the attack there.
 		p.pre = append(p.pre,
-			oraclegen.Step{Op: "pass_to", Step: "declare-attackers", Active: "p1"},
 			oraclegen.Step{Op: "attack", Seat: 1, Defender: "p0", Attackers: []string{"p1:" + creature}},
 			oraclegen.Step{Op: "pass", Seat: 1},
 		)

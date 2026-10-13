@@ -23,6 +23,7 @@ func cloneEngineFields(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	cloneFieldsEngineDerivedTables(c, e, sp, remap)
 	cloneFieldsEngineScratch(c, e, sp, remap)
 	cloneFieldsEngineTriggerMaps(c, e, sp, remap)
+	cloneFieldsEngineTriggerMaps2(c, e, sp, remap)
 	cloneFieldsEngineResolution(c, e, sp, remap)
 	cloneFieldsEngineDrain(c, e, sp, remap)
 	cloneFieldsEngineTokenMint(c, e, sp, remap)
@@ -140,6 +141,7 @@ func cloneFieldsEngine(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	c.controlGrants = append([]controlGrant(nil), e.controlGrants...)
 	c.mulligans = e.mulligans
 	c.windowDiagnostics = e.windowDiagnostics
+	c.paidManaCensus = e.paidManaCensus
 	c.startingLife = e.startingLife
 	c.setNameInPool = e.setNameInPool
 	c.layer4InPool = e.layer4InPool
@@ -334,6 +336,14 @@ func cloneFieldsEngineTriggerMaps(c, e *Engine, sp *Spare, remap *cloneRemap) {
 			c.castRevealed[k0] = nv0
 		}
 	}
+	if e.castCounterPut != nil {
+		c.castCounterPut = make(map[state.ObjID][]state.ObjID, len(e.castCounterPut))
+		for k0, v0 := range e.castCounterPut {
+			var nv0 []state.ObjID
+			nv0 = append([]state.ObjID(nil), v0...)
+			c.castCounterPut[k0] = nv0
+		}
+	}
 	if e.fuseTargets != nil {
 		c.fuseTargets = make(map[state.ObjID][][]state.Target, len(e.fuseTargets))
 		for k0, v0 := range e.fuseTargets {
@@ -397,6 +407,9 @@ func cloneFieldsEngineTriggerMaps(c, e *Engine, sp *Spare, remap *cloneRemap) {
 		}
 	}
 	c.trigSub = e.trigSub.clone()
+}
+
+func cloneFieldsEngineTriggerMaps2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	if e.charmTargets != nil {
 		c.charmTargets = make(map[state.ObjID][][]state.Target, len(e.charmTargets))
 		for k0, v0 := range e.charmTargets {
@@ -768,6 +781,12 @@ func cloneFieldsEngineContinuation2(c, e *Engine, sp *Spare, remap *cloneRemap) 
 				p0.cands[i1] = e.entryStageDone.cands[i1]
 				p0.cands[i1].remembered = append([]state.ObjID(nil), e.entryStageDone.cands[i1].remembered...)
 				p0.cands[i1].rememberedPlayers = append([]state.PlayerID(nil), e.entryStageDone.cands[i1].rememberedPlayers...)
+				if e.entryStageDone.cands[i1].svars != nil {
+					p0.cands[i1].svars = make(map[string]string, len(e.entryStageDone.cands[i1].svars))
+					for k2, v2 := range e.entryStageDone.cands[i1].svars {
+						p0.cands[i1].svars[k2] = v2
+					}
+				}
 			}
 		}
 		if e.entryStageDone.applied != nil {
@@ -776,6 +795,12 @@ func cloneFieldsEngineContinuation2(c, e *Engine, sp *Spare, remap *cloneRemap) 
 				p0.applied[i1] = e.entryStageDone.applied[i1]
 				p0.applied[i1].remembered = append([]state.ObjID(nil), e.entryStageDone.applied[i1].remembered...)
 				p0.applied[i1].rememberedPlayers = append([]state.PlayerID(nil), e.entryStageDone.applied[i1].rememberedPlayers...)
+				if e.entryStageDone.applied[i1].svars != nil {
+					p0.applied[i1].svars = make(map[string]string, len(e.entryStageDone.applied[i1].svars))
+					for k2, v2 := range e.entryStageDone.applied[i1].svars {
+						p0.applied[i1].svars[k2] = v2
+					}
+				}
 			}
 		}
 		p0.bodyIDs = append([]string(nil), e.entryStageDone.bodyIDs...)
@@ -799,11 +824,23 @@ func cloneFieldsEngineContinuation2(c, e *Engine, sp *Spare, remap *cloneRemap) 
 				p0.matches[i1] = e.tokenChoice.matches[i1]
 				p0.matches[i1].remembered = append([]state.ObjID(nil), e.tokenChoice.matches[i1].remembered...)
 				p0.matches[i1].rememberedPlayers = append([]state.PlayerID(nil), e.tokenChoice.matches[i1].rememberedPlayers...)
+				if e.tokenChoice.matches[i1].svars != nil {
+					p0.matches[i1].svars = make(map[string]string, len(e.tokenChoice.matches[i1].svars))
+					for k2, v2 := range e.tokenChoice.matches[i1].svars {
+						p0.matches[i1].svars[k2] = v2
+					}
+				}
 			}
 		}
 		p0.plan = append([]tokenPlanMint(nil), e.tokenChoice.plan...)
 		p0.match.remembered = append([]state.ObjID(nil), e.tokenChoice.match.remembered...)
 		p0.match.rememberedPlayers = append([]state.PlayerID(nil), e.tokenChoice.match.rememberedPlayers...)
+		if e.tokenChoice.match.svars != nil {
+			p0.match.svars = make(map[string]string, len(e.tokenChoice.match.svars))
+			for k2, v2 := range e.tokenChoice.match.svars {
+				p0.match.svars[k2] = v2
+			}
+		}
 		c.tokenChoice = &p0
 	}
 }
@@ -945,6 +982,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 					c.replChoices[i0].cands[i1] = e.replChoices[i0].cands[i1]
 					c.replChoices[i0].cands[i1].remembered = append([]state.ObjID(nil), e.replChoices[i0].cands[i1].remembered...)
 					c.replChoices[i0].cands[i1].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].cands[i1].rememberedPlayers...)
+					if e.replChoices[i0].cands[i1].svars != nil {
+						c.replChoices[i0].cands[i1].svars = make(map[string]string, len(e.replChoices[i0].cands[i1].svars))
+						for k2, v2 := range e.replChoices[i0].cands[i1].svars {
+							c.replChoices[i0].cands[i1].svars[k2] = v2
+						}
+					}
 				}
 			}
 			c.replChoices[i0].applied = append([]bool(nil), e.replChoices[i0].applied...)
@@ -960,6 +1003,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 					c.replChoices[i0].appliedRepls[i1] = e.replChoices[i0].appliedRepls[i1]
 					c.replChoices[i0].appliedRepls[i1].remembered = append([]state.ObjID(nil), e.replChoices[i0].appliedRepls[i1].remembered...)
 					c.replChoices[i0].appliedRepls[i1].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].appliedRepls[i1].rememberedPlayers...)
+					if e.replChoices[i0].appliedRepls[i1].svars != nil {
+						c.replChoices[i0].appliedRepls[i1].svars = make(map[string]string, len(e.replChoices[i0].appliedRepls[i1].svars))
+						for k2, v2 := range e.replChoices[i0].appliedRepls[i1].svars {
+							c.replChoices[i0].appliedRepls[i1].svars[k2] = v2
+						}
+					}
 				}
 			}
 			if e.replChoices[i0].used != nil {
@@ -968,6 +1017,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 					c.replChoices[i0].used[i1] = e.replChoices[i0].used[i1]
 					c.replChoices[i0].used[i1].remembered = append([]state.ObjID(nil), e.replChoices[i0].used[i1].remembered...)
 					c.replChoices[i0].used[i1].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].used[i1].rememberedPlayers...)
+					if e.replChoices[i0].used[i1].svars != nil {
+						c.replChoices[i0].used[i1].svars = make(map[string]string, len(e.replChoices[i0].used[i1].svars))
+						for k2, v2 := range e.replChoices[i0].used[i1].svars {
+							c.replChoices[i0].used[i1].svars[k2] = v2
+						}
+					}
 				}
 			}
 			c.replChoices[i0].tokenPlan = append([]tokenPlanMint(nil), e.replChoices[i0].tokenPlan...)
@@ -982,6 +1037,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 						p1.cands[i2] = e.replChoices[i0].stage.cands[i2]
 						p1.cands[i2].remembered = append([]state.ObjID(nil), e.replChoices[i0].stage.cands[i2].remembered...)
 						p1.cands[i2].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].stage.cands[i2].rememberedPlayers...)
+						if e.replChoices[i0].stage.cands[i2].svars != nil {
+							p1.cands[i2].svars = make(map[string]string, len(e.replChoices[i0].stage.cands[i2].svars))
+							for k3, v3 := range e.replChoices[i0].stage.cands[i2].svars {
+								p1.cands[i2].svars[k3] = v3
+							}
+						}
 					}
 				}
 				if e.replChoices[i0].stage.applied != nil {
@@ -990,6 +1051,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 						p1.applied[i2] = e.replChoices[i0].stage.applied[i2]
 						p1.applied[i2].remembered = append([]state.ObjID(nil), e.replChoices[i0].stage.applied[i2].remembered...)
 						p1.applied[i2].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].stage.applied[i2].rememberedPlayers...)
+						if e.replChoices[i0].stage.applied[i2].svars != nil {
+							p1.applied[i2].svars = make(map[string]string, len(e.replChoices[i0].stage.applied[i2].svars))
+							for k3, v3 := range e.replChoices[i0].stage.applied[i2].svars {
+								p1.applied[i2].svars[k3] = v3
+							}
+						}
 					}
 				}
 				p1.bodyIDs = append([]string(nil), e.replChoices[i0].stage.bodyIDs...)
@@ -1011,6 +1078,12 @@ func cloneFieldsEngineParked2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 							p2.cands[i3] = e.replChoices[i0].manaBoundary.phase.cands[i3]
 							p2.cands[i3].remembered = append([]state.ObjID(nil), e.replChoices[i0].manaBoundary.phase.cands[i3].remembered...)
 							p2.cands[i3].rememberedPlayers = append([]state.PlayerID(nil), e.replChoices[i0].manaBoundary.phase.cands[i3].rememberedPlayers...)
+							if e.replChoices[i0].manaBoundary.phase.cands[i3].svars != nil {
+								p2.cands[i3].svars = make(map[string]string, len(e.replChoices[i0].manaBoundary.phase.cands[i3].svars))
+								for k4, v4 := range e.replChoices[i0].manaBoundary.phase.cands[i3].svars {
+									p2.cands[i3].svars[k4] = v4
+								}
+							}
 						}
 					}
 					p1.phase = &p2

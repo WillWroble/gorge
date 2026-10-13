@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -198,4 +199,53 @@ func TestAppendFixtureCounts(t *testing.T) {
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("got %v, want %v", got, want)
 	}
+}
+
+// TestTriggerConditionBoardCheckSVarHistoryOnce pins the CheckSVar block of
+// triggerConditionFixtures to append the this-turn history candidates exactly
+// once itself: a second identical historyPreludes append is output-invisible
+// (the first playing cause wins) but repeats the generation work.
+// activationSVarPrelude offers the same candidates from its own history
+// build, so the expected count is the block's one append plus that build's.
+func TestTriggerConditionBoardCheckSVarHistoryOnce(t *testing.T) {
+	reg := loadGenRegistry(t)
+	const name = "Lasting Tarfire"
+	c, ok := reg.Lookup(name)
+	if !ok {
+		t.Fatalf("precondition: %s not in the corpus", name)
+	}
+	f := c.Faces[0]
+	for i := range f.Triggers {
+		tr := &f.Triggers[i]
+		check := tr.ParamStr(cards.PKCheckSVar)
+		if check == "" {
+			continue
+		}
+		body := strings.TrimSpace(f.SVars[check])
+		if body == "" {
+			body = check
+		}
+		want := historyPreludes(reg, f.Name, body, staticCountFrom(tr.ParamStr(cards.PKSVarCompare)))
+		if len(want) == 0 {
+			continue
+		}
+		inner, _ := activationSVarPrelude(reg, f, check, tr.ParamStr(cards.PKSVarCompare))
+		got := triggerConditionFixtures(reg, f, tr)
+		occurrences := func(xs []conditionPrelude, p conditionPrelude) int {
+			n := 0
+			for _, x := range xs {
+				if reflect.DeepEqual(x, p) {
+					n++
+				}
+			}
+			return n
+		}
+		for j, w := range want {
+			if g, wn := occurrences(got, w), occurrences(want, w)+occurrences(inner, w); g != wn {
+				t.Errorf("%s trigger#%d: history candidate %d appears %d times in the fixtures, want %d (the block's one historyPreludes append plus activationSVarPrelude's)", name, i, j, g, wn)
+			}
+		}
+		return
+	}
+	t.Fatalf("precondition: no %s trigger has a CheckSVar whose body (%v) builds history preludes", name, f.SVars)
 }

@@ -93,7 +93,12 @@ func TestXMagePortScenarios(t *testing.T) {
 			sc := sc
 			t.Run(fam+"/"+slug+"/"+sc.Name, func(t *testing.T) {
 				t.Parallel()
-				fails, transcript, run := runOracleScenario(reg, sc.oracleScenario)
+				// XMage's addCard places setup permanents before the game
+				// with no zone-change triggers, and cmd/xmageport validates
+				// through RunOracleScenarioJSON: run in the same fixture mode.
+				osc := sc.oracleScenario
+				osc.xmageFixture = true
+				fails, transcript, run := runOracleScenario(reg, osc)
 				if run != nil && run.e != nil {
 					if diff := diffGames(run.e.G, replayFromLog(t, run.cfg, run.e.L.Events)); diff != "" {
 						t.Errorf("log-only replay differs:\n%s", diff)

@@ -235,6 +235,7 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 	if ev.Kind != events.TargetsChosen {
 		return false
 	}
+	firstTime := strings.EqualFold(t.ParamStr(cards.PKFirstTime), "True")
 	if v, ok := t.Param(cards.PKValidSource); ok {
 		// ValidSource$ names the spell or ability doing the targeting: the
 		// TargetsChosen event's Obj, the stack object whose target decision
@@ -266,6 +267,11 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 					(ev.Obj == 0 || e.ControllerOf(ev.Obj) == e.ControllerOf(source)) {
 					return false
 				}
+				if firstTime && !firstTimeTargetedThisTurn(e, ev, id, false) {
+					// "for the first time each turn" is per matched object: a
+					// later target of this same event may still be its first.
+					continue
+				}
 				return true
 			}
 		}
@@ -279,7 +285,7 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 		// only say for it.
 		if (ev.Amount == 1 || ev.Amount == 3) &&
 			effects.MatchesPlayerSpecCtx(e.Game(), v, ev.Player, e.ControllerOf(source), e.PlayerSpecCtx(source)) {
-			return true
+			return !firstTime || firstTimeTargetedThisTurn(e, ev, 0, true)
 		}
 		return false
 	}
@@ -303,7 +309,42 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 		// own controller.
 		return false
 	}
-	return targeted
+	return targeted && (!firstTime || firstTimeTargetedThisTurn(e, ev, source, false))
+}
+
+// firstTimeTargetedThisTurn answers FirstTime$ True on Mode$ BecomesTarget
+// ("becomes the target of a spell or ability for the first time each turn",
+// Glyph Keeper, Kira, the Glasskites, Valiant creatures): true when no EARLIER
+// TargetsChosen event this turn named the same object (or player). Same
+// replay-stable backwards log scan as firstDamageToThisTurn -- no new event
+// kind, no engine field, survives Clone -- stopping at TurnChange.
+//
+// Events recorded for the same stack object ev.Obj are the SAME targeting
+// (a spell's later target groups, the event itself when the log already holds
+// it) and never count as an earlier time. A TargetsChosen with no stack
+// object is a hand-built fixture emit and counts like any other.
+func firstTimeTargetedThisTurn(e Board, ev events.Event, id state.ObjID, player bool) bool {
+	for i := len(e.Log().Events) - 1; i >= 0; i-- {
+		le := e.Log().Events[i]
+		if le.Kind == events.TurnChange {
+			return true
+		}
+		if le.Kind != events.TargetsChosen || (ev.Obj != 0 && le.Obj == ev.Obj) {
+			continue
+		}
+		if player {
+			if (le.Amount == 1 || le.Amount == 3) && le.Player == ev.Player {
+				return false
+			}
+			continue
+		}
+		for _, t := range le.IDs {
+			if t == id {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // becomesTargetOnceMatches implements Mode$ BecomesTargetOnce (Forge's

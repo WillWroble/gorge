@@ -19,7 +19,10 @@ import (
 // cause is where the rule looks -- before asserting the effect.
 func TestRoomProbeScenariosShowTheirEffect(t *testing.T) {
 	reg := oracleHarnessCorpus(t)
-	probeName := frontHalfOf(roomUnlockProbe)
+	// Both doors are unlocked by the end, so CR 709.5 gives the Room permanent
+	// the names of both: the full "Left // Right" card name (only a Room with
+	// a single unlocked door reports one door's name).
+	probeName := roomUnlockProbe
 	cases := []struct {
 		card, key string
 		check     func(t *testing.T, reg *cards.Registry, res rules.OracleResult, item oraclegen.Item)
@@ -110,11 +113,4 @@ func gremlinTamerTokens(t *testing.T, reg *cards.Registry, res rules.OracleResul
 	if tokens != 2 {
 		t.Fatalf("Gremlin tokens at the end = %d, want 2 (the probe's ETB and its full unlock each make one); permanents %+v", tokens, final.Permanents)
 	}
-}
-
-func frontHalfOf(n string) string {
-	if i := strings.Index(n, " // "); i > 0 {
-		return n[:i]
-	}
-	return n
 }

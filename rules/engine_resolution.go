@@ -118,4 +118,19 @@ type engineResolution struct {
 	// recheck pass: applyReplacementsDispatch drops those matches and
 	// applyReplacement extends it for a nested redirect. Nil otherwise.
 	replExclude []string `clone:"reset"`
+	// replDrawChain is the draw lineage's applied set (CR 614.5, 616.1e):
+	// the identities (replIdentity) of every draw replacement currently
+	// running on this draw's ancestry. applyReplacement pushes a draw
+	// replacement's identity for the duration of its ReplaceWith$ body, so
+	// every Draw the body emits -- a per-card draw or a DrawBatchProposal --
+	// re-enters the replacement pass with those identities excluded while
+	// the remaining replacements get their CR 616.1e opportunity (Thought
+	// Reflection's two draws still meet Notion Thief, Blood Scrivener's
+	// draws still meet a second Scrivener). A replacement effect that
+	// already applied to an ancestor draw never applies again (CR 614.5);
+	// a sibling draw of the same body starts from the same stack and may
+	// meet a replacement whose own body has already finished. Empty
+	// whenever no draw replacement body is in flight, so no unrelated draw
+	// changes behavior. Transient scratch, the replRedirect class.
+	replDrawChain []string `clone:"reset"`
 }

@@ -28,12 +28,12 @@ func mzActionType(k decision.Kind) int {
 	}
 }
 
-// encodeStateMZ writes the decision's MageZero feature-id set into out as a
+// EncodeStateMZ writes the decision's MageZero feature-id set into out as a
 // multi-hot vector: each mzenc id (a hash in [0, 2^31-1)) folds into a slot by
 // modulus. It is a pure function of the request's view, so a decision's state
 // vector is content-derived and deterministic. Ids are walked in sorted order
 // so the result never depends on map iteration.
-func encodeStateMZ(r *Request, out []float32) {
+func EncodeStateMZ(r *Request, out []float32) {
 	for i := range out {
 		out[i] = 0
 	}

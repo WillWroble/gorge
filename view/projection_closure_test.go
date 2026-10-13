@@ -123,6 +123,12 @@ func TestViewMarshalsClosed(t *testing.T) {
 		// carrier, so it joins the public facts class here. See the
 		// Pool/available doc on view.PlayerView for how the two differ.
 		"available": true,
+		// The four per-turn watchers (state.Player's *ThisTurn tallies, folded
+		// by events.Apply) are public scalar counts of what each seat did this
+		// turn -- visible to every viewer at the table, never a hidden-zone
+		// carrier.
+		"spells_cast_this_turn": true, "life_gained_this_turn": true,
+		"life_lost_this_turn": true, "tokens_created_this_turn": true,
 		// library_top (task inbox-paramcensus-static-grant-misc) IS a hidden-
 		// zone carrier — exactly the class this allowlist exists to gate —
 		// admitted deliberately: it is the Continuous MayLookAt grant's

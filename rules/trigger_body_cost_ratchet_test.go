@@ -9,6 +9,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // Full sorted carrier snapshot: identifiers/raw costs only, never Forge text.
@@ -939,7 +942,11 @@ func costFamiliesInRaw(raw string) map[string]bool {
 }
 
 func TestTriggerBodyCostCorpusRatchet(t *testing.T) {
-	root := filepath.Join("..", ".cards", "cardsfolder")
+	corpus, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("corpus missing: could not resolve the repo root")
+	}
+	root := cards.CorpusDir(corpus)
 	if _, err := os.Stat(root); err != nil {
 		t.Fatalf("corpus missing at %s: %v", root, err)
 	}

@@ -213,7 +213,7 @@ func TestBanefireCounterGateStillReadsThePaidX(t *testing.T) {
 	o.Zone = state.ZStack
 	e.G.SetZone(state.ZStack, 0, append(e.G.Zone(state.ZStack, 0), id))
 	o.X = 5
-	if got := e.replacementCheckValue(id, "X"); got != 5 {
+	if got := e.replacementCheckValue(id, "X", nil); got != 5 {
 		t.Fatalf("banefire's CheckSVar$ X gate read %d, want the paid X's 5 (Count$xPaid unchanged by the reorder)", got)
 	}
 }

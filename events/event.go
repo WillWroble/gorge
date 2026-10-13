@@ -1172,10 +1172,30 @@ const (
 	// script reads that head, so every other game keeps its chain. Appended
 	// after AbilityTriggered so every earlier ordinal is unchanged.
 	CastBattlefield
+	// DrawBatchProposal is the synthetic pre-action proposal for one draw
+	// instruction's batch: Player is the player about to draw and Amount the
+	// batch's card count. Forge's Player.drawCards(n) runs the DrawCards
+	// replacement class over the whole batch before any card moves (Alms
+	// Collector's "would draw two or more cards"), and the per-card Draw
+	// events are what the log records. It is never logged: the caller holds
+	// it through the replacement registry and draws nothing when a body
+	// consumed it. Appended after CastBattlefield so every earlier ordinal,
+	// hash chain and golden replay is unchanged.
+	DrawBatchProposal
+	// SpellCastReversed reverses the spell-cast turn watcher of one CR 733.1
+	// aborted cast: Player is the caster whose PutOnStack the reversal
+	// undoes. A PutOnStack cannot be removed from the append-only log, so
+	// the tally (state.Player.SpellsCastThisTurn, folded by PutOnStack) is
+	// decremented by this companion event, the way ManaUndo reverses one
+	// mana activation. It is emitted only from rules' abortCast, so no bot
+	// game and no golden replay contains it. Appended after
+	// DrawBatchProposal so every earlier ordinal, hash chain and golden
+	// replay is unaffected.
+	SpellCastReversed
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(CastBattlefield) + 1
+	NumKinds = int(SpellCastReversed) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving

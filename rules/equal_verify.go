@@ -20,11 +20,11 @@ import (
 // it is compared here.
 
 const (
-	continuousEffectFieldCount = 114
+	continuousEffectFieldCount = 115
 	attackOfferFieldCount      = 4
 	blockChargeFieldCount      = 7
 	objectTypesFieldCount      = 3
-	optionFieldCount           = 42
+	optionFieldCount           = 43
 	grantFieldCount            = 3
 )
 
@@ -132,6 +132,7 @@ func continuousEffectEqual(a, b *ContinuousEffect) bool {
 		a.MayPlayFree == b.MayPlayFree &&
 		a.MayPlayValidAfterStack == b.MayPlayValidAfterStack &&
 		cards.TriggerEqual(a.AddTrigger, b.AddTrigger) &&
+		cards.ReplEqual(a.AddRepl, b.AddRepl) &&
 		a.TriggerGrantor == b.TriggerGrantor &&
 		a.AbilityGrantor == b.AbilityGrantor &&
 		cards.StringMapEqual(a.AddSVars, b.AddSVars) &&
@@ -214,6 +215,14 @@ func optionEqual(a, b *decision.Option) bool {
 	if a.Grant != b.Grant {
 		if a.Grant == nil || b.Grant == nil || a.Grant.Already != b.Grant.Already ||
 			a.Grant.Duplicate != b.Grant.Duplicate || !sliceEq(a.Grant.Keywords, b.Grant.Keywords) {
+			return false
+		}
+	}
+	if a.Loyalty != b.Loyalty {
+		if a.Loyalty == nil || b.Loyalty == nil ||
+			a.Loyalty.Delta != b.Loyalty.Delta || a.Loyalty.X != b.Loyalty.X ||
+			a.Loyalty.Ultimate != b.Loyalty.Ultimate || a.Loyalty.Removal != b.Loyalty.Removal ||
+			a.Loyalty.Dies != b.Loyalty.Dies || a.Loyalty.Restart != b.Loyalty.Restart {
 			return false
 		}
 	}

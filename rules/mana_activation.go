@@ -659,6 +659,9 @@ func (e *Engine) appendAvailableManaAbilitiesGate(out []*cards.SA, statics *acti
 				}
 			}
 		}
+		if len(cost.Sac) > 0 && effects.ManaReflectedReadsSacrificed(ma) {
+			return manaReflectedSacrificeLive(e, asPayer(e), p, id, cost, &c, ma)
+		}
 		return len(effects.ManaReflectedCandidates(e, &c, ma)) > 0
 	}
 	// A ManaReflected ability may sit on the top face or any under-card; each
@@ -1592,6 +1595,12 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 			ctx.Remembered = append(ctx.Remembered, state.Target{Obj: id})
 		}
 		cols := effects.ManaReflectedCandidates(e, ctx, ma)
+		if len(produced) == 1 && slices.Contains(cols, produced) {
+			// A payment plan's step names its colour (pay.AlternativeExec's
+			// one-letter Produced$): resolve it as the answered ask would.
+			e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
+			return
+		}
 		switch len(cols) {
 		case 0:
 			e.emit(events.Event{Kind: events.Note, Obj: source, Text: "ManaReflected found no mana to reflect"})
@@ -1605,6 +1614,12 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 	if pay.CostHasDynamicXTap(e.costRef(ma.ParamStr(cards.PKCost))) && mp.AmountTrim == "0" {
 		// X=0 produces no mana and therefore has no meaningful colour
 		// allocation decision.
+		e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
+		return
+	}
+	if mp.Each.Present && e.manaEachCount(p, source, ma, sacs, gained) <= 0 {
+		// Each$ 0 (Brigid, Doun's Mind with no other creatures) adds no mana,
+		// so there is no colour to allocate; effMana adds nothing.
 		e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
 		return
 	}
@@ -1812,6 +1827,21 @@ func (e *Engine) manaEffectAmount(p state.PlayerID, source state.ObjID, ma *card
 		return 0
 	}
 	return amount
+}
+
+// manaEachCount resolves the Each$ multiplier in the same context
+// manaEffectAmount uses, so the pre-ask gate agrees with effMana.
+func (e *Engine) manaEachCount(p state.PlayerID, source state.ObjID, ma *cards.SA, sacs []state.ObjID, gained pay.GainedManaRef) int32 {
+	o := e.G.Obj(source)
+	if o == nil || o.Face() == nil {
+		return 0
+	}
+	ctx := e.manaAmountCtx(p, source)
+	for _, id := range sacs {
+		ctx.Sacrificed = append(ctx.Sacrificed, effects.SacrificedLKI(e, id))
+	}
+	effects.SetSVars(ctx, gained.SVars(o.Face().SVars))
+	return effects.ManaEachNum(effects.ManaOf(ma), e, ctx, 1)
 }
 
 func (e *Engine) resolveManaEffectColor(p state.PlayerID, source state.ObjID, ma *cards.SA, produced string, gained pay.GainedManaRef, sacs []state.ObjID) {

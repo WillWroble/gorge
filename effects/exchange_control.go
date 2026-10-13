@@ -92,9 +92,7 @@ func effExchangeControl(h Host, c *Ctx, sa *cards.SA) {
 	if strings.EqualFold(sa.ParamStr(cards.PKRememberExchanged), "True") {
 		for _, id := range []state.ObjID{first.ID, second.ID} {
 			target := state.Target{Obj: id}
-			if !targetIn(c.Remembered, target) {
-				c.Remembered = append(c.Remembered, target)
-			}
+			rememberCtxOnce(h, c, target)
 			if source := h.Game().Obj(c.Source); source == nil || !targetIn(source.Remembered, target) {
 				eventRemember(h, c, id)
 			}

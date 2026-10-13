@@ -12,7 +12,18 @@ type Player struct {
 	// CoinFlipsThisTurn counts canonical flip-result Notes. Folded by
 	// events.Apply and cleared at TurnChange; clone copies this scalar.
 	CoinFlipsThisTurn int32
-	Pool              Mana
+	// SpellsCastThisTurn, LifeGainedThisTurn, LifeLostThisTurn and
+	// TokensCreatedThisTurn are the per-seat turn watchers: spells put on
+	// the stack, life gained, life lost (damage to the player included,
+	// infect poison excluded) and tokens minted since the last TurnChange.
+	// Folded only by events.Apply (events/apply_turnwatch.go) and cleared at
+	// TurnChange, so a log-only replay rebuilds them exactly; clone copies
+	// these scalars with the Player struct.
+	SpellsCastThisTurn    int32
+	LifeGainedThisTurn    int32
+	LifeLostThisTurn      int32
+	TokensCreatedThisTurn int32
+	Pool                  Mana
 
 	// RestrictedMana retains the spend restriction on mana produced by a
 	// RestrictValid$ mana ability. It is cleared with the pool at step/phase
@@ -622,6 +633,19 @@ type DelayedTrigger struct {
 	// ("|RN=<n>") because the event gains no field (Ruling T20-a); zero when
 	// the registration remembered no number.
 	RememberedAmount int32
+	// DefinedPlayer is a DelayedTriggerDefinedPlayer$ registration's player
+	// (seat+1; zero = none): the registration is armed only from that
+	// player's first turn start after BirthTurn, and with ThisTurn$ it dies
+	// when that turn ends. It rides the DelayedRegister Text ("|DP=<n>")
+	// because the event gains no field (Ruling T20-a).
+	DefinedPlayer int32
+	// ThisTurnDefined marks a DefinedPlayer registration that also carried
+	// ThisTurn$ True (expires at the end of the defined player's turn).
+	// Rides "|TD".
+	ThisTurnDefined bool
+	// Static is a Static$ True Mode$ Phase registration: Forge runs its body
+	// at fire time without a stack object. Rides the bare "|ST" flag.
+	Static bool
 }
 
 const startingLife = 20

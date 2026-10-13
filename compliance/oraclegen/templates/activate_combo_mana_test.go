@@ -49,20 +49,21 @@ func TestComboManaPrefixNamesGorgesColour(t *testing.T) {
 				t.Fatalf("precondition: %s scenario plays through activate step %d", tc.card, step)
 			}
 			pool := res.Snapshots[step+1].Players[0].Pool
-			if len(pool) == 0 || !strings.ContainsRune("WUBRG", rune(pool[0])) || strings.Trim(pool, pool[:1]) != "" {
-				t.Fatalf("precondition: gorge pool %q is one colour", pool)
-			}
-			// Precondition (dynamic shape): the engine resolved a non-empty
-			// one-colour pool for the variable amount (measured: X=1, pool
-			// "G" — the amount value does not enter the selector).
-			if tc.each && len(pool) < 1 {
-				t.Fatalf("precondition: %s dynamic pool %q is non-empty", tc.card, pool)
-			}
-			amount := ""
+			var want string
 			if tc.each {
-				amount = "X "
+				// Precondition: the scenario has no other creatures, so X=0
+				// and gorge adds nothing (and asks no colour); the selector
+				// falls back to the first produced colour.
+				if pool != "" {
+					t.Fatalf("precondition: %s Each$ X=0 pool %q is empty", tc.card, pool)
+				}
+				want = "{T}: Add X {" + strings.Fields(sa.ParamStr(cards.PKProduced))[1] + "}"
+			} else {
+				if len(pool) == 0 || !strings.ContainsRune("WUBRG", rune(pool[0])) || strings.Trim(pool, pool[:1]) != "" {
+					t.Fatalf("precondition: gorge pool %q is one colour", pool)
+				}
+				want = "{T}: Add {" + string(pool[0]) + "}"
 			}
-			want := "{T}: Add " + amount + "{" + string(pool[0]) + "}"
 			if step >= len(it.XAbility) || it.XAbility[step] != want {
 				t.Errorf("XMage ability = %v at step %d, want %q (gorge pool %q)", it.XAbility, step, want, pool)
 			}

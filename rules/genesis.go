@@ -284,6 +284,7 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 		landTypeWords:     chars.CorpusLandTypeWords(nameUniverseOrCorpus(cfg)),
 		mulligans:         cfg.Mulligans,
 		windowDiagnostics: cfg.WindowDiagnostics,
+		paidManaCensus:    cfg.PaidManaCensus,
 		startingLife:      life,
 	}
 	// The embedded turn ledger's per-turn slices (engine_turnledger.go).
@@ -325,7 +326,8 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 	}
 	e.G.Tokens = cfg.Tokens
 	e.setNameInPool, e.layer4InPool, e.controlStaticInPool = poolGates(cfg)
-	e.trigGrant.free = true // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.free = true     // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.replFree = true // the granted-replacement proof (trigger_grantfree.go)
 	e.G.NameUniverse = cfg.NameUniverse
 	e.G.NamedCorpus = cfg.NamedCorpus
 	e.G.NameUniverseNames = append([]string(nil), cfg.NameUniverseNames...)

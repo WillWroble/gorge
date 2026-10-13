@@ -210,7 +210,17 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 		// No Defined$/Choices$: the SA's own chosen target is the object to
 		// copy (the "target creature you control becomes a copy of target
 		// creature" family has one target being both source and become).
-		for _, t := range c.Targets {
+		// A link with its OWN ValidTgts$ whose become operand names the
+		// PARENT's target (Shuri's DBClone, CloneTarget$ ParentTarget under a
+		// targeting Pump root) copies its own answer (Ctx.PickedTargets),
+		// never the root's list: reading c.Targets made the copy source the
+		// root's target, a self-copy with no change. Other shapes keep
+		// c.Targets (the placement ask's answer for a depth-0 body).
+		own := c.Targets
+		if c.PickedTargets != nil && DefinedIsTargetReuse(cp.CloneTarget) {
+			own = c.PickedTargets
+		}
+		for _, t := range own {
 			if !t.IsPlayer {
 				source = append(source, t)
 			}
@@ -388,6 +398,16 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 			// SetColor$ Colorless a silent no-op.
 			setColors = cp.SetColors
 			setColorPresent = true
+		}
+	}
+	// AddColors$ is additive (CR 707.9b); an unparseable list is loud.
+	var addColorsL []string
+	if cp.AddColors != "" {
+		if cp.AddColorsOK {
+			addColorsL = cp.AddColorsL
+		} else {
+			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
+				Text: "Clone AddColors$ " + cp.AddColors + " is not a colour this build can add; the copy keeps its colours"})
 		}
 	}
 	// Unknown rider values stay loud rather than pretending to apply.
@@ -583,6 +603,9 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 		if setColorPresent {
 			reg(state.ContinuousEffect{Layer: state.LColor, AddColors: slices.Clone(setColors), OverwriteColors: true})
 		}
+		if len(addColorsL) > 0 {
+			reg(state.ContinuousEffect{Layer: state.LColor, AddColors: slices.Clone(addColorsL)})
+		}
 		if len(addKeywords) > 0 {
 			reg(state.ContinuousEffect{Layer: state.LAbilities, AddKeywords: slices.Clone(addKeywords)})
 		}
@@ -663,6 +686,29 @@ func CloneStaticGrantReadable(svars map[string]string, name string) bool {
 	return ok && len(statics) > 0
 }
 
+// CloneNamedGrantsReadable is the ETB offer gate's check for the AddSVars$ /
+// AddTriggers$ riders: every named SVar must exist and every named trigger
+// must exist and parse, the same tests effClone applies when it registers the
+// grant, so an unresolvable grant fails closed before the election instead of
+// being dropped with a Note after the copy entered.
+func CloneNamedGrantsReadable(svars map[string]string, cp *CloneParams) bool {
+	for _, name := range cp.AddSVars {
+		if _, ok := svars[name]; !ok {
+			return false
+		}
+	}
+	for _, name := range cp.AddTriggers {
+		raw, ok := svars[name]
+		if !ok {
+			return false
+		}
+		if _, ok := cards.ParseTriggerLine(raw); !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // cloneNames splits a comma-separated SVar grant in printed order.
 func cloneNames(raw string) []string {
 	var names []string
@@ -675,13 +721,19 @@ func cloneNames(raw string) []string {
 }
 
 // cloneBecome resolves CloneTarget$. Absent means Self (the resolving
-// ability's own source object) -- "this permanent becomes a copy". The
-// named forms reuse the same Defined$ referent grammar the source half uses.
+// ability's own source object) -- "this permanent becomes a copy" -- except
+// on a targeting Choices$ ability, where the Choices$ pick is the source and
+// the target is the become operand (CloneParams.ChoicesTargetBecome), read
+// as CloneTarget$ Targeted. The named forms reuse the same Defined$ referent
+// grammar the source half uses.
 func cloneBecome(h Host, c *Ctx, cp *CloneParams) ([]state.Target, bool) {
 	if c.CloneEnter.BecomeValid {
 		return []state.Target{{Obj: c.CloneEnter.Become}}, true
 	}
 	spec := cp.CloneTarget
+	if cp.ChoicesTargetBecome {
+		spec = "Targeted"
+	}
 	if spec == "" {
 		if c.Source == 0 {
 			return nil, true

@@ -638,6 +638,28 @@ func effDamageAll(h Host, c *Ctx, sa *cards.SA) {
 	// (see effDealDamage): every creature and player it hits latches
 	// together.
 	var damaged []state.Target
+	// A sweep inside a chain whose root opened the damage map shares it
+	// (Chandra's Fury: "4 damage to target player and 1 damage to each
+	// creature that player controls" is one simultaneous batch): MARK every
+	// hit for the DB$ DamageResolve flush instead of dealing it, in the same
+	// seat/zone order the immediate walk uses. A sweep with per-call riders
+	// the flush cannot honour (RememberDamaged$, ReplaceDyingDefined$) deals
+	// immediately as before.
+	if len(c.PendingDamage) > 0 && !remember && replaceDyingParam(sa) == "" {
+		if spec != "" {
+			for _, p := range g.AliveFrom(0) {
+				for _, id := range g.Zone(state.ZBattlefield, p) {
+					if MatchesSpecCtx(g, spec, id, c.SpecContext(c.Controller)) && inSweepScope(g, id, scope) {
+						c.PendingDamage = append(c.PendingDamage, PendingDamage{rider: rider, target: state.Target{Obj: id}})
+					}
+				}
+			}
+		}
+		for _, p := range validPlayers(h, c, sa.ParamStr(cards.PKValidPlayers)) {
+			c.PendingDamage = append(c.PendingDamage, PendingDamage{rider: rider, target: state.Target{Player: p, IsPlayer: true}})
+		}
+		return
+	}
 	h.BeginDamageBatch()
 	if spec != "" {
 		for _, p := range g.AliveFrom(0) {

@@ -302,6 +302,12 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 	if ev.Kind == events.Damage {
 		matches = append(matches, e.grantedPreventMatches(ev)...)
 	}
+	// A GRANTED static replacement (AddReplacementEffect$ on a Mode$
+	// Continuous static, rules/replacement_granted.go): appended after the
+	// printed and granted-keyword scans for the same deterministic
+	// composition reason bloodthirst/sunburst are, so a card's own lines
+	// always precede the ones it grants.
+	matches = append(matches, e.grantedStaticReplacementMatches(ev, event)...)
 	matches = e.dropAppliedReplacements(matches)
 	if ev.Kind == events.ManaAdd {
 		return e.continueManaReplacements(ev, manaCandidates, nil, false, e.manaFromTap, e.manaProducer)
@@ -373,7 +379,7 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 
 	// CR 616.1 competitions either compose commutative Updated effects or
 	// park destination-changing effects for the affected player to order.
-	if shouldPoseDrawReplacementChoice(ev, matches) {
+	if shouldPoseDrawReplacementChoice(ev, matches) || e.shouldPoseLoneOptionalMove(ev, matches) {
 		e.poseReplacementChoice(ev, matches)
 		return ev, true
 	}
@@ -552,6 +558,15 @@ type replMatch struct {
 	// granting ability; later source control changes cannot redefine You.
 	controller       state.PlayerID
 	frozenController bool
+	// svars is the SVar table that resolves a GRANTED static replacement's
+	// body (state.ContinuousEffect.SVars, the GRANTING face's table). replCtx
+	// prefers it over the host object's own face: a cross-object grant
+	// (Scion of Halaster's "first draw each turn" body lives on Scion, the
+	// host is the commander it affects) would otherwise resolve the body's
+	// SVars -- and its ReplaceWith$ SubAbility$ chain -- from the host. Nil
+	// on every printed, keyword and Effect-created match, whose table comes
+	// from the match's face or the source object's face as before.
+	svars map[string]string
 }
 
 // rememberedSpecContext builds the match context a ValidCard$/ValidLKI$
@@ -718,6 +733,12 @@ func replacementEventKind(ev events.Event) cards.ReplEvent {
 		return cards.ReplDamageDone
 	case events.Draw:
 		return cards.ReplDraw
+	case events.DrawBatchProposal:
+		// The batch proposal is the DrawCards class's own boundary: a
+		// R:Event$ Draw line replaces a single card draw only, so only a
+		// R:Event$ DrawCards line (Alms Collector's Number$ GE2, Quantum
+		// Riddler) matches it.
+		return cards.ReplDrawCards
 	case events.TokenCreate:
 		return cards.ReplCreateToken
 	case events.Explore:
@@ -896,18 +917,25 @@ func (e *Engine) replCtx(m replMatch, ev events.Event) *effects.Ctx {
 	if f == nil {
 		f = o.Face()
 	}
-	if ev.Kind == events.Draw {
+	if ev.Kind == events.Draw || ev.Kind == events.DrawBatchProposal {
 		// A replaced DRAW names the draw-er, not (only) the card: the body's
 		// ReplacedPlayer selectors (UnlessPayer$, Defined$) resolve against
 		// this, and its own DB$ Draw re-does the draw the original event
 		// would have done, so the Remembered/Captured seed above is dropped
 		// for draws — the body's own RememberDrawn$ records what it actually
 		// drew (a seeded stale entry would double the reveal's and the
-		// discard condition's population).
+		// discard condition's population). A batch proposal (the DrawCards
+		// class's held event) names the same player: Alms Collector's
+		// `Defined$ You & ReplacedPlayer` body reads it.
 		ctx.Repl.Player = state.Target{Player: ev.Player, IsPlayer: true}
 		ctx.Remembered, ctx.Captured = nil, nil
 	}
-	if f != nil {
+	if m.svars != nil {
+		// A GRANTED static replacement: the granting face's table, not the
+		// host's (replMatch.svars). Preferred over f, whose fallback is the
+		// host object's own face for a cross-object grant.
+		effects.SetSVars(ctx, m.svars)
+	} else if f != nil {
 		effects.SetSVars(ctx, f.SVars)
 	}
 	if o != nil && m.repl != nil && m.repl.ParamStr(cards.PKKeyword) == "ETBReplacement" && m.repl.With != nil && m.repl.With.API == "Clone" {
@@ -1120,11 +1148,13 @@ func (e *Engine) applyReplacement(ev events.Event, m replMatch) (events.Event, b
 			// not reach the battlefield, so report it handled.
 			return ev, true
 		}
-		if ev.Kind == events.Draw {
+		if ev.Kind == events.Draw || ev.Kind == events.DrawBatchProposal {
 			// A bodyless R:Event$ Draw line's complete replacement is stopping
 			// the draw (CR 614.1a). Reaching here means the election has already
 			// been made: a lone Optional$ replacement is asked at dispatch, and
-			// selecting one in a competition is itself the election.
+			// selecting one in a competition is itself the election. The
+			// DrawCards batch proposal is the same shape: its complete
+			// replacement is that the batch draws nothing.
 			return ev, true
 		}
 		return ev, false
@@ -1174,8 +1204,20 @@ func (e *Engine) applyReplacement(ev events.Event, m replMatch) (events.Event, b
 	} else {
 		e.replRedirect = nil
 	}
+	// A draw replacement's own body draws in the replaced event's place
+	// (Thought Reflection's two cards, Alms Collector's one each). Those
+	// draws are the modified events of CR 616.1e: they get one more
+	// replacement pass that excludes every draw replacement already applied
+	// to this draw's lineage (CR 614.5), this one included. The identity is
+	// live for exactly the body's duration, so a sibling draw of the same
+	// body sees the same stack while a later, independent draw does not.
+	savedChain := e.replDrawChain
+	if ev.Kind == events.Draw || ev.Kind == events.DrawBatchProposal {
+		e.replDrawChain = append(append([]string(nil), e.replDrawChain...), replIdentity(m))
+	}
 	e.runReplaceWith(ctx, ev.Obj, m.repl.With, &ev)
 	e.replRedirect = savedRedirect
+	e.replDrawChain = savedChain
 	return ev, true
 }
 
