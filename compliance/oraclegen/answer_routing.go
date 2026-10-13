@@ -332,15 +332,19 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return nil, true
 	case soleAltCost(d):
 		return as, true
-	case r.unpayableCostWindowClosed(i):
-		// gorge's mana window for an optional triggered cost, closed with
-		// "done" because no potential mana covers the cost (the runner's
-		// unpayableTriggerCostWindowDone), then the decline-only ask the
-		// forced-single-option filter drops. XMage has no mana window; it
-		// poses DoIfCostPaid's "Pay {2}?" chooseUse (measured on Esoteric
-		// Duplicator: strict mode's "Missing CHOICE def" on that ask), so
-		// the window's close scripts the decline there.
-		return append(as, XAnswer{d.Seat, "choice", "no"}), true
+	case r.triggerCostWindow(i):
+		// The mana-activation window of a triggered "you may pay <cost>. If
+		// you do, ..." (rules' paymentManaAskClass): XMage's DoIfCostPaid
+		// asks only its chooseUse and pays the mana itself, so the taps
+		// (and their colour asks) have no XMage ask to answer.
+		return nil, true
+	case triggerCostAnswer(d) != "":
+		// The pay/decline ask of that triggered cost is XMage's chooseUse
+		// ("Pay {W} and transform Brigid?"), which it poses even when gorge
+		// offers only the decline (an unpayable mana cost): a boolean
+		// answer, never the gorge label (measured strict miss: "Missing
+		// CHOICE def ... Pay {B} and transform Grub, Notorious Auntie?").
+		return append(as, XAnswer{d.Seat, "choice", triggerCostAnswer(d)}), true
 	case waterbendHelperDeclined(d):
 		// The waterbend tap-helpers ask: XMage pays the ability's waterbend
 		// generic from the prefilled mana pool and never poses the ask, so
@@ -421,6 +425,57 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 	return nil, false
 }
 
+// triggerCostAnswer is XMage's chooseUse answer to a triggered-cost
+// pay/decline ask: "yes" for the pay pick, "no" for the decline, "" for any
+// other decision.
+func triggerCostAnswer(d rules.OracleDecision) string {
+	if d.Kind != "choose_n" || len(d.Picks) != 1 {
+		return ""
+	}
+	switch pickKind(d, 0) {
+	case "trigger_cost_pay":
+		return "yes"
+	case "trigger_cost_decline":
+		return "no"
+	}
+	return ""
+}
+
+// triggerCostWindow reports a mana-window decision (an "activate" source tap,
+// its "done", or the tapped source's colour pick) that belongs to a
+// triggered cost: the run of such decisions by the same asker ends at that
+// cost's pay/decline ask.
+func (r *answerRouting) triggerCostWindow(i int) bool {
+	if !manaWindowPick(r.ds[i]) {
+		return false
+	}
+	for j := i + 1; j < len(r.ds) && sameAsker(r.ds[i], r.ds[j]); j++ {
+		if triggerCostAnswer(r.ds[j]) != "" {
+			return true
+		}
+		if !manaWindowPick(r.ds[j]) {
+			return false
+		}
+	}
+	return false
+}
+
+// manaWindowPick is one answered step of a payment window: a source tap or
+// "done" (option kinds activate/done), or the colour ask a tapped source poses.
+func manaWindowPick(d rules.OracleDecision) bool {
+	if d.Kind != "choose_n" {
+		return false
+	}
+	if d.Resume == "mana_color" {
+		return true
+	}
+	if len(d.Picks) != 1 {
+		return false
+	}
+	k := pickKind(d, 0)
+	return k == "activate" || k == "done"
+}
+
 // distinctRefs is the number of different object refs among refs: the
 // castable-card count of a Play ask (one option per card or per ability).
 func distinctRefs(refs []string) int {
@@ -429,18 +484,6 @@ func distinctRefs(refs []string) int {
 		seen[ref] = struct{}{}
 	}
 	return len(seen)
-}
-
-// unpayableCostWindowClosed reports decision i as a payment mana window
-// (options "Tap <source> for mana" ... "Done") answered "done", followed by
-// the same asker's decline-only triggered-cost ask ("Do not pay" alone).
-func (r *answerRouting) unpayableCostWindowClosed(i int) bool {
-	d := r.ds[i]
-	if d.Kind != "choose_n" || len(d.Picks) != 1 || pickKind(d, 0) != "done" || i+1 >= len(r.ds) {
-		return false
-	}
-	next := r.ds[i+1]
-	return sameAsker(d, next) && next.Options == 1 && len(next.Picks) == 1 && pickKind(next, 0) == "trigger_cost_decline"
 }
 
 // lookedFirst reports a look_ack by the same seat earlier in decision i's
