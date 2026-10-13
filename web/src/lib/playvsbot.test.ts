@@ -34,6 +34,19 @@ describe('startPlayVsBot (Task ui11)', () => {
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ format: 'constructed', mulligans: 0 });
   });
 
+  it('sends bot_policy only when the player picked one', async () => {
+    setBasePathForTests('');
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ table: 'g1', match: 1, seed: 7, seat: 0, token: 'tok', join: '/t/g1?seat=0&token=tok' }),
+    });
+    await startPlayVsBot('commander', 'h', 'b', 6, 'bot');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ format: 'commander', human_deck: 'h', bot_deck: 'b', bot_policy: 'bot', mulligans: 6 });
+    await startPlayVsBot('commander', '', '', 6, '');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ format: 'commander', mulligans: 6 });
+  });
+
   it('propagates a server rejection so the panel can render it', async () => {
     setBasePathForTests('');
     fetchMock.mockReset();

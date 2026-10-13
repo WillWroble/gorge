@@ -17,7 +17,12 @@ set -euo pipefail
 
 BIN=${BIN:-bin/gorged}
 DECKS=${DECKS:-internal/testutil/decks}
-# 2026-10-07: 16 tables, 8 constructed + 8 commander. The demo now serves
+# 2026-10-13: 2 tables, the operator's layout: t1 a 1v1 constructed table
+# (two bots, SEATS) and t2 a 4-bot commander pod (COMMANDER_SEATS), both
+# spectated omniscient ("clairvoyant": every hand shown). On-demand
+# play-vs-bot games (-vsbot) are unchanged and come on top of these.
+#
+# 2026-10-07 (retired): 16 tables, 8 constructed + 8 commander. The demo now serves
 # commander games, so the policy must support both formats and 4 seats: the
 # old sb-search-lite-atk default is constructed-only/2-seat and
 # gorged's validateBotPolicyFlags REJECTS it for lacking commander, which
@@ -25,10 +30,12 @@ DECKS=${DECKS:-internal/testutil/decks}
 # constructed+commander and seats 4. TABLES=16 with the FORMATS below
 # cycling constructed,commander gives exactly 8 of each (table i takes
 # formats[(i-1) mod 2]).
-TABLES=${TABLES:-16}
-# 2026-10-07: 4, lethal-pressure's supported seat count (it plays commander,
-# which is a 4-player format).
-SEATS=${SEATS:-4}
+TABLES=${TABLES:-2}
+# Seats of a constructed table, and of a commander table (gorged
+# -commander-seats). 2026-10-13: 2 and 4 -- a bot-vs-bot constructed table
+# beside a 4-player pod. Before that every table seated 4 (2026-10-07).
+SEATS=${SEATS:-2}
+COMMANDER_SEATS=${COMMANDER_SEATS:-4}
 # Wall-clock delay gorged inserts per decision. This has walked 1.5s -> 250ms
 # -> 500ms -> 250ms; the user asked for 250ms back on 2026-09-07, so 250ms is
 # the ruling and the earlier "tighter than a person can follow" judgement was
@@ -69,9 +76,8 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # the demo at all. Before that (2026-09-28): lethal-pressure (AR7), which is
 # again today's default.
 BOT_POLICY=${BOT_POLICY:-lethal-pressure}
-# 2026-10-07: constructed,commander -- cycled across 16 TABLES this deals 8
-# tables of each format (table i takes formats[(i-1) mod 2]). Matches the
-# 4-format, 4-seat lethal-pressure shape.
+# constructed,commander -- table i takes formats[(i-1) mod 2], so TABLES=2
+# deals t1 constructed and t2 commander.
 FORMATS=${FORMATS:-constructed,commander}
 # Deterministic across deploys: the same seed deals the same opening tables,
 # so a UI change is the only thing that differs between two screenshots.
@@ -268,6 +274,7 @@ start_one() {
 		-decks "$DECKS" \
 		-tables "$TABLES" \
 		-seats "$SEATS" \
+		-commander-seats "$COMMANDER_SEATS" \
 		-pace "$PACE" \
 		-format "$FORMATS" \
 		-seed "$SEED" \
@@ -336,4 +343,4 @@ wait_ready "$PUB_PORT"
 say "$(curl -fsS "http://127.0.0.1:$PUB_PORT/api/tables" |
 	tr ',' '\n' | grep '"format"' | cut -d'"' -f4 | sort | uniq -c |
 	tr '\n' ' ')on :$PUB_PORT"
-say "ready — spectator ($SPECTATOR, bots $BOT_POLICY, pace $PACE) http://localhost:$PUB_PORT/${OMNI_PORT:+  ·  omniscient http://localhost:$OMNI_PORT/}${MB_PORT:+  ·  manabrew wire http://localhost:$MB_PORT/}"
+say "ready — spectator ($SPECTATOR, bots $BOT_POLICY, seats $SEATS/commander $COMMANDER_SEATS, pace $PACE) http://localhost:$PUB_PORT/${OMNI_PORT:+  ·  omniscient http://localhost:$OMNI_PORT/}${MB_PORT:+  ·  manabrew wire http://localhost:$MB_PORT/}"

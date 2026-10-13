@@ -1,4 +1,4 @@
-import type { Decision, ErrorBody, EventBody, Intent, MatchInfo, TableInfo, View } from '../protocol';
+import type { BotPolicyList, Decision, ErrorBody, EventBody, Intent, MatchInfo, TableInfo, View } from '../protocol';
 import type { SeatCtx } from './seat';
 import { withBase } from './basepath';
 
@@ -20,6 +20,7 @@ export const undoURL = (t: string, k: number) => withBase(`/api/tables/${enc(t)}
 export const gamesURL = () => withBase('/api/games');
 export const decksURL = () => withBase('/api/decks');
 export const deckStatsURL = () => withBase('/api/stats/decks');
+export const botPoliciesURL = () => withBase('/api/bot-policies');
 
 // seatQuery is the seat/token query threading on the seat-scoped GETs
 // (M2e-3's FL-99: ?seat=N&token=…). The token is a bearer credential for
@@ -117,6 +118,9 @@ export interface DeckInfo {
 }
 
 export const fetchDecks = () => getJSON<DeckInfo[]>(decksURL());
+
+/** The server's offered bot policies and its default (GET /api/bot-policies), for the play-vs-bot opponent picker. */
+export const fetchBotPolicies = () => getJSON<BotPolicyList>(botPoliciesURL());
 
 /** One row of the public deck leaderboard: finished bot-vs-bot games only. */
 export interface DeckRecord {

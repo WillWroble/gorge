@@ -49,6 +49,11 @@ type config struct {
 	// time so a malformed list fails before any table is added (R-E3-1).
 	formatsRaw string
 	formats    []host.Format
+	// commanderSeats is the -commander-seats flag: the seat count of every
+	// commander table, so one server can run 2-seat constructed tables
+	// beside 4-seat commander pods. Zero (the default) means -seats, the
+	// single count every table had before the flag existed.
+	commanderSeats int
 	// humansRaw is the -humans flag: a comma-separated list of table t1's
 	// slot indices that are real people. Empty stays all-bot, identical to
 	// today. applyHumans parses it into humans at serve time so a malformed
@@ -265,6 +270,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.decks, "decks", "internal/testutil/decks", "directory of deck JSON files")
 	fs.IntVar(&c.tables, "tables", 4, "number of tables")
 	fs.IntVar(&c.seats, "seats", 4, "seats per table")
+	fs.IntVar(&c.commanderSeats, "commander-seats", 0, "seats per commander table; 0 = -seats")
 	fs.DurationVar(&c.pace, "pace", 50*time.Millisecond, "sleep after every decision; 0 = as fast as possible")
 	fs.DurationVar(&c.cooldown, "cooldown", 5*time.Second, "pause between matches on a perpetual table")
 	fs.StringVar(&c.dir, "dir", "gorged-data", "persistence directory")
@@ -343,6 +349,9 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	}
 	if err := c.applyFormats(); err != nil {
 		return err
+	}
+	if c.commanderSeats < 0 {
+		return fmt.Errorf("-commander-seats %d: want 0 (= -seats) or a seat count", c.commanderSeats)
 	}
 	if err := c.applyManaBrew(); err != nil {
 		return err
@@ -471,7 +480,11 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	srv := &http.Server{Handler: topMux}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
-	fmt.Fprintf(os.Stderr, "gorged: %d tables of %d on %s (dir %s)\n", len(r.Tables()), c.seats, ln.Addr(), c.dir)
+	seatsDesc := fmt.Sprint(c.seats)
+	if c.commanderSeats > 0 && c.commanderSeats != c.seats && c.wantsFormat(host.FormatCommander) {
+		seatsDesc = fmt.Sprintf("%d (commander %d)", c.seats, c.commanderSeats)
+	}
+	fmt.Fprintf(os.Stderr, "gorged: %d tables of %s on %s (dir %s)\n", len(r.Tables()), seatsDesc, ln.Addr(), c.dir)
 	if gate != nil {
 		for _, s := range c.humans {
 			seat := state.PlayerID(s)
@@ -688,11 +701,14 @@ func (c config) tableConfigs(cmdPool, conPool []string, vis view.Visibility) []h
 		if len(c.formats) > 0 {
 			format = c.formats[(i-1)%len(c.formats)]
 		}
-		pool := conPool
+		pool, seats := conPool, c.seats
 		if format == host.FormatCommander {
 			pool = cmdPool
+			if c.commanderSeats > 0 {
+				seats = c.commanderSeats
+			}
 		}
-		cfg := host.TableConfig{ID: host.TableID(fmt.Sprintf("t%d", i)), Name: fmt.Sprintf("Table %d", i), Seats: c.seats,
+		cfg := host.TableConfig{ID: host.TableID(fmt.Sprintf("t%d", i)), Name: fmt.Sprintf("Table %d", i), Seats: seats,
 			Decks: pool, Seed: c.seed + uint64(i-1), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
 			Mulligans: c.mulligans, Format: format, BotPolicy: c.botPolicy, BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana}
 		if i == 1 && len(c.humans) > 0 {
