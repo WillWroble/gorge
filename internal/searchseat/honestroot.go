@@ -3,7 +3,29 @@ package searchseat
 import (
 	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/state"
 )
+
+// ClosedListSeat is a search seat that does not know its opponents' deck
+// lists: it searches worlds whose opponent hidden cards are drawn from a
+// belief over deck lists (searchprobe.Belief), never from the opponent's
+// real list. SearchBelief is that belief, nil when the seat's lists are
+// open. A driver builds such a seat's public game with SeatSetup, so the
+// honest root it hands the seat (HonestRoot) is closed the same way.
+type ClosedListSeat interface {
+	SearchBelief() *searchprobe.Belief
+}
+
+// SeatSetup is the declared public game as seat s, playing actor, may see
+// it: the game itself, or -- for a ClosedListSeat with a belief -- the game
+// with every opponent's list dropped and the belief in its place
+// (searchprobe.PublicGame.Closed).
+func SeatSetup(setup searchprobe.PublicGame, s any, actor state.PlayerID) searchprobe.PublicGame {
+	if c, ok := s.(ClosedListSeat); ok {
+		return setup.Closed(actor, c.SearchBelief())
+	}
+	return setup
+}
 
 // HonestRoot builds one honest root engine for a seat that needs an engine
 // handle at its own decision: a single searchprobe.Redealer deal of the live
@@ -18,6 +40,11 @@ import (
 // permute, never for which hidden card is where. seed is the deal seed; the
 // host derives it per decision (from the per-seat seed and the decision
 // sequence) so a root is a pure function of the feed and that seed.
+//
+// With a closed setup (setup.Belief, SeatSetup) the root's opponent hidden
+// cards are re-identified from the belief exactly as every closed search
+// world's are, so the root never holds the opponent's real hidden cards
+// either.
 //
 // The returned engine is a hypothetical clone, owned by the caller for the
 // duration of the decision and sharing nothing mutable with e. A refused or

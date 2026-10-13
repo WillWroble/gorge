@@ -295,8 +295,11 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				decisionBoard = &board // b is a copy of board; &b would escape per decision
 				rootEngine := e
 				fdLive := fdFrame
+				// A closed-list seat sees the game without its opponents'
+				// lists (searchseat.SeatSetup): its root and Setup both.
+				seatSetup := searchseat.SeatSetup(setup, seats[d.Player], d.Player)
 				if hooks.HonestRoot && fdLive {
-					hroot, reason := searchseat.HonestRoot(setup, fd, e,
+					hroot, reason := searchseat.HonestRoot(seatSetup, fd, e,
 						bots.RootSeed(cfg.Seed^(uint64(d.Player)+1), d.Seq))
 					if hroot != nil {
 						rootEngine = hroot
@@ -309,7 +312,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				}
 				if fdLive {
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideSearch(context.Background(),
-						searchseat.Env{Setup: setup, Engine: rootEngine, Board: b, Feed: fd}, *d)
+						searchseat.Env{Setup: seatSetup, Engine: rootEngine, Board: b, Feed: fd}, *d)
 					// The played intent is recorded back into the history
 					// exactly as the teacher's loop records it (the FINAL
 					// intent, post-override). A translation error means the

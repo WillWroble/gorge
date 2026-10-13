@@ -175,12 +175,15 @@ func (f *matchFeeds) rebuild(cfg rules.Config, l *events.Log, n int) error {
 //
 // The returned parkedData carries the whole Env; parkSeat hands it to
 // DecideEnv outside the lock and nothing reads it again afterwards.
-func (m *match) envData(p state.PlayerID, dc *decision.Decision, brd *botpolicy.Board) *parkedData {
+func (m *match) envData(p state.PlayerID, dc *decision.Decision, brd *botpolicy.Board, es bots.EnvSeat) *parkedData {
 	slot := int(p)
 	seed := bots.RootSeed(m.seed^uint64(slot+1), dc.Seq)
-	setup := searchprobe.PublicGame{
+	// A closed-list seat (searchseat.ClosedListSeat, az-c3 with a belief)
+	// sees the game without its opponents' lists: its honest root and the
+	// Setup its search reads are both closed.
+	setup := searchseat.SeatSetup(searchprobe.PublicGame{
 		Names: m.cfg.Names, Decks: m.cfg.Decks, Tokens: m.cfg.Tokens, StartingLife: m.cfg.StartingLife,
-	}
+	}, es, p)
 	var feed *searchseat.Feed
 	if m.feeds != nil && slot >= 0 && slot < len(m.feeds.bySlot) {
 		feed = m.feeds.bySlot[slot]

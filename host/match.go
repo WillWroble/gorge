@@ -523,7 +523,7 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 	// never implements bots.EnvSeat today, but if one ever did, the human
 	// must still be parked on a View, not silently handed an Env.
 	if es, ok := seats[d.Player].(bots.EnvSeat); ok && !isHuman && es.WantsEnv(&dc) {
-		return m.envData(d.Player, &dc, brd)
+		return m.envData(d.Player, &dc, brd, es)
 	}
 	if _, ok := seats[d.Player].(seat.BoardSeat); ok && !isHuman {
 		return &parkedData{

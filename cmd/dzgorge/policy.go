@@ -11,6 +11,7 @@ import (
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
 	"github.com/adams-shaun/gorge/seat"
 )
@@ -77,6 +78,12 @@ import (
 //	   :kinds=LIST               the searched kinds by name, comma-separated: priority, attackers,
 //	                             blockers, target, modes, optional, choose, multitarget, or all (=
 //	                             :morekinds); the default is the first four
+//	   :closedlist               the opponent's deck list is closed: the seat's own list stays known,
+//	                             but every world deals the opponent's unknown hand and library from a
+//	                             list drawn from the belief corpus (play -belief-decks/-belief-pool,
+//	                             default the TRAIN split of -decks/-pool), conditioned on the colours
+//	                             of the opponent's seen cards, never from its real list or its real
+//	                             hidden cards (azmcts.WorldRedealClosed)
 //	prior:net=gen1.gpol          the network's policy alone: the argmax of its prior over the
 //	                             candidates the search would build, no simulation
 //	az:sims=100:remote=unix:/tmp/dzg.sock
@@ -107,9 +114,19 @@ type policySpec struct {
 	OppNodes  bool
 	SkipPass  int
 	OppFull   bool         // :oppfull
+	Closed    bool         // :closedlist (the belief is set by play, setBelief)
 	Kinds     azmcts.Kinds // :kinds= / :morekinds; zero is azmcts.AllKinds
 	// lookup resolves card names for sbtactical (setLookup); nil reads View facts only.
 	lookup builtins.CardLookup
+	// belief is :closedlist's opponent-list belief (setBelief).
+	belief *searchprobe.Belief
+}
+
+// setBelief gives a :closedlist seat its belief (loaded after the specs are parsed).
+func (p *policySpec) setBelief(b *searchprobe.Belief) {
+	if p.Closed {
+		p.belief = b
+	}
 }
 
 // setLookup gives an sbtactical seat its card lookup over the game's corpus (the
@@ -177,6 +194,8 @@ func parsePolicy(s string) (*policySpec, error) {
 			p.OppNodes = true
 		case "oppfull":
 			p.OppFull = true
+		case "closedlist":
+			p.Closed = true
 		case "morekinds":
 			p.Kinds = azmcts.FullKinds()
 		case "kinds":
@@ -223,8 +242,14 @@ func parsePolicy(s string) (*policySpec, error) {
 		}
 		p.model = m
 	}
+	if p.Closed && p.Kind != "az" {
+		return nil, fmt.Errorf("policy %q: closedlist is an az key", s)
+	}
 	if p.Kind == "az" || p.Kind == "prior" {
-		if _, err := p.seat(1); err != nil {
+		// Validated open: the closed world's belief is loaded later (setBelief).
+		q := *p
+		q.Closed = false
+		if _, err := q.seat(1); err != nil {
 			return nil, fmt.Errorf("policy %q: %w", s, err)
 		}
 	}
@@ -266,6 +291,9 @@ func (p *policySpec) azConfig() azmcts.SeatConfig {
 	// Honest worlds only: the seat never searches the real engine's hidden zones. The
 	// prior-only student asks for no world at all; redeal just satisfies NewSeat.
 	cfg.World = azmcts.WorldRedeal
+	if p.Closed {
+		cfg.World, cfg.Belief = azmcts.WorldRedealClosed, p.belief
+	}
 	cfg.Worlds = p.Worlds
 	cfg.Explore, cfg.NoNoise = p.Explore, p.NoNoise
 	cfg.PriorOnly = p.Kind == "prior"

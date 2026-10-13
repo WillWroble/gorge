@@ -11,11 +11,17 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/view"
 )
 
@@ -28,6 +34,10 @@ import (
 // -allow-decklist-bots opt-in.
 func (c config) enableAZC3() error {
 	switch {
+	case c.az3Net == "" && (c.az3Belief != "" || c.az3BeliefPool != ""):
+		return errors.New("-az-c3-belief needs -az-c3-net")
+	case c.az3BeliefPool != "" && c.az3Belief == "":
+		return errors.New("-az-c3-belief-pool needs -az-c3-belief")
 	case c.az3Net == "" && c.az3Decks == "":
 		return nil
 	case c.az3Net == "":
@@ -126,4 +136,52 @@ func (c config) azc3Table(pool []string, vis view.Visibility) *host.TableConfig 
 		// table with a human even with the bit set.
 		AllowDecklistBots: true,
 	}
+}
+
+// azc3Belief loads -az-c3-belief (with -az-c3-belief-pool's train split, or
+// every deck file in the directory) and closes az-c3's opponent lists with
+// it. No flag: the open lists, unchanged.
+func (c config) azc3Belief(reg *cards.Registry) error {
+	if c.az3Belief == "" {
+		return nil
+	}
+	var names []string
+	if c.az3BeliefPool != "" {
+		raw, err := os.ReadFile(c.az3BeliefPool)
+		if err != nil {
+			return fmt.Errorf("-az-c3-belief-pool: %w", err)
+		}
+		for i, line := range strings.Split(string(raw), "\n") {
+			v := strings.Split(line, "\t")
+			if i == 0 || len(v) < 2 || v[1] != "train" {
+				continue
+			}
+			names = append(names, v[0]+".json")
+		}
+	} else {
+		ents, err := os.ReadDir(c.az3Belief)
+		if err != nil {
+			return fmt.Errorf("-az-c3-belief: %w", err)
+		}
+		for _, e := range ents {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+				names = append(names, e.Name())
+			}
+		}
+	}
+	sort.Strings(names)
+	var decks [][]*cards.Card
+	for _, n := range names {
+		_, d, err := deck.Load(reg, filepath.Join(c.az3Belief, n))
+		if err != nil {
+			continue // a deck the corpus cannot resolve is no evidence either way
+		}
+		decks = append(decks, d)
+	}
+	b, err := searchprobe.NewBelief(decks)
+	if err != nil {
+		return fmt.Errorf("-az-c3-belief %s: %w", c.az3Belief, err)
+	}
+	azc3.SetBelief(b)
+	return nil
 }

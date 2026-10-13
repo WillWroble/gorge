@@ -257,10 +257,24 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 		sc.rng.chance = w.next.chance.clone()
 	}
 	l.RewindTo(s0.L, evEnd)
+	// A hypothetical world's card table and pool gates survive the restore:
+	// the re-run re-applies the world's HiddenIdentity events (the injected
+	// redeal), which read the table, and S0 predates them when the world was
+	// forked at a posed resolution. Both only ever grow within one world.
+	hypCards := g.HypotheticalCards
+	gates := [3]bool{e.setNameInPool, e.layer4InPool, e.controlStaticInPool}
 	*g = *sc.G
+	if hypCards != nil {
+		g.HypotheticalCards = hypCards
+	}
 	sc.L = l
 	*e = *sc
 	e.G, e.L = g, l
+	if hypCards != nil {
+		e.setNameInPool = e.setNameInPool || gates[0]
+		e.layer4InPool = e.layer4InPool || gates[1]
+		e.controlStaticInPool = e.controlStaticInPool || gates[2]
+	}
 	e.tape, e.tapeEpoch = kernel, epoch
 	if arena != nil {
 		e.decArena = arena

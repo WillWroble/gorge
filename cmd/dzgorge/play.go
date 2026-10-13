@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -81,6 +82,48 @@ type azAgg struct {
 
 var azStats azAgg
 
+// refusals counts redeal refusals and deal failures by reason (-out summary).
+var refusals struct {
+	sync.Mutex
+	m map[string]int
+}
+
+func noteRefusal(refused, failed string) {
+	refusals.Lock()
+	defer refusals.Unlock()
+	if refusals.m == nil {
+		refusals.m = map[string]int{}
+	}
+	if refused != "" {
+		refusals.m["refused: "+reasonKey(refused)]++
+	}
+	if failed != "" {
+		refusals.m["deal failed: "+reasonKey(failed)]++
+	}
+}
+
+// reasonKey is a reason up to its first parenthesis or colon-detail, so counts
+// aggregate over the card names and numbers a reason carries.
+func reasonKey(s string) string {
+	if i := strings.IndexByte(s, '('); i > 0 {
+		s = s[:i]
+	}
+	if len(s) > 120 {
+		s = s[:120]
+	}
+	return strings.TrimSpace(s)
+}
+
+func refusalReasons() map[string]int {
+	refusals.Lock()
+	defer refusals.Unlock()
+	out := make(map[string]int, len(refusals.m))
+	for k, v := range refusals.m {
+		out[k] = v
+	}
+	return out
+}
+
 func runPlay(args []string) int {
 	fs := flag.NewFlagSet("play", flag.ExitOnError)
 	cardsDir := fs.String("cards", ".cards", "gorge corpus directory")
@@ -115,6 +158,9 @@ func runPlay(args []string) int {
 	fs.IntVar(&gonet.CardCacheSize, "gonet-card-cache", gonet.CardCacheSize, "cached gonet= card vectors (0 = none)")
 	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (rules/paid_mana_census.go)")
 	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
+	beliefDecks := fs.String("belief-decks", "", "a :closedlist seat's belief corpus: deck directory (default -decks)")
+	beliefPool := fs.String("belief-pool", "", "a :closedlist seat's belief corpus: pool.tsv (default -pool)")
+	beliefSplit := fs.String("belief-split", "train", "a :closedlist seat's belief corpus: the pool split its decks come from")
 	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
 	fs.Parse(args)
 	tuneGC()
@@ -156,6 +202,29 @@ func runPlay(args []string) int {
 	}
 	for _, p := range specs {
 		p.setLookup(reg)
+	}
+	if specs[0].Closed || specs[1].Closed {
+		bd, bp := *beliefDecks, *beliefPool
+		if bd == "" {
+			bd = *decksDir
+		}
+		if bp == "" {
+			bp = *poolPath
+		}
+		if *beliefSplit == *split && *split != "train" {
+			fmt.Fprintf(os.Stderr, "play: -belief-split %q is the games' own split: the belief would hold the opponents' real decks\n", *beliefSplit)
+			return 2
+		}
+		tb := time.Now()
+		b, skipped, err := loadBelief(reg, bd, bp, *beliefSplit)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "play:", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "belief: %d %s decks (%d skipped), %d distinct cards, %.1fs\n", b.Decks(), *beliefSplit, skipped, b.Cards().Len(), time.Since(tb).Seconds())
+		for _, p := range specs {
+			p.setBelief(b)
+		}
 	}
 	pool, err := readPool(*poolPath, *split)
 	if err != nil {
@@ -227,6 +296,9 @@ func runPlay(args []string) int {
 		}
 		azStats.asked.Add(1)
 		azStats.refused.Add(int64(d.Stats.RedealRefused))
+		if d.Refused != "" || d.DealFailed != "" {
+			noteRefusal(d.Refused, d.DealFailed)
+		}
 		azStats.noWorld.Add(int64(d.Stats.NoWorld))
 		azStats.allFailed.Add(int64(d.Stats.AllFailed))
 		azStats.priorFallbacks.Add(int64(d.Stats.PriorFallbacks))
@@ -405,6 +477,10 @@ func runPlay(args []string) int {
 		sum["az_no_world_sims"] = azStats.noWorld.Load()
 		sum["az_all_failed"] = azStats.allFailed.Load()
 		sum["az_prior_fallbacks"] = azStats.priorFallbacks.Load()
+		if r := refusalReasons(); len(r) > 0 {
+			// Why redeals refused or deals failed, by reason (numbers and names stripped).
+			sum["az_refusal_reasons"] = r
+		}
 	}
 	if n := azStats.topKPoints.Load(); n > 0 {
 		// topk=K: decisions (root and in-simulation) the network ranked, those where it cut, and

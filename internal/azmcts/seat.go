@@ -12,6 +12,7 @@ import (
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
 )
 
@@ -54,6 +55,9 @@ type SeatConfig struct {
 	// Worlds is the redeal source's K (RedealSource): 0 deals a fresh world
 	// per simulation. Ignored by the clairvoyant source.
 	Worlds int
+	// Belief is WorldRedealClosed's model of the opponents' lists, required
+	// by that world and ignored by the others. Shared and read-only.
+	Belief *searchprobe.Belief
 	// Mulligan is the London-mulligan rule of the seat's own bot (seat.Bot.
 	// WithMulligan), which answers every KMulligan ask (the round is never
 	// searched). The zero value is the default bot's 1/3 coin.
@@ -147,12 +151,16 @@ func newSeat(seed uint64, net *policynet.Model, cfg SeatConfig) (*Seat, error) {
 	}
 	switch cfg.World {
 	case WorldRedeal:
+	case WorldRedealClosed:
+		if cfg.Belief == nil {
+			return nil, errors.New("azmcts: the closed redeal world needs a belief (SeatConfig.Belief)")
+		}
 	case "", WorldClairvoyant:
 		if cfg.Source == nil {
 			return nil, errors.New("azmcts: the clairvoyant world is not linked (internal/azmcts/clairvoyant)")
 		}
 	default:
-		return nil, fmt.Errorf("azmcts: world source %q: want %s or %s", cfg.World, WorldClairvoyant, WorldRedeal)
+		return nil, fmt.Errorf("azmcts: world source %q: want %s, %s or %s", cfg.World, WorldClairvoyant, WorldRedeal, WorldRedealClosed)
 	}
 	def := seat.NewBot(seed)
 	if cfg.Search.AutoPayment {
@@ -207,8 +215,8 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 	opts.Seed = DecisionSeed(s.seed, d.Seq)
 	var src WorldSource
 	var redeal *RedealSource
-	if s.cfg.World == WorldRedeal {
-		rs, err := s.redealSource(env, obs, opts.Seed)
+	if s.redeals() {
+		rs, err := s.redealSource(env, obs, opts.Seed, d.Player)
 		if err != nil {
 			return decision.Intent{}, err
 		}
@@ -298,8 +306,8 @@ func (s *Seat) decidePrior(ctx context.Context, env searchseat.Env, d decision.D
 // incrementally across the game) and the feed's collector. A feed that has
 // no frames, or a known-card fold that failed, is a refusal -- counted, and
 // the bot's answer is played -- never a clairvoyant fallback.
-func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed uint64) (*RedealSource, error) {
-	in := RedealInput{Setup: env.Setup}
+func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed uint64, actor state.PlayerID) (*RedealSource, error) {
+	in := RedealInput{Setup: searchseat.SeatSetup(env.Setup, s, actor)}
 	if env.Feed != nil && env.Feed.Live() && env.Feed.Frames() > 0 {
 		in.History = env.Feed.History()
 		in.Base = searchprobe.RedealBase{Engine: env.Engine, Observer: env.Feed.Collector()}
@@ -311,6 +319,22 @@ func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed
 		in.Known = known
 	}
 	return NewRedeal(in, obs, seed, s.cfg.Worlds)
+}
+
+// redeals reports whether the seat searches honest redeal worlds (open or
+// closed lists).
+func (s *Seat) redeals() bool {
+	return s.cfg.World == WorldRedeal || s.cfg.World == WorldRedealClosed
+}
+
+// SearchBelief is the belief a closed-list seat draws its opponents' lists
+// from (searchseat.ClosedListSeat), nil for every other world: a driver
+// closes the seat's public game (and so its honest root) with it.
+func (s *Seat) SearchBelief() *searchprobe.Belief {
+	if s.cfg.World == WorldRedealClosed {
+		return s.cfg.Belief
+	}
+	return nil
 }
 
 // worldName is the record's world source name.

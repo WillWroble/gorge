@@ -466,6 +466,13 @@ type Game struct {
 	// A persisted match supplies it on replay so a later corpus update cannot
 	// renumber a NameCard decision's options.
 	NameUniverseNames []string
+	// HypotheticalCards is the card table a hypothetical search world's
+	// HiddenIdentity events name their cards from (the closed-decklist
+	// redeal's belief universe). Like Tokens it is immutable shared corpus
+	// data, not game state: rules.ReidentifyHidden sets it once on a
+	// hypothetical engine before emitting the events that read it, clones
+	// share it, and it is nil in every real match and replay.
+	HypotheticalCards *cards.Universe
 
 	// Delayed holds delayed-trigger registrations (CR 603.7: Mode$ Phase, or
 	// the event-matched shape a DelayedTrigger.EventMode names) that have not
