@@ -91,22 +91,24 @@ func TestCostStaticOpponentCombatProbes(t *testing.T) {
 			if tc.wantAttack && !hasStep(it.Steps, "attack") {
 				t.Fatalf("precondition: attacking-creature probe has no attack prelude: %+v", it.Steps)
 			}
-			if tc.wantAttack {
+			if tc.wantAttack || tc.wantBlock {
 				// XMage declares attackers in the declare-attackers
-				// beginStep, so a pass_to checkpoint ahead of an opponent
-				// attack already sees "tapped attacking" and diverges.
+				// beginStep, so a pass_to checkpoint ahead of ANY attack
+				// already sees "tapped attacking" and diverges; and a p0
+				// pass_to naming "Active: p0" reads as p0's NEXT turn in the
+				// driver (Static Snare, Dark Endurance: xmage turn 3, gorge 1).
 				seen := false
 				for _, st := range it.Steps {
-					if st.Op == "attack" && st.Seat == 1 {
+					if st.Op == "attack" {
 						seen = true
 						break
 					}
-					if st.Op == "pass_to" && st.Step == "declare-attackers" && st.Active == "p1" {
-						t.Fatalf("pass_to declare-attackers precedes the opponent attack: %+v", it.Steps)
+					if st.Op == "pass_to" && st.Step == "declare-attackers" {
+						t.Fatalf("pass_to declare-attackers precedes the attack: %+v", it.Steps)
 					}
 				}
-				if tc.name != "Static Snare" && !seen {
-					t.Fatalf("precondition: no opponent attack step: %+v", it.Steps)
+				if !seen {
+					t.Fatalf("precondition: no attack step: %+v", it.Steps)
 				}
 			}
 			if tc.wantBlock && !hasStep(it.Steps, "block") {

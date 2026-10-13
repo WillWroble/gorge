@@ -38,8 +38,13 @@ func costTargetProbe(reg *cards.Registry, f *cards.Face, st cards.Static, p cost
 		attacker, blocker := attackerFixture, "Llanowar Elves"
 		p.battlefield = appendUnique(p.battlefield, attacker)
 		p.opponentBattlefield = appendUnique(p.opponentBattlefield, blocker)
+		// No pass_to precedes the attack: the attack op reaches the
+		// declaration itself, and XMage declares attackers in the
+		// declare-attackers beginStep, so a pass_to checkpoint there already
+		// sees "tapped attacking" where gorge's does not. A pass_to naming
+		// "Active: p0" was worse: the XMage driver reads it as p0's NEXT turn
+		// (Dark Endurance static#0.0: xmage turn 3, gorge 1).
 		p.pre = append(p.pre,
-			oraclegen.Step{Op: "pass_to", Step: "declare-attackers", Active: "p0"},
 			oraclegen.Step{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + attacker}},
 			oraclegen.Step{Op: "block", Seat: 1, Blocks: [][2]string{{"p1:" + blocker, "p0:" + attacker}}},
 		)

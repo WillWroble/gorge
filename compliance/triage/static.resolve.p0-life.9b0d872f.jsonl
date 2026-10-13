@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"resolve","field":"p0.life","diff":"gorge-xmage=-2"},"key":"static | resolve | p0.life | gorge-xmage=-2","cards":1}
-{"card":"Vitu-Ghazi Inspector","template":"static#0.0","status":"diverge","api":"ChangesZone:PutCounter","sets":["MKM"],"detail":"step 1 (resolve) p0.life: gorge \"20\", xmage \"22\""}

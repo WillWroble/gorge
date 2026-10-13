@@ -141,7 +141,7 @@ var cloneKnownKeys = [...]string{
 	"Choices", "ChooseFromList", "ClassBand", "ClearImprinted", "CloneTarget", "CloneZone",
 	"Condition", "ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
 	"ConditionSVarCompare", "ConditionZone", "CopyCard", "CopyFromChosenName", "Cost", "CostDesc", "Defined",
 	"DefinedCards", "DefinedTarget", "Description", "Duration", "Exclude", "ExcludeChosen",
 	"Execute", "Exhaust", "FaceDown", "ForgetOtherTargets", "GainThisAbility", "GameActivationLimit", "Image",

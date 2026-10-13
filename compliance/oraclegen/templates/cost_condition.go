@@ -292,11 +292,12 @@ func costAttackPrelude(word string, count int) (conditionPrelude, bool) {
 	pre := conditionPrelude{steps: []oraclegen.Step{
 		{Op: "attack", Seat: side, Defender: defender, Attackers: oraclegen.Repeat(ref, count)},
 	}}
-	if side == 0 {
-		// p1's attack needs no pass_to: it passes p0's turn to p1's, and a
-		// pass_to checkpoint would already see XMage's declared attack.
-		pre.steps = append([]oraclegen.Step{{Op: "pass_to", Step: "declare-attackers", Active: "p0"}}, pre.steps...)
-	}
+	// No pass_to precedes the attack, for either side: the attack op itself
+	// reaches the declaration (passing p0's turn to p1's for p1), and XMage
+	// declares attackers in the declare-attackers beginStep, so a pass_to
+	// checkpoint there already sees "tapped attacking" where gorge's does not.
+	// A p0 pass_to naming "Active: p0" was worse still: the XMage driver reads
+	// it as p0's NEXT turn (Static Snare static#0.0: xmage turn 3, gorge 1).
 	if side == 0 {
 		pre.battlefield = oraclegen.Repeat(attackerFixture, count)
 	} else {

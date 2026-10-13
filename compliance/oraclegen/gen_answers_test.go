@@ -166,13 +166,13 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			want: []XAnswer{{0, "choice", "no"}, {0, "target", "[target_skip]"}},
 		},
 		{
-			// A declined "you may put it into your hand" hidden pick: XMage
-			// poses the optional ask on the target queue only (measured
-			// driver error on Sparring Dummy: "Found wrong choice command"
-			// for the pair's "no").
-			name: "declined hidden pick: target skip only",
+			// A declined "you may put it into your hand" hidden pick: XMage's
+			// choose(Cards, TargetCard) is makeChoose, the choice queue
+			// (measured on Sparring Dummy: "Missing CHOICE def"; the pair's
+			// "no" is "Found wrong choice command").
+			name: "declined hidden pick: choice skip only",
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "hidden_pick", Options: 1, Min: 0, Max: 1, First: "Wastes", OptionRefs: []string{"p0:Wastes#27"}},
-			want: []XAnswer{{0, "target", "[target_skip]"}},
+			want: []XAnswer{{0, "choice", "[choice_skip]"}},
 		},
 		{
 			// A declined optional Play after a hidden-zone look: XMage poses
@@ -295,6 +295,18 @@ func TestYesNoRequiresAnEngineBoolean(t *testing.T) {
 				t.Fatalf("yesNo(%+v) = %q, true; want rejected", d, got)
 			}
 		})
+	}
+
+	// The gift ask lists the decline first (option 0), so the promise is
+	// option 1 and must still read as XMage's yes (Jolly Gerbils trigger#0.0
+	// promised in gorge and never in XMage while the index decided it).
+	promise := rules.OracleDecision{Options: 2, Picks: []string{"Promise b a gift"}, PickRefs: []string{"Promise b a gift"}, PickIdx: []int{1}, PickKinds: []string{"gift_promise"}}
+	if got, ok := yesNo(promise); !ok || got != "yes" {
+		t.Fatalf("yesNo(gift promise at option 1) = %q, %v; want yes", got, ok)
+	}
+	decline := rules.OracleDecision{Options: 2, Picks: []string{"Don't promise a gift"}, PickRefs: []string{"Don't promise a gift"}, PickIdx: []int{0}, PickKinds: []string{"gift_decline"}}
+	if got, ok := yesNo(decline); !ok || got != "no" {
+		t.Fatalf("yesNo(gift decline at option 0) = %q, %v; want no", got, ok)
 	}
 
 	// A snapshot written before PickKinds existed carries no kind; an exact
