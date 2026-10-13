@@ -95,6 +95,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // (blocking) step, so the driver must too.
     private PhaseStep phase = MAIN;
 
+    // The stack object names seen at the last checkpoint, for the empty-stack
+    // diagnostic: what a pass pair expected to resolve and no longer can.
+    private List<String> lastCheckpointStack = new ArrayList<>();
+
     // Whether the scenario scripts a divided-damage split ("<ref>^X=<n>"
     // target answers, oraclegen's damageSplitAnswers). Such a cast queues no
     // target names of its own: the split answers are the targets.
@@ -2479,6 +2483,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
     /** The active player's own pass on its turn (seat 1 active). XMage's
      * idle TestPlayer passes without being told, so it queues nothing. */
     static final int PASS_ACTIVE_OWN = 4;
+    /** The first pass of a p1-first pair: on the active player's turn (seat 0)
+     * seat 1 casts at instant speed, keeps priority (CR 117.3c) and passes,
+     * then seat 0 passes to resolve the top object (CR 117.4). Queues nothing
+     * like PASS_PAIR_FIRST; the pair's second pass is PASS_PAIR_SECOND. */
+    static final int PASS_P1_PAIR_FIRST = 5;
 
     /** The XMage commands a pass step queues on the active player, the seat
      * that carries every checkpoint. */
@@ -2497,6 +2506,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
     private static boolean isActiveOwnPass(JsonArray steps, int index, int activeSeat) {
         return activeSeat != 0 && isOp(steps, index, "pass") && seatOfStep(steps, index) == activeSeat
                 && !isOp(steps, index - 1, "pass") && !isOp(steps, index + 1, "pass");
+    }
+
+    /** Whether the pass pair starting at step {@code first} is a p1-first pair:
+     * seat 1 casts at instant speed on the active player's turn, then passes
+     * (CR 117.3c holds priority after casting), and seat 0 passes to resolve
+     * (CR 117.4). A seat-1 cast immediately before the pair is what makes it
+     * this shape; a bare [{pass s1},{pass s0}] stays unsupported. */
+    private static boolean isP1PairFirst(JsonArray steps, int first) {
+        return seatOfStep(steps, first) == 1
+                && isOp(steps, first + 1, "pass") && seatOfStep(steps, first + 1) == 0
+                && !isOp(steps, first - 1, "pass") && !isOp(steps, first + 2, "pass")
+                && isOp(steps, first - 1, "cast") && seatOfStep(steps, first - 1) == 1;
     }
 
     private static int seatOfStep(JsonArray steps, int index) {
@@ -2525,6 +2546,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         }
         int seat = seatOfStep(steps, index);
         if (isOp(steps, index - 1, "pass")) {
+            if (isP1PairFirst(steps, index - 1)) {
+                return PASS_PAIR_SECOND;
+            }
             if (seatOfStep(steps, index - 1) == 0 && seat == 1
                     && !isOp(steps, index - 2, "pass") && !isOp(steps, index + 1, "pass")) {
                 return PASS_PAIR_SECOND;
@@ -2532,6 +2556,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
             throw new IllegalArgumentException("unsupported pass sequence at step " + index);
         }
         if (isOp(steps, index + 1, "pass")) {
+            if (isP1PairFirst(steps, index)) {
+                return PASS_P1_PAIR_FIRST;
+            }
             if (seat == 0 && seatOfStep(steps, index + 1) == 1 && !isOp(steps, index + 2, "pass")) {
                 return PASS_PAIR_FIRST;
             }
@@ -2617,13 +2644,41 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 && str(prev, "op").equals("pass_to") && str(prev, "decision").equals("choose");
     }
 
+    /** The stack's object names, top first. */
+    private static List<String> stackNames(Game g) {
+        List<String> names = new ArrayList<>();
+        for (StackObject so : g.getStack()) {
+            names.add(so.getName());
+        }
+        return names;
+    }
+
+    /** The CMD_REQUIRE_STACK failure text. A pass pair that should resolve the
+     * stack's top object found the stack empty; name the turn, step and
+     * priority holder, and the objects that were on the stack at the last
+     * checkpoint and have since left it (the recent departures), so the
+     * mechanism (the object resolved early, or the pair ran at the wrong step)
+     * is visible without a re-run. */
+    static String emptyStackDiagnostic(String cmd, int turn, String step, String priority,
+            List<String> lastStack, List<String> nowStack) {
+        List<String> departed = new ArrayList<>(lastStack);
+        departed.removeAll(nowStack);
+        return cmd + ": the stack is empty (turn " + turn + ", step " + step
+                + ", priority " + priority + "; since the last checkpoint the stack lost " + departed + ")";
+    }
+
     private void queuePassCommands(int stepIdx) {
         for (String cmd : passCommands(steps(sc0), stepIdx, activeSeat)) {
             switch (cmd) {
                 case CMD_REQUIRE_STACK:
                     runCode(cmd, turn, phase, playerA, (info, pl, g) -> {
                         if (g.getStack().isEmpty()) {
-                            throw new IllegalStateException(cmd + ": the stack is empty");
+                            Player prio = g.getPriorityPlayerId() == null ? null
+                                    : g.getPlayer(g.getPriorityPlayerId());
+                            throw new IllegalStateException(emptyStackDiagnostic(cmd, g.getTurnNum(),
+                                    g.getTurnStepType() == null ? "" : g.getTurnStepType().name(),
+                                    prio == null ? "none" : prio.getName(), lastCheckpointStack,
+                                    stackNames(g)));
                         }
                     });
                     break;
@@ -2756,9 +2811,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     phase = PhaseStep.DRAW;
                 } else if (stepName.equals("end")) {
                     phase = PhaseStep.END_TURN;
-                } else if (stepName.equals("main1") || stepName.isEmpty()) {
+                } else if (stepName.equals("main1")) {
                     phase = MAIN;
                 }
+                // An empty step is a checkpoint wherever the scenario already
+                // is: phase is left as the preceding ops set it.
                 return;
             }
             case "block": {
@@ -3662,6 +3719,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     private JsonObject snapshot(String checkpoint, Game g) {
+        lastCheckpointStack = stackNames(g);
         JsonObject s = new JsonObject();
         s.addProperty("checkpoint", checkpoint);
         s.addProperty("turn", g.getTurnNum());
