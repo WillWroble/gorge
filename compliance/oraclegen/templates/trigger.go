@@ -159,6 +159,17 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 			return it, nil
 		}
 	}
+	// A modal trigger's targets live on its mode SVars (charmTriggerFixtures):
+	// tried last, so every item an earlier pass serves keeps its bytes.
+	if charmFxs := charmTriggerFixtures(reg, f, &f.Triggers[idx]); len(charmFxs) > 0 {
+		for _, c := range causes {
+			it, ok, didFire := triggerWith(reg, f, name, req, c, charmFxs)
+			fired = fired || didFire
+			if ok {
+				return it, nil
+			}
+		}
+	}
 	if !fired {
 		if attackTriggerSub(req.Sub) {
 			for _, cause := range causes {

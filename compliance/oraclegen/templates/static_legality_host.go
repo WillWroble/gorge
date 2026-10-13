@@ -197,6 +197,12 @@ func cantBlockByBlockerFilterItem(reg *cards.Registry, f *cards.Face, name strin
 			return finishLegalityItem(reg, f, name, mode, req, sc, []string{"509.1b"})
 		}
 	}
+	// A nameless-blocker filter no vanilla pair can split: the face-down
+	// blocker variant (static_legality_nameless.go).
+	st, _ := staticSlotOf(f, req)
+	if it, sk, ok := cantBlockByNamelessItem(reg, f, name, req, st.ParamStr(cards.PKValidBlocker)); ok {
+		return it, sk
+	}
 	return staticSkip(name, mode, "no probe pair splits the blocker filter")
 }
 
