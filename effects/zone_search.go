@@ -1314,7 +1314,7 @@ func applyLibrarySearch(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, owne
 		ev.Player = owner
 		applyMoveFaceDown(h, c, &cz.Riders.FaceDownRiders, &ev, to)
 		markChangeZoneAttach(h, c, sa, cz, &ev)
-		h.Emit(ev)
+		emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 		if to == state.ZExile && c.Source != 0 {
 			if o := g.Obj(id); o != nil && !o.IsToken {
 				h.Emit(events.Event{Kind: events.Imprint, Obj: c.Source, IDs: []state.ObjID{id}, Text: "exiled-with"})
@@ -1349,7 +1349,6 @@ func applyLibrarySearch(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, owne
 		// then the AttachedTo$ rider (the Origin$ Library ChangeZone lines
 		// carrying it, e.g. an "return an Aura ... attached to CARDNAME" search).
 		if to == state.ZBattlefield {
-			applyGainControlFor(h, c, cz.Riders.GainControl, id)
 			changeZoneAttachedTo(h, c, sa, cz, id)
 		}
 		if cz.RememberChanged {

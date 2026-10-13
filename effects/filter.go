@@ -2504,6 +2504,12 @@ func matchPredicate(g *state.Game, p string, o *state.Object, sc SpecContext) (r
 }
 
 func isBlocking(g *state.Game, id state.ObjID) bool {
+	// The blocker's own record (CR 506.4/509.1h): it stays blocking after
+	// the attacker it blocked left combat; the scan below covers objects a
+	// test seeded by writing BlockedBy directly.
+	if o := g.Obj(id); o != nil && o.IsBlocking {
+		return true
+	}
 	for i := range g.Objs {
 		for _, b := range g.Objs[i].BlockedBy {
 			if b == id {
