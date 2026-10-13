@@ -46,6 +46,10 @@ type triggerCause struct {
 	// (card name -> kind -> count), the p1 side of counters.
 	opponentCounters map[string]map[string]int
 	activateCost     string // Forge cost of the activate step in steps (Crew/Saddle tap choice); "" when none
+	// auraBearer is the p0 creature a castSelfX Aura is cast onto (setup
+	// cannot place an unattached Aura: CR 704.5m sweeps it); "" for every
+	// other cause.
+	auraBearer string
 	// preludeActivationCost is the Forge cost of a prelude activate step
 	// whose cost carries a choice (scriptPreludeActivationCost exports its
 	// picks); "" when no prelude activates with such a cost.

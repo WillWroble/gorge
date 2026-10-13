@@ -40,18 +40,18 @@ var wantTriggerCensus = map[string]map[string]int{
 		"served:trigger.ltb-other":                   1,
 		"served:trigger.ltb-self":                    4,
 		"served:trigger.land-played":                 1, // The Endstone: agent-20261009T160853Z-c3e35453
-		"served:trigger.phase":                       19,
+		"served:trigger.phase":                       20,
 		"served:trigger.spell-cast":                  6,
 		"skip:trigger.attacks: trigger did not fire": 0,
-		"served:trigger.becomes-target":              4,
+		"served:trigger.becomes-target":              5, // lb4-g12: Famished Worldsire's Ward, kept alive by a +1/+1 counter (the tail's x/0 cause).
 		// lb-xpending: Famished Worldsire's Ward trigger (a printed 0/0) moved
 		// from the bare "did not fire" to its named zero-toughness reason.
 		"skip:trigger.becomes-target: trigger did not fire":                                                        0,
-		"skip:trigger.becomes-target: trigger creature enters with toughness 0 and dies before it can be targeted": 1,
+		"skip:trigger.becomes-target: trigger creature enters with toughness 0 and dies before it can be targeted": 0,
 		"skip:trigger.dies-other: trigger did not fire":                                                            0,
 		"skip:trigger.dies: trigger no recipe: dies needs a creature":                                              0,
 		"skip:trigger.etb-other: trigger covered by level A":                                                       76,
-		"skip:trigger.phase: trigger did not fire":                                                                 1,
+		"skip:trigger.phase: trigger did not fire":                                                                 0, // lb4-g12: Chorale of the Void, cast onto a bearer.
 		"skip:trigger.spell-cast: trigger did not fire":                                                            0,
 		"served:trigger.sacrificed":                                                                                2,
 		"served:trigger.damage":                                                                                    6,
@@ -108,7 +108,7 @@ var wantTriggerCensus = map[string]map[string]int{
 		"served:trigger.noncombat-damage":                    3,
 		"served:trigger.phase":                               16, // Paradox Shaper, Stingerquill Voxmancer, Woodwork Prodigy: the consumed !IsPrepared gate is a cast-self cause now.
 		"served:trigger.scry":                                5,
-		"served:trigger.spell-cast":                          19, // Ruric Thar, Biomagus: both prowess instances are served; Codie, Ravenous Codex: the prepared-copy cast cause now serves it.
+		"served:trigger.spell-cast":                          20, // lb4-g12: Danitha, Sword of Hope (the ValidSA$ IsTargeting list). Ruric Thar, Biomagus: both prowess instances are served; Codie, Ravenous Codex: the prepared-copy cast cause now serves it.
 		"served:trigger.spell-cast-opponent":                 1,
 		"served:trigger.surveil":                             5,
 		"skip:trigger.attacks: trigger did not fire":         0,
@@ -122,7 +122,7 @@ var wantTriggerCensus = map[string]map[string]int{
 		"skip:trigger.phase: trigger condition: turn history (PlayerCountOpponents$HasPropertywasDealtNonCombatDamageLastTurn)": 1,
 		"skip:trigger.phase: trigger did not fire":                                                                              0,
 		"skip:trigger.spell-cast-self: trigger covered by level A":                                                              1,
-		"skip:trigger.spell-cast: trigger did not fire":                                                                         1,
+		"skip:trigger.spell-cast: trigger did not fire":                                                                         0,
 		"skip:trigger.spell-cast: trigger spell-cast filter predicate gorge does not implement (prepared)":                      0, // now the served:trigger.spell-cast prepared-copy cast cause
 		"skip:trigger.etb-other: trigger no recipe: etb filter OppCtrl (Creature.OppCtrl)":                                      0,
 		"skip:trigger.phase: trigger did not fire from the graveyard":                                                           0,
