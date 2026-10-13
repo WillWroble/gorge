@@ -43,6 +43,14 @@ func mayPlayRiderFires(reg *cards.Registry, f *cards.Face, name string, req leve
 	}
 	sc, probe, ok := mayPlayRiderCast(base.Scenario)
 	if !ok {
+		// The static's offered scenario plays a land: retry with a creature
+		// spell the permission offers (trigger_mayplay_rider_creature.go).
+		if cb, found := mayPlayRiderCreatureBase(reg, c, f, name, sreq, f.Statics[si]); found {
+			base = cb
+			sc, probe, ok = mayPlayRiderCast(base.Scenario)
+		}
+	}
+	if !ok {
 		return skip("the permission scenario ends in no offered cast")
 	}
 	n, res, ok := oraclegen.Settle(reg, sc)

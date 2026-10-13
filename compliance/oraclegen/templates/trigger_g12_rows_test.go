@@ -54,13 +54,14 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		{"Fire Lord Zuko", "trigger#0.1", served},
 		// A graveyard trigger whose sibling would return the card first.
 		{"Fear of Infinity", "trigger#0.1", served},
+		// Oblivious Bookworm trigger#0.2 and Mikey & Don trigger#0.0 left
+		// this residue: Static$ True lines never reach the stack, so they are
+		// pinned by TestBookkeepingClassRows (trigger_bookkeeping_test.go).
 		// Residue (see the lb4-g12 report).
-		{"Coveted Falcon", "trigger#0.0", "trigger did not fire"},                                                                // "permanent you own but don't control": no setup gives p1 control of a p0-owned permanent
-		{"Oblivious Bookworm", "trigger#0.2", "trigger did not fire"},                                                            // Static$ True bookkeeping trigger: never uses the stack
-		{"Mikey & Don, Party Planners", "trigger#0.0", "trigger mayplay rider: the permission scenario ends in no offered cast"}, // the MayPlay rider recipe (lb4-gtrig) needs a Mutant/Ninja/Turtle creature probe; the static's offered probe is a land play
-		{"Avatar Aang", "trigger#1.0", "trigger did not fire"},                                                                   // back face transforms away during setup's turn-1 upkeep
-		{"Codie, Ravenous Codex", "trigger#0.0", "trigger did not fire"},                                                         // the prepared-copy probe's spell face (Whiplash Wordsmith's) is not in the XMage manifests
-		{"Smaug, Wicked Worm", "trigger#0.1", "trigger did not fire"},                                                            // Spell.ManaFromTreasure: the scenario pays from a seeded pool, never a Treasure
+		{"Coveted Falcon", "trigger#0.0", "trigger did not fire"},        // "permanent you own but don't control": no setup gives p1 control of a p0-owned permanent
+		{"Avatar Aang", "trigger#1.0", "trigger did not fire"},           // back face transforms away during setup's turn-1 upkeep
+		{"Codie, Ravenous Codex", "trigger#0.0", "trigger did not fire"}, // the prepared-copy probe's spell face (Whiplash Wordsmith's) is not in the XMage manifests
+		{"Smaug, Wicked Worm", "trigger#0.1", "trigger did not fire"},    // Spell.ManaFromTreasure: the scenario pays from a seeded pool, never a Treasure
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, ok := reg.Lookup(tc.name)

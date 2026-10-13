@@ -63,12 +63,13 @@ func TestWave4AttachedRelative(t *testing.T) {
 
 // TestWave4TurnFaceUpYouCause: Growing Dread's "Whenever you turn a permanent
 // face up" is served by the turned-face-up-other recipe (p0's own special
-// action), while Oblivious Bookworm's Static$ True remember line stays a gap.
+// action), while Oblivious Bookworm's Static$ True imprint line is a
+// bookkeeping record observed through its end-step consumer.
 func TestWave4TurnFaceUpYouCause(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	for _, tc := range []struct{ name, key, sub string }{
 		{"Growing Dread", "trigger#0.1", levelb.TurnedFaceUpOtherSub},
-		{"Oblivious Bookworm", "trigger#0.1", "trigger.gap:TurnFaceUp"},
+		{"Oblivious Bookworm", "trigger#0.1", levelb.BookkeepingSub},
 	} {
 		c, ok := reg.Lookup(tc.name)
 		if !ok {

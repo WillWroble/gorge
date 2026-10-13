@@ -235,6 +235,13 @@ func sameNameBucketRank(bucket string) int {
 // static_observe_self_removal.go re-runs the DSK chunk at alias 2 (verified).
 // Unresolved stayed 0 and no other set moved.
 //
+// Re-measured on the bookkeeping-trigger template (wave-4 lb4w2-bookkeep):
+// DSK unproven 35 -> 36. Serving Oblivious Bookworm trigger#0.2 (its upkeep
+// reset of the turned-face-up imprint, observed on turn 3) makes the turn-3
+// end-step consumer draw and then discard, and the discard mode answer names
+// one of three hand Wastes by a rank-derived ref: no exact answer exists, so
+// it is Unproven, not Unresolved. Unresolved stayed 0.
+//
 // Re-measured on lb4-harness (wave-4 Level B harness rows): DSK alias 3 -> 2,
 // SPM 2 -> 1, TDM 2 -> 1, TLA 2 -> 1. Each lost alias was the SECOND copy of
 // a cast step's own target (Undead Sprinter, Friendly Neighborhood, Ringing
@@ -248,7 +255,7 @@ var wantSameNameCensus = map[string]string{
 	"BIG": `{"alias":0,"copy":0,"unresolved":0,"unproven":1,"items":null}`,
 	"BLB": `{"alias":3,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"DFT": `{"alias":0,"copy":0,"unresolved":0,"unproven":4,"items":null}`,
-	"DSK": `{"alias":2,"copy":0,"unresolved":0,"unproven":35,"items":null}`,
+	"DSK": `{"alias":2,"copy":0,"unresolved":0,"unproven":36,"items":null}`,
 	"ECL": `{"alias":0,"copy":0,"unresolved":0,"unproven":5,"items":null}`,
 	"EOE": `{"alias":3,"copy":0,"unresolved":0,"unproven":2,"items":null}`,
 	"FDN": `{"alias":0,"copy":1,"unresolved":0,"unproven":2,"items":null}`,

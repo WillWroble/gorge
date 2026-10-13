@@ -38,7 +38,7 @@ func triggerSubs(sub string) bool {
 		levelb.UnlockDoorSub, levelb.FullyUnlockSub, stateSelfCountersSub, levelb.CounterAddedSub,
 		levelb.TurnedFaceUpSub, levelb.TurnedFaceUpOtherSub, levelb.SacrificeSub, levelb.DamageSub,
 		levelb.ManaExpendSub, levelb.TapsForManaSub, levelb.MayPlayRiderSub, levelb.LandPlayedZoneSub,
-		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub:
+		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub, levelb.BookkeepingSub:
 		return true
 	case "trigger.forage", "trigger.give-gift", "trigger.explores", "trigger.collect-evidence",
 		"trigger.manifest-dread", "trigger.discover", "trigger.elemental-bend",
@@ -60,6 +60,9 @@ func PassToSteps() []string {
 		"end",
 		"end-combat",
 		"main1@p0",
+		// The bookkeeping template's turn advance stops at upkeep@p0, then
+		// main1 in that same turn (trigger_bookkeeping.go bkAdvance).
+		"main1",
 		// The opponent-turn cast cause passes to p1's main phase before p0
 		// casts there.
 		"main1@p1",
@@ -85,6 +88,11 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 		// A Static$ True rider never reaches the stack: it is observed on the
 		// permanent the permitted cast puts onto the battlefield.
 		return mayPlayRiderFires(reg, f, name, req)
+	}
+	if req.Sub == levelb.BookkeepingSub {
+		// A Static$ True bookkeeping line is observed through its consumer
+		// (trigger_bookkeeping.go).
+		return bookkeepingFires(reg, f, name, req)
 	}
 	if req.Sub == levelb.TapsForManaSub {
 		// A triggered mana ability resolves off the stack, so it needs its own

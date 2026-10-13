@@ -187,6 +187,12 @@ func classifyTrigger(f *cards.Face, t *cards.Trigger) (sub, gap string, covered 
 	gapMode := func() (string, string, bool) {
 		return "trigger.gap:" + t.Mode, "trigger mode " + t.Mode, false
 	}
+	// A Static$ bookkeeping line is observed through its consumer
+	// (trigger_bookkeeping.go); it never reaches the stack, so no event
+	// recipe below can observe it directly.
+	if sub, ok := classifyBookkeeping(f, t); ok {
+		return sub, "", false
+	}
 	if sub, ok := classifyEventTrigger(t); ok {
 		return sub, "", false
 	}
