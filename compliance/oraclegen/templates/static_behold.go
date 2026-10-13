@@ -31,3 +31,23 @@ func answerBeholdCost(base *oraclegen.Item, name, want string) bool {
 		return st.Op == "cast" && st.Card == "p0:"+name
 	}, want)
 }
+
+// beholdFromHand answers XMage's behold location ask ahead of the scripted
+// hand pick. With a beholdable permanent on the battlefield AND one in hand,
+// BeholdType.beholdOne first asks chooseUse "Choose controlled" / "Reveal from
+// hand"; unscripted, the pick's card name reaches the battlefield
+// TargetPermanent instead and is rejected (Champion of the Clachan). The
+// fixture always has both: the battlefield probe and the spare in hand.
+func beholdFromHand(answers [][]oraclegen.XAnswer, steps []oraclegen.Step, name, pick string) {
+	for i, st := range steps {
+		if st.Op != "cast" || st.Card != "p0:"+name || i >= len(answers) {
+			continue
+		}
+		for k, a := range answers[i] {
+			if a.Kind == "choice" && a.Value == pick {
+				answers[i] = append(answers[i][:k:k], append([]oraclegen.XAnswer{{Seat: a.Seat, Kind: "choice", Value: "no"}}, answers[i][k:]...)...)
+				return
+			}
+		}
+	}
+}

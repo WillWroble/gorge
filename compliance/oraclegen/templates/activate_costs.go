@@ -176,6 +176,12 @@ func filterCostFixturesX(tok string, x int) []string {
 	var candidates []string
 	for _, clause := range strings.Split(filter, "|") {
 		clause = strings.TrimSpace(clause)
+		if strings.Contains(clause, "named") {
+			// A name predicate ("Card.Other+YouOwn+namedSay Its Name") is
+			// paid by copies of that card (namedSelfCount), never by the
+			// generic "card" stand-ins, which XMage's named target rejects.
+			return nil
+		}
 		switch {
 		case strings.HasPrefix(clause, "permanent.other"):
 			candidates = append(candidates, permanentCostFixtures(clause)...)

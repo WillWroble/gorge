@@ -926,7 +926,7 @@ func tokenCandidates(mine bool) []cand {
 	}
 	return []cand{{
 		seat: "p0", zone: "battlefield", card: "Grizzly Bears",
-		ref: "p0:token:Goblin",
+		ref: "p0:token:Goblin Token",
 		pre: []Step{
 			{Op: "cast", Seat: 0, Card: "p0:Dragon Fodder", Mana: "CR", Targets: nil},
 			{Op: "resolve"},
