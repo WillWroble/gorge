@@ -60,7 +60,11 @@ func PaymentPlanShapeTierOf(ma *cards.SA, cost costvocab.Cost) (tier Tier, c Con
 	deferred := func(detail string) (Tier, Consequence, string, bool) {
 		return TierDeferred, Consequence{}, detail, false
 	}
-	if ma == nil || ma.API != "Mana" {
+	// A reflected-mana ability is planned only in its one opponent-reflecting
+	// shape (PaymentPlanReflectedShape); it then takes the same key, cost
+	// and SubAbility$ checks as an AB$ Mana ability.
+	reflected := PaymentPlanReflectedShape(ma)
+	if ma == nil || (ma.API != "Mana" && !reflected) {
 		return deferred("source:special_production")
 	}
 	// The key loop carries the key NAMES only (never a Params value) into
@@ -74,7 +78,7 @@ func PaymentPlanShapeTierOf(ma *cards.SA, cost costvocab.Cost) (tier Tier, c Con
 	// the sorted copy.
 	failing, found := "", false
 	for key := range maps.Keys(ma.Params) {
-		if (!found || key < failing) && paymentPlanShapeKeyFails(key) {
+		if (!found || key < failing) && paymentPlanShapeKeyFails(key) && !(reflected && paymentPlanReflectedParamSet.Has(key)) {
 			failing, found = key, true
 		}
 	}

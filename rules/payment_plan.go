@@ -824,6 +824,10 @@ func (e *Engine) paymentPlanManaUnitsOnlyCompute(p state.PlayerID, only []state.
 			// (one alternative per colour, any literal amount) and an amount-1
 			// Combo/Chosen/ColorIdentity (one alternative per producible
 			// colour). Combo Any and every allocation (amount > 1) stay deferred.
+			if alt, ok := paymentPlanReflectedAlt(e, p, id, ma, amt); ok {
+				units, idx = setPaymentPlanUnitAlt(units, idx, id, alt)
+				continue
+			}
 			if raw != "Any" && !pay.PaymentPlanChoiceShape(raw) {
 				continue
 			}

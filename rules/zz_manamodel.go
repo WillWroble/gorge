@@ -60,7 +60,12 @@ type MMAlt struct {
 	InP   bool
 	Class string // the activation cost's class (MMClasses)
 	Token bool   // the source is a token
-	ma    *cards.SA
+	// Detail, for an alternative outside P, is why the planner census
+	// withholds it: the tier gate's detail string when it defers the
+	// ability, else "census:<reason>" naming the census layer that drops a
+	// tier-admitted ability.
+	Detail string
+	ma     *cards.SA
 }
 
 // MMUnit is one source: at most one of its alternatives is used.
@@ -234,7 +239,36 @@ func (e *Engine) MMUnits(p state.PlayerID) (units []MMUnit, unpriced int) {
 			units = mmAddAlt(units, u.ID, MMAlt{Mana: a.Mana, InP: true, Class: "Free:Tier", Token: tok, ma: a.Ma})
 		}
 	}
+	for i := range units {
+		for k := range units[i].Alts {
+			if a := &units[i].Alts[k]; !a.InP {
+				a.Detail = e.mmPDetail(p, units[i].ID, a)
+			}
+		}
+	}
 	return units, unpriced
+}
+
+// mmPDetail names why a is outside the planner census (MMAlt.Detail).
+func (e *Engine) mmPDetail(p state.PlayerID, id state.ObjID, a *MMAlt) string {
+	if a.ma == nil {
+		return "census:no_ability"
+	}
+	if tier, _, d := pay.PaymentPlanAbilityTier(asPayer(e), p, id, a.ma); tier == pay.TierDeferred {
+		if d == "" {
+			d = "deferred"
+		}
+		return d
+	}
+	if o := e.G.Obj(id); o != nil && o.Tapped {
+		return "census:tapped"
+	}
+	for _, u := range e.paymentPlanManaUnits(p) {
+		if u.ID == id {
+			return "census:production_differs"
+		}
+	}
+	return "census:no_unit"
 }
 
 // mmCostCap bounds how much mana c can absorb, the per-colour cap of the

@@ -1595,6 +1595,12 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 			ctx.Remembered = append(ctx.Remembered, state.Target{Obj: id})
 		}
 		cols := effects.ManaReflectedCandidates(e, ctx, ma)
+		if len(produced) == 1 && slices.Contains(cols, produced) {
+			// A payment plan's step names its colour (pay.AlternativeExec's
+			// one-letter Produced$): resolve it as the answered ask would.
+			e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
+			return
+		}
 		switch len(cols) {
 		case 0:
 			e.emit(events.Event{Kind: events.Note, Obj: source, Text: "ManaReflected found no mana to reflect"})
