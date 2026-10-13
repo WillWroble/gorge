@@ -476,6 +476,10 @@
       "tier": "core",
       "status": "CORE"
     },
+    "limited/booster": {
+      "tier": "core",
+      "status": "CORE"
+    },
     "limited/draft": {
       "tier": "core",
       "status": "CORE"
