@@ -215,15 +215,19 @@ type projector struct {
 	viewer state.PlayerID
 	// effective and namer are ch's optional SpellEffectiveCost and layer-3
 	// Name capabilities (nil when ch lacks them); noTokens is a
-	// tokenSuppressor's answer.
+	// tokenSuppressor's answer. namer is consulted only when vchars is
+	// absent, and its empty string keeps the printed name: a bound-empty
+	// name (a both-locked Room) needs vchars' flag.
 	effective interface {
 		SpellEffectiveCost(state.PlayerID, state.ObjID) string
 	}
 	namer interface{ Name(state.ObjID) string }
 	// vchars is ch's optional one-call Name/Keywords/Power/Toughness
-	// (rules.Engine.ViewCharacteristics), nil when ch lacks it.
+	// (rules.Engine.ViewCharacteristics), nil when ch lacks it. The second
+	// return is the name's bound flag: when true, the (possibly empty) name
+	// is authoritative and the printed face is not a fallback.
 	vchars interface {
-		ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	}
 	noTokens bool
 	// noDerived leaves every CardView's Chars-derived facts (layer-3 name,
@@ -242,7 +246,7 @@ func newProjector(g *state.Game, ch Chars, viewer state.PlayerID, sc *projScratc
 	})
 	p.namer, _ = ch.(interface{ Name(state.ObjID) string })
 	p.vchars, _ = ch.(interface {
-		ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	})
 	if s, ok := ch.(tokenSuppressor); ok && s.SuppressCardTokens() {
 		p.noTokens = true
@@ -465,19 +469,22 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 	// vchars answers the four derived facts below in one call; without it
 	// each is asked for separately.
 	var dName string
+	var dNameSet bool
 	var dKw []string
 	if p.vchars != nil && !p.noDerived {
-		dName, dKw, cv.Power, cv.Toughness = p.vchars.ViewCharacteristics(id)
+		dName, dNameSet, dKw, cv.Power, cv.Toughness = p.vchars.ViewCharacteristics(id)
 	}
 	if f := o.Face(); f != nil {
 		cv.Name = f.Name
 		// Name is a layer-3 characteristic. Keep the optional method so
 		// lightweight Chars test doubles remain source-compatible while the
-		// real rules engine exposes SetName$ results to clients.
+		// real rules engine exposes SetName$ results to clients. A bound
+		// name is authoritative even when empty: a both-locked Room has no
+		// name (CR 709.5) and must not fall back to its printed front face.
 		if p.noDerived {
 			// a lean projection's printed name
 		} else if p.vchars != nil {
-			if dName != "" {
+			if dNameSet || dName != "" {
 				cv.Name = dName
 			}
 		} else if p.namer != nil {

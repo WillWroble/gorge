@@ -143,8 +143,8 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 				}
 			}
 		case ref == "TriggerObjectsCards" && prop == "GreatestCardManaCost":
-			if f != nil && f.Cmc() > n {
-				n = f.Cmc()
+			if f != nil && int32(objectManaValue(o)) > n {
+				n = int32(objectManaValue(o))
 			}
 		case prop == "CardPower":
 			if f != nil {
@@ -190,12 +190,14 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 			// TriggeredSpellAbility$CardManaCostLKI, Sunbird's Invocation's
 			// PeekAmount X among them) is Forge's LKI spelling of the same
 			// property: the mana value the object HAD when the triggering
-			// event happened. A face's mana value never changes and the lki
-			// swap above already binds the zone-change snapshot when one is
-			// carried, so the LKI spelling reads the same number the plain
-			// spelling does -- one shared case, so the two cannot disagree.
+			// event happened. A printed face's mana value never changes, and
+			// the lki swap above already binds the zone-change snapshot when
+			// one is carried -- so a battlefield Room's CR 709.5 value reads
+			// the snapshot's door designations, and the LKI spelling reads
+			// the same number the plain spelling does. One shared case, so
+			// the two cannot disagree.
 			if f != nil {
-				n += f.Cmc()
+				n += int32(objectManaValue(o))
 			}
 		case prop == "CardNumColors":
 			// The referenced object's colour count (task rv2b-countheads):

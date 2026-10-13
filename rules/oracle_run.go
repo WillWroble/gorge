@@ -32,7 +32,6 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules/chars"
 	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -410,17 +409,17 @@ func (r *oracleRun) objName(o *state.Object) string {
 
 // fieldName is the name the snapshot reports for a permanent. A face-down
 // battlefield permanent has no name (CR 708.2a), so it reports the empty
-// string, exactly as the XMage driver's perm.getName() does. A battlefield
-// Room wears the CR 709.5 name its unlocked doors give it (chars.RoomName):
+// string, exactly as the XMage driver's perm.getName() does. Every other
+// battlefield permanent wears its BOUND derived name (effects.Chars.NameSet):
+// a battlefield Room wears the CR 709.5 name its unlocked doors give it --
 // the empty string when both doors are locked, one door's name when one is
-// unlocked, "Left // Right" when both are -- the same string XMage's
-// RoomCharacteristicsEffect computes. A layer-3 SetName$ effect (CR 613.1b)
-// still wins over that printed-name rule, so a Room wears the derived name
-// when it differs from the printed face name (the only way an effect can
-// override it here). Every other battlefield object wears its layer-3 name
-// (which may differ from its printed face name -- Honest Work's Humble
-// Merchant). Every other zone names the printed face, since a continuous
-// effect only applies on the battlefield.
+// unlocked, "Left // Right" when both are, the same string XMage's
+// RoomCharacteristicsEffect computes -- and a layer-3 SetName$ effect (CR
+// 613.1b) overwrites that when it applies. The bound flag is what makes the
+// both-locked Room's empty string a real answer rather than "read the printed
+// face". A battlefield permanent with no bound name wears its printed face
+// name (the layer walk seeds exactly that). Every other zone names the
+// printed face, since a continuous effect only applies on the battlefield.
 func (r *oracleRun) fieldName(o *state.Object) string {
 	if o == nil || o.Face() == nil {
 		return ""
@@ -429,14 +428,8 @@ func (r *oracleRun) fieldName(o *state.Object) string {
 		if o.FaceDown {
 			return ""
 		}
-		if name, ok := chars.RoomName(o); ok {
-			if n := r.e.Derived(o.ID).Name; n != o.Face().Name {
-				return n
-			}
-			return name
-		}
-		if n := r.e.Derived(o.ID).Name; n != "" {
-			return n
+		if c := r.e.Derived(o.ID); c.NameSet {
+			return c.Name
 		}
 	}
 	return o.Face().Name
@@ -1103,14 +1096,20 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 			if used[o.Index] {
 				continue
 			}
-			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" ||
+			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasSuffix(k, "_pay") ||
 				strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "play ") || strings.HasPrefix(l, "cast ")) {
 				return o.Index, nil
 			}
-			if lp == "no" && (k == "no" || k == "decline" || k == "trigger_cost_decline" || o.Mode == "unless_decline" || strings.HasPrefix(l, "no") ||
-				strings.HasPrefix(l, "do not") ||
-				strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") || strings.HasPrefix(l, "don't")) {
+			if lp == "no" && (oracleDeclineOption(o) || strings.HasPrefix(l, "no")) {
 				return o.Index, nil
+			}
+		}
+		if lp == "yes" {
+			// An optional ask with one way to accept ("Exile 1 card" /
+			// "Do not pay", or a lone "Play X" the seat may skip): yes is
+			// that option.
+			if i := oracleSoleAccept(d, used); i >= 0 {
+				return i, nil
 			}
 		}
 	}
@@ -1125,6 +1124,44 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 		}
 	}
 	return -1, nil
+}
+
+// oracleDeclineOption reports whether o is a decline: a no/decline kind or
+// mode, or a label that says so ("No", "Decline", "Do not pay"). A "no"
+// pick also takes any label starting "no" (matchPick).
+func oracleDeclineOption(o decision.Option) bool {
+	k, l := strings.ToLower(o.Kind), strings.ToLower(o.Label)
+	return k == "no" || k == "decline" || strings.HasSuffix(k, "_decline") || o.Mode == "unless_decline" ||
+		l == "no" || strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") ||
+		strings.HasPrefix(l, "don't") || strings.HasPrefix(l, "do not")
+}
+
+// oracleSoleAccept returns the one unused non-decline option of a choose or
+// modes ask that can be declined (it offers a decline option, or takes zero
+// answers), or -1 when there is no such single option. Declarations
+// (attackers, blockers) and targets are never a yes.
+func oracleSoleAccept(d *decision.Decision, used map[int]bool) int {
+	if d.Kind != decision.KChoose && d.Kind != decision.KModes {
+		return -1
+	}
+	accept, declinable := -1, d.Min == 0
+	for _, o := range d.Options {
+		if used[o.Index] {
+			continue
+		}
+		if oracleDeclineOption(o) {
+			declinable = true
+			continue
+		}
+		if accept >= 0 {
+			return -1
+		}
+		accept = o.Index
+	}
+	if !declinable {
+		return -1
+	}
+	return accept
 }
 
 // oracleColourSet normalises a colour string to its WUBRG letters in fixed

@@ -1888,8 +1888,9 @@ func startsFilterAlternative(s string) bool {
 // only its front-face characteristics in those zones (CR 712.8a), even when
 // its retained FaceIdx (events.Move does not reset it) still identifies the
 // face it had while transformed. On the battlefield and stack every layout
-// uses its selected face. Empty names are omitted; an ability object (Card
-// nil) has no name.
+// uses its selected face -- except a battlefield Room, whose names are its
+// UNLOCKED doors' individual names (CR 709.5; none, one or both of them).
+// Empty names are omitted; an ability object (Card nil) has no name.
 // A layer-3 name (SetName$, CR 613.1d) OVERRIDES everything below, split
 // halves included, and is handled by sharesName/sharesNameWithObject before
 // they reach here -- see hasEffectiveName for why it cannot be folded into
@@ -1897,6 +1898,11 @@ func startsFilterAlternative(s string) bool {
 func nameCharacteristics(o *state.Object) []string {
 	if o == nil || o.Card == nil {
 		return nil
+	}
+	// CR 709.5: a battlefield Room's names are its unlocked doors' names --
+	// none, one or both of them (CR 709.4a) -- not the printed front face.
+	if names, room := roomNames(o); room {
+		return names
 	}
 	offPlay := o.Zone != state.ZStack && o.Zone != state.ZBattlefield
 	if offPlay && o.Card.AlternateMode == "Split" {
