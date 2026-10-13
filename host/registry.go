@@ -318,10 +318,10 @@ func (r *Registry) AddTable(c TableConfig) error {
 	if _, dup := r.tables[c.ID]; dup {
 		return fmt.Errorf("host: table %s already exists", c.ID)
 	}
-	if c.OnDemand && r.opts.MaxOnDemandTables > 0 {
+	if c.OnDemand && c.Event == "" && r.opts.MaxOnDemandTables > 0 {
 		n := 0
 		for _, t := range r.tables {
-			if t.cfg.OnDemand {
+			if t.cfg.OnDemand && t.cfg.Event == "" {
 				n++
 			}
 		}

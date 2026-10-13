@@ -659,6 +659,12 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 		budget = 0
 	}
 	seats := defaultSeatsWithAutoPayMana(t.cfg.BotPolicy, autoPayMana, t.cfg.BotCommonSense, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	if len(t.cfg.SeatBotPolicies) > 0 {
+		// E1-2: a table with per-seat bot policies rebuilds its bots from
+		// SeatBotPolicies (seat i plays seatBotPolicy(i)); the embedder's
+		// r.opts.Seats override below still wins over it.
+		seats = seatPolicySeats(t.cfg, autoPayMana, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	}
 	if r.opts.Seats != nil {
 		seats = r.opts.Seats(m.cfg.Names, m.seed)
 	}
