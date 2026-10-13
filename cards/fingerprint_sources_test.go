@@ -44,6 +44,7 @@ var fingerprintCensus = map[string]fingerprintFile{
 	"ateot_values.go":         {true, "atEOTValues feeds Primitives, so which AtEOT$ values are unsupported is part of the compiled IR"},
 	"breakdown.go":            {false, "coverage-report grouping (CoverageGroup); report time only, nothing compiled"},
 	"cache_canon.go":          {true, "canonical gob encoding of the cache and segment bytes"},
+	"cache_codec.go":          {true, "the face codec: the cache and segment bytes of every Face"},
 	"cache_lock.go":           {false, "single-flight lock around compile+Save; never changes the bytes written"},
 	"cache_lock_flock.go":     {false, "flock implementation of the single-flight lock"},
 	"cache_lock_noflock.go":   {false, "no-op single-flight lock for platforms without flock"},

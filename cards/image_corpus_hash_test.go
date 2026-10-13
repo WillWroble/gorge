@@ -151,4 +151,13 @@ func TestImageCorpusHashIsTheCanonicalCacheGobDigest(t *testing.T) {
 		t.Fatalf("reloaded corpus identity = %x, want %x (image and persisted cache disagree)",
 			loadedImg.Hdr.CorpusHash, img.Hdr.CorpusHash)
 	}
+	// LoadRegistry's own image takes its digest from the cache stream it
+	// decoded (buildImageHashed) instead of re-encoding the corpus; that
+	// digest must be the canonical one too.
+	if loaded.lazy == nil {
+		t.Fatal("LoadRegistry returned no image (want the imaged route)")
+	}
+	if got := loaded.lazy.img.Hdr.CorpusHash; got != img.Hdr.CorpusHash {
+		t.Fatalf("LoadRegistry stream digest = %x, want canonical %x", got, img.Hdr.CorpusHash)
+	}
 }

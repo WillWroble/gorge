@@ -2,6 +2,7 @@ package cards
 
 import (
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -289,8 +290,10 @@ type cacheFile struct {
 // boundary token is not retained elsewhere, so a stale cache cannot be repaired
 // in memory and must be recompiled. Keyword expansions are also re-linked after
 // decoding below, so a newly added idempotent expansion does not force every
-// worktree to rewrite its corpus.
-const cacheVersion = 6
+// worktree to rewrite its corpus. Version 7 encodes each Face with the flat
+// face codec (cache_codec.go) and streams cacheFileWire directly instead of
+// one cacheFile GobEncode blob; the values are unchanged.
+const cacheVersion = 7
 
 // CacheVersionError is returned by LoadRegistry when the cache file on disk
 // was written by a different cacheVersion than this build's. Callers detect
@@ -344,9 +347,7 @@ func (r *Registry) saveGob(path string) error {
 		return fail(err)
 	}
 	cf := cacheFile{Version: cacheVersion, Cards: r.AllCards(), Tokens: r.Tokens}
-	// &cf: cacheFile's GobEncode is on the pointer receiver, and gob refuses
-	// an unaddressable top-level value that only *T encodes.
-	if err := gob.NewEncoder(zw).Encode(&cf); err != nil {
+	if err := gob.NewEncoder(zw).Encode(cf.wire()); err != nil {
 		zw.Close()
 		return fail(err)
 	}
@@ -374,12 +375,20 @@ func LoadRegistry(path string) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cf cacheFile
-	if err := gob.NewDecoder(zr).Decode(&cf); err != nil {
+	// The decompressed stream is the canonical corpus gob (saveGob writes
+	// exactly canonicalCorpusGob's bytes), so hashing it as it is read
+	// yields Image.Hdr.CorpusHash without re-encoding the corpus. The drain
+	// below sends the rest of the stream through the hash as well, so every
+	// byte is hashed exactly once whatever the decoder buffered.
+	h := sha256.New()
+	tr := io.TeeReader(zr, h)
+	var w cacheFileWire
+	if err := gob.NewDecoder(tr).Decode(&w); err != nil {
 		zr.Close()
 		return nil, err
 	}
-	if _, err := io.Copy(io.Discard, zr); err != nil {
+	cf := w.cacheFile()
+	if _, err := io.Copy(io.Discard, tr); err != nil {
 		zr.Close()
 		return nil, err
 	}
@@ -391,7 +400,9 @@ func LoadRegistry(path string) (*Registry, error) {
 	}
 	// The imaged registry keeps the decoded cards only as the pointer-free
 	// image and drops the trees; tokens are finished eagerly, as before.
-	return imagedRegistry(cf.Cards, cf.Tokens)
+	var canon [sha256.Size]byte
+	h.Sum(canon[:0])
+	return imagedRegistryHashed(cf.Cards, cf.Tokens, &canon)
 }
 
 // finishDecoded is the post-decode half of LoadRegistry: it turns cards and
