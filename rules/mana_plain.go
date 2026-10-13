@@ -77,6 +77,12 @@ func (e *Engine) plainManaAdd(p state.PlayerID, source state.ObjID, ma *cards.SA
 	default:
 		ev.Counter = produced
 	}
+	// A producer whose face reads the spent mana's source identity
+	// (Spell.ManaFromCard) adds its units as a source-bearing provenance
+	// batch, exactly as effMana's provenanceOnly arm does.
+	if effects.ManaSourceObserved(e, source) {
+		ev.Text = events.ManaRestrictionText("", source)
+	}
 	return ev, f.cost.Tap, true
 }
 

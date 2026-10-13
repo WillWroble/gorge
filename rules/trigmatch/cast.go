@@ -10,6 +10,7 @@
 package trigmatch
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -700,6 +701,12 @@ func incrementAdmits(e Board, source state.ObjID, ev events.Event) bool {
 // validSAManaFromPrefix opens the single-field ValidSA$ mana-provenance spellings.
 const validSAManaFromPrefix = "Spell.ManaFrom"
 
+// validSAManaFromCardSelf is the producing-source provenance spelling: the
+// spell was cast using mana produced by the trigger's own source. Any other
+// Spell.ManaFromCard form (none in the corpus) falls to the CastSa strip,
+// which does not know it, and fails closed.
+const validSAManaFromCardSelf = "Spell.ManaFromCard.StrictlySelf"
+
 // ValidSAMatches evaluates a SpellCast trigger's ValidSA$ clause. The
 // measured grammar is the mana comparison family, "Spell.ManaSpent <OP><N>"
 // (Roiling Vortex's EQ0 -- no mana was spent to cast that spell; Raggadragga
@@ -739,6 +746,16 @@ func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.Pla
 		if fields[0] == validSATeamworkClause {
 			o := e.Game().Obj(ev.Obj)
 			return o != nil && o.CastFlags&state.FlagTeamworkPaid != 0
+		}
+		if fields[0] == validSAManaFromCardSelf {
+			// "a spell using mana produced by CARDNAME" (Tecutlan, The Myriad
+			// Pools, Barracks of the Thousand): the trigger's own source is
+			// one of the producers the cast's payment spent, as recorded by
+			// the pay-time CastInfo (Object.ManaSpentSources; rules'
+			// cast_mana_sources.go). StrictlySelf is this very object, so a
+			// new object of the same card (CR 400.7) never matches.
+			o := e.Game().Obj(ev.Obj)
+			return o != nil && slices.Contains(o.ManaSpentSources, source)
 		}
 		if strings.HasPrefix(fields[0], validSAManaFromPrefix) || fields[0] == validSAMayPlaySourceClause {
 			// Spell.ManaFrom<Tag> (Smaug, Wicked Worm; Mastermind Plum;

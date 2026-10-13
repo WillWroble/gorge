@@ -79,10 +79,13 @@ const railEvents: { event: { kind: string; player: number; text?: string; obj?: 
   ? [{ event: { kind: 'player_lost', player: 1, text: 'commander damage (21 or more from one commander)' } }]
   : resolved ? [{ event: { kind: 'stack_resolve', player: 1, obj: 42 } }] : [];
 // Browser test hook: replace the projection after mount, including a visible
-// empty hand and a changed card identity, to exercise Rail's live derivation.
+// empty hand and a changed card identity (and the counts that go with them),
+// to prove a live update re-renders the rail without ever listing a hand.
 (window as Window & { updateFixtureHands?: () => void }).updateFixtureHands = () => {
   railPlayers[1].hand = [card(55, 'Ari Updated Card')];
+  railPlayers[1].hand_size = 1;
   railPlayers[2].hand = [];
+  railPlayers[2].hand_size = 0;
   window.dispatchEvent(new CustomEvent('fixture-view-update', { detail: { ...railView, players: [...railPlayers] } }));
 };
 

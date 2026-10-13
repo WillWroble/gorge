@@ -74,6 +74,15 @@ type config struct {
 	// botAutoPayMana is the -bot-auto-mana startup switch. It is copied into
 	// every startup and on-demand vs-bot table, including human caretakers.
 	botAutoPayMana bool
+	// botCommonSense is the -bot-common-sense startup switch: it opts every
+	// hosted bot and human-seat caretaker into the bots/sanity CommonSense
+	// guard (host.TableConfig.BotCommonSense, bots.Options.CommonSense).
+	// OPT-IN, default off — with it unset every seat is exactly the unwrapped
+	// policy, so no served game, head or training run moves. It is copied
+	// into every startup and on-demand vs-bot table like botAutoPayMana, and
+	// into host.Options.DefaultBotCommonSense so a pre-field tables.json is
+	// migrated at restore.
+	botCommonSense bool
 	// autoMana enables payment-plan publication and controls for human seats.
 	autoMana bool
 	// botPolicy is the -bot-policy flag: the default policy a vs-bot request
@@ -300,6 +309,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.seatToken, "seat-token", "", "fixed bearer token for the first human slot (tests and local use only; default mints a random token per slot)")
 	fs.BoolVar(&c.vsbot, "vsbot", false, "arm the on-demand play-vs-bot flow (landing page seats a human against a bot via POST /api/games)")
 	fs.BoolVar(&c.botAutoPayMana, "bot-auto-mana", true, "have hosted bots and human-seat caretakers cast through offered automatic mana payment plans")
+	fs.BoolVar(&c.botCommonSense, "bot-common-sense", false, "wrap hosted bots and human-seat caretakers in the bots/sanity CommonSense guard (drop hostile self-removal from the option list, answer the London mulligan by the constructed policy); opt-in, default off")
 	fs.BoolVar(&c.autoMana, "auto-mana", true, "enable automatic mana payment plans and controls for human seats (disable with -auto-mana=false for the legacy manual path)")
 	fs.StringVar(&c.botPolicy, "bot-policy", host.LethalPressurePolicy, "default hosted bot policy for a vs-bot request that omits bot_policy; must be registered, offered, and support both formats (bot, lethal-pressure, cast-profile)")
 	fs.StringVar(&c.botPoliciesRaw, "bot-policies", defaultBotPoliciesRaw, "comma-separated set of bot policies this server OFFERS (the /api/bot-policies listing and accepted POST /api/games names); empty offers every registered entry")
@@ -769,7 +779,7 @@ func (c config) tableConfigs(cmdPool, conPool []string, vis view.Visibility) []h
 		}
 		cfg := host.TableConfig{ID: host.TableID(fmt.Sprintf("t%d", i)), Name: fmt.Sprintf("Table %d", i), Seats: seats,
 			Decks: pool, Seed: c.seed + uint64(i-1), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
-			Mulligans: c.mulligans, Format: format, BotPolicy: c.botPolicy, BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana}
+			Mulligans: c.mulligans, Format: format, BotPolicy: c.botPolicy, BotAutoPayMana: c.botAutoPayMana, BotCommonSense: c.botCommonSense, AutoMana: c.autoMana}
 		if i == 1 && len(c.humans) > 0 {
 			cfg.Humans = c.humans
 			cfg.Perpetual = false
@@ -800,7 +810,7 @@ func (g config) hostOptions(reg *cards.Registry, load func(string) (host.Deck, e
 	// function of its seed on every machine and every replay, exactly like
 	// the engine and the bots themselves.
 	return host.Options{Dir: g.dir, LoadDeck: load, Tokens: reg.Tokens, NameUniverse: reg.Universe(), Sync: true, Cooldown: g.cooldown,
-		MaxDecisionsPerTurn: host.DefaultMaxDecisionsPerTurn, DefaultBotAutoPayMana: g.botAutoPayMana,
+		MaxDecisionsPerTurn: host.DefaultMaxDecisionsPerTurn, DefaultBotAutoPayMana: g.botAutoPayMana, DefaultBotCommonSense: g.botCommonSense,
 		MaxOnDemandTables: g.maxOnDemandTables, ThinkTimeout: g.manabrewThinkTimeout(),
 		// BP-18 (spec §7): the §9.4 search-CPU flags reach the host here.
 		// SearchSlots bounds concurrent searched decisions registry-wide

@@ -1,15 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { View, SeatInfo } from '../protocol';
+  import type { View, SeatInfo, CardView } from '../protocol';
   import type { CardOptions } from '../lib/cardoptions';
   import { arrangeTable, type SeatCell } from '../lib/tablearrange';
   import { regionRows, slotUnits, type BoardRow } from '../lib/boardregions';
-  import { seatSize, shareOpponentSize, splitHeights, type RegionDemand, type SeatSize } from '../lib/cardsizing';
+  import { GAP, seatSize, shareOpponentSize, splitHeights, STRIP_HEADER_H, STRIP_PAD, type RegionDemand, type SeatSize } from '../lib/cardsizing';
+  import { visibleHand } from '../lib/board';
+  import { passiveBandH, passiveFaceH, stripHand } from '../lib/passivehand';
   import { rowCount } from '../lib/layoutprofile';
   import { layoutStore } from '../lib/layouts.svelte';
   import { seatColour } from '../lib/colours';
   import { seatGlow } from '../lib/seatglow';
-  import Quadrant from './Quadrant.svelte';
+  import Quadrant, { type PassiveHandSpec } from './Quadrant.svelte';
 
   /**
    * Board is the table: the opponents' area, the centre strip, the viewer's
@@ -29,6 +31,15 @@
    *
    * The Arrows overlay is mounted at the table root (Table.svelte), not here:
    * the felt clips its content and an arrow must reach the rail.
+   *
+   * A SPECTATOR (no seat of their own at this table) sees every hand the
+   * server exposed as a passive fan of card faces in that seat's own panel
+   * (PassiveHandFan, lib/passivehand). Exposure is read from the projected
+   * hand alone — visibleHand(player) is null for a redacted hand, so a public
+   * spectator gets no fan, and hand_size is never consulted. A seated viewer
+   * gets none either: their own hand is the interactive HandFan in the hand
+   * row, and an opponent's hand is never drawn here. The band is taken out of
+   * the panel BEFORE its rows are sized, so a hand never covers a permanent.
    */
   let {
     view,
@@ -114,10 +125,44 @@
 
   const strips = $derived(new Set(arr.cells.filter((c) => c.strip).map((c) => c.seat)));
   const oppRows = $derived(arr.cells.map((c) => rowsFor(c.seat, c.strip)));
+
+  // The spectator's passive hands. `exposed` is the one visibility gate: a
+  // seated viewer never gets one, and a spectator only for a hand the server
+  // actually sent.
+  function exposed(seat: number): CardView[] | null {
+    if (arr.seated) return null;
+    const p = byseat.get(seat);
+    return p ? visibleHand(p) : null;
+  }
+  // Every full-size panel's fan shares the smallest face any of them asks
+  // for, so the hands read evenly across the table.
+  const handFaceH = $derived.by((): number => {
+    const asks = arr.cells.filter((c) => !c.strip && exposed(c.seat) !== null).map((c) => passiveFaceH(cellBox(c).h));
+    if (arr.own !== null && exposed(arr.own) !== null) asks.push(passiveFaceH(heights.ownH));
+    return asks.length > 0 ? Math.min(...asks) : 0;
+  });
+  function handSpec(seat: number, at: 'top' | 'bottom', panelW: number): PassiveHandSpec | null {
+    const cards = exposed(seat);
+    if (cards === null) return null;
+    return { cards, faceH: handFaceH, band: passiveBandH(handFaceH), at, width: panelW - GAP * 2 };
+  }
+  function stripSpec(seat: number, b: { w: number; h: number }): PassiveHandSpec | null {
+    const cards = exposed(seat);
+    if (cards === null) return null;
+    const sh = stripHand(b.w, b.h - STRIP_HEADER_H - STRIP_PAD * 2, cards.length);
+    return { cards, faceH: sh.faceH, band: sh.bandW, at: 'side', width: sh.bandW };
+  }
+  const oppHands = $derived(arr.cells.map((c) => (c.strip ? stripSpec(c.seat, cellBox(c)) : handSpec(c.seat, 'top', cellBox(c).w))));
+  const ownHand = $derived(arr.own === null ? null : handSpec(arr.own, 'bottom', W));
+
   const oppSizes = $derived.by((): SeatSize[] => {
     const raw = arr.cells.map((c, i) => {
       const b = cellBox(c);
-      return seatSize({ panelW: b.w, panelH: b.h, header: true, strip: c.strip, rows: demands(oppRows[i], c.seat), artBelow: profile.cards.artBelow });
+      const hand = oppHands[i];
+      // A rim band takes height from the panel, a strip's side band width.
+      const panelW = hand?.at === 'side' ? b.w - hand.band - GAP : b.w;
+      const panelH = hand && hand.at !== 'side' ? b.h - hand.band : b.h;
+      return seatSize({ panelW, panelH, header: true, strip: c.strip, rows: demands(oppRows[i], c.seat), artBelow: profile.cards.artBelow });
     });
     return shareOpponentSize(raw, arr.cells.map((c) => c.strip), profile.cards.artBelow);
   });
@@ -125,7 +170,7 @@
   const ownRows = $derived(arr.own === null ? [] : rowsFor(arr.own, false));
   const ownSize = $derived(arr.own === null ? null : seatSize({
     panelW: W,
-    panelH: heights.ownH,
+    panelH: heights.ownH - (ownHand?.band ?? 0),
     header: showOwnHeader,
     strip: false,
     rows: demands(ownRows, arr.own),
@@ -166,6 +211,7 @@
             priority={view.priority === p.seat}
             glow={seatGlow(view, options, p.seat)}
             onFocus={c.strip ? () => (focus = c.seat) : null}
+            passiveHand={oppHands[i]}
           />
         </div>
       {/if}
@@ -187,6 +233,7 @@
         active={view.active === p.seat}
         priority={view.priority === p.seat}
         glow={seatGlow(view, options, p.seat)}
+        passiveHand={ownHand}
       />
     {/if}
   </div>

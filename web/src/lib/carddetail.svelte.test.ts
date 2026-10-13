@@ -156,7 +156,7 @@ describe('HoverCard', () => {
   // and the pointer never fires a leave — so nothing else closes the
   // panel, and worse, the tile now renders a card the reader never asked
   // for. The surface therefore re-feeds the id it is rendering and the
-  // panel closes when it describes a different object. HandList's
+  // panel closes when it describes a different object. The hand fans'
   // supervise ('the object left the visible set') is a separate contract
   // and stays untouched above.
 

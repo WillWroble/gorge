@@ -510,14 +510,20 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 		// same set the body's own Defined$ ExiledWith resolves. Without it
 		// the ref fails closed and the gate is never evaluated, so those
 		// triggers stay silent even when the exile count meets the gate.
-		var out []state.Target
-		g := h.Game()
-		for _, id := range g.Zone(state.ZExile, c.Controller) {
-			if o := g.Obj(id); o != nil && o.ExiledWith == c.Source {
-				out = append(out, state.Target{Obj: id})
-			}
-		}
-		return out, true
+		//
+		// The read is exiledWithSet -- the ONE reader Defined$ ExiledWith and
+		// Card.ExiledWithSource share -- so it counts the source's FORWARD
+		// link (Object.ExiledCards, the association every ChangeZone exile
+		// records) as well as the reverse scalar, over EVERY seat's exile
+		// (CR 406.6 / 607.2a: "cards exiled with" the object are the cards
+		// its linked exile put there, wherever their owners' exile zones
+		// are). Veteran Survivor exiles a card from ANY graveyard and names
+		// no ExiledWithSource, so its moves stamp only the forward link and
+		// an opponent's card lands in that opponent's exile: the old
+		// controller-exile, reverse-only scan counted zero. A card that
+		// leaves exile drops out of both links inside events.Apply's Move
+		// fold (a new object, CR 400.7), so the count never sees it again.
+		return exiledWithSet(h.Game(), c), true
 	case refTargetsExiled:
 		// Forge's cast-cost PAID lists (AbilityUtils.getPaidCards ->
 		// SpellAbility.getPaidList): the cards this cast's own cost removed --

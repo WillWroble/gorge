@@ -1989,6 +1989,13 @@ var apiSpecificRulesStat = map[string]string{
 	// so its read is family-attributed like the grant path's, never in the
 	// generic Continuous union.
 	"Engine.mayPlayAltCosts": "Continuous.MayPlay",
+	// The printed-cost permission read (rules/mayplay.go's
+	// mayPlayPlainGrant, called from the may-play spell walk and beginCast):
+	// it runs mayPlayStatic over the same two static sources and reads
+	// MayPlayAltManaCost$ to tell a permission that prices its own cast
+	// (Valgavoth, Terror Eater) from a printed-cost one, so its reads are
+	// family-attributed exactly like the grant path's.
+	"Engine.mayPlayPlainGrant": "Continuous.MayPlay",
 	// The ValidSA$ classifier (rules/mayplay.go's mayPlayKinds, called from
 	// legal.go's may-play spell walk): it reads MayPlay statics' ValidSA$
 	// live -- Brokkos, Apex of Forever's `ValidSA$ Spell.Mutate` permits

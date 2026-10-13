@@ -473,6 +473,11 @@ var predicates = map[string]predFn{
 		s := g.Obj(src)
 		return s != nil && s.ChosenName != "" && sharesName(o, s.ChosenName, NewSpecContext(0, 0))
 	},
+	// Context-free noName: matchPositive evaluates it through namePredicate
+	// (with the layer-3 name) before reaching this map.
+	"noName": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return hasNoName(o, NewSpecContext(0, 0))
+	},
 	"ChosenType": func(g *state.Game, o *state.Object, _ state.PlayerID, src state.ObjID) bool {
 		s := g.Obj(src)
 		return s != nil && s.ChosenType != "" && hasType(o, s.ChosenType)
@@ -893,8 +898,8 @@ func init() {
 	// Dead, Necromancy, Genesis, ...) and 4 `ValidCard$ Card.StrictlySelf` --
 	// where the live id read is the whole meaning. The 3
 	// `ValidSA$ Spell.ManaFromCard.StrictlySelf` spellcast-provenance
-	// carriers stay fail closed on their own unread ManaFromCard word, so
-	// this alias cannot reach them.
+	// carriers never reach this alias: rules/trigmatch reads that whole
+	// clause as the producing-source provenance (Object.ManaSpentSources).
 	predicates["StrictlySelf"] = predicates["Self"]
 	// EffectSource is the Effect-delivered spelling of Self: the effect's own
 	// source object (Card.EffectSource in a StaticAbilities$ body's
@@ -1937,11 +1942,29 @@ func nameCharacteristics(o *state.Object) []string {
 // layer-3 effective name rather than the printed face. ok is false for every
 // other token, which then falls through to the ordinary predicate map.
 func namePredicate(p string, g *state.Game, o *state.Object, sc SpecContext) (bool, bool) {
-	if p != "NamedCard" {
-		return false, false
+	switch p {
+	case "NamedCard":
+		s := g.Obj(sc.Source)
+		return s != nil && s.ChosenName != "" && sharesName(o, s.ChosenName, sc), true
+	case "noName":
+		return hasNoName(o, sc), true
 	}
-	s := g.Obj(sc.Source)
-	return s != nil && s.ChosenName != "" && sharesName(o, s.ChosenName, sc), true
+	return false, false
+}
+
+// hasNoName is Forge's noName qualifier (Pompous Gadabout's "creatures that
+// don't have a name"): a face-down permanent or spell has no name (CR
+// 708.2a), and neither has an object whose name characteristics are empty --
+// a battlefield Room with no unlocked door (CR 709.5). A layer-3 name
+// (SetName$, CR 613.1d) bound by rules gives the object one.
+func hasNoName(o *state.Object, sc SpecContext) bool {
+	if o == nil || o.Card == nil || hasEffectiveName(o, sc) {
+		return false
+	}
+	if o.FaceDown && (o.Zone == state.ZBattlefield || o.Zone == state.ZStack) {
+		return true
+	}
+	return len(nameCharacteristics(o)) == 0
 }
 
 // sharesName reports whether o's name characteristics include name -- Forge

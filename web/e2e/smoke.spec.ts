@@ -702,8 +702,10 @@ async function assertLobby(page: Page, base: string, label: string): Promise<voi
 }
 
 /** assertTable checks one table route (live or finished) mounts its board,
- *  renders at least one transcript line, and leaves no loading state. */
-async function assertTable(page: Page, base: string, path: string, label: string): Promise<void> {
+ *  renders at least one transcript line, and leaves no loading state. For a
+ *  spectator page it also checks the passive hand fans against the redaction
+ *  (inbox-omniscient-rendered-hand-fans). */
+async function assertTable(page: Page, base: string, path: string, label: string, mode: 'public' | 'omniscient'): Promise<void> {
   const c = watch(page, base);
   const url = `${base}${path}`;
   const res = await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -734,6 +736,22 @@ async function assertTable(page: Page, base: string, path: string, label: string
   // boxes for every player, and at least one transcript line.
   const seats = await page.locator('.quadrant').count();
   expect(seats, `${label} GET ${path} should render seat boxes`).toBeGreaterThan(0);
+
+  // A spectator sees a passive fan of card faces for EXACTLY the seats whose
+  // hand the projection exposes — the rail summary marks a redacted hand
+  // data-hand-hidden — read in one snapshot so a live hand change cannot land
+  // between the two counts. A public spectator gets no exposed hand, so no
+  // fan and no hand face at all.
+  const hands = await page.evaluate(() => ({
+    exposed: document.querySelectorAll('[data-seat-table] [data-stat="hand"]:not([data-hand-hidden])').length,
+    fans: document.querySelectorAll('[data-passive-hand]').length,
+    faces: document.querySelectorAll('[data-hand-card]').length,
+  }));
+  expect(hands.fans, `${label} GET ${path}: one passive hand fan per exposed hand`).toBe(hands.exposed);
+  if (mode === 'public') {
+    expect(hands.exposed, `${label} GET ${path}: a public spectator sees no hand`).toBe(0);
+    expect(hands.faces, `${label} GET ${path}: a public spectator sees no hand card`).toBe(0);
+  }
 
   // The transcript's live lines: give the SSE/DVR a moment to land the first
   // event line for the live route.
@@ -771,11 +789,11 @@ for (const [mode, base] of [
         const { table, match } = await liveTableAndMatch(request, b);
 
         const live = await ctx.newPage();
-        await assertTable(live, b, `/t/${table}`, `${label} live table /t/${table}`);
+        await assertTable(live, b, `/t/${table}`, `${label} live table /t/${table}`, mode);
         await live.close();
 
         const fin = await ctx.newPage();
-        await assertTable(fin, b, `/t/${table}/m/${match}`, `${label} match /t/${table}/m/${match}`);
+        await assertTable(fin, b, `/t/${table}/m/${match}`, `${label} match /t/${table}/m/${match}`, mode);
         await fin.close();
       } finally {
         await ctx.close();
@@ -869,6 +887,11 @@ for (const [mode, base] of [['seated', SEATED]] as const) {
       // A beat for the SSE/snapshot to settle so the geometry and the console
       // judgement are against a steady page.
       await page.waitForTimeout(500);
+
+      // A seated client draws only its own interactive fan: the spectator's
+      // passive hand fans never appear at a seat (inbox-omniscient-rendered-
+      // hand-fans).
+      expect(await page.locator('[data-passive-hand]').count(), `${label}: a seated page draws no passive hand fan`).toBe(0);
 
       // 1 and 2 are hand-row invariants: during the mulligan round there is no
       // hand row to measure, so they run only on the live board.

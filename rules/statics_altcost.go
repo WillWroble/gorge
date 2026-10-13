@@ -119,8 +119,8 @@ func (e *Engine) alternativeCosts(p state.PlayerID, id state.ObjID) []altCostVie
 	// A MayPlay static's MayPlayAltManaCost$ (Darksteel Monolith) is the same
 	// "pay THIS instead of the mana cost" shape delivered by the may-play
 	// family; the family root carries its own gates and limit.
-	for _, c := range e.mayPlayAltCosts(p, id) {
-		out = append(out, altCostView{cost: c})
+	for _, v := range e.mayPlayAltCosts(p, id) {
+		out = append(out, altCostView{cost: v.cost})
 	}
 	return out
 }

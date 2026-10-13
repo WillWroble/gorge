@@ -45,9 +45,10 @@ const archmageOfEchoesSrc = "Name:Archmage of Echoes\nManaCost:4 U\nTypes:Creatu
 // BACK face (Tecutlan, the Searing Rift) SpellCast trigger line and its SVar
 // body, VERBATIM, attached to a plain artifact so the front face's other
 // triggers stay out of the pin. Its ValidSA$
-// Spell.ManaFromCard.StrictlySelf is unread (both predicates unknown, fail
-// closed), so the trigger stays INERT after the ValidCard$ fix -- the
-// boundary this file pins executable.
+// Spell.ManaFromCard.StrictlySelf admits only a cast that spent mana THIS
+// permanent produced (rules/cast_mana_sources.go); the fixture has no mana
+// ability, so every cast below is paid from source-less pool mana and the
+// trigger stays INERT -- the control half of manafromcard_test.go.
 const tecutlanSpellCastSrc = "Name:Tecutlan, the Searing Rift\nManaCost:2 R\nTypes:Legendary Artifact\n" +
 	"T:Mode$ SpellCast | ValidCard$ Permanent | ValidSA$ Spell.ManaFromCard.StrictlySelf | ValidActivatingPlayer$ You | Execute$ TrigDiscover | TriggerDescription$ Whenever you cast a permanent spell using mana produced by CARDNAME, discover X, where X is that spell's mana value.\n" +
 	"SVar:TrigDiscover:DB$ Discover | Num$ TriggeredSpellAbility$CardManaCostLKI\n" +
@@ -56,7 +57,8 @@ const tecutlanSpellCastSrc = "Name:Tecutlan, the Searing Rift\nManaCost:2 R\nTyp
 // myriadPoolsSpellCastSrc is the real corpus carrier
 // .cards/cardsfolder/t/the_everflowing_well_the_myriad_pools.txt's BACK face
 // (The Myriad Pools) SpellCast trigger line and its SVar body, VERBATIM,
-// attached to a plain artifact -- the second still-inert ValidSA$ carrier.
+// attached to a plain artifact -- the second ValidSA$ carrier, inert here
+// for the same reason.
 const myriadPoolsSpellCastSrc = "Name:The Myriad Pools\nManaCost:2 U\nTypes:Legendary Artifact\n" +
 	"T:Mode$ SpellCast | ValidCard$ Permanent | ValidSA$ Spell.ManaFromCard.StrictlySelf | ValidActivatingPlayer$ You | Execute$ TrigCopy | TriggerDescription$ Whenever you cast a permanent spell using mana produced by CARDNAME, up to one other target permanent you control becomes a copy of that spell until end of turn.\n" +
 	"SVar:TrigCopy:DB$ Clone | Defined$ TriggeredCardLKICopy | CloneTarget$ Targeted | ValidTgts$ Permanent.YouCtrl+Other | TargetMin$ 0 | TargetMax$ 1 | TgtPrompt$ Select up to one other target permanent you control | Duration$ UntilEndOfTurn\n" +
@@ -131,12 +133,13 @@ func TestArchmageOfEchoesCommaAlternativesFire(t *testing.T) {
 	replayCheck(t, e, cfg)
 }
 
-// TestSpellCastPermanentValidSACarriersStayInert pins the scope boundary:
+// TestSpellCastPermanentValidSACarriersStayInert pins the control boundary:
 // Brass's Tunnel-Grinder's and The Everflowing Well's back-face SpellCast
-// triggers carry the unread `ValidSA$ Spell.ManaFromCard.StrictlySelf`
-// clause (both predicates unknown, fail closed), so they stay dead after the
-// ValidCard$ fix -- on an X-cost permanent spell AND a plain one. Firing
-// them is a separate ticket, not this one.
+// triggers carry `ValidSA$ Spell.ManaFromCard.StrictlySelf`, which admits a
+// cast only when mana produced by the carrier itself was spent on it
+// (TestManaFromCardStrictlySelfReadsTheSpentSource is the firing half). Paid
+// from pool mana no source produced, they stay dead -- on an X-cost
+// permanent spell AND a plain one.
 func TestSpellCastPermanentValidSACarriersStayInert(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{tecutlanSpellCastSrc, myriadPoolsSpellCastSrc} {
@@ -153,7 +156,7 @@ func TestSpellCastPermanentValidSACarriersStayInert(t *testing.T) {
 		castFirst(t, e, "cast")
 		drainTriggerAsks(t, e, 30)
 		if got := pushCount(e, carrier); got != 0 {
-			t.Fatalf("%s TriggerPush count after permanent casts = %d, want 0 (ValidSA$ Spell.ManaFromCard.StrictlySelf is unread and fails closed)", src, got)
+			t.Fatalf("%s TriggerPush count after permanent casts = %d, want 0 (no mana the carrier produced was spent)", src, got)
 		}
 		replayCheck(t, e, cfg)
 	}

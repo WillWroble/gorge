@@ -58,6 +58,9 @@ func (r *Registry) load() error {
 			if _, present := shape.Tables[i].Config["bot_auto_pay_mana"]; !present {
 				rec.Config.BotAutoPayMana = r.opts.DefaultBotAutoPayMana
 			}
+			if _, present := shape.Tables[i].Config["bot_common_sense"]; !present {
+				rec.Config.BotCommonSense = r.opts.DefaultBotCommonSense
+			}
 		}
 		// Browser-created games have process-local credentials. A restart
 		// cannot safely revive them (and historically aborts live games

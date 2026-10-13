@@ -45,7 +45,7 @@
    * hover detail, no notion of who resolved it. Now it renders the card's
    * real name as text beside the label, wires the same HoverCard
    * dwell/focus/CardDetail inspector every other card surface uses
-   * (StackTile, CardTile, HandList — ResolvedCard was the one surface
+   * (StackTile, CardTile, the hand fans — ResolvedCard was the one surface
    * without it), and colours the row's border by the resolving seat.
    *
    * Ownership reads `card.controller`, not `card.owner`: for a just

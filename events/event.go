@@ -1867,6 +1867,11 @@ var flagNames = [...]struct {
 	// ("prepared_copy") the offer carries, as teamwork_paid matches its
 	// mode. Appended at the end per the table's own ordering rule.
 	{"prepared_copy", state.FlagPreparedCopy},
+	// The mana-producing-source capture: the cast spent mana a producer
+	// carrying a `Spell.ManaFromCard` SpellCast reader made, and the spent
+	// sources ride the same event's IDs into Object.ManaSpentSources.
+	// Appended at the end per the table's own ordering rule.
+	{"manasources", state.FlagManaSourcesSpent},
 }
 
 // FlagsFrom parses a comma-separated flag list (CastInfo.Counter's shape)
