@@ -21,10 +21,10 @@ func TestAtEOTOutOfScopeNotesEvenWithNoAffectedObject(t *testing.T) {
 	h := newHost(t, 2)
 	// No targets in context: Defined() resolves to nothing, so the pump's
 	// affected set is empty.
-	Resolve(h, &Ctx{Controller: 0}, sa(t, "DB$ Pump | AtEOT$ ExileCombat"))
+	Resolve(h, &Ctx{Controller: 0}, sa(t, "DB$ Pump | AtEOT$ Library"))
 	notes := 0
 	for _, e := range h.log {
-		if e.Kind == events.Note && strings.Contains(e.Text, "AtEOT$ ExileCombat is not implemented") {
+		if e.Kind == events.Note && strings.Contains(e.Text, "AtEOT$ Library is not implemented") {
 			notes++
 		}
 	}
@@ -58,12 +58,12 @@ func TestAtEOTInScopeValueWithNoAffectedObjectIsSilent(t *testing.T) {
 func TestAtEOTOutOfScopeNoteIsOnePerCall(t *testing.T) {
 	h := newHost(t, 2)
 	c := &Ctx{Controller: 0}
-	s := sa(t, "DB$ Pump | AtEOT$ SacrificeCombat")
+	s := sa(t, "DB$ Pump | AtEOT$ Library")
 	scheduleAtEOT(h, c, s, nil)
 	scheduleAtEOT(h, c, s, nil)
 	notes := 0
 	for _, e := range h.log {
-		if e.Kind == events.Note && strings.Contains(e.Text, "AtEOT$ SacrificeCombat is not implemented") {
+		if e.Kind == events.Note && strings.Contains(e.Text, "AtEOT$ Library is not implemented") {
 			notes++
 		}
 	}
