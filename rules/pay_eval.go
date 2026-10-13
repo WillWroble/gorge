@@ -75,9 +75,17 @@ func (v *payEval) ManaStatic(ab *cards.SA) pay.ManaStatic {
 // SourceInterference (pay.Eval) is the planner's source-interference check
 // (paymentPlanSourceInterference): the trigger and replacement matchers that
 // can observe tapping id for ma's mana.
-func (v *payEval) SourceInterference(id state.ObjID, ma *cards.SA) (pay.Tier, pay.Consequence, string) {
+func (v *payEval) SourceInterference(id state.ObjID, ma *cards.SA, produced string) (pay.Tier, pay.Consequence, string, state.Mana) {
 	e := (*Engine)(v)
-	return e.paymentPlanSourceInterference(id, ma)
+	if produced != "" {
+		// A TapsForMana trigger only fires when the ability's cost taps.
+		if ma == nil || !e.parseCost(ma.ParamStr(cards.PKCost)).Tap {
+			return pay.TierNormal, pay.Consequence{}, "", state.Mana{}
+		}
+		return pay.TierNormal, pay.Consequence{}, "", e.paymentPlanTapExtraMana(id, produced)
+	}
+	tier, c, detail := e.paymentPlanSourceInterference(id, ma)
+	return tier, c, detail, state.Mana{}
 }
 
 // ManaUnits (pay.Eval) is p's payment-plan source census
