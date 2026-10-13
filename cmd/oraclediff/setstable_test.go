@@ -146,3 +146,65 @@ func TestParseLevels(t *testing.T) {
 		t.Fatal("parseLevels(\"\") should fail")
 	}
 }
+
+func TestSetsJSON(t *testing.T) {
+	cs := testCensus()
+	a := []adopt.SetStatus{
+		{Set: "BLB", Name: "Bloomburrow", Released: "2024-08-02", Formats: []string{"Standard"},
+			Cards: 305, Outstanding: 2, ProblemCards: 1, Buckets: map[string]int{adopt.BucketGorgeWrong: 1, adopt.BucketExpectation: 1}},
+		{Set: "FDN", Name: "Foundations", Released: "2024-11-15", Formats: []string{"Standard"}, Cards: 305},
+	}
+	b := []adopt.SetStatus{
+		{Set: "BLB", Name: "Bloomburrow", Released: "2024-08-02", Formats: []string{"Standard"},
+			Cards: 305, Outstanding: 3, ProblemCards: 2, Buckets: map[string]int{adopt.BucketXMageLacks: 2, adopt.BucketDiverge: 1, adopt.BucketGorgeWrong: 0}},
+		{Set: "FDN", Name: "Foundations", Released: "2024-11-15", Formats: []string{"Standard"}, Cards: 305},
+	}
+	var buf bytes.Buffer
+	if err := writeSetsJSON(&buf, cs, a, b); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("want one line per set, got %d:\n%s", len(lines), buf.String())
+	}
+	// The table's row order: newest Standard set first.
+	var fdn, blb map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &fdn); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &blb); err != nil {
+		t.Fatal(err)
+	}
+	if fdn["set"] != "FDN" || blb["set"] != "BLB" {
+		t.Fatalf("row order wrong:\n%s", buf.String())
+	}
+	if fdn["level_a_pass"] != 305.0 || fdn["level_b_pass"] != 305.0 || fdn["outstanding_b"] != 0.0 {
+		t.Fatalf("clean set row wrong: %s", lines[0])
+	}
+	want := map[string]any{
+		"set": "BLB", "name": "Bloomburrow", "released": "2024-08-02", "cards": 305.0,
+		"level_a_pass": 304.0, "level_b_pass": 303.0, "outstanding_b": 2.0,
+		"reasons": map[string]any{adopt.BucketXMageLacks: 2.0, adopt.BucketDiverge: 1.0},
+	}
+	for k, v := range want {
+		gotJSON, _ := json.Marshal(blb[k])
+		wantJSON, _ := json.Marshal(v)
+		if string(gotJSON) != string(wantJSON) {
+			t.Errorf("BLB %s = %s, want %s", k, gotJSON, wantJSON)
+		}
+	}
+	// An unmeasured level is null, not zero.
+	var onlyA bytes.Buffer
+	if err := writeSetsJSON(&onlyA, cs, a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(onlyA.String(), `"level_b_pass":null,"outstanding_b":null,"reasons":null`) {
+		t.Fatalf("unmeasured level B should be null:\n%s", onlyA.String())
+	}
+	// Determinism.
+	var again bytes.Buffer
+	writeSetsJSON(&again, cs, a, b)
+	if !bytes.Equal(buf.Bytes(), again.Bytes()) {
+		t.Fatal("two renders of the same rows differ")
+	}
+}

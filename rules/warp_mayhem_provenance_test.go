@@ -122,11 +122,11 @@ func TestCastSaWarpAndMayhemProvenanceAllSites(t *testing.T) {
 			}
 
 			// Site 3: Count$ThisTurnCast_.
-			counted := e.spellsCastThisTurnMatching(0, spec, 0)
+			counted := e.spellsCastThisTurnMatching(0, spec, 0, noTC)
 			if len(counted) != 1 || counted[0] != spell.ID {
 				t.Fatalf("Count$ThisTurnCast_ matches = %v, want the paid cast %d", counted, spell.ID)
 			}
-			if got := len(e.spellsCastThisTurnMatching(0, spec, spell.ID)); got != 0 {
+			if got := len(e.spellsCastThisTurnMatching(0, spec, spell.ID, noTC)); got != 0 {
 				t.Fatalf("Count$ThisTurnCast_ excluded count = %d, want 0", got)
 			}
 

@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command sbagent is a SpellBench protocol v2 agent (the agent role of
 // spec/SPELLBENCH_PROTOCOL_V2.md, Section 10): it answers hello, game_start,
 // choose and game_over as NDJSON over stdin/stdout until stdin closes.

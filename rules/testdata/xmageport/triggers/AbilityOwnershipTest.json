@@ -66,8 +66,7 @@
      }
     }
    ],
-   "xmage": "AbilityOwnershipTest#testOwned",
-   "known_bug": "B6: ChangeZoneAll GainControl$ moves the card under its OWNER and emits ControlChange only after the battlefield MoveZone (effects/zone_changeall.go:248 then :271; same order in effects/zone_change.go:1481), so Soul Snuffers' ETB trigger is controlled by its owner and Obelisk Spider (\"you put\") never triggers. CR 110.2a, 603.3a."
+   "xmage": "AbilityOwnershipTest#testOwned"
   },
   {
    "name": "test-to-graveyard",
@@ -136,8 +135,7 @@
      }
     }
    ],
-   "xmage": "AbilityOwnershipTest#testToGraveyard",
-   "known_bug": "B6: ChangeZoneAll GainControl$ emits ControlChange after the battlefield MoveZone (effects/zone_changeall.go:248 then :271), so the returned creatures' ETB triggers are controlled by their owner, and the owner's Obelisk Spider triggers instead of none. CR 110.2a, 603.3a."
+   "xmage": "AbilityOwnershipTest#testToGraveyard"
   }
  ]
 }

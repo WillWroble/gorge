@@ -2,9 +2,12 @@ package rules
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -12,7 +15,11 @@ import (
 // card, rather than a hand-authored approximation of its ChangeZone ability.
 func TestSorceressSchemesCorpusMultiZoneTargets(t *testing.T) {
 	t.Parallel()
-	if _, err := os.Stat("../.cards/cardsfolder/s/sorceresss_schemes.txt"); err != nil {
+	dir, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("required Forge corpus card is unavailable: could not resolve the repo root")
+	}
+	if _, err := os.Stat(filepath.Join(cards.CorpusDir(dir), "s", "sorceresss_schemes.txt")); err != nil {
 		t.Fatalf("required Forge corpus card is unavailable: %v", err)
 	}
 	reg := searchTestRegistry(t)

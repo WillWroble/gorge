@@ -53,10 +53,15 @@ import (
 // the whole game is still replayed and every planned cast must mirror, but
 // no named cast is required.
 // cov-loyaltyrank (the bot now ranks planeswalker loyalty abilities by their
-// cost/effect facts instead of always taking the first one) moves seed 6191
-// the same way: its Roaming Throne cast at seq 9987 is no longer reached, so
-// it is pinned at seq 0 like 4038. The float-trigger-order shape stays
+// cost/effect facts instead of always taking the first one) moves seed 6191:
+// its Roaming Throne cast at seq 9987 is no longer reached, so it is pinned
+// at seq 0 like 4038. The float-trigger-order shape stays
 // covered by TestFloatTrimmedTriggerOrderAllowsOnlyFloatTriggers.
+// xp-b6-gaincontrol (CR 110.2a/603.3a: a card put onto the battlefield "under
+// your control" enters under the new controller, not its owner with a late
+// ControlChange) also moves seed 6191's trajectory: Oblivion Sower's exiled
+// lands now enter under the caster, so the seq-9987 Roaming Throne
+// float-trigger finding is not reached either; the seq-0 pin holds.
 func TestRoundSevenFindingsMirror(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)

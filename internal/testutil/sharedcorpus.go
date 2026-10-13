@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
 )
@@ -58,4 +59,21 @@ func SharedCorpusDir(dir string) (corpus string, ok bool) {
 		}
 	}
 	return filepath.Join(top, ".cards"), true
+}
+
+// CorpusDirOrSkip is SharedCorpusDir for a test that needs the corpus
+// DIRECTORY (a CLI's -dir, a cardsfolder walk) rather than a registry. It
+// Skips when the corpus was never fetched, probing cardsfolder and never
+// .cards itself (a stat'd .cards mtime un-caches the test; see
+// SharedCorpusDir), and fails when git cannot resolve the repository.
+func CorpusDirOrSkip(t testing.TB) string {
+	t.Helper()
+	dir, ok := SharedCorpusDir(".")
+	if !ok {
+		t.Fatalf("testutil: could not resolve git repo root")
+	}
+	if _, err := os.Stat(cards.CorpusDir(dir)); err != nil {
+		t.Skip("testutil: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
+	}
+	return dir
 }

@@ -85,6 +85,13 @@ type engineTriggerMaps struct {
 	// never cast and paid no cost (CR 707.10).
 	castExiled   map[state.ObjID][]state.ObjID `clone:"deep"`
 	castRevealed map[state.ObjID][]state.ObjID `clone:"deep"`
+	// castCounterPut is the same discipline for the creatures a Blight<N>
+	// cost part put its -1/-1 counters on (Forge's paid list "CounterPut"),
+	// read through effects.Ctx.Paid.CounterPut by `Defined$ CounterPutCards`
+	// (Grub, Notorious Auntie's "a copy of the blighted creature"). Written by
+	// payCast and by the triggered-cost window, which pays a trigger body's
+	// own Cost$ Blight<N>.
+	castCounterPut map[state.ObjID][]state.ObjID `clone:"deep"`
 	// fuseTargets maps a fused (FlagFused) stack object id to its two target
 	// stages' own chosen targets (index 0 the front half's, index 1 the
 	// alternate half's). Recorded by payCast at payment, read by resolveFused

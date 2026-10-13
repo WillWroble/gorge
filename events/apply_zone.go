@@ -658,6 +658,16 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		if !wasBattlefield {
 			o.AcqTurn = g.Turn
 			o.AcqStep = g.Step
+			// CR 400.7: a battlefield entry from another zone is a new
+			// object, so it inherits no attachment history. Without this a
+			// permanent that left the battlefield and returned (blink,
+			// reanimation, a bounced-and-replayed Equipment) would keep the
+			// LastBearer of its prior incarnation, and a Defined$
+			// Equipped|Enchanted read on the now-unattached object would
+			// resolve to a creature it was never attached to. The leaving
+			// arm above already preserved the old bearer as LastBearer for
+			// LKI; this is its reset on the next entry.
+			o.LastBearer = 0
 			// Riot's choice is made before this entry. The "haste" half grants
 			// a keyword (the "counter" half is placed by the engine's
 			// EntryCounterGrants path); consuming the election here makes every
@@ -721,8 +731,14 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		o.Damage = 0
 		o.ClassLevelValue = 0
 		o.IsAttacking = false
+		o.IsBlocking = false
 		o.AttackingBattle = 0
 		o.BlockedBy = nil
+		// CR 400.7: the this-turn block history is battlefield-stint state
+		// too, so a creature that leaves and returns is a new object that
+		// blocked/blocked-by nothing this turn.
+		o.BlockedByThisTurn = nil
+		o.BlockedThisTurn = nil
 		if !countersRemain || to == state.ZHand || to == state.ZLibrary {
 			o.Counters = nil
 		}

@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 package v1agent
 
 // Hooks for a caller that drives Tactical from a board it built itself

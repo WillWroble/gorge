@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"activate","field":"permanents","diff":"gorge+Dazzling Theater // Prop Room; xmage+Dazzling Theater"},"key":"static | activate | permanents | gorge+Dazzling Theater // Prop Room; xmage+Dazzling Theater","cards":1}
+{"card":"Inquisitive Glimmer","template":"static#0.1","status":"diverge","api":"-","sets":["DSK"],"detail":"step 2 (activate) permanents: gorge \"c0 o0 Dazzling Theater // Prop Room [enchantment room] {W}\", xmage \"c0 o0 Dazzling Theater [enchantment room] {W}\""}

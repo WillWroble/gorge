@@ -81,9 +81,7 @@ func set(s string) map[string]bool {
 // stamp Generated:/last-modified fields and to decide a run's live/stale
 // status from file mtimes; it scans a training output tree and never drives
 // the engine, so no game, event, view or replay depends on its clock.
-// cmd/hindsight (the pn20 branch-mining tool) reads it only to report run and
-// per-decision wall seconds; every sample, rollout and record is a pure
-// function of its seeds. The paymirror A/B harness reads the clock only in
+// The paymirror A/B harness reads the clock only in
 // its cmd/paymirror CLI: the per-game wall-time budget is injected to the
 // library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
 // builds from time.Now, and the CLI's progress line prints per-game elapsed
@@ -108,37 +106,42 @@ func set(s string) map[string]bool {
 // corpus. cmd/enginebench (the docs/015 engine-speed rows) reads it only to
 // report each row's elapsed wall time beside its CPU time; every game and
 // seed is fixed by its flags. host/manabrewhttp uses time only for SSE
-// keep-alive and write deadlines. No game, event, view or
+// keep-alive and write deadlines. cmd/dzgorge (the DraftZero driver) reads
+// it only for its remote-batch flush timer, retry back-off and per-call
+// timing counters; every game is a pure function of its seed.
+// internal/gamepool and internal/inferbroker (both tag-gated schedulers) use
+// timers only to decide WHEN a ready batch is flushed and to report queue and
+// serve nanoseconds; which decisions are answered, and every answer, is a
+// pure function of the games' seeds. No game, event, view or
 // replay reads the clock, and intents reach the engine only through
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
-		module + "/host":              true,
-		module + "/host/httpapi":      true,
-		module + "/cmd/gorged":        true,
-		module + "/cmd/botbench":      true,
-		module + "/cmd/ledger":        true,
-		module + "/cmd/searchprobe":   true,
-		module + "/cmd/searchteacher": true,
-		module + "/cmd/cardfuzz":      true,
-		module + "/cmd/exitloop":      true,
-		module + "/cmd/traindash":     true,
-		module + "/cmd/hindsight":     true,
-		module + "/cmd/paymirror":     true,
-		module + "/cmd/sbv1agent":     true,
-		module + "/cmd/kshadowcheck":  true,
-		module + "/cmd/sbagent":       true,
-		module + "/cmd/sbv2local":     true,
-		module + "/cmd/searchbench":   true,
-		module + "/cmd/enginebench":   true,
-		module + "/cmd/dzgorge":       true,
-		module + "/internal/gamepool": true,
-		module + "/internal/broker":   true,
-		module + "/host/manabrewhttp": true,
+		module + "/host":                 true,
+		module + "/host/httpapi":         true,
+		module + "/cmd/gorged":           true,
+		module + "/cmd/botbench":         true,
+		module + "/cmd/ledger":           true,
+		module + "/cmd/searchprobe":      true,
+		module + "/cmd/searchteacher":    true,
+		module + "/cmd/cardfuzz":         true,
+		module + "/cmd/exitloop":         true,
+		module + "/cmd/traindash":        true,
+		module + "/cmd/paymirror":        true,
+		module + "/cmd/sbv1agent":        true,
+		module + "/cmd/kshadowcheck":     true,
+		module + "/cmd/sbagent":          true,
+		module + "/cmd/sbv2local":        true,
+		module + "/cmd/searchbench":      true,
+		module + "/cmd/enginebench":      true,
+		module + "/cmd/dzgorge":          true,
+		module + "/internal/gamepool":    true,
+		module + "/internal/inferbroker": true,
+		module + "/host/manabrewhttp":    true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
-			t.Errorf("%s imports time; only host, host/httpapi and cmd/gorged may", path)
+			t.Errorf("%s imports time; only the packages in this test's allowed map may (see its doc comment)", path)
 		}
 	}
 }
@@ -167,6 +170,12 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// seats a non-bench opponent may link it. The honest azmcts core
 		// never pulls the clone back in, and neither do the hosted search
 		// packages or any bots/ entry.
+		// The shadow answer (HD-3, human-divergence design §5.4) is computed by
+		// a package the host calls and the offline triage tool recomputes
+		// through: it may not depend on the host that calls it, nor on test
+		// scaffolding.
+		{module + "/internal/divergence/shadow", module + "/host"},
+		{module + "/internal/divergence/shadow", module + "/internal/testutil"},
 		{module + "/host", module + "/internal/azmcts/clairvoyant"},
 		{module + "/host/httpapi", module + "/internal/azmcts/clairvoyant"},
 		{module + "/cmd/gorged", module + "/internal/azmcts/clairvoyant"},

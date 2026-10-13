@@ -28,7 +28,7 @@ func TestAZSeatDoesNotReEquipForever(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays one full searched game")
 	}
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	saveAZ(t)
 	azWorldArg = "clairvoyant"
 	azCfg.Search.Sims = 25

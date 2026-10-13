@@ -25,10 +25,16 @@ func TestAttackedThisTurnIsARecognisedPredicate(t *testing.T) {
 			t.Errorf("UnknownPredicates(%q) = %v, want none", spec, un)
 		}
 	}
-	// blockedThisTurn has no stamp and stays unknown, so a mixed form keeps
-	// failing closed through that word.
-	if un := effects.UnknownPredicates("Creature.attackedThisTurn,Creature.blockedThisTurn"); len(un) != 1 || un[0] != "blockedThisTurn" {
-		t.Errorf("UnknownPredicates(mixed form) = %v, want [blockedThisTurn]", un)
+	// blockedByValidThisTurn <type> is a recognised referent word now (the
+	// block-history words); an argument outside the known shapes stays
+	// unknown, so a mixed form keeps failing closed through that word.
+	// blockedThisTurn itself is recognised: the this-turn block history
+	// supplies its stamp.
+	if un := effects.UnknownPredicates("Creature.attackedThisTurn,Creature.blockedByValidThisTurn Bogus.Nope"); len(un) != 1 || un[0] != "blockedByValidThisTurn Bogus.Nope" {
+		t.Errorf("UnknownPredicates(mixed form) = %v, want [blockedByValidThisTurn Bogus.Nope]", un)
+	}
+	if un := effects.UnknownPredicates("Creature.attackedThisTurn,Creature.blockedThisTurn"); len(un) != 0 {
+		t.Errorf("UnknownPredicates(blockedThisTurn mixed form) = %v, want none", un)
 	}
 }
 

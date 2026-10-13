@@ -134,7 +134,11 @@ type TargetParams struct {
 	// object spec); SharedTypes is TargetsWithSharedTypes$ split on ',' into
 	// lowercase card-type tokens (nil when absent or empty).
 	SharedCardType string
-	SharedTypes    []string
+	// RelatedProperty is TargetsWithRelatedProperty$, trimmed (LECMC /
+	// LEPower: the candidate's mana value / power may not exceed the
+	// ParentTarget's).
+	RelatedProperty string
+	SharedTypes     []string
 	// SetProp and SetPropKind are the target-SET property constraint
 	// (TargetsWithSameCardType$, TargetsWithSameCreatureType$,
 	// TargetsWithEqualToughness$, TargetsWithDifferentCMC$,
@@ -280,6 +284,7 @@ func compileTargets(sa *cards.SA) *TargetParams {
 	p.ControllerProperty = strings.TrimSpace(sa.ParamStr(cards.PKTargetsWithControllerProperty))
 	p.ValidTargeting = strings.TrimSpace(sa.ParamStr(cards.PKTargetValidTargeting))
 	p.SharedCardType = strings.TrimSpace(sa.ParamStr(cards.PKTargetsWithSharedCardType))
+	p.RelatedProperty = strings.TrimSpace(sa.ParamStr(cards.PKTargetsWithRelatedProperty))
 	p.SharedTypes = sharedTypesList(sa.ParamStr(cards.PKTargetsWithSharedTypes))
 
 	switch {

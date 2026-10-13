@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestMaxTotalTargetCMCMixedPlayerCreatureMinimum verifies that a player is a
@@ -38,7 +41,7 @@ func TestMaxTotalTargetCMCMixedPlayerCreatureMinimum(t *testing.T) {
 func TestMaxTotalTargetCMCCorpusCensus(t *testing.T) {
 	t.Parallel()
 	var files []string
-	err := filepath.WalkDir("../.cards/cardsfolder", func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(cards.CorpusDir(testutil.CorpusDirOrSkip(t)), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

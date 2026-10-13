@@ -58,18 +58,11 @@ func decodeLiveCaptureTokens(t *testing.T, dir string) (map[string]string, []str
 // silently degrading to tokens_unread.
 func TestReproCorpusCachedTokenPathsReadable(t *testing.T) {
 	requireCorpus(t)
-	// Resolve the corpus the SAME way testutil.CorpusRegistry does
-	// (SharedCorpusDir prefers the main checkout's .cards so the go test
-	// cache key is shared across worktrees). The registry this test reads
-	// its token paths from was opened at that directory, so the "opened
-	// corpus" this test checks against must be that directory too -- not
-	// feedback.Root()'s worktree toplevel, whose .cards is a symlink to it
-	// but whose path differs.
-	corpus, ok := testutil.SharedCorpusDir(".")
-	if !ok {
-		t.Fatalf("could not resolve the shared corpus directory")
-	}
-	tokenscripts := filepath.Join(corpus, "tokenscripts")
+	// Expect the SAME corpus the registry below opens: CorpusRegistry uses
+	// testutil.SharedCorpusDir, which resolves the main checkout's .cards, not
+	// this worktree's symlink (fixed by f5f897898). feedback.Root()/.cards here
+	// would name the worktree's symlink and fail in every worktree.
+	tokenscripts := filepath.Join(testutil.CorpusDirOrSkip(t), "tokenscripts")
 	info, err := os.Stat(tokenscripts)
 	if err != nil || !info.IsDir() {
 		t.Fatalf("no tokenscripts directory under the opened corpus %s: %v", tokenscripts, err)

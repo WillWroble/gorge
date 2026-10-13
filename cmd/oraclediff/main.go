@@ -11,7 +11,7 @@
 //	oraclediff refreeze [-cards .cards] [-apply]
 //	oraclediff impact [-cards .cards] [-top N] [-json]
 //	oraclediff status [-cards .cards] -set S | -all [-out status.md] [-write-ratchet] [-json]
-//	oraclediff sets  [-cards .cards] [-out FILE] [-level A,B|A|B] [-sets S,...] [-procs N]
+//	oraclediff sets  [-cards .cards] [-out FILE] [-level A,B|A|B] [-sets S,...] [-procs N] [-json]
 //	oraclediff tickets [-cards .cards] [-out DIR] [-min-cards 10] [-any-in FORMAT] [-json]
 //
 // gen writes one level-A scenario per manifest card gorge fully supports
@@ -146,12 +146,13 @@ func main() {
 		level := fs.String("level", "A,B", "levels to measure, comma-separated: A, B or A,B")
 		sets := fs.String("sets", "", "only these comma-separated set codes")
 		procs := fs.Int("procs", 2, "gate child processes at a time (at most 4)")
+		asJSON := fs.Bool("json", false, "print one JSON object per set row instead of the markdown table")
 		fs.Parse(os.Args[2:])
 		var only []string
 		if *sets != "" {
 			only = strings.Split(*sets, ",")
 		}
-		err = runSetsTable(*dir, *out, *level, only, *procs)
+		err = runSetsTable(*dir, *out, *level, only, *procs, *asJSON)
 	case "rule":
 		fs := flag.NewFlagSet("rule", flag.ExitOnError)
 		dir := fs.String("cards", ".cards", "corpus dir")

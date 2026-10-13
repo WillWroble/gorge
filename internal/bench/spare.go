@@ -31,8 +31,7 @@ import (
 //   - NOT recycled, no single last-use point: cmd/enginebench findRoots (its
 //     roots are e.Clone()s that share e's log prefix, so e must outlive
 //     them), cmd/enginebench searchGame (the engine is handed to the search
-//     and to searchseat.Feed, whose results may retain clones), cmd/hindsight
-//     captureGame (branches retain e.Clone() for post-game evaluation),
+//     and to searchseat.Feed, whose results may retain clones),
 //     cmd/searchteacher playGame (returns the engine to its caller),
 //     internal/paymirror PlayConfig (a deferred handler reads e.G at return
 //     and CheckLive may retain), internal/spellbench kshadow/v2engine/v2shadow

@@ -105,7 +105,7 @@ func (e *Engine) mayPlayGrantScoped(p state.PlayerID, id state.ObjID, board bool
 	// (a) Self-grants: the card's own statics, read off its face wherever
 	// the card currently sits (an S: line is part of the face, so a card in
 	// the graveyard carries it exactly as it would on the battlefield).
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}
@@ -162,6 +162,21 @@ func (e *Engine) mayPlayGrantScoped(p state.PlayerID, id state.ObjID, board bool
 	return free, ok
 }
 
+// mayPlayOwnStatics is the card's own face statics a may-play read
+// evaluates as SELF-grants for player p: all of them when p controls the
+// card, none otherwise. A self-grant ("You may cast this card from exile",
+// Misthollow Griffin) is worded for the card's controller -- its owner while
+// it sits in a public zone (CR 108.4a) -- so a walk that visits another
+// seat's exile for a battlefield grant of p's (Azula, Cunning Usurper) must
+// never hand p the owner's permission. The one gate every self-grant arm
+// (grant, typed permissions, RaiseCost$) reads, so they cannot drift.
+func mayPlayOwnStatics(o *state.Object, p state.PlayerID) []cards.Static {
+	if o.Controller != p {
+		return nil
+	}
+	return o.Face().Statics
+}
+
 // mayPlaySpellOffer is one cast offer a may-play permission produces for a
 // card: which card and zone, the permission's identity (key/text -- empty
 // for an untyped grant), and the permission's own free-cast / RaiseCost$
@@ -214,7 +229,7 @@ func (e *Engine) mayPlayPermissions(p state.PlayerID, id state.ObjID, board bool
 		out = append(out, mayPlaySpellOffer{id: id, key: key, text: text,
 			free: free, raise: raise, hasRaise: hasRaise, priced: priced})
 	}
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}
@@ -316,7 +331,7 @@ func (e *Engine) mayPlayRaiseCost(p state.PlayerID, id state.ObjID) (raise Cost,
 		}
 		raise = raise.Plus(r)
 	}
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}

@@ -32,6 +32,9 @@ func SacrificedLKI(h Host, id state.ObjID) state.SacrificedInfo {
 	}
 	if o.Zone == state.ZBattlefield {
 		s.Power, s.Toughness = h.Power(id), h.Toughness(id)
+		if ch := h.Chars(id); ch != nil {
+			s.Types = append([]string(nil), ch.Types...)
+		}
 		return s
 	}
 	if dh, ok := h.(departureCountersHost); ok {
