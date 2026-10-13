@@ -1079,6 +1079,10 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			case IsSetupChoice(d):
 				setupAnswers = append(setupAnswers, XAnswer{d.Seat, "setup_choice", d.Picks[0]})
 				any = true
+			case isSetupNumber(d):
+				a, _ := SetupNumberChoice(d)
+				setupAnswers = append(setupAnswers, a)
+				any = true
 			case IsSetupTargetDecline(d):
 				// The driver queues a target skip before build() so XMage
 				// declines the optional ask instead of auto-picking.

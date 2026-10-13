@@ -1,6 +1,10 @@
 package oraclegen
 
-import "github.com/adams-shaun/gorge/rules"
+import (
+	"strconv"
+
+	"github.com/adams-shaun/gorge/rules"
+)
 
 // IsSetupChoice reports whether d is a setup-placed permanent's as-enters
 // colour or type choice: gorge records it before step zero (Step < 0,
@@ -14,6 +18,27 @@ func IsSetupChoice(d rules.OracleDecision) bool {
 		return false
 	}
 	return d.PickKinds[0] == "color" || d.PickKinds[0] == "type"
+}
+
+// SetupNumberChoice returns the XMage answer for a setup-placed permanent's
+// as-enters "choose a number" (Talion, the Kindly Lord's ETBReplacement
+// ChooseNumber): gorge records it before step zero (Step < 0, Resume "etb",
+// pick kind "number") and XMage poses the same dialog through
+// TestPlayer.getAmount while placing the seeded permanent, which reads an
+// "X=<n>" head of the choice queue -- the same mapping the step-time
+// transcriber gives a gameplay number pick. Unscripted, XMage's AI picked its
+// own number and the row compared two different chosen numbers (CR 614.12:
+// the choice is made as the permanent enters). ok is false for every other
+// decision.
+func SetupNumberChoice(d rules.OracleDecision) (XAnswer, bool) {
+	if d.Step >= 0 || d.Resume != "etb" || d.Kind != "choose_n" || len(d.Picks) != 1 || len(d.PickKinds) != 1 ||
+		d.PickKinds[0] != "number" {
+		return XAnswer{}, false
+	}
+	if _, err := strconv.Atoi(d.Picks[0]); err != nil {
+		return XAnswer{}, false
+	}
+	return XAnswer{d.Seat, "setup_choice", "X=" + d.Picks[0]}, true
 }
 
 // HoistSetupChoices moves every setup_choice answer in a step's answer stream
@@ -41,4 +66,9 @@ func HoistSetupChoices(answers [][]XAnswer, step int) {
 		return
 	}
 	answers[step] = append(setup, rest...)
+}
+
+func isSetupNumber(d rules.OracleDecision) bool {
+	_, ok := SetupNumberChoice(d)
+	return ok
 }
