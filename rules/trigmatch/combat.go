@@ -392,7 +392,7 @@ func DamageMatchesWithCapture(e Board, t cards.Trigger, source state.ObjID, ev e
 	// THIS event's amount on the per-event modes. The batch modes compare the
 	// batch TOTAL, which only exists once the batch closes, so they are gated
 	// by the caller (DamageAmountBatched / DamageAmountMatches at queue/close).
-	if !DamageAmountBatched(t) && !DamageAmountMatches(e, t, source, ev.Amount) {
+	if !DamageAmountBatched(t) && !DamageAmountMatches(e, t, source, ev.Obj, ev.Amount) {
 		return false
 	}
 	return true
@@ -414,7 +414,10 @@ func DamageAmountBatched(t cards.Trigger) bool {
 // DamageAmountMatches evaluates t's DamageAmount$ against amount. An absent
 // parameter admits everything; an unreadable one (no operator, an operand
 // neither a number nor a readable SVar/count) fails closed like CompareLife.
-func DamageAmountMatches(e Board, t cards.Trigger, source state.ObjID, amount int32) bool {
+// recipient is the damaged object (0 for a player or an unknown batch): the
+// engine-defined operand "TargetToughness" (Taii Wakeen, Perfect Shot) is that
+// object's current toughness and fails closed when there is none.
+func DamageAmountMatches(e Board, t cards.Trigger, source, recipient state.ObjID, amount int32) bool {
 	spec := strings.TrimSpace(t.ParamStr(cards.PKDamageAmount))
 	if spec == "" {
 		return true
@@ -424,7 +427,16 @@ func DamageAmountMatches(e Board, t cards.Trigger, source state.ObjID, amount in
 	}
 	op, raw := spec[:2], strings.TrimSpace(spec[2:])
 	n, err := strconv.ParseInt(raw, 10, 32)
-	if err != nil {
+	if err == nil {
+		return ApplyCompare(int(amount), op, int(n))
+	}
+	if raw == "TargetToughness" {
+		if recipient == 0 || e.Game().Obj(recipient) == nil {
+			return false
+		}
+		return ApplyCompare(int(amount), op, int(e.Toughness(recipient)))
+	}
+	{
 		obj := e.Game().Obj(source)
 		if obj == nil || obj.Face() == nil {
 			return false

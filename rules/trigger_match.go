@@ -1525,7 +1525,7 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 							// in the stream it queued at before this gate was
 							// batch-scoped; closeDamageBatch patches its referent
 							// amount to the batch total.
-						} else if !trigmatch.DamageAmountMatches(boardOf(e), t, id, damageAmount) {
+						} else if !trigmatch.DamageAmountMatches(boardOf(e), t, id, ev.Obj, damageAmount) {
 							// No batch open: this event is its own batch, so
 							// DamageAmount$ reads its amount now.
 							continue
@@ -2071,7 +2071,7 @@ func (e *Engine) closeDamageBatch() {
 		}
 		// DamageAmount$ on a batch mode compares the accumulated TOTAL: a
 		// queued entry whose total fails it never triggered (CR 603.2).
-		if ent.gate != nil && !trigmatch.DamageAmountMatches(boardOf(e), *ent.gate, ent.gateSrc, ent.amount) {
+		if ent.gate != nil && !trigmatch.DamageAmountMatches(boardOf(e), *ent.gate, ent.gateSrc, 0, ent.amount) {
 			if dead == nil {
 				dead = make([]bool, len(e.pendingTriggers))
 			}

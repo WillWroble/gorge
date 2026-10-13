@@ -18,8 +18,9 @@ import (
 )
 
 // damageAmountUnreadableOperands are operands neither numeric nor an SVar on
-// the carrying face: DamageAmountMatches fails closed on them. Only Taii
-// Wakeen's "EQTargetToughness" (damage equal to the recipient's toughness).
+// the carrying face: only Taii Wakeen's "EQTargetToughness" (damage equal to
+// the recipient's toughness), which DamageAmountMatches reads from the damaged
+// object (and fails closed on a player or a batched gate).
 var damageAmountUnreadableOperands = map[string]bool{"TargetToughness": true}
 
 func TestTriggerDamageAmountCensus(t *testing.T) {
