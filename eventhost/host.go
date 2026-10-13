@@ -43,20 +43,24 @@ type Options struct {
 
 // run is one event's live state, guarded by its own mutex.
 type run struct {
-	h         *Host
-	mu        sync.Mutex
-	meta      meta
-	ev        *event.Event
-	spec      setdata.Spec
-	drafters  [4]pickbotDrafter
-	builders  [4]pickbotBuilder
-	subs      []subscriber // {session, seat}, subscription order
-	lastPack  [4]string    // last draft_pack key sent per seat
-	halted    string       // persistence/replay failure: read-only, 503 on writes
-	blocked   string       // E1-5: why a game could not start
-	tokens    map[host.TableID]string
-	live      atomic.Bool // phase != COMPLETE; read under Host.mu for the capacity bound
-	justDraft bool        // the draft ended since the last broadcast: one last pod_progress
+	h        *Host
+	mu       sync.Mutex
+	meta     meta
+	ev       *event.Event
+	spec     setdata.Spec
+	drafters [4]pickbotDrafter
+	builders [4]pickbotBuilder
+	subs     []subscriber // {session, seat}, subscription order
+	lastPack [4]string    // last draft_pack key sent per seat
+	halted   string       // persistence/replay failure: read-only, 503 on writes
+	blocked  string       // E1-5: why a game could not start
+	tokens   map[host.TableID]string
+	// E1-5: finished matches awaiting their pairing-order log slot, and
+	// each series' last published public JSON. Both guarded by mu.
+	outcomes   map[[2]int]outcome
+	lastSeries map[[3]int]string
+	live       atomic.Bool // phase != COMPLETE; read under Host.mu for the capacity bound
+	justDraft  bool        // the draft ended since the last broadcast: one last pod_progress
 }
 
 // subscriber is one SSE session watching this event, at its seat (-1 for a
@@ -71,6 +75,9 @@ type Host struct {
 	opts   Options
 	mu     sync.Mutex
 	events map[string]*run
+	// tables maps every live event game table to the attempt it is playing,
+	// so OnMatchEnd can drop a match it did not start. Guarded by mu.
+	tables map[host.TableID]gameRef
 	closed bool
 	wg     sync.WaitGroup
 }
@@ -99,14 +106,19 @@ func New(o Options) (*Host, error) {
 		policies[i] = n
 	}
 	o.DefaultPolicy, o.Policies = dp, policies
-	h := &Host{opts: o, events: map[string]*run{}}
+	h := &Host{opts: o, events: map[string]*run{}, tables: map[host.TableID]gameRef{}}
 	lookup := h.lookup()
 	ids, err := o.Store.ids()
 	if err != nil {
 		return nil, err
 	}
 	for _, id := range ids {
-		r := &run{h: h, tokens: map[host.TableID]string{}}
+		r := &run{
+			h:          h,
+			tokens:     map[host.TableID]string{},
+			outcomes:   map[[2]int]outcome{},
+			lastSeries: map[[3]int]string{},
+		}
 		m, merr := o.Store.loadMeta(id)
 		if merr != nil {
 			r.meta, r.halted = meta{ID: id}, fmt.Sprintf("event %s: meta unreadable: %v", id, merr)
@@ -330,7 +342,15 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errUnavailable("eventhost: %v", err)
 	}
-	r := &run{h: h, meta: m, ev: event.New(), tokens: map[host.TableID]string{}, justDraft: false}
+	r := &run{
+		h:          h,
+		meta:       m,
+		ev:         event.New(),
+		tokens:     map[host.TableID]string{},
+		outcomes:   map[[2]int]outcome{},
+		lastSeries: map[[3]int]string{},
+		justDraft:  false,
+	}
 	r.live.Store(true)
 	h.events[id] = r
 	h.mu.Unlock()

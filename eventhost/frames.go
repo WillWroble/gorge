@@ -1,6 +1,8 @@
 package eventhost
 
 import (
+	"encoding/json"
+
 	"github.com/adams-shaun/gorge/event"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/limited/draft"
@@ -54,6 +56,38 @@ func (r *run) broadcast() {
 				continue
 			}
 			r.push(s, protocol.TDraftPack, r.packFor(seat))
+		}
+	}
+	r.publishSeries()
+}
+
+// publishSeries pushes a series_update for each series whose public JSON
+// changed, rounds then pairings in deterministic (pairing) order. It is
+// called from broadcast under r.mu. lastSeries is looked up only by key,
+// never ranged over, so map order never reaches a frame.
+func (r *run) publishSeries() {
+	results := r.ev.Results()
+	for rd := 1; rd <= draft.Rounds; rd++ {
+		for _, p := range event.Pairings(rd) {
+			ser := r.seriesFor(-1, results, rd, p[0], p[1])
+			b, err := json.Marshal(ser)
+			if err != nil {
+				continue // a marshal failure of our own struct cannot happen
+			}
+			key := [3]int{rd, p[0], p[1]}
+			if r.lastSeries[key] == string(b) {
+				continue
+			}
+			r.lastSeries[key] = string(b)
+			for _, sub := range r.subs {
+				s, ok := r.h.opts.Registry.Session(sub.session)
+				if !ok {
+					continue
+				}
+				r.push(s, protocol.TSeriesUpdate, protocol.SeriesUpdate{
+					Event: r.meta.ID, Series: ser,
+				})
+			}
 		}
 	}
 }
