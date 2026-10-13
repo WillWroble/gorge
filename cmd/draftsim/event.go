@@ -109,6 +109,12 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 	}
 
 	er := &eventResult{decks: decks}
+	if r.noGames {
+		// Draft-only (the pool-shape tests): stop after the build phase.
+		// The series stay pending, no EventEnded is applied and the caller
+		// reads the pools and decks off the returned event.
+		return e, er, nil
+	}
 	for {
 		pending := e.PendingSeries()
 		if len(pending) == 0 {

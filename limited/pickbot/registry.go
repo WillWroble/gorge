@@ -77,7 +77,7 @@ var DefaultTuning = Tuning{
 	RatingScale:      100,
 	HeuristicCentre:  2,
 	HeuristicScale:   2,
-	ColourFitMax:     4,
+	ColourFitMax:     8,
 	ColourFitRamp:    9,
 	ColourlessFit:    0.5,
 	MainSize:         23,
@@ -100,8 +100,8 @@ type Builder interface {
 }
 
 type entry struct {
-	Drafter Drafter
-	Builder Builder
+	newDrafter func(CardLookup) Drafter
+	newBuilder func(CardLookup) Builder
 }
 
 var (
@@ -110,24 +110,43 @@ var (
 )
 
 func init() {
-	Register("rating-colour", &RatingColour{}, &Best23{})
-	Register("best23", &RatingColour{}, &Best23{})
+	Register("rating-colour",
+		func(lookup CardLookup) Drafter { return &RatingColour{Lookup: lookup} },
+		func(lookup CardLookup) Builder { return &Best23{Lookup: lookup} })
+	Register("best23",
+		func(lookup CardLookup) Drafter { return &RatingColour{Lookup: lookup} },
+		func(lookup CardLookup) Builder { return &Best23{Lookup: lookup} })
 }
 
 // Register names one drafter/builder pair in the registry, mirroring
-// bots.Register. Re-registering a name replaces its entry.
-func Register(name string, d Drafter, b Builder) {
+// bots.Register. The pair is registered as constructors so New can build a
+// fresh instance with a caller's lookup injected; re-registering a name
+// replaces its entry.
+func Register(name string, nd func(CardLookup) Drafter, nb func(CardLookup) Builder) {
 	entriesMu.Lock()
 	defer entriesMu.Unlock()
-	entries[name] = entry{Drafter: d, Builder: b}
+	entries[name] = entry{newDrafter: nd, newBuilder: nb}
 }
 
-// Lookup returns the registered drafter and builder pair by name.
-func Lookup(name string) (Drafter, Builder, bool) {
+// New constructs a fresh drafter and builder pair by registry name with
+// lookup injected, so a caller (cmd/draftsim's -drafter/-builder flags,
+// eventhost's persona) owns its instances instead of sharing the
+// registry's. An unknown name is (nil, nil, false).
+func New(name string, lookup CardLookup) (Drafter, Builder, bool) {
 	entriesMu.RLock()
 	defer entriesMu.RUnlock()
 	e, ok := entries[name]
-	return e.Drafter, e.Builder, ok
+	if !ok {
+		return nil, nil, false
+	}
+	return e.newDrafter(lookup), e.newBuilder(lookup), true
+}
+
+// Lookup returns the registered drafter and builder pair by name, built
+// with a nil lookup: the FDN rated path is name-keyed and needs none, and
+// a caller that has card facts uses New.
+func Lookup(name string) (Drafter, Builder, bool) {
+	return New(name, nil)
 }
 
 // Names lists the registered names, sorted.
