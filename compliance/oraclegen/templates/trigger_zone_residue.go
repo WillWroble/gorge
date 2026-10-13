@@ -176,23 +176,23 @@ func selfETBChoosesOpposingCreature(f *cards.Face) bool {
 	return false
 }
 
-// choicesAsTargetAnswers rewrites the item's "choice" answers as "target"
-// answers naming the decision's exact pick: the object ref gorge picked
-// (Zenos's ETB "choose a creature an opponent controls"), or the seat ref
-// (Shinryu's "choose an opponent"). XMage asks both as targets, so a
-// choice-queue answer is consumed by the wrong ask (measured lb4-gtrig:
-// "Found wrong choice command ... TargetOpponent").
+// choicesAsTargetAnswers rewrites the item's object "choice" answers as
+// "target" answers naming the decision's exact pick: Zenos's ETB "choose a
+// creature an opponent controls" is a target ask in XMage, so a choice-queue
+// answer is consumed by the wrong ask (measured lb4-gtrig: "Found wrong
+// choice command ... TargetOpponent"). A player pick stays a choice:
+// Shinryu's "choose an opponent" is XMage's player.choose over a
+// TargetOpponent, which reads the choice queue by player name (strict replay,
+// lb4w2-3seat: "Missing CHOICE def ... TargetOpponent" with the pick queued
+// as a target).
 func choicesAsTargetAnswers(xa [][]oraclegen.XAnswer, ds []rules.OracleDecision) [][]oraclegen.XAnswer {
 	for step := range xa {
 		for i := range xa[step] {
 			a := &xa[step][i]
-			if a.Kind != "choice" || a.Value == "yes" || a.Value == "no" {
+			if a.Kind != "choice" || a.Value == "yes" || a.Value == "no" || isSeatAnswer(a.Value) {
 				continue
 			}
 			a.Kind = "target"
-			if strings.HasPrefix(a.Value, "p0") || strings.HasPrefix(a.Value, "p1") {
-				continue
-			}
 			for _, d := range ds {
 				if d.Step == step && len(d.ObjectPicks) == 1 && len(d.PickRefs) == 1 {
 					a.Value = d.PickRefs[0]
@@ -201,4 +201,17 @@ func choicesAsTargetAnswers(xa [][]oraclegen.XAnswer, ds []rules.OracleDecision)
 		}
 	}
 	return xa
+}
+
+// isSeatAnswer reports an answer value naming a player ("p0", "p1", "p2").
+func isSeatAnswer(v string) bool {
+	if len(v) < 2 || v[0] != 'p' {
+		return false
+	}
+	for _, r := range v[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

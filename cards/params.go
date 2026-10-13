@@ -789,6 +789,10 @@ const (
 	// ChangeZone's ExiledWithEffectSource$ rider: the exile is tagged as
 	// exiled-with the Effect's source (Forger's Foundry; append-only).
 	PKExiledWithEffectSource
+	// Play's RememberPlayed$ rider: the card the Play began to play joins the
+	// source's remembered set (Planetarium of Wan Shi Tong's "only once each
+	// turn"; append-only).
+	PKRememberPlayed
 	paramKeyCount
 )
 
@@ -1168,6 +1172,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKImprintChosen:                    "ImprintChosen",
 	PKValidBlockerAmount:               "ValidBlockerAmount",
 	PKExiledWithEffectSource:           "ExiledWithEffectSource",
+	PKRememberPlayed:                   "RememberPlayed",
 	PKInvalidTypes:                     "InvalidTypes",
 	PKKeywords:                         "Keywords",
 	PKLeftRightPile:                    "LeftRightPile",

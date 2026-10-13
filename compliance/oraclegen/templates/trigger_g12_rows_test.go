@@ -57,7 +57,9 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		// Residue (see the lb4-g12 report).
 		// A donate prelude (lb4w2-gen): p1 controls a p0-owned permanent.
 		{"Coveted Falcon", "trigger#0.0", served},
-		{"Oblivious Bookworm", "trigger#0.2", "trigger did not fire"}, // Static$ True bookkeeping trigger: never uses the stack
+		// Oblivious Bookworm trigger#0.2 left this residue: a Static$ True
+		// line never reaches the stack, so TestBookkeepingClassRows
+		// (trigger_bookkeeping_test.go) pins it through its turn-3 consumer.
 		// Mikey & Don, Party Planners trigger#0.0 is served by a subtype creature
 		// probe (lb4w2-gen); its Static$ True rider never reaches the stack, so
 		// TestLevelBGeneratorResidueRowsServed pins it by the +1/+1 counter instead.

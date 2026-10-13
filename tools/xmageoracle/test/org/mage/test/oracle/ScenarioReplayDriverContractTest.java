@@ -670,6 +670,24 @@ public final class ScenarioReplayDriverContractTest {
                 + "whole object name rewrite, pass-through)");
     }
 
+    /** The scenario's seat count: absent and 2 are the two-seat duel, 3 the
+     * FreeForAll, anything else fails (gorge's oracleSeatCount). */
+    private static void seatCounts() {
+        check(ScenarioReplay.scenarioPlayers(JsonParser.parseString("{}").getAsJsonObject()) == 2, "absent players is not 2");
+        check(ScenarioReplay.scenarioPlayers(JsonParser.parseString("{\"players\":2}").getAsJsonObject()) == 2, "players 2 is not 2");
+        check(ScenarioReplay.scenarioPlayers(JsonParser.parseString("{\"players\":3}").getAsJsonObject()) == 3, "players 3 is not 3");
+        for (String bad : new String[]{"1", "4"}) {
+            boolean threw = false;
+            try {
+                ScenarioReplay.scenarioPlayers(JsonParser.parseString("{\"players\":" + bad + "}").getAsJsonObject());
+            } catch (IllegalArgumentException e) {
+                threw = true;
+            }
+            check(threw, "players " + bad + " was accepted");
+        }
+        System.out.println("PASS seat counts (absent/2 duel, 3 free-for-all, others refused)");
+    }
+
     public static void main(String[] args) throws Exception {
         attachments();
         zones();
@@ -680,5 +698,6 @@ public final class ScenarioReplayDriverContractTest {
         bargain();
         craft();
         spellings();
+        seatCounts();
     }
 }
