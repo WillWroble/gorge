@@ -87,6 +87,11 @@ type seriesState struct {
 	ended   bool
 	bestOf  int
 	games   []int8 // winner seat, or -1 for a draw
+	// inFlight is the started-but-not-yet-resulted game attempt, or nil.
+	inFlight *GameAttempt
+	// attempts is the highest attempt logged for the series' NEXT game; it
+	// resets to 0 when a game ends, so each game's attempts start at 1.
+	attempts int
 }
 
 // finishedSeries is a completed series, kept for standings and replay.
@@ -251,6 +256,10 @@ func (e *Event) apply(en *Entry) error {
 		return e.applySeriesEnded(en)
 	case KindEventEnded:
 		return e.applyEventEnded(en)
+	case KindGameStarted:
+		return e.applyGameStarted(en)
+	case KindGameAborted:
+		return e.applyGameAborted(en)
 	default:
 		return fmt.Errorf("event: unknown entry kind %q", en.Kind)
 	}
@@ -514,11 +523,77 @@ func (e *Event) applyGameEnded(en *Entry) error {
 	if en.Head == "" {
 		return fmt.Errorf("event: GameEnded: game has no chain head")
 	}
+	if st.inFlight != nil {
+		if en.Game != st.inFlight.Game {
+			return fmt.Errorf("event: GameEnded: game %d does not match the in-flight attempt's game %d", en.Game, st.inFlight.Game)
+		}
+		if en.Attempt != 0 && en.Attempt != st.inFlight.Attempt {
+			return fmt.Errorf("event: GameEnded: attempt %d does not match the in-flight attempt %d", en.Attempt, st.inFlight.Attempt)
+		}
+		st.inFlight = nil
+	}
+	st.attempts = 0
 	g := int8(-1)
 	if en.Winner != nil {
 		g = int8(*en.Winner)
 	}
 	st.games = append(st.games, g)
+	return nil
+}
+
+// applyGameStarted records a game attempt: the host table an attempt of the
+// series' next game is being played on. A crash or restart aborts the
+// attempt with GameAborted and the retry logs the next attempt.
+func (e *Event) applyGameStarted(en *Entry) error {
+	if err := e.seriesEntryOK(en); err != nil {
+		return err
+	}
+	st := e.seriesFor(en.A, en.B)
+	if !st.started {
+		return fmt.Errorf("event: GameStarted: series seats %d–%d not started", en.A, en.B)
+	}
+	if st.ended {
+		return fmt.Errorf("event: GameStarted: series seats %d–%d already ended", en.A, en.B)
+	}
+	if st.inFlight != nil {
+		return fmt.Errorf("event: GameStarted: series seats %d–%d already has a game attempt in flight (game %d attempt %d)",
+			en.A, en.B, st.inFlight.Game, st.inFlight.Attempt)
+	}
+	if en.Game != len(st.games)+1 {
+		return fmt.Errorf("event: GameStarted: game %d is not the series' next game (%d)", en.Game, len(st.games)+1)
+	}
+	if en.Attempt != st.attempts+1 {
+		return fmt.Errorf("event: GameStarted: attempt %d is not the series' next attempt (%d)", en.Attempt, st.attempts+1)
+	}
+	if en.Table == "" {
+		return fmt.Errorf("event: GameStarted: attempt has no table")
+	}
+	st.inFlight = &GameAttempt{
+		Round: en.Round, A: en.A, B: en.B, Game: en.Game, Attempt: en.Attempt,
+		Table: en.Table, Seed: en.GameSeed,
+	}
+	st.attempts = en.Attempt
+	return nil
+}
+
+// applyGameAborted clears an in-flight game attempt without recording a
+// result, so the game can be replayed as the series' next attempt.
+func (e *Event) applyGameAborted(en *Entry) error {
+	if err := e.seriesEntryOK(en); err != nil {
+		return err
+	}
+	st := e.seriesFor(en.A, en.B)
+	if st.inFlight == nil {
+		return fmt.Errorf("event: GameAborted: series seats %d–%d has no game attempt in flight", en.A, en.B)
+	}
+	if en.Game != st.inFlight.Game || en.Attempt != st.inFlight.Attempt {
+		return fmt.Errorf("event: GameAborted: names game %d attempt %d, but the in-flight attempt is game %d attempt %d",
+			en.Game, en.Attempt, st.inFlight.Game, st.inFlight.Attempt)
+	}
+	if en.Reason == "" {
+		return fmt.Errorf("event: GameAborted: no reason given")
+	}
+	st.inFlight = nil
 	return nil
 }
 
@@ -532,6 +607,10 @@ func (e *Event) applySeriesEnded(en *Entry) error {
 	}
 	if st.ended {
 		return fmt.Errorf("event: SeriesEnded: series seats %d–%d already ended", en.A, en.B)
+	}
+	if st.inFlight != nil {
+		return fmt.Errorf("event: SeriesEnded: series seats %d–%d has a game attempt in flight (game %d attempt %d)",
+			en.A, en.B, st.inFlight.Game, st.inFlight.Attempt)
 	}
 	if len(st.games) != st.bestOf {
 		return fmt.Errorf("event: SeriesEnded: %d of %d games played", len(st.games), st.bestOf)

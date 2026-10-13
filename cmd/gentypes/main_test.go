@@ -27,7 +27,8 @@ func TestCommittedProtocolTSIsFresh(t *testing.T) {
 func TestFrameTypeUnionListsEveryConstant(t *testing.T) {
 	src, _ := Render()
 	for _, ft := range []protocol.FrameType{protocol.THello, protocol.TWidget, protocol.TMatchStart, protocol.TSnapshot,
-		protocol.TEvent, protocol.TDecision, protocol.TMatchEnd, protocol.TTableHalted, protocol.TOverflow, protocol.TError} {
+		protocol.TEvent, protocol.TDecision, protocol.TMatchEnd, protocol.TTableHalted, protocol.TOverflow, protocol.TError,
+		protocol.TEventState, protocol.TDraftPack, protocol.TPodProgress, protocol.TSeriesUpdate} {
 		if !strings.Contains(src, `"`+string(ft)+`"`) {
 			t.Errorf("FrameType union lacks %q", ft)
 		}
