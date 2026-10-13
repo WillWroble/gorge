@@ -10,8 +10,10 @@ import "testing"
 // gets its root-caused verdict (the history of every pin is in the deleted
 // TestRoundNineFindingsMirror's doc, round9_test.go at 19fa2a40d):
 //
-//   - 10860 seq 3239: Worldly Tutor (the Command Tower production fix),
-//     equivalent;
+//   - 10860 seq 3246: Worldly Tutor (the Command Tower production fix),
+//     equivalent (was seq 3239 until eng-turnwatch: an aborted cast now
+//     logs a SpellCastReversed event, shifting every later seq by +7 here;
+//     the card list and verdicts of the game are otherwise identical);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
 //   - 10056 seq 6128: Lagomos, Hand of Hatred, equivalent;
@@ -21,7 +23,7 @@ import "testing"
 //
 // roundNineWant holds those pins.
 var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-	10860: {3239: ""},
+	10860: {3246: ""},
 	11056: {},
 	10056: {6128: ""},
 	8175:  {},

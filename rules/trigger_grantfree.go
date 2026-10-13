@@ -48,6 +48,18 @@ type trigGrantProof struct {
 	// Set by AddContinuous and by the registry rescan, which every header
 	// change of e.continuous triggers (an empty registry has nothing to see).
 	replSeen bool
+	// replFree is the proof for GRANTED static replacements (a Continuous
+	// static's AddReplacementEffect$): true only while no object's faces carry
+	// such a static (nor an AddStaticAbility$ grant that could parse to one),
+	// so rules/replacement_granted.go's scan can return without building
+	// active(). Held per object as they appear, exactly like free; sticky once
+	// a carrier is seen. replObjs is its own cursor (the trigger proof's objs
+	// is advanced by a different predicate). replVer is the continuousVersion
+	// the cursor belongs to: a continuous change (a copy effect rewriting a
+	// scanned object's CopyFace) rewinds the cursor so the new faces are seen.
+	replFree bool
+	replObjs int
+	replVer  int
 }
 
 // forClone is the proof a Clone inherits: the same objects (copied in
@@ -126,6 +138,66 @@ func (e *Engine) faceGrantsTriggersCached(f *cards.Face) bool {
 		return ff.grantsTrig
 	}
 	return faceGrantsTriggers(f)
+}
+
+// replGrantsPossible reports whether some active() entry may carry a GRANTED
+// static replacement (a Mode$ Continuous static's AddReplacementEffect$, or an
+// AddStaticAbility$ grant whose SVar body is one), so rules/replacement_granted.go
+// can return without building active(). It mirrors trigGrantsPossible's proof:
+// every face the static scan reads is a face of some object (its card's faces
+// or its CopyFace), so while no object's faces carry the parameter the scan is
+// empty. Held per object as they appear; sticky once a carrier is seen. An
+// engine with a zero proof (a fixture-built one) is treated as possible and
+// scans -- the fail-safe direction.
+func (e *Engine) replGrantsPossible() bool {
+	pr := &e.trigGrant
+	if !pr.replFree {
+		return true
+	}
+	if pr.replVer != e.continuousVersion {
+		// A continuous change can rewrite an already-scanned object's faces
+		// (a "becomes a copy" effect), so rewind and re-check every object.
+		pr.replVer, pr.replObjs = e.continuousVersion, 0
+	}
+	for ; pr.replObjs < len(e.G.Objs); pr.replObjs++ {
+		o := &e.G.Objs[pr.replObjs]
+		if faceGrantsRepl(o.CopyFace) {
+			pr.replFree = false
+			return true
+		}
+		if o.Card != nil {
+			for _, f := range o.Card.Faces {
+				if faceGrantsRepl(f) {
+					pr.replFree = false
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// faceGrantsRepl reports whether a face carries a static that could grant a
+// replacement effect: an AddReplacementEffect$ parameter directly, an
+// AddStaticAbility$ grant whose parsed body may be one, or an SVar whose text
+// names the parameter (the granted-body form).
+func faceGrantsRepl(f *cards.Face) bool {
+	if f == nil {
+		return false
+	}
+	for i := range f.Statics {
+		st := &f.Statics[i]
+		if strings.TrimSpace(st.ParamStr(cards.PKAddReplacementEffect)) != "" ||
+			strings.TrimSpace(st.ParamStr(cards.PKAddStaticAbility)) != "" {
+			return true
+		}
+	}
+	for _, v := range f.SVars {
+		if strings.Contains(v, "AddReplacementEffect") {
+			return true
+		}
+	}
+	return false
 }
 
 func faceGrantsTriggers(f *cards.Face) bool {

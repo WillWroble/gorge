@@ -214,6 +214,20 @@ type tactical struct {
 	// is raced, not simulated (tactical_combat.go).
 	blockChances, blocks int
 	lastBlockTurn        int32
+	// mull is the London-mulligan rule the fallback's Board carries
+	// (SetMulligan); the zero value is gorge's 1/3 coin.
+	mull botpolicy.MulliganRule
+}
+
+// SetMulligan sets a Tactical seat's London-mulligan rule (botpolicy.
+// MulliganRule): the keep/mulligan and bottoming asks are answered by gorge's
+// default policy on the seat-visible Board, exactly as seat.Bot.WithMulligan
+// answers them. MulliganCoin (the default) is the 1/3 coin. It is a no-op on
+// the SpellBench ports, which keep (heuristic) or follow their draw order.
+func (s *Seat) SetMulligan(rule botpolicy.MulliganRule) {
+	if s.tac != nil {
+		s.tac.mull = rule
+	}
 }
 
 // SetTrace makes a Tactical seat write its scored priority candidates and
@@ -327,6 +341,7 @@ func (t *tactical) decideKind(s *Seat, v view.View, d *decision.Decision) decisi
 // fallback is gorge's default bot policy on the seat-visible Board.
 func (t *tactical) fallback(v view.View, d *decision.Decision) decision.Intent {
 	brd := seat.BoardFromView(v)
+	brd.Mulligan = t.mull
 	in := botpolicy.Decide(brd, d, t.rng)
 	return repaired(d, in)
 }

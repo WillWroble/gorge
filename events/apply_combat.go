@@ -207,6 +207,9 @@ func foldDamage(g *state.Game, e *Event) {
 			// life loss the poison replaces.
 		} else {
 			g.Players[e.Player].Life -= e.Amount
+			if e.Amount > 0 {
+				g.Players[e.Player].LifeLostThisTurn += e.Amount
+			}
 		}
 	}
 }
@@ -367,6 +370,7 @@ func foldMyriadCopy(g *state.Game, e *Event) {
 	src := g.Obj(e.Obj)
 	if validPlayer(g, e.Player) && src != nil && src.Face() != nil {
 		o := g.AddObject(src.Card, e.Player)
+		tallyTokenCreated(g, e.Player)
 		o.SetFaceIdx(src.FaceIdx)
 		o.IsToken = true
 		o.IsCopy = true

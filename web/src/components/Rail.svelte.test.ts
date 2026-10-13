@@ -25,7 +25,7 @@ const card = (over: Partial<CardView> = {}): CardView => ({
 // records, which is exactly the gap a previous round shipped a crash
 // through on a public server while an omniscient one stayed fine.
 const spectatorPlayer = (seat: number, name: string, over: Partial<PlayerView> = {}): PlayerView => ({
-  seat, name, life: 40, lost: false, library_size: 60, hand_size: 7, graveyard_size: 0,
+  seat, name, life: 40, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 60, hand_size: 7, graveyard_size: 0,
   completed_dungeons: 0,
   hand: null as unknown as CardView[],
   pool: null as unknown as Record<string, number>,
