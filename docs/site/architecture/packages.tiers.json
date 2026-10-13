@@ -119,6 +119,10 @@
       "tier": "cmd",
       "status": "TOOL"
     },
+    "cmd/draftsim": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
     "cmd/dzbroker": {
       "tier": "cmd",
       "status": "EXT"

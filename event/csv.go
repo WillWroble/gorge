@@ -27,11 +27,6 @@ func DraftDataCSV(e *Event, w io.Writer, cardNames []string) error {
 	names := append([]string(nil), cardNames...)
 	sort.Strings(names)
 
-	// Replay the log onto a throwaway event, capturing each pick's pack and
-	// pool from the pod state just before the pick is applied.
-	re := New()
-	idToName := map[string]string{}
-	cw := csv.NewWriter(w)
 	header := []string{"expansion", "event_type", "draft_id", "pack_number", "pick_number", "pick"}
 	for _, n := range names {
 		header = append(header, "pack_card_"+n)
@@ -39,9 +34,47 @@ func DraftDataCSV(e *Event, w io.Writer, cardNames []string) error {
 	for _, n := range names {
 		header = append(header, "pool_"+n)
 	}
+	cw := csv.NewWriter(w)
 	if err := cw.Write(header); err != nil {
 		return fmt.Errorf("event: DraftDataCSV: %w", err)
 	}
+	if err := draftDataRows(e, cw, names); err != nil {
+		return err
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return fmt.Errorf("event: DraftDataCSV: %w", err)
+	}
+	return nil
+}
+
+// DraftDataCSVRows writes an event's draft_data ROWS with no header line:
+// the shape a run appends to an existing -draftlog (a second header line
+// mid-file is not a 17Lands draft_data CSV). The column order is the same
+// header's. The event must be created.
+func DraftDataCSVRows(e *Event, w io.Writer, cardNames []string) error {
+	if !e.cooked {
+		return fmt.Errorf("event: DraftDataCSVRows: event not created")
+	}
+	names := append([]string(nil), cardNames...)
+	sort.Strings(names)
+	cw := csv.NewWriter(w)
+	if err := draftDataRows(e, cw, names); err != nil {
+		return err
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return fmt.Errorf("event: DraftDataCSVRows: %w", err)
+	}
+	return nil
+}
+
+// draftDataRows replays the log onto a throwaway event and writes one
+// draft_data row per pick, capturing each pick's pack and pool from the pod
+// state just before the pick is applied. The header line is the caller's.
+func draftDataRows(e *Event, cw *csv.Writer, names []string) error {
+	re := New()
+	idToName := map[string]string{}
 	entries := e.Log()
 	for i := range entries {
 		en := entries[i]
@@ -59,7 +92,7 @@ func DraftDataCSV(e *Event, w io.Writer, cardNames []string) error {
 			if name == "" {
 				return fmt.Errorf("event: DraftDataCSV: log entry %d: picked ID %q is in no logged pack", i, en.ID)
 			}
-			row := make([]string, 0, len(header))
+			row := make([]string, 0, 6+2*len(names))
 			row = append(row,
 				e.set,
 				"gorge_pod",
@@ -77,10 +110,6 @@ func DraftDataCSV(e *Event, w io.Writer, cardNames []string) error {
 		if err := re.Apply(en); err != nil {
 			return fmt.Errorf("event: DraftDataCSV: log entry %d does not replay: %w", i, err)
 		}
-	}
-	cw.Flush()
-	if err := cw.Error(); err != nil {
-		return fmt.Errorf("event: DraftDataCSV: %w", err)
 	}
 	return nil
 }

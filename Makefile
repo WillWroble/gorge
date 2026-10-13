@@ -82,6 +82,7 @@ help:
 	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
 	@echo "  make compliance-status — generated per-set/per-format compliance status (compliance/status.md, never committed) + ratchet check"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
+	@echo "  make draftsim       — build draftsim and play 2 verified 4-bot draft events (SET/SEED override)"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
 	@echo "  make deploy-demo    — rebuild and (re)serve the demo on :8080 (bot tables omniscient)"
 	@echo "                        (PACE=1.5s / TABLES / SEATS / FORMATS / SEED override the defaults)"
@@ -120,6 +121,17 @@ $(BIN_DIR)/gorged: $(GO_SRC)
 $(BIN_DIR)/botbench: $(GO_SRC)
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -o $@ ./cmd/botbench
+
+$(BIN_DIR)/draftsim: $(GO_SRC)
+	@mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build -o $@ ./cmd/draftsim
+
+.PHONY: draftsim
+# draftsim runs E0's headless limited lab: 4-bot draft pods over the two
+# embedded set specs, best-23 deck builds, and a Bo1 round-robin played
+# through the rules engine, with -verify replaying every game's chain.
+draftsim: $(BIN_DIR)/draftsim
+	$(BIN_DIR)/draftsim -set FDN -seed 1 -events 2 -verify
 
 .PHONY: gorged
 # gorged runs the M2a table server: perpetual bot tables served to a browser

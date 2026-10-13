@@ -13,7 +13,7 @@ below; this file changes only when a DOMAIN appears, not when a package does.
 
 | Domain | What it covers |
 |---|---|
-| [repo-map-engine.md](repo-map-engine.md) | The engine chain: `cards` … `host/httpapi`, and the one-way import direction. |
+| [repo-map-engine.md](repo-map-engine.md) | The engine chain: `cards` … `host/httpapi`, the one-way import direction, and E0's draft stack (`limited/…`, `event`). |
 | [repo-map-internal.md](repo-map-internal.md) | `internal/` infrastructure and shared tooling packages. |
 | [repo-map-research.md](repo-map-research.md) | Research harnesses and bench/training tools (`internal/` and `cmd/`). |
 | [repo-map-paths.md](repo-map-paths.md) | Everything else, plus the untracked-but-load-bearing paths. |
