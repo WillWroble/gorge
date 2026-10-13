@@ -1,2 +1,0 @@
-{"shape":{"template":"trigger","op":"pass_to","field":"p0.library","diff":"placement"},"key":"trigger | pass_to | p0.library | placement","cards":1}
-{"card":"Spinneret and Spiderling","template":"trigger#0.1","status":"diverge","api":"AttackersDeclared:PutCounter+DamageDoneOnce:Dig","sets":["SPM"],"detail":"step 1 (pass_to) p0.exile: gorge \"[Wastes]\", xmage \"[]\""}

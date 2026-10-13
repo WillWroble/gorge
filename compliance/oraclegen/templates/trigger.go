@@ -130,6 +130,16 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 			}
 		}
 	}
+	// The class-G12 tail (trigger_recipes_tail.go): causes built for the
+	// filter or condition the recipe's own causes miss. They run only after
+	// every cause above failed, so no item an earlier cause serves moves.
+	for _, c := range tailTriggerCauses(reg, f, name, &f.Triggers[idx], req, causes) {
+		it, ok, didFire := triggerWith(reg, f, name, req, c, fxs)
+		fired = fired || didFire
+		if ok {
+			return it, nil
+		}
+	}
 	if !fired {
 		if attackTriggerSub(req.Sub) {
 			for _, cause := range causes {
@@ -227,6 +237,9 @@ func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requ
 		}
 	}
 	p0.Battlefield = appendFixtureCounts(p0.Battlefield, c.battlefield)
+	if c.auraBearer != "" {
+		p0.Battlefield = appendFixtureUnique(p0.Battlefield, c.auraBearer)
+	}
 	p0.Graveyard = appendFixtureCounts(p0.Graveyard, c.graveyard)
 	p1.Hand = appendFixtureCounts(p1.Hand, c.opponentHand)
 	p1.Graveyard = appendFixtureCounts(p1.Graveyard, c.opponentGraveyard)
