@@ -246,7 +246,7 @@ func effChangeZoneAll(h Host, c *Ctx, sa *cards.SA) {
 		}
 		ev := moveZoneEvent(c, id, z, to)
 		applyMoveFaceDown(h, c, &cza.Riders.FaceDownRiders, &ev, to)
-		h.Emit(ev)
+		emitEntryMove(h, c, cza.Riders.GainControl, to, ev)
 		moved = append(moved, id)
 		exiledWithAssociation(h, c, id, to)
 		// Tapped$ True (Splendid Reclamation's "Return all land cards
@@ -268,7 +268,6 @@ func effChangeZoneAll(h Host, c *Ctx, sa *cards.SA) {
 		// ChangeZone path applies; the shared resolver is loud rather
 		// than silent on an unresolvable selector.
 		if to == state.ZBattlefield {
-			applyGainControlFor(h, c, cza.Riders.GainControl, id)
 			// StaticEffect$ (ChangeZoneAll's carriers -- Ghost Vacuum, Grimoire
 			// of the Dead, Storm of Souls, Shilgengar): the same per-card rider
 			// registration every other ChangeZone mover applies.

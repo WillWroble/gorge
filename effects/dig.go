@@ -306,7 +306,7 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 			// applyFaceDownMarker preserves ExileFaceDown$'s source-carrying
 			// payload (Counter, Amount and nil IDs), while also stamping
 			// battlefield FaceDown$ entries.
-			h.Emit(ev)
+			emitEntryMove(h, c, digGainControl(dp.GainControl), dest, ev)
 			if dp.Imprint && c.Source != 0 {
 				if moved := g.Obj(id); moved != nil && moved.Zone == dest && !moved.IsToken {
 					h.Emit(events.Event{Kind: events.Imprint, Obj: c.Source, IDs: []state.ObjID{id}})
@@ -317,9 +317,6 @@ func effDig(h Host, c *Ctx, sa *cards.SA) {
 				h.Emit(events.Event{Kind: events.Tap, Obj: id, Player: p, Text: "entered tapped"})
 			}
 			rider.apply(h, c, id, p, dest)
-			if dest == state.ZBattlefield && dp.GainControl {
-				h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: c.Controller})
-			}
 			// StaticEffect$ on a battlefield take (Arbiter of the Ideal's
 			// "put it onto the battlefield ... it's an enchantment"): the same
 			// rider registration every ChangeZone mover applies.

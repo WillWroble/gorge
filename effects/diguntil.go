@@ -342,14 +342,11 @@ func effDigUntil(h Host, c *Ctx, sa *cards.SA) {
 						// the Aura enters, with no second CR 303.4f choice.
 						events.MarkNamedAttachEntry(&ev, []state.ObjID{bearer})
 					}
-					h.Emit(ev)
+					emitEntryMove(h, c, digGainControl(gainControl), dest, ev)
 					if tapped {
 						h.Emit(events.Event{Kind: events.Tap, Obj: id, Player: p, Text: "entered tapped"})
 					}
 					rider.apply(h, c, id, p, dest)
-					if gainControl {
-						h.Emit(events.Event{Kind: events.ControlChange, Obj: id, Player: c.Controller})
-					}
 					if o := g.Obj(id); bearer != 0 && o != nil && o.Zone == state.ZBattlefield && o.AttachedTo == 0 {
 						// CR 303.4f: the selected permanent is the Aura's
 						// chosen bearer on this non-cast battlefield entry
