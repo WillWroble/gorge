@@ -81,11 +81,13 @@ func TestStarfieldVocalistProbeDoublesETBTrigger(t *testing.T) {
 
 // TestFerocificationBeginCombatTriggerOnStack pins the beginning-of-combat
 // placement: at the controller's first priority ask in the begin-combat step
-// the trigger is already on the stack, unresolved.
+// the trigger is already on the stack, unresolved. p0 controls a creature, so
+// its modes have a legal target (TestFerocificationNoOwnCreatureRemovesTrigger
+// covers the board where they do not).
 func TestFerocificationBeginCombatTriggerOnStack(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	sc := `{"name":"ferocification-begin-combat","cr":["511.1"],"why":"level-B begin-combat trigger probe",` +
-		`"setup":{"p0":{"battlefield":["Ferocification"]},"p1":{"battlefield":["Grizzly Bears"]}},` +
+		`"setup":{"p0":{"battlefield":["Ferocification","Grizzly Bears"]},"p1":{"battlefield":["Grizzly Bears"]}},` +
 		`"steps":[` +
 		`{"op":"pass_to","seat":0,"step":"begin-combat"},` +
 		`{"op":"resolve","seat":0}]}`
