@@ -23,6 +23,7 @@ import (
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/eventhost"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
 	"github.com/adams-shaun/gorge/state"
@@ -220,6 +221,16 @@ type config struct {
 	// host.Options.ThinkTimeout, applied only while -manabrew is on
 	// (manabrewThinkTimeout) so setting it alone changes nothing.
 	manabrewThink time.Duration
+	// events is the -events flag: host 4-seat draft events under /api/events
+	// (eventhost; persistence under <dir>/events). Off by default so a
+	// server that never turned it on keeps the spectator/bot surface it had
+	// before, byte for byte: every /api/events path stays the JSON 404 the
+	// catch-all answers, and the event store directory is never created.
+	events bool
+	// maxEvents is the -max-events flag: how many draft events not yet
+	// COMPLETE the server serves at once. A new event past the bound is
+	// refused 409 capacity, never queued.
+	maxEvents int
 }
 
 func main() {
@@ -349,6 +360,8 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")
+	fs.BoolVar(&c.events, "events", false, "host 4-seat draft events under /api/events (eventhost; persistence under <dir>/events)")
+	fs.IntVar(&c.maxEvents, "max-events", 4, "maximum draft events not yet COMPLETE")
 	return fs, c
 }
 
@@ -453,7 +466,18 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	}
 
 	load := deckLoaders(reg, c.decks, c.az3Decks, az3Pool)
-	r, err := host.New(c.hostOptions(reg, load))
+	// -events chains the event store's deck loader in front of the ordinary
+	// loaders and hands serve the relay the registry's OnMatchEnd will run
+	// through. Built before host.New because the registry's deck loader must
+	// already answer event deck ids when the eventhost resumes stored
+	// events' in-flight games (events.go).
+	ew, load, err := c.prepareEvents(reg, load)
+	if err != nil {
+		return err
+	}
+	hopts := c.hostOptions(reg, load)
+	ew.hook(&hopts)
+	r, err := host.New(hopts)
 	if err != nil {
 		return err
 	}
@@ -497,6 +521,23 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		}
 		opts.CreateGame = c.createGame(r, gate, cmdPool, conPool, vsbotVis)
 		opts.Seat = gate.resolve
+	}
+	// Draft events (E1): an event's human seats need game tokens minted
+	// through the same gate resolution the rest of the server uses, and the
+	// eventhost must exist before NewHandler mounts /api/events. A server
+	// with -events off leaves evh nil and the surface byte-identical.
+	var evh *eventhost.Host
+	if c.events {
+		if gate == nil {
+			gate = &seatGate{tokenToClaim: map[string]httpapi.SeatClaim{}, claimTokens: map[httpapi.SeatClaim]string{}}
+		}
+		opts.Seat = gate.resolve
+		if evh, err = c.startEvents(ew, r, reg, gate); err != nil {
+			return err
+		}
+		if evh != nil {
+			opts.Events = evh
+		}
 	}
 	// Card art is cached and served from this server's own origin (art.go)
 	// rather than sending every viewer's browser to Scryfall directly — see
@@ -565,6 +606,9 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		seatsDesc = fmt.Sprintf("%d (commander %d)", c.seats, c.commanderSeats)
 	}
 	fmt.Fprintf(os.Stderr, "gorged: %d tables of %s on %s (dir %s)\n", len(r.Tables()), seatsDesc, ln.Addr(), c.dir)
+	if evh != nil {
+		fmt.Fprintf(os.Stderr, "gorged: draft events on (/api/events, dir %s)\n", filepath.Join(c.dir, "events"))
+	}
 	if gate != nil {
 		for _, s := range c.humans {
 			seat := state.PlayerID(s)
@@ -602,16 +646,25 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 			fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...)
 		})
 	}
+	// closeAll shuts the eventhost down BEFORE the registry: an event game
+	// that finishes during shutdown reports through OnMatchEnd, and a relay
+	// call into a closed registry must not start another table on it.
+	closeAll := func() {
+		if evh != nil {
+			_ = evh.Close()
+		}
+		_ = r.Close()
+	}
 	select {
 	case err := <-errc:
 		if mbSrv != nil {
 			_ = mbSrv.Close()
 		}
-		r.Close()
+		closeAll()
 		return err
 	case err := <-mbErrc: // nil when -manabrew-addr was not set; a nil channel never fires
 		_ = srv.Close()
-		r.Close()
+		closeAll()
 		return err
 	case <-ctx.Done():
 	}
@@ -621,7 +674,8 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if mbSrv != nil {
 		_ = mbSrv.Shutdown(shutdown)
 	}
-	return r.Close()
+	closeAll()
+	return nil
 }
 
 // isLoopbackListener reports whether ln is a TCP listener bound to a
