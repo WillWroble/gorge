@@ -105,11 +105,14 @@ func (b *Best23) Build(set string, pool []limited.CardRef) build.Deck {
 	t := b.tuning()
 	all := b.candidates(set, pool)
 
-	// 1. The colour pair whose best MainSize playable cards rate highest.
-	// A short pair is scored with the off-colour fill the build itself
-	// would run — the same best-remaining cards for every short pair — so
-	// a thin pair cannot win merely by holding fewer (even negative) cards
-	// than a deep one.
+	// 1. The colour pair whose best MainSize playable cards rate highest,
+	// scored on its in-pair cards alone (spec §4.6 step 1): a pair short of
+	// MainSize playables pays ShortPairPenalty per unfilled slot instead of
+	// being credited with the off-colour cards the build would pad it with,
+	// so a thin pair padded with other colours' best cards cannot outscores
+	// a deep real pair. The build itself still pads the chosen pair with the
+	// best remaining cards of any colour (spec §4.6 step 4's off-colour
+	// fill) — that fill is never scored.
 	var best, bestAll []candidate
 	bestSum := 0.0
 	for _, pair := range colourPairs {
@@ -131,6 +134,7 @@ func (b *Best23) Build(set string, pool []limited.CardRef) build.Deck {
 			taken[c.id] = true
 			sum += c.rating
 		}
+		sum += t.ShortPairPenalty * float64(t.MainSize-len(main23))
 		for _, c := range all {
 			if len(main23) >= t.MainSize {
 				break
@@ -140,7 +144,6 @@ func (b *Best23) Build(set string, pool []limited.CardRef) build.Deck {
 			}
 			main23 = append(main23, c)
 			taken[c.id] = true
-			sum += c.rating
 		}
 		if sum > bestSum || best == nil {
 			bestSum, best, bestAll = sum, main23, inPair

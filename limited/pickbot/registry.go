@@ -61,22 +61,31 @@ type Tuning struct {
 	MinCreatures int
 	HighValueMV  int
 	MaxHighValue int
+	// ShortPairPenalty is what the builder's pair scan charges a colour pair
+	// per maindeck slot its own cards cannot fill, so a thin pair padded
+	// with the pool's best off-colour cards cannot outscores a deep real
+	// pair (spec §4.6 step 1 scores a pair on its in-pair cards; the
+	// off-colour fill is build-side only). The default −15 puts one
+	// unfilled slot at about what a 0.40-GIH card would earn on the centred
+	// rating scale, and is insensitive between −5 and −30.
+	ShortPairPenalty float64
 }
 
 // DefaultTuning is the spec §4.6 default knob set.
 var DefaultTuning = Tuning{
-	RatingCentre:    0.55,
-	RatingScale:     100,
-	HeuristicCentre: 2,
-	HeuristicScale:  2,
-	ColourFitMax:    4,
-	ColourFitRamp:   9,
-	ColourlessFit:   0.5,
-	MainSize:        23,
-	DeckSize:        40,
-	MinCreatures:    14,
-	HighValueMV:     6,
-	MaxHighValue:    3,
+	RatingCentre:     0.55,
+	RatingScale:      100,
+	HeuristicCentre:  2,
+	HeuristicScale:   2,
+	ColourFitMax:     4,
+	ColourFitRamp:    9,
+	ColourlessFit:    0.5,
+	MainSize:         23,
+	DeckSize:         40,
+	MinCreatures:     14,
+	HighValueMV:      6,
+	MaxHighValue:     3,
+	ShortPairPenalty: -15,
 }
 
 // Drafter picks one card ID out of the pack a PickView offers. r is the
