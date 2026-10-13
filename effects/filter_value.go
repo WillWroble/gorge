@@ -118,11 +118,15 @@ func objectBaseToughness(o *state.Object) int {
 }
 
 // objectManaValue is the one mana-value read the extreme-CMC classifier
-// shares with the rest of the engine: the compiled face's CMC, the same
-// Face().Cmc() read manaValueOf, cascade and the Count$ walkers use. It is
-// the analogue of objectPower for greatestCMC/lowerCMC, so the two extreme
-// classifiers cannot drift on what a card's mana value is.
+// shares with the rest of the engine: a battlefield Room's CR 709.5 value
+// (the sum of its unlocked doors'), otherwise the compiled face's CMC -- the
+// same Face().Cmc() read manaValueOf, cascade and the Count$ walkers use. It
+// is the analogue of objectPower for greatestCMC/lowerCMC, so the two
+// extreme classifiers cannot drift on what a card's mana value is.
 func objectManaValue(o *state.Object) int {
+	if mv, room := roomManaValue(o); room {
+		return mv
+	}
 	f := o.Face()
 	if f == nil {
 		return 0
@@ -360,6 +364,12 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 			// 601.3a check must.
 			if sc.HasManaValue {
 				have = int(sc.ManaValue)
+			} else if mv, room := roomManaValue(o); room {
+				// CR 709.5: a battlefield Room's mana value is its unlocked
+				// doors' sum. parseCMC stays the fallback: a face copy with a
+				// rewritten ManaCost must be priced from the current text
+				// (Face.Cmc is the load-time value and reports unbound).
+				have = mv
 			} else {
 				have = int(parseCMC(f.ManaCost))
 			}

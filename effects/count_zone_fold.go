@@ -246,7 +246,7 @@ func (f *zoneCountFold) visit(id state.ObjID, zone state.Zone, specCtx SpecConte
 		_, dt := o.CounterPTTotals()
 		f.n += int32(o.Face().Toughness()) + dt
 	case zoneFoldPropCardManaCost:
-		f.n += o.Face().Cmc()
+		f.n += int32(objectManaValue(o))
 	case zoneFoldPropCardTypes:
 		vocab := cardTypeWords
 		if f.prop == "CardTypesPermanent" {
@@ -353,9 +353,10 @@ func differentPropertyValue(h Host, o *state.Object, kind differentPropertyKind)
 	case diffManaCost:
 		// Face() is nil for a Card==nil or out-of-range FaceIdx object
 		// (state/object.go); a remembered/targeted shell contributes
-		// nothing rather than panicking the match.
-		if f := o.Face(); f != nil {
-			return f.Cmc(), true
+		// nothing rather than panicking the match. objectManaValue applies
+		// the CR 709.5 Room rule for a battlefield Room.
+		if o.Face() != nil {
+			return int32(objectManaValue(o)), true
 		}
 		return 0, false
 	case diffPower:

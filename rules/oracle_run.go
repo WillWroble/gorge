@@ -32,7 +32,6 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules/chars"
 	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -390,17 +389,17 @@ func (r *oracleRun) objName(o *state.Object) string {
 
 // fieldName is the name the snapshot reports for a permanent. A face-down
 // battlefield permanent has no name (CR 708.2a), so it reports the empty
-// string, exactly as the XMage driver's perm.getName() does. A battlefield
-// Room wears the CR 709.5 name its unlocked doors give it (chars.RoomName):
+// string, exactly as the XMage driver's perm.getName() does. Every other
+// battlefield permanent wears its BOUND derived name (effects.Chars.NameSet):
+// a battlefield Room wears the CR 709.5 name its unlocked doors give it --
 // the empty string when both doors are locked, one door's name when one is
-// unlocked, "Left // Right" when both are -- the same string XMage's
-// RoomCharacteristicsEffect computes. A layer-3 SetName$ effect (CR 613.1b)
-// still wins over that printed-name rule, so a Room wears the derived name
-// when it differs from the printed face name (the only way an effect can
-// override it here). Every other battlefield object wears its layer-3 name
-// (which may differ from its printed face name -- Honest Work's Humble
-// Merchant). Every other zone names the printed face, since a continuous
-// effect only applies on the battlefield.
+// unlocked, "Left // Right" when both are, the same string XMage's
+// RoomCharacteristicsEffect computes -- and a layer-3 SetName$ effect (CR
+// 613.1b) overwrites that when it applies. The bound flag is what makes the
+// both-locked Room's empty string a real answer rather than "read the printed
+// face". A battlefield permanent with no bound name wears its printed face
+// name (the layer walk seeds exactly that). Every other zone names the
+// printed face, since a continuous effect only applies on the battlefield.
 func (r *oracleRun) fieldName(o *state.Object) string {
 	if o == nil || o.Face() == nil {
 		return ""
@@ -409,14 +408,8 @@ func (r *oracleRun) fieldName(o *state.Object) string {
 		if o.FaceDown {
 			return ""
 		}
-		if name, ok := chars.RoomName(o); ok {
-			if n := r.e.Derived(o.ID).Name; n != o.Face().Name {
-				return n
-			}
-			return name
-		}
-		if n := r.e.Derived(o.ID).Name; n != "" {
-			return n
+		if c := r.e.Derived(o.ID); c.NameSet {
+			return c.Name
 		}
 	}
 	return o.Face().Name
