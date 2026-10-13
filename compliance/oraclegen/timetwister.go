@@ -51,6 +51,38 @@ func ShufflesThenDraws(f *cards.Face) bool {
 	return false
 }
 
+// ShufflesThenReadsLibrary reports a face whose Oracle text shuffles a card
+// into a library and, in the same sentence, then reads or moves cards off its
+// top (Stay Hidden, Stay Silent: "shuffle enchanted creature into its owner's
+// library, then manifest dread"). Which card sits on top is random in XMage
+// and seeded in gorge, so a library of Wastes plus the shuffled card can send
+// a different card to the graveyard on each engine.
+func ShufflesThenReadsLibrary(f *cards.Face) bool {
+	if f == nil {
+		return false
+	}
+	for _, sentence := range strings.FieldsFunc(strings.ToLower(f.Oracle), func(r rune) bool {
+		return r == '.' || r == '\n'
+	}) {
+		shuffle := strings.Index(sentence, "shuffle")
+		if shuffle < 0 {
+			continue
+		}
+		tail := sentence[shuffle+len("shuffle"):]
+		then := strings.Index(tail, "then")
+		if then < 0 {
+			continue
+		}
+		after := tail[then+len("then"):]
+		for _, read := range []string{"manifest dread", "manifest the top", "mill", "exile the top", "look at the top", "reveal the top", "put the top", "surveil"} {
+			if strings.Contains(after, read) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // UniformShuffleLibraries makes a shuffle-back-and-draw deterministic on both
 // engines. Gorge's shuffle is seeded and XMage's is not, so a seat that
 // shuffles a returned card into a library of Wastes and draws seven may or

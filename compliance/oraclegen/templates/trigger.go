@@ -89,7 +89,7 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	causes, why, room := roomTriggerCauses(reg, name, req)
 	if !room {
 		causes, why = triggerRecipe(reg, f, name, &f.Triggers[idx], req.Sub)
-		causes = roomSecondDoorCauses(reg, name, req, causes)
+		causes = roomDoorCauses(reg, name, req, causes)
 	}
 	if why != "" {
 		return skip("no recipe: " + why)
