@@ -929,6 +929,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		}
 		g = &group{at: len(em.steps) - 1}
 		for _, ch := range a.choices {
+			seat := ch.seat
 			if ch.x >= 0 && a.kind != "cast" && a.kind != "activate" {
 				// "X=N" not tied to a spell or ability: a damage-assignment
 				// or other amount ask gorge does not pose as a choose.
@@ -941,7 +942,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 					return r
 				}
 				g.xvals = append(g.xvals, xans{Seat: ch.seat, Kind: "mode", Value: pick})
-				g.answers = append(g.answers, answer{Kind: "modes", Pick: []string{lbl}})
+				g.answers = append(g.answers, answer{Kind: "modes", Pick: []string{lbl}, Seat: &seat})
 				continue
 			}
 			if strings.HasPrefix(pick, "name:") {
@@ -964,11 +965,11 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 			if ch.target && !hasTargets {
 				g.targets = append(g.targets, pick)
 			} else if ch.target {
-				g.answers = append(g.answers, answer{Kind: "target", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "target", Pick: []string{pick}, Seat: &seat})
 			} else if ch.x >= 0 {
-				g.answers = append(g.answers, answer{Kind: "choose", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "choose", Pick: []string{pick}, Seat: &seat})
 			} else {
-				g.answers = append(g.answers, answer{Kind: "any", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "any", Pick: []string{pick}, Seat: &seat})
 			}
 		}
 		return nil
