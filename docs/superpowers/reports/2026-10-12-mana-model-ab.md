@@ -1,6 +1,7 @@
 # Mana-model A/B: do bots choose the newly offered options, and does the flag change results?
 
-Ticket `cli-20261010T041236Z-ff0e5565` (round t2), branch
+Ticket `cli-20261010T041236Z-ff0e5565` (harness and first report round t2,
+tables re-derived and verified round t3), branch
 `wt/cli-20261010T041236Z-ff0e5565`, Depends-On
 `cli-20261010T041236Z-2e8dee40` (the widening: `rules.Config.PaidManaCensus`,
 `rules/paid_mana_census.go`, default **off**).
@@ -51,7 +52,10 @@ All 12 jobs are complete (two deck sets × three policy pairs × flag off/on,
    options are a *late-game* phenomenon. In the flag-off (exposure) arms, the
    share of priority windows that expose a new option is 0.02–1.58% at turns
    1–4, 1.4–7.0% at 5–8, 7.8–18.7% at 9–16 and 20–38% at 17+. `az:…:explore`
-   samples moves by visits only on turns 1–4 (`cmd/dzgorge/policy.go:36`), so
+   samples moves by visits only on turns 1–4 (`internal/azmcts/seat.go:65`
+   sets `ExploreTurns: 4`; the sampler is `internal/azmcts/seat.go:227`,
+   `opts.Sample = …G.Turn <= s.cfg.ExploreTurns`; `cmd/dzgorge/policy.go:36`
+   is only the doc line), so
    a generation that explores there almost never sees the option class the
    flag adds. See the recommendation below.
 
@@ -114,6 +118,27 @@ OUT=.ds4/scratch/manamodel DZ=.ds4/scratch/manamodel/dzgorge W=6 PAIRS=600 \
 ```
 
 Tables: `python3 -I scripts/manamodel_ab_report.py .ds4/scratch/manamodel -json report-summary.json`.
+
+## Round t3 verification
+
+Round t3 re-derived every table from the raw per-game JSONL with the committed
+generator, and independently recomputed the win-rate deltas by a second method
+(per-pair means over `(pair, leg)`, 1.96·SE):
+
+```
+python3 -I scripts/manamodel_ab_report.py .ds4/scratch/manamodel \
+  -json /tmp/report-summary-t3.json > /tmp/report-tables-t3.md
+diff .ds4/scratch/manamodel/report-tables.md /tmp/report-tables-t3.md   # byte-identical
+
+python3 -I /tmp/verify.py   # independent recompute of the delta table
+fdn-r1  -0.0067 ±0.0127   fdn-r2  -0.0092 ±0.0167   fdn-r3  -0.0108 ±0.0228
+cons-r1 -0.0142 ±0.0127   cons-r2 +0.0025 ±0.0159   cons-r3 +0.0233 ±0.0214
+```
+
+Both agree with the table below to its printed precision. All 12
+`.summary.json` files exist (12 jobs + the `screen` job), every job reports
+`stalls=0` and `errors=0`, and `probe:mismatch` is 0 on every window of every
+run. The raw files are the authority; the tables are reproducible from them.
 
 ## Results
 
@@ -215,7 +240,8 @@ does not by itself require it. **Operator's call.**
 
 **Exploration.** The plateau is consistent with the exploration window
 missing where the new options live. `az:…:explore` samples moves by visits
-only on turns 1–4 (`cmd/dzgorge/policy.go:36`), while >90% of the flag-added
+only on turns 1–4 (`internal/azmcts/seat.go:65`, `ExploreTurns: 4`; sampler
+`internal/azmcts/seat.go:227`), while >90% of the flag-added
 options appear at turn 5+, and 26–38% of constructed windows at turn 17+
 expose one. A generation that only random-walks turns 1–4 will essentially
 never record the paid-cost choice class into its self-play corpus. Concretely,
