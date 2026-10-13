@@ -102,10 +102,11 @@ func TestStaticContinuousUnobservedStaysSkipped(t *testing.T) {
 // cannot reach carry their own reason rather than the generic one. Sunbird
 // Standard's Effigy face left this table with
 // levelb-static-count-attachments (agent-20261009T055718Z-661990d1): its
-// ExiledWith$Colors CDA is served by the Craft prelude.
+// ExiledWith$Colors CDA is served by the Craft prelude. Lumbering Worldwagon
+// left it with lb4-g7: the crew prelude animates the Vehicle, so its CDA
+// power prints (staticCrewCDAFixture).
 func TestStaticContinuousNamedGaps(t *testing.T) {
 	for _, row := range []struct{ card, key, want string }{
-		{"Lumbering Worldwagon", "static#0.0", "characteristic-defining P/T of a non-creature"},
 		{"Midnight Oil", "static#0.0", "static hand size is not observable"},
 	} {
 		if got := staticSkipReason(t, row.card, row.key); !strings.Contains(got, row.want) {

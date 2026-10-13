@@ -41,6 +41,22 @@ func TestStaticG7ClassServed(t *testing.T) {
 		// graveyarded by the paid branch.
 		{"Osseous Exhale", "static#0.0", `"cast_mode":"optionalcost"`},
 		{"Piercing Exhale", "static#0.0", `{"kind":"arrange","pick":[]}`},
+		// Lesson graveyard gates (static_legality_gated.go).
+		{"The Lion-Turtle", "static#0.0", `"can_attack":{"attacker":"p0:The Lion-Turtle"},"want":false`},
+		{"The Lion-Turtle", "static#0.1", `"can_block":{"blocker":"p0:The Lion-Turtle","attacker":"p1:Savannah Lions"},"want":false`},
+		{"Platypus-Bear", "static#0.0", `"graveyard":["Firebending Lesson"]`},
+		// Ward-scoped DisableTriggers (static_disable_ward.go).
+		{"Nowhere to Run", "static#0.1", `"trigger_on_stack":"p1:Tomakul Honor Guard","want":false`},
+		// Panharmonicon's changeling fallback probe.
+		{"Splinter, Radical Rat", "static#0.0", `"card":"p0:Irregular Cohort"`},
+		// CombatDamageToughness on an equipped attacker.
+		{"Bark of Doran", "static#0.1", `"op":"attach","seat":0,"card":"p0:Bark of Doran","attached_to":"p0:Giant Spider"`},
+		// A Room door's hand-size static, cast rather than placed.
+		{"Roaring Furnace // Steaming Sauna", "static#1.0", `"card":"p0:Steaming Sauna"`},
+		// Unlocked Room doors (static_unlocked_doors.go).
+		{"Rampaging Soulrager", "static#0.0", `"card":"p0:Prop Room"`},
+		// A Vehicle's CDA P/T printed by crewing it.
+		{"Lumbering Worldwagon", "static#0.0", `"xmage_ability":["","","Crew 4",""]`},
 	} {
 		t.Run(tc.card, func(t *testing.T) {
 			req := counterReq(t, reg, tc.card, tc.key)

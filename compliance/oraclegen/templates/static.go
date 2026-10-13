@@ -15,6 +15,7 @@ package templates
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
@@ -225,6 +226,12 @@ func disableTriggersItem(reg *cards.Registry, f *cards.Face, name string, req le
 	skip := func(why string) (oraclegen.Item, *oraclegen.Skip) {
 		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "static DisableTriggers " + why}
 	}
+	if st, _ := staticSlotOf(f, req); disablesWard(st) {
+		if it, ok := disableWardItem(reg, f, name, req); ok {
+			return it, nil
+		}
+		return skip("ward probe's trigger is not suppressed by the card")
+	}
 	probe, ok := reg.Lookup(disableTriggerProbe)
 	if !ok || len(probe.Faces) == 0 {
 		return skip("probe not in corpus")
@@ -292,6 +299,12 @@ func combatDamageToughnessItem(reg *cards.Registry, f *cards.Face, name string, 
 		return skip("control has no combat-damage checkpoint")
 	}
 	// Observation: the card on the battlefield raises the damage to toughness.
+	// An Equipment's static covers only the creature it equips (Bark of
+	// Doran's Creature.EquippedBy+powerLTtoughness): attach it to the
+	// attacker first.
+	if st, _ := staticSlotOf(f, req); strings.Contains(st.ParamStr(cards.PKValidCard), "EquippedBy") {
+		steps = append([]oraclegen.Step{{Op: "attach", Seat: 0, Card: "p0:" + name, AttachedTo: "p0:" + toughnessAttacker}}, steps...)
+	}
 	sc := staticScenario(f, name, []string{name, toughnessAttacker}, nil, steps)
 	p0 := sc.Setup["p0"]
 	setupBackFace(&p0, name, req)

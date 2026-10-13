@@ -117,7 +117,8 @@ import (
 // Re-pinned by lb4-g7 (level-B wave 4 class G7): the gated-grant target
 // fixture serves DFT Slick Imitator (a spell of p0's on the stack) and EOE
 // Adagia, Windswept Bastion (an artifact of p0's), and the split-second
-// observation serves FRA Samut, Tyrant of Naktamun.
+// observation serves FRA Samut, Tyrant of Naktamun; the crew CDA fixture
+// serves DFT Lumbering Worldwagon.
 // It fails in both directions.
 var wantStaticContinuousCensus = map[string]map[string]int{
 	"BIG": {
@@ -146,8 +147,7 @@ var wantStaticContinuousCensus = map[string]map[string]int{
 	// 20261009T055718Z-17e92d7b) is the generic-observability row the
 	// advanced-scenario path serves.
 	"DFT": {
-		"served": 64,
-		"skip:static characteristic-defining P/T of a non-creature (the snapshot omits its P/T)": 1,
+		"served": 65,
 	},
 }
 
