@@ -54,7 +54,11 @@ func oracleCastWantMode(st oracleStep, o *state.Object) string {
 // AlternativeCost-static cast option (Leyline of Mutation's "You may pay
 // {W}{U}{B}{R}{G} rather than pay the mana cost"): the engine offers it as its
 // own "cast" option with no Mode and AltCostIndex 1 (rules/legal_walk_hand.go),
-// so the Mode match alone can never tell it from the plain cast.
+// so the Mode match alone can never tell it from the plain cast. A cast
+// through a may-play permission from a non-hand zone offers its first
+// alternative (Warped Space's "pay {0} rather than pay the mana cost for a
+// spell you cast from exile") the same way under Mode "mayplay"
+// (rules/legal_walk_alt.go), so the mode names that option too.
 const oracleAltCostMode = "alternative"
 
 // oracleCastModeMatches reports whether a cast option is the one a step's
@@ -62,7 +66,7 @@ const oracleAltCostMode = "alternative"
 // option whose Mode equals want for every other mode.
 func oracleCastModeMatches(o decision.Option, want string) bool {
 	if want == oracleAltCostMode {
-		return o.Mode == "" && o.AltCostIndex == 1
+		return (o.Mode == "" || o.Mode == "mayplay") && o.AltCostIndex == 1
 	}
 	return o.Mode == want
 }
