@@ -24,9 +24,13 @@ func init() {
 // shape RollDice's per-roll Notes use.
 const FlipNotePrefix = events.FlipNotePrefix
 
-// FlipCoinWin is the shared outcome oracle for effect and cost-action flips.
-// Edgar's exact first-flip static replaces the random outcome; later flips
-// (including the next one in the same batch) use the seeded RNG again.
+// FlipCoinWin is the shared outcome oracle for one flip that is its own
+// flipping instruction (a cost-action flip, one "flip a coin"): Edgar's
+// FlipCoinMod forces it heads when it is the controller's first flip this
+// turn, otherwise the seeded RNG decides. A multi-coin instruction ("flip two
+// coins") is ONE batch and reads FlipCoinForced once for every coin in it
+// (effFlipCoin), because Edgar's Oracle covers "the first time you flip one
+// or more coins each turn, those coins".
 const (
 	flipModPlayer  = "You"
 	flipModCheck   = "Count$YouFlipThisTurn"
@@ -35,26 +39,40 @@ const (
 )
 
 func FlipCoinWin(h Host, p state.PlayerID) bool {
+	if FlipCoinForced(h, p) {
+		return true
+	}
+	return h.Rand(2) == 0
+}
+
+// FlipCoinForced reports whether player p's next batch of coin flips comes up
+// heads and wins by a FlipCoinMod static (Edgar, King of Figaro's Two-Headed
+// Coin): p controls a battlefield permanent carrying the exact corpus shape
+// and has flipped no coin this turn (Count$YouFlipThisTurn EQ0, folded from
+// the canonical flip Notes into Player.CoinFlipsThisTurn by events.Apply).
+// Any other parameter shape is not read: the flip stays random.
+func FlipCoinForced(h Host, p state.PlayerID) bool {
 	g := h.Game()
-	if int(p) >= 0 && int(p) < len(g.Players) && g.Players[p].CoinFlipsThisTurn == 0 {
-		for _, controller := range g.Players {
-			for _, id := range g.Zone(state.ZBattlefield, controller.ID) {
-				o := g.Obj(id)
-				if o == nil || o.PhasedOut || o.FaceDown || o.Face() == nil || o.Controller != p {
-					continue
-				}
-				for _, st := range o.Face().Statics {
-					if st.Mode == ModeFlipCoinMod && st.ParamStr(cards.PKValidPlayer) == flipModPlayer &&
-						st.ParamStr(cards.PKCheckSVar) == flipModCheck && st.ParamStr(cards.PKSVarCompare) == flipModCompare &&
-						st.ParamStr(cards.PKResult) == flipModResult &&
-						staticKeysReadable(st.Params, "Mode", "ValidPlayer", "CheckSVar", "SVarCompare", "Result", "Description") {
-						return true
-					}
+	if int(p) < 0 || int(p) >= len(g.Players) || g.Players[p].CoinFlipsThisTurn != 0 {
+		return false
+	}
+	for _, controller := range g.Players {
+		for _, id := range g.Zone(state.ZBattlefield, controller.ID) {
+			o := g.Obj(id)
+			if o == nil || o.PhasedOut || o.FaceDown || o.Face() == nil || o.Controller != p {
+				continue
+			}
+			for _, st := range o.Face().Statics {
+				if st.Mode == ModeFlipCoinMod && st.ParamStr(cards.PKValidPlayer) == flipModPlayer &&
+					st.ParamStr(cards.PKCheckSVar) == flipModCheck && st.ParamStr(cards.PKSVarCompare) == flipModCompare &&
+					st.ParamStr(cards.PKResult) == flipModResult &&
+					staticKeysReadable(st.Params, "Mode", "ValidPlayer", "CheckSVar", "SVarCompare", "Result", "Description") {
+					return true
 				}
 			}
 		}
 	}
-	return h.Rand(2) == 0
+	return false
 }
 
 // FlipCoinNote builds the canonical coin-flip result event: Player is the
@@ -313,8 +331,16 @@ func effFlipCoin(h Host, c *Ctx, sa *cards.SA) {
 		if int(p) < 0 || int(p) >= len(g.Players) || g.Players[p].Lost {
 			continue
 		}
+		// One flipping instruction is one batch (Edgar: "those coins come
+		// up heads"): FlipCoinForced is read once, before the batch's first
+		// Note bumps the turn's flip count. FlipUntilYouLose$ is a sequence
+		// of single flips, so only its first flip can be forced.
+		forced := FlipCoinForced(h, p)
 		for i := int32(0); untilLose || i < amount; i++ {
-			win := FlipCoinWin(h, p)
+			win := forced && (i == 0 || !untilLose)
+			if !win {
+				win = h.Rand(2) == 0
+			}
 			h.Emit(FlipCoinNote(c.Source, p, win))
 			flipRecord(h, c, p, win, rememberResult, rememberKind)
 			if win {
