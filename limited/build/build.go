@@ -7,6 +7,7 @@ package build
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/adams-shaun/gorge/deck"
@@ -16,6 +17,17 @@ import (
 // BasicNames names the five basics in the fixed W U B R G order every
 // Basics array uses.
 var BasicNames = [5]string{"Plains", "Island", "Swamp", "Mountain", "Forest"}
+
+// MaxBasicsPerType is the most copies of one basic land type a built deck may
+// carry. MTR 7.1 imposes no maximum — basics are free and unlimited — so this
+// is a hosting bound: it caps an untrusted build request before the count can
+// reach the engine or the deck file.
+const MaxBasicsPerType = 40
+
+// MaxDeckSize is the most cards a built deck may contain, maindeck plus
+// basics. MTR 7.1 imposes no maximum; this is a hosting bound so a crafted
+// request cannot build a deck large enough to DoS an event.
+const MaxDeckSize = 100
 
 // Deck is one seat's built deck: the CardRef IDs it maindecks from its own
 // pool plus the basic lands it adds free of charge (MTR 7.1 — basics are
@@ -27,25 +39,46 @@ type Deck struct {
 	Basics [5]int
 }
 
-// Total is the deck's card count: maindeck cards plus basics.
+// Total is the deck's card count: maindeck cards plus basics. It saturates at
+// the int limits rather than overflowing, so it is safe to call on an
+// untrusted Deck before Validate has bounded its counts.
 func (d Deck) Total() int {
 	n := len(d.Main)
 	for _, c := range d.Basics {
+		switch {
+		case c > 0 && n > math.MaxInt-c:
+			return math.MaxInt
+		case c < 0 && n < math.MinInt-c:
+			return math.MinInt
+		}
 		n += c
 	}
 	return n
 }
 
 // Validate checks a deck against the pool it was built from: at least 40
-// cards, every maindeck ID in the pool, no duplicate IDs. There is no
-// maximum and no copy limit (MTR 7.1); basics are free and unlimited.
+// cards, at most MaxDeckSize, every basic count between 0 and
+// MaxBasicsPerType, every maindeck ID in the pool, no duplicate IDs. There is
+// no copy limit on non-basics (MTR 7.1); basics are free and unlimited under
+// the rules, so the per-type and total caps are hosting bounds.
 func Validate(pool []limited.CardRef, d Deck) error {
+	for i, n := range d.Basics {
+		if n < 0 {
+			return fmt.Errorf("build: %s count %d is negative", BasicNames[i], n)
+		}
+		if n > MaxBasicsPerType {
+			return fmt.Errorf("build: %s count %d exceeds the %d-per-type limit", BasicNames[i], n, MaxBasicsPerType)
+		}
+	}
 	inPool := make(map[string]struct{}, len(pool))
 	for _, c := range pool {
 		inPool[c.ID] = struct{}{}
 	}
-	if total := d.Total(); total < 40 {
+	switch total := d.Total(); {
+	case total < 40:
 		return fmt.Errorf("build: deck has %d cards, want at least 40", total)
+	case total > MaxDeckSize:
+		return fmt.Errorf("build: deck has %d cards, want at most %d", total, MaxDeckSize)
 	}
 	seen := make(map[string]struct{}, len(d.Main))
 	for _, id := range d.Main {
