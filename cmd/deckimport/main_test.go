@@ -9,25 +9,8 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
-
-// testCorpusDir returns the repo-root .cards corpus directory, skipping the
-// test when it is absent (a fresh worktree may not carry the gitignored
-// corpus). It resolves the repo root from the test's own working directory
-// (the package dir, at <root>/cmd/deckimport).
-func testCorpusDir(t *testing.T) string {
-	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Dir(filepath.Dir(wd))
-	dir := filepath.Join(root, ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("no corpus at %s (run make fetch-cards compile-cards)", dir)
-	}
-	return dir
-}
 
 // writeTempDecklist writes body to a temp file and returns its path.
 func writeTempDecklist(t *testing.T, body string) string {
@@ -40,7 +23,7 @@ func writeTempDecklist(t *testing.T, body string) string {
 }
 
 func TestConvertReportsMissingAndForceStillWrites(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	in := writeTempDecklist(t, "4 Lightning Bolt\n4 Monastery Swiftspear\n2 Totally Fake Card\n20 Mountain\n")
 	out := filepath.Join(t.TempDir(), "deck.json")
 
@@ -95,7 +78,7 @@ func TestConvertReportsMissingAndForceStillWrites(t *testing.T) {
 }
 
 func TestDeckimportResolvesFlavorNameAlias(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	// Arvinox, the Mind Flail is the Universes-Within flavour name printed on
 	// Mind Flayer, the Shadow; the alias must resolve through the corpus
 	// registry exactly like the canonical name does.
@@ -115,7 +98,7 @@ func TestDeckimportResolvesFlavorNameAlias(t *testing.T) {
 }
 
 func TestRoundTripWritesLoadableDeckFile(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	in := writeTempDecklist(t, "4 Lightning Bolt\n4 Goblin Guide\n4 Monastery Swiftspear\n12 Mountain\n")
 	out := filepath.Join(t.TempDir(), "deck.json")
 
@@ -146,7 +129,7 @@ func TestRoundTripWritesLoadableDeckFile(t *testing.T) {
 }
 
 func TestConvertRefusesToWriteAnIneligibleCommanderDeck(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	// A commander section whose card is not commander-eligible (Birds of
 	// Paradise is neither legendary nor marked): the deck is resolvable, so
 	// dr.Ok is true, but writing the file would produce a deck that fails
@@ -169,7 +152,7 @@ func TestConvertRefusesToWriteAnIneligibleCommanderDeck(t *testing.T) {
 }
 
 func TestConvertCommanderSetsFieldAndChecksEligibility(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	in := writeTempDecklist(t, "Commander\nAtraxa, Praetors' Voice\n1 Birds of Paradise\n4 Llanowar Elves\n")
 	dr, err := convert(in, corpusDir, "", "", filepath.Join(t.TempDir(), "c.json"), true, "", "")
 	if err != nil {
@@ -236,7 +219,7 @@ func TestJSONReportShape(t *testing.T) {
 }
 
 func TestConvertRejectsUnparseableLine(t *testing.T) {
-	corpusDir := testCorpusDir(t)
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	in := writeTempDecklist(t, "4 Lightning Bolt\nLightning Bolt\n")
 	_, err := convert(in, corpusDir, "", "", "", false, "", "")
 	if err == nil {

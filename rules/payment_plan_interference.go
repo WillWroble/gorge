@@ -133,7 +133,7 @@ func (e *Engine) paymentPlanSourceInterference(id state.ObjID, ma *cards.SA) (pa
 	cost := e.parseCost(ma.ParamStr(cards.PKCost))
 	for _, produced := range pay.PaymentPlanProductions(asPayer(e), id, ma) {
 		if cost.Tap {
-			dmg, by, ok := e.paymentPlanTapObservers(id, controller, produced)
+			dmg, _, by, ok := e.paymentPlanTapObservers(id, controller, produced)
 			if !ok {
 				return deferredBy(by)
 			}
@@ -151,6 +151,20 @@ func (e *Engine) paymentPlanSourceInterference(id state.ObjID, ma *cards.SA) (pa
 	return pay.TierNormal, pay.Consequence{}, ""
 }
 
+// paymentPlanTapExtraMana is the additional mana the deterministic static
+// TapsForMana triggers (pay.PaymentPlanFoldableTapMana) add when id taps for
+// ma producing `produced`. It is the same walk paymentPlanSourceInterference
+// ran: that verdict was not deferred, so every observer is either the source's
+// own damage trigger or folded here.
+func (e *Engine) paymentPlanTapExtraMana(id state.ObjID, produced string) state.Mana {
+	src := e.G.Obj(id)
+	if src == nil {
+		return state.Mana{}
+	}
+	_, extra, _, _ := e.paymentPlanTapObservers(id, src.Controller, produced)
+	return extra
+}
+
 // paymentPlanTapObservers runs every Taps/TapsForMana trigger that could see
 // a mana tap of id (activated by activator, declaring produced) through the
 // real matcher. It returns the source's own City-of-Brass damage, or ok=false
@@ -162,7 +176,7 @@ func (e *Engine) paymentPlanSourceInterference(id state.ObjID, ma *cards.SA) (pa
 // checkFaceTriggers walks them -- and leaves the zone question to the real
 // zoneGate. Granted-trigger statics that observe a Tap are walked over the
 // battlefield recipients their Affected$ admits.
-func (e *Engine) paymentPlanTapObservers(id state.ObjID, activator state.PlayerID, produced string) (damage uint32, by state.ObjID, ok bool) {
+func (e *Engine) paymentPlanTapObservers(id state.ObjID, activator state.PlayerID, produced string) (damage uint32, extra state.Mana, by state.ObjID, ok bool) {
 	// The synchronous context emitManaTap/emitTap establish around the Tap
 	// event, restored before return: this is matcher scratch, not game state.
 	savedObj, savedPlayer, savedEntering := e.tapObj, e.tapPlayer, e.tapEntering
@@ -196,7 +210,20 @@ func (e *Engine) paymentPlanTapObservers(id state.ObjID, activator state.PlayerI
 						continue
 					}
 				}
-				return 0, oid, false
+				// A folded trigger's mana goes to the trigger controller (absent
+				// Defined$ or You) or to the tapped permanent's controller, which
+				// is the payer; a ProduceMana replacement on that extra mana
+				// defers as it does for the source's own production.
+				if tm, folds := pay.PaymentPlanFoldableTapMana(fc.face, t); folds && (tm.ToTapped || o.Controller == activator) {
+					if by, replaced := e.paymentPlanExtraReplaced(oid, activator, tm.Mana); replaced {
+						return 0, state.Mana{}, by, false
+					}
+					for i := range extra {
+						extra[i] += tm.Mana[i]
+					}
+					continue
+				}
+				return 0, state.Mana{}, oid, false
 			}
 		}
 	}
@@ -238,16 +265,30 @@ func (e *Engine) paymentPlanTapObservers(id state.ObjID, activator state.PlayerI
 				}
 				for i, t := range granted {
 					if e.triggerMatchesWithSVars(t, rid, ev, nil, svars[i]) {
-						return 0, ce.Source, false
+						return 0, state.Mana{}, ce.Source, false
 					}
 				}
 			}
 		}
 	}
 	if by, seen := e.paymentPlanDelayedTapObserver(id, ev); seen {
-		return 0, by, false
+		return 0, state.Mana{}, by, false
 	}
-	return damage, 0, true
+	return damage, extra, 0, true
+}
+
+// paymentPlanExtraReplaced reports the first ProduceMana replacement that
+// applies to the mana a folded trigger of oid adds for activator.
+func (e *Engine) paymentPlanExtraReplaced(oid state.ObjID, activator state.PlayerID, m state.Mana) (state.ObjID, bool) {
+	for i, n := range m {
+		if n <= 0 {
+			continue
+		}
+		if by, ok := e.paymentPlanProductionReplaced(oid, activator, string(cards.ManaSymbol(i)), n, false); ok {
+			return by, true
+		}
+	}
+	return 0, false
 }
 
 // paymentPlanDelayedTapObserver reports the source of the first live

@@ -857,6 +857,23 @@ func conditionDefinedGroup(h Host, c *Ctx, sa *cards.SA, defined string) ([]stat
 		}
 		group = []state.Target{{Obj: c.TriggerCard}}
 	}
+	if defined == "TriggeredTargetLKICopy" {
+		// The object (or player) the triggering event happened TO -- the
+		// TriggerContext.TriggerTarget role rules' triggerReferents captures
+		// at fire time (DamageDone/DamageDoneOnce's damaged recipient, the
+		// Attached bearer). The Incredible Hulk's "if he's attacking" and
+		// Snarlfang Vermin's "if that creature is still on the battlefield"
+		// gate on it. Object identity survives a zone change here, so the
+		// member is read live: a recipient that left the battlefield fails
+		// Card.inZoneBattlefield. An ABSENT role (a mode that names no target,
+		// a hand-built context) leaves the gate UNSUPPORTED, this file's
+		// documented fail-open convention.
+		tt := c.TriggerTarget
+		if !tt.IsPlayer && tt.Obj == 0 {
+			return nil, false
+		}
+		group = []state.Target{tt}
+	}
 	if defined == "TriggeredSpellAbility" {
 		// The trigger's spell/ability referent (Shiko and Narset, Unified and
 		// Orvar, the All-Form; 2 corpus carriers) -- the SAME binding the

@@ -24,7 +24,7 @@ const (
 	attackOfferFieldCount      = 4
 	blockChargeFieldCount      = 7
 	objectTypesFieldCount      = 3
-	optionFieldCount           = 42
+	optionFieldCount           = 43
 	grantFieldCount            = 3
 )
 
@@ -214,6 +214,14 @@ func optionEqual(a, b *decision.Option) bool {
 	if a.Grant != b.Grant {
 		if a.Grant == nil || b.Grant == nil || a.Grant.Already != b.Grant.Already ||
 			a.Grant.Duplicate != b.Grant.Duplicate || !sliceEq(a.Grant.Keywords, b.Grant.Keywords) {
+			return false
+		}
+	}
+	if a.Loyalty != b.Loyalty {
+		if a.Loyalty == nil || b.Loyalty == nil ||
+			a.Loyalty.Delta != b.Loyalty.Delta || a.Loyalty.X != b.Loyalty.X ||
+			a.Loyalty.Ultimate != b.Loyalty.Ultimate || a.Loyalty.Removal != b.Loyalty.Removal ||
+			a.Loyalty.Dies != b.Loyalty.Dies || a.Loyalty.Restart != b.Loyalty.Restart {
 			return false
 		}
 	}

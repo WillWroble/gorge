@@ -66,7 +66,8 @@ func (t *trigSubAsk) clone() *trigSubAsk {
 // their targets when placed on the stack; those later choices do not change
 // the CR 603.3d timing.
 // ChangeZone links use their dedicated resolution chooser, which consumes the
-// same SubPreAsk record. TargetingPlayer$ links are excluded whole: the ask
+// same SubPreAsk record. A Defined$ target-reuse link with its own ValidTgts$
+// is announced like any other (see the loop). TargetingPlayer$ links are excluded whole: the ask
 // belongs to a NAMED chooser (the opponent, the triggered player), and the
 // trig_sub continuation assigns the decision to the trigger's controller and
 // cannot yet hand one link's ask to a different seat; the mid-resolution
@@ -85,19 +86,21 @@ func (e *Engine) triggerChainPreAsks(root *cards.SA) []*cards.SA {
 		if effects.TargetsOf(sa).TargetingPlayer != "" {
 			return nil
 		}
-		defined := effects.DefinedRefOf(sa)
-		if effects.TargetAskIsChangeZone(sa) {
+		if effects.TargetAskIsChangeZone(sa) && effects.DefinedRefOf(sa).Set() {
 			// changeZoneChosenTargetsFor owns the resolution ask and consumes
 			// this same SubPreAsk record. A Defined$ ChangeZone names its
 			// referent directly and does not pose a target ask.
-			if defined.Set() {
-				continue
-			}
-		} else if effects.TargetAskReusesPrior(sa) {
-			// Mirror chosenTargetsFor: reusing a prior target is not a new
-			// targeting choice (except Fight's two distinct declarations).
 			continue
 		}
+		// A link that names an earlier target in Defined$ AND declares its
+		// own ValidTgts$ (Iroh, Tea Master's `GainControl | Defined$
+		// Targeted`, the ExchangeControl `Defined$ ParentTarget` pairs) is
+		// still a targeting choice: Forge chooses every TargetRestrictions in
+		// the chain, and the cast-side collectSubTargetPreAsks keeps such
+		// links. chosenTargetsFor never asks them mid-resolution, so placement
+		// is the only point their target is chosen; the resolution reads the
+		// answer through the announced union (Defined$ Targeted) or SubPreAsk
+		// (effExchangeControl).
 		subs = append(subs, sa)
 	}
 	return subs
@@ -142,6 +145,17 @@ func (e *Engine) askTriggerSubTargets() bool {
 	}
 	for ts.stage < len(ts.subs) {
 		sub := ts.subs[ts.stage]
+		// A link whose pool reads an EARLIER target (Glen Elendra's
+		// `ControlledBy Player.wasDealtCombatDamageThisCombatBy ParentTarget`)
+		// is judged against the nearest earlier link's answers, the root's for
+		// the first -- the binding the cast flow's subTargetAsk and the
+		// resolution recheck (recheckCastSubTargets) use.
+		parent := o.Targets
+		if ts.stage > 0 {
+			parent = ts.ans[ts.stage-1]
+		}
+		savedParent, savedBound := e.subOfferParent, e.subOfferBound
+		e.subOfferParent, e.subOfferBound = parent, true
 		candidates := e.legalTargetCandidates(ts.controller, ts.obj, ts.obj, sub)
 		if effects.TargetUniqueRequested(sub) {
 			chosen := append([]state.Target(nil), o.Targets...)
@@ -160,6 +174,7 @@ func (e *Engine) askTriggerSubTargets() bool {
 			candidates = filtered
 		}
 		min, max := e.resolvedTargetBounds(ts.controller, ts.obj, sub, 0)
+		e.subOfferParent, e.subOfferBound = savedParent, savedBound
 		if min > 0 && len(candidates) < min {
 			e.trigSub = nil
 			e.emit(events.Event{Kind: events.MoveZone, Obj: ts.obj,

@@ -657,8 +657,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testDoubleScrivener1",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testDoubleScrivener1"
   },
   {
    "name": "test-double-scrivener2",
@@ -731,8 +730,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testDoubleScrivener2",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testDoubleScrivener2"
   },
   {
    "name": "test-double-scrivener3",
@@ -805,8 +803,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testDoubleScrivener3",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testDoubleScrivener3"
   },
   {
    "name": "test-asmodeus1",
@@ -1191,8 +1188,7 @@
      "eq": 2
     }
    ],
-   "xmage": "DrawEffectsTest#testReflectionAsmodeus1",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testReflectionAsmodeus1"
   },
   {
    "name": "test-reflection-asmodeus2",
@@ -1274,8 +1270,7 @@
      "eq": 4
     }
    ],
-   "xmage": "DrawEffectsTest#testReflectionAsmodeus2",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testReflectionAsmodeus2"
   },
   {
    "name": "test-reflection-asmodeus3",
@@ -1363,8 +1358,7 @@
      "eq": 6
     }
    ],
-   "xmage": "DrawEffectsTest#testReflectionAsmodeus3",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testReflectionAsmodeus3"
   },
   {
    "name": "test-asmodeus-reflection1",
@@ -1674,8 +1668,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testAlmsCollectorReflection1",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testAlmsCollectorReflection1"
   },
   {
    "name": "test-alms-collector-reflection2",
@@ -1739,8 +1732,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testAlmsCollectorReflection2",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testAlmsCollectorReflection2"
   },
   {
    "name": "test-alms-collector-reflection3",
@@ -1804,8 +1796,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testAlmsCollectorReflection3",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testAlmsCollectorReflection3"
   },
   {
    "name": "test-notion-thief-reflection1",
@@ -2111,8 +2102,7 @@
      }
     }
    ],
-   "xmage": "DrawEffectsTest#testReflectionNotionThief1",
-   "known_bug": "B14: after one draw replacement applies (Thought Reflection's draw-two, Blood Scrivener), the remaining draw replacements (Notion Thief, Alms Collector, Asmodeus, a second Scrivener) are not re-applied to the modified draws, so the controller just draws the replaced count. CR 616.1e, 616.5."
+   "xmage": "DrawEffectsTest#testReflectionNotionThief1"
   },
   {
    "name": "test-notion-thief",

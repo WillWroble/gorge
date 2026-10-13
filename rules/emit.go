@@ -167,6 +167,24 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		// ReplaceEffect body changed the amount): the returned event is what
 		// gets logged, not the emit caller's copy.
 		ev = replaced
+	} else if ev.Kind == events.Draw && len(e.replDrawChain) > 0 {
+		// CR 616.1e/614.5: a Draw a draw-replacement body emits is the
+		// modified draw of the one that replacement replaced. It gets its
+		// own replacement pass -- Thought Reflection's two cards still meet
+		// Notion Thief, Asmodeus or a second Blood Scrivener -- with every
+		// replacement already applied to this draw's lineage excluded, this
+		// body's own included, so the chain terminates (CR 614.5: a
+		// replacement effect gets one opportunity per event). The applied
+		// set is empty outside a draw-replacement body, so an unrelated
+		// draw's emit is untouched.
+		savedExclude := e.replExclude
+		e.replExclude = e.replDrawChain
+		replaced, handled := e.applyReplacements(ev)
+		e.replExclude = savedExclude
+		if handled {
+			return replaced
+		}
+		ev = replaced
 	} else if e.redirectRecheck(ev) {
 		replaced, handled := e.applyRedirectReplacements(ev)
 		if handled {
@@ -342,7 +360,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		}
 	}
 	stored := ev
-	e.foldEntryMove(&stored, true)
+	absorbedEntry := e.foldEntryMove(&stored, true)
 	e.expireClonesOnEvent(stored, wasTapped)
 	if stored.Kind == events.MoveZone { // CR 303.4f: a non-cast Aura enters attached to its chosen bearer.
 		settleAuraEntry(e, &stored)
@@ -361,7 +379,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 	if (stored.Kind == events.TokenCreate || stored.Kind == events.CardToken) && tokenMintWant != 0 {
 		// Other permanents' "enters tapped / with a counter" replacements
 		// apply to a token's entry too (rules/token_entry_replacements.go).
-		e.applyTokenEntryUpdates(tokenMintWant)
+		e.applyTokenEntryUpdates(tokenMintWant, absorbedEntry)
 	}
 	// E1 (emit-action.md): any object minted during this event (a token, a
 	// named-card or permanent copy, an ability wrapper) is a card the genesis
@@ -563,6 +581,7 @@ func (e *Engine) emit(ev events.Event) events.Event {
 		delete(e.sacrificedLKI, ev.Obj)
 		delete(e.castExiled, ev.Obj)
 		delete(e.castRevealed, ev.Obj)
+		delete(e.castCounterPut, ev.Obj)
 		delete(e.fuseTargets, ev.Obj)
 		delete(e.copyTargetStage, ev.Obj)
 		delete(e.copyAnswerTargets, ev.Obj)

@@ -433,7 +433,7 @@ func (w *legalWalk) battlefieldWalk() {
 						// offered, and the ability is withheld only when NEITHER cost is
 						// payable.
 						altCost, hasAlt := e.abilityAlternateCost(ab)
-						printedOK := w.offerCastable(p, id, cost, abilityScope(ab), true)
+						printedOK := w.offerCastable(p, id, cost, abilityScope(ab), true) || w.autoPayOffer(p, id, i, cost, ab)
 						altOK := hasAlt && w.offerCastable(p, id, altCost, abilityScope(ab), true)
 						if !printedOK && !altOK {
 							continue
@@ -484,6 +484,7 @@ func (w *legalWalk) battlefieldWalk() {
 								Cost:  e.abilityOfferCost(p, id, ab),
 								Grant: e.abilityGrant(id, ab), Attach: ab.API == "Attach",
 								GrantStatics:  staticModesFromSVars(ab, abFace.SVars),
+								Loyalty:       abilityLoyaltyFact(o, ab, &cost, loyal),
 								SelfSkipTurns: abilitySelfSkipTurns(ab), ForeignSource: o.Controller != p})
 						}
 						if altOK {

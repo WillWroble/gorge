@@ -697,6 +697,9 @@ func incrementAdmits(e Board, source state.ObjID, ev events.Event) bool {
 	return spent > e.Power(source) || spent > e.Toughness(source)
 }
 
+// validSAManaFromPrefix opens the single-field ValidSA$ mana-provenance spellings.
+const validSAManaFromPrefix = "Spell.ManaFrom"
+
 // ValidSAMatches evaluates a SpellCast trigger's ValidSA$ clause. The
 // measured grammar is the mana comparison family, "Spell.ManaSpent <OP><N>"
 // (Roiling Vortex's EQ0 -- no mana was spent to cast that spell; Raggadragga
@@ -715,6 +718,19 @@ func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.Pla
 		if fields[0] == validSATeamworkClause {
 			o := e.Game().Obj(ev.Obj)
 			return o != nil && o.CastFlags&state.FlagTeamworkPaid != 0
+		}
+		if strings.HasPrefix(fields[0], validSAManaFromPrefix) {
+			// Spell.ManaFrom<Tag> (Smaug, Wicked Worm; Mastermind Plum;
+			// Alchemist's Talent) is the SA-level spelling of the card-level
+			// "CastSa Spell.ManaFrom<Tag>" predicate: answer it from the same
+			// spend window through the CastSa provenance strip. A tag the
+			// strip does not know (Spell.ManaFromCard) comes back unchanged
+			// and fails closed.
+			// The strip is exact-token over a base.predicate chain, so the
+			// token rides on a bare "Card" base; a stripped token leaves "Card".
+			spec := "Card.CastSa " + fields[0]
+			rest, ok := e.CastProvenanceAdmits(spec, ev.Obj, ctrl)
+			return ok && rest != spec
 		}
 		return e.MatchesSpec(fields[0], ev.Obj, source, ctrl, SpecOpts{})
 	case 2:

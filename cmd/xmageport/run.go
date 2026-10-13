@@ -117,7 +117,7 @@ func (g *group) placed() []answer {
 		if i < len(g.kinds) && g.kinds[i] < len(ks) {
 			k = g.kinds[i]
 		}
-		out[i] = answer{Kind: ks[k], Pick: a.Pick}
+		out[i] = answer{Kind: ks[k], Pick: a.Pick, Seat: a.Seat}
 	}
 	return out
 }

@@ -492,7 +492,15 @@ func segFresh(dir, cache, seg string) bool {
 
 // refreshSegments rebuilds seg: from the gob cache when that is fresh (a raw
 // decode, no compile), or by recompiling the corpus and saving both files.
+//
+// It holds the cache's single-flight lock (cache_lock.go) and re-checks the
+// segment under it, so concurrent subset openers rebuild it once.
 func refreshSegments(dir, cache, seg string) error {
+	unlock := lockCache(cache)
+	defer unlock()
+	if segFresh(dir, cache, seg) {
+		return nil
+	}
 	if cacheFresh(dir, cache) {
 		if cf, err := decodeCacheFile(cache); err == nil && cf.Version == cacheVersion {
 			return writeSegments(seg, cf.Cards, cf.Tokens)

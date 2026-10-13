@@ -7,6 +7,7 @@ import (
 
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/seat"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -65,7 +66,7 @@ func TestAutoPayFlagReachesFittedSidesAndBaseline(t *testing.T) {
 // TestAutoPayFlagParses runs the real flag path end to end on one pair and one
 // iteration, so a typo in the flag wiring fails here rather than in a fit.
 func TestAutoPayFlagParses(t *testing.T) {
-	dir := corpusDir(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var out, errb bytes.Buffer
 	code := mainExit([]string{"-dir", dir, "-pairs", "mono-black-aggro:mono-white-equipment",
 		"-games", "1", "-iters", "1", "-seed", "7", "-workers", "2", "-fit", "CreatureBase", "-auto-pay", "-quiet"}, &out, &errb)

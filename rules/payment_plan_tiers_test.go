@@ -39,8 +39,11 @@ func TestPaymentPlanTiers(t *testing.T) {
 		{"Horizon Canopy", pay.TierLastResort, "source:last_resort", func(c pay.Consequence) bool { return c.Life == 1 }},
 		{"Lotus Petal", pay.TierLastResort, "source:last_resort", func(c pay.Consequence) bool { return c.Sacrifice }},
 		{"Undiscovered Paradise", pay.TierLastResort, "source:last_resort", func(c pay.Consequence) bool { return c.ReturnToHand }},
-		// Deferred: everything else, manual only.
-		{"Witch Engine", pay.TierDeferred, "source:target", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
+		// Deferred: everything else, manual only. (Witch Engine, the one
+		// "source:target" corpus producer, targets through its SubAbility$, so
+		// CR 605.1a keeps it out of Face.ManaAbilities and this table;
+		// TestChainTargetingManaRiderStaysDeferredWhenPlannedDirectly keeps the
+		// tier covered on an inline fixture.)
 		{"Cryptolith Fragment", pay.TierDeferred, "source:rider", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		{"Mox Poison", pay.TierDeferred, "source:rider", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
 		{"Rainbow Vale", pay.TierDeferred, "source:rider", func(c pay.Consequence) bool { return c == (pay.Consequence{}) }},
@@ -285,14 +288,15 @@ func TestPaymentPlanTiersFPAncientTomb(t *testing.T) {
 
 // TestPaymentPlanTiersFPHarmfulRiderFamily (FP-2b). Every harmful rider shape
 // the census found admitted silently is now either withheld from plans
-// (deferred: life loss to each player, poison, control change, the targeted
-// rider) or, when it is a fully determined last-resort consequence (damage to
-// you, return to hand), planned only with that consequence disclosed in the
-// witness step (aph-last-resort-plans).
+// (deferred: life loss to each player, poison; a control-change or targeted
+// rider is no mana ability at all, CR 605.1a) or, when it is a fully
+// determined last-resort consequence (damage to you, return to hand), planned
+// only with that consequence disclosed in the witness step
+// (aph-last-resort-plans).
 func TestPaymentPlanTiersFPHarmfulRiderFamily(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"Tarnished Citadel", "Cryptolith Fragment", "Elves of Deep Shadow", "Mox Poison",
-		"Rainbow Vale", "Undiscovered Paradise", "Witch Engine", "Cabal Pit"} {
+		"Rainbow Vale", "Undiscovered Paradise", "Cabal Pit"} {
 		t.Run(name, func(t *testing.T) {
 			e, _, spell := newFixtureDeck(t, 9842, "Name:One Probe\nManaCost:1\nTypes:Instant\nA:SP$ Draw | Num$ 1\nOracle:x\n")
 			id := onBoardCard(t, e, 0, corpusTierFixture(t, name))
