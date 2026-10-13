@@ -89,65 +89,22 @@ func cloneSeatCounters(m map[string]map[string]int32) map[string]map[string]int3
 	return out
 }
 
-// faceDownTargetProbe is the Disguise card a "target face-down permanent"
-// ability aims at: cast face down for {3} in the prelude (CR 702.168a), it is
-// the only face-down permanent on the board.
-const faceDownTargetProbe = "Bolrac-Clan Basher"
-
-// faceDownTargetPrelude serves an ability whose only target is a face-down
-// permanent (Hauntwoods Shrieker's "Reveal target face-down permanent"). No
-// setup op places a permanent face down, so the prelude casts the Disguise
-// probe face down from hand and the activation targets it. ok is false for
-// any other ability.
-func faceDownTargetPrelude(reg *cards.Registry, sa *cards.SA, p0 *oraclegen.Seat) ([]oraclegen.Step, []string, bool) {
-	if sa == nil || !faceDownTargetShape(sa) {
-		return nil, nil, false
-	}
-	c, ok := reg.Lookup(faceDownTargetProbe)
-	if !ok || len(c.Faces) == 0 {
-		return nil, nil, false
-	}
-	_, _, mode, _, why := morphFamilyCost(c.Faces[0])
-	if why != "" {
-		return nil, nil, false
-	}
-	p0.Hand = appendFixtureUnique(p0.Hand, faceDownTargetProbe)
-	ref := "p0:" + faceDownTargetProbe
-	return []oraclegen.Step{
-		{Op: "cast", Seat: 0, Card: ref, Mana: faceDownCastPool, CastMode: mode},
-		{Op: "resolve"},
-	}, []string{ref}, true
-}
-
-// faceDownTargetShape reports an ability whose one target filter is a bare
-// face-down card or permanent.
-func faceDownTargetShape(sa *cards.SA) bool {
-	switch strings.TrimSpace(sa.ParamStr(cards.PKValidTgts)) {
-	case "Card.faceDown", "Permanent.faceDown", "Creature.faceDown":
-		return true
-	}
-	return false
-}
-
 // castFixturePrelude is the activate template's one hook for a target the
 // fixture cross product cannot place and a real cast must make: the source's
-// own exiled-with cast, the source's own token-and-secret-choice cast (A
-// Killer Among Us), or a face-down probe. ok is false when neither shape
-// holds.
+// own exiled-with cast, or the source's own token-and-secret-choice cast (A
+// Killer Among Us). A face-down target is the oraclegen candidate's
+// (candidatesFor's Disguise prelude). ok is false when neither shape holds.
 func castFixturePrelude(reg *cards.Registry, f *cards.Face, sa *cards.SA, name string, p0 *oraclegen.Seat) ([]oraclegen.Step, []string, bool) {
 	if steps, targets, ok := exiledWithCastPrelude(f, sa, name, p0); ok {
 		return steps, targets, true
 	}
-	if steps, targets, ok := revealChosenTokenPrelude(f, sa, name, p0); ok {
-		return steps, targets, true
-	}
-	return faceDownTargetPrelude(reg, sa, p0)
+	return revealChosenTokenPrelude(f, sa, name, p0)
 }
 
 // castFixtureShape reports whether castFixturePrelude serves the ability.
 func castFixtureShape(f *cards.Face, sa *cards.SA) bool {
 	_, reveal := revealChosenTokenShape(f, sa)
-	return exiledWithCastShape(f, sa) || reveal || (sa != nil && faceDownTargetShape(sa))
+	return exiledWithCastShape(f, sa) || reveal
 }
 
 // revealChosenTokenShape reads an ability whose cost reveals the source's

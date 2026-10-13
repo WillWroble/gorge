@@ -76,12 +76,6 @@ func TestLevelBCostAndStaticRowsServed(t *testing.T) {
 					}
 				}
 			}},
-		{"Hauntwoods Shrieker", "activate#0.0", "face-down target made by a Disguise cast",
-			func(t *testing.T, it oraclegen.Item, _ rules.OracleResult) {
-				if !stepsCast(it.Scenario.Steps, faceDownTargetProbe) {
-					t.Fatalf("no face-down cast of %s: %+v", faceDownTargetProbe, it.Scenario.Steps)
-				}
-			}},
 		{"Kaito, Bane of Nightmares", "activate#0.3", "Ninjutsu: an unblocked attacker returned",
 			func(t *testing.T, _ oraclegen.Item, res rules.OracleResult) {
 				p, ok := permByNameIn(res, "Kaito, Bane of Nightmares")
