@@ -24,17 +24,22 @@ export type VsBotMulligans = (typeof VS_BOT_MULLIGANS)[number];
  * mulligans is the per-game London allowance. It is always sent: the
  * entry point's default of 6 (mulligan down to one card) is a client choice,
  * independent of the server's -mulligans flag for its own tables.
+ *
+ * botPolicy names the opponent's hosted policy; empty keeps the server's
+ * default (-bot-policy), exactly as an omitted deck id keeps random.
  */
 export async function startPlayVsBot(
   format: VsBotFormat,
   humanDeck = '',
   botDeck = '',
   mulligans: VsBotMulligans = 6,
+  botPolicy = '',
 ): Promise<string> {
   const g: CreateGame = await createGame({
     format,
     ...(humanDeck ? { human_deck: humanDeck } : {}),
     ...(botDeck ? { bot_deck: botDeck } : {}),
+    ...(botPolicy ? { bot_policy: botPolicy } : {}),
     mulligans,
   });
   return withBase(g.join);

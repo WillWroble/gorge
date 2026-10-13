@@ -828,6 +828,18 @@ func TestFormatFlagParsing(t *testing.T) {
 		t.Fatalf("constructed table decks %v, want the constructed pool", cfgs[1].Decks)
 	}
 
+	// -commander-seats seats commander tables apart from -seats (the demo's
+	// 2-seat constructed table beside a 4-seat pod); zero leaves -seats.
+	c.seats = 2
+	for _, tc := range []struct{ cmdSeats, wantCmd int }{{0, 2}, {4, 4}} {
+		c.commanderSeats = tc.cmdSeats
+		cfgs = c.tableConfigs(nil, nil, view.Omniscient)
+		if cfgs[0].Seats != tc.wantCmd || cfgs[1].Seats != 2 {
+			t.Fatalf("-commander-seats %d: commander %d constructed %d seats, want %d and 2",
+				tc.cmdSeats, cfgs[0].Seats, cfgs[1].Seats, tc.wantCmd)
+		}
+	}
+
 	// A junk name fails at apply time, naming the value.
 	c = config{formatsRaw: "constructed,commander,blitz"}
 	if err := c.applyFormats(); err == nil || !strings.Contains(err.Error(), "blitz") {
