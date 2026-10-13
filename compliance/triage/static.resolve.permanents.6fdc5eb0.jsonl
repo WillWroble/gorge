@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"resolve","field":"permanents","diff":"Ornithopter gorge+[4/3] xmage+[1/1]"},"key":"static | resolve | permanents | Ornithopter gorge+[4/3] xmage+[1/1]","cards":1}
+{"card":"Behind the Mask","template":"static#0.0","status":"diverge","api":"Animate","sets":["MKM"],"detail":"step 1 (resolve) permanents: gorge \"c1 o1 Ornithopter [artifact creature thopter] {} 4/3\", xmage \"c1 o1 Ornithopter [artifact creature thopter] {} 1/1\""}

@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"cast","field":"stack","diff":"gorge=[spell:Fractured Realm@p0] xmage=[spell:$CARD@p0]"},"key":"static | cast | stack | gorge=[spell:Fractured Realm@p0] xmage=[spell:$CARD@p0]","cards":1}
+{"card":"Mirror Room","template":"static#1.0","status":"diverge","api":"UnlockDoor:CopyPermanent","detail":"step 0 (cast) stack: gorge \"[spell:Fractured Realm@p0]\", xmage \"[spell:Mirror Room@p0]\""}

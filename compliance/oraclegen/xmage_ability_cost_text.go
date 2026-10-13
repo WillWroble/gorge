@@ -7,6 +7,9 @@
 //
 //   - "Sacrifice this artifact" -> "Sacrifice {this}": SacrificeSourceCost
 //     text is "sacrifice {this}"; ExileSourceCost likewise "exile {this}".
+//     The MKM Case cards are the exception: their solved ability builds a
+//     SacrificeSourceCost with setText("sacrifice this Case") (e.g.
+//     CaseOfTheBurningMasks.java:50), so "Sacrifice this Case" stays verbatim.
 //   - "Remove two +1/+1 counters from this creature" -> "Remove two +1/+1
 //     counters from {this}": RemoveCountersSourceCost (both the count and
 //     the Counter overload) text is "remove ... from {this}", and Forge's
@@ -72,6 +75,12 @@ func xmageCostText(cost, sourceName string) string {
 // xmageCostPart rewrites one comma-separated cost part.
 func xmageCostPart(part string) string {
 	switch {
+	// A Case's solved ability overrides SacrificeSourceCost's default text
+	// with "sacrifice this Case", which AbilityImpl.getRule() renders as
+	// "Sacrifice this Case"; the generic SacrificeSourceCost rewrite to
+	// "{this}" would make the prefix select nothing in XMage.
+	case part == "Sacrifice this Case":
+		return part
 	case sacrificeThisRE.MatchString(part):
 		return "Sacrifice {this}"
 	case exileSelfGraveRE.MatchString(part):

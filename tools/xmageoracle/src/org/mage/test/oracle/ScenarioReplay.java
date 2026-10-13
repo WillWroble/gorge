@@ -46,6 +46,7 @@ import mage.util.RandomUtil;
 import mage.players.Player;
 import mage.filter.FilterCard;
 import mage.target.TargetCard;
+import mage.target.common.TargetCardInGraveyardBattlefieldOrStack;
 import mage.util.CardUtil;
 import mage.watchers.common.PermanentsEnteredBattlefieldWatcher;
 import org.mage.test.player.PlayerAction;
@@ -119,6 +120,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // mode's reduction is in force, and the sacrifice it adds is paid from
     // this cast's own recorded choose picks.
     private boolean bargainedCast = false;
+    // A cast step with cast_mode "optionalcost": gorge elected the cast's
+    // optional additional cost (collect evidence, blight, waterbend, behold),
+    // so the generator's leading scripted "Yes" is that cost's ask. On any
+    // other cast a leading Yes belongs to a later ask and is left queued.
+    private boolean optionalCostCast = false;
 
     /** TestPlayer normally delegates these library decisions directly to its AI,
      * bypassing the scripted target/choice queues. Route them through this player. */
@@ -155,8 +161,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
          * the opening-hand Leyline ask (LeylineAbility) is No; every optional
          * additional cost (kicker, offspring, waterbend: the
          * OptionalAdditionalSourceCosts hook; XMage's mana costs always report
-         * canPay, so it asks even when the pool is short) is No, consuming the
-         * generator's own leading "No" when it scripted one; an either-or
+         * canPay, so it asks even when the pool is short) takes the
+         * generator's own leading "No" when it scripted one, and on an
+         * "optionalcost" cast its leading "Yes" -- gorge elected the cost, so
+         * XMage pays it too; an either-or
          * additional cost (OrCost) takes the cost gorge recorded for the step.
          * Every other ask stays with the scripted queue.
          */
@@ -166,7 +174,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 return false;
             }
             if (askedBy(OptionalAdditionalSourceCosts.class, "addOptionalAdditionalCosts")) {
-                switch (optionalAdditionalCostAnswer(owner.bargainedCast, getChoices())) {
+                switch (optionalAdditionalCostAnswer(owner.bargainedCast, owner.optionalCostCast, getChoices())) {
                     case PAY:
                         // The step elected Bargain: pay the cost. This is the
                         // SAME ask every optional additional cost poses
@@ -548,18 +556,44 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     && target.getChooseHint().startsWith("to sacrifice");
         }
 
+        /** A craft cost's material ask: CraftCost.pay's target is a
+         * TargetCardInGraveyardBattlefieldOrStack (CraftAbility.makeTarget)
+         * with a minimum of two or more materials, and pay() calls
+         * chooseTarget exactly ONCE -- unlike every normal multi-target ask,
+         * which the game re-asks until its minimum is met. A census of the
+         * XMage sets shows the only min>1 users of this target class are the
+         * craft abilities, so this is the structural craft marker. */
+        static boolean isCraftMaterialsAsk(mage.target.Target target) {
+            return target != null
+                    && target.getOriginalTarget() instanceof TargetCardInGraveyardBattlefieldOrStack
+                    && target.getMinNumberOfTargets() > 1;
+        }
+
+        /** Whether the craft fill loop must call chooseTarget again: the ask
+         * has fewer materials chosen than its minimum and the scripted queue
+         * still holds an answer for it. An empty queue stops the loop: the
+         * base player would otherwise fall into strict-mode AI auto-pick (or
+         * fail on an unmatched definition), neither of which a scenario
+         * authored. */
+        static boolean craftMaterialsNeedFill(int chosen, int min, boolean queueNonEmpty) {
+            return chosen < min && queueNonEmpty;
+        }
+
         /** The decision a cast-time optional additional cost ask gets,
          * independent of any Game so the contract test can exercise all three
          * outcomes: a bargained cast PAYs it; otherwise the generator's own
-         * leading "No" is CONSUMED by the caller so strict mode sees it used;
-         * every other ask is DECLINEd (gorge casts for the mana cost only). */
+         * leading "No" is CONSUMED by the caller so strict mode sees it used,
+         * and so is a leading "Yes" on an "optionalcost" cast (gorge elected
+         * the cost, so the consumed Yes pays it); every other ask is DECLINEd
+         * (gorge casts for the mana cost only). */
         enum OptionalCostAnswer { PAY, CONSUME, DECLINE }
 
-        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, List<String> choices) {
+        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, boolean optionalCostCast, List<String> choices) {
             if (bargainedCast) {
                 return OptionalCostAnswer.PAY;
             }
-            if (!choices.isEmpty() && choices.get(0).equals("No")) {
+            if (!choices.isEmpty() && (choices.get(0).equals("No")
+                    || (optionalCostCast && choices.get(0).equals("Yes")))) {
                 return OptionalCostAnswer.CONSUME;
             }
             return OptionalCostAnswer.DECLINE;
@@ -655,6 +689,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     getTargets().remove(0);
                     return true;
                 }
+            }
+            if (isCraftMaterialsAsk(target)) {
+                // CraftCost.pay calls chooseTarget exactly ONCE while
+                // TestPlayer.chooseTarget consumes one queued definition per
+                // call, so without this a craft with two or more materials
+                // would exile only the first and leave the rest of the
+                // scripted queue to fail assertAllCommandsUsed. Fill to the
+                // ask's minimum, one definition per call; the chosen count is
+                // the progress guard, since the base can return true having
+                // only consumed a [target_skip].
+                boolean chosen = super.chooseTarget(outcome, target, source, game);
+                while (chosen && craftMaterialsNeedFill(target.getSize(),
+                        target.getMinNumberOfTargets(), !getTargets().isEmpty())) {
+                    int before = target.getSize();
+                    chosen = super.chooseTarget(outcome, target, source, game);
+                    if (target.getSize() == before) {
+                        break;
+                    }
+                }
+                return chosen;
             }
             return super.chooseTarget(outcome, target, source, game);
         }
@@ -858,6 +912,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             // Reset here so an earlier scenario's Bargain cannot answer this
             // one's optional additional costs.
             bargainedCast = false;
+            optionalCostCast = false;
             gorgeName = str(sc, "card");
             xmageName = str(sc, "xmage_name");
             endTurnScenario = hasEndTurnEffect(xmageName.isEmpty() ? gorgeName : xmageName);
@@ -2030,21 +2085,31 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return s != null ? s : xmageSpelling(n);
     }
 
-    /** One snapshot value's spelling rewrite: gorge spells every card object
-     * by its front face, so XMage's whole "A // B" object name for a
-     * split/Room card (the card under test's whole name, a probe's, an MDFC
-     * land's) is rewritten to its front half, and the spell of a face-1 cast
-     * -- which XMage names by the back half's ability -- is rewritten to the
-     * front the way gorge names the spell. The card under test's back half
-     * is the only back half a scenario can name, so it is the only alias. */
+    /** One snapshot value's spelling rewrite for a STACK SPELL's source: gorge
+     * spells every card object by its front face, so XMage's whole "A // B"
+     * object name for a split/Room card (the card under test's whole name, a
+     * probe's, an MDFC land's) is rewritten to its front half, and the spell
+     * of a face-1 cast -- which XMage names by the back half's ability -- is
+     * rewritten to the front the way gorge names the spell. The card under
+     * test's back half is the only back half a scenario can name, so it is
+     * the only alias. The back-half alias is valid ONLY for a spell: a Room
+     * permanent whose back door is unlocked really is named for that back
+     * half (CR 709.5), and gorge reports it so; use gorgeObjectSpellingRule
+     * for every other snapshot string. */
     static String gorgeSpellingRule(String gorgeName, String xmageName, String s) {
-        if (!xmageName.isEmpty()) {
-            if (s.equals(xmageName)) {
-                return gorgeName;
-            }
-            if (xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
-                return gorgeName;
-            }
+        if (!xmageName.isEmpty() && xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
+            return gorgeName;
+        }
+        return gorgeObjectSpellingRule(gorgeName, xmageName, s);
+    }
+
+    /** The spelling rewrite for every snapshot string that is not a stack
+     * spell's source (permanents, zones, ability sources, targets): the
+     * whole object name reads as the front half, and a bare back-half name is
+     * left alone, because a Room's unlocked back door is a real name. */
+    static String gorgeObjectSpellingRule(String gorgeName, String xmageName, String s) {
+        if (!xmageName.isEmpty() && s.equals(xmageName)) {
+            return gorgeName;
         }
         return frontHalf(s);
     }
@@ -2052,22 +2117,32 @@ public class ScenarioReplay extends CardTestPlayerBase {
     /** Rewrites XMage's spelling of the card under test back to the scenario's
      * (gorge) spelling throughout a value, so the comparator sees one name. */
     private JsonElement gorgeSpellings(JsonElement e) {
+        return gorgeSpellings(e, false);
+    }
+
+    private JsonElement gorgeSpellings(JsonElement e, boolean spellSource) {
         if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
             String s = e.getAsString();
-            String r = gorgeSpellingRule(gorgeName, xmageName, s);
+            String r = spellSource ? gorgeSpellingRule(gorgeName, xmageName, s)
+                    : gorgeObjectSpellingRule(gorgeName, xmageName, s);
             return r.equals(s) ? e : new JsonPrimitive(r);
         }
         if (e.isJsonArray()) {
             JsonArray a = new JsonArray();
             for (JsonElement x : e.getAsJsonArray()) {
-                a.add(gorgeSpellings(x));
+                a.add(gorgeSpellings(x, false));
             }
             return a;
         }
         if (e.isJsonObject()) {
+            JsonObject in = e.getAsJsonObject();
+            // A stack entry {"kind":"spell","source":name}: only its source
+            // is the spell's name and takes the face-1 back-half alias.
+            JsonElement kind = in.get("kind");
+            boolean spell = kind != null && kind.isJsonPrimitive() && "spell".equals(kind.getAsString());
             JsonObject o = new JsonObject();
-            for (Map.Entry<String, JsonElement> en : e.getAsJsonObject().entrySet()) {
-                o.add(en.getKey(), gorgeSpellings(en.getValue()));
+            for (Map.Entry<String, JsonElement> en : in.entrySet()) {
+                o.add(en.getKey(), gorgeSpellings(en.getValue(), spell && en.getKey().equals("source")));
             }
             return o;
         }
@@ -2353,6 +2428,20 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return cmds;
     }
 
+    /** A pass_to for decision "priority" that directly follows a pass_to for
+     * decision "choose": gorge posed a mid-resolution ask at the first and
+     * answers it at the second, so XMage must resolve the stack's top object
+     * before this step's checkpoint (planCounterCauses' proliferate recipe). */
+    static boolean passToResolvesTop(JsonArray steps, int index) {
+        if (index < 1 || index >= steps.size()) {
+            return false;
+        }
+        JsonObject cur = steps.get(index).getAsJsonObject();
+        JsonObject prev = steps.get(index - 1).getAsJsonObject();
+        return str(cur, "op").equals("pass_to") && str(cur, "decision").equals("priority")
+                && str(prev, "op").equals("pass_to") && str(prev, "decision").equals("choose");
+    }
+
     private void queuePassCommands(int stepIdx) {
         for (String cmd : passCommands(steps(sc0), stepIdx, activeSeat)) {
             switch (cmd) {
@@ -2432,6 +2521,16 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 // beginStep before any priority), so this is for completeness.
                 String stepName = str(st, "step");
                 String decision = str(st, "decision");
+                if (passToResolvesTop(steps(sc0), stepIdx)) {
+                    // gorge's two-step "choose" then "priority" reaches a
+                    // mid-resolution ask and answers it; XMage cannot stop
+                    // inside a resolution, so the spell or ability stays on
+                    // its stack until the second step resolves its top object
+                    // (the answers are consumed by that resolution).
+                    waitStackResolved(turn, phase, p, true);
+                    dropLastCast();
+                    return;
+                }
                 if (st.has("active")) {
                     String active = str(st, "active");
                     int nextActiveSeat = active.equals("p1") ? 1 : active.equals("p0") ? 0 : -1;
@@ -2546,6 +2645,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     throw new IllegalArgumentException("cast_mode " + castMode + " unsupported");
                 }
                 bargainedCast = "bargained".equals(castMode);
+                optionalCostCast = "optionalcost".equals(castMode);
                 // "plot" is XMage's Plot special action (PlotAbility is a
                 // SpecialAction: no stack, not a cast), activated from the
                 // hand by its rule text "Plot {cost}" like XMage's own
