@@ -1055,6 +1055,9 @@ type attackManaSource struct {
 	// mana vector unlessManaReachable prices against.
 	counts [6]int32
 	amt    int32
+	// life is the life the activation pays (a paid-cost census alt,
+	// paid_mana_census.go; 0 for every free-cost source).
+	life int32
 	// prod is the exact production one activation yields, rendered as braced
 	// symbols ("{R}", "{C}{C}"): the tap option's label, so the
 	// alternatives of one multi-ability permanent are distinguishable on the
@@ -1077,7 +1080,7 @@ func (e *Engine) attackWindowUnits(p state.PlayerID, exclude map[state.ObjID]boo
 		if exclude[s.id] {
 			continue
 		}
-		alt := windowManaAlt{Ma: s.ma, Counts: s.counts, Amt: s.amt}
+		alt := windowManaAlt{Ma: s.ma, Counts: s.counts, Amt: s.amt, Life: s.life, LifeKeep: s.life > 0}
 		if i, ok := idx[s.id]; ok {
 			out[i].Alts = append(out[i].Alts, alt)
 			continue
@@ -1160,7 +1163,7 @@ func (e *Engine) attackManaSources(p state.PlayerID) []attackManaSource {
 	// window taps one concrete ability with no sub-ask, and windowManaUnits
 	// already exposes one alt per priceable ability, so every alt becomes an
 	// option -- a multi-colour dual's two intrinsics are both payable now.
-	for _, u := range e.windowManaUnits(p) {
+	for _, u := range e.windowManaUnitsPaid(p) {
 		for _, a := range u.Alts {
 			units := int32(0)
 			for _, n := range a.Counts {
@@ -1169,7 +1172,7 @@ func (e *Engine) attackManaSources(p state.PlayerID) []attackManaSource {
 			if units <= 0 {
 				continue
 			}
-			out = append(out, attackManaSource{id: u.ID, ma: a.Ma, original: a.Ma, gained: pay.GainedManaRefFor(asPayer(e), p, u.ID, a.Ma), units: units, counts: a.Counts, amt: a.Amt, prod: manaUnitsLabel(a.Counts, a.Amt)})
+			out = append(out, attackManaSource{id: u.ID, ma: a.Ma, original: a.Ma, gained: pay.GainedManaRefFor(asPayer(e), p, u.ID, a.Ma), units: units, counts: a.Counts, amt: a.Amt, life: a.Life, prod: manaUnitsLabel(a.Counts, a.Amt)})
 		}
 	}
 	// The choice-shaped productions the shared membership deliberately

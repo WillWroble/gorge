@@ -27,6 +27,14 @@ import (
 // longer indexes the face) degrades to a no-op rather than panicking the one
 // goroutine driving the match.
 func (e *Engine) beginActivation(p state.PlayerID, opt decision.Option) {
+	e.beginActivationPaid(p, opt, false)
+}
+
+// beginActivationPaid is beginActivation; autoPay arms the planner's witness
+// for an ability the floating pool cannot pay (armAbilityAutoPay), the way the
+// priority offer's autopay row (autoPayOffer) promised. A direct caller that
+// wants the manual CR 601.2g window passes false.
+func (e *Engine) beginActivationPaid(p state.PlayerID, opt decision.Option, autoPay bool) {
 	o := e.G.Obj(opt.Obj)
 	if o == nil {
 		return
@@ -128,6 +136,9 @@ func (e *Engine) beginActivation(p state.PlayerID, opt decision.Option) {
 	}
 	e.cast = e.newCast(p, opt.Obj, o.Zone, "", opt.Ability)
 	e.cast.abilityMerged, e.cast.cost, e.cast.mods, e.cast.ownReduce = pa.Merged, cost, mods, own
+	if autoPay && opt.AltCostIndex == 0 {
+		e.armAbilityAutoPay(e.cast, opt.Ability)
+	}
 	e.continueCast()
 }
 
