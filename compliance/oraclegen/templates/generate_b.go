@@ -33,6 +33,9 @@ func GenerateB(reg *cards.Registry, name string, req levelb.Requirement) (item o
 		// driver; a slot a family builder left empty is filled here from the
 		// step's own card (activate_xability_fill.go, cluster C5).
 		fillActivateXAbility(reg, &item)
+		// A pass_to the driver would place in the wrong step names where
+		// gorge stopped (passto_pin.go).
+		pinPassToSteps(reg, &item)
 		c, ok := reg.Lookup(name)
 		if !ok || req.Face < 0 || req.Face >= len(c.Faces) {
 			return
