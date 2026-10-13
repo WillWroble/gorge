@@ -27,6 +27,20 @@ func mmOptKey(o decision.Option) string {
 	return fmt.Sprintf("%s|%d|%s|%s|%d", o.Kind, o.Obj, o.Label, o.ManaSymbol, o.Player)
 }
 
+// mmTurnBucket groups gorge's turn counter (both players' turns): 1-4 is the
+// span :explore samples by visits.
+func mmTurnBucket(turn int32) string {
+	switch {
+	case turn <= 4:
+		return "1-4"
+	case turn <= 8:
+		return "5-8"
+	case turn <= 16:
+		return "9-16"
+	}
+	return "17+"
+}
+
 func mmBucket(n int) string {
 	switch {
 	case n == 0:
@@ -74,6 +88,7 @@ func (m mmStats) observe(e *rules.Engine, engineFlag, auto bool, d *decision.Dec
 		return
 	}
 	m.add("windows", 1)
+	m.add("turn:"+mmTurnBucket(e.G.Turn), 1)
 	all, spells := mmVisibleList(d, auto)
 	own := e.G.Active == d.Player && e.G.Step.IsMain() && len(e.G.Stack) == 0
 	m.add("list:all:"+mmBucket(all), 1)
@@ -121,6 +136,8 @@ func (m mmStats) observe(e *rules.Engine, engineFlag, auto bool, d *decision.Dec
 		return
 	}
 	m.add("new:windows", 1)
+	tb := mmTurnBucket(e.G.Turn)
+	m.add("new:turn:"+tb, 1)
 	if own {
 		m.add("new:ownmain:windows", 1)
 	}
@@ -131,6 +148,7 @@ func (m mmStats) observe(e *rules.Engine, engineFlag, auto bool, d *decision.Dec
 		for _, o := range d.Options {
 			if o.Index == in.Choices[0] && newKeys[mmOptKey(o)] {
 				m.add("new:chosen", 1)
+				m.add("new:chosen:turn:"+tb, 1)
 				m.add("new:chosen:kind:"+o.Kind, 1)
 			}
 		}
