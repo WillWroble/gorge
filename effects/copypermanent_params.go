@@ -140,7 +140,7 @@ var copyPermanentKnownKeys = [...]string{
 	"ChooseFromList", "Chooser", "ClassBand", "ClearImprinted", "Condition",
 	"ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn",
 	"ConditionPresent", "ConditionPresent2", "ConditionSVarCompare", "ConditionZone", "Controller", "CopyCard", "Cost",
 	"CostDesc", "Defined", "DefinedCards", "DefinedName", "DefinedTarget",
 	"Description", "Exclude", "Execute", "Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image",

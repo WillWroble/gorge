@@ -1226,15 +1226,14 @@ func (e *Engine) triggeredCostComponentsPayable(tc *triggeredEffectCost) bool {
 		}
 		if triggeredPartIsDiscard(amt, i) && strings.EqualFold(part.Spec, "Hand") {
 			// The Hand shape pays the whole hand: every card the hand still
-			// holds is reserved and the token's count is satisfied whenever
-			// the hand holds at least that many -- a Discard<1/Hand> token
-			// needs a card; a Discard<0/Hand> one is payable with an empty
-			// hand (a free pay-nothing election, disclosed in the round-2
-			// report; no corpus carrier is measured for it in a window cost).
+			// holds is reserved, whatever count the token spells. "Discard
+			// your hand" is payable with an EMPTY hand -- discarding zero
+			// cards demands no resource the payer lacks (CR 118.3; Byway
+			// Barterer's ruling: "You may discard your hand even if it has
+			// no cards in it"), the reading the cast path's
+			// pay.DiscardCostPayable already gives the same token and
+			// Forge's CostDiscard ("an empty hand always works").
 			cands := e.triggeredMandatoryCandidatesWith(tc, i, part, reserved)
-			if part.N > 0 && int32(len(cands)) < part.N {
-				return false
-			}
 			for _, id := range cands {
 				reserved[id] = true
 			}

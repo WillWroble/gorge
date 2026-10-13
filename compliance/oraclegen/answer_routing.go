@@ -374,8 +374,12 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 	case digExileComplement(d) != "":
 		// XMage's Dig dialog for the exile-second-destination family selects
 		// the card to EXILE, the opposite of gorge's pick (the card to hand),
-		// so the scripted answer is the other offered option.
-		return append(as, XAnswer{d.Seat, "choice", digExileComplement(d)}), true
+		// so the scripted answer is the other offered option. The dialog is
+		// LookLibraryAndPickControllerEffect's chooseTarget over a TargetCard,
+		// the TARGET queue (measured 2026-10-13: "Missing TARGET def ...
+		// TargetCard", the choice-queue answer left unused and the AI
+		// exiling the card gorge kept).
+		return append(as, XAnswer{d.Seat, "target", digExileComplement(d)}), true
 	case d.Resume == "taporuntap" && len(d.Picks) == 1:
 		// TapOrUntap's election is XMage's chooseUse, not a labelled choice:
 		// the pick's option index maps to the boolean (option 0, the
@@ -390,11 +394,14 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return perControllerTargetAnswers(d), true
 	case d.Resume == "hidden_pick" && len(d.Picks) == 0 && d.Min == 0 && d.Max > 0:
 		// A declined "you may put it into your hand" hidden pick (Sparring
-		// Dummy's milled land): XMage poses the optional ask on its target
-		// queue only, so the skip token declines it there. The declined
-		// pair's "no" boolean has no chooseUse to answer (measured driver
-		// error: "Found wrong choice command").
-		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
+		// Dummy's milled land): XMage's player.choose(Outcome, Cards,
+		// TargetCard) is TestPlayer.makeChoose, the CHOICE queue (measured
+		// 2026-10-13: "Missing CHOICE def ... TargetCard", with the earlier
+		// target-queue skip left unused and the AI taking the land), so the
+		// choice skip token declines it. The declined pair's "no" boolean has
+		// no chooseUse to answer (measured driver error: "Found wrong choice
+		// command").
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}), true
 	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && r.lookedFirst(i):
 		// A declined optional Play after a hidden-zone look (Cosmic Cube's
 		// "you may cast a spell from among them"). XMage's

@@ -111,6 +111,7 @@ func NonManaCastableP(e Engine, p state.PlayerID, id state.ObjID, cost *costvoca
 				avail = append(avail, oid)
 			}
 		}
+		avail = DistinctNameCandidates(e, part.Spec, avail)
 		if int32(len(avail)) < part.N {
 			return false
 		}

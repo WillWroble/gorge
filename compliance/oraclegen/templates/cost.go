@@ -110,6 +110,13 @@ func costStatic(reg *cards.Registry, f *cards.Face, name string, req levelb.Requ
 	case "Terror of the Peaks":
 		cands = []costProbe{{spell: "Shock", mana: "R", battlefield: []string{name}, targeted: true, opponent: true}}
 	default:
+		if ps, pgap, handled := raiseCostChosenProbes(reg, f, name, idx); handled {
+			if len(ps) == 0 {
+				return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: costStaticGap(f.Statics[idx], pgap)}
+			}
+			cands = ps
+			break
+		}
 		ps, pgap, handled := parameterCostProbes(reg, f, name, idx)
 		if len(ps) > 0 {
 			cands = ps

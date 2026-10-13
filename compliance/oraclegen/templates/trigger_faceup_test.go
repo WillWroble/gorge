@@ -31,6 +31,12 @@ var turnFaceUpCases = []struct {
 	// itself is no morph family (it is a DSK payoff), so the recipe falls
 	// back to turning up a probe. Its TurnFaceUp trigger is the card's second.
 	{"Cryptid Inspector", "trigger#0.1", levelb.TurnedFaceUpSub, "Bolrac-Clan Basher", false, "disguised", "{3}{R}{R}: Turn this face-down permanent face up."},
+	// Fugitive Codebreaker's Disguise cost carries a graveyard-count
+	// reduction rider (wave-4 lb4-gtrig); the scenario's graveyard is empty.
+	{"Fugitive Codebreaker", "trigger#0.0", levelb.TurnedFaceUpSub, "Fugitive Codebreaker", true, "disguised", "{5}{R}: Turn this face-down permanent face up."},
+	// Growing Dread's "Whenever YOU turn a permanent face up" (ValidCause$
+	// SpellAbility.YouCtrl) is p0's own turn-up of a probe (wave-4 lb4-gtrig).
+	{"Growing Dread", "trigger#0.1", levelb.TurnedFaceUpOtherSub, "Bolrac-Clan Basher", false, "disguised", "{3}{R}{R}: Turn this face-down permanent face up."},
 }
 
 // TestTurnFaceUpTriggerRecipeFires: each turned-face-up item generates, casts

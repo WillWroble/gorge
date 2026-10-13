@@ -156,32 +156,42 @@ func TestAmbergrisStyleDiscardDrawCostDeclineMovesNothing(t *testing.T) {
 	}
 }
 
-// TestTriggerCostEmptyHandDeclinesNoHalfPayment pins the gate's empty-hand
-// half: with an empty hand the Hand-spec discard cannot pay, so the window
-// offers DECLINE ONLY -- the cost's draw half is never paid on an unpaid
-// component.
-func TestTriggerCostEmptyHandDeclinesNoHalfPayment(t *testing.T) {
+// TestTriggerCostEmptyHandDiscardIsPayable pins the gate's empty-hand half:
+// "discard your hand" demands no card the payer lacks, so with an EMPTY hand
+// the Hand-spec discard is still payable (CR 118.3; Byway Barterer's ruling
+// "You may discard your hand even if it has no cards in it") -- the window
+// offers pay beside decline, and paying discards nothing while the cost's
+// draw half and the body's draw both happen.
+func TestTriggerCostEmptyHandDiscardIsPayable(t *testing.T) {
 	t.Parallel()
 	e := handEngine(t)
 
 	d := etbCostWindow(t, e, discardCostLooter)
-	pay, decline := windowPayDecline(t, d)
-	if pay >= 0 {
-		t.Fatalf("an empty-hand Discard<1/Hand> cost was offered as payable: %+v", d.Options)
+	pay, _ := windowPayDecline(t, d)
+	if pay < 0 {
+		t.Fatalf("an empty-hand Discard<1/Hand> cost was offered decline-only: %+v", d.Options)
 	}
 	mark := len(e.L.Events)
-	submitChoices(t, e, decline)
+	submitChoices(t, e, pay)
 	passUntilStackEmpty(t, e, 20)
 
+	draws := 0
 	for _, ev := range e.L.Events[mark:] {
-		if ev.Kind == events.Draw || events.IsDiscard(ev) {
-			t.Fatalf("the unpayable cost still moved a card: %+v", ev)
+		if events.IsDiscard(ev) {
+			t.Fatalf("an empty hand discarded a card: %+v", ev)
 		}
+		if ev.Kind == events.Draw {
+			draws++
+		}
+	}
+	if got := len(e.G.Zone(state.ZHand, 0)); got != 3 || draws != 3 {
+		t.Fatalf("hand = %d after %d draws, want 3 (the cost's two and the body's one)", got, draws)
 	}
 }
 
-// TestTriggerCostEmptyHandOrdinarySpecDeclines is the ordinary-spec twin: a
-// `Cost$ Discard<1/Card>` body with no hand card is decline-only too.
+// TestTriggerCostEmptyHandOrdinarySpecDeclines is the ordinary-spec contrast:
+// a `Cost$ Discard<1/Card>` body ("discard a card") with no hand card IS
+// unpayable, so its window is decline-only.
 func TestTriggerCostEmptyHandOrdinarySpecDeclines(t *testing.T) {
 	t.Parallel()
 	const script = "Name:Ordinary Discarder\nManaCost:1 B\nTypes:Creature Zombie\nPT:1/1\n" +

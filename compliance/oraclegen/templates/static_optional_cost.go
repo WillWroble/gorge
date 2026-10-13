@@ -179,6 +179,16 @@ func paidOptionalCostItem(reg *cards.Registry, f *cards.Face, name string, req l
 	}
 	pSnap, ok1 := lastSnapshot(reg, paid)
 	dSnap, ok2 := lastSnapshot(reg, declined)
+	if ok1 && ok2 && pSnap == dSnap {
+		// A paid branch that only looks at the library (Piercing Exhale's
+		// "If a Dragon was beheld, surveil 2") leaves the same board when
+		// the looked-at cards stay on top, as they do over the Wastes
+		// filler: graveyard them instead (optional_cost_arrange.go).
+		if moved, ok := paidArrangeToGraveyard(reg, f, paid); ok {
+			paid = moved
+			pSnap, ok1 = lastSnapshot(reg, paid)
+		}
+	}
 	if !ok1 || !ok2 || pSnap == dSnap {
 		return oraclegen.Item{}, false
 	}

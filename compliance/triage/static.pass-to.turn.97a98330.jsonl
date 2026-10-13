@@ -1,0 +1,3 @@
+{"shape":{"template":"static","op":"pass_to","field":"turn","diff":"gorge=2 xmage=1"},"key":"static | pass_to | turn | gorge=2 xmage=1","cards":2}
+{"card":"Archangel of Tithes","template":"static#0.0","status":"diverge","api":"-","sets":["OTJ"],"detail":"step 1 (pass_to) turn: gorge \"2\", xmage \"1\""}
+{"card":"Dáin, Lord of the Iron Hills","template":"static#0.0","status":"diverge","api":"-","sets":["HOB"],"detail":"step 1 (pass_to) turn: gorge \"2\", xmage \"1\""}

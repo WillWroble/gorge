@@ -104,7 +104,8 @@ func TestStaticPanharmoniconNamedSkips(t *testing.T) {
 	cases := []struct{ card, want string }{
 		{"Roaming Throne", "as-enters creature-type choice"},
 		{"Cloud, Midgar Mercenary", "equipped-self filter"},
-		{"Splinter, Radical Rat", "no creature probe with a simple enters trigger"},
+		// Splinter, Radical Rat left this table (lb4-g7): the changeling
+		// fallback probe (Irregular Cohort) satisfies its Ninja filter.
 	}
 	for _, tc := range cases {
 		req := panharmoniconReq(t, reg, tc.card)

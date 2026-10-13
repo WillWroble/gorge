@@ -231,7 +231,9 @@ func (e *Engine) offerCastableUsing(statics costStaticViews, p state.PlayerID, i
 		tax = e.commanderTaxAmount(p, id)
 	}
 	delve := int32(0)
-	if e.hasKeywordH(id, kwhDelve) {
+	// Delve reduces a SPELL's cost (CR 702.66a); an ability scope keeps the
+	// object's own current-zone keyword read.
+	if scope.Kind == "Spell" && e.hasCastDelve(id) || scope.Kind != "Spell" && e.hasKeywordH(id, kwhDelve) {
 		delve = int32(len(e.G.Zone(state.ZGraveyard, p)))
 	}
 	if !e.manaFeasiblePricedP(p, id, ability, base, &mods, tax, delve, hyp) {

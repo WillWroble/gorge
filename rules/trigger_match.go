@@ -199,6 +199,10 @@ type pendingTrigger struct {
 	// with the cast spell riding IDs as Remembered. Idx and SA are unset
 	// for it.
 	Demonstrate bool
+	// Storm is a GRANTED storm keyword (a layer-6 AddKeyword$ Storm --
+	// Prismari, the Inspiration's instant/sorcery grant): the Demonstrate
+	// shape, pushed with the __kwStorm: payload (rules/storm_granted.go).
+	Storm bool
 	// Cipher is the combat-damage-to-player trigger a creature's ENCODED
 	// card grants (CR 702.99b: "Whenever that creature deals combat damage
 	// to a player, its controller may cast a copy of the encoded card
@@ -1257,6 +1261,7 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 				case events.PutOnStack:
 					e.checkGrantedConspireTriggers(observer, id, o, f, *ev, objLKI)
 					e.checkGrantedDemonstrateTriggers(observer, id, o, f, *ev, objLKI)
+					e.checkGrantedStormTriggers(observer, id, o, f, *ev, objLKI)
 				case events.MoveZone:
 					e.checkGrantedExploitTriggers(observer, id, o, f, *ev, objLKI)
 					e.checkGrantedOffspringTriggers(observer, id, o, f, *ev, objLKI)
@@ -1831,6 +1836,8 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 		// carrying a Demonstrate grant) -- the same both-paths rule Conspire
 		// follows.
 		e.checkGrantedDemonstrateTriggers(observer, id, o, f, *ev, objLKI)
+		// A granted Storm follows the same both-paths rule.
+		e.checkGrantedStormTriggers(observer, id, o, f, *ev, objLKI)
 		// A granted Exploit must fire when its creature enters even when the
 		// object's own printed triggers are live for this event -- the same
 		// both-paths rule Afflict and Conspire follow.

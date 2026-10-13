@@ -36,13 +36,13 @@ func discardNamedCard(filter string) (string, bool) {
 }
 
 // discardFixtureSupported covers the single-card discard selectors: any card,
-// a legendary card and a card with a literal name. A legendary card that must
-// share a name with a legendary permanent (Key to the Side-Door's
-// `sharesNameWith Valid Permanent.Legendary+YouCtrl`) stays a named gap: the
-// engine's sharesNameWith reads only a Targeted/Remembered/TriggeredCard
-// referent (effects/filter_attachment.go sharesNameWithArg), so it never
-// offers the ability however the board is set. One deterministic hand fixture is
-// sufficient and the engine/XMage answer translation selects it.
+// a legendary card, a card with a literal name, and a legendary card that
+// shares a name with a legendary permanent (Key to the Side-Door's
+// `sharesNameWith Valid Permanent.Legendary+YouCtrl`, the battlefield-sweep
+// referent effects/filter_attachment.go sharesNameValidBattlefield reads):
+// that shape also places a same-named legendary permanent
+// (discardCostBattlefield). One deterministic hand fixture is sufficient and
+// the engine/XMage answer translation selects it.
 func discardFixtureSupported(tok string) bool {
 	count, filter, ok := discardFilter(tok)
 	if !ok || count != "1" {
@@ -51,7 +51,24 @@ func discardFixtureSupported(tok string) bool {
 	if _, named := discardNamedCard(filter); named {
 		return true
 	}
-	return strings.EqualFold(filter, "Card") || strings.EqualFold(filter, "Card.Legendary")
+	return strings.EqualFold(filter, "Card") || strings.EqualFold(filter, "Card.Legendary") ||
+		strings.EqualFold(filter, discardSharesLegendaryName)
+}
+
+// discardSharesLegendaryName is the one Discard filter whose payment needs a
+// battlefield referent: a legendary card named like a legendary permanent you
+// control.
+const discardSharesLegendaryName = "Card.Legendary+sharesNameWith Valid Permanent.Legendary+YouCtrl"
+
+// discardCostBattlefield names the permanents a Discard cost's filter needs on
+// p0's battlefield: the legendary namesake of the hand card for the
+// sharesNameWith shape, nothing for every other shape.
+func discardCostBattlefield(tok string) []string {
+	_, filter, ok := discardFilter(tok)
+	if !ok || !strings.EqualFold(filter, discardSharesLegendaryName) {
+		return nil
+	}
+	return []string{legendaryHandCard}
 }
 
 // discardCostPlacement is what a non-self Discard cost needs on p0's side:

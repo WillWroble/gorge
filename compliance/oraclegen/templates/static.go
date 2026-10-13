@@ -15,6 +15,7 @@ package templates
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
@@ -35,9 +36,9 @@ func staticSubs(sub string) bool {
 	switch sub {
 	case "static.disable-triggers", "static.combat-damage-toughness", "static.can-attack-defender", "static.can-attack-defender-svar", "static.cant-block-by", "static.cant-be-cast-threshold", "static.cant-be-cast-combat", "static.cant-be-activated-combat", "static.cant-block-self", "static.cant-block-by-self", "static.min-blockers",
 		"static.cant-be-cast-opponent-turn", "static.cant-be-cast-first-turns", "static.cant-be-cast-limit", "static.cant-be-activated-opponent-turn", "static.cant-be-activated-all", "static.cant-be-activated-enchanted", "static.panharmonicon", "static.optional-cost",
-		"static.cant-attack-enchanted", "static.cant-block-enchanted", "static.cant-block-by-blocker-filter", "static.cant-gain-life", "static.mana-convert-creature-spells", "static.cant-be-activated-named",
+		"static.cant-attack-enchanted", "static.cant-block-enchanted", "static.cant-block-by-blocker-filter", "static.cant-gain-life", "static.cant-gain-life-enchanted", "static.alternative-cost-spells", "static.alternative-cost-equip", "static.activations-exhaust-unbounded", "static.mana-convert-creature-spells", "static.cant-be-activated-named",
 		"static.cant-be-activated-named-enters",
-		"static.tap-power-value", "static.cast-with-flash", "static.untap-other-player", "static.cant-draw",
+		"static.tap-power-value", "static.tap-power-value-station", "static.cast-with-flash", "static.untap-other-player", "static.cant-draw",
 		"static.cant-attack-gated", "static.cant-block-gated", "static.cant-block-by-gated", "static.can-attack-defender-gated", "static.max-blockers", "static.must-attack-self",
 		"static.unspent-mana", "static.no-cleanup-damage", "static.ignore-legend-rule", "static.cant-be-copied", "static.cant-put-counter",
 		"static.activate-as-if-haste", "static.activations-powerup", "static.plot-zone", "static.ignore-hexproof", "static.cant-be-suspected",
@@ -102,6 +103,14 @@ func staticRequirement(reg *cards.Registry, f *cards.Face, name string, req leve
 		return mustAttackItem(reg, f, name, req)
 	case "static.cant-gain-life":
 		return cantGainLifeItem(reg, f, name, req)
+	case "static.cant-gain-life-enchanted":
+		return cantGainLifeEnchantedItem(reg, f, name, req)
+	case "static.alternative-cost-spells":
+		return alternativeCostSpellsItem(reg, f, name, req)
+	case "static.alternative-cost-equip":
+		return alternativeCostEquipItem(reg, f, name, req)
+	case "static.activations-exhaust-unbounded":
+		return activationsExhaustUnboundedItem(reg, f, name, req)
 	case "static.mana-convert-creature-spells":
 		return manaConvertCreatureItem(reg, f, name, req)
 	case "static.cant-be-activated-named":
@@ -132,6 +141,8 @@ func staticRequirement(reg *cards.Registry, f *cards.Face, name string, req leve
 		return optionalCostItem(reg, f, name, req)
 	case "static.tap-power-value":
 		return tapPowerValueItem(reg, f, name, req)
+	case "static.tap-power-value-station":
+		return tapPowerValueStationItem(reg, f, name, req)
 	case "static.cast-with-flash":
 		return castWithFlashItem(reg, f, name, req)
 	case "static.untap-other-player":
@@ -225,6 +236,12 @@ func disableTriggersItem(reg *cards.Registry, f *cards.Face, name string, req le
 	skip := func(why string) (oraclegen.Item, *oraclegen.Skip) {
 		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "static DisableTriggers " + why}
 	}
+	if st, _ := staticSlotOf(f, req); disablesWard(st) {
+		if it, ok := disableWardItem(reg, f, name, req); ok {
+			return it, nil
+		}
+		return skip("ward probe's trigger is not suppressed by the card")
+	}
 	probe, ok := reg.Lookup(disableTriggerProbe)
 	if !ok || len(probe.Faces) == 0 {
 		return skip("probe not in corpus")
@@ -292,6 +309,12 @@ func combatDamageToughnessItem(reg *cards.Registry, f *cards.Face, name string, 
 		return skip("control has no combat-damage checkpoint")
 	}
 	// Observation: the card on the battlefield raises the damage to toughness.
+	// An Equipment's static covers only the creature it equips (Bark of
+	// Doran's Creature.EquippedBy+powerLTtoughness): attach it to the
+	// attacker first.
+	if st, _ := staticSlotOf(f, req); strings.Contains(st.ParamStr(cards.PKValidCard), "EquippedBy") {
+		steps = append([]oraclegen.Step{{Op: "attach", Seat: 0, Card: "p0:" + name, AttachedTo: "p0:" + toughnessAttacker}}, steps...)
+	}
 	sc := staticScenario(f, name, []string{name, toughnessAttacker}, nil, steps)
 	p0 := sc.Setup["p0"]
 	setupBackFace(&p0, name, req)
