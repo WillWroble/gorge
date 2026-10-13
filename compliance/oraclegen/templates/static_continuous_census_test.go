@@ -114,14 +114,17 @@ import (
 // (Far Fortune, End Boss and Vnwxt, Verbose Host), so the two
 // "grants a replacement effect" skips leave and DFT's served count rises by
 // two (61->63).
+// Re-pinned by lb4-g7 (level-B wave 4 class G7): the gated-grant target
+// fixture serves DFT Slick Imitator (a spell of p0's on the stack) and EOE
+// Adagia, Windswept Bastion (an artifact of p0's), and the split-second
+// observation serves FRA Samut, Tyrant of Naktamun.
 // It fails in both directions.
 var wantStaticContinuousCensus = map[string]map[string]int{
 	"BIG": {
 		"served": 3,
 	},
 	"EOE": {
-		"served": 62,
-		"skip:static gated self grant is not offered in the gate-on fixture": 1,
+		"served": 63,
 	},
 	"FDN": {
 		"served": 68,
@@ -131,9 +134,8 @@ var wantStaticContinuousCensus = map[string]map[string]int{
 		"skip:static needs counters on the affected permanent":                                       1,
 	},
 	"FRA": {
-		"served": 37,
-		"skip:static effect not observable on a probe or the card":            1,
-		"skip:static grants only keywords outside the compared evergreen set": 1,
+		"served": 38,
+		"skip:static effect not observable on a probe or the card": 1,
 	},
 	// DFT includes the Surveyor cycle's graveyard AddAbility$ grant, served by
 	// the gated-grant observation's off-battlefield arm (agent-
@@ -144,9 +146,8 @@ var wantStaticContinuousCensus = map[string]map[string]int{
 	// 20261009T055718Z-17e92d7b) is the generic-observability row the
 	// advanced-scenario path serves.
 	"DFT": {
-		"served": 63,
+		"served": 64,
 		"skip:static characteristic-defining P/T of a non-creature (the snapshot omits its P/T)": 1,
-		"skip:static gated self grant is not offered in the gate-on fixture":                     1,
 	},
 }
 

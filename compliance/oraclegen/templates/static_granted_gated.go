@@ -93,6 +93,32 @@ func staticGatedGrantedAbilityItem(reg *cards.Registry, c *cards.Card, f *cards.
 	addActivationCostFixtures(&p0, name, sa.ParamStr(cards.PKCost), activationX(sa.ParamStr(cards.PKCost)))
 	sc.Setup["p0"] = p0
 	sc.Steps = append(append([]oraclegen.Step(nil), steps...), oraclegen.Step{Op: "pass_to", Seat: 0, Step: "main1", Decision: "priority"})
+	it, why, ok = gatedGrantOffered(reg, f, name, req, st, sc, kind, label, pool, gatedGrantTarget{})
+	if ok || why != staticGatedNotOfferedReason {
+		return it, why, ok
+	}
+	// A targeted grant is not offered without a legal target: retry with the
+	// target fixture its ValidTgts$ names (static_granted_gated_targets.go).
+	if tf, tok := gatedGrantTargetFor(reg, sa); tok {
+		return gatedGrantOffered(reg, f, name, req, st, sc, kind, label, pool, tf)
+	}
+	return it, why, ok
+}
+
+// gatedGrantOffered asserts the gated grant offered on sc (the gate on) and
+// not offered on its control (the gate off), with tf's target fixture in both.
+func gatedGrantOffered(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, st cards.Static, sc oraclegen.Scenario, kind, label, pool string, tf gatedGrantTarget) (oraclegen.Item, string, bool) {
+	sc.Setup = cloneSeats(sc.Setup)
+	p0 := sc.Setup["p0"]
+	for _, b := range tf.battlefield {
+		p0.Battlefield = appendFixtureUnique(append([]string(nil), p0.Battlefield...), b)
+	}
+	for _, h := range tf.hand {
+		p0.Hand = appendFixtureUnique(append([]string(nil), p0.Hand...), h)
+	}
+	sc.Setup["p0"] = p0
+	sc.Steps = append(append([]oraclegen.Step(nil), sc.Steps...), tf.steps...)
+	speedGated := staticGatedOnMaxSpeed(&st)
 	if pool != "" {
 		sc.Steps = append(sc.Steps, oraclegen.Step{Op: "mana", Seat: 0, Mana: pool})
 	}

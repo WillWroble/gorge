@@ -66,17 +66,20 @@ func TestStaticNamedKeywordGrant(t *testing.T) {
 }
 
 // TestStaticNamedKeywordGrantStillSkips pins the other direction: a static
-// granting a keyword outside BOTH vocabularies (Samut's Split second to
-// instant/sorcery spells) keeps the named skip, so widening the set did not
-// swallow every keyword grant.
+// granting a keyword outside BOTH vocabularies to a PERMANENT keeps the named
+// skip, so widening the set did not swallow every keyword grant. Absolute
+// Virtue's protection from each of your opponents lands on its controller,
+// a player, whose keywords neither snapshot carries. (Samut, Tyrant of
+// Naktamun, the earlier pin, is served by the split-second observation since
+// lb4-g7.)
 func TestStaticNamedKeywordGrantStillSkips(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	_, skip := GenerateB(reg, "Samut, Tyrant of Naktamun",
-		probeRequirement(t, reg, "Samut, Tyrant of Naktamun", "static#0.0"))
+	_, skip := GenerateB(reg, "Absolute Virtue",
+		probeRequirement(t, reg, "Absolute Virtue", "static#0.0"))
 	if skip == nil {
-		t.Fatal("Samut, Tyrant of Naktamun served, want a keyword skip")
+		t.Fatal("Absolute Virtue served, want a keyword skip")
 	}
 	if !strings.Contains(skip.Reason, "outside the compared") {
-		t.Fatalf("Samut skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
+		t.Fatalf("Absolute Virtue skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
 	}
 }

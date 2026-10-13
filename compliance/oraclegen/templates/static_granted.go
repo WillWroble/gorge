@@ -258,6 +258,13 @@ func grantTries(reg *cards.Registry, f *cards.Face, st cards.Static) []offerTry 
 		for _, p := range grantProbeNames {
 			tries = append(tries, offerTry{probe: p, kind: "activate", label: label, extraBF: []string{p}})
 		}
+		// A grant only creature TOKENS receive (Insidious Roots' "Creature
+		// tokens you control have '{T}: Add one mana of any color.'"): no
+		// card probe can stand in, so the recipient is a token the prelude
+		// makes (static_granted_token.go).
+		if t, ok := grantTokenRecipientTry(reg, st, label); ok {
+			tries = append(tries, t)
+		}
 		return tries
 	}
 	sa = grantedActivatedAbility(f, st)
@@ -285,7 +292,11 @@ func grantTries(reg *cards.Registry, f *cards.Face, st cards.Static) []offerTry 
 			extraBF: []string{p}, attachProbe: attach,
 		})
 	}
-	return tries
+	// A granted ability whose only legal targets are tokens (Ghired, Mirror
+	// of the Wilds' "copy target token you control that entered this
+	// turn") is not offered without one: retry each probe with a token the
+	// prelude makes this turn (static_granted_token.go).
+	return append(tries, grantTokenTargetTries(reg, sa, tries)...)
 }
 
 // staticGrantAttached reports whether the grant's Affected$ names the

@@ -85,14 +85,16 @@ func TestStaticContinuousTypeChange(t *testing.T) {
 }
 
 // TestStaticContinuousUnobservedStaysSkipped: a keyword-grant static outside
-// both vocabularies still skips (Teval, Arbiter of Virtue grants Delve;
+// both vocabularies still skips (Raiding Schemes grants Conspire to spells,
+// whose observation needs the optional tap cost paid;
 // agent-20261009T153027Z-7c702026 served Colossal Rattlewurm's Flash grant by
-// adding "flash" to the named vocabulary, so it is no longer in this skip
-// set). Living Conundrum left this set when the empty-library fixture served
-// it (TestStaticLibraryEmpty).
+// adding "flash" to the named vocabulary, and lb4-g7 served Teval, Arbiter of
+// Virtue's Delve grant through the offered cast once the engine priced a
+// stack-scoped Delve grant). Living Conundrum left this set when the
+// empty-library fixture served it (TestStaticLibraryEmpty).
 func TestStaticContinuousUnobservedStaysSkipped(t *testing.T) {
-	if got := staticSkipReason(t, "Teval, Arbiter of Virtue", "static#0.0"); !strings.Contains(got, "keywords outside the compared evergreen set") {
-		t.Fatalf("Teval, Arbiter of Virtue skip = %q, want the keyword gap", got)
+	if got := staticSkipReason(t, "Raiding Schemes", "static#0.0"); !strings.Contains(got, "keywords outside the compared evergreen set") {
+		t.Fatalf("Raiding Schemes skip = %q, want the keyword gap", got)
 	}
 }
 
