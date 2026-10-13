@@ -905,7 +905,7 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 		sharedRef = e.sharedCardTypeReference(ref, source, sc)
 		sharedWhitelist = tp.SharedTypes
 	}
-	related := e.newRelatedPropertyRecheck(sa, source, sc)
+	related := e.newRelatedPropertyRecheck(sa, self, sc)
 	for _, t := range targets {
 		if t.IsPlayer {
 			// CR 702.18 / CR 702.11 / CR 702.16c for players: a target that

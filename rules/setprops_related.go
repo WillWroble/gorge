@@ -54,7 +54,11 @@ type relatedPropertyRecheck struct {
 	ref  state.ObjID
 }
 
-func (e *Engine) newRelatedPropertyRecheck(sa *cards.SA, source state.ObjID, sc effects.SpecContext) relatedPropertyRecheck {
+// self is the object whose announced Targets hold the ParentTarget when no
+// chain-link parent is bound: the resolving STACK object at the recheck (not
+// the source card, whose Targets are empty for a trigger), the source itself
+// at an offer made without a bound parent.
+func (e *Engine) newRelatedPropertyRecheck(sa *cards.SA, self state.ObjID, sc effects.SpecContext) relatedPropertyRecheck {
 	if sa == nil {
 		return relatedPropertyRecheck{}
 	}
@@ -62,7 +66,25 @@ func (e *Engine) newRelatedPropertyRecheck(sa *cards.SA, source state.ObjID, sc 
 	if prop == "" {
 		return relatedPropertyRecheck{}
 	}
-	return relatedPropertyRecheck{prop: prop, ref: e.sharedCardTypeReference("ParentTarget", source, sc)}
+	return relatedPropertyRecheck{prop: prop, ref: e.relatedPropertyReference(self)}
+}
+
+// relatedPropertyReference resolves ParentTarget: the first object target of
+// the bound chain-link parent (CR 608.2b -- the same parent legalTargets feeds
+// ResolutionTargets), else of self's own announced Targets.
+func (e *Engine) relatedPropertyReference(self state.ObjID) state.ObjID {
+	var parent []state.Target
+	if e.subOfferBound {
+		parent = e.subOfferParent
+	} else if o := e.G.Obj(self); o != nil {
+		parent = o.Targets
+	}
+	for _, t := range parent {
+		if !t.IsPlayer && t.Obj != 0 && t.Obj != self {
+			return t.Obj
+		}
+	}
+	return 0
 }
 
 func (r relatedPropertyRecheck) admits(e *Engine, obj state.ObjID) bool {
