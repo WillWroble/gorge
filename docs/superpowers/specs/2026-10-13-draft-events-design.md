@@ -30,7 +30,7 @@ multi-human pods, leak-free search bots.
 | Q8 | Human identity | Invite link carrying a seat token + a typed display name. Timeout during the draft auto-picks; a game never auto-replaces a human (caretaker only if `ThinkTimeout` is set). |
 | Q9 | Restart | The event resumes from its log. A game in progress at restart is aborted and replayed from scratch with a new seed; both facts are logged. |
 | Q10 | Reveal | Other seats' picks and decks are hidden until COMPLETE, then revealed. Bot-vs-bot games are watchable live. |
-| Q11 | Layout | New pure top-level `limited/` and `event/` packages, plus an `eventhost` runtime package. Its archtest `time` allow-list line is landed by the operator by hand (E1). |
+| Q11 | Layout | New pure top-level `limited/` and `event/` packages, plus an `eventhost` runtime package. Its archtest `time` allow-list line (`module + "/eventhost"`) was landed by hand with operator approval on 2026-10-13. |
 | Q12 | Refactor | After E2, as its own ticket: move play-vs-bot onto events and `createGame` out of `cmd/gorged`. |
 | Q14 | Training data | Draft logs export in 17Lands `draft_data` column shape from E0. |
 
