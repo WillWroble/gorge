@@ -1983,7 +1983,7 @@ func resolvedRemembered(h Host, c *Ctx) []state.Target {
 		// all the context has (the second shape above).
 		return copyTargets(c.Remembered)
 	}
-	return hostRemembered(h, c)
+	return captureFilteredRemembered(h, c)
 }
 
 // hostRemembered is Forge's host remembered list: resolvedRemembered
@@ -1997,7 +1997,21 @@ func resolvedRemembered(h Host, c *Ctx) []state.Target {
 // `DefinedPlayer$ RememberedOwner`, the trigger's capture is the Hovership
 // itself, and an ETB that exiled nothing left the source's list empty -- the
 // fallback made the Hovership's owner manifest dread instead of nobody.
+// A RepeatEach iteration binds its subject as Remembered and keeps it even
+// when it equals the capture (Bomb Squad's state trigger captures itself and
+// its RepeatCards$ loop may visit itself), the guard
+// rememberedWrittenByResolution applies for the same reason.
 func hostRemembered(h Host, c *Ctx) []state.Target {
+	if c.RepeatSubject != (state.Target{}) {
+		return copyTargets(c.Remembered)
+	}
+	return captureFilteredRemembered(h, c)
+}
+
+// captureFilteredRemembered is the shared tail of resolvedRemembered and
+// hostRemembered: the capture entries the source's written list does not
+// hold are dropped (the first and third shapes above).
+func captureFilteredRemembered(h Host, c *Ctx) []state.Target {
 	if len(c.Captured) == 0 {
 		return copyTargets(c.Remembered)
 	}

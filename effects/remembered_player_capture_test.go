@@ -68,3 +68,36 @@ func TestRememberedPlayerIgnoresTriggerPlayerCapture(t *testing.T) {
 	}
 	wantPlayers(t, definedPlayerIDs(h, c, "RememberedPlayer"), nil, "definedPlayerIDs(RememberedPlayer) with only a trigger capture")
 }
+
+// TestRepeatPlayersRememberedSpellingsIgnoreTriggerCapture pins RepeatEach's
+// RepeatPlayers$ twin of the same rule: its RememberedController and
+// OppNonRememberedController spellings read hostRemembered too, so a trigger
+// whose source wrote nothing loops over nobody / every opponent, never the
+// capture's seat.
+func TestRepeatPlayersRememberedSpellingsIgnoreTriggerCapture(t *testing.T) {
+	h, c, _ := capturedSelfHost(t)
+	got, ok := repeatPlayers(h, c, "RememberedController")
+	if !ok || len(got) != 0 {
+		t.Fatalf("RepeatPlayers$ RememberedController = %v (ok %v), want nobody", got, ok)
+	}
+	// OppNonRememberedController: opponents of the resolving controller (1)
+	// that do not control a remembered card. With the capture read as a
+	// remembered card, seat 1 would be "the remembered controller" -- it is
+	// excluded either way as the resolver, so pin with controller 0 instead.
+	c.Controller = 0
+	got, ok = repeatPlayers(h, c, "OppNonRememberedController")
+	if !ok {
+		t.Fatal("RepeatPlayers$ OppNonRememberedController unrecognised")
+	}
+	wantPlayers(t, got, []state.PlayerID{1, 2}, "RepeatPlayers$ OppNonRememberedController with nothing remembered")
+}
+
+// TestRememberedControllerKeepsRepeatSubjectEqualToCapture pins the
+// RepeatEach guard: an iteration whose subject IS the trigger's capture
+// (Bomb Squad's state trigger visiting itself) still names its controller.
+func TestRememberedControllerKeepsRepeatSubjectEqualToCapture(t *testing.T) {
+	h, c, src := capturedSelfHost(t)
+	c.RepeatSubject = state.Target{Obj: src.ID}
+	wantPlayers(t, definedPlayerIDs(h, c, "RememberedController"), []state.PlayerID{1},
+		"definedPlayerIDs(RememberedController) for a RepeatEach subject equal to the capture")
+}
