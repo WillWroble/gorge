@@ -11,17 +11,19 @@ set -euo pipefail
 wt=${1:?worktree}; sha=${2:?sha}
 git -C "$wt" switch -q --detach "$sha"
 cd "$wt"
-skip='^(TestHeads|TestInvariantsUnderSeedFuzz[0-9]*)$'
+skip='^(TestHeads)$'
 # Opt-in exhaustive audits that the lean per-ticket gate leaves out
 # (db57ab8e6 made the oraclegen target audit opt-in); the full suite runs them.
 export GORGE_ORACLEGEN_FULL_TARGET_AUDIT=1
 go vet -p=8 ./...
 # Per-test budget (operator, 2026-10-05, doubled 2026-10-09): every test fits 4 GB RSS, 4 vCPU,
-# 1 min wall. Test binaries record their own peak RSS through internal/testbudget;
-# cmd/testbudget reads those persistent records and the per-test wall from the
-# -json stream (tee reprints the plain text the batch's failure parser reads).
+# 1 min wall. `go test -exec "testbudget exec"` runs every test binary and
+# records its peak RSS (wait4 rusage) per package -- no package carries a
+# TestMain for it -- while keeping the test result cache usable. cmd/testbudget
+# reads those persistent records and the per-test wall from the -json stream
+# (tee reprints the plain text the batch's failure parser reads).
 # The RSS directory survives runs so cached packages retain their valid record;
-# GORGE_TESTBUDGET_RSS=0 keeps the cache and checks wall only.
+# GORGE_TESTBUDGET_RSS=0 checks wall only.
 budget=$PWD/.ds4/scratch/testbudget
 mkdir -p "$budget"
 go build -o "$budget/testbudget" ./cmd/testbudget
@@ -30,7 +32,7 @@ if [ "${GORGE_TESTBUDGET_RSS:-1}" = 1 ]; then
 	export GORGE_TESTBUDGET_RSS_DIR=$budget/rss
 	rss_flag=(-rss-dir "$budget/rss")
 fi
-go test -p=8 -json -skip "$skip" ./... | "$budget/testbudget" tee -events "$budget/events.json"
+go test -p=8 -json -exec "$budget/testbudget exec" -skip "$skip" ./... | "$budget/testbudget" tee -events "$budget/events.json"
 "$budget/testbudget" check -events "$budget/events.json" "${rss_flag[@]}"
 go test ./rules -run '^TestHeads$'
 make sim

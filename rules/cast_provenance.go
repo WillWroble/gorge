@@ -562,6 +562,12 @@ var castOriginTokens = []castOriginToken{
 	// build can put on the stack) and Aerial Extortionist's negated form all
 	// read it.
 	{token: "wasCastFromTheirHand", zone: state.ZHand},
+	// "whenever you cast a spell from your library" (Melek, Izzet Paragon's
+	// copy trigger; Wickerwing Effigy's Bird grant) — the caster casts from
+	// their own library (a library cast is always from the caster's own
+	// library in this build, the same implicit scope the YourGraveyard
+	// spelling takes).
+	{token: "wasCastFromYourLibrary", zone: state.ZLibrary, byYou: true},
 }
 
 // specCarriesCastOrigin reports whether spec carries ANY origin-zone token

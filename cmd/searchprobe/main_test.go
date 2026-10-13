@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 func TestRejectInvalidBudgetsBeforeLoadingCorpus(t *testing.T) {
@@ -44,9 +45,7 @@ func TestSummarizeResultsSeparatesEligibleRootsAndNoRootGames(t *testing.T) {
 func TestRunWritesReadableProfiles(t *testing.T) {
 	// The corpus need only be fetched; searchprobe loads this build's own
 	// fingerprint-keyed IR via cards.OpenCorpus (compiling if necessary).
-	if _, err := os.Stat("../../.cards/cardsfolder"); err != nil {
-		t.Skipf("compiled corpus unavailable: %v", err)
-	}
+	corpusDir := testutil.CorpusDirOrSkip(t)
 	tmp := t.TempDir()
 	outPath := filepath.Join(tmp, "report.json")
 	cpuPath := filepath.Join(tmp, "cpu.pprof")
@@ -54,7 +53,7 @@ func TestRunWritesReadableProfiles(t *testing.T) {
 	err := run([]string{
 		"-games", "1", "-workers", "1", "-seed", "10307",
 		"-attempts", "1", "-worlds", "4", "-max-submits", "5000",
-		"-cards", "../../.cards", "-out", outPath,
+		"-cards", corpusDir, "-out", outPath,
 		"-cpuprofile", cpuPath, "-memprofile", heapPath,
 	}, io.Discard)
 	if err != nil {

@@ -100,8 +100,7 @@
      "pt": "3/3"
     }
    ],
-   "xmage": "HardenedScaleTest#hangarBackHardenedScalesMetallicMimicTest",
-   "known_bug": "B16: etbCounter X and Metallic Mimic's additional +1/+1 counter are placed as separate events, so Hardened Scales adds one to each (X=1 enters with 4, not 3). CR 614.1c, 122.6."
+   "xmage": "HardenedScaleTest#hangarBackHardenedScalesMetallicMimicTest"
   }
  ]
 }

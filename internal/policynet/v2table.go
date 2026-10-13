@@ -292,6 +292,15 @@ const (
 	v2SeatOther
 )
 
+// Exported relative seats, for front ends built outside this package (front
+// end V lives in internal/policynet/v2front so the wire types it reads stay
+// out of every binary that links policynet).
+const (
+	V2SeatNone  = v2SeatNone
+	V2SeatMine  = v2SeatMine
+	V2SeatOther = v2SeatOther
+)
+
 // clamp01..clamp helpers are shared scalar encodings.
 func clamp01(x float32) float32 {
 	if x < 0 {

@@ -144,16 +144,16 @@ func (e *Engine) castWindowProbeUnits(pc *pendingCast, windowUnits []windowManaU
 				// production; only a choice-shaped or dynamic amount it
 				// withholds is added here (the skip test runs below, after
 				// the production is parsed).
-			case castWindowPayLifeCost(cost):
-				lifeCost = cost.Life
-				if pl.Life <= lifeCost {
-					continue
-				}
 			case castWindowGenericCostShape(cost):
 				genericCost = cost.Generic
-			case pay.CastWindowSelfSacCost(asPayer(e), p, id, cost):
 			default:
-				continue
+				// The PayLife<N> and self-sacrifice arms are the paid-cost
+				// census layer's shared shape test (paid_mana_census.go).
+				lc, ok := e.paidCostShape(p, id, cost, pl.Life)
+				if !ok {
+					continue
+				}
+				lifeCost = lc
 			}
 			amt, ok := e.castWindowAmount(p, id, o, ma)
 			if !ok {

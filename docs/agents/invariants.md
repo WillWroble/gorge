@@ -59,9 +59,25 @@ search clones are one mechanism.
 
 The engine is a pure function of `(Config, intents)`.
 
-- No wall clock. `time` may be imported only by the host tier and by
-  measurement CLIs. Research libraries that need timing take an injected
-  `Millis` hook instead.
+- No wall clock. The authority on who may import `time` is the `allowed`
+  map in `internal/archtest/arch_test.go` (`TestTimeIsImportedOnlyByTheHost`),
+  not this page. It holds four classes, each argued in that test's doc
+  comment:
+  - the host/server tier: `host`, `host/httpapi`, `host/manabrewhttp`,
+    `cmd/gorged` (injected sleep, SSE keep-alive, write and shutdown
+    deadlines);
+  - measurement and developer CLIs that read the clock only to bound a run or
+    report elapsed time (`cmd/botbench`, `cmd/enginebench`, `cmd/searchbench`,
+    `cmd/cardfuzz`, `cmd/paymirror`, `cmd/ledger`, `cmd/traindash`, the
+    search/SpellBench agents and probes, and similar);
+  - a few batching/scheduling libraries whose timers decide only WHEN work is
+    flushed, never what a game sees: `internal/gamepool` and the
+    inference-batching decision broker;
+  - nothing in the engine, card pipeline, effects, view or bot policies.
+
+  Research libraries that need timing take an injected `Millis` hook instead
+  (`searchseat.Millis`, `sbsearch.Millis`, `azmcts.Millis`, installed by the
+  CLI).
 - No ambient randomness. Use `math/rand/v2` with a seeded source; the engine
   has one seeded PCG with a draw counter (`rules/rng.go`). A bot's rng is
   seeded from `(match seed, seat)`.
@@ -146,13 +162,20 @@ checks the worktree, the index and HEAD.
 
 ### 7. No cgo, no third-party dependencies
 
-`go.mod` has no `require` lines. The card pipeline, the rules core and the
-learned-policy stack (`internal/policynet`: hand-derived gradients, no
-autodiff) are pure Go. The engine must also build for 32-bit, so it cannot
-depend on packed 64-bit ints.
+The root `go.mod` has no `require` lines and the root `go.sum` is empty or
+absent. The card pipeline, the rules core and the learned-policy stack
+(`internal/policynet`: hand-derived gradients, no autodiff) are pure Go. The
+engine must also build for 32-bit, so it cannot depend on packed 64-bit ints.
+
+An experiment that genuinely needs a third-party module goes in its own nested
+module that imports the root through a `replace`, never the other way round:
+`experimental/gamepool` (the tag-gated GPU scorer and the `gamepool` command)
+requires purego for its CUDA binding; the pool scheduler it drives stays in
+the root's `internal/gamepool`.
 
 **Enforced by:**
-- `go.mod` review.
+- `internal/archtest` `TestRootModuleHasNoRequires` (parses the root `go.mod`
+  and fails on any `require` directive or a non-empty `go.sum`).
 - `TestEngineCompilesFor32Bit`.
 
 `wazero` is the one planned exception, arriving with the M3 plugin tier.
@@ -243,7 +266,8 @@ by millions.
 resource budget (4 GB RSS, 4 vCPU, 1 min wall; doubled 2026-10-09) is enforced by `cmd/testbudget`
 in `scripts/postmerge_full.sh`: any test over budget that
 `internal/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
-shrink-only) do not list fails the post-merge batch.
+shrink-only) do not list fails the post-merge batch. Peak RSS is measured per test binary by
+`go test -exec "testbudget exec"`; a new test package needs no TestMain for it.
 
 ## Contributor guidelines
 

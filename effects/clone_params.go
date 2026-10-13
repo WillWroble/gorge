@@ -51,6 +51,12 @@ type CloneParams struct {
 	ChoiceTitle    string
 	// CloneTarget is CloneTarget$, the become operand.
 	CloneTarget string
+	// ChoicesTargetBecome reports Forge CloneEffect's become arm for a
+	// Choices$ source on a targeting ability with no CloneTarget$: the SA's
+	// own target becomes the copy ("choose a creature; target creature
+	// becomes a copy of it" -- Cytoshape, Kaya, Spirits' Justice), never the
+	// resolving source.
+	ChoicesTargetBecome bool
 	// ExcludeChosen is ExcludeChosen$ True.
 	ExcludeChosen bool
 	// CloneZone is CloneZone$, the copy source's required zone.
@@ -154,7 +160,7 @@ var cloneKnownKeys = [...]string{
 	"TargetValidTargeting", "TargetingPlayer", "TargetingPlayerControls", "TargetsAtRandom",
 	"TargetsForEachPlayer", "TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
-	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription",
 	"Type", "Ultimate", "UnlessAI", "UnlessCost", "UnlessPayer", "UnlessResolveSubs",
@@ -206,6 +212,7 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.ChoiceOptional = isTrue(sa.ParamStr(cards.PKChoiceOptional))
 	p.ChoiceTitle = strings.TrimSpace(sa.ParamStr(cards.PKChoiceTitle))
 	p.CloneTarget = strings.TrimSpace(rawParamText(sa, "CloneTarget").Text)
+	p.ChoicesTargetBecome = p.Choices != "" && p.CloneTarget == "" && TargetsOf(sa).Targeted()
 	p.ExcludeChosen = isTrue(rawParamText(sa, "ExcludeChosen").Text)
 	p.CloneZone = strings.TrimSpace(rawParamText(sa, "CloneZone").Text)
 	p.Optional = isTrue(sa.ParamStr(cards.PKOptional))

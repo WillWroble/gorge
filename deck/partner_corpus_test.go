@@ -1,21 +1,19 @@
-package deck
+package deck_test
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestIsPartnerPairDoctorCompanionCorpus is the deck-layer pin for the Doctor
 // Who cycle's third commander-pair family: a card carrying K:Doctor's
 // companion (real corpus Rose Tyler) and a Doctor (real corpus The Tenth
 // Doctor, subtype Doctor) are a legal pair, in either designation order. It
-// reads the real corpus through the gitignored .cards/ tree (corpusRegistry
-// below) rather than the synthetic commanderFixture, so the one production
+// reads the real corpus through the gitignored .cards/ tree (testutil.CorpusRegistry) rather than the synthetic commanderFixture, so the one production
 // pair predicate (IsPartnerPair -> doctorCompanionPair) is pinned against the
 // cards a real deck names, not an authored approximation of them.
 //
@@ -27,7 +25,7 @@ import (
 // companion is a third commander-pair family") plus its follow-up corrections
 // e54c1232 and 112a01b6.
 func TestIsPartnerPairDoctorCompanionCorpus(t *testing.T) {
-	reg := corpusRegistry(t)
+	reg := testutil.CorpusRegistry(t)
 	rose := corpusCard(t, reg, "Rose Tyler")
 	doctor := corpusCard(t, reg, "The Tenth Doctor")
 
@@ -52,38 +50,12 @@ func TestIsPartnerPairDoctorCompanionCorpus(t *testing.T) {
 
 	// The assertion under test: the pair is legal, and the clause names roles
 	// rather than positions, so both argument orders must agree.
-	if !IsPartnerPair(rose, doctor) {
+	if !deck.IsPartnerPair(rose, doctor) {
 		t.Fatalf("IsPartnerPair(Rose Tyler, The Tenth Doctor) = false; a Doctor's-companion pair must be legal")
 	}
-	if !IsPartnerPair(doctor, rose) {
+	if !deck.IsPartnerPair(doctor, rose) {
 		t.Fatalf("IsPartnerPair(The Tenth Doctor, Rose Tyler) = false; the pair is directional-free and must be legal in either order")
 	}
-}
-
-// corpusRegistry opens the repo's gitignored .cards/ corpus the way
-// internal/testutil.CorpusRegistry does -- `git rev-parse --show-toplevel`
-// under cards.GitEnv(), then cards.OpenCorpus -- and Skips when the corpus is
-// absent. It is duplicated here rather than imported because
-// internal/testutil imports this package: importing it from a deck test is an
-// import cycle. A checkout with no .cards/ at all still Skips, so a clean
-// clone passes.
-func corpusRegistry(t *testing.T) *cards.Registry {
-	t.Helper()
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("corpus: could not resolve git repo root: %v", err)
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("deck: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	r, err := cards.OpenCorpus(dir)
-	if err != nil {
-		t.Fatalf("corpus: could not open %s: %v", dir, err)
-	}
-	return r
 }
 
 // corpusCard is reg.Lookup or the test fails: a corpus card these tests depend

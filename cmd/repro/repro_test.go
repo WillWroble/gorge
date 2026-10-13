@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
 	"github.com/adams-shaun/gorge/replay"
 	"github.com/adams-shaun/gorge/view"
@@ -28,13 +29,7 @@ const fixtureRel = "testdata/feedback/" + fixtureID
 // so a green result without a corpus proves nothing.
 func requireCorpus(t *testing.T) {
 	t.Helper()
-	root, err := feedback.Root()
-	if err != nil {
-		t.Skipf("no repo root: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".cards")); err != nil {
-		t.Skip("no .cards/ corpus present — run `make fetch-cards compile-cards`")
-	}
+	testutil.CorpusDirOrSkip(t)
 }
 
 // TestReproFixtureSummaryExitsZero is the committed fixture's gate: the

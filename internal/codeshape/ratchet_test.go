@@ -57,7 +57,9 @@ const (
 	// grouped the LKI snapshot set, the replacement context, clone-as-enters,
 	// mana, kicker and the per-primitive cursors (effects/ctx_groups.go): 121 -> 73.
 	// W3 dead removed write-only/never-set fields: 73 -> 68.
-	ctxFieldCount = 68
+	// lb-copyperm-sel grouped the cost-paid lists (Exiled, Revealed and the
+	// new CounterPut) into Ctx.Paid: 68 -> 67.
+	ctxFieldCount = 67
 	ctxEmbedCount = 1
 	// resumePointFieldCount is the number of fields in rules' resumePoint.
 	resumePointFieldCount = 5

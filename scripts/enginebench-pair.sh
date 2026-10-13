@@ -14,6 +14,10 @@
 #   BUILD_ARGS  extra go build arguments passed through to enginebench-build.sh
 #               (for example BUILD_ARGS="-tags enginebench_az")
 #   GOGC  passed through to both binaries if set
+#   PIN   optional CPU list for taskset: when set, every rep runs as
+#         `taskset -c $PIN env GOMAXPROCS=1 GORGE_BENCH_PIN=$PIN BIN ...`
+#         (the scripts/smoke-perf.sh pattern), and enginebench records the pin
+#         in its "pin" field. Unset (the default) runs unpinned, as before.
 set -euo pipefail
 . "$(dirname "$0")/enginebench-lib.sh"
 base_rev=${1:?usage: enginebench-pair.sh BASE CAND [OUT]}
@@ -30,13 +34,18 @@ echo "results -> $out"
 IFS=';' read -r -a rows <<<"${ROWS:-$DEFAULT_ROWS}"
 secs=${SECS:-$(budget_secs $((${#rows[@]} * reps * 2)))}
 echo "budget ${BUDGET}s: -secs $secs per run"
+pin=()
+if [ -n "${PIN:-}" ]; then
+	pin=(taskset -c "$PIN" env GOMAXPROCS=1 GORGE_BENCH_PIN="$PIN")
+	echo "pinned: taskset -c $PIN, GOMAXPROCS=1"
+fi
 budget_start
 run1() { # run1 LABEL BIN REP ROWARGS...
 	local label=$1 bin=$2 rep=$3
 	shift 3
 	budget_left || return 0
 	# shellcheck disable=SC2046
-	heavy "$bin" "$@" -secs "$secs" $(workload_args) -label "$label" -rep "$rep" -out "$out" \
+	heavy ${pin[@]+"${pin[@]}"} "$bin" "$@" -secs "$secs" $(workload_args) -label "$label" -rep "$rep" -out "$out" \
 		>/dev/null 2>>"$out.stderr" || echo "FAIL $label rep=$rep $*" | tee -a "$out.stderr" >&2
 }
 for row in "${rows[@]}"; do

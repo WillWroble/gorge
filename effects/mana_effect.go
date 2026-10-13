@@ -172,6 +172,11 @@ func ManaProducerTag(h Host, source state.ObjID) (tag string, snow bool) {
 func effMana(h Host, c *Ctx, sa *cards.SA) {
 	mp := ManaOf(sa)
 	noteUnreadParams(h, c, "Mana", mp.Unread)
+	// Each$ evaluating to 0 adds nothing, so it must not pose the colour ask
+	// either (Brigid, Doun's Mind with no other creatures).
+	if mp.Each.Present && ManaEachNum(mp, h, c, 1) <= 0 {
+		return
+	}
 	produced := mp.Produced
 	// A resumed Combo allocation supplies one concrete symbol per unit.
 	// Consume it before walking the SA so the same choice is not posed again;
@@ -315,6 +320,16 @@ func effMana(h Host, c *Ctx, sa *cards.SA) {
 	if amt < 0 {
 		amt = 0
 	}
+	// Each$ (Brigid, Doun's Mind: "Add X {G} or X {W}"): every produced
+	// colour unit is multiplied by the evaluated Each$. At 0 nothing is
+	// added (CR 106.1: the pool stays empty), so no ManaAdd is emitted.
+	if mp.Each.Present {
+		each := ManaEachNum(mp, h, c, 1)
+		if each < 0 {
+			each = 0
+		}
+		amt *= each
+	}
 	// RestrictValid$ (Master of Dark Rites' "Spend this mana only to cast
 	// Vampire, Cleric, and/or Demon spells", Eldrazi Temple, Cavern of
 	// Souls, Giada, Shrine of the Forsaken Gods): the produced mana carries
@@ -432,6 +447,9 @@ func effMana(h Host, c *Ctx, sa *cards.SA) {
 					if selected == r {
 						unitAmount++
 					}
+				}
+				if mp.Each.Present {
+					unitAmount *= ManaEachNum(mp, h, c, 1)
 				}
 			}
 			counter := string(r)
