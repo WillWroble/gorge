@@ -175,6 +175,14 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // alternative cost (Leyline of Mutation's grant). XMage poses that as its
     // alternative-cost key menu; the generator's leading "Yes" picks key 1.
     private boolean alternativeCostCast = false;
+    // A cast step with cast_mode "conspired" or "casualty": gorge elected the
+    // spell's (often granted) copy cost -- Raiding Schemes' conspire,
+    // Silverquill's casualty 1. XMage poses each as its own
+    // OptionalAdditionalSourceCosts yes/no (ConspireAbility, CasualtyAbility);
+    // that ask is paid, and the tap/sacrifice it adds takes the generator's
+    // scripted pick (or the step's choose pick, as Bargain's sacrifice does).
+    // Null on every other cast.
+    private Class<?> copyCostCast = null;
     // A cast step whose recorded gorge answer promised a Gift (pick
     // "gift_promise", CR 702.174a): XMage's GiftAbility poses the promise as
     // an optional additional cost, so the generator's leading "Yes" pays it,
@@ -247,6 +255,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
         public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText, Ability source, Game game) {
             if (source instanceof LeylineAbility) {
                 return false;
+            }
+            if (owner.copyCostCast != null && askedBy(owner.copyCostCast, "addOptionalAdditionalCosts")) {
+                // The step elected this copy cost: pay it (the ask is the
+                // keyword's own, so no other optional cost is answered here).
+                return true;
             }
             if (askedBy(OptionalAdditionalSourceCosts.class, "addOptionalAdditionalCosts")) {
                 switch (optionalAdditionalCostAnswer(owner.bargainedCast,
@@ -334,7 +347,23 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         getChoices().add(0, pick);
                     }
                 }
-                if (isSacrificeChoice(target)) {
+                if (owner.copyCostCast == mage.abilities.keyword.TeamworkAbility.class
+                        && askedByName("TeamworkCost", "pay") && getChoices().isEmpty()) {
+                    // A "teamworked" cast's tap (TeamworkCost: any number of
+                    // untapped creatures you control, an open-ended
+                    // TargetPermanent(0, MAX)): gorge's forced one-option
+                    // election is not scripted, so name the creatures the
+                    // step's choose answer recorded, then close the ask when
+                    // other candidates remain.
+                    UUID abilityControllerId = target.getAffectedAbilityControllerId(this.getId());
+                    List<UUID> candidates = new ArrayList<>(target.possibleTargets(abilityControllerId, source, game));
+                    getChoices().addAll(teamworkTapChoices(owner.castCostPicks, candidates,
+                            (id, answer) -> hasObjectTargetNameOrAlias(game.getPermanent(id), answer)));
+                }
+                // A copy-cost cast's sacrifice (casualty) is scripted by the
+                // generator from gorge's own ask ("@ref" on the choice queue);
+                // pushing the step's pick too would leave one unconsumed.
+                if (isSacrificeChoice(target) && owner.copyCostCast == null) {
                     UUID abilityControllerId = target.getAffectedAbilityControllerId(this.getId());
                     List<UUID> candidates = new ArrayList<>(target.possibleTargets(abilityControllerId, source, game));
                     for (String pick : owner.castCostPicks) {
@@ -740,6 +769,28 @@ public class ScenarioReplay extends CardTestPlayerBase {
             return OptionalCostAnswer.DECLINE;
         }
 
+        /** The choice-queue entries that pay a teamwork tap with the
+         * creatures a cast's recorded choose picks name: each matching pick
+         * once, then a [choice_skip] when a candidate is left untapped (the
+         * ask is open-ended, so XMage would otherwise ask for more). An
+         * unmatched pick is left out, so strict mode names the miss. */
+        static List<String> teamworkTapChoices(List<String> picks, List<UUID> candidates,
+                BiPredicate<UUID, String> matches) {
+            List<String> out = new ArrayList<>();
+            List<UUID> left = new ArrayList<>(candidates);
+            for (String pick : picks) {
+                UUID id = costPickChoice(java.util.Collections.singletonList(pick), left, matches);
+                if (id != null) {
+                    out.add(pick);
+                    left.remove(id);
+                }
+            }
+            if (!out.isEmpty() && !left.isEmpty()) {
+                out.add(TestPlayer.CHOICE_SKIP);
+            }
+            return out;
+        }
+
         /** The candidate a cost's recorded choose picks name, or null when
          * none matches. Unlike attachmentChoice there is no automatic pick:
          * a sacrifice cost is paid only when the scenario named its object,
@@ -1056,6 +1107,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             bargainedCast = false;
             optionalCostCast = false;
             alternativeCostCast = false;
+            copyCostCast = null;
             giftPromisedCast = false;
             gorgeName = str(sc, "card");
             xmageName = str(sc, "xmage_name");
@@ -2100,7 +2152,31 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 // (Leyline of Mutation's {W}{U}{B}{R}{G}). XMage poses it as
                 // its own yes/no while casting, which the generator scripts
                 // from gorge's election, so the step is a plain cast here.
-                || mode.equals("alternative");
+                || mode.equals("alternative")
+                || mode.equals("prepared_copy")
+                || copyCostKeyword(mode) != null;
+    }
+
+    /** The XMage keyword class whose optional additional cost a copy-cost
+     * cast mode elects: "conspired" is ConspireAbility (CR 702.78a, tap two
+     * untapped creatures that share a colour with the spell), "casualty" is
+     * CasualtyAbility (CR 702.153a, sacrifice a creature with power N or
+     * greater), "teamworked" is TeamworkAbility (CR 702.194a, tap any
+     * number of untapped creatures you control with total power N or
+     * more). Null for every other mode. A plain cast of the spell
+     * otherwise: "prepared_copy" (the copy of a prepared creature's prepare
+     * spell, CR 722.3c) is cast by its spell name like any card. */
+    static Class<?> copyCostKeyword(String mode) {
+        if ("conspired".equals(mode)) {
+            return mage.abilities.keyword.ConspireAbility.class;
+        }
+        if ("casualty".equals(mode)) {
+            return mage.abilities.keyword.CasualtyAbility.class;
+        }
+        if ("teamworked".equals(mode)) {
+            return mage.abilities.keyword.TeamworkAbility.class;
+        }
+        return null;
     }
 
     /** The activate command for a card's flashback: TestPlayer's
@@ -2711,7 +2787,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 return a instanceof ActivatedManaAbilityImpl;
             }
         }
-        return false;
+        // No printed ability carries the text: a GAINED ability (Locus of
+        // Enlightenment's craft materials, CR 613.1f). Its rule text is the
+        // only thing known before the game runs, so a plain "{T}: Add {G}"
+        // tap-for-mana text is activated as the mana ability it is (CR
+        // 605.1a); TestPlayer's activate command never finds a mana ability.
+        return isTapManaText(text);
+    }
+
+    /** A "{T}: Add ..." rule text with no other cost: the mana-ability shape
+     * a gained ability is recognised by when the source prints none. */
+    static boolean isTapManaText(String text) {
+        return text != null && text.matches("\\{T\\}: Add (\\{[WUBRGC]\\})+\\.?");
     }
 
     static final int PASS_PAIR_FIRST = 1;
@@ -3186,6 +3273,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 bargainedCast = "bargained".equals(castMode);
                 optionalCostCast = "optionalcost".equals(castMode);
                 alternativeCostCast = "alternative".equals(castMode);
+                copyCostCast = copyCostKeyword(castMode);
                 // "plot" is XMage's Plot special action (PlotAbility is a
                 // SpecialAction: no stack, not a cast), activated from the
                 // hand by its rule text "Plot {cost}" like XMage's own
@@ -3372,8 +3460,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     activateManaAbility(turn, phase, p, text);
                     return;
                 }
-                for (String t : targets(st)) {
-                    queueCastTarget(p, t);
+                // A divided (TargetAmount) activation's recipients come from
+                // the generator's scripted "<ref>^X=<share>" answers, already
+                // queued for this step; queueing the bare step targets too
+                // would hand chooseTargetAmount an alias it rejects ("Must be
+                // target amount, but found unknown target", The Earth Crystal).
+                if (!stepScriptsTargetAmount(sc0, stepIdx)) {
+                    for (String t : targets(st)) {
+                        queueCastTarget(p, t);
+                    }
                 }
                 activateAbility(turn, phase, p, boundActivationText(p, str(st, "card"), text, stepIdx));
                 return;
@@ -3449,6 +3544,27 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     static void queueSetupChoices(TestPlayer player, String value) {
         queueChoice(player, value);
+    }
+
+    /** Whether the generator scripted a divided-target share
+     * ("<ref>^X=<share>", oraclegen dividedTargetAnswers) for step i: the
+     * TargetAmount recipients of an activation whose own targets it then
+     * answers in place of the step's bare target list. */
+    static boolean stepScriptsTargetAmount(JsonObject sc, int i) {
+        if (sc == null || !sc.has("xmage_answers") || !sc.get("xmage_answers").isJsonArray()) {
+            return false;
+        }
+        JsonArray xans = sc.getAsJsonArray("xmage_answers");
+        if (i < 0 || i >= xans.size() || !xans.get(i).isJsonArray()) {
+            return false;
+        }
+        for (JsonElement e : xans.get(i).getAsJsonArray()) {
+            JsonObject a = e.getAsJsonObject();
+            if ("target".equals(str(a, "kind")) && str(a, "value").contains("^X=")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Applies the generator's scripted answers (oraclegen.XAnswer). */
