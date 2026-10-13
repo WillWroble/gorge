@@ -1,2 +1,0 @@
-{"shape":{"template":"static","op":"harness","field":"xmage","diff":"IllegalArgumentException: cast_mode alternative unsupported"},"key":"static | harness | xmage | IllegalArgumentException: cast_mode alternative unsupported","cards":1}
-{"card":"Leyline of Mutation","template":"static#0.0","status":"harness","api":"-","sets":["DSK"],"detail":"xmage: IllegalArgumentException: cast_mode alternative unsupported"}
