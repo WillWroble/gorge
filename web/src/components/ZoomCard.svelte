@@ -51,4 +51,7 @@
     cursor: zoom-out;
     filter: drop-shadow(0 18px 40px rgb(0 0 0 / 0.6));
   }
+  :global(html.fx-off) .zoom {
+    filter: none;
+  }
 </style>
