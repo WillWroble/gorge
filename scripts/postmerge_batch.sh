@@ -13,6 +13,11 @@
 # red, a new head first re-checks just those failing tests; the full suite
 # runs again only once they pass.
 #
+# The suite and its bisect steps run GATE class (`gorge_heavy_run -g`): they
+# hold a heavy lane but are never parked or deferred by a ticket gate's broker
+# bracket. This loop is what pushes main, so parking it stalls every landing's
+# push behind the gates of later tickets.
+#
 # A red run also PAUSES the agentctl pipeline (writes $PAUSE, the file the
 # daemon checks every tick) so nothing else lands on a red main while the
 # operator bisects and fixes. The pause is ours only if the file was absent:
@@ -47,10 +52,13 @@ pause_pipeline() {
   echo "postmerge_batch RED $1 $(date -u +%FT%TZ): main->origin full suite failed; bisecting (see $LOG)" >"$PAUSE"
   say "PAUSED pipeline: RED ${1:0:9}"
 }
+# our_pause: the pause marker exists and this loop wrote it.
+our_pause() { [ -e "$PAUSE" ] && /usr/bin/grep -q '^postmerge_batch ' "$PAUSE"; }
+# resume_pipeline <sha> [why]: lift our own pause; why defaults to "GREEN <sha>".
 resume_pipeline() {
   if [ -e "$PAUSE" ] && /usr/bin/grep -q '^postmerge_batch ' "$PAUSE"; then
     rm -f "$PAUSE"
-    say "RESUMED pipeline: GREEN ${1:0:9}"
+    say "RESUMED pipeline: ${2:-GREEN ${1:0:9}}"
   fi
 }
 
@@ -75,7 +83,7 @@ if [ "${1:-}" = "--parse-fails" ]; then parse_fails "$2"; exit 0; fi
 # fails_at <sha> <pkg> <regex>: 0 if the tests FAIL at sha, 1 if they pass.
 fails_at() {
   git -C "$wt" switch -q --detach "$1" || return 2
-  ! (cd "$wt" && gorge_heavy_run "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
+  ! (cd "$wt" && gorge_heavy_run -g "${SCOPE[@]}" go test -p=4 -run "$3" "$2" >/dev/null 2>&1)
 }
 
 # bisect <good> <bad> <pkg> <regex>: first first-parent commit in good..bad
@@ -98,10 +106,41 @@ last_green=$(git rev-parse origin/main)
 red_fails=""     # "<pkg> <regex>" lines still failing on main
 flaky_reruns=0   # consecutive all-flaky full reruns at one head
 FLAKY_RERUNS_MAX=2
+# Cadence (2026-10-12): a full run is ~8-12 min on up to 16 cores, so on a
+# GREEN pipeline it starts only once BATCH_MIN_AHEAD commits are unpushed or
+# the oldest unpushed commit is BATCH_MAX_AGE_S old. Any non-green state (red
+# failures outstanding, our pause marker, a pending confirming rerun) runs on
+# every head change, as before.
+BATCH_MIN_AHEAD=${BATCH_MIN_AHEAD:-4}
+BATCH_MAX_AGE_S=${BATCH_MAX_AGE_S:-1800}
+need_run=0       # 1 from a RED/ALL FLAKY until the next GREEN: never defer
+last_deferred="" # head whose DEFER line was already logged
 while true; do
   git fetch -q origin main 2>/dev/null || true
   head=$(git rev-parse main)
-  if [ "$head" != "$last_tested" ] && [ "$(git rev-list --count origin/main..main)" -gt 0 ]; then
+  # Normally only an unpushed head is worth a run. While OUR pause is up,
+  # any new head is: a hand fix pushed straight to origin leaves nothing
+  # ahead, and main cannot move ahead while the pipeline is paused, so
+  # requiring an unpushed commit here kept the pause up forever (2026-10-12:
+  # 6025ab05c, the caretaker-flake fix, was pushed by hand at 15:4x with this
+  # loop's pause in place; the promised confirming rerun never started).
+  go_run=0
+  if [ "$head" != "$last_tested" ]; then
+    ahead=$(git rev-list --count origin/main..main)
+    if [ -n "$red_fails" ] || [ "$need_run" = 1 ] || our_pause; then
+      { [ "$ahead" -gt 0 ] || our_pause; } && go_run=1
+    elif [ "$ahead" -gt 0 ]; then
+      oldest=$(git log --reverse --format=%ct origin/main..main | head -n1)
+      age=$(( $(date +%s) - ${oldest:-$(date +%s)} ))
+      if [ "$ahead" -ge "$BATCH_MIN_AHEAD" ] || [ "$age" -ge "$BATCH_MAX_AGE_S" ]; then
+        go_run=1
+      elif [ "$head" != "$last_deferred" ]; then
+        last_deferred=$head
+        say "DEFER ahead=$ahead oldest=${age}s (min $BATCH_MIN_AHEAD / max ${BATCH_MAX_AGE_S}s)"
+      fi
+    fi
+  fi
+  if [ "$go_run" = 1 ]; then
     # Still red? Re-check only the failing tests before paying for a full run.
     still=""
     while read -r pkg re; do
@@ -115,24 +154,24 @@ while true; do
       red_fails=""
       say "FULL start ${head:0:9} ($(git rev-list --first-parent --count "$last_green..$head") since last green ${last_green:0:9})"
       s=$(date +%s)
-      if gorge_heavy_run "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
+      if gorge_heavy_run -g "${SCOPE[@]}" scripts/postmerge_full.sh "$wt" "$head" >"$OUT" 2>&1; then
         last_tested=$head
         if git push -q origin "$head:refs/heads/main"; then
-          last_green=$head; flaky_reruns=0
+          last_green=$head; flaky_reruns=0; need_run=0
           say "GREEN ${head:0:9} pushed ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         elif git fetch -q origin main && git merge-base --is-ancestor "$head" origin/main; then
           # Someone pushed main past the green head first (a direct push):
           # the green commit is already on origin, so the pause must lift --
           # with nothing left to push this loop would never run again.
-          last_green=$head; flaky_reruns=0
+          last_green=$head; flaky_reruns=0; need_run=0
           say "GREEN ${head:0:9} already on origin ($(( $(date +%s) - s ))s)"
           resume_pipeline "$head"
         else
           say "GREEN ${head:0:9} push FAILED"
         fi
       else
-        last_tested=$head
+        last_tested=$head; need_run=1
         pause_pipeline "$head"
         say "RED ${head:0:9} ($(( $(date +%s) - s ))s): $(/usr/bin/grep -E '^(--- FAIL|FAIL|panic)' "$OUT" | head -n5 | tr '\n' ' ')"
         red_fails=$(parse_fails "$OUT")
@@ -160,11 +199,15 @@ while true; do
         # waiting for main to move -- main cannot move while paused, so the
         # old wait deadlocked (2026-10-10 11:18 -> 10-12, 47h, 8 FLAKY).
         # Bounded: after FLAKY_RERUNS_MAX flaky reruns it stays paused.
+        # Dispatch resumes now rather than after the confirming rerun (18
+        # idle minutes on 2026-10-12, 3c23860d2); a RED rerun re-pauses via
+        # pause_pipeline, which writes the marker whenever it is absent.
         if [ -n "$red_fails" ] && [ -z "$real_fails" ]; then
           if [ "$flaky_reruns" -lt "$FLAKY_RERUNS_MAX" ]; then
             flaky_reruns=$((flaky_reruns + 1))
             last_tested=""
             say "ALL FLAKY ${head:0:9}: full rerun $flaky_reruns/$FLAKY_RERUNS_MAX"
+            resume_pipeline "$head" "ALL FLAKY ${head:0:9} (confirming full rerun running)"
           else
             say "ALL FLAKY ${head:0:9} again after $FLAKY_RERUNS_MAX reruns: staying paused; operator needed"
           fi

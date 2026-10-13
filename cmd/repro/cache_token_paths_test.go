@@ -58,6 +58,10 @@ func decodeLiveCaptureTokens(t *testing.T, dir string) (map[string]string, []str
 // silently degrading to tokens_unread.
 func TestReproCorpusCachedTokenPathsReadable(t *testing.T) {
 	requireCorpus(t)
+	// Expect the SAME corpus the registry below opens: CorpusRegistry uses
+	// testutil.SharedCorpusDir, which resolves the main checkout's .cards, not
+	// this worktree's symlink (fixed by f5f897898). feedback.Root()/.cards here
+	// would name the worktree's symlink and fail in every worktree.
 	tokenscripts := filepath.Join(testutil.CorpusDirOrSkip(t), "tokenscripts")
 	info, err := os.Stat(tokenscripts)
 	if err != nil || !info.IsDir() {

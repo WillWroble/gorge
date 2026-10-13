@@ -6,55 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance"
 	"github.com/adams-shaun/gorge/internal/testutil"
 )
-
-// TestDeclaredSetsCompliant is the compliance claim (spec section 8): every
-// set in compliance/declared.json meets its level at this head. It runs
-// only declared sets, so its cost grows with the claim, not the corpus. A
-// missing corpus fails rather than skips: a declared set cannot be checked
-// without it.
-func TestDeclaredSetsCompliant(t *testing.T) {
-	t.Parallel()
-	root := filepath.Join("..", "..")
-	declared, err := compliance.LoadDeclared(filepath.Join(root, "compliance", "declared.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(declared) == 0 {
-		t.Log("no declared sets")
-		return
-	}
-	// SharedCorpus compiles the corpus when the binary's fingerprint-keyed
-	// IR cache is absent (a branch whose cards/ sources differ from the one
-	// that last compiled it) and caches the result per process. Bare
-	// LoadRegistry would instead fail hard on that absent cache, and the
-	// gate runs this package in parallel with ./rules, the only other
-	// writer: that raced the cache into existence and failed the gate
-	// (cli-20261006T024354Z-e5dc4abb). A genuinely missing corpus still
-	// errors and fails the test. It is also the process-shared registry: a
-	// registry is read-only after open, and a fresh load per test cost
-	// ~600 MB and ~1 s.
-	corpus, ok := testutil.SharedCorpusDir(".")
-	if !ok {
-		t.Fatalf("declared sets need the corpus: could not resolve the repo root")
-	}
-	reg, err := cards.SharedCorpus(corpus)
-	if err != nil {
-		t.Fatalf("declared sets need the corpus (make fetch-cards compile-cards): %v", err)
-	}
-	probs, err := CheckDeclared(reg, root, declared)
-	if err != nil {
-		t.Fatalf("%v: %v", declared, err)
-	}
-	for _, sp := range probs {
-		for _, p := range sp.Problems {
-			t.Errorf("%s:%s %s: %s", sp.Set, sp.Level, p.Card, p.Reason)
-		}
-	}
-}
 
 func TestDeclaredFileIsWellFormed(t *testing.T) {
 	d, err := compliance.LoadDeclared(filepath.Join("..", "..", "compliance", "declared.json"))

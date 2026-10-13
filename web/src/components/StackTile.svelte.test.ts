@@ -33,7 +33,7 @@ const view = (stack: StackView[]): View => ({
   viewer: 255, visibility: 'omniscient', turn: 1, round: 1, step: 'main1', phase: 'main1', active: 0, priority: 0,
   over: false, draw: false, winner: null, stack, pending: [],
   players: [{
-    seat: 0, name: 'P0', life: 40, lost: false, library_size: 90, hand_size: 7, graveyard_size: 0,
+    seat: 0, name: 'P0', life: 40, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 90, hand_size: 7, graveyard_size: 0,
     completed_dungeons: 0,
     hand: [], battlefield: [], graveyard: [], exile: [], pool: {}, command: [], commanders: [], commander_casts: [],
   }],

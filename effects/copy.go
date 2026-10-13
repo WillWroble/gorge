@@ -284,7 +284,13 @@ func effCopySpellAbility(h Host, c *Ctx, sa *cards.SA) {
 	// EVERY copy it actually made. Read once here and threaded into both
 	// emit sites below; an absent/False key leaves the remembered set
 	// untouched, exactly the historical behaviour.
-	rememberCopies := strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberCopies)), "True")
+	//
+	// RememberNewCard$ True (Spinerock Tyrant, Mizzix's Replica Rider,
+	// Choreographed Sparks, Gandalf, Nalfeshnee, Spider-Verse: the follow-up
+	// Pump/Animate reads Defined$ Remembered) is Forge's same rider spelled
+	// for the "new card" the copy is; it records the copy identically.
+	rememberCopies := strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberCopies)), "True") ||
+		strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberNewCard)), "True")
 	// DefinedTarget$ (Feather, Radiant Arbiter's DefinedTarget$ ChosenCard,
 	// Ivy, Gleeful Spellthief's DefinedTarget$ Self): Forge's
 	// CopySpellAbilityEffect makes ONE copy per defined target, each with

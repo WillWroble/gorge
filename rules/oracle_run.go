@@ -170,16 +170,29 @@ type oracleObserve struct {
 type oracleAnswer struct {
 	Kind string   `json:"kind"`
 	Pick []string `json:"pick"`
+	// Seat, when set, asserts the engine poses the decision this answer is
+	// consumed by to that seat; a mismatch is a harness failure (checked
+	// once the pick has proven consumption, so the generator's wildcard
+	// retry still sees its not-offered failures). The generated xmageport
+	// scenarios set it from the XMage choice's own player, so a decider that
+	// resolves to the wrong seat is caught even when the wrong seat's answer
+	// still produces the right board (B8: OptionalDecider$
+	// TriggeredSourceController asked the trigger source's controller
+	// instead of the damage source's). nil = no assertion.
+	Seat *int `json:"seat,omitempty"`
 }
 
 type oracleExpect struct {
-	Card           string                `json:"card,omitempty"`
-	Zone           string                `json:"zone,omitempty"`
-	PT             string                `json:"pt,omitempty"`
-	Keywords       []string              `json:"keywords,omitempty"`
-	NoKeywords     []string              `json:"no_keywords,omitempty"`
-	Types          []string              `json:"types,omitempty"`
-	NoTypes        []string              `json:"no_types,omitempty"`
+	Card       string   `json:"card,omitempty"`
+	Zone       string   `json:"zone,omitempty"`
+	PT         string   `json:"pt,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
+	NoKeywords []string `json:"no_keywords,omitempty"`
+	Types      []string `json:"types,omitempty"`
+	NoTypes    []string `json:"no_types,omitempty"`
+	// Colours asserts the card's current colour set (CR 105.2, layer 5) as
+	// WUBRG letters in any order; "" asserts colourless.
+	Colours        *string               `json:"colours,omitempty"`
 	Tapped         *bool                 `json:"tapped,omitempty"`
 	Damage         *int32                `json:"damage,omitempty"`
 	Counters       map[string]int32      `json:"counters,omitempty"`
@@ -277,17 +290,24 @@ func harnessf(format string, a ...any) error {
 }
 
 type oracleRun struct {
-	cfg        Config
-	reg        *cards.Registry
-	e          *Engine
-	refs       map[string]state.ObjID
-	targets    []string
-	answers    []oracleAnswer
-	log        []string
-	extraFails []string
-	snaps      []OracleSnapshot
-	decisions  []OracleDecision
-	noSnapshot bool // runOracleScenarioWith's switch
+	cfg     Config
+	reg     *cards.Registry
+	e       *Engine
+	refs    map[string]state.ObjID
+	targets []string
+	answers []oracleAnswer
+	// borrowed holds, per step index, the answers of that step the previous
+	// checkpoint's settleTriggerAsks already consumed (what is left of them).
+	borrowed map[int][]oracleAnswer
+	// askedAtCheckpoint counts checkpoints (setup excluded) taken while a
+	// trigger-order or triggered-cost ask was still pending: what
+	// settleTriggerAsks exists to keep at zero. OracleResult reports it.
+	askedAtCheckpoint int
+	log               []string
+	extraFails        []string
+	snaps             []OracleSnapshot
+	decisions         []OracleDecision
+	noSnapshot        bool // runOracleScenarioWith's switch
 	// xmageFixture mirrors sc.xmageFixture: this run replays a GENERATED
 	// compliance scenario, where XMage is the reference engine. The
 	// hand-authored audit fixtures are gorge-internal (no XMage snapshot to
@@ -633,7 +653,14 @@ func (r *oracleRun) build(sc oracleScenario) error {
 				// face's entry grants (The Legend of Kuruk's lore counter)
 				// stranded on a permanent whose face never carried them.
 				if backFace && pl.zone == state.ZBattlefield {
+					// Placement is not a transform (CR 701.28): the back
+					// face's "as this transforms" replacement (Sephiroth's
+					// emblem) must not run for a card the harness merely
+					// seats on that face, as XMage's addCard does.
+					prior := e.applyingReplacement
+					e.applyingReplacement = true
 					e.emit(events.Event{Kind: events.FlipFace, Obj: id, Amount: 1, Text: "Transformed"})
+					e.applyingReplacement = prior
 				}
 				r.placeSetupCard(id, from, pl.zone, sc.xmageFixture, backFace)
 			}
@@ -708,7 +735,9 @@ func (r *oracleRun) build(sc oracleScenario) error {
 				e.emit(events.Event{Kind: events.LifeChange, Player: pid, Amount: d})
 			}
 		}
-		emitSetupSpeed(e.emit, p, e.G.Players[p].Speed, sc.Setup[fmt.Sprintf("p%d", p)])
+		if !sc.xmageFixture {
+			emitSetupSpeed(e.emit, p, e.G.Players[p].Speed, sc.Setup[fmt.Sprintf("p%d", p)])
+		}
 	}
 	e.Advance()
 	r.answers = append([]oracleAnswer(nil), sc.SetupAnswers...)
@@ -730,7 +759,29 @@ func (r *oracleRun) build(sc oracleScenario) error {
 	// scenario keeps the empty-stack stop: its fixture is written for the
 	// trigger to resolve during setup, and there is no XMage snapshot to
 	// align with.
+	// XMage's ScenarioReplay.applySetupState raises a setup speed inside the
+	// "setup" checkpoint -- at the target turn's first main phase, AFTER the
+	// upkeep and draw steps (CR 702.179). A generated scenario therefore
+	// seeds it at the last decision before main 1 (the draw step, or the
+	// upkeep when the first turn skips its draw): early enough that main 1's
+	// options are posed with it, late enough that a static-GRANTED "Max
+	// speed — at the beginning of your upkeep" trigger (Endrider
+	// Spikespitter) is never queued while speed is still 0, as in XMage.
+	speedSeeded := !sc.xmageFixture
 	for i := 0; i < 400*turn; i++ {
+		if !speedSeeded && e.G.Turn == targetTurn && !e.G.Over &&
+			(e.G.Step == state.StepDraw ||
+				(e.G.Step == state.StepUpkeep && skipFirstDrawStep(e.G, state.StepDraw) != state.StepDraw)) {
+			speedSeeded = true
+			for p := 0; p < seats; p++ {
+				// Like applySetupState (speed > 0 only): an absent speed
+				// leaves whatever a Start-your-engines card already
+				// started, never lowering it back to 0.
+				if setup := sc.Setup[fmt.Sprintf("p%d", p)]; setup.Speed > 0 {
+					emitSetupSpeed(e.emit, p, e.G.Players[p].Speed, setup)
+				}
+			}
+		}
 		if !seededMana && e.G.Turn == targetTurn && e.G.Step == state.StepMain1 {
 			seededMana = true
 			for p := 0; p < 2; p++ {
@@ -807,6 +858,12 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 			// Permanent.nonLand+OppCtrl): XMage poses no ask for the
 			// controller's own seat.
 			od.PerOpponent = strings.Contains(effects.TargetsOf(d.ResumeSA).ValidTgts, "OppCtrl")
+		}
+		if d.Kind == decision.KChoose && d.ResumeKind == "choice" && d.ResumeSA != nil && d.ResumeSA.API == "ChangeTargets" {
+			od.Retarget = true
+		}
+		if d.Kind == decision.KChoose && len(d.Options) > 0 && d.Options[0].Kind == "x" && r.e.cast != nil && r.e.cast.cost.X > 1 {
+			od.XMulti = true
 		}
 		if d.Kind == decision.KTarget && d.ResumeSA != nil {
 			od.Divided = effects.DividedTotal(d.ResumeSA)
@@ -1046,7 +1103,8 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 			if used[o.Index] {
 				continue
 			}
-			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasSuffix(k, "_pay") || strings.HasPrefix(l, "yes")) {
+			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasSuffix(k, "_pay") ||
+				strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "play ") || strings.HasPrefix(l, "cast ")) {
 				return o.Index, nil
 			}
 			if lp == "no" && (oracleDeclineOption(o) || strings.HasPrefix(l, "no")) {
@@ -1113,6 +1171,24 @@ func oracleSoleAccept(d *decision.Decision, used map[int]bool) int {
 	return accept
 }
 
+// oracleColourSet normalises a colour string to its WUBRG letters in fixed
+// order, so an expectation need not know the engine's letter order.
+func oracleColourSet(s string) string {
+	var b strings.Builder
+	for _, c := range "WUBRG" {
+		if strings.ContainsRune(strings.ToUpper(s), c) {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+// abstractYesNo reports whether a pick is the author's abstract yes/no.
+func abstractYesNo(pick string) bool {
+	lp := strings.ToLower(pick)
+	return lp == "yes" || lp == "no"
+}
+
 // answer handles one pending decision. Priority is passed. Anything else is
 // answered from the step's queues (targets, then answers of the matching
 // kind), else by the documented fallback: accept an optional trigger, keep
@@ -1150,6 +1226,15 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 		if a.Kind != string(d.Kind) && a.Kind != "any" {
 			continue
 		}
+		// An "any" yes/no is the author's abstract accept/decline: a
+		// decision that offers no yes/no-shaped option (a mana-payment tap
+		// prompt posed ahead of the real ask) is not the one it was meant
+		// for, so the answer stays queued for the next decision.
+		if a.Kind == "any" && len(a.Pick) == 1 && abstractYesNo(a.Pick[0]) {
+			if idx, _ := r.matchPick(d, a.Pick[0], map[int]bool{}); idx < 0 {
+				continue
+			}
+		}
 		r.answers = append(r.answers[:i:i], r.answers[i+1:]...)
 		used := map[int]bool{}
 		var choices []int
@@ -1171,6 +1256,16 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 			}
 			used[idx] = true
 			choices = append(choices, idx)
+		}
+		// The seat assertion fires only once the pick proves this decision
+		// is the one the answer is consumed by: a wildcard "any" answer that
+		// a foreign decision merely touches keeps its not-offered failure,
+		// which the generator's placement loop retries on the kinds and
+		// steps a setChoice can mean. A consumed answer posed to the wrong
+		// seat is the B8 bug shape and fails here.
+		if a.Seat != nil && int(d.Player) != *a.Seat {
+			return harnessf("answer %q posed to p%d, scenario says p%d: %s",
+				strings.Join(a.Pick, ","), d.Player, *a.Seat, optionDump(d))
 		}
 		return r.submit(d, choices, "answer")
 	}
@@ -1690,6 +1785,11 @@ func (r *oracleRun) do(st oracleStep) error {
 	e := r.e
 	r.targets = append([]string(nil), st.Targets...)
 	r.answers = append([]oracleAnswer(nil), st.Answers...)
+	if rest, ok := r.borrowed[r.step]; ok {
+		// settleTriggerAsks answered the head of this step's script one
+		// checkpoint early; only the remainder is still owed.
+		r.answers = rest
+	}
 	seat := state.PlayerID(st.Seat)
 	r.logf("step %s %s", st.Op, st.Card)
 	op := oracleOpCodes.Code(string(st.Op))
@@ -2008,6 +2108,11 @@ func (r *oracleRun) check(x oracleExpect) []string {
 				failf("%s: has type %q, want not (types %v)", x.Card, ty, types)
 			}
 		}
+		if x.Colours != nil {
+			if got, want := oracleColourSet(e.Derived(id).Colors), oracleColourSet(*x.Colours); got != want {
+				failf("%s: colours %q, want %q", x.Card, got, want)
+			}
+		}
 		if x.Tapped != nil && o.Tapped != *x.Tapped {
 			failf("%s: tapped=%v, want %v", x.Card, o.Tapped, *x.Tapped)
 		}
@@ -2287,6 +2392,12 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 		if err := r.do(st); err != nil {
 			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
 		}
+		if err := r.settleTriggerAsks(sc.Steps, i); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		if r.pendingTriggerAsk() {
+			r.askedAtCheckpoint++
+		}
 		if !r.noSnapshot {
 			r.snaps = append(r.snaps, r.snapshot(fmt.Sprintf("step %d (%s)", i, st.Op)))
 		}
@@ -2326,6 +2437,75 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 		fails = append(fails, r.check(x)...)
 	}
 	return fails, r.log, r
+}
+
+// pendingTriggerAsk reports whether the pending decision is one XMage has
+// already answered by the time its checkpoint is taken: the CR 603.3b order
+// ask for several triggers put on the stack at once, or the payment window
+// of a "you may pay" triggered cost (CR 603.5, e.choosing == chooseTriggeredCost,
+// including its mana-source taps).
+func (r *oracleRun) pendingTriggerAsk() bool {
+	d := r.e.Pending()
+	if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+		return false
+	}
+	return d.Kind == decision.KTriggerOrder || r.e.choosing == chooseTriggeredCost
+}
+
+// settleTriggerAsks answers a trigger-order or triggered-cost ask still
+// pending when step i finishes, BEFORE the step's checkpoint. XMage poses
+// both asks inside the pass that put the trigger on the stack and consumes its
+// scripted answer there, so its checkpoint already shows the ordered stack /
+// the paid cost; gorge, which left the ask pending until the next step drove
+// it, showed an empty stack or an unpaid cost (Twinflame Travelers, Katara,
+// Brigid, Trystan: final states agreed, the mid-step diverged). The answers are
+// the ones the scenario scripts on the NEXT step that has any -- the generator
+// writes them on the following resolve/pass_to step -- and what is left of
+// them stays owed to that step (r.borrowed); with none scripted the ask takes
+// the harness's own fallback, exactly as that later step would have. Both the
+// answers and the fallback are the same ones the later step would have used,
+// so only WHEN the ask is answered moves, never its outcome.
+func (r *oracleRun) settleTriggerAsks(steps []oracleStep, i int) error {
+	if !r.xmageFixture || !r.pendingTriggerAsk() {
+		return nil
+	}
+	next := -1
+	for j := i + 1; j < len(steps); j++ {
+		if len(steps[j].Answers) > 0 {
+			next = j
+			break
+		}
+	}
+	saved := r.answers
+	r.answers = nil
+	if next >= 0 {
+		r.answers = append([]oracleAnswer(nil), steps[next].Answers...)
+	}
+	defer func() {
+		if next >= 0 {
+			if r.borrowed == nil {
+				r.borrowed = map[int][]oracleAnswer{}
+			}
+			r.borrowed[next] = r.answers
+		}
+		r.answers = saved
+	}()
+	for n := 0; n < 100; n++ {
+		d := r.e.Pending()
+		if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+			return nil
+		}
+		// A scripted answer keeps the chain going through the ask's own
+		// sub-asks (the mana-ability colour pick between two taps); with
+		// none left, only a trigger ask itself is settled.
+		if len(r.answers) == 0 && !r.pendingTriggerAsk() {
+			return nil
+		}
+		if err := r.answer(d, "settle"); err != nil {
+			return err
+		}
+	}
+	return harnessf("settle: trigger ask never resolved")
 }
 
 // seatZeroStart lives here, not in a test file, because runOracleScenario

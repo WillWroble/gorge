@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command sbv2local plays SpellBench protocol v2 games in-process: the gorge
 // v2 environment (internal/spellbench/v2engine) against two v2 agents
 // (internal/spellbench/v2agent), every message the canonical line either

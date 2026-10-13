@@ -264,6 +264,7 @@ func foldCopyToken(g *state.Game, e *Event) {
 		srcAtEOTTrigBody = src.AtEOTTrigBody
 	}
 	o := g.AddObject(card, e.Player)
+	tallyTokenCreated(g, e.Player)
 	o.IsToken = true
 	o.IsCopy = true
 	o.SetFaceIdx(faceIdx)
@@ -308,6 +309,7 @@ func foldCardToken(g *state.Game, e *Event) {
 	}
 	card, faceIdx := src.Card, src.FaceIdx
 	o := g.AddObject(card, e.Player)
+	tallyTokenCreated(g, e.Player)
 	o.IsToken = true
 	o.SetFaceIdx(faceIdx)
 	Move(g, o.ID, state.ZLibrary, state.ZBattlefield)
@@ -334,6 +336,7 @@ func foldTokenCreate(g *state.Game, e *Event) {
 		return
 	}
 	o := g.AddObject(def, e.Player)
+	tallyTokenCreated(g, e.Player)
 	o.IsToken = true
 	Move(g, o.ID, state.ZLibrary, state.ZBattlefield)
 	applyEntryCounterPairs(o, e.Pairs)

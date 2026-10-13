@@ -558,6 +558,26 @@ func titleEnum(s string) string {
 	return strings.Join(parts, " ")
 }
 
+// canCopy reports whether seat p has a setup card that can become a copy of
+// another permanent (a face SVar resolving `DB$ Clone`: Clone, Altered Ego,
+// Phantasmal Image).
+func (t *translator) canCopy(p int) bool {
+	for _, pl := range t.places[p] {
+		c, ok := t.lookup(pl.name)
+		if !ok {
+			continue
+		}
+		for _, f := range c.Faces {
+			for _, body := range f.SVars {
+				if strings.Contains(body, "DB$ Clone") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // assertRef maps an asserted card name to a ref: tokens by controller, cards
 // by the asserting player's objects first, then the other seat's.
 func (t *translator) assertRef(p int, name string) (string, *refusal) {
@@ -583,6 +603,11 @@ func (t *translator) assertRef(p int, name string) (string, *refusal) {
 			return "", refuse("copy-ambiguous-ref", "assert on p%d's copy of %s", p, n)
 		}
 		if rs := t.anyRefs(1-p, n); len(rs) > 0 {
+			// A copy of the other seat's card is named for the original
+			// but owned by p: bind the assert to p's object, not the original.
+			if t.canCopy(p) {
+				return fmt.Sprintf("p%d:%s", p, n), nil
+			}
 			return rs[0], nil
 		}
 		return "", refuse("assert-not-in-setup", "%s", n)
@@ -978,6 +1003,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 		}
 		g = &group{at: len(em.steps) - 1}
 		for _, ch := range a.choices {
+			seat := ch.seat
 			if ch.x >= 0 && a.kind != "cast" && a.kind != "activate" {
 				// "X=N" not tied to a spell or ability: a damage-assignment
 				// or other amount ask gorge does not pose as a choose.
@@ -990,7 +1016,7 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 					return r
 				}
 				g.xvals = append(g.xvals, xans{Seat: ch.seat, Kind: "mode", Value: pick})
-				g.answers = append(g.answers, answer{Kind: "modes", Pick: []string{lbl}})
+				g.answers = append(g.answers, answer{Kind: "modes", Pick: []string{lbl}, Seat: &seat})
 				continue
 			}
 			if strings.HasPrefix(pick, "name:") {
@@ -1013,11 +1039,11 @@ func (em *emitter) emit(a *action) (*group, *refusal) {
 			if ch.target && !hasTargets {
 				g.targets = append(g.targets, pick)
 			} else if ch.target {
-				g.answers = append(g.answers, answer{Kind: "target", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "target", Pick: []string{pick}, Seat: &seat})
 			} else if ch.x >= 0 {
-				g.answers = append(g.answers, answer{Kind: "choose", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "choose", Pick: []string{pick}, Seat: &seat})
 			} else {
-				g.answers = append(g.answers, answer{Kind: "any", Pick: []string{pick}})
+				g.answers = append(g.answers, answer{Kind: "any", Pick: []string{pick}, Seat: &seat})
 			}
 		}
 		return nil

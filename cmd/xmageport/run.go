@@ -182,7 +182,7 @@ func (g *group) placed() []answer {
 			// or block declaration the walk passes first
 			k++
 		}
-		out[i] = answer{Kind: ks[k], Pick: a.Pick}
+		out[i] = answer{Kind: ks[k], Pick: a.Pick, Seat: a.Seat}
 	}
 	return out
 }

@@ -48,23 +48,17 @@ func (e *Engine) CombatDamageToPlayersThisTurn() []effects.CombatDamageHit {
 // Infect-marked player damage is poison, not life loss (CR 702.90b), and
 // lifeLoss already excludes it. Using the one classifier the LifeLost
 // triggers and the speed check read keeps the count and those triggers
-// agreeing. Derived from the event log like CastThisTurn, so a replay that
-// rebuilds the game arrives at the same number. Life GAINED is not folded
+// agreeing. Read from state.Player.LifeLostThisTurn, which events.Apply
+// folds with the same classification and clears at TurnChange, so a replay
+// that rebuilds the game arrives at the same number. Life GAINED is not folded
 // in — "lost life" is a loss even if the player ended the turn higher than
 // they started (CR 118.3's distinction, and the reading Forge's own head
 // takes).
 func (e *Engine) LifeLostThisTurn(p state.PlayerID) int32 {
-	var n int32
-	for i := len(e.L.Events) - 1; i >= 0; i-- {
-		ev := e.L.Events[i]
-		if ev.Kind == events.TurnChange {
-			break
-		}
-		if q, amount, ok := lifeLoss(ev); ok && q == p {
-			n += amount
-		}
+	if int(p) < 0 || int(p) >= len(e.G.Players) {
+		return 0
 	}
-	return n
+	return e.G.Players[p].LifeLostThisTurn
 }
 
 // CountersRemovedThisTurn satisfies effects.Host's CountersRemovedThisTurn
@@ -138,23 +132,16 @@ func (e *Engine) DamageTakenThisTurn(p state.PlayerID) int32 {
 // Count$LifeYouGainedThisTurn (the "At the beginning of each end step, if you
 // gained 4 or more life this turn" family's CheckSVar$ gate — Angelic Accord,
 // Resplendent Angel, Valkyrie Harbinger): the total life p gained this turn,
-// summed from every LifeChange above zero since the last TurnChange. Derived
-// from the event log like LifeLostThisTurn, so a replay that rebuilds the
-// game arrives at the same number. Life LOST is not folded in — "gained
+// summed from every LifeChange above zero since the last TurnChange. Read
+// from state.Player.LifeGainedThisTurn (folded by events.Apply), so a replay
+// that rebuilds the game arrives at the same number. Life LOST is not folded in — "gained
 // life" counts only positive LifeChanges (CR 118.3's distinction, the same
 // one-sided read LifeLostThisTurn takes in the other direction).
 func (e *Engine) LifeGainedThisTurn(p state.PlayerID) int32 {
-	var n int32
-	for i := len(e.L.Events) - 1; i >= 0; i-- {
-		ev := e.L.Events[i]
-		if ev.Kind == events.TurnChange {
-			break
-		}
-		if ev.Kind == events.LifeChange && ev.Player == p && ev.Amount > 0 {
-			n += ev.Amount
-		}
+	if int(p) < 0 || int(p) >= len(e.G.Players) {
+		return 0
 	}
-	return n
+	return e.G.Players[p].LifeGainedThisTurn
 }
 
 // CardsDiscardedThisTurn satisfies effects.Host's CardsDiscardedThisTurn for

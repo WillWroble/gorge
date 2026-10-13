@@ -19,11 +19,9 @@ import (
 // process (see ChildMaxCards for why the gate runs in children).
 const statusChildEnv = "GORGE_ADOPT_STATUS_SETS"
 
-// ratchetChildSem bounds the two ratchet tests' child processes TOGETHER to
-// the four StatusChunked allows one test. The tests run in parallel (they
-// share only the read-only census and their children are separate
-// processes), so without a shared bound a grown level-B claim could put
-// 4+4 children at ~0.6 GiB each on one binary.
+// ratchetChildSem bounds TestCertificationRatchet's child processes to the
+// four StatusChunked allows one test, at ~0.6 GiB each. (The level-B ratchet
+// shared it while it also ran in children; its chunks now run in process.)
 var ratchetChildSem = make(chan struct{}, 4)
 
 func TestStatusChild(t *testing.T) {

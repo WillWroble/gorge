@@ -746,10 +746,11 @@ func staticConditionGap(f *cards.Face, st cards.Static) string {
 	case has("maxspeed"):
 		return "needs max speed (setup has no speed knob)"
 	case has("attackedthisturn"):
-		// The object predicate is absent from the filter grammar (only
-		// attackedThisCombat exists), so a Card.Self+attackedThisTurn gate
-		// fails closed and stays false after the source attacks.
-		return "gate reads the attackedThisTurn filter predicate, which the engine does not evaluate"
+		// The filter grammar evaluates attackedThisTurn (effects/filter.go);
+		// what is missing is a fixture that makes the source attack. The
+		// play-permission observation serves a Card.Self gate itself
+		// (staticNeedsSelfAttack); a gate it cannot serve lands here.
+		return "gate needs the source to have attacked this turn (no self-attack fixture serves this shape)"
 	}
 	return ""
 }
