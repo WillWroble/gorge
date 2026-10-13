@@ -202,6 +202,18 @@ type TableConfig struct {
 	// rules.Config and on its sidecar, so a replay rebuilds the life the
 	// match actually played with.
 	StartingLife int32 `json:"starting_life,omitempty"`
+	// AllowDecklistBots opts a BOT-ONLY table into a bot policy that reads
+	// every seat's real decklist (operator ruling 2026-10-13). An Env policy
+	// (bots.Info.Env) builds its search root from every seat's true 40/60 —
+	// host/botenv.go's envData hands searchseat.HonestRoot the table's
+	// m.cfg.Decks — so "honest" redeals the hidden cards but the deck LIST
+	// it redeals from is the opponent's real one. Such a policy is refused
+	// at any table with a human, always, even with this opt-in; the bit only
+	// ever matters on a table whose seats are all bots (a test, bench or
+	// spectator game). A table written by an older binary without the field
+	// loads as false, and restart skips a persisted table the new rule
+	// refuses rather than failing the whole process.
+	AllowDecklistBots bool `json:"allow_decklist_bots,omitempty"`
 }
 
 // autoPayManaEnabled is the effective hosted-bot setting. BotAutoPayMana is
@@ -213,6 +225,17 @@ func (c TableConfig) autoPayManaEnabled() bool {
 }
 
 var ErrNotFound = errors.New("host: not found")
+
+// errDecklistBotRefusal marks the two refusal forms the 2026-10-13
+// decklist ruling adds to validated. It is the ONLY failure restart
+// recovers from: a tables.json written by an older binary can carry an
+// Env policy without the allow_decklist_bots opt-in, and skipping that
+// table beats failing the whole start. Every other validation failure
+// (unknown policy name, bad seats, missing decks) still fails the start,
+// as TestBotPolicyPersistsItsNormalizedDefaultAndRejectsUnknownRestore
+// pins. The sentinel text is phrased to read naturally inside both
+// refusal messages, which are asserted by substring in the tests.
+var errDecklistBotRefusal = errors.New("reads opponents' decklists")
 
 // validated normalizes a table configuration before it is retained by the
 // registry. Keeping normalization beside validation means a name cannot be
@@ -228,6 +251,21 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 	// seat would crash the match. Refuse the table instead.
 	if e, ok := bots.Lookup(policy); ok && e.NeedsAutoPay && !c.autoPayManaEnabled() {
 		return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q needs automatic mana payment (auto_mana and bot_auto_pay_mana both on)", c.ID, policy)
+	}
+	// Operator ruling 2026-10-13: a policy that reads every seat's real
+	// decklist (bots.Info.Env; host/botenv.go envData) never seats against a
+	// human, and only runs on a bot-only table that explicitly opted in.
+	// Both refusals wrap errDecklistBotRefusal so restart can tell the one
+	// stale-table case it recovers (a persisted table written by an older
+	// binary without the opt-in) from a validation failure it must still
+	// fail the start over — an unknown policy name, bad seats, missing decks.
+	if e, ok := bots.Lookup(policy); ok && e.Env {
+		if len(c.Humans) > 0 {
+			return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q %w; it cannot seat at a table with a human", c.ID, policy, errDecklistBotRefusal)
+		}
+		if !c.AllowDecklistBots {
+			return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q %w and needs allow_decklist_bots on a bot-only table", c.ID, policy, errDecklistBotRefusal)
+		}
 	}
 	switch {
 	case c.ID == "":

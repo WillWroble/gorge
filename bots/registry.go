@@ -36,10 +36,18 @@ type Info struct {
 	Tier                     Tier
 	Strength                 []Measurement
 	Cost                     Cost
-	Env, Search              bool
-	Formats                  []string
-	MaxSeats                 int
-	Caretaker                string
+	// Env marks a policy whose seat builds a full search engine over every
+	// seat's REAL decklist (host/botenv.go envData: searchprobe.PublicGame
+	// from m.cfg.Decks). "Honest" root redeals the hidden cards, but the
+	// deck LIST it redeals from is each seat's true list, so an Env seat
+	// knows every seat's real decklist. Operator ruling 2026-10-13: Env
+	// therefore never seats against a human, and on a bot-only table only
+	// with TableConfig.AllowDecklistBots (enforced by host's table
+	// validation and gorged's offered-set gate).
+	Env, Search bool
+	Formats     []string
+	MaxSeats    int
+	Caretaker   string
 	// NeedsAutoPay marks a policy that plays through the engine's automatic
 	// mana payment plans and has no manual-tap mode (its factory refuses
 	// Options.AutoPayMana == false). The host refuses a table that names it
@@ -131,6 +139,16 @@ func Names() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// ReadsDecklists reports whether the named policy builds a search engine
+// over every seat's REAL decklist (Info.Env; host/botenv.go's envData).
+// The single discriminator for the operator ruling of 2026-10-13: such a
+// policy seats only on a bot-only table that set TableConfig's
+// AllowDecklistBots, and never against a human. An unknown name is false.
+func ReadsDecklists(name string) bool {
+	e, ok := Lookup(name)
+	return ok && e.Env
 }
 
 func Entries() []Entry {

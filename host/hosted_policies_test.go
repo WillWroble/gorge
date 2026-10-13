@@ -135,7 +135,9 @@ func TestEveryHostedPolicyIsDeterministic(t *testing.T) {
 				}
 				defer r.Close()
 				cfg := TableConfig{ID: "t1", Name: "det" + tag, Seats: 2, Decks: []string{"a", "b"},
-					Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: e.Name}
+					Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: e.Name,
+					// A decklist-reading policy (Info.Env) seats only on a bot-only table that opted in.
+					AllowDecklistBots: e.Env}
 				if err := r.AddTable(cfg); err != nil {
 					t.Fatalf("%q: AddTable: %v", e.Name, err)
 				}

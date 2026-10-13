@@ -137,6 +137,14 @@ type config struct {
 	az3Net, az3Decks string
 	az3DemoTable     bool
 	policyPools      map[string][]string
+	// allowDecklistBots is the -allow-decklist-bots flag (azc3.go): the
+	// operator's explicit opt-in that lets the server's own BOT-ONLY tables
+	// run a policy that reads every seat's real decklist (bots.Info.Env).
+	// Its only effect today is the az-c3 demo table (azc3Table), which needs
+	// it before -az-c3-net is accepted. It never seats such a policy against
+	// a human: the host refuses Env at any table with Humans regardless of
+	// the opt-in, and the offered set (botpolicies.go) never lists one.
+	allowDecklistBots bool
 	// seatToken is the -seat-token flag: a fixed bearer token for the first
 	// human slot instead of a random per-slot one. Tests and local use only
 	// (R-E3-3) — production runs mint random tokens.
@@ -312,7 +320,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.BoolVar(&c.botCommonSense, "bot-common-sense", false, "wrap hosted bots and human-seat caretakers in the bots/sanity CommonSense guard (drop hostile self-removal from the option list, answer the London mulligan by the constructed policy); opt-in, default off")
 	fs.BoolVar(&c.autoMana, "auto-mana", true, "enable automatic mana payment plans and controls for human seats (disable with -auto-mana=false for the legacy manual path)")
 	fs.StringVar(&c.botPolicy, "bot-policy", host.LethalPressurePolicy, "default hosted bot policy for a vs-bot request that omits bot_policy; must be registered, offered, and support both formats (bot, lethal-pressure, cast-profile)")
-	fs.StringVar(&c.botPoliciesRaw, "bot-policies", defaultBotPoliciesRaw, "comma-separated set of bot policies this server OFFERS (the /api/bot-policies listing and accepted POST /api/games names); empty offers every registered entry")
+	fs.StringVar(&c.botPoliciesRaw, "bot-policies", defaultBotPoliciesRaw, "comma-separated set of bot policies this server OFFERS (the /api/bot-policies listing and accepted POST /api/games names); empty offers every registered entry that does not read opponents' decklists (a decklist-reading policy can never be offered: vs-bot always seats a human)")
 	fs.IntVar(&c.botSearchSlots, "bot-search-slots", defaultBotSearchSlots(), "maximum concurrent searched bot decisions across the process; decisions queue, never degrade (>= 1; default max(1, GOMAXPROCS/2))")
 	fs.IntVar(&c.botSearchParallelism, "bot-search-parallelism", 1, "goroutines within one searched decision (latency only, never an answer; >= 1)")
 	fs.IntVar(&c.maxSearchTables, "max-search-tables", 8, "maximum live on-demand tables whose policy is a search entry (0 = unlimited)")
@@ -328,9 +336,10 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.DurationVar(&c.prewarmArtBudget, "prewarm-art-budget", 0, "with -prewarm-art-only: stop the fill after this much wall-clock time and exit non-zero (0 = no limit)")
 	fs.IntVar(&c.prewarmArtMaxConsecutiveFailures, "prewarm-art-max-consecutive-failures", 0, "with -prewarm-art-only: stop the fill once this many names in a row have failed and exit non-zero (0 = no limit)")
 	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
-	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -vsbot, -auto-mana and -bot-auto-mana)")
+	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -allow-decklist-bots, -auto-mana and -bot-auto-mana; runs only on its bot-only demo table, never against a human)")
 	fs.BoolVar(&c.az3DemoTable, "az-c3-demo-table", true, "with -az-c3-net: add one two-seat az-c3 vs az-c3 table, dealt from -az-c3-decks, for spectators")
 	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
+	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")

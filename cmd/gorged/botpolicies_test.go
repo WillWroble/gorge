@@ -21,16 +21,10 @@ import (
 // serve(): serve opens the corpus, and these are pure flag checks that must
 // fail before any listener opens.
 func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
-	// A policy that exists but does NOT play commander. If this precondition
-	// is false the "lacks a format" case below would be vacuous, so assert
-	// it loudly.
-	search, ok := bots.Lookup("search")
-	if !ok {
-		t.Fatal("bots registry has no \"search\" entry; the format case cannot be set up")
-	}
-	if contains(search.Formats, host.FormatCommander.String()) {
-		t.Fatalf("\"search\" unexpectedly supports commander (formats %v); pick a constructed-only policy", search.Formats)
-	}
+	// The "lacks a format" case below needs a NON-decklist constructed-only
+	// entry, registered for the purpose (registerFormatSpy asserts its own
+	// preconditions loudly).
+	registerFormatSpy(t)
 	// "bot" must play BOTH formats, or the valid case and the default-
 	// normalization case would not exercise the success path.
 	bot, ok := bots.Lookup(bots.Default)
@@ -42,6 +36,11 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 			t.Fatalf("default %q lacks %s (formats %v); the valid case is not valid", bots.Default, f, bot.Formats)
 		}
 	}
+	// The "lacks a format" refusal needs a NON-decklist constructed-only
+	// entry: the ruling of 2026-10-13 refuses a decklist-reading default
+	// before the format check ever runs, and every real non-Env entry plays
+	// both formats.
+	registerFormatSpy(t)
 
 	for _, tc := range []struct {
 		name       string
@@ -50,7 +49,7 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name: "unknown default", def: "nope", offeredRaw: "bot,search",
+			name: "unknown default", def: "nope", offeredRaw: "bot,cast-profile",
 			wantErr: "unknown bot policy",
 		},
 		{
@@ -58,11 +57,14 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 			wantErr: "unknown bot policy",
 		},
 		{
-			name: "default not in the offered set", def: "search", offeredRaw: "bot",
+			// "search" reads decklists now, so its own refusal names the
+			// ruling; a plain policy the offered set omits still tests the
+			// set gate.
+			name: "default not in the offered set", def: "cast-profile", offeredRaw: "bot",
 			wantErr: "is not in -bot-policies",
 		},
 		{
-			name: "default lacks a format", def: "search", offeredRaw: "bot,search",
+			name: "default lacks a format", def: formatSpyPolicy, offeredRaw: "bot," + formatSpyPolicy,
 			wantErr: "does not support the commander format",
 		},
 		{
@@ -93,12 +95,14 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 		wantOff    []string
 	}{
 		{
-			name: "explicit list", def: "bot", offeredRaw: "search,bot",
-			wantDef: "bot", wantOff: []string{"bot", "search"}, // registry order, not typed order
+			name: "explicit list", def: "bot", offeredRaw: "cast-profile,bot",
+			wantDef: "bot", wantOff: []string{"bot", "cast-profile"}, // registry order, not typed order
 		},
 		{
-			name: "empty offers everything", def: "bot", offeredRaw: "",
-			wantDef: "bot", wantOff: bots.Names(),
+			// The ruling of 2026-10-13: an empty list offers every registered
+			// entry EXCEPT the decklist readers.
+			name: "empty offers every non-decklist entry", def: "bot", offeredRaw: "",
+			wantDef: "bot", wantOff: nonDecklistPolicyNames(),
 		},
 		{
 			name: "blank default normalizes", def: "", offeredRaw: "bot",

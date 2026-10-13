@@ -116,8 +116,10 @@ PPROF=${PPROF:-false}
 
 # AZ_C3_NET / AZ_C3_DECKS (both or neither) serve the az-c3 bot: its .dzgw network
 # and the directory of the FDN decks it was trained on (docs/superpowers/reports/
-# 2026-10-09-az-c3-hosted.md). Set, the demo gains an az-c3 vs az-c3 table and the
-# play-vs-bot deck list gains the FDN decks, whose opponent is az-c3.
+# 2026-10-09-az-c3-hosted.md). Set, the demo gains an az-c3 vs az-c3 table —
+# bot-only, so setting AZ_C3_NET is the operator's explicit opt-in for
+# -allow-decklist-bots (az-c3 reads every seat's real decklist; it never plays
+# against a human, and the play-vs-bot deck list no longer offers it).
 AZ_C3_NET=${AZ_C3_NET-}
 AZ_C3_DECKS=${AZ_C3_DECKS-}
 PUB_PORT=${PUB_PORT:-8080}
@@ -202,7 +204,7 @@ AZ_ARGS=()
 if [ -n "$AZ_C3_NET$AZ_C3_DECKS" ]; then
 	[ -n "$AZ_C3_NET" ] && [ -n "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET and AZ_C3_DECKS go together" >&2; exit 1; }
 	[ -r "$AZ_C3_NET" ] && [ -d "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET is not a file or AZ_C3_DECKS is not a directory" >&2; exit 1; }
-	AZ_ARGS=(-az-c3-net "$AZ_C3_NET" -az-c3-decks "$AZ_C3_DECKS")
+	AZ_ARGS=(-az-c3-net "$AZ_C3_NET" -az-c3-decks "$AZ_C3_DECKS" -allow-decklist-bots)
 fi
 say() { printf 'deploy-demo: %s\n' "$*"; }
 

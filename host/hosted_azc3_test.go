@@ -85,7 +85,9 @@ func TestHostedAZC3IsDeterministic(t *testing.T) {
 		}
 		defer r.Close()
 		cfg := TableConfig{ID: "t1", Name: "azc3" + tag, Seats: 2, Decks: []string{"a", "b"},
-			Seed: seed, Spectator: view.Public, BotPolicy: azc3.Policy, BotAutoPayMana: true, AutoMana: true}
+			Seed: seed, Spectator: view.Public, BotPolicy: azc3.Policy, BotAutoPayMana: true, AutoMana: true,
+			// az-c3 reads every seat's real decklist (Info.Env); these tables are bot-only and opt in.
+			AllowDecklistBots: true}
 		if err := r.AddTable(cfg); err != nil {
 			t.Fatalf("AddTable: %v", err)
 		}
@@ -148,7 +150,7 @@ func TestHostRefusesAZC3WithoutAutoPay(t *testing.T) {
 			t.Fatal(err)
 		}
 		cfg := TableConfig{ID: "t1", Name: "refused", Seats: 2, Decks: []string{"a", "b"}, Seed: 1,
-			Spectator: view.Public, BotPolicy: azc3.Policy, AutoMana: c.autoMana, BotAutoPayMana: c.botPay}
+			Spectator: view.Public, BotPolicy: azc3.Policy, AutoMana: c.autoMana, BotAutoPayMana: c.botPay, AllowDecklistBots: true}
 		if err := r.AddTable(cfg); err == nil {
 			t.Errorf("%s: AddTable accepted an az-c3 table without automatic mana payment", c.name)
 		}

@@ -20,8 +20,12 @@ import (
 )
 
 // enableAZC3 validates the az-c3 flags and registers the policy. It runs
-// before the policy flags are resolved: gorged offers every registered entry
-// by default, so the entry has to exist, or stay absent, by then.
+// before the policy flags are resolved: gorged offers every registered
+// non-decklist entry by default (botpolicies.go), so the entry has to
+// exist, or stay absent, by then. az-c3 reads opponents' decklists
+// (bots.Info.Env), so it is never offered; it runs only on the bot-only
+// demo table (azc3Table), and -az-c3-net requires the operator's
+// -allow-decklist-bots opt-in.
 func (c config) enableAZC3() error {
 	switch {
 	case c.az3Net == "" && c.az3Decks == "":
@@ -30,8 +34,8 @@ func (c config) enableAZC3() error {
 		return errors.New("-az-c3-decks needs -az-c3-net")
 	case c.az3Decks == "":
 		return errors.New("-az-c3-net needs -az-c3-decks: the network was trained on one deck distribution and the server keeps the bot to it")
-	case !c.vsbot:
-		return errors.New("-az-c3-net needs -vsbot: az-c3 is reachable only through the play-vs-bot flow")
+	case !c.allowDecklistBots:
+		return errors.New("-az-c3-net needs -allow-decklist-bots: az-c3 reads opponents' decklists and runs only on its bot-only demo table, never against a human")
 	case !c.autoMana || !c.botAutoPayMana:
 		return errors.New("-az-c3-net needs -auto-mana and -bot-auto-mana (both default on): az-c3 pays its mana through the engine's automatic payment plans")
 	}
@@ -116,5 +120,10 @@ func (c config) azc3Table(pool []string, vis view.Visibility) *host.TableConfig 
 		Seed: c.seed + uint64(c.tables), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
 		Mulligans: c.mulligans, Format: host.FormatConstructed, BotPolicy: azc3.Policy,
 		BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana,
+		// The table exists only when az-c3 is enabled, and enabling az-c3
+		// required -allow-decklist-bots (enableAZC3): this is the opt-in's
+		// one effect. All seats are bots; the host refuses az-c3 at any
+		// table with a human even with the bit set.
+		AllowDecklistBots: true,
 	}
 }
