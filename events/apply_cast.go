@@ -69,6 +69,12 @@ func foldCastInfo(g *state.Game, e *Event) {
 		if FlagsFrom(e.Counter)&state.FlagConvoked != 0 {
 			o.Convoked = append([]state.ObjID(nil), e.IDs...)
 		}
+		// The spent mana's producing sources (Spell.ManaFromCard provenance)
+		// are an ID-list fold too, the Convoked pattern: the trailing
+		// pay-time CastInfo's IDs, whenever the flag is present.
+		if FlagsFrom(e.Counter)&state.FlagManaSourcesSpent != 0 {
+			o.ManaSpentSources = append([]state.ObjID(nil), e.IDs...)
+		}
 		// AddsCounters$ (Opal Palace and siblings) is a structured-payload
 		// fold: the producing ABILITIES whose riders applied to this cast --
 		// snapshotted at production, with how many of each one's mana units
@@ -109,6 +115,9 @@ func foldCastInfo(g *state.Game, e *Event) {
 			// bool folded above; the Amount is deliberately unused
 		case FlagsFrom(e.Counter)&state.FlagOptionalCostPaid != 0:
 			// bool folded above; the Amount is deliberately unused
+		case FlagsFrom(e.Counter)&state.FlagManaSourcesSpent != 0:
+			// the source id list was folded above; the Amount is
+			// deliberately unused (the Conspired arm's consume shape)
 		case FlagsFrom(e.Counter)&state.FlagConvoked != 0:
 			// the convoked id list was folded above; the Amount is
 			// deliberately unused (the Conspired arm's consume shape)
