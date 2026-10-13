@@ -20,16 +20,15 @@ import (
 
 func tevalDelveEngine(t *testing.T, teval bool) (*Engine, state.ObjID, state.ObjID) {
 	t.Helper()
-	e := handEngine(t, corpusAlternativeCard(t, "Teval, Arbiter of Virtue"))
+	e := handEngine(t, corpusAlternativeCard(t, "Teval, Arbiter of Virtue"),
+		card(t, "Name:Ogre\nManaCost:3 R\nTypes:Creature Ogre\nPT:3/3\nOracle:x\n"))
+	hand := append([]state.ObjID(nil), e.G.Zone(state.ZHand, 0)...)
 	if teval {
-		for _, o := range e.G.Zone(state.ZHand, 0) {
-			e.emit(events.Event{Kind: events.MoveZone, Obj: o, From: state.ZHand, To: state.ZBattlefield})
-		}
+		e.emit(events.Event{Kind: events.MoveZone, Obj: hand[0], From: state.ZHand, To: state.ZBattlefield})
 	}
 	gy := e.G.AddObject(card(t, "Name:Husk\nManaCost:G\nTypes:Creature Husk\nPT:1/1\nOracle:x\n"), 0)
 	e.emit(events.Event{Kind: events.MoveZone, Obj: gy.ID, From: state.ZLibrary, To: state.ZGraveyard})
-	spell := e.G.AddObject(card(t, "Name:Ogre\nManaCost:3 R\nTypes:Creature Ogre\nPT:3/3\nOracle:x\n"), 0)
-	e.G.SetZone(state.ZHand, 0, append(e.G.Zone(state.ZHand, 0), spell.ID))
+	spell := e.G.Obj(hand[1])
 	return e, spell.ID, gy.ID
 }
 
