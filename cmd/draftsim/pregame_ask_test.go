@@ -44,7 +44,7 @@ func TestDraftsimPregameAskIsPosed(t *testing.T) {
 	}
 
 	deckA, deckB := deck(), deck()
-	oc, eng, err := driveGame(r, 99, 0, 1, deckA, deckB)
+	oc, eng, err := driveGame(r, 99, [2]string{"bot", "bot"}, [2]string{"p0", "p1"}, deckA, deckB)
 	if err != nil {
 		t.Fatalf("game: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestDraftsimPregameAskIsPosed(t *testing.T) {
 	if asks != 1 {
 		t.Fatalf("engine log carries %d starting_player asks, want 1 (the pose ran before the first Advance)", asks)
 	}
-	if _, err := replay.Replay(eng.L, gameConfig(r, 99, 0, 1, deckA, deckB)); err != nil {
+	if _, err := replay.Replay(eng.L, gameConfig(r, 99, [2]string{"p0", "p1"}, deckA, deckB)); err != nil {
 		t.Fatalf("replay of the asked game: %v", err)
 	}
 }

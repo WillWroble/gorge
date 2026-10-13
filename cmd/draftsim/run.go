@@ -43,6 +43,9 @@ type eventResult struct {
 	standings []event.Standing
 	// games is one record per played game, in play order.
 	games []gameRecord
+	// decks is each seat's built deck, resolved to engine card pointers —
+	// the gauntlet replays them against the human decks after the event.
+	decks [][]*cards.Card
 }
 
 // run is main's testable body. It validates the flags, opens the corpus,
@@ -72,6 +75,13 @@ func run(o options, out io.Writer) (*result, error) {
 	}
 	if o.events < 1 {
 		return nil, fmt.Errorf("-events must be at least 1, got %d", o.events)
+	}
+	// The gauntlet is validated before anything expensive runs: its
+	// refusals (unknown catalog value, a non-FDN set, an Env policy on the
+	// measurement seats) must not depend on the corpus.
+	g, err := gauntletFromOptions(o)
+	if err != nil {
+		return nil, err
 	}
 	spec, err := setdata.Load(o.set)
 	if err != nil {
@@ -108,6 +118,10 @@ func run(o options, out io.Writer) (*result, error) {
 		}
 	}
 
+	var acc *gauntletAccum
+	if g != nil {
+		acc = &gauntletAccum{}
+	}
 	res := &result{}
 	for n := 0; n < o.events; n++ {
 		seed := o.seed + uint64(n)
@@ -146,7 +160,20 @@ func run(o options, out io.Writer) (*result, error) {
 			csvHeader = false
 		}
 		printStandings(out, er)
+		if g != nil {
+			if err := gauntletEvent(r, g, ev, er.decks, seed, o.verify, acc, out); err != nil {
+				return nil, fmt.Errorf("event %d (seed %d): gauntlet: %w", n+1, seed, err)
+			}
+		}
 		res.events = append(res.events, *er)
+	}
+	if g != nil {
+		// The human-vs-human sanity pairings do not depend on the draft,
+		// so they run once per run, seeded from -seed itself.
+		if err := gauntletSanity(r, g, o.seed, o.verify, acc, out); err != nil {
+			return nil, fmt.Errorf("gauntlet sanity: %w", err)
+		}
+		acc.print(out, g.baseline)
 	}
 	return res, nil
 }
