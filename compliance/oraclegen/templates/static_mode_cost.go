@@ -174,14 +174,67 @@ func unlessStoryFixture(f *cards.Face, req levelb.Requirement) []string {
 	return []string{"Sol Ring", "Arcane Signet"}
 }
 
-// cantBlockUnlessTaxItem keeps Archangel of Tithes's attacking static a named
-// gap: the blockers decision is not posed when the {1} tax leaves no
-// affordable block, and every affordable block pays the same {1}, so no
-// checkpoint the scenario grammar reaches can show the tax refusing a pair.
+// unlessBlockLand is p1's untapped land: the one mana that pays the {1}
+// block tax, so the blockers decision is posed with exactly one affordable
+// block.
+const unlessBlockLand = "Wastes"
+
+// cantBlockUnlessTaxItem serves CantBlockUnless (Archangel of Tithes's "As
+// long as Archangel of Tithes is attacking, creatures can't block unless
+// their controller pays {1} for each of those creatures", CR 509.1d): p0
+// attacks with the card and its Grizzly Bears, and p1 blocks the Bears with
+// its own, paying the {1} from its one untapped Wastes -- the paid-block
+// checkpoint shows the blocker blocking and the land tapped for the tax. The
+// control without the land poses no blockers decision at all (no block is
+// affordable), so the block step cannot run: the tax is what the Wastes paid.
 func cantBlockUnlessTaxItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
 	const mode = "CantBlockUnless"
-	return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "static " + mode +
-		" needs a paid-block checkpoint: the blockers decision is not posed when the {1} tax leaves no affordable block"}
+	skip := func(why string) (oraclegen.Item, *oraclegen.Skip) {
+		return oraclegen.Item{}, &oraclegen.Skip{Card: name, Reason: "static " + mode + " " + why}
+	}
+	if !f.IsCreature() {
+		return skip("paid-block observation attacks with the card, which is not a creature")
+	}
+	mk := func(land bool) oraclegen.Scenario {
+		sc := staticScenario(f, name, []string{name, unlessBlocker}, nil, []oraclegen.Step{
+			{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + name, "p0:" + unlessBlocker}},
+			{Op: "block", Seat: 1, Blocks: [][2]string{{"p1:" + unlessBlocker, "p0:" + unlessBlocker}}},
+		})
+		p0, p1 := sc.Setup["p0"], sc.Setup["p1"]
+		// Two Grizzly Bears on p0's side would make the attacker ref
+		// ambiguous: appendFixtureUnique keeps one.
+		p0.Battlefield = appendFixtureUnique(p0.Battlefield, unlessBlocker)
+		p1.Battlefield = appendFixtureUnique(p1.Battlefield, unlessBlocker)
+		if land {
+			p1.Battlefield = append(p1.Battlefield, unlessBlockLand)
+		}
+		sc.Setup["p0"], sc.Setup["p1"] = p0, p1
+		return sc
+	}
+	sc := mk(true)
+	res, ok := runStatic(reg, sc)
+	if !ok || len(res.Fails) != 0 || len(res.Snapshots) == 0 {
+		return skip(fmt.Sprintf("paid block does not replay (ok=%v fails=%v)", ok, res.Fails))
+	}
+	last := res.Snapshots[len(res.Snapshots)-1]
+	paid, blocked := false, false
+	for _, p := range last.Permanents {
+		switch {
+		case p.Controller == 1 && p.Name == unlessBlockLand:
+			paid = p.Tapped
+		case p.Controller == 1 && p.Name == unlessBlocker:
+			blocked = p.Blocking
+		}
+	}
+	if !paid || !blocked {
+		return skip(fmt.Sprintf("the paid-block checkpoint shows tax paid=%v blocking=%v", paid, blocked))
+	}
+	if cres, cok := runStatic(reg, mk(false)); cok && len(cres.Fails) == 0 {
+		return skip("control blocks with no mana for the tax")
+	}
+	it := oraclegen.NewLevelBItem(name, req.Key, StaticObserved.Version, []string{"509.1d"}, sc)
+	it.XAnswers = oraclegen.XAnswersForScenario(res, sc, oraclegen.ModeNumbers(f), nil)
+	return it, nil
 }
 
 // manaConvertCaseProbe is the Case spell the conversion pays for from

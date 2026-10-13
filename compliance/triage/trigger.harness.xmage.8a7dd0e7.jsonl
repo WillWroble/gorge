@@ -1,2 +1,0 @@
-{"shape":{"template":"trigger","op":"harness","field":"xmage","diff":"IllegalArgumentException: cast_mode prepared_copy unsupported"},"key":"trigger | harness | xmage | IllegalArgumentException: cast_mode prepared_copy unsupported","cards":1}
-{"card":"Codie, Ravenous Codex","template":"trigger#0.0","status":"harness","api":"SpellCast:CopySpellAbility","sets":["FRA"],"detail":"xmage: IllegalArgumentException: cast_mode prepared_copy unsupported"}

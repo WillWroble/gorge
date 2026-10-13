@@ -22,6 +22,10 @@ func cantBeShape(f *cards.Face, st *cards.Static) (sub string, ok bool) {
 			return "static.cant-be-cast-opponent-turn", true
 		case paramsAre(st, map[string]string{"ValidCard": "Card", "Caster": "Player", "NumLimitEachTurn": "1"}):
 			return "static.cant-be-cast-limit", true
+		case paramsAre(st, map[string]string{"Caster": attackedYouCaster}):
+			// Sandswirl Wanderglyph: "Each opponent who attacked you or a
+			// planeswalker you control this turn can't cast spells."
+			return "static.cant-be-cast-attacked-you", true
 		case paramsAre(st, map[string]string{"ValidCard": "Card.Self", "EffectZone": "All", "Caster": "Player.Active", "SVarCompare": "LE3"}, "CheckSVar") && yourTurnsSVar(f, st.Params["CheckSVar"]):
 			return "static.cant-be-cast-first-turns", true
 		}
@@ -37,6 +41,11 @@ func cantBeShape(f *cards.Face, st *cards.Static) (sub string, ok bool) {
 	}
 	return "", false
 }
+
+// attackedYouCaster is the one attacked-you Caster$ spelling the
+// static.cant-be-cast-attacked-you observation models: an opponent who
+// attacked you, or a planeswalker you control, during their current turn.
+const attackedYouCaster = "Player.Opponent+attackedYouTheirCurrentTurn,Player.Opponent+attackedYouCtrlTheirCurrentTurn_Planeswalker"
 
 // cantBeNamedGap is the named reason a CantBeCast / CantBeActivated shape the
 // template cannot observe stays a gap, or "".

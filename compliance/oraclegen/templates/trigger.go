@@ -38,7 +38,7 @@ func triggerSubs(sub string) bool {
 		levelb.UnlockDoorSub, levelb.FullyUnlockSub, stateSelfCountersSub, levelb.CounterAddedSub,
 		levelb.TurnedFaceUpSub, levelb.TurnedFaceUpOtherSub, levelb.SacrificeSub, levelb.DamageSub,
 		levelb.ManaExpendSub, levelb.TapsForManaSub, levelb.MayPlayRiderSub, levelb.LandPlayedZoneSub,
-		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub, levelb.LosesGameSub,
+		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub, levelb.LosesGameSub, levelb.TeamworkTappedSub,
 		levelb.BookkeepingSub:
 		return true
 	case "trigger.forage", "trigger.give-gift", "trigger.explores", "trigger.collect-evidence",
@@ -323,7 +323,7 @@ func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requ
 	}
 	sc := oraclegen.Scenario{
 		Setup:        map[string]oraclegen.Seat{"p0": p0, "p1": p1},
-		SetupAnswers: oraclegen.OpeningHandAnswers(f),
+		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), c.setupAnswers...),
 		Steps:        scenarioSteps,
 	}
 	if c.castSelfX {

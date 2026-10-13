@@ -177,7 +177,7 @@ public final class ScenarioReplayWave4DriverTest {
      * plain cast whose leading Yes picks XMage's first alternative cost. */
     private static void alternativeCast() throws Exception {
         check(ScenarioReplay.castModeSupported("alternative"), "alternative cast_mode must be elected");
-        check(!ScenarioReplay.castModeSupported("conspired"), "an unwired cast_mode is still rejected");
+        check(!ScenarioReplay.castModeSupported("kicked"), "an unwired cast_mode is still rejected");
         Class<?>[] types = {String.class, List.class};
         List<String> choices = new ArrayList<>(Collections.singletonList("Yes"));
         check((Boolean) adapter("alternativeCostKey", types, "You may choose an alternative cost", choices)
