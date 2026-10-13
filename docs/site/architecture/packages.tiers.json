@@ -315,6 +315,11 @@
       "tier": "host",
       "status": "SUPP"
     },
+    "eventhost": {
+      "tier": "host",
+      "status": "SUPP",
+      "purpose": "Hosted draft events inside gorged: event store, lobby and join, draft with synchronous bots, per-event SSE frames; build and games land in later tickets."
+    },
     "host/httpapi": {
       "tier": "host",
       "status": "SUPP"
