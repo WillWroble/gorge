@@ -1,0 +1,246 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"sort"
+
+	"github.com/adams-shaun/gorge/bots"
+	_ "github.com/adams-shaun/gorge/bots/all" // link the built-in policies
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/event"
+	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/limited/pickbot"
+	"github.com/adams-shaun/gorge/limited/setdata"
+)
+
+// runner carries everything one draftsim run reads more than once: the card
+// corpus, the drafted set's spec, the pod's personas and the output sink.
+type runner struct {
+	reg     *cards.Registry
+	spec    setdata.Spec
+	drafter pickbot.Drafter
+	builder pickbot.Builder
+	players []string
+	verbose bool
+	out     io.Writer
+}
+
+// result is what one run produced, in the shape the tests assert on.
+type result struct {
+	// events is one record per event, in run order.
+	events []eventResult
+}
+
+// eventResult is one event's outcome: its marshaled log, its final table
+// and the per-game records in play order.
+type eventResult struct {
+	// log is the event's complete log, marshaled as JSON lines.
+	log []byte
+	// standings is the final table (event COMPLETE only).
+	standings []event.Standing
+	// games is one record per played game, in play order.
+	games []gameRecord
+}
+
+// run is main's testable body. It validates the flags, opens the corpus,
+// plays every event and — with -verify — replays each event from its own
+// log, returning a non-nil error (and therefore a non-zero exit code) on
+// the first refusal, failed game or replay mismatch.
+func run(o options, out io.Writer) (*result, error) {
+	players, err := o.playerList()
+	if err != nil {
+		return nil, err
+	}
+	// The Env refusal comes before anything else: a policy that builds its
+	// search over every seat's REAL decklist must never seat in a draft,
+	// where the whole point is that the decks are not known until the build
+	// phase (operator ruling 2026-10-13, the rule host's
+	// TableConfig.AllowDecklistBots gate enforces for tables).
+	for i, p := range players {
+		if _, err := bots.Normalize(p); err != nil {
+			return nil, fmt.Errorf("seat %d: %w", i, err)
+		}
+		if bots.ReadsDecklists(p) {
+			return nil, fmt.Errorf("seat %d policy %q reads every seat's real decklist (bots.Info.Env); draftsim refuses Env policies (operator ruling 2026-10-13)", i, p)
+		}
+	}
+	if err := personaNamesOK(o.drafter, o.builder); err != nil {
+		return nil, err
+	}
+	if o.events < 1 {
+		return nil, fmt.Errorf("-events must be at least 1, got %d", o.events)
+	}
+	spec, err := setdata.Load(o.set)
+	if err != nil {
+		return nil, err
+	}
+
+	reg, err := testutil.OpenCorpusRegistry(o.dir)
+	if err != nil {
+		return nil, fmt.Errorf("opening corpus at %s: %w (run `make fetch-cards compile-cards` first)", o.dir, err)
+	}
+	lookup := func(name string) *cards.Card { c, _ := reg.Lookup(name); return c }
+
+	r := &runner{
+		reg:     reg,
+		spec:    spec,
+		drafter: &pickbot.RatingColour{Lookup: lookup},
+		builder: &pickbot.Best23{Lookup: lookup},
+		players: players,
+		verbose: o.verbose,
+		out:     out,
+	}
+
+	var csvOut *os.File
+	if o.draftlog != "" {
+		if csvOut, err = os.OpenFile(o.draftlog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err != nil {
+			return nil, fmt.Errorf("opening -draftlog %s: %w", o.draftlog, err)
+		}
+		defer csvOut.Close()
+	}
+
+	res := &result{}
+	for n := 0; n < o.events; n++ {
+		seed := o.seed + uint64(n)
+		fmt.Fprintf(out, "event %d: seed %d, set %s, drafter %s, builder %s\n", n+1, seed, spec.Code, o.drafter, o.builder)
+		if o.verbose {
+			for i, p := range players {
+				fmt.Fprintf(out, "  seat %d: %s (persona %s/%s/%s)\n", i, p, o.drafter, o.builder, p)
+			}
+		}
+		ev, er, err := runOneEvent(r, seed, o.verify)
+		if err != nil {
+			return nil, fmt.Errorf("event %d (seed %d): %w", n+1, seed, err)
+		}
+		logBytes, err := event.MarshalLog(ev.Log())
+		if err != nil {
+			return nil, fmt.Errorf("event %d: %w", n+1, err)
+		}
+		er.log = logBytes
+		if o.verify {
+			if err := verifyEvent(r, seed, logBytes); err != nil {
+				return nil, fmt.Errorf("event %d (seed %d): %v", n+1, seed, err)
+			}
+			fmt.Fprintf(out, "event %d: replay OK (%d log entries, %d games)\n", n+1, len(ev.Log()), len(er.games))
+		}
+		if !ev.Done() {
+			return nil, fmt.Errorf("event %d ended in phase %s, want COMPLETE", n+1, ev.Phase())
+		}
+		if csvOut != nil {
+			if err := event.DraftDataCSV(ev, csvOut, sheetNames(spec)); err != nil {
+				return nil, fmt.Errorf("event %d: draft CSV: %w", n+1, err)
+			}
+		}
+		printStandings(out, er)
+		res.events = append(res.events, *er)
+	}
+	return res, nil
+}
+
+// personaNamesOK validates the -drafter and -builder names against the
+// pickbot registry before anything expensive runs.
+func personaNamesOK(drafter, builder string) error {
+	if _, _, ok := pickbot.Lookup(drafter); !ok {
+		return fmt.Errorf("unknown -drafter %q (known: %s)", drafter, pickbot.Names())
+	}
+	if _, _, ok := pickbot.Lookup(builder); !ok {
+		return fmt.Errorf("unknown -builder %q (known: %s)", builder, pickbot.Names())
+	}
+	return nil
+}
+
+// sheetNames is the set's sheet-card universe, sorted: the pack_card_ and
+// pool_ columns the -draftlog export writes. No map iteration reaches the
+// output: the names are collected per sheet in slice order and the sort
+// fixes the final order.
+func sheetNames(spec setdata.Spec) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, sheet := range spec.Sheets {
+		for _, sc := range sheet {
+			if !seen[sc.Name] {
+				seen[sc.Name] = true
+				names = append(names, sc.Name)
+			}
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// verifyEvent re-runs one event from its own log (the -verify contract):
+// the log is replayed through the event state machine, the replayed log is
+// byte-compared against the recorded one, and every game is replayed from
+// the rebuilt event's saved decks and compared head for head. The first
+// difference is the error.
+func verifyEvent(r *runner, seed uint64, logBytes []byte) error {
+	ev, err := event.ReplayLog(logBytes)
+	if err != nil {
+		return fmt.Errorf("event log replay: %w", err)
+	}
+	again, err := event.MarshalLog(ev.Log())
+	if err != nil {
+		return fmt.Errorf("event log re-marshal: %w", err)
+	}
+	if !bytes.Equal(again, logBytes) {
+		return fmt.Errorf("event log replay diverges at %s", firstDiffLine(logBytes, again))
+	}
+	if ev.Seed() != seed {
+		return fmt.Errorf("event log replay carries seed %d, want %d", ev.Seed(), seed)
+	}
+	for _, en := range ev.Log() {
+		if en.Kind != event.KindGameEnded {
+			continue
+		}
+		head, err := replayGameHead(r, ev, en.Round, en.A, en.B, en.Game)
+		if err != nil {
+			return fmt.Errorf("game round %d seats %d–%d: %w", en.Round, en.A, en.B, err)
+		}
+		if head != en.Head {
+			return fmt.Errorf("game round %d seats %d–%d: replayed chain head %s, log has %s", en.Round, en.A, en.B, head, en.Head)
+		}
+	}
+	return nil
+}
+
+// firstDiffLine names the first JSON log line where want and got part
+// ways, for the -verify failure message.
+func firstDiffLine(want, got []byte) string {
+	wl := bytes.Split(bytes.TrimRight(want, "\n"), []byte("\n"))
+	gl := bytes.Split(bytes.TrimRight(got, "\n"), []byte("\n"))
+	for i := 0; i < len(wl) && i < len(gl); i++ {
+		if !bytes.Equal(wl[i], gl[i]) {
+			return fmt.Sprintf("log line %d", i+1)
+		}
+	}
+	if len(wl) != len(gl) {
+		return fmt.Sprintf("log length %d vs %d", len(gl), len(wl))
+	}
+	return "an unknown position"
+}
+
+// printStandings writes the standings table under the event's per-game
+// lines. The percentages are fractions with MTR Appendix C's 33% floor,
+// printed to three places. The persona column is read back out of the
+// event's own EventCreated log entry.
+func printStandings(out io.Writer, er *eventResult) {
+	personas := [4]string{"?", "?", "?", "?"}
+	entries, err := event.ParseLog(er.log)
+	if err == nil {
+		for _, en := range entries {
+			if en.Kind == event.KindEventCreated {
+				for i, s := range en.Seats {
+					personas[i] = s.Persona
+				}
+			}
+		}
+	}
+	fmt.Fprintln(out, "  standings: seat persona                pts    MW    OMW    GW    OGW")
+	for _, s := range er.standings {
+		fmt.Fprintf(out, "    %d %-24s %3d  %.3f  %.3f  %.3f  %.3f\n",
+			s.Seat, personas[s.Seat], s.Points, s.MW, s.OMW, s.GW, s.OGW)
+	}
+}
