@@ -61,8 +61,7 @@
      ]
     }
    ],
-   "xmage": "SubTypeChangingEffectsTest#testKeepOtherTypes",
-   "known_bug": "XP[remove-creature-types-strips-all-subtypes]: Animate RemoveCreatureTypes$ True strips every non-card-type/non-supertype word, so artifact subtype Food is removed from Gingerbrute (types [Artifact Creature Dragon]); IsCreatureSubtype treats any subtype as a creature type (rules/chars/types.go:468, used at rules/chars/types.go:600). Should strip only creature types (e.g. effects.CreatureTypeWords as the SetCreatureTypes arm does). CR 205.3d, 205.1b."
+   "xmage": "SubTypeChangingEffectsTest#testKeepOtherTypes"
   },
   {
    "name": "test-maskwood-nexus3",
