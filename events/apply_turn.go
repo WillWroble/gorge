@@ -169,7 +169,7 @@ func foldTurnChange(g *state.Game, e *Event) {
 			// survives the end-of-combat reset (so an at-end-of-combat
 			// trigger still sees it) but not the turn boundary.
 			g.Objs[i].BlockedByThisTurn = nil
-			g.Objs[i].BlockedThisTurn = false
+			g.Objs[i].BlockedThisTurn = nil
 			// CR 702.100a: exerted is a per-turn fact. ExertSkipUntap is
 			// deliberately NOT reset here -- its window spans the turn
 			// boundary and is consumed at the next untap step instead.
