@@ -54,14 +54,21 @@ func TestG12TriggerFilterRows(t *testing.T) {
 		{"Fire Lord Zuko", "trigger#0.1", served},
 		// A graveyard trigger whose sibling would return the card first.
 		{"Fear of Infinity", "trigger#0.1", served},
-		// Oblivious Bookworm trigger#0.2 and Mikey & Don trigger#0.0 left
-		// this residue: Static$ True lines never reach the stack, so they are
-		// pinned by TestBookkeepingClassRows (trigger_bookkeeping_test.go).
 		// Residue (see the lb4-g12 report).
-		{"Coveted Falcon", "trigger#0.0", "trigger did not fire"},        // "permanent you own but don't control": no setup gives p1 control of a p0-owned permanent
-		{"Avatar Aang", "trigger#1.0", "trigger did not fire"},           // back face transforms away during setup's turn-1 upkeep
-		{"Codie, Ravenous Codex", "trigger#0.0", "trigger did not fire"}, // the prepared-copy probe's spell face (Whiplash Wordsmith's) is not in the XMage manifests
-		{"Smaug, Wicked Worm", "trigger#0.1", "trigger did not fire"},    // Spell.ManaFromTreasure: the scenario pays from a seeded pool, never a Treasure
+		// A donate prelude (lb4w2-gen): p1 controls a p0-owned permanent.
+		{"Coveted Falcon", "trigger#0.0", served},
+		// Oblivious Bookworm trigger#0.2 left this residue: a Static$ True
+		// line never reaches the stack, so TestBookkeepingClassRows
+		// (trigger_bookkeeping_test.go) pins it through its turn-3 consumer.
+		// Mikey & Don, Party Planners trigger#0.0 is served by a subtype creature
+		// probe (lb4w2-gen); its Static$ True rider never reaches the stack, so
+		// TestLevelBGeneratorResidueRowsServed pins it by the +1/+1 counter instead.
+		{"Avatar Aang", "trigger#1.0", "trigger did not fire"}, // back face transforms away during setup's turn-1 upkeep
+		// The prepared-copy cast through Hallway Heckler, a carrier XMage holds
+		// (lb4w2-gen); the XMage driver still lacks cast_mode prepared_copy.
+		{"Codie, Ravenous Codex", "trigger#0.0", served},
+		// Buried Treasure's mana spent on the probe (lb4w2-gen).
+		{"Smaug, Wicked Worm", "trigger#0.1", served},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, ok := reg.Lookup(tc.name)

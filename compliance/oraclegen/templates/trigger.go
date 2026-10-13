@@ -483,6 +483,11 @@ func triggerServe(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 			copy(it.XAbility[offset:], c.xability)
 		}
 	}
+	// A target fixture's own prelude can activate a probe's ability (the
+	// donated-permanent prelude's Humble Defector, candidates_donated.go):
+	// its slot is filled from the probe's ability index, as GenerateB's
+	// finalisation fills every served row's.
+	fillActivateXAbility(reg, &it)
 	// Every step the XMage driver reads a rule text for must carry it at its
 	// own index, and no other step may carry any: the driver throws on an
 	// activate step with an empty xmage_ability (ScenarioReplay's "activate")

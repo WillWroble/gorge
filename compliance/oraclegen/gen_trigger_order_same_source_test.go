@@ -7,14 +7,16 @@ import (
 	"github.com/adams-shaun/gorge/rules"
 )
 
-// TestTriggerOrderSameSourceKeepsInertText pins the same-source guard: when two
-// simultaneous triggers share one source object (Thundertrap Trainer's ETB and
-// Offspring, both "p0:Thundertrap Trainer"), the name form would answer the
-// same name for both picks, which XMage's chooseTriggeredAbility cannot tell
-// apart -- the rule text is the only distinguishing answer, and it already
-// agrees. So a same-source order keeps the pre-name inert text form for every
-// pick (main's behaviour, byte-identical scenario).
-func TestTriggerOrderSameSourceKeepsInertText(t *testing.T) {
+// TestTriggerOrderSameSourceScriptsXMageRuleText pins the same-source form:
+// when two simultaneous triggers share one source object (Thundertrap
+// Trainer's ETB and Offspring, both "p0:Thundertrap Trainer"), the name form
+// would answer the same name for both picks, which XMage's
+// chooseTriggeredAbility cannot tell apart. The rule text is the only
+// distinguishing answer, so every pick but the last (XMage pushes the last
+// remaining ability without an ask) is keyed in XMage's rule-text form
+// (xmageTriggerOrderKeys); the old form scripted every pick's verbatim text,
+// and the unconsumed last one sat at the queue head for the next dialog.
+func TestTriggerOrderSameSourceScriptsXMageRuleText(t *testing.T) {
 	d := rules.OracleDecision{Step: 1, Seat: 0, Kind: "order", GorgeKind: "trigger_order",
 		Options: 2, Min: 2, Max: 2, PickIdx: []int{0, 1}, PickKinds: []string{"trigger", "trigger"},
 		Picks:    []string{"Thundertrap Trainer: When this creature enters, look at the top four cards.", "Thundertrap Trainer: Offspring"},
@@ -22,10 +24,10 @@ func TestTriggerOrderSameSourceKeepsInertText(t *testing.T) {
 	got := XAnswers([]rules.OracleDecision{d}, 2, nil)
 	want := [][]XAnswer{
 		nil,
-		{{0, "choice", "When this creature enters, look at the top four cards."}, {0, "choice", "Offspring"}},
+		{{0, "choice", "When this creature enters, look at the top four cards."}},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("XAnswers = %#v, want %#v (same-source order keeps the inert text form)", got, want)
+		t.Fatalf("XAnswers = %#v, want %#v (same-source order keys all picks but the last)", got, want)
 	}
 }
 

@@ -43,10 +43,12 @@ func mayPlayRiderFires(reg *cards.Registry, f *cards.Face, name string, req leve
 	}
 	sc, probe, ok := mayPlayRiderCast(base.Scenario)
 	if !ok {
-		// The static's offered scenario plays a land: retry with a creature
-		// spell the permission offers (trigger_mayplay_rider_creature.go).
-		if cb, found := mayPlayRiderCreatureBase(reg, c, f, name, sreq, f.Statics[si]); found {
-			base = cb
+		// The static's own row may be served by a land play (Mikey & Don's
+		// "play lands and cast Mutant, Ninja, or Turtle spells"), which the
+		// rider never reads: retry with a creature of a subtype the
+		// permission names.
+		if alt, altOK := mayPlayRiderSubtypeOffer(reg, c, f, name, sreq, f.Statics[si]); altOK {
+			base = alt
 			sc, probe, ok = mayPlayRiderCast(base.Scenario)
 		}
 	}
@@ -119,6 +121,61 @@ func mayPlayRiderObserved(res rules.OracleResult, probe string) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+// mayPlayRiderSubtypeOffer is the offered-cast scenario for a MayPlay static
+// whose Affected$ alternatives name creature SUBTYPES (Mutant.TopLibrary,
+// Ninja.TopLibrary, Turtle.TopLibrary) no generic offer probe carries: a
+// quiet creature of the first subtype the registry holds is the probe, in
+// each zone the static affects, tried exactly as staticOfferItem tries its
+// own (with and without the source's cast base). A rider row is about the
+// creature cast the permission allows, so only a cast is served.
+func mayPlayRiderSubtypeOffer(reg *cards.Registry, c *cards.Card, f *cards.Face, name string, req levelb.Requirement, st cards.Static) (oraclegen.Item, bool) {
+	var cast *oraclegen.Item
+	if base, why := staticBase(reg, c, f, name, req, staticProbePlan{}, nil); why == "" {
+		cast = &base
+	}
+	zones := offerZones(st.ParamStr(cards.PKAffectedZone))
+	for _, alt := range strings.Split(st.ParamStr(cards.PKAffected), ",") {
+		word := strings.TrimSpace(alt)
+		if i := strings.IndexAny(word, ".+"); i >= 0 {
+			word = word[:i]
+		}
+		if word == "" || isCardTypeWord(word) {
+			continue
+		}
+		probe, ok := oraclegen.SubtypeCard(reg, word)
+		if !ok {
+			continue
+		}
+		pc, ok := reg.Lookup(probe)
+		if !ok || len(pc.Faces) == 0 || !pc.Faces[0].IsCreature() {
+			continue
+		}
+		for _, z := range zones {
+			t, ok := offerTryFor(reg, probe, z, false, false)
+			if !ok || t.kind != offerKindCast {
+				continue
+			}
+			for _, base := range []*oraclegen.Item{cast, nil} {
+				if it, ok := offerItem(reg, f, name, req, t, base); ok {
+					return it, true
+				}
+			}
+		}
+	}
+	return oraclegen.Item{}, false
+}
+
+// isCardTypeWord reports a Forge card-type or catch-all head ("Card",
+// "Permanent", "Land", "Creature", ...): not a subtype a probe is found by.
+func isCardTypeWord(word string) bool {
+	switch strings.ToLower(word) {
+	case "card", "permanent", "spell", "land", "creature", "artifact", "enchantment",
+		"planeswalker", "instant", "sorcery", "battle", "kindred", "tribal":
+		return true
 	}
 	return false
 }

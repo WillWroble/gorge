@@ -13,9 +13,10 @@ import (
 
 // bookkeepingClassRows is the wave-4 "bookkeeping static trigger" class
 // (operator decision 2026-10-13: a multi-turn template, no exemption): every
-// Static$ True record/reset/cleanup line of the Standard sets, plus the
-// Static$ True may-play rider whose permission scenario offered only a land.
-// Each names what the served scenario must show.
+// Static$ True record/reset/cleanup line of the Standard sets. Each names
+// what the served scenario must show. (Mikey & Don's Static$ may-play rider,
+// the class's tenth row, is served by lb4w2-gen's subtype probe and pinned by
+// TestLevelBGeneratorResidueRowsServed.)
 var bookkeepingClassRows = []struct {
 	card, key string
 	// turn3 marks a scenario that advances to p0's next turn.
@@ -33,7 +34,6 @@ var bookkeepingClassRows = []struct {
 	{card: "Desert Were-Worm", key: "trigger#0.2", turn3: true},
 	{card: "Oblivious Bookworm", key: "trigger#0.1", turn3: true, probe: "Bolrac-Clan Basher"},
 	{card: "Oblivious Bookworm", key: "trigger#0.2", turn3: true, probe: "Bolrac-Clan Basher"},
-	{card: "Mikey & Don, Party Planners", key: "trigger#0.0", probe: "Ninja of the Deep Hours"},
 }
 
 // TestBookkeepingClassRows serves every row of the class and checks the
@@ -115,8 +115,7 @@ func TestBookkeepingClassRows(t *testing.T) {
 
 // TestBookkeepingClassCensus is the class ratchet over the committed printed
 // sets: the bookkeeping sub-family's requirements are exactly the table's
-// rows (minus the may-play rider, which has its own sub-family), and every
-// one is served. A new bookkeeping line in a set, or one the template stops
+// rows, and every one is served. A new bookkeeping line in a set, or one the template stops
 // serving, fails here by name.
 func TestBookkeepingClassCensus(t *testing.T) {
 	reg := loadGenRegistry(t)
@@ -158,9 +157,6 @@ func TestBookkeepingClassCensus(t *testing.T) {
 	sort.Strings(got)
 	var want []string
 	for _, tc := range bookkeepingClassRows {
-		if tc.card == "Mikey & Don, Party Planners" {
-			continue // levelb.MayPlayRiderSub
-		}
 		want = append(want, tc.card+" "+tc.key)
 	}
 	sort.Strings(want)
