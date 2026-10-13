@@ -622,6 +622,19 @@ type DelayedTrigger struct {
 	// ("|RN=<n>") because the event gains no field (Ruling T20-a); zero when
 	// the registration remembered no number.
 	RememberedAmount int32
+	// DefinedPlayer is a DelayedTriggerDefinedPlayer$ registration's player
+	// (seat+1; zero = none): the registration is armed only from that
+	// player's first turn start after BirthTurn, and with ThisTurn$ it dies
+	// when that turn ends. It rides the DelayedRegister Text ("|DP=<n>")
+	// because the event gains no field (Ruling T20-a).
+	DefinedPlayer int32
+	// ThisTurnDefined marks a DefinedPlayer registration that also carried
+	// ThisTurn$ True (expires at the end of the defined player's turn).
+	// Rides "|TD".
+	ThisTurnDefined bool
+	// Static is a Static$ True Mode$ Phase registration: Forge runs its body
+	// at fire time without a stack object. Rides the bare "|ST" flag.
+	Static bool
 }
 
 const startingLife = 20

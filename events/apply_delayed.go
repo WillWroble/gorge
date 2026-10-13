@@ -82,6 +82,26 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 	if effectRepeat {
 		text = strings.TrimSuffix(text, "|EF")
 	}
+	// DelayedTriggerDefinedPlayer$ rides "|DP=<seat+1>" (+ a bare "|TD" for
+	// ThisTurn$) and Static$ True a bare "|ST", all appended after the
+	// IsPresent$ triple and before |RN=, so they strip here (reverse append
+	// order: TD, DP, ST) and BEFORE |PC=, whose LastIndex value would
+	// otherwise swallow them. Absent on every earlier registration.
+	thisTurnDefined := strings.HasSuffix(text, "|TD")
+	if thisTurnDefined {
+		text = strings.TrimSuffix(text, "|TD")
+	}
+	definedPlayer := int32(0)
+	if i := strings.LastIndex(text, "|DP="); i >= 0 {
+		if n, err := strconv.Atoi(strings.TrimSpace(text[i+4:])); err == nil && n > 0 {
+			definedPlayer = int32(n)
+		}
+		text = text[:i]
+	}
+	staticFlag := strings.HasSuffix(text, "|ST")
+	if staticFlag {
+		text = strings.TrimSuffix(text, "|ST")
+	}
 	// OptionalDecider$ (an api:Effect Triggers$ body's "you may"
 	// election) rides "|OD=<spec>" the same way ValidPlayer$ and MaxTurn
 	// do. It is stripped before the mode/Trigger split below so the
@@ -194,6 +214,9 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 		ImprintOnHost:     imprint,
 		SourceBattlefield: sourceBattlefield,
 		RememberedAmount:  rememberedAmount,
+		DefinedPlayer:     definedPlayer,
+		ThisTurnDefined:   thisTurnDefined,
+		Static:            staticFlag,
 	})
 	g.DelayedNext++
 }

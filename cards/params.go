@@ -269,6 +269,8 @@ const (
 	PKUnlessPayer
 	PKUnlessSwitched
 	PKUpTo
+	PKUpcomingTurn
+	PKDelayedTriggerDefinedPlayer
 	PKValid
 	PKValidActivatingPlayer
 	PKValidActivator
@@ -1054,6 +1056,8 @@ var paramKeyNames = [paramKeyCount]string{
 	PKUnlessPayer:                      "UnlessPayer",
 	PKUnlessSwitched:                   "UnlessSwitched",
 	PKUpTo:                             "UpTo",
+	PKUpcomingTurn:                     "UpcomingTurn",
+	PKDelayedTriggerDefinedPlayer:      "DelayedTriggerDefinedPlayer",
 	PKValid:                            "Valid",
 	PKValidActivatingPlayer:            "ValidActivatingPlayer",
 	PKValidActivator:                   "ValidActivator",
