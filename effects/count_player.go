@@ -458,7 +458,7 @@ func hasPropertyStateBacked(h Host, g *state.Game, c *Ctx, group []state.PlayerI
 			return 0, false
 		}
 		spec, cmp := tail[:i], tail[i+1:]
-		parsedOp, threshold, ok := parseCountCompare(cmp)
+		parsedOp, threshold, ok := parseCountCompareOrSVar(h, c, cmp)
 		if !ok || (parsedOp != "GE" && parsedOp != "GT" && parsedOp != "LE") {
 			return 0, false
 		}

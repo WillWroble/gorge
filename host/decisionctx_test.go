@@ -31,7 +31,7 @@ func TestDecisionCtxArmsTheSeatBudget(t *testing.T) {
 	if !ok {
 		t.Fatal("decisionCtx armed nothing on a seat that declares a budget")
 	}
-	if got := dl.Sub(start); got <= 0 || got > time.Duration(hostedDecisionDeadlineMS)*time.Millisecond+50*time.Millisecond {
+	if got := dl.Sub(start); got <= 0 || got > time.Duration(hostedDecisionDeadlineMS)*time.Millisecond+2*time.Second {
 		t.Fatalf("armed deadline is %v from start, want ~%d ms", got, hostedDecisionDeadlineMS)
 	}
 

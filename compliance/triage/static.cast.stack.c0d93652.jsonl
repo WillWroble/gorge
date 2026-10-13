@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"cast","field":"stack","diff":"gorge=[spell:Prop Room@p0] xmage=[spell:$CARD@p0]"},"key":"static | cast | stack | gorge=[spell:Prop Room@p0] xmage=[spell:$CARD@p0]","cards":1}
+{"card":"Dazzling Theater","template":"static#1.0","status":"diverge","api":"-","detail":"step 0 (cast) stack: gorge \"[spell:Prop Room@p0]\", xmage \"[spell:Dazzling Theater@p0]\""}

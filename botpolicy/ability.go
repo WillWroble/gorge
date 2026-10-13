@@ -98,9 +98,75 @@ func (b Board) abilityScore(o decision.Option, me state.PlayerID) (score int32, 
 	if o.SelfSkipTurns > 0 && !b.turnSkipWorthIt(o) {
 		return 0, false // A6: a skipped turn costs more than the ability gains.
 	}
+	if o.Loyalty != nil && o.Loyalty.Restart {
+		// A7: a game restart ends the engine's game as a draw (Karn
+		// Liberated's ultimate); the old label-tie rule never took it either.
+		return 0, false
+	}
+	if o.Loyalty != nil {
+		// A7: a planeswalker loyalty ability carries no digit in its label, so
+		// A2's label read tied every one of a walker's abilities and only the
+		// first was ever chosen. Rank by the loyalty fact instead.
+		return b.loyaltyScore(o.Loyalty, me), true
+	}
 	// A2: cheaper ranks higher (only among worth-taking abilities; A1 above
 	// already returned for the no-op case).
 	return 1000 - abilityCost(o.Label), true
+}
+
+// Loyalty ranking bands (A7). A loyalty ability scores above an ordinary
+// ability (1000 - cost <= 1000) except the two bands that kill the walker
+// (1000 for a walker-killing removal, 900 for any other walker-killing
+// minus): a walker may activate one loyalty ability per turn, so taking it
+// forgoes nothing the other abilities could not do afterwards, but spending
+// the walker itself is worse than the ordinary ability it forgoes. Within
+// the walker the order is: an ultimate, a minus that removes a threat the
+// opponent actually presents, a plus, a zero, then the remaining minuses
+// (cheapest first; a minus that would kill the walker last).
+const (
+	loyaltyUltimate    int32 = 1900
+	loyaltyRemoval     int32 = 1500
+	loyaltyPlus        int32 = 1200
+	loyaltyZero        int32 = 1150
+	loyaltyMinus       int32 = 1100
+	loyaltyMinusX      int32 = 1050
+	loyaltyKillsWalker int32 = 900
+)
+
+// loyaltyScore is A7: the score of one loyalty ability from the engine's own
+// cost/ability facts (decision.Option.Loyalty). A pure function of the fact
+// and the Board; consumes no rng; the opponent-creature census is an
+// order-independent existential fold.
+func (b Board) loyaltyScore(l *decision.Loyalty, me state.PlayerID) int32 {
+	switch {
+	case l.Ultimate:
+		return loyaltyUltimate
+	case l.Removal && b.opponentHasCreature(me):
+		if l.Dies {
+			return loyaltyKillsWalker + 100 // still a removal, but below every plus
+		}
+		return loyaltyRemoval
+	case l.Delta > 0:
+		return min(loyaltyPlus+l.Delta, loyaltyRemoval-1)
+	case l.X:
+		return loyaltyMinusX
+	case l.Dies:
+		return loyaltyKillsWalker
+	case l.Delta == 0:
+		return loyaltyZero
+	}
+	return loyaltyMinus + l.Delta // Delta < 0: the smaller minus ranks higher
+}
+
+// opponentHasCreature reports whether any creature the seat does not control
+// is on a battlefield (the target a removal loyalty ability would need).
+func (b Board) opponentHasCreature(me state.PlayerID) bool {
+	for _, c := range b.Creatures.All() {
+		if c.Controller != me {
+			return true
+		}
+	}
+	return false
 }
 
 // boonHasNoOwnTarget is A1c's pre-activation decline, the fb-20260927T153930Z

@@ -20,7 +20,11 @@
 # and releases its lane while a broker bracket is open, resumes and re-takes it
 # at gate-end, and a fresh `run` defers while the flag is live; a job that ends
 # during a bracket's grace gives its lane back at once, and a group signal to
-# the wrapper (Ctrl-C, `timeout`) takes the job with it, parked or not.
+# the wrapper (Ctrl-C, `timeout`) takes the job with it, parked or not. Part G
+# pins GORGE_HEAVY_YIELD=stop (the opt-in). Part H is the default `weight`
+# yield (pm-cpuweight): the job is NEVER stopped -- go test's -timeout is wall
+# clock, so a STOPped suite times out -- yet it releases its lane for the
+# bracket, its scope's CPUWeight drops and is restored once the lane is back.
 set -uo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
@@ -43,6 +47,9 @@ cleanup() {
 	[ -z "${GQPID:-}" ] || kill -KILL "$GQPID" 2>/dev/null
 	[ -z "${GSJOBPID:-}" ] || kill -KILL -- "-$GSJOBPID" 2>/dev/null
 	[ -z "${CLJOBPID:-}" ] || kill -KILL -- "-$CLJOBPID" 2>/dev/null
+	[ -z "${WHJOBPID:-}" ] || kill -KILL -- "-$WHJOBPID" 2>/dev/null
+	[ -z "${GCPID:-}" ] || kill -KILL "$GCPID" 2>/dev/null
+	[ -z "${GCJOBPID:-}" ] || kill -KILL -- "-$GCJOBPID" 2>/dev/null
 	for v in LPIDA LPIDB LPIDC LPIDD LPIDE; do
 		[ -z "${!v:-}" ] || kill -KILL "${!v}" 2>/dev/null
 	done
@@ -366,6 +373,8 @@ check "killing the leases frees a lane of the 3-lane pool" $?
 # `run` job must, while the broker bracket is open, STOP its child, release the
 # lane, and re-take it before continuing; and a fresh `run` STARTED while the
 # bracket is live must not take a lane at all (gorge_heavy_acquire defers).
+# STOP is the opt-in mode since pm-cpuweight (the default is `weight`, Part H).
+export GORGE_HEAVY_YIELD=stop
 export GORGE_HEAVY_LANES=1
 export GORGE_HEAVY_LOCK=$TMP/gateyield.lock
 export GORGE_HEAVY_PAUSE_GRACE_S=1
@@ -592,6 +601,180 @@ for case in "0 dies" "1 trap"; do
 	flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
 	check "the lane is free after the TERMed sourcing caller ($2 case)" $?
 done
+
+# ---- H: the default yield is CPU weight, and the job is never STOPped ---------
+# STOP broke post-merge: a STOPped `go test` keeps its wall-clock -timeout
+# running and dies "test timed out after 10m". The weight yield keeps the job
+# running, releases the lane for the bracket, and re-takes it before the job's
+# weight is restored.
+unset GORGE_HEAVY_YIELD
+export GORGE_HEAVY_LANES=1
+export GORGE_HEAVY_LOCK=$TMP/weight.lock
+export GORGE_HEAVY_PAUSE_GRACE_S=1
+rm -f "$GORGE_REWARD_DIR/gate-active"
+# jobstate PID: the kernel run state letter (T = stopped).
+jobstate() { awk '{print $3}' "/proc/$1/stat" 2>/dev/null; }
+
+# H1. a job in no scope of its own (no systemd needed): never stopped, lane
+# yielded and re-taken, and the supervisor says it could not deprioritise it.
+cat >"$TMP/fakectl.sh" <<'CTL'
+#!/usr/bin/env bash
+echo "$*" >>"$CTLLOG"
+CTL
+chmod +x "$TMP/fakectl.sh"
+export CTLLOG=$TMP/ctl.log
+: >"$CTLLOG"
+: >"$TMP/whticks"
+rm -f "$TMP/whjobpid"
+GORGE_HEAVY_SYSTEMCTL=$TMP/fakectl.sh TICKS=$TMP/whticks JOBPIDFILE=$TMP/whjobpid JOBFD=$TMP/whjobfd \
+	"$S/heavy_lock.sh" run -- "$TMP/job.sh" >"$TMP/wh.log" 2>&1 &
+WHPID=$!
+for _ in $(seq 80); do [ -s "$TMP/whjobpid" ] && break; sleep 0.1; done
+WHJOBPID=$(cat "$TMP/whjobpid" 2>/dev/null || true)
+[ -n "$WHJOBPID" ]
+check "precondition: a weight-mode run job started" $? "$(cat "$TMP/wh.log")"
+"$S/broker.sh" gate-begin smoke >/dev/null 2>&1
+freed=0
+for _ in $(seq 30); do
+	if flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null; then freed=1; break; fi
+	sleep 0.2
+done
+[ "$freed" = 1 ]
+check "weight mode: the job released its lane while the bracket is open" $?
+stopped=0
+w1=$(wc -l <"$TMP/whticks")
+for _ in $(seq 10); do
+	[ "$(jobstate "$WHJOBPID")" = T ] && stopped=1
+	sleep 0.2
+done
+w2=$(wc -l <"$TMP/whticks")
+[ "$stopped" = 0 ] && [ "$w2" -gt "$w1" ]
+check "weight mode: the job keeps RUNNING through the bracket (never STOPped)" $? \
+	"stopped=$stopped ticks $w1 -> $w2"
+grep -q 'no process of job' "$TMP/wh.log"
+check "weight mode: an unscoped job is reported as not deprioritised" $? "$(cat "$TMP/wh.log")"
+! grep -q set-property "$CTLLOG"
+check "weight mode: no set-property on the caller's own cgroup" $? "$(cat "$CTLLOG")"
+"$S/broker.sh" gate-end smoke >/dev/null 2>&1
+held=0
+for _ in $(seq 30); do
+	if ! flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null; then held=1; break; fi
+	sleep 0.2
+done
+[ "$held" = 1 ]
+check "weight mode: the job re-took its lane after gate-end" $?
+kill -TERM "$WHPID" 2>/dev/null
+wait "$WHPID" 2>/dev/null
+dead=0
+for _ in $(seq 30); do kill -0 "$WHJOBPID" 2>/dev/null || { dead=1; break; }; sleep 0.1; done
+[ "$dead" = 1 ] || kill -KILL -- "-$WHJOBPID" 2>/dev/null
+WHJOBPID=""
+
+# H2. a job in its own systemd scope (real systemd, skipped where a user
+# manager cannot start a scope, e.g. inside a bwrap seat): its scope drops to
+# CPUWeight=10 for the bracket and is restored after the lane is re-taken.
+if systemd-run --user --scope -q true >/dev/null 2>&1; then
+	: >"$TMP/wsticks"
+	rm -f "$TMP/wsjobpid"
+	TICKS=$TMP/wsticks JOBPIDFILE=$TMP/wsjobpid JOBFD=$TMP/wsjobfd \
+		"$S/heavy_lock.sh" run -- systemd-run --user --scope -q \
+		--setenv=TICKS="$TMP/wsticks" --setenv=JOBPIDFILE="$TMP/wsjobpid" --setenv=JOBFD="$TMP/wsjobfd" \
+		"$TMP/job.sh" >"$TMP/ws.log" 2>&1 &
+	WSPID=$!
+	for _ in $(seq 80); do [ -s "$TMP/wsjobpid" ] && break; sleep 0.1; done
+	WHJOBPID=$(cat "$TMP/wsjobpid" 2>/dev/null || true)
+	unit=$(sed -n 's/^0:://p' "/proc/$WHJOBPID/cgroup" 2>/dev/null)
+	unit=${unit##*/}
+	case $unit in *.scope) true ;; *) false ;; esac
+	check "precondition: the scoped job runs in its own scope" $? "pid=$WHJOBPID unit=$unit $(cat "$TMP/ws.log")"
+	before=$(systemctl --user show -p CPUWeight --value "$unit" 2>/dev/null)
+	"$S/broker.sh" gate-begin smoke >/dev/null 2>&1
+	got=""
+	for _ in $(seq 30); do
+		got=$(systemctl --user show -p CPUWeight --value "$unit" 2>/dev/null)
+		[ "$got" = 10 ] && break
+		sleep 0.2
+	done
+	[ "$got" = 10 ]
+	check "weight mode: the job's scope drops to CPUWeight=10 in the bracket" $? "before=$before got=$got"
+	flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+	check "weight mode: the scoped job released its lane" $?
+	w1=$(wc -l <"$TMP/wsticks")
+	sleep 0.8
+	w2=$(wc -l <"$TMP/wsticks")
+	[ "$(jobstate "$WHJOBPID")" != T ] && [ "$w2" -gt "$w1" ]
+	check "weight mode: the scoped job keeps running at the low weight" $? "ticks $w1 -> $w2"
+	# gate-end while a gate still holds the lane: weight stays low until the
+	# lane is the job's again.
+	flock -o "$GORGE_HEAVY_LOCK" -c 'sleep 3' &
+	GLPID=$!
+	sleep 0.3
+	"$S/broker.sh" gate-end smoke >/dev/null 2>&1
+	sleep 1.5
+	got=$(systemctl --user show -p CPUWeight --value "$unit" 2>/dev/null)
+	[ "$got" = 10 ]
+	check "weight mode: weight stays low while a gate still holds the lane" $? "got=$got"
+	wait "$GLPID"
+	got=""
+	for _ in $(seq 30); do
+		got=$(systemctl --user show -p CPUWeight --value "$unit" 2>/dev/null)
+		[ "$got" = "$before" ] && break
+		sleep 0.2
+	done
+	[ "$got" = "$before" ]
+	check "weight mode: the scope's original CPUWeight is restored after the lane is re-taken" $? \
+		"before=$before got=$got"
+	! flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+	check "weight mode: the scoped job holds its lane again" $?
+	kill -TERM "$WSPID" 2>/dev/null
+	wait "$WSPID" 2>/dev/null
+	dead=0
+	for _ in $(seq 30); do kill -0 "$WHJOBPID" 2>/dev/null || { dead=1; break; }; sleep 0.1; done
+	[ "$dead" = 1 ] || systemctl --user stop "$unit" 2>/dev/null
+	WHJOBPID=""
+else
+	printf 'skip H2: no user systemd scope available here\n'
+fi
+rm -f "$GORGE_REWARD_DIR/gate-active"
+# ---- I: a GATE-class run (-g) is neither deferred nor parked by a bracket ----
+# postmerge_batch.sh runs the full suite with `gorge_heavy_run -g`: it is what
+# pushes main, so a ticket gate's bracket must not freeze it (2026-10-12: a
+# 6-minute suite ran 50+ minutes parked, and a parked binary's 10-minute wall
+# timeout fired as a false RED). It still takes a lane from the pool.
+export GORGE_HEAVY_LANES=1
+export GORGE_HEAVY_LOCK=$TMP/gateclass.lock
+export GORGE_HEAVY_PAUSE_GRACE_S=1
+rm -f "$GORGE_REWARD_DIR/gate-active"
+"$S/broker.sh" gate-begin smoke >/dev/null 2>&1
+rm -f "$TMP/gc-marker"
+"$S/heavy_lock.sh" run -g -w 2 -- touch "$TMP/gc-marker" 2>"$TMP/gc.err"
+rc=$?
+[ "$rc" = 0 ] && [ -e "$TMP/gc-marker" ]
+check "a -g run takes a free lane while the bracket is live" $? "rc=$rc $(cat "$TMP/gc.err")"
+: >"$TMP/gcticks"
+TICKS=$TMP/gcticks JOBPIDFILE=$TMP/gcjobpid JOBFD=$TMP/gcjobfd \
+	bash -c '. "$1/heavy_lock.sh"; gorge_heavy_run -g "$2"' _ "$S" "$TMP/job.sh" >"$TMP/gc.log" 2>&1 &
+GCPID=$!
+for _ in $(seq 80); do [ -s "$TMP/gcjobpid" ] && break; sleep 0.1; done
+GCJOBPID=$(cat "$TMP/gcjobpid" 2>/dev/null || true)
+flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+[ $? -ne 0 ]
+check "a sourced gorge_heavy_run -g job holds its lane during the bracket" $?
+# Past the 1 s grace: a parked job would have stopped ticking by now.
+sleep 2.5
+c1=$(wc -l <"$TMP/gcticks")
+sleep 1
+c2=$(wc -l <"$TMP/gcticks")
+[ "$c2" -gt "$c1" ]
+check "a -g job keeps running while the gate bracket is open (not parked)" $? "$c1 -> $c2 $(cat "$TMP/gc.log")"
+flock -n "$GORGE_HEAVY_LOCK" -c true 2>/dev/null
+[ $? -ne 0 ]
+check "a -g job never yields its lane to the bracket" $?
+"$S/broker.sh" gate-end smoke >/dev/null 2>&1
+kill -KILL "$GCPID" 2>/dev/null
+wait "$GCPID" 2>/dev/null
+[ -z "$GCJOBPID" ] || kill -KILL -- "-$GCJOBPID" 2>/dev/null
+[ -z "$GCJOBPID" ] || kill -KILL "$GCJOBPID" 2>/dev/null
 
 printf '\n%s failure(s)\n' "$fails"
 [ "$fails" = 0 ]

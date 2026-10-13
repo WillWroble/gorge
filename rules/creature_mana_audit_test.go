@@ -163,6 +163,11 @@ func expectedManaTotal(row censusRow) (int, bool) {
 	if err != nil {
 		return 0, false
 	}
+	// Each$ (Brigid, Doun's Mind) multiplies every produced unit by a
+	// board-dependent count, so the unit total is not static either.
+	if strings.TrimSpace(row.item.sa.Params["Each"]) != "" {
+		return 0, false
+	}
 	produced := strings.TrimSpace(row.item.sa.Params["Produced"])
 	// A Special batch (EachColorAmong, DoubleManaInPool) is board-dependent;
 	// its unit count is not a static function of the token grammar.

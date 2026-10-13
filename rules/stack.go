@@ -405,8 +405,9 @@ func (e *Engine) resolveTop() {
 		// load it so the ability's Sacrificed$<Property> heads resolve against
 		// what it sacrificed. Mirror of triggerContexts: engine-only.
 		ctx.Sacrificed = e.sacrificedLKI[id]
-		ctx.Exiled = e.castExiled[id]
-		ctx.Revealed = e.castRevealed[id]
+		ctx.Paid.Exiled = e.castExiled[id]
+		ctx.Paid.Revealed = e.castRevealed[id]
+		ctx.Paid.CounterPut = e.castCounterPut[id]
 		if link, ok := e.sourceLifelinkLKI[id]; ok {
 			ctx.Snap.SourceLifelink = link
 			ctx.Snap.SourceLifelinkValid = true
@@ -671,8 +672,9 @@ func (e *Engine) resolveTop() {
 		// onto resolution so Sacrificed$<Property> heads resolve against what
 		// this spell sacrificed.
 		ctx.Sacrificed = e.sacrificedLKI[id]
-		ctx.Exiled = e.castExiled[id]
-		ctx.Revealed = e.castRevealed[id]
+		ctx.Paid.Exiled = e.castExiled[id]
+		ctx.Paid.Revealed = e.castRevealed[id]
+		ctx.Paid.CounterPut = e.castCounterPut[id]
 		effects.SetSVars(ctx, f.SVars)
 		// CR 601.2b: a modal spell's choice was recorded on its proposal before
 		// targets and payment. Pre-seeding Modes makes effCharm execute exactly
@@ -903,6 +905,7 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 		sharedRef = e.sharedCardTypeReference(ref, source, sc)
 		sharedWhitelist = tp.SharedTypes
 	}
+	related := e.newRelatedPropertyRecheck(sa, self, sc)
 	for _, t := range targets {
 		if t.IsPlayer {
 			// CR 702.18 / CR 702.11 / CR 702.16c for players: a target that
@@ -968,6 +971,7 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 				e.mentorAdmits(sa, source, t.Obj) &&
 				(controllerProp == "" || e.targetControllerPropertyAdmits(controllerProp, t.Obj)) &&
 				(!hasSharedRef || e.sharedCardTypeAdmits(t.Obj, sharedRef, sharedWhitelist)) &&
+				related.admits(e, t.Obj) &&
 				(tpState == tpNone || e.tpControlsAdmits(o, you, tpChooser, tpState)) &&
 				!(o.Zone == state.ZBattlefield && e.restrictionBlocksTarget(t.Obj, you)) &&
 				!(o.Zone == state.ZBattlefield && e.shroudBlocksTarget(t.Obj)) &&

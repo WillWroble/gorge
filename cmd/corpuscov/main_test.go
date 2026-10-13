@@ -5,28 +5,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
-
-func corpusDirOrSkip(t *testing.T) string {
-	t.Helper()
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("could not resolve git repo root: %v", err)
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	return dir
-}
 
 // TestCensusExploreDeterministicAndFlagged plays two short games with
 // coverage-directed exploration on, twice: the census and the decision
@@ -34,7 +18,7 @@ func corpusDirOrSkip(t *testing.T) string {
 // forced answers must be flagged in the record and counted apart from the
 // policy's own choices.
 func TestCensusExploreDeterministicAndFlagged(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	runOnce := func() (string, []byte, []byte) {
 		tmp := t.TempDir()
 		c := config{games: 2, seed: 7, policy: "bot", autopay: true, explore: 0.3, dir: dir, top: 5,

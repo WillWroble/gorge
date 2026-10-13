@@ -38,7 +38,7 @@ func TestTriggerReferentsUseEventRoles(t *testing.T) {
 			t.Errorf("%s: got %+v, want %+v", tt.mode, got, tt.want)
 		}
 	}
-	if sc := e.specCtx(source, 0); !reflect.DeepEqual(sc.TriggerContext, effects.TriggerContext{}) {
+	if sc := e.specCtx(source, 0); !reflect.DeepEqual(sc.TriggerContext, noTC) {
 		t.Fatal("ordinary static/trigger-match context inherited damage provenance")
 	}
 }

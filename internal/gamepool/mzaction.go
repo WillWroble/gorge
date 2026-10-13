@@ -67,11 +67,12 @@ func cardName(v *view.View, id state.ObjID) string {
 	return ""
 }
 
-// encodeActionMZ writes an option's content-derived features into out
-// (flatActionDim wide): decision kind, option kind, who it concerns, and
+// EncodeActionMZ writes an option's content-derived features into out (the
+// GPU scorer's flatActionDim wide; experimental/gamepool/gpuscorer): decision
+// kind, option kind, who it concerns, and
 // Java-hashed slots for the option label, the card it names and, for a block,
 // the attacker it blocks. Pure function of (view, decision, option).
-func encodeActionMZ(r *Request, o decision.Option, out []float32) {
+func EncodeActionMZ(r *Request, o decision.Option, out []float32) {
 	for i := range out {
 		out[i] = 0
 	}

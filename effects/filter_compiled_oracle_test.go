@@ -2,10 +2,8 @@ package effects_test
 
 import (
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -189,93 +187,159 @@ func contextsFor(g *state.Game) []effects.SpecContext {
 	}
 }
 
+// oracleFixture is the sweep's read-only input, built once per test binary
+// and shared by every TestCompiledFilterMatchesTextualOracleChunkNN and
+// TestCompiledSpecCacheConcurrent: the repo decks' parameter strings, the
+// mid-game states (six bot games played from scratch) and each state's
+// evaluation contexts. Both matchers only read g/o, and the spec cache
+// publishes atomically, so sharing it across parallel tests is safe. The
+// first caller builds it under its own t; a builder that fails that t
+// leaves the fixture unbuilt, so the next caller rebuilds it (and fails the
+// same way under its own t).
+var oracleFixture struct {
+	sync.Mutex
+	built    bool
+	specs    []string
+	games    []*state.Game
+	contexts [][]effects.SpecContext
+}
+
+func loadOracleFixture(t *testing.T) ([]string, []*state.Game, [][]effects.SpecContext) {
+	t.Helper()
+	reg := testutil.CorpusRegistry(t)
+	oracleFixture.Lock()
+	defer oracleFixture.Unlock()
+	if !oracleFixture.built {
+		specs := repoDeckFilterStrings(t, reg)
+		games := midGameStates(t, reg)
+		if len(specs) < 1000 || len(games) == 0 {
+			t.Fatalf("sample too small: %d specs, %d games", len(specs), len(games))
+		}
+		contexts := make([][]effects.SpecContext, len(games))
+		for i, g := range games {
+			contexts[i] = contextsFor(g)
+		}
+		oracleFixture.specs, oracleFixture.games, oracleFixture.contexts = specs, games, contexts
+		oracleFixture.built = true
+	}
+	return oracleFixture.specs, oracleFixture.games, oracleFixture.contexts
+}
+
+// oracleChunks is how many independent tests the compiled-vs-textual sweep
+// (spec x game x context x object, ~143M comparisons) is sharded into. Run
+// as one test (four parallel subtests) it was 29 s under gate contention and
+// ~12 s + setup alone at 4 vCPU (2026-10-12). Chunk c owns the strided spec
+// slice specs[c], specs[c+K], ... -- strided, because the work per spec
+// varies with the spec's selectivity and contiguous slices measured 4.8-8.4 s
+// per chunk against a 4.8 s floor (2026-10-09) -- so the chunks partition the
+// sorted spec list exactly (TestCompiledFilterChunksPartitionTheSpecs).
+const oracleChunks = 8
+
+// oracleChunk returns the indices of chunk c's specs.
+func oracleChunk(n, c int) []int {
+	var out []int
+	for i := c; i < n; i += oracleChunks {
+		out = append(out, i)
+	}
+	return out
+}
+
 // TestCompiledFilterMatchesTextualOracle holds the compiled filter form
 // exactly equal to the textual evaluator it replaced, over every parameter
 // string of the repo decks' cards, every object of several mid-game states,
 // and a spread of bound and unbound evaluation contexts -- for both the
-// ordinary matcher and the zone-aware off-battlefield matcher.
-func TestCompiledFilterMatchesTextualOracle(t *testing.T) {
-	reg := testutil.CorpusRegistry(t)
-	specs := repoDeckFilterStrings(t, reg)
-	games := midGameStates(t, reg)
-	if len(specs) < 1000 || len(games) == 0 {
-		t.Fatalf("sample too small: %d specs, %d games", len(specs), len(games))
-	}
-	contexts := make([][]effects.SpecContext, len(games))
-	for i, g := range games {
-		contexts[i] = contextsFor(g)
-	}
+// ordinary matcher and the zone-aware off-battlefield matcher. It runs as
+// TestCompiledFilterMatchesTextualOracleChunkNN (oracleChunks).
+func runCompiledFilterChunk(t *testing.T, c int) {
+	t.Parallel()
+	specs, games, contexts := loadOracleFixture(t)
 	zones := []state.Zone{state.ZGraveyard, state.ZHand, state.ZExile, state.ZLibrary}
-	// The spec x game x context x object sweep runs as four parallel chunk
-	// subtests (TestKr8WorldsInFuzzGames's shape): the fixtures are read-only
-	// under both matchers (the compiled matchers never write g/o; the spec
-	// cache publishes entries atomically and
-	// TestCompiledSpecCacheConcurrent already exercises it from many
-	// goroutines), each chunk owns a strided spec slice -- strided, because
-	// the work per spec varies with the spec's selectivity and contiguous
-	// slices measured 4.8-8.4s per chunk against a 4.8s floor -- and the
-	// counters are atomic, so the measured counts are independent of
-	// scheduling. Measured 2026-10-09 (GOMAXPROCS=4, same 143,013,000
-	// comparisons, 0 mismatches both ways): 22.3s serial, 17.6s with six
-	// contiguous chunks (one 8.4s straggler), 12.2s with these four strided.
-	var checks, matched, mismatches atomic.Int64
-	report := func(t *testing.T, format string, args ...any) {
-		if mismatches.Add(1) <= 20 {
+	var checks, matched, mismatches int
+	report := func(format string, args ...any) {
+		mismatches++
+		if mismatches <= 20 {
 			t.Errorf(format, args...)
 		}
 	}
-	const chunks = 4
-	t.Run("specs", func(t *testing.T) {
-		for c := 0; c < chunks; c++ {
-			c := c
-			t.Run(strconv.Itoa(c), func(t *testing.T) {
-				t.Parallel()
-				for i := c; i < len(specs); i += chunks {
-					spec := specs[i]
-					match, matchZone := effects.CompiledSpecForTest(spec)
-					for gi, g := range games {
-						ids := pickObjs(g)
-						for ci, sc := range contexts[gi] {
-							for _, id := range ids {
-								o := g.Obj(id)
-								want := effects.MatchesObjectTextOracle(g, spec, o, sc)
-								got := match(g, o, sc)
-								checks.Add(1)
-								if want {
-									matched.Add(1)
-								}
-								if got != want {
-									report(t, "game %d ctx %d spec %q obj %d (%s, zone %v): oracle %v compiled %v",
-										gi, ci, spec, id, faceName(o), o.Zone, want, got)
-								}
-								if ci == 0 {
-									if cached := effects.MatchesObjectCompiledCached(g, spec, o, sc); cached != want {
-										report(t, "cached: game %d spec %q obj %d: oracle %v cached %v", gi, spec, id, want, cached)
-									}
-								}
-								if o.IsCopy && o.Zone != state.ZStack && o.Zone != state.ZBattlefield {
-									continue
-								}
-								for _, z := range zones {
-									want := effects.MatchesZoneTextOracle(g, spec, o, sc, z)
-									checks.Add(1)
-									if got := matchZone(g, o, sc, z); got != want {
-										report(t, "zone %v game %d ctx %d spec %q obj %d: oracle %v compiled %v",
-											z, gi, ci, spec, id, want, got)
-									}
-								}
-							}
+	for _, i := range oracleChunk(len(specs), c) {
+		spec := specs[i]
+		match, matchZone := effects.CompiledSpecForTest(spec)
+		for gi, g := range games {
+			ids := pickObjs(g)
+			for ci, sc := range contexts[gi] {
+				for _, id := range ids {
+					o := g.Obj(id)
+					want := effects.MatchesObjectTextOracle(g, spec, o, sc)
+					got := match(g, o, sc)
+					checks++
+					if want {
+						matched++
+					}
+					if got != want {
+						report("game %d ctx %d spec %q obj %d (%s, zone %v): oracle %v compiled %v",
+							gi, ci, spec, id, faceName(o), o.Zone, want, got)
+					}
+					if ci == 0 {
+						if cached := effects.MatchesObjectCompiledCached(g, spec, o, sc); cached != want {
+							report("cached: game %d spec %q obj %d: oracle %v cached %v", gi, spec, id, want, cached)
+						}
+					}
+					if o.IsCopy && o.Zone != state.ZStack && o.Zone != state.ZBattlefield {
+						continue
+					}
+					for _, z := range zones {
+						want := effects.MatchesZoneTextOracle(g, spec, o, sc, z)
+						checks++
+						if got := matchZone(g, o, sc, z); got != want {
+							report("zone %v game %d ctx %d spec %q obj %d: oracle %v compiled %v",
+								z, gi, ci, spec, id, want, got)
 						}
 					}
 				}
-			})
+			}
 		}
-	})
-	if matched.Load() == 0 {
+	}
+	if matched == 0 {
 		t.Fatal("no spec matched any object: the sample exercises nothing")
 	}
-	t.Logf("%d specs, %d states, %d comparisons (%d oracle matches), %d mismatches",
-		len(specs), len(games), checks.Load(), matched.Load(), mismatches.Load())
+	t.Logf("chunk %d: %d of %d specs, %d states, %d comparisons (%d oracle matches), %d mismatches",
+		c, len(oracleChunk(len(specs), c)), len(specs), len(games), checks, matched, mismatches)
+}
+
+func TestCompiledFilterMatchesTextualOracleChunk00(t *testing.T) { runCompiledFilterChunk(t, 0) }
+func TestCompiledFilterMatchesTextualOracleChunk01(t *testing.T) { runCompiledFilterChunk(t, 1) }
+func TestCompiledFilterMatchesTextualOracleChunk02(t *testing.T) { runCompiledFilterChunk(t, 2) }
+func TestCompiledFilterMatchesTextualOracleChunk03(t *testing.T) { runCompiledFilterChunk(t, 3) }
+func TestCompiledFilterMatchesTextualOracleChunk04(t *testing.T) { runCompiledFilterChunk(t, 4) }
+func TestCompiledFilterMatchesTextualOracleChunk05(t *testing.T) { runCompiledFilterChunk(t, 5) }
+func TestCompiledFilterMatchesTextualOracleChunk06(t *testing.T) { runCompiledFilterChunk(t, 6) }
+func TestCompiledFilterMatchesTextualOracleChunk07(t *testing.T) { runCompiledFilterChunk(t, 7) }
+
+// TestCompiledFilterChunksPartitionTheSpecs holds the sharding to full
+// coverage: one TestCompiledFilterMatchesTextualOracleChunkN per chunk, and
+// every spec index in exactly one chunk.
+func TestCompiledFilterChunksPartitionTheSpecs(t *testing.T) {
+	const n = 1003 // any size: the stride covers every index for every n
+	for _, size := range []int{0, 1, oracleChunks - 1, oracleChunks, n} {
+		seen := make([]int, size)
+		for c := 0; c < oracleChunks; c++ {
+			for _, i := range oracleChunk(size, c) {
+				seen[i]++
+			}
+		}
+		for i, k := range seen {
+			if k != 1 {
+				t.Fatalf("n=%d: spec %d is in %d chunks", size, i, k)
+			}
+		}
+	}
+	if tests := len([]func(*testing.T){TestCompiledFilterMatchesTextualOracleChunk00,
+		TestCompiledFilterMatchesTextualOracleChunk01, TestCompiledFilterMatchesTextualOracleChunk02,
+		TestCompiledFilterMatchesTextualOracleChunk03, TestCompiledFilterMatchesTextualOracleChunk04,
+		TestCompiledFilterMatchesTextualOracleChunk05, TestCompiledFilterMatchesTextualOracleChunk06,
+		TestCompiledFilterMatchesTextualOracleChunk07}); tests != oracleChunks {
+		t.Fatalf("%d chunk tests for %d chunks", tests, oracleChunks)
+	}
 }
 
 // TestCompiledSpecCacheConcurrent exercises the process-wide cache from many
@@ -283,9 +347,8 @@ func TestCompiledFilterMatchesTextualOracle(t *testing.T) {
 // answer the oracle gives, whether it compiled the spec, raced another
 // compiler, or read a promoted snapshot.
 func TestCompiledSpecCacheConcurrent(t *testing.T) {
-	reg := testutil.CorpusRegistry(t)
-	specs := repoDeckFilterStrings(t, reg)
-	g := midGameStates(t, reg)[1]
+	specs, games, _ := loadOracleFixture(t)
+	g := games[1]
 	ids := pickObjs(g)
 	sc := effects.SpecContext{You: 0, Source: ids[0]}
 	var wg sync.WaitGroup

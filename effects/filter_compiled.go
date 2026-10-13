@@ -256,8 +256,7 @@ func compiledPositive(c *compiledPred, g *state.Game, o *state.Object, sc *SpecC
 			return false, false
 		}
 		if kind == wordChosenColor {
-			src := g.Obj(sc.Source)
-			if src == nil || colourLetter(src.ChosenColor) == 0 {
+			if _, col := sourceChosen(g, *sc); colourLetter(col) == 0 {
 				return false, false
 			}
 		}
@@ -678,6 +677,7 @@ var specialPositiveTokenSet = state.NewNameSet(
 	"TriggeredCards",
 	"TriggeredTarget",
 	"NotDefinedTriggeredTarget",
+	"NotDefinedTriggeredCard",
 	"blockingTriggeredAttacker",
 	"EffectSource",
 	"IsGoaded",

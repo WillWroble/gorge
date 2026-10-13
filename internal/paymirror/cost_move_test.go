@@ -169,6 +169,11 @@ func TestExpectedUnmirrorableVerdict(t *testing.T) {
 // to end (constructed seed 1006, the-epic-storm vs uw-control, Cabal Ritual
 // paid with a Lotus Petal): every planned cast whose witness sacrifices a
 // planned source mirrors equivalently -- witness, float route and control.
+//
+// cov-loyaltyrank: the bot now ranks planeswalker loyalty abilities by their
+// cost/effect facts, which moved uw-control's games; seed 1006 no longer
+// sacrifices a planned source, so the test plays seed 1003 (same decks, two
+// such casts, all equivalent). The name keeps the round-5 seed it came from.
 func TestPayMirrorSacrificeSourcesSeed1006(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -179,7 +184,7 @@ func TestPayMirrorSacrificeSourcesSeed1006(t *testing.T) {
 	// The driver keeps only a compact copy of an equivalent report (its
 	// witness dropped), so the full reports are collected as they are made.
 	var full []*Report
-	g := PlayGame(d, GameSpec{Seed: 1006, Decks: []string{"the-epic-storm", "uw-control"}, Policy: "bot"},
+	g := PlayGame(d, GameSpec{Seed: 1003, Decks: []string{"the-epic-storm", "uw-control"}, Policy: "bot"},
 		DriverOptions{Control: true, Resolve: true, OnReport: func(_ GameSpec, r *Report) { full = append(full, r) }})
 	if g.Err != "" {
 		t.Fatalf("game error: %s", g.Err)
@@ -211,5 +216,5 @@ func TestPayMirrorSacrificeSourcesSeed1006(t *testing.T) {
 	if sacrificing == 0 {
 		t.Fatalf("no planned cast sacrificed a planned source (the check is vacuous): %d planned casts, %d turns", len(full), g.Turns)
 	}
-	t.Logf("MEASURED seed 1006: %d planned casts, %d with a sacrificed planned source", len(full), sacrificing)
+	t.Logf("MEASURED seed 1003: %d planned casts, %d with a sacrificed planned source", len(full), sacrificing)
 }

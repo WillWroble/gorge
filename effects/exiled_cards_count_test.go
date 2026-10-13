@@ -47,19 +47,19 @@ func TestExiledCardsPaidCount(t *testing.T) {
 
 	// Two paid cards: the /Twice body reads 4, the bare amount 2 -- the values
 	// Corpseweft's token P/T is set from.
-	c.Exiled = []state.ObjID{paidA, paidB}
+	c.Paid.Exiled = []state.ObjID{paidA, paidB}
 	if got, ok := EvalCountOK(h, c, "ExiledCards$Amount/Twice"); !ok || got != 4 {
-		t.Fatalf("ExiledCards$Amount/Twice with %d paid cards = %d (ok=%v), want 4", len(c.Exiled), got, ok)
+		t.Fatalf("ExiledCards$Amount/Twice with %d paid cards = %d (ok=%v), want 4", len(c.Paid.Exiled), got, ok)
 	}
 	if got, ok := EvalCountOK(h, c, "ExiledCards$Amount"); !ok || got != 2 {
-		t.Fatalf("ExiledCards$Amount with %d paid cards = %d (ok=%v), want 2", len(c.Exiled), got, ok)
+		t.Fatalf("ExiledCards$Amount with %d paid cards = %d (ok=%v), want 2", len(c.Paid.Exiled), got, ok)
 	}
 
 	// Zero contrast: no paid list, but the remembered and associated cards are
 	// still there -- the modelled head must read a legitimate zero (ok=true),
 	// never borrow those sets. An unresolvable verdict here would mean the
 	// referent was not claimed at all.
-	c.Exiled = nil
+	c.Paid.Exiled = nil
 	if got, ok := EvalCountOK(h, c, "ExiledCards$Amount/Twice"); !ok || got != 0 {
 		t.Fatalf("ExiledCards$Amount/Twice without a paid list = %d (ok=%v), want a modelled 0", got, ok)
 	}

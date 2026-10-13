@@ -20,7 +20,7 @@ import (
 // policynet.LoadOnPolicy with an outcome, and the flag's front door refuses
 // a run without a policynet side or with an existing destination.
 func TestOnPolicyCorpusLeavesTheBenchUnchanged(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	defer func(m *policynet.Model, k []decision.Kind, p string) {
 		policynetModel, policynetKinds, onpolicyCorpusPath = m, k, p
 	}(policynetModel, policynetKinds, onpolicyCorpusPath)
@@ -96,7 +96,7 @@ func slicesEqual(a, b []float32) bool {
 // from the greedy run), -opp-mix swaps side B per game as a pure function of
 // the game seed, and the parser refuses bad specs.
 func TestSampledCollectionAndOppMix(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	defer func(m *policynet.Model, k []decision.Kind, p string, temp float64, mix []oppMixEntry) {
 		policynetModel, policynetKinds, onpolicyCorpusPath, policynetTemperature, oppMix = m, k, p, temp, mix
 	}(policynetModel, policynetKinds, onpolicyCorpusPath, policynetTemperature, oppMix)
