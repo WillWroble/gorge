@@ -191,6 +191,12 @@ type OracleDecision struct {
 	// its chooseUse only when two or more of its costs can be paid, so the
 	// generator scripts the boolean only for AltPayable >= 2.
 	AltPayable int `json:"alt_payable,omitempty"`
+	// TriggerCostMana marks a triggered "you may pay <cost>" ask whose cost
+	// is mana only. XMage's DoIfCostPaid poses its chooseUse for a mana cost
+	// even when it cannot be paid (gorge then offers only the decline), but
+	// not for an unpayable non-mana cost (a forage, a sacrifice), so the
+	// generator scripts a decline-only ask's "no" only when this is set.
+	TriggerCostMana bool `json:"trigger_cost_mana,omitempty"`
 	// ManaColours is the offered colour set of a mana ask whose XMage side is
 	// an AddManaInAnyCombinationEffect dialog (the engine's Produced$ "Combo
 	// <colours>"): one multi-amount message per colour, in the set's own

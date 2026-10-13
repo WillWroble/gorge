@@ -939,6 +939,7 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 			}
 			od.PickRefsInexact = append(od.PickRefsInexact, inexact)
 		}
+		od.TriggerCostMana = triggerCostAskManaOnly(r.e, d)
 		chain = markTrigChain(r.e.trigSub, d)
 		od.LeadingUnposed = chain.leading
 		r.decisions = append(r.decisions, od)

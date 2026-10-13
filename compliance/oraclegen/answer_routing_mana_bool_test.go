@@ -52,7 +52,8 @@ func ashlingOrder(step int) rules.OracleDecision {
 func ashlingDecline(step int) rules.OracleDecision {
 	return rules.OracleDecision{Step: step, Seat: 0, Kind: "choose_n", Options: 1,
 		Picks: []string{"Do not pay"}, PickIdx: []int{0}, PickRefs: []string{"p0:Ashling, Rekindled"},
-		PickKinds: []string{"trigger_cost_decline"}, Via: "answer", GorgeKind: "choose", Min: 1, Max: 1}
+		PickKinds: []string{"trigger_cost_decline"}, Via: "answer", GorgeKind: "choose", Min: 1, Max: 1,
+		TriggerCostMana: true}
 }
 
 // TestOptionalManaTriggerBooleanDropsAheadOfColourPick: the yesno whose
