@@ -783,6 +783,9 @@ const (
 	// Mode$ AttackerBlocked's "blocked by two or more creatures" comparator
 	// (Seifer, Balamb Rival; append-only).
 	PKValidBlockerAmount
+	// A Mode$ Continuous static's AddReplacementEffect$ grant (DFT Far
+	// Fortune, End Boss; Vnwxt, Verbose Host; append-only).
+	PKAddReplacementEffect
 	// ChangeZone's ExiledWithEffectSource$ rider: the exile is tagged as
 	// exiled-with the Effect's source (Forger's Foundry; append-only).
 	PKExiledWithEffectSource
@@ -1556,6 +1559,7 @@ var paramKeyNames = [paramKeyCount]string{
 	PKTriggeredOwnAbility:              "TriggeredOwnAbility",
 	PKValidDestination:                 "ValidDestination",
 	PKValidSpellAbility:                "ValidSpellAbility",
+	PKAddReplacementEffect:             "AddReplacementEffect",
 }
 
 // String is the key's Forge text.

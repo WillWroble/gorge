@@ -100,7 +100,7 @@ func (e *Engine) replacementMatchesEffectCreated(r cards.Repl, source state.ObjI
 // meaning of You.
 func (e *Engine) replacementMatchesEffectCreatedBy(r cards.Repl, source state.ObjID, ev events.Event,
 	remembered []state.ObjID, rememberedPlayers []state.PlayerID, controller state.PlayerID) bool {
-	return e.replacementMatchesRememberedUngatedBy(r, source, ev, remembered, rememberedPlayers, nil, controller)
+	return e.replacementMatchesRememberedUngatedBy(r, source, ev, remembered, rememberedPlayers, nil, controller, nil)
 }
 
 // replacementMatchesToken / replacementMatchesEffectCreatedToken are the
@@ -120,11 +120,23 @@ func (e *Engine) replacementMatchesEffectCreatedToken(r cards.Repl, source state
 // predicate body without the ActiveZones$ gate; only the wrappers above
 // reach it.
 func (e *Engine) replacementMatchesRememberedUngated(r cards.Repl, source state.ObjID, ev events.Event, remembered []state.ObjID, rememberedPlayers []state.PlayerID, tokenOverride *state.Object) bool {
-	return e.replacementMatchesRememberedUngatedBy(r, source, ev, remembered, rememberedPlayers, tokenOverride, e.controllerOf(source))
+	return e.replacementMatchesRememberedUngatedBy(r, source, ev, remembered, rememberedPlayers, tokenOverride, e.controllerOf(source), nil)
+}
+
+// replacementMatchesGranted is the matcher for a GRANTED static replacement
+// (AddReplacementEffect$ on a Mode$ Continuous static, rules/replacement_granted.go):
+// svars is the GRANTING face's SVar table (state.ContinuousEffect.SVars). A
+// CheckSVar$ gate on the granted R: line evaluates against it, not the host
+// object's own face -- the grant's body and gate are written on the granting
+// face, and a cross-object grant (Scion of Halaster granting its commander a
+// "first draw each turn" replacement, whose SVar:X lives on Scion) would
+// otherwise read the host's face and mis-evaluate the gate.
+func (e *Engine) replacementMatchesGranted(r cards.Repl, source state.ObjID, ev events.Event, svars map[string]string) bool {
+	return e.replacementMatchesRememberedUngatedBy(r, source, ev, nil, nil, nil, e.controllerOf(source), svars)
 }
 
 func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source state.ObjID, ev events.Event,
-	remembered []state.ObjID, rememberedPlayers []state.PlayerID, tokenOverride *state.Object, you state.PlayerID) bool {
+	remembered []state.ObjID, rememberedPlayers []state.PlayerID, tokenOverride *state.Object, you state.PlayerID, svars map[string]string) bool {
 	switch r.EventKind() {
 	case cards.ReplAttached:
 		if ev.Kind != events.Attach || len(ev.IDs) == 0 {
@@ -140,7 +152,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		if v := r.ParamStr(cards.PKValidTarget); v != "" && !e.matchesSpecFrom(v, ev.IDs[0], you, source) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplTurnFaceUp:
 		// The "as this is turned face up" class (CR 614.1a with CR 708.6/
 		// CR 702.36e): the turned permanent is the turn-up event's own Obj
@@ -160,7 +172,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 				return false
 			}
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplCounter:
 		// The Effect-created bodyless CantHappen form (Mistrise Village's
 		// AntiMagic, reached only from counterReplacementMatchesAll's scan,
@@ -278,7 +290,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// to say the Moved case never carries these gates in the corpus; the
 		// etbCounter passthrough is the one carrier, and the shared read is a
 		// no-op for every Moved line without the params.
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplUntap:
 		if ev.Kind != events.Untap {
 			return false
@@ -301,7 +313,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!e.matchesSpecFrom(v, ev.Obj, you, source) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplBeginPhase:
 		if ev.Kind != events.StepChange {
 			return false
@@ -326,7 +338,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		if r.ParamStr(cards.PKHellbent) == "True" && len(e.G.Zone(state.ZHand, you)) > 0 {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplBeginTurn:
 		// The skip-an-extra-turn class (Trouble in Pairs, Stranglehold,
 		// Ugin's Nexus, Gerrard's Hourglass Pendant). Reached ONLY through the
@@ -360,7 +372,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// Optional$-gated and ReplaceWith$-bearing shapes are not implemented:
 		// extraTurnSkipped reports a matched line whose action is not Skip$
 		// True loudly instead of silently skipping, and never silently skips.
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplTransform:
 		if ev.Kind != events.FlipFace {
 			return false
@@ -372,7 +384,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!e.matchesSpecFrom(v, ev.Obj, you, source) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplPayLife:
 		return payLifeReplacementMatches(e, r, source, ev, you)
 	case cards.ReplGainLife:
@@ -393,7 +405,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!e.matchesSpecFrom(v, ev.Obj, you, source) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplProduceMana:
 		// Only genuine production replaces: a ManaAdd without a producing
 		// source (a test seed, a spend) and a negative Amount (spending, not
@@ -430,7 +442,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 				return false
 			}
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplConnive:
 		return replacementMatchesConnive(e, r, source, ev, you)
 	case cards.ReplExplore:
@@ -444,9 +456,9 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!e.matchesSpecFrom(v, ev.Obj, you, source) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplMill, cards.ReplScry:
-		return millScryProposalMatches(r, ev, func(v string) bool { return effects.MatchesPlayerSpec(e.G, v, ev.Player, you) }, func() bool { return e.replacementConditionHolds(r, source, you) })
+		return millScryProposalMatches(r, ev, func(v string) bool { return effects.MatchesPlayerSpec(e.G, v, ev.Player, you) }, func() bool { return e.replacementConditionHoldsWith(r, source, you, svars) })
 	case cards.ReplRollDice:
 		// The roll-action replacement (R:Event$ RollDice, task rolldice-repl
 		// -- Wyll, Blade of Frontiers; Barbarian Class; Pixie Guide; the
@@ -468,7 +480,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// carries no die-size field to gate on, and its one corpus carrier is
 		// the unmodelled SwapRoll body the dispatch skips loudly -- a sides
 		// gate is never silently widened onto a die of another size.
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplDraw, cards.ReplDrawCards:
 		// The batch proposal is the DrawCards class's own held event
 		// (Forge's Player.drawCards(n) DrawCards pass, XMage's
@@ -559,7 +571,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// DrawTwo / library-empty Win carriers) fired unconditionally. No
 		// repo deck carries any of the class's 39 carriers, so no golden
 		// game changes (measured).
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplCreateToken:
 		// The token-creation replacement class (Divine Visitation, Doubling
 		// Season, Academy Manufactor, Xorn, ...). Applied by
@@ -601,7 +613,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 		// here. This "vacuously satisfiable" reading is the TOKEN class's
 		// alone: the AddCounter case below DOES read EffectOnly$, because
 		// CounterChange has non-effect emitters (turn-based actions, costs).
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplAddCounter:
 		// The counter-placement replacement class (Hardened Scales, Branching
 		// Evolution, Doubling Season, Vorinclex, ...). Applied by
@@ -717,7 +729,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 				return false
 			}
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplRollPlanarDice:
 		// The planar-dice replacement class (Ichor Elixir, task rollplanar1):
 		// "if you would roll one or more planar dice, instead roll that many
@@ -731,7 +743,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!effects.MatchesPlayerSpec(e.G, vp, ev.Player, you) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplCascade:
 		// The cascade instruction's replacement boundary (CR 614.4;
 		// Averna, the Chaos Bloom's `ValidPlayer$ You | ActiveZones$
@@ -745,7 +757,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!effects.MatchesPlayerSpec(e.G, vp, ev.Player, you) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	case cards.ReplGameLoss, cards.ReplGameWin:
 		// The "you can't lose the game" / "your opponents can't win the
 		// game" class (CR 104.3 / 704.5a-c, task fdn-repl-cant-lose). Only
@@ -787,9 +799,9 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 			!effects.MatchesPlayerSpec(e.G, vp, ev.Player, you) {
 			return false
 		}
-		return e.replacementConditionHolds(r, source, you)
+		return e.replacementConditionHoldsWith(r, source, you, svars)
 	}
-	return r.EventKind() == cards.ReplLoseMana && loseManaReplacementApplies(ev, replacementPlayerMatches(e, source, &r, ev.Player), e.replacementConditionHolds(r, source, you))
+	return r.EventKind() == cards.ReplLoseMana && loseManaReplacementApplies(ev, replacementPlayerMatches(e, source, &r, ev.Player), e.replacementConditionHoldsWith(r, source, you, svars))
 }
 
 // replacementConditionHolds evaluates the condition parameters a replacement
@@ -803,6 +815,15 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 // closed: the replacement does not apply, never that an unreadable count is
 // presumed large enough to let it.
 func (e *Engine) replacementConditionHolds(r cards.Repl, source state.ObjID, you state.PlayerID) bool {
+	return e.replacementConditionHoldsWith(r, source, you, nil)
+}
+
+// replacementConditionHoldsWith is replacementConditionHolds with an
+// optional SVar table: a GRANTED static replacement's CheckSVar$ gate
+// evaluates against the GRANTING face's table (svars), not the host object's
+// own face. Every printed, keyword and Effect-created caller passes nil and
+// keeps reading the source's face (replacementCheckValue's default).
+func (e *Engine) replacementConditionHoldsWith(r cards.Repl, source state.ObjID, you state.PlayerID, svars map[string]string) bool {
 	// A kw:Class level band (ClassBand$) is an independent AND gate: this
 	// function reads only IsPresent$, so a band written anywhere else would be
 	// silently ignored and a level-N granted replacement would be live from
@@ -879,7 +900,7 @@ func (e *Engine) replacementConditionHolds(r cards.Repl, source state.ObjID, you
 		return false
 	}
 	if check, ok := r.Param(cards.PKCheckSVar); ok {
-		n := e.replacementCheckValue(source, check)
+		n := e.replacementCheckValue(source, check, svars)
 		if cmp := r.ParamStr(cards.PKSVarCompare); cmp != "" {
 			op, rhs, valid := splitCompare(strings.TrimSpace(cmp))
 			if !valid || !applyCompare(int(n), op, rhs) {
@@ -918,12 +939,12 @@ func (e *Engine) replacementAmountMatches(spec string, amount int32, c *effects.
 	return false
 }
 
-func (e *Engine) replacementCheckValue(source state.ObjID, check string) int32 {
+func (e *Engine) replacementCheckValue(source state.ObjID, check string, svars map[string]string) int32 {
 	o := e.G.Obj(source)
 	if o == nil {
 		return 0
 	}
-	ctx := e.replCtx(replMatch{id: source}, events.Event{})
+	ctx := e.replCtx(replMatch{id: source, svars: svars}, events.Event{})
 	// The face's own SVar table comes FIRST: a CheckSVar$ X gate whose face
 	// defines a real SVar:X body (Steel Exemplar's Count$Converge, Walking
 	// Dream's PlayerCountOpponents$ head, the multiclass_baldric and
