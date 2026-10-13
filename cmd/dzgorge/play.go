@@ -54,8 +54,10 @@ type gameRec struct {
 	// drew or put into its hand from its library (17lands' "game in hand").
 	InHand [2][]string `json:"in_hand"`
 	Mull   [2]int      `json:"mull"`
-	Visits int         `json:"visits,omitempty"` // visit records this game added to -corpus
-	Err    string      `json:"error,omitempty"`
+	// MM is each seat's -mm-stats priority-window counters (mmstats.go).
+	MM     [2]mmStats `json:"mm,omitempty"`
+	Visits int        `json:"visits,omitempty"` // visit records this game added to -corpus
+	Err    string     `json:"error,omitempty"`
 }
 
 type job struct {
@@ -70,6 +72,10 @@ type azAgg struct {
 	msX1000                                                            atomic.Int64
 	topKPoints, topKCuts, topKBefore                                   atomic.Int64
 	oppPoints, oppExpanded                                             atomic.Int64
+	// The fuller search (:morekinds, :kinds=): root searches and in-walk points per fuller kind
+	// (azmcts.ExtraKindNames), and the opponent's payment points (:oppnodes:oppfull with :autopay).
+	extraSearched, extraPoints [azmcts.NumExtraKinds]atomic.Int64
+	oppPayPoints               atomic.Int64
 }
 
 var azStats azAgg
@@ -96,7 +102,7 @@ func runPlay(args []string) int {
 	// whatever the hand holds (botpolicy/policy.go), and every seat here delegates that ask to it.
 	// -mull-heuristic (or a seat's :mull key) replaces the coin with a land-count rule.
 	mulligans := fs.Int("mulligans", 0, "London mulligans each player may take (0 skips the round)")
-	mullHeur := fs.Bool("mull-heuristic", false, "every bot, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
+	mullHeur := fs.Bool("mull-heuristic", false, "every bot, sbtactical, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
 	progress := fs.Int("progress", 0, "print progress every N games (0 = about 20 times)")
 	fs.IntVar(&recordEvery, "record-every", 1, "write one searched decision in K to -corpus (cheap games for the value)")
 	recFeat := fs.String("record-features", "mz", "encoding of the -corpus records: mz, or entity for dzg's networks (dzgorge pack)")
@@ -106,6 +112,8 @@ func runPlay(args []string) int {
 	fs.IntVar(&remoteCache, "remote-cache", remoteCache, "cached remote evaluations (states)")
 	fs.IntVar(&gonetCache, "gonet-cache", gonetCache, "cached gonet= evaluations (states; 0 = none)")
 	fs.IntVar(&gonetCardCache, "gonet-card-cache", gonetCardCache, "cached gonet= card vectors (0 = none)")
+	fs.BoolVar(&paidManaCensus, "paid-mana-census", false, "Config.PaidManaCensus: the payment census counts payable paid-cost mana sources (rules/paid_mana_census.go)")
+	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
 	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
 	fs.Parse(args)
 	tuneGC()
@@ -144,6 +152,9 @@ func runPlay(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	for _, p := range specs {
+		p.setLookup(reg)
 	}
 	pool, err := readPool(*poolPath, *split)
 	if err != nil {
@@ -227,6 +238,11 @@ func runPlay(args []string) int {
 			azStats.msX1000.Add(int64(d.MS * 1000))
 			azStats.oppPoints.Add(int64(d.Stats.OppPoints))
 			azStats.oppExpanded.Add(int64(d.Stats.OppExpanded))
+			azStats.oppPayPoints.Add(int64(d.Stats.OppPayPoints))
+			for x := range azStats.extraSearched {
+				azStats.extraSearched[x].Add(int64(d.Stats.ExtraSearched[x]))
+				azStats.extraPoints[x].Add(int64(d.Stats.ExtraPoints[x]))
+			}
 		}
 	}
 	outF, err := os.Create(*out)
@@ -363,6 +379,25 @@ func runPlay(args []string) int {
 			sum["az_opp_points_per_searched"] = float64(op) / float64(n)
 			sum["az_opp_expanded_per_searched"] = float64(oe) / float64(n)
 		}
+		if op := azStats.oppPayPoints.Load(); op > 0 {
+			// :oppnodes:oppfull with :autopay: the opponent's priority points over the payment vocabulary.
+			sum["az_opp_pay_points_per_searched"] = float64(op) / float64(n)
+		}
+		extraS, extraP := map[string]int64{}, map[string]float64{}
+		for x, name := range azmcts.ExtraKindNames {
+			if v := azStats.extraSearched[x].Load(); v > 0 {
+				extraS[name] = v
+			}
+			if v := azStats.extraPoints[x].Load(); v > 0 {
+				extraP[name] = float64(v) / float64(n)
+			}
+		}
+		if len(extraS)+len(extraP) > 0 {
+			// :morekinds / :kinds=: searched decisions of the fuller kinds, and their points inside
+			// simulations per searched decision.
+			sum["az_extra_searched"] = extraS
+			sum["az_extra_points_per_searched"] = extraP
+		}
 	}
 	if azStats.asked.Load() > 0 {
 		sum["az_redeal_refused"] = azStats.refused.Load()
@@ -407,6 +442,9 @@ func score(a, b, half int) float64 {
 
 var sparePool sync.Pool
 
+// paidManaCensus is play -paid-mana-census; mmStatsOn is play -mm-stats.
+var paidManaCensus, mmStatsOn bool
+
 func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, maxTurns, maxIntents, mulligans int, record bool) (gameRec, []byte) {
 	rec := gameRec{Game: jb.game, Pair: jb.pair, Leg: jb.leg, Seed: jb.seed, Decks: jb.decks, Winner: -1}
 	seats := make([]seat.Seat, 2)
@@ -443,14 +481,22 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 	cfg := rules.Config{
 		Seed: jb.seed, Names: []string{"p0", "p1"}, Decks: [][]*cards.Card{d0, d1},
 		Tokens: reg.Tokens, NameUniverse: reg.Universe(), Mulligans: mulligans,
+		PaidManaCensus: paidManaCensus,
 	}
 	spare, _ := sparePool.Get().(*rules.Spare)
 	if spare == nil {
 		spare = new(rules.Spare)
 	}
 	cfg.Spare = spare
+	var eng *rules.Engine
+	var auto [2]bool
+	for s := 0; s < 2; s++ {
+		k := specs[jb.sides[s]]
+		auto[s] = k.AutoPay || k.Kind == "random" || k.Kind == "sbtactical"
+	}
 	hooks := gbench.Hooks{
 		Setup: func(e *rules.Engine) {
+			eng = e
 			// The decision arena recycles decision storage; a search seat reads the live
 			// engine as its root, so a game with one keeps it off (as botbench does).
 			if !search {
@@ -463,6 +509,12 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 			}
 		},
 		Decision: func(seatIdx int, d *decision.Decision, in decision.Intent, _ *botpolicy.Board) error {
+			if mmStatsOn && eng != nil {
+				if rec.MM[seatIdx] == nil {
+					rec.MM[seatIdx] = mmStats{}
+				}
+				rec.MM[seatIdx].observe(eng, paidManaCensus, auto[seatIdx], d, in)
+			}
 			if d.Kind == decision.KMulligan && len(d.Options) > 0 && d.Options[0].Kind != "bottom" &&
 				len(in.Choices) > 0 && optionKind(d, in.Choices[0]) == "mulligan" {
 				rec.Mull[seatIdx]++

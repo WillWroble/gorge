@@ -20,7 +20,7 @@ const noPool = params.get('pool') === 'none';
 const graveyard = Array.from({ length: 9 }, (_, i) => card(i + 1));
 const exile = Array.from({ length: 10 }, (_, i) => card(i + 101));
 const player: PlayerView = {
-  seat: 0, name: 'You', life: 20, lost: false, library_size: 72, hand_size: 1, graveyard_size: graveyard.length,
+  seat: 0, name: 'You', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 72, hand_size: 1, graveyard_size: graveyard.length,
   completed_dungeons: 0,
   hand: [], battlefield: [], graveyard, exile, command: [], commanders: [], commander_casts: [],
   pool: noPool ? {} : { B: 3 },

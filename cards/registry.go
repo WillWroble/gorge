@@ -38,6 +38,14 @@ type Registry struct {
 
 	univOnce sync.Once
 	univ     *Universe
+
+	// ShapeGate, when set, names extra reasons a card is not fully playable
+	// even though every primitive it references is implemented: a script
+	// SHAPE whose body the engine declines at run time with a loud Note
+	// (cards cannot import effects, so the caller supplies the predicate).
+	// Unsupported appends its result. Only the coverage report sets it;
+	// deck-eligibility readers leave it nil and keep primitive-only semantics.
+	ShapeGate func(*Card) []string
 }
 
 func NewRegistry() *Registry {

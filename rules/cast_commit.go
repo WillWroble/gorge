@@ -1087,6 +1087,13 @@ func (e *Engine) abortCast(pc *pendingCast, text string, suppress bool) {
 			e.emit(events.Event{Kind: events.MoveZone, Obj: pc.stackObj, From: state.ZStack, To: pc.from, Text: "reversed"})
 		}
 	}
+	// CR 733.1: a pushed spell's PutOnStack stays in the append-only log, so
+	// the spell-cast turn watcher it folded (state.Player.SpellsCastThisTurn)
+	// is undone by a companion reversal event. An ability's AbilityPush folds
+	// no such watcher, so only a spell reverses one.
+	if pc.pushed && !pc.isAbility() {
+		e.emit(events.Event{Kind: events.SpellCastReversed, Player: pc.player})
+	}
 	if pc.faceBefore != nil {
 		if o := e.G.Obj(pc.card); o != nil && o.FaceIdx != *pc.faceBefore {
 			e.emit(events.Event{Kind: events.FlipFace, Obj: pc.card, Amount: int32(*pc.faceBefore)})

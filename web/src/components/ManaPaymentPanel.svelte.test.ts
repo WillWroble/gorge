@@ -26,7 +26,7 @@ const spell = (id: number, name: string): CardView => ({
   damage: 0, attacking: false, controller: 0, owner: 0, summon_sick: false,
 });
 const player = (seat: number, hand: CardView[], battlefield: CardView[]): PlayerView => ({
-  seat, name: seats[seat].name, life: 20, lost: false, library_size: 40, hand_size: hand.length, graveyard_size: 0,
+  seat, name: seats[seat].name, life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: hand.length, graveyard_size: 0,
   completed_dungeons: 0,
   hand, battlefield, graveyard: [], exile: [], pool: {}, command: [], commanders: [], commander_casts: [],
 });

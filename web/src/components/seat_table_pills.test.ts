@@ -11,7 +11,7 @@ const card = (id: number): CardView => ({
   summon_sick: false,
 });
 const player = (lists: boolean): PlayerView => ({
-  seat: 0, name: 'Ari', life: 20, lost: false, library_size: 49, hand_size: 7, graveyard_size: 2,
+  seat: 0, name: 'Ari', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 49, hand_size: 7, graveyard_size: 2,
   completed_dungeons: 0,
   hand: lists ? [card(1)] : null as unknown as CardView[], battlefield: [],
   graveyard: lists ? [card(2)] : [], exile: lists ? [card(3)] : [],

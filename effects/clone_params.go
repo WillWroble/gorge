@@ -264,7 +264,8 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 
 // cloneETBShapeOK is ETBShapeOK's computation: rules' etbCloneWhitelist's
 // POSITIVE key whitelist (Choices$, AddKeywords$, AddTypes$,
-// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$) plus its
+// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$, AddTriggers$,
+// AddSVars$) plus its
 // text-only value checks. The key scan only answers a boolean, so the map's
 // iteration order cannot reach an event.
 func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
@@ -293,5 +294,5 @@ func CloneKnownKeys() []string { return slices.Clone(cloneKnownKeys[:]) }
 // cloneETBShapeKeys are the keys the implemented as-enters Clone shape carries.
 var cloneETBShapeKeys = state.NewNameSet(
 	"Choices", "AddKeywords", "AddTypes", "SpellDescription",
-	"AddStaticAbilities", "IntoPlayTapped",
+	"AddStaticAbilities", "IntoPlayTapped", "AddTriggers", "AddSVars",
 )

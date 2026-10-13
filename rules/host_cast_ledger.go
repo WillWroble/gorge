@@ -428,20 +428,13 @@ func (e *Engine) DepartureCounters(obj state.ObjID) ([]state.Counter, bool) {
 // PlayerCount<group>$Condition<N> SpellsCastThisTurn property (Ertai's
 // Scorn / Mindbreak Trap / Whiplash Trap: "for each opponent who cast two
 // or more spells this turn"): every PutOnStack naming p since the last
-// TurnChange. Derived from the event log like CastThisTurn, so a replay
-// derives the same number.
+// TurnChange. Read from state.Player.SpellsCastThisTurn, which events.Apply
+// folds from the same PutOnStack events, so a replay derives the same number.
 func (e *Engine) SpellsCastThisTurnBy(p state.PlayerID) int {
-	n := 0
-	for i := len(e.L.Events) - 1; i >= 0; i-- {
-		ev := e.L.Events[i]
-		if ev.Kind == events.TurnChange {
-			break
-		}
-		if ev.Kind == events.PutOnStack && ev.Player == p {
-			n++
-		}
+	if int(p) < 0 || int(p) >= len(e.G.Players) {
+		return 0
 	}
-	return n
+	return int(e.G.Players[p].SpellsCastThisTurn)
 }
 
 // castsThisTurnMatchingBy counts the spells p put on the stack since the last

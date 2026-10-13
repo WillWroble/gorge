@@ -1182,10 +1182,20 @@ const (
 	// consumed it. Appended after CastBattlefield so every earlier ordinal,
 	// hash chain and golden replay is unchanged.
 	DrawBatchProposal
+	// SpellCastReversed reverses the spell-cast turn watcher of one CR 733.1
+	// aborted cast: Player is the caster whose PutOnStack the reversal
+	// undoes. A PutOnStack cannot be removed from the append-only log, so
+	// the tally (state.Player.SpellsCastThisTurn, folded by PutOnStack) is
+	// decremented by this companion event, the way ManaUndo reverses one
+	// mana activation. It is emitted only from rules' abortCast, so no bot
+	// game and no golden replay contains it. Appended after
+	// DrawBatchProposal so every earlier ordinal, hash chain and golden
+	// replay is unaffected.
+	SpellCastReversed
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(DrawBatchProposal) + 1
+	NumKinds = int(SpellCastReversed) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving
