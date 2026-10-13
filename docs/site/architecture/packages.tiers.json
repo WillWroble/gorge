@@ -480,7 +480,15 @@
       "tier": "core",
       "status": "CORE"
     },
+    "limited/build": {
+      "tier": "core",
+      "status": "CORE"
+    },
     "limited/draft": {
+      "tier": "core",
+      "status": "CORE"
+    },
+    "limited/pickbot": {
       "tier": "core",
       "status": "CORE"
     },
