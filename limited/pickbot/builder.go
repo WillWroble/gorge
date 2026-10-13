@@ -29,8 +29,9 @@ type candidate struct {
 }
 
 // Best23 is the spec §4.6 builder, v1: it picks the colour pair whose best
-// 23 playable cards rate highest, plays those 23 preferring 14 creatures
-// and capping mana value 6+ at 3, and fills the rest with basics through
+// 23 playable cards rate highest, plays those 23 preferring MinCreatures
+// creatures and capping mana value 6+ at 3, and fills the rest with basics
+// through
 // build.AutoLands. A pool too thin to field 23 in-pair playables is filled
 // with the best remaining cards of any colour. The caller owns the deck's
 // name and is the one who can say so in it (build.Deck carries no name
