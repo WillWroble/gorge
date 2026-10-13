@@ -81,6 +81,15 @@ func (e *Engine) armAbilityAutoPay(pc *pendingCast, idx int) {
 	if pc == nil || pc.Payment != nil {
 		return
 	}
+	// A TapCreaturesForMana ability (Heirloom Epic) lets the payer tap
+	// creatures for part of the cost in an election that comes AFTER this
+	// point, so the mana still owed is not known yet: a witness armed now
+	// would carry a Cost the election then changes (cost_changed fallback).
+	// Leave such an activation to the ordinary window; the offer still
+	// prices the creature credit (planAbilityPayment, offerCastableUsing).
+	if pay.TapCreaturesForMana(e.pcAbility(pc)) {
+		return
+	}
 	mana := e.castPaymentMana(pc)
 	if !abilityCostNeedsMana(mana) || !pay.PaymentPlanPoolAccepted(asPayer(e), pc.player) {
 		return

@@ -44,7 +44,7 @@ var kindFixtures = []kindFixture{
 	{"exile up to 2 of 3", "foundations-tramplesaurus-rex", "foundations-wretched-ranks", testSeed, 1, decision.KChoose, "exile", 0, 2, 3, "choose"},
 	{"up to 2 targets of 3", "mono-red-prowess", "foundations-reign-of-dragons", testSeed + 1, 1, decision.KTarget, "", 1, 2, 3, "multitarget"},
 	{"optional target of 2", "foundations-calling-all-angels", "mono-blue-tempo", testSeed + 1, 0, decision.KTarget, "", 0, 1, 2, "multitarget"},
-	{"2 targets of 5", "foundations-wretched-ranks", "mono-red-prowess", testSeed + 1, 0, decision.KTarget, "", 2, 2, 5, "multitarget"},
+	{"2 targets of 5", "foundations-wretched-ranks", "mono-red-prowess", testSeed + 32, 0, decision.KTarget, "", 2, 2, 5, "multitarget"},
 }
 
 func (f kindFixture) matches(d *decision.Decision) bool {

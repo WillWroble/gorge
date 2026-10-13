@@ -86,7 +86,7 @@ func TestAutoPayFastDeclinesWhenSourcesCannotPay(t *testing.T) {
 }
 
 // TestAutoPayFastAgreesWithPlannerInGames plays legacy-deck bot games with
-// PaidManaCensus on and the verify flag set, so every fast-path accept across
+// the paid-cost census on (the default) and the verify flag set, so every fast-path accept across
 // whole games is checked against the planner (a disagreement panics). It also
 // requires the fast path to have accepted at least once, so a path that
 // silently never fires fails the build.
@@ -104,12 +104,11 @@ func TestAutoPayFastAgreesWithPlannerInGames(t *testing.T) {
 		a := names[i%len(names)]
 		b := names[(i+5)%len(names)]
 		cfg := Config{
-			Seed:           93000 + uint64(i),
-			Names:          []string{a, b},
-			Decks:          [][]*cards.Card{testutil.RepoDeck(t, reg, a), testutil.RepoDeck(t, reg, b)},
-			Tokens:         reg.Tokens,
-			NameUniverse:   reg.Universe(),
-			PaidManaCensus: true,
+			Seed:         93000 + uint64(i),
+			Names:        []string{a, b},
+			Decks:        [][]*cards.Card{testutil.RepoDeck(t, reg, a), testutil.RepoDeck(t, reg, b)},
+			Tokens:       reg.Tokens,
+			NameUniverse: reg.Universe(),
 		}
 		e := New(cfg)
 		bot := newTestBot(uint64(930 + i))

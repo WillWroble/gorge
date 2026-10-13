@@ -531,6 +531,13 @@ func (e *Engine) planAbilityPayment(p state.PlayerID, id state.ObjID, ability in
 	} else if n > 0 {
 		cost.Generic = 0
 	}
+	// Heirloom Epic's `TapCreaturesForMana` ability: the offer gate prices the
+	// activation with the same conservative creature credit (mana.go's
+	// offerCastableUsing), so the witness must compose that identical cost, or
+	// its Cost would over-state the activation the payment actually makes.
+	if pay.TapCreaturesForMana(ab) {
+		cost.Generic -= e.creatureManaOfferCredit(p, id, cost)
+	}
 	composed := e.offerCostFor(p, id, cost, abilityScope(ab))
 	return e.planComposedCost(p, id, composed, true, true)
 }

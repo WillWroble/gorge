@@ -104,7 +104,7 @@ func main() {
 	secs := flag.Float64("secs", 20, "minimum timed wall seconds for game-playing and search rows")
 	seed := flag.Uint64("seed", 1, "base seed; game g uses seed+g")
 	autopay := flag.Bool("autopay", false, "bot row: the auto-pay bot (EnableAutoPayMana) instead of manual taps")
-	paidManaCensus := flag.Bool("paid-mana-census", false, "set rules.Config.PaidManaCensus for every game (the autopay fast path's cost basis)")
+	paidManaCensus := flag.Bool("paid-mana-census", true, "the paid-cost mana census (default on); =false sets rules.Config.DisablePaidManaCensus for every game")
 	sims := flag.Int("sims", 100, "az row: simulations per searched decision")
 	copies := flag.Int("copies", 2000, "clone/step rows: timed copies per root")
 	label := flag.String("label", "", "build label recorded in the output")
