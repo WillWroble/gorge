@@ -321,6 +321,9 @@ func sacFixtureSupported(tok string, x int) bool {
 	if sacSelf(tok) || tokenCostSupported(tok) {
 		return true
 	}
+	if _, ok := suspectCostNeeds(tok); ok {
+		return true
+	}
 	if _, ok := sacAttachedFixture(tok); ok {
 		return true
 	}

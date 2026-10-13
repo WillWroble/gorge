@@ -150,6 +150,13 @@ func classifyEventTrigger(t *cards.Trigger) (sub string, ok bool) {
 			landPlayedFilterBare(t.ParamStr(cards.PKValidCard)) {
 			return "trigger.land-played", true
 		}
+		// "Whenever you play a land from exile" (Ghost-Spider) and "from
+		// anywhere other than your hand" (Shadow of the Goblin's Origin$ list):
+		// a stack-using line whose origin list names exile or the graveyard is
+		// served by a land drop from that zone (LandPlayedZoneSub).
+		if landPlayedZoneServable(t) {
+			return LandPlayedZoneSub, true
+		}
 	case cards.TriggerDiscarded:
 		if namesSelf(t.ParamStr(cards.PKValidCard)) || discardByController(t) {
 			return "trigger.discarded", true
@@ -289,4 +296,28 @@ func selfCastTrigger(f *cards.Face, t *cards.Trigger) bool {
 		}
 	}
 	return true
+}
+
+// LandPlayedZoneSub is the level-B sub-family of an origin-scoped LandPlayed
+// trigger whose origin list names exile or the graveyard: its cause plays a
+// land from that zone (a graveyard land under a play-lands-from-graveyard
+// permission, or a land a spell exiled with a play permission). Exported so
+// the recipe and this classifier share one spelling.
+const LandPlayedZoneSub = "trigger.land-played-zone"
+
+// landPlayedZoneServable reports a LandPlayed line whose Origin$ list names
+// Exile or Graveyard, whose ValidCard$ accepts any land the player controls,
+// and which uses the stack (a Static$ True bookkeeping line never reaches the
+// stack to be observed).
+func landPlayedZoneServable(t *cards.Trigger) bool {
+	if strings.EqualFold(t.ParamStr(cards.PKStatic), "True") || !landPlayedFilterBare(t.ParamStr(cards.PKValidCard)) {
+		return false
+	}
+	for _, z := range strings.Split(t.ParamStr(cards.PKOrigin), ",") {
+		switch strings.ToLower(strings.TrimSpace(z)) {
+		case "exile", "graveyard":
+			return true
+		}
+	}
+	return false
 }

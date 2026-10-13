@@ -88,18 +88,39 @@ func tokenAltNeeds(head, alt string, n int) ([]tokenNeed, bool) {
 	case head == "Sac" && sacTokenBases[base] && !isToken:
 		return []tokenNeed{{strings.ToUpper(base[:1]) + base[1:], n}}, true
 	case isToken && anyTokenKind[base] != "":
-		// A '+' modifier (Forge's WithDifferentNames, namedWood) narrows the
-		// token the cost accepts. This build does not evaluate a Sac cost
-		// spec's modifier (rules/cost keeps it on CostPart.Spec and the
-		// filter matcher fails closed on it), so no maker can be shown to
-		// satisfy one: fail closed rather than pay with a token the modifier
-		// forbids. The scope is exactly the modifier, not the base kind.
+		// A '+' modifier (namedWood) narrows the token the cost accepts; no
+		// maker can be shown to satisfy one, so it fails closed rather than
+		// paying with a token the modifier forbids. The one exception is the
+		// SET modifier WithDifferentNames on an artifact-token Sac
+		// (Transmutation Font), which rules/pay enforces on the candidate
+		// list (DistinctNameCandidates): n makers of n distinct artifact
+		// kinds pay it.
+		if head == "Sac" && base == "artifact" && strings.HasSuffix(alt, ".token+withdifferentnames") {
+			return distinctArtifactTokenNeeds(n)
+		}
 		if strings.Contains(alt, "+") {
 			return nil, false
 		}
 		return []tokenNeed{{anyTokenKind[base], n}}, true
 	}
 	return nil, false
+}
+
+// distinctArtifactTokens are the artifact token kinds a "with different
+// names" cost is paid with, in maker preference order.
+var distinctArtifactTokens = []string{"Food", "Clue", "Treasure"}
+
+// distinctArtifactTokenNeeds is one token of each of n distinct artifact
+// kinds; ok is false when the makers cannot name that many.
+func distinctArtifactTokenNeeds(n int) ([]tokenNeed, bool) {
+	if n > len(distinctArtifactTokens) {
+		return nil, false
+	}
+	out := make([]tokenNeed, 0, n)
+	for _, kind := range distinctArtifactTokens[:n] {
+		out = append(out, tokenNeed{kind, 1})
+	}
+	return out, true
 }
 
 // activationTokenNeeds is every token need of a whole Cost$ string.

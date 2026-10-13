@@ -121,6 +121,12 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 			return it, nil
 		}
 	}
+	// A grant of the abilities of cards exiled with the source to countered
+	// creatures (Agatha's Soul Cauldron) is made by the source's own
+	// exile-and-counter activation (static_gains_exiled_with.go).
+	if it, ok := gainsExiledWithItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
 	plans := []staticProbePlan{{}}
 	probePlan := staticPlanFor(affected)
 	if !probePlan.empty() {
