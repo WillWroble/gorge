@@ -8,7 +8,7 @@
  "FDN": "B",
  "FIN": "A",
  "FRA": "A",
- "HOB": "A",
+ "HOB": "B",
  "LCI": "A",
  "MKM": "A",
  "MSH": "A",
@@ -17,6 +17,6 @@
  "SPM": "A",
  "TDM": "A",
  "TLA": "A",
- "TMT": "A",
- "WOE": "A"
+ "TMT": "B",
+ "WOE": "B"
 }
