@@ -93,6 +93,10 @@ EOF
 		git -C "$r" push -q origin main
 		echo "operator hold" >"$r/.ds4/orchestrator/pause"
 	fi
+	if [ "${3:-}" = idle ]; then
+		# Nothing ahead of origin and no pause at all: the idle fast path.
+		git -C "$r" push -q origin main
+	fi
 	if [ "${3:-}" = handpush ]; then
 		# The loop's own pause is up and the fix was pushed by hand: nothing
 		# is ahead of origin.
@@ -141,5 +145,13 @@ d=$(run_scenario foreign green foreign green)
 r=$d/repo
 check "foreign: no full run for someone else's pause" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
 check "foreign: the operator's pause is untouched" "$(has "$r/.ds4/orchestrator/pause" "operator hold"; echo $?)"
+
+# ---- idle: nothing ahead and no pause -> no run ---------------------------
+# The guard's new "our pause is up" disjunct must not fire with no pause, and
+# the head-equality check must still suppress a run when nothing is ahead.
+d=$(run_scenario idle green idle green)
+r=$d/repo
+check "idle: no full run with nothing ahead and no pause" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "idle: no pause marker created" "$([ ! -e "$r/.ds4/orchestrator/pause" ]; echo $?)"
 
 [ "$fails" = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }
