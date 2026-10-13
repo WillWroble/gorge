@@ -34,6 +34,9 @@ func (r *Registry) Unsupported(c *Card, supported map[string]bool) []string {
 			out = append(out, p)
 		}
 	}
+	if r.ShapeGate != nil {
+		out = append(out, r.ShapeGate(c)...)
+	}
 	return out
 }
 

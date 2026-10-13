@@ -1474,6 +1474,9 @@ var stringMapParams = map[string]string{
 	// value; not a card Params map.
 	"rules:staticModesFromSVars:svars":       "SVars table lookup by StaticAbilities$ name, not a card Params map",
 	"effects:CloneStaticGrantReadable:svars": "SVars table lookup by named Clone static, not a card Params map",
+	// effects/clone.go CloneNamedGrantsReadable: the face SVar table read by
+	// the AddSVars$/AddTriggers$ grant names, not card Params.
+	"effects:CloneNamedGrantsReadable:svars": "SVars table lookup by named Clone AddSVars$/AddTriggers$ grant, not a card Params map",
 	// effects/clone_etb_selector.go CloneETBSpendSelector reads the source
 	// face's SVar table by the fixed spend variable name, not card Params.
 	"effects:CloneETBSpendSelector:svars": "source-face SVars lookup for the ETB cast-spend selector, not a card Params map",

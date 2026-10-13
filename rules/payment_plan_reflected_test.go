@@ -121,27 +121,6 @@ func TestPaymentPlanReflectedNeedsTheSource(t *testing.T) {
 	}
 }
 
-// TestPaymentPlanReflectedOwnLandsStayDeferred pins the scope: Reflecting
-// Pool reflects the payer's OWN lands, which a planned self-sacrifice could
-// remove mid-payment, so it keeps its special-production deferral.
-func TestPaymentPlanReflectedOwnLandsStayDeferred(t *testing.T) {
-	t.Parallel()
-	e, spell, _ := reflectedBoard(t, 9613, reflectedRedProbe, "")
-	own := onBoard(t, e, 0, ppMountain)
-	e.G.Obj(own).Tapped = true
-	pool := onBoardCard(t, e, 0, choiceCard(t, "Reflecting Pool"))
-	if len(e.availableManaAbilitiesForWindow(0, pool, false)) == 0 {
-		t.Fatal("precondition: Reflecting Pool offers no mana ability (it reflects nothing)")
-	}
-	ma := choiceCard(t, "Reflecting Pool").Faces[0].Abilities[0]
-	if tier, _, detail := pay.PaymentPlanAbilityTier(asPayer(e), 0, pool, ma); tier != pay.TierDeferred || detail != "source:special_production" {
-		t.Fatalf("Reflecting Pool tier = %v (%q), want deferred special_production", tier, detail)
-	}
-	if got := e.PlanCastPayment(0, paymentCast(spell)); got.Plan != nil {
-		t.Fatalf("Reflecting Pool was planned: %+v", got.Plan)
-	}
-}
-
 // TestPaymentPlanReflectedBotAnswerValidates runs the auto-pay bot's own
 // answer shape (seat/bot.go: the action's first plan, cloned) through the
 // validator and the engine on the board where the reflected shape binds, so

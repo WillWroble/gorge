@@ -80,8 +80,7 @@
      ]
     }
    ],
-   "xmage": "BecomesCreatureTest#testChimericMass",
-   "known_bug": "B17: Animate staticAbilities$ SetPower$/SetToughness$ Count$CardCounters.CHARGE reads 0 on the animated Chimeric Mass, so it becomes 0/0 and dies. CR 613.4b."
+   "xmage": "BecomesCreatureTest#testChimericMass"
   }
  ]
 }

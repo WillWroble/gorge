@@ -521,8 +521,8 @@ func etbChoicePrompt(kind string) string {
 
 // etbCloneWhitelist reports whether a DB$ Clone ETB body's rider set is
 // entirely inside the supported scope: Choices$ (the copy-template selector),
-// AddTypes$ and AddKeywords$ (the CR 707.9e copy modifiers) and
-// SpellDescription$. This is a POSITIVE whitelist over the parsed parameter
+// AddTypes$ and AddKeywords$ (the CR 707.9e copy modifiers),
+// AddTriggers$/AddSVars$ (named grants) and SpellDescription$. This is a POSITIVE whitelist over the parsed parameter
 // keys -- the param census's case-whitelist range shape -- never a blacklist:
 // an explicit key list cannot keep up with the corpus. The round-1 blacklist
 // missed IntoPlayTapped$ (Vesuva), ChoiceTitle$ (Mirrorhall Mimic),
@@ -533,30 +533,7 @@ func etbChoicePrompt(kind string) string {
 // scope boundary); rules/etb_clone_whitelist_census_test.go pins the
 // classified population bidirectionally.
 func etbCloneWhitelist(sa *cards.SA, svars map[string]string) bool {
-	// The key whitelist and the text-only value checks are compiled once
-	// (effects.CloneParams.ETBShapeOK): a supported KEY is not a supported
-	// VALUE: only Mockingbird's cast-spend Y selector has a resolver on this
-	// route. Other resolver-dependent selectors, multi-word AddKeywords$
-	// heads (Flesh Duplicate's "IfNew Vanishing:3") and IntoPlayTapped$
-	// values other than True remain withheld.
-	cp := effects.CloneOf(sa)
-	if !cp.ETBShapeOK || (effects.SpecNeedsResolver(cp.Choices) && !effects.CloneETBSpendSelector(cp.Choices, svars)) {
-		return false
-	}
-	// A SubAbility$ chain is offered only as Altered Ego's "enters with X
-	// additional +1/+1 counters" rider (effects.CloneETBSubChainOK).
-	if !effects.CloneETBSubChainOK(sa) {
-		return false
-	}
-	// A named static is installed on the cloned face by CloneStatic, so
-	// every static reader sees it through its normal printed-S: path. An
-	// unresolvable member still fails closed before posing the ETB election.
-	for _, name := range cp.StaticNames {
-		if !effects.CloneStaticGrantReadable(svars, name) {
-			return false
-		}
-	}
-	return true
+	return effects.CloneETBOffered(sa, svars)
 }
 
 var etbChoiceKindTab = state.NewStrTable[string](

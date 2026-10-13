@@ -51,7 +51,7 @@ const land = (id: number, name: string): CardView => ({
   damage: 0, attacking: false, controller: 0, owner: 0, summon_sick: false,
 });
 const view = (d: Decision | null): View => {
-  const me: PlayerView = { seat: 0, name: 'You', life: 20, lost: false, library_size: 40, hand_size: 0, graveyard_size: 0,
+  const me: PlayerView = { seat: 0, name: 'You', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: 0, graveyard_size: 0,
   completed_dungeons: 0,
     hand: [], battlefield: [land(41, 'Swamp'), land(42, 'Badlands'), land(43, 'Horizon Test')], graveyard: [], exile: [],
     pool: {}, command: [], commanders: [], commander_casts: [] };

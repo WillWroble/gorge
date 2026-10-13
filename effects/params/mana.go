@@ -196,7 +196,7 @@ var manaKnownKeys = [...]string{
 	"DefinedTarget", "Description", "Each", "Exclude", "Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image",
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IsCurse", "IsPresent", "KW",
 	"Keyword", "KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor",
-	"ModeCost", "Monstrosity", "NewController", "NumDmg", "OpponentTurn", "PersistentMana",
+	"ModeCost", "Monstrosity", "NewController", "OpponentTurn", "PersistentMana",
 	"PersistentUntilEndOfCombat", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp",
 	"PrecostDesc", "PresentCompare", "PresentDefined", "PresentZone", "Produced",
 	"RandomNumTargets", "ReduceAmount", "ReduceCost", "RememberAnimated", "RememberCostMana", "RememberObjects",

@@ -105,12 +105,6 @@
       {
        "kind": "any",
        "pick": [
-        "yes"
-       ]
-      },
-      {
-       "kind": "any",
-       "pick": [
         "p1:Howling Banshee"
        ]
       }
@@ -135,8 +129,7 @@
       "p1": 17
      }
     }
-   ],
-   "known_bug": "Phantasmal Image's Clone carries AddTypes$/AddTriggers$/AddSVars$ riders the ETB-copy whitelist declines, so effClone takes the loud 'unimplemented API Clone' fallback (effects/clone.go:63-75): the Image enters as a 0/0 and dies. Plain Clone (clone-ignores-copied-pump) works."
+   ]
   }
  ]
 }

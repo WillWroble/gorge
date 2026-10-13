@@ -758,7 +758,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return nil, true
 	case definedSpecRememberedController:
-		return controllersOf(g, hostRemembered(h, c)), true // persistent-aware, capture-excluded
+		return rememberedControllersLKI(h, c), true
 	case definedSpecNonRememberedController:
 		// These selectors name living players other than the controller of a
 		// remembered CARD. A remembered player is not a card anchor, and an
@@ -1573,6 +1573,39 @@ func lkiControllerFor(c *Ctx, id state.ObjID) (state.PlayerID, bool) {
 	return 0, false
 }
 
+// rememberedControllersLKI is the controller read of a Remembered$ group,
+// with CR 608.2h look-back: a remembered object that is no longer on the
+// battlefield answers with the controller RememberLKI$ captured before its
+// departure (events.Apply's Move resets the live controller to the owner),
+// falling back to the live controller when no capture exists.
+//
+// When the resolution carries a ChangeZone capture, its own body wrote the
+// memory, so the group is the capture-excluded one (rememberedWithSource,
+// the set ConditionDefined$ Remembered gates read): the trigger's seeded
+// referent -- Unyielding Gatekeeper itself, in Ctx.Remembered because
+// resolvedRemembered returns an ordinary trigger's context unchanged -- is
+// not remembered by that body, and counting its controller made the Token
+// line mint a second Detective for the Gatekeeper's controller.
+func rememberedControllersLKI(h Host, c *Ctx) []state.Target {
+	g := h.Game()
+	if c == nil || len(c.Snap.ChangeZone) == 0 {
+		return controllersOf(g, hostRemembered(h, c)) // persistent-aware, capture-excluded
+	}
+	ts := rememberedWithSource(h, c)
+	rewritten := make([]state.Target, 0, len(ts))
+	for _, t := range ts {
+		if !t.IsPlayer {
+			if o := g.Obj(t.Obj); o != nil && o.Zone != state.ZBattlefield {
+				if p, ok := lkiControllerFor(c, t.Obj); ok {
+					t = state.Target{Player: p, IsPlayer: true}
+				}
+			}
+		}
+		rewritten = append(rewritten, t)
+	}
+	return controllersOf(g, rewritten)
+}
+
 // objectsOf returns Remembered's object entries (IsPlayer false) as a fresh
 // slice -- never aliasing Ctx.Remembered, for the reason copyTargets' own
 // doc comment gives.
@@ -2107,10 +2140,12 @@ func exileProvenanceNeeded(c *Ctx) bool {
 		}
 	}
 	// The A: spelling (Mimeoplasm, Revered One's `ValidTgts$
-	// Creature.ExiledWithSource`) names it on the source face's own ability
-	// lines, which no SVar carries. Ctx.Host is bound by effects.Resolve; a
-	// Ctx that never entered Resolve has no host and keeps the SVar-only read.
-	return c.Host != nil && faceAbilitiesNameExiledWithSource(c.Host, c.Source)
+	// Creature.ExiledWithSource`) and the S: spelling (Maralen, Fae
+	// Ascendant's MayPlay `Affected$ ...ExiledWithSource`, exiled by a Dig)
+	// name it on the source face's own ability or static lines, which no SVar
+	// carries. Ctx.Host is bound by effects.Resolve; a Ctx that never entered
+	// Resolve has no host and keeps the SVar-only read.
+	return c.Host != nil && faceNamesExiledWithSource(c.Host, c.Source)
 }
 
 // faceAbilitiesNameExiledWithSource reports whether the source CARD's own
@@ -2590,6 +2625,13 @@ var exiledWithSourceKeyCodes = state.NewStrCodes(
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Affected", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "AffectedZone", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Description", Val: exiledWithSourceKeyFilterOrText},
+	// The card-filter keys the other static modes name the exiled set by:
+	// Agatha's Soul Cauldron's GainsAbilitiesOf$, Circu, Dimir Lobotomist's
+	// CantBeCast ValidCard$, Ashiok's Erasure's SharedRestrictions$.
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsAbilitiesOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsTriggerAbsOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "SharedRestrictions", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "ValidCard", Val: exiledWithSourceKeyFilterOrText},
 )
 
 // triggeredCardQualified resolves `<base>.<qualifier>` when base is one of the
