@@ -89,6 +89,7 @@ func altCostEngineReg(t *testing.T, seed uint64, reg *cards.Registry, heroCorpus
 // is recompiled (see the file header).
 func freshEncoreRegistry(t *testing.T) *cards.Registry {
 	t.Helper()
+	src := testutil.CorpusDirOrSkip(t)
 	dir := t.TempDir()
 	cf := filepath.Join(dir, "cardsfolder")
 	tk := filepath.Join(dir, "tokenscripts")
@@ -99,8 +100,8 @@ func freshEncoreRegistry(t *testing.T) *cards.Registry {
 		t.Fatal(err)
 	}
 	for _, pair := range [][2]string{
-		{"../.cards/cardsfolder/i/impulsive_pilferer.txt", filepath.Join(cf, "impulsive_pilferer.txt")},
-		{"../.cards/tokenscripts/c_a_treasure_sac.txt", filepath.Join(tk, "c_a_treasure_sac.txt")},
+		{filepath.Join(cards.CorpusDir(src), "i", "impulsive_pilferer.txt"), filepath.Join(cf, "impulsive_pilferer.txt")},
+		{filepath.Join(src, "tokenscripts", "c_a_treasure_sac.txt"), filepath.Join(tk, "c_a_treasure_sac.txt")},
 	} {
 		b, err := os.ReadFile(pair[0])
 		if err != nil {

@@ -29,6 +29,11 @@ import (
 // UntilEOT, dropped at end-of-turn cleanup; an explicit Permanent (and other
 // source-relative durations) persists while its source stays on the battlefield.
 func effEffect(h Host, c *Ctx, sa *cards.SA) {
+	// A nested Effect (this body is an Effect-created delayed trigger's own
+	// execution, under its carrier's source-scoped frame): its chain's self-exile idiom names the OUTER carrier, so
+	// the registrations this call makes are spared. See EffectFrame.Spare.
+	nested := c.EffectFrame.Carrier && c.EffectFrame.Source == c.Source && c.EffectFrame.Stamp == 0
+	clock := h.Game().Clock
 	ep := EffectOf(sa)
 	noteUnreadParams(h, c, "Effect", ep.Unread)
 	rawDur := ep.Duration
@@ -1219,6 +1224,12 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 	// every Effect-created registration from the source (Host.EndEffectSource)
 	// while leaving the source's printed statics alone.
 	c.EffectFrame = EffectFrame{Source: c.Source}
+	if nested {
+		c.EffectFrame.Spare = clock
+		if c.EffectFrame.Spare == 0 {
+			c.EffectFrame.Spare = 1
+		}
+	}
 }
 
 type effEffectCode uint16

@@ -22,7 +22,11 @@ import (
 
 func loopCorpus(t *testing.T) *cards.Registry {
 	t.Helper()
-	if _, err := os.Stat("../.cards/cardsfolder"); err != nil {
+	dir, ok := testutil.SharedCorpusDir(".")
+	if !ok {
+		t.Fatal("loop research: could not resolve the repo root")
+	}
+	if _, err := os.Stat(cards.CorpusDir(dir)); err != nil {
 		t.Fatal("loop research requires the real .cards corpus:", err)
 	}
 	return testutil.CorpusRegistry(t)

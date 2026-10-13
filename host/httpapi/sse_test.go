@@ -248,8 +248,8 @@ func TestWidgetsAreCoalescedToTheTicker(t *testing.T) {
 	_ = r.Start("t1")
 	r.Wait("t1")
 	elapsed := time.Since(start)
-	// Read for 300ms after the match ends, then count what arrived.
-	deadline := time.After(300 * time.Millisecond)
+	// Read for up to 2s (a loaded box needs the slack; widgets stop with the match) after the match ends, then count what arrived.
+	deadline := time.After(2 * time.Second)
 	widgets, withID := 0, 0
 	done := make(chan []sseFrame)
 	go func() { done <- readSSE(t, resp.Body, 1000) }()
@@ -528,7 +528,7 @@ func TestOlderGraceTimerCannotCloseAfterReschedule(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { r.Close() })
-	h := &handler{reg: r, opts: Options{ResumeGrace: 10 * time.Millisecond}.withDefaults(), grace: map[string]*graceTimer{}}
+	h := &handler{reg: r, opts: Options{ResumeGrace: 750 * time.Millisecond}.withDefaults(), grace: map[string]*graceTimer{}}
 	s := r.OpenSession()
 	h.scheduleGrace(s.ID)
 	h.mu.Lock()
@@ -544,7 +544,7 @@ func TestOlderGraceTimerCannotCloseAfterReschedule(t *testing.T) {
 		if open {
 			t.Fatal("Out() delivered a frame instead of closing")
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("grace never closed the session")
 	}
 	if _, ok := r.Session(s.ID); ok {

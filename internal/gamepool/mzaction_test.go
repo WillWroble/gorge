@@ -22,13 +22,13 @@ func TestEncodeActionMZ(t *testing.T) {
 	r := &Request{View: v, Decision: decision.Decision{Kind: decision.KPriority}}
 	a := make([]float32, 128)
 	b := make([]float32, 128)
-	encodeActionMZ(r, decision.Option{Kind: "cast", Label: "Cast Lightning Bolt", Obj: state.ObjID(7)}, a)
-	encodeActionMZ(r, decision.Option{Kind: "cast", Label: "Cast Lightning Bolt", Obj: state.ObjID(7)}, b)
+	EncodeActionMZ(r, decision.Option{Kind: "cast", Label: "Cast Lightning Bolt", Obj: state.ObjID(7)}, a)
+	EncodeActionMZ(r, decision.Option{Kind: "cast", Label: "Cast Lightning Bolt", Obj: state.ObjID(7)}, b)
 	if !reflect.DeepEqual(a, b) {
 		t.Fatal("not deterministic")
 	}
 	c := make([]float32, 128)
-	encodeActionMZ(r, decision.Option{Kind: "pass", Label: "Pass priority"}, c)
+	EncodeActionMZ(r, decision.Option{Kind: "pass", Label: "Pass priority"}, c)
 	if reflect.DeepEqual(a, c) {
 		t.Fatal("distinct options encoded identically")
 	}

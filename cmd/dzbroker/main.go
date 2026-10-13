@@ -1,6 +1,6 @@
 //go:build broker
 
-// Command dzbroker is the experimental, tag-gated driver for internal/broker.
+// Command dzbroker is the experimental, tag-gated driver for internal/inferbroker.
 //
 // It runs gorge self-play with a GAME MULTIPLIER and a no-barrier decision
 // broker, so the batching envelope (mean/max ready-set width) can be measured
@@ -36,7 +36,7 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/broker"
+	"github.com/adams-shaun/gorge/internal/inferbroker"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/seat"
 )
@@ -77,7 +77,7 @@ func run(args []string) int {
 	fs.BoolVar(&c.verbose, "v", false, "per-game lines to stderr")
 	fs.Parse(args)
 
-	if !broker.Enabled {
+	if !inferbroker.Enabled {
 		fmt.Fprintln(os.Stderr, "dzbroker: this binary was built without -tags broker")
 		return 2
 	}
@@ -123,10 +123,10 @@ func runBroker(c *cfg) int {
 		return 1
 	}
 
-	br, err := broker.New(broker.Options{
+	br, err := inferbroker.New(inferbroker.Options{
 		MaxBatch: c.brokerBat,
 		Wait:     time.Duration(c.brokerMS) * time.Millisecond,
-	}, broker.PassThrough{})
+	}, inferbroker.PassThrough{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dzbroker:", err)
 		return 1
@@ -217,7 +217,7 @@ func runBroker(c *cfg) int {
 // playOne runs one multiplied game: same decks, this game's seed, both seats
 // wrapped behind the broker. This is the control: the wrapped seat still makes
 // the choice, so wrapping changes only WHEN a decision is served, never WHAT.
-func playOne(br *broker.Broker, reg *cards.Registry, g *rec, dA, dB []*cards.Card, c *cfg) {
+func playOne(br *inferbroker.Broker, reg *cards.Registry, g *rec, dA, dB []*cards.Card, c *cfg) {
 	seats := []seat.Seat{
 		br.Wrap(seat.NewBot(g.Seed^1), 0),
 		br.Wrap(seat.NewBot(g.Seed^2), 1),

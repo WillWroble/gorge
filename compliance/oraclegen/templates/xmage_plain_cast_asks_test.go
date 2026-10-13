@@ -139,7 +139,7 @@ func TestPlainCastAsksDriverPins(t *testing.T) {
 		"owner.recordedCostIsFirst(trueText, falseText)",
 		"castCostPicks.addAll(names(a, \"pick\"))",
 		"this.owner = player.owner;",
-		"optionalAdditionalCostAnswer(owner.bargainedCast, getChoices())",
+		"optionalAdditionalCostAnswer(owner.bargainedCast, owner.optionalCostCast, getChoices())",
 		"static boolean castModeSupported(String mode)",
 	} {
 		if !strings.Contains(java, required) {

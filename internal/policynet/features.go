@@ -45,6 +45,11 @@ import (
 //     row instead. Folded by view.OwnLibrary off the seat's own deck list and
 //     what it sees -- never the view's own Library list -- so it is
 //     checkpointable and playable. Same geometry as mz (sparse rows only).
+//   - FeaturesMZGrave ("mz-grave"): FeaturesMZ plus per-card graveyard
+//     property tokens for both seats (graveyard.go): types, mana value, spell
+//     API, keywords and creature P/T, under "mz|gy-me|" / "mz|gy-opp|". Read
+//     from the public graveyards of the redacted view: checkpointable and
+//     playable. Same geometry as mz (sparse rows only).
 type FeatureSet uint8
 
 const (
@@ -56,9 +61,11 @@ const (
 	// FeaturesMZOwnLib is appended after every earlier set: the ordinals are
 	// part of what a checkpoint's feature set names, never renumbered.
 	FeaturesMZOwnLib
+	// FeaturesMZGrave is appended after FeaturesMZOwnLib, same rule.
+	FeaturesMZGrave
 )
 
-var featureSetNames = [...]string{"v1", "mz", "mz-opphand", "mz-oracle", "entity", "mz-ownlib"}
+var featureSetNames = [...]string{"v1", "mz", "mz-opphand", "mz-oracle", "entity", "mz-ownlib", "mz-grave"}
 
 // String is the flag spelling.
 func (fs FeatureSet) String() string {
@@ -138,6 +145,9 @@ func EncoderHashFor(fs FeatureSet) uint64 {
 	if fs == FeaturesMZOwnLib {
 		s += ownLibHashSuffix()
 	}
+	if fs == FeaturesMZGrave {
+		s += graveHashSuffix()
+	}
 	h := uint64(14695981039346656037)
 	for i := 0; i < len(s); i++ {
 		h ^= uint64(s[i])
@@ -149,7 +159,7 @@ func EncoderHashFor(fs FeatureSet) uint64 {
 // FeaturesForHash maps a checkpoint's encoder hash back to the non-diagnostic
 // feature set it was written under.
 func FeaturesForHash(h uint64) (FeatureSet, bool) {
-	for _, fs := range []FeatureSet{FeaturesV1, FeaturesMZ, FeaturesEntity, FeaturesMZOwnLib} {
+	for _, fs := range []FeatureSet{FeaturesV1, FeaturesMZ, FeaturesEntity, FeaturesMZOwnLib, FeaturesMZGrave} {
 		if EncoderHashFor(fs) == h {
 			return fs, true
 		}
@@ -173,6 +183,9 @@ func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag
 	mzState(v, seat, push)
 	if fs == FeaturesMZOwnLib {
 		ownLibState(v, seat, push)
+	}
+	if fs == FeaturesMZGrave {
+		graveyardState(v, seat, push)
 	}
 	if fs.Diagnostic() && diag != nil {
 		mzDiag(v, seat, fs, diag, push)

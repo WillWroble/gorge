@@ -75,7 +75,7 @@ func TestArtifactTreasureManaPaysCastWithBothProvenances(t *testing.T) {
 	if _, ok := e.castSaAdmits("Card.CastSa Spell.ManaFromTreasure", marut); !ok {
 		t.Fatal("Treasure tag lost on Artifact mana")
 	}
-	if got := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0); len(got) != 1 || got[0] != marut {
+	if got := e.spellsCastThisTurnMatching(0, "Card.CastSa Spell.ManaFromArtifact", 0, noTC); len(got) != 1 || got[0] != marut {
 		t.Fatalf("cast count = %v, want Marut", got)
 	}
 	if !hasSplitSecond(e.derivedWith(marut, state.ZStack).Keywords) {

@@ -145,7 +145,12 @@ var baseBuckets = map[string]bucket{
 	// read for OptionalDecider$ (the resolution-time optional gate) and
 	// ResolvedLimit$ (the per-turn resolution cap's increment eligibility).
 	"rt": bTrig,
-	"s":  bStat, "st": bStat, "sv": bStat,
+	// pt.Trigger is the pendingTrigger's own line -- a granted (AddTrigger$)
+	// or gained trigger carries its cards.Trigger on the queue entry -- read
+	// by staticTriggerLine for Static$ True: the same parameter map t/tr
+	// cover.
+	"pt.Trigger": bTrig,
+	"s":          bStat, "st": bStat, "sv": bStat,
 	// carrier is offBattlefieldGrantedWalk's element of
 	// actionStaticSource.addAbilityContinuous(): a staticView like s/st/sv,
 	// whose Params (Condition$/Affected$/AddAbility$) the offer walk reads.
@@ -1617,9 +1622,11 @@ var stringMapParams = map[string]string{
 	// Effect's ReplaceWith$ SVar body and its SubAbility$ line, svars the
 	// face's SVar table the SubAbility$ name is looked up in -- recognitions
 	// of the Effect-created "exile it instead" redirect, not card Params maps.
-	"effects:redirectExileBody:body":  "keys of a replacementBodyParams-built ReplaceWith$ SVar body, not a card Params map",
-	"effects:redirectExileBody:svars": "SVars table lookup by SubAbility$ name, not a card Params map",
-	"effects:selfExileIdiom:sub":      "keys of a replacementBodyParams-built SubAbility$ SVar body, not a card Params map"}
+	"effects:redirectExileBody:body":        "keys of a replacementBodyParams-built ReplaceWith$ SVar body, not a card Params map",
+	"effects:redirectExileBody:svars":       "SVars table lookup by SubAbility$ name, not a card Params map",
+	"effects:redirectSubName:body":          "keys of a replacementBodyParams-built SubAbility$ SVar body, not a card Params map",
+	"effects:redirectRiderChain:svars":      "SVars table lookup by SubAbility$ name, not a card Params map",
+	"effects:redirectLineRemembered:params": "parseReplacementLine-built ReplaceWith$ line map, not a card Params map"}
 
 // propagateKeyReads resolves two indirect read shapes:
 //

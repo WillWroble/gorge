@@ -124,8 +124,73 @@ check "helper preserves input order" $? "got=$got"
 
 # --- the wiring: match the candidate assignment itself, not the helper's
 # definition. Removing the call from this pipeline must fail this assertion.
-grep -Eq '^  pkgs=\$\(printf .+ \| gate_affected_default_build_pkgs\)$' "$GATE"
+grep -Eq '^ +pkgs=\$\(printf .+ \| gate_affected_default_build_pkgs\)$' "$GATE"
 check "candidate derivation pipes pkgs through the default-build filter" $?
+
+# --- the selection plan (gate_affected_plan): a pure function of the touched
+# file list, fed synthetic lists here. The structural set must be present for
+# EVERY list (the post-merge culprit classes of 2026-10-05..12 were tree
+# censuses no import-based selection reaches), the fast reverse-dependency
+# closure must follow non-test edits only, and each cheap trigger must fire
+# on exactly its class.
+plan() ( cd "$ROOT" && bash -c "source '$GATE'; gate_affected_plan" )
+STRUCT=$(cd "$ROOT" && bash -c "source '$GATE'; gate_structural_pkgs")
+for want in ./cmd/testbudget ./cmd/gentypes ./compliance/levelb ./internal/policynet ./cmd/pkgmap; do
+	printf '%s\n' "$STRUCT" | grep -qx -- "$want"
+	check "structural set names $want" $?
+done
+has() { printf '%s\n' "$1" | grep -qx -- "others $2"; }
+flag() { printf '%s\n' "$1" | grep -qx -- "$2 $3"; }
+for case in '' 'docs/agents/README.md' 'web/src/protocol.ts' 'rules/mana.go' 'cards/open.go' 'internal/archtest/arch_test.go'; do
+	P=$(printf '%s\n' "$case" | plan)
+	miss=
+	for want in $STRUCT ./internal/codeshape ./view ./compliance/gate ./compliance/adopt; do
+		has "$P" "$want" || miss="$miss $want"
+	done
+	[ -z "$miss" ]
+	check "plan for [${case:-<empty>}] keeps the always-run set" $? "missing:$miss"
+done
+P=$(printf 'docs/agents/README.md\n' | plan)
+flag "$P" archtest_lean 1 && flag "$P" tplrest 0 && flag "$P" traj 0 && flag "$P" botbench_subset 0 && flag "$P" tpl 0
+check "docs-only plan: archtest lean, no engine triggers" $? "$P"
+P=$(printf 'internal/archtest/arch_test.go\n' | plan)
+has "$P" ./internal/archtest && flag "$P" archtest_lean 0
+check "touched internal/archtest runs whole, not lean" $? "$P"
+P=$(printf 'rules/mana.go\n' | plan)
+has "$P" ./bots && ! has "$P" ./rules && ! has "$P" ./deck && flag "$P" traj 1 && flag "$P" tplrest 1 && flag "$P" botbench_subset 0
+check "rules non-test edit: fast rdep closure (./bots), no corpus-heavy rdep (./deck), traj + templates remainder" $? "$P"
+P=$(printf 'rules/mana_test.go\n' | plan)
+! has "$P" ./bots && flag "$P" traj 0 && flag "$P" tplrest 0
+check "rules test-only edit: no rdep closure, no engine triggers" $? "$P"
+P=$(printf 'cards/open.go\n' | plan)
+has "$P" ./internal/corpusheap && has "$P" ./cards && flag "$P" botbench_subset 1 && flag "$P" tplrest 1 && flag "$P" traj 0
+check "corpus loader edit: corpusheap + botbench subset + templates remainder" $? "$P"
+P=$(printf 'cards/open.go\ncmd/botbench/main.go\n' | plan)
+has "$P" ./cmd/botbench && flag "$P" botbench_subset 0
+check "touched cmd/botbench runs whole, not the subset test" $? "$P"
+P=$(printf 'compliance/oraclegen/templates/trigger.go\n' | plan)
+flag "$P" tpl 1 && flag "$P" tplrest 0 && ! has "$P" ./compliance/oraclegen/templates
+check "touched templates: four shards, not in the batch, no extra remainder" $? "$P"
+P=$(printf 'compliance/oraclegen/generate.go\n' | plan)
+flag "$P" tpl 0 && flag "$P" tplrest 1
+check "generator edit runs the templates remainder shard" $? "$P"
+# The fast allowlist must not rot: every member is a real directory.
+rot=$(cd "$ROOT" && bash -c "source '$GATE'; gate_fast_rdep_pkgs" | while read -r d; do [ -d "$ROOT/$d" ] || echo "$d"; done)
+[ -z "$rot" ]
+check "every fast rdep allowlist member exists" $? "missing: $rot"
+# Wiring: the body reads the plan, --list exits before any go work, the lean
+# archtest line skips only the 32-bit compile, and the remainder shard uses
+# the tpl=1 path's exact h4 invocation (shared result-cache entry).
+grep -qF 'plan=$(git diff --name-only "$mb" HEAD | gate_affected_plan)' "$GATE"
+check "gate body derives its selection from gate_affected_plan" $?
+awk '/^if \[ "\$list_only" = 1 \]/{l=NR} /^GOMAXPROCS=6 go vet/{v=NR} END{exit !(l && v && l < v)}' "$GATE"
+check "--list exits before vet/test" $?
+grep -qF "go test -p=1 -skip '^TestEngineCompilesFor32Bit\$' ./internal/archtest/" "$GATE"
+check "lean archtest skips only the 32-bit compile" $?
+[ "$(grep -cF 'go test -p=1 -skip "$tpl4" ./compliance/oraclegen/templates' "$GATE")" = 2 ]
+check "templates remainder trigger reuses the h4 invocation" $?
+! grep -q 'TestInvariantsUnderSeedFuzz' "$GATE"
+check "no dead //go:build fuzz skip pattern in the gate" $?
 
 # --- the shard partition: complete, disjoint, and covering the digit-prefixed
 # names a naive [A-Z] split drops. rules_shard_patterns_from_list is the pure

@@ -267,7 +267,13 @@ func askUnlessMana(e Engine) {
 			rest = append(rest, units[:si]...)
 			rest = append(rest, units[si+1:]...)
 			for ai, a := range src.Alts {
-				if safe != (UnlessManaReachable(e, u.Payer, u.Cost, ManaAdd(pool, a.Mana()), snow, typed, life,
+				// A life-paying alt (the paid-cost census layer only) is not
+				// tappable when it would kill the payer, and the charge is
+				// priced from the life left after it.
+				if a.Life > 0 && a.Life >= life {
+					continue
+				}
+				if safe != (UnlessManaReachable(e, u.Payer, u.Cost, ManaAdd(pool, a.Mana()), snow, typed, life-a.Life,
 					e.Eval().Conv(u.Payer, u.StackObj, false), rest)) {
 					continue
 				}

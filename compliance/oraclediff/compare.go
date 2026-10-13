@@ -135,11 +135,15 @@ func fields(s rules.OracleSnapshot, xmage bool, compare []string) []field {
 		if wantsCompare(compare, CompareHandCount) {
 			hand = fmt.Sprint(len(p.Hand))
 		}
+		graveyard := list(p.Graveyard, false)
+		if wantsCompare(compare, CompareGraveyardCount) {
+			graveyard = fmt.Sprint(len(p.Graveyard))
+		}
 		out = append(out,
 			field{pf("life"), fmt.Sprint(p.Life)},
 			field{pf("counters"), counters(p.Counters)},
 			field{pf("hand"), hand},
-			field{pf("graveyard"), list(p.Graveyard, false)},
+			field{pf("graveyard"), graveyard},
 			field{pf("exile"), list(p.Exile, true)},
 			field{pf("library_count"), fmt.Sprint(p.LibraryCount)},
 		)

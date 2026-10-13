@@ -6,13 +6,13 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 func TestTargetedCardSelfCensus(t *testing.T) {
-	dir := "../.cards/cardsfolder"
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("corpus not fetched")
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	got := map[string]bool{}
 	if err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".txt") {
