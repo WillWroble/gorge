@@ -179,7 +179,7 @@ func compareSnap(g, x rules.OracleSnapshot, compare []string, ignore []string) (
 	}
 	gf, xf := fields(g, false, compare), fields(x, true, compare)
 	for k := range gf {
-		if ignored(gf[k].name, ignore) {
+		if ignored(gf[k].name, ignore) || (g.Over && x.Over && !gameOverField(gf[k].name)) {
 			continue
 		}
 		if k >= len(xf) || !fieldEqual(gf[k], xf[k]) {

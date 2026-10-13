@@ -20,7 +20,7 @@ func TestScenarioReplayEndTurnTracksMultiActionSkippedStep(t *testing.T) {
 		"int beforeA = playerA.getActions().size();",
 		"int beforeB = playerB.getActions().size();",
 		"step(st, op, i);",
-		"runCode(cp, turn, phase, checkpointSeat(op, st),",
+		"runCode(cp, turn, phase, checkpointSeat(op, st, i),",
 		"playerA.getActions().subList(beforeA, playerA.getActions().size())",
 		"playerB.getActions().subList(beforeB, playerB.getActions().size())",
 		"remainingA.addAll(queuedA.get(i));",
