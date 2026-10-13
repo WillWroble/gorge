@@ -53,7 +53,17 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # Hosted bot policy (host/bot_policy.go's closed vocabulary) for every
 # startup table and for a play-vs-bot game that names none.
 #
-# 2026-10-07: lethal-pressure. The demo serves 8 constructed and 8 commander
+# 2026-10-13: bot. Of the three commander-capable entries (bot,
+# lethal-pressure, cast-profile) it is the strongest: on auto-pay tables
+# (-bot-auto-mana, on by default) bot is lethal-pressure plus the
+# combat-simulation attacker/blocker, while lethal-pressure plays as the
+# plain auto-pay bot. That arm passed the held-out gate at 53.69%
+# [52.73, 54.64] Commander and 53.17% [52.68, 53.65] constructed vs the
+# plain auto-pay bot (commit 66aa546dd; docs/superpowers/reports/
+# 2026-10-09-bot-consolidation-plan.md finding 1). Same cost (<1 ms per
+# decision), so the 2026-10-07 load reasoning below still holds.
+#
+# 2026-10-07 (retired): lethal-pressure. The demo serves 8 constructed and 8 commander
 # tables (see TABLES above), and lethal-pressure is constructed+commander and
 # seats 4, so it is the only default that satisfies gorged's
 # validateBotPolicyFlags for that table mix. It also removes the sb-search
@@ -73,9 +83,8 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # 247ms, same ballpark (docs/superpowers/specs/2026-09-28-spellbench-agent-
 # design.md §12.6). Both are Experimental and constructed-only/2-seat-only
 # (bots.Info.Formats/MaxSeats), so neither could serve the commander half of
-# the demo at all. Before that (2026-09-28): lethal-pressure (AR7), which is
-# again today's default.
-BOT_POLICY=${BOT_POLICY:-lethal-pressure}
+# the demo at all. Before that (2026-09-28): lethal-pressure (AR7).
+BOT_POLICY=${BOT_POLICY:-bot}
 # constructed,commander -- table i takes formats[(i-1) mod 2], so TABLES=2
 # deals t1 constructed and t2 commander.
 FORMATS=${FORMATS:-constructed,commander}
