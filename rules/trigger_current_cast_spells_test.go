@@ -63,7 +63,7 @@ func TestTriggerObjectsCurrentCastSpellsSnapshotsAtTheTriggeringCast(t *testing.
 }
 
 func castThisTurn(e *Engine, id state.ObjID) bool {
-	for _, got := range e.EachSpellCastThisTurnMatching(0, "Card", 0) {
+	for _, got := range e.EachSpellCastThisTurnMatching(0, "Card", 0, noTC) {
 		if got == id {
 			return true
 		}

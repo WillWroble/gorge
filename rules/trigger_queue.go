@@ -123,6 +123,12 @@ func (e *Engine) putTriggersOnStack() bool {
 			e.pendingTriggers, e.orderedTriggers = e.pendingTriggers[:0], 0
 			return false
 		}
+		if e.resolveStaticTriggers() {
+			// Static$ True triggers resolve off the stack (static_trigger.go)
+			// and are never part of the CR 603.3b order choice; their events
+			// can have queued more triggers, so the batch is re-scanned.
+			continue
+		}
 		if e.orderedTriggers == 0 {
 			n := e.sortPendingTriggers()
 			// Forge's OrderDuplicates$: duplicate instances of a flagged
@@ -1432,24 +1438,36 @@ func (e *Engine) faceOwningTrigger(source state.ObjID, t cards.Trigger) *cards.F
 //
 // So the answer to "is the decider ever someone other than the controller" is
 // yes, and it is honoured for the two forms this engine can actually resolve:
-// TriggeredCardController and TriggeredSourceController both read the
-// controller of the object the trigger remembered, which is the object the
-// triggering event was about (triggerRemembered, above) -- the same object
-// Forge means by both names in every T: line in the corpus that uses them.
+// TriggeredCardController reads the triggering card (its last-known
+// controller when it left the battlefield, else Remembered[0]'s object), and
+// TriggeredSourceController reads the source the causing event captured
+// (effects.TriggeredSourceController), falling back to Remembered[0] only
+// when the trigger captured no source role. The fallback is what the corpus's
+// five TriggeredSourceController T: lines all hit before B8: each is a
+// DamageDone combat-damage trigger, whose Remembered is the DAMAGED object
+// (triggerRemembered, above) -- a player-damage event's fallback names the
+// trigger's own source instead -- so the decider was the trigger source's
+// controller, not the damage dealer's. All five (Brood Sliver, Edric Spymaster
+// of Trest, Undercity Reaches, Gix Yawgmoth Praetor, Synapse Sliver) now read
+// the captured damage source, one root cause per card.
 //
-// CAVEAT (Task 6, fix round 1): that equivalence assumes Remembered[0] is
-// the object the FIRING trigger's own T: line is on, which triggerRemembered
-// no longer guarantees for a DeclareAttackers-driven Attacks trigger --
-// Remembered there is every attacker declared against one defending player
-// (handleAttackers emits one event per defender since Task m34), in event
-// order, so Remembered[0] is whichever creature attacking that defender was
-// declared first, not necessarily pt.Source. No repo-deck T: line combines
-// Mode$ Attacks with OptionalDecider$ TriggeredCardController/
-// TriggeredSourceController today (measured against the same corpus the
-// table above was), so this is a latent gap, not a live one -- but a future
-// card that did would have this read the wrong creature's controller
-// whenever it attacks alongside another creature that happened to be
-// declared first.
+// CAVEAT (Task 6, fix round 1; B8 kept the shape): the Remembered[0] fallback
+// assumes it is the object the FIRING trigger's own T: line is on, which
+// triggerRemembered no longer guarantees for a DeclareAttackers-driven Attacks
+// trigger -- Remembered there is every attacker declared against one defending
+// player (handleAttackers emits one event per defender since Task m34), in
+// event order, so Remembered[0] is whichever creature attacking that defender
+// was declared first, not necessarily pt.Source. For TriggeredSourceController
+// the captured role now wins whenever the Attacks capture bound one (the
+// single-matching-attacker case, rules/trigger_referents.go sets
+// c.TriggerSource = c.TriggerCard); the multi-attacker case leaves the role
+// absent and still reads Remembered[0]. No repo-deck T: line combines Mode$
+// Attacks with OptionalDecider$ TriggeredCardController/
+// TriggeredSourceController today (measured against the same corpus the table
+// above was), so this is a latent gap, not a live one -- but a future card
+// that did would have TriggeredCardController read the wrong creature's
+// controller whenever it attacks alongside another creature that happened to
+// be declared first.
 //
 // LIMITATION, stated rather than assumed: the remaining ten T: lines
 // (TriggeredPlayer, EnchantedController, TriggeredAttackingPlayer,
@@ -1518,10 +1536,15 @@ func (e *Engine) deciderFromSpec(spec string, controller state.PlayerID, remembe
 			who = p
 		}
 	case deciderFromSpecTriggeredSourceController:
-		if len(remembered) > 0 {
-			if o := e.G.Obj(remembered[0].Obj); o != nil {
-				who = o.Controller
-			}
+		// The shared resolver (effects.TriggeredSourceController): the
+		// source the causing event recorded, else Remembered[0]. For a
+		// DamageDone trigger Remembered holds the DAMAGED object, so the
+		// old Remembered[0]-only read asked the wrong seat whenever the
+		// damage source and the trigger's own source had different
+		// controllers (B8: Brood Sliver's may belongs to the controller of
+		// the Sliver that dealt the damage, not Brood Sliver's controller).
+		if p, ok := effects.TriggeredSourceController(e.G, tc, remembered); ok {
+			who = p
 		}
 	}
 	if int(who) >= len(e.G.Players) || e.G.Players[who].Lost {

@@ -49,7 +49,12 @@ FORGE_REPO ?= https://github.com/adams-shaun/forge.git
 # 25a608a4f = fb4d80911 (Card-Forge master 2026-10-02) + Card-Forge/forge#12153
 # (Bard's Company P/T, Voice of Victory type, Yip Yip! target) + #12160
 # (Demonic Pact's discard mode targets an opponent).
-FORGE_REF  ?= 25a608a4fc5fe837314a263e4ac6600a01d7c348
+# 1dc038bc6 = the adams-shaun/forge branch `gorge` (2026-10-12): adds 764b1e3a3
+# (g_1_1_elf token is Elf, not Elf Warrior; Card-Forge/forge#12242/#12244) and
+# 1dc038bc6 (Bullseye, Death Dealer, Ghostly Dancers ETB Origin$ Any |
+# Destination$ Battlefield; Reckless Detective UnlessResolveSubs$ WhenPaid;
+# Card-Forge/forge#12243/#12245).
+FORGE_REF  ?= 1dc038bc620c7802fc4337cd04028aef50356096
 # The XMage commit the compliance oracle (manifests, out-of-tree driver)
 # is pinned to. XMage is MIT; nothing from it is a build dependency.
 # docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md

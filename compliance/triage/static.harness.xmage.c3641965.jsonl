@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"harness","field":"xmage","diff":"AssertionError: Found wrong choice command (invalid target or miss skip command):"},"key":"static | harness | xmage | AssertionError: Found wrong choice command (invalid target or miss skip command):","cards":1}
+{"card":"Champion of the Clachan","template":"static#0.1","status":"harness","api":"ChangesZone:ChangeZone","sets":["ECL"],"detail":"xmage: AssertionError: Found wrong choice command (invalid target or miss skip command):"}

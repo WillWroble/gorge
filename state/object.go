@@ -40,13 +40,28 @@ type GoadEffect struct {
 // has no characteristics from the layer system at all, so the values must be
 // captured while the permanent is still on the battlefield. It carries only
 // the characteristics the Sacrificed$<Property> SVar heads ask for -- power,
-// toughness and mana value -- rather than a full Object clone, since that is
-// all the corpus uses this mechanism for.
+// toughness, mana value and the printed mana-cost string (ChromaSource) --
+// rather than a full Object clone, since that is all the corpus uses this
+// mechanism for.
 type SacrificedInfo struct {
 	Obj       ObjID
 	Power     int32
 	Toughness int32
 	ManaValue int32
+	// ManaCost is the printed cost string the object had at the sacrifice
+	// (the Sacrificed$ChromaSource.<Colour> reader counts its coloured
+	// symbols). A face's printed cost never changes, but it must be captured
+	// here rather than read live for the same reason power is: the reader
+	// runs after the object has left the battlefield, and only the snapshot
+	// is guaranteed to be the object the sacrifice named.
+	ManaCost string
+	// FaceDown records that the sacrificed permanent was face down (CR
+	// 708.5: a face-down permanent has no mana cost), so the ChromaSource
+	// reader contributes nothing for it -- the same rule the battlefield
+	// devotion scan applies to a face-down permanent still in play. The
+	// snapshot is taken before the zone change, which is when Move clears
+	// the flag.
+	FaceDown bool
 	// Counters is the object's counter kinds and counts at the instant of
 	// the sacrifice (the sacrificed-LKI ladder's third rung: a
 	// cost-sacrificed source whose EachFromSource$ copy reads it after Move
@@ -951,6 +966,39 @@ type Object struct {
 	// wherever IsAttacking is.
 	AttackingBattle ObjID
 	BlockedBy       []ObjID
+	// IsBlocking marks a creature declared as a blocker this combat (CR
+	// 509.1g), recorded on the BLOCKER so it survives its attacker leaving
+	// combat: CR 506.4 / 509.1h keep a creature blocking after the creature
+	// it blocks is removed (Norin, Swift Survivalist exiles a blocked
+	// attacker; the blocker is still "blocking"). Set by events.Apply's
+	// DeclareBlockers case, cleared with IsAttacking (EndCombatReset, leaving
+	// the battlefield, a control change, phasing out).
+	IsBlocking bool
+	// BlockedByThisTurn records, on an attacking creature, the blockers that
+	// blocked it this turn (CR 509.1), in declaration order. Unlike the live
+	// BlockedBy list it survives the end-of-combat reset (events.EndCombatReset
+	// clears BlockedBy but not this), so a delayed "at end of combat" trigger
+	// can still ask which creatures blocked this attacker this turn -- Forge's
+	// Card.blockedByThisTurn / Card.gotBlockedThisTurn and the source-relative
+	// Card.blockedBySourceThisTurn. It is folded by events.Apply's
+	// DeclareBlockers case, reset in TurnChange's per-object loop (a per-turn
+	// fact) and cleared when the permanent leaves the battlefield (CR 400.7: a
+	// re-entering creature is a new object that blocked nothing this turn).
+	// Like BlockedBy it is a slice, so CloneDeep backs it independently.
+	BlockedByThisTurn []ObjID
+	// BlockedThisTurn is the blocker-side half of the same this-turn block
+	// history: the attackers this creature blocked this turn (CR 509.1), in
+	// declaration order. Like BlockedByThisTurn it survives the end-of-combat
+	// reset and is reset in TurnChange and on a battlefield exit (CR 400.7).
+	// It backs Forge's Card.blockedThisTurn ("each creature that blocked this
+	// turn": Heat Stroke, Gideon's Triumph, Hezrou // Demonic Stench, Sizzling
+	// Barrage, Lurker, Inferno Hellion, Vizier of Deferment, Glyph of Delusion)
+	// and, because it names the attackers rather than being a flag, the
+	// referent words blockedValidThisTurn / blockedRemembered: an attacker
+	// that has since died is not scanned for, so "blocked a Zombie that then
+	// died" still reads true. Set by events.Apply's DeclareBlockers fold; a
+	// slice, so CloneDeep backs it independently.
+	BlockedThisTurn []ObjID
 	// EncoreAttackTurn/Defender record "attacks that opponent this turn if
 	// able" on an encore token. Zero Turn means no requirement; turns begin
 	// at 1, so the zero value is unambiguous.
@@ -1602,7 +1650,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [106]byte
+	_ [50]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
@@ -2132,7 +2180,7 @@ func carveClone[T any](buf *[]T, src []T) []T {
 
 // cloneArenaNeed adds the element counts o's carved slices need to a.
 func (o *Object) cloneArenaNeed(ids, tgs, ctr *int) {
-	*ids += len(o.BlockedBy) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
+	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.BlockedThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
 		len(o.DamageTakenThisTurnBy) + len(o.ImprintTokens) + len(o.EncodedCards) + len(o.SeekFound) + len(o.ExiledCards)
 	*tgs += len(o.Targets) + len(o.SubTargets) + len(o.Remembered) + len(o.Chosen)
 	*ctr += len(o.Counters)
@@ -2151,6 +2199,8 @@ func (o *Object) cloneDeepIntoArena(c *Object, a *cloneArena) {
 	c.SubTargets = carveClone(&a.tgs, o.SubTargets)
 	c.Remembered = carveClone(&a.tgs, o.Remembered)
 	c.BlockedBy = carveClone(&a.ids, o.BlockedBy)
+	c.BlockedByThisTurn = carveClone(&a.ids, o.BlockedByThisTurn)
+	c.BlockedThisTurn = carveClone(&a.ids, o.BlockedThisTurn)
 	c.CrewedVehicles = carveClone(&a.ids, o.CrewedVehicles)
 	c.Chosen = carveClone(&a.tgs, o.Chosen)
 	if c.Chosen == nil && o.Chosen != nil {
@@ -2199,9 +2249,10 @@ func cloneRuntimeSVars(m map[string]int32) map[string]int32 {
 }
 
 // SacrificedInfoOf captures the last-known-information snapshot of the object
-// id names at the instant it is about to be sacrificed -- power, toughness and
-// mana value -- so a later Sacrificed$<Property> SVar can answer "the
-// sacrificed creature's power" without reading a now-graveyard object. It
+// id names at the instant it is about to be sacrificed -- power, toughness,
+// mana value and the printed mana cost -- so a later Sacrificed$<Property>
+// SVar can answer "the sacrificed creature's power" without reading a
+// now-graveyard object. It
 // must be called BEFORE the sacrifice's zone change: the object is still a
 // battlefield permanent then, so its face and any +1/+1 counters (the
 // layer-7d portion of its P/T, preserved because they have not yet been reset
@@ -2229,7 +2280,8 @@ func SacrificedInfoOf(g *Game, id ObjID) SacrificedInfo {
 			counters = append(counters, o.Counters[i])
 		}
 	}
-	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(), Counters: counters,
+	return SacrificedInfo{Obj: id, Power: p, Toughness: t, ManaValue: o.Face().Cmc(),
+		ManaCost: o.Face().ManaCost, FaceDown: o.FaceDown, Counters: counters,
 		Types: append([]string(nil), o.Face().Types...)}
 }
 

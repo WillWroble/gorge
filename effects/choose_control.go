@@ -581,12 +581,10 @@ func effChooseCard(h Host, c *Ctx, sa *cards.SA) {
 	selection := *c // candidate filters read the pre-clear remembered set
 	initForgetOtherSnapshot(h, c, sa, choosers, 2)
 	forgetOtherRemembered(h, c, sa)
-	if c.Forget.Ready {
-		// The snapshot is authoritative across the asks: a later chooser's
-		// pool must still match the pre-clear candidates (plus anything
-		// re-remembered since) after the first move cleared the live set.
-		selection.Remembered = append(append([]state.Target(nil), selection.Remembered...), c.Forget.Snapshot...)
-	}
+	// The snapshot is authoritative across the asks: a later chooser's
+	// pool must still match the pre-clear candidates (plus anything
+	// re-remembered since) after the first move cleared the live set.
+	armForgetSelection(&selection, c)
 	// Reveal$ True (Planetary Annihilation's "each player chooses six lands
 	// they keep" is public knowledge — CR 701.x's open choice): each chooser's
 	// ANSWERED choice is revealed to every seat with the same ids-Note
@@ -716,9 +714,7 @@ func effChooseCard(h Host, c *Ctx, sa *cards.SA) {
 			// Ctx as it stood at the ask (before this record), then record,
 			// reveal and re-read the bounds.
 			selection = *c
-			if c.Forget.Ready {
-				selection.Remembered = append(append([]state.Target(nil), selection.Remembered...), c.Forget.Snapshot...)
-			}
+			armForgetSelection(&selection, c)
 			answered := ChoiceAnswerTargets(ans)
 			chooseCardRecord(h, c, sa, answered)
 			if reveal {
@@ -1857,13 +1853,17 @@ func repeatPlayers(h Host, c *Ctx, spec string) ([]state.PlayerID, bool) {
 		selected[c.Controller] = true
 	case repeatPlayersRemembered:
 		add(c.Remembered)
+	case repeatPlayersRememberedController:
+		// The Remembered* player spellings read the host list, never the
+		// trigger's capture -- the same hostRemembered Defined$ uses.
+		add(hostRemembered(h, c))
 	case repeatPlayersNonTargetedController:
 		add(c.Targets)
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = !selected[p]
 		}
 	case repeatPlayersOppNonRememberedController:
-		add(c.Remembered)
+		add(hostRemembered(h, c))
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = p != c.Controller && !selected[p]
 		}
@@ -2139,6 +2139,7 @@ const (
 	repeatPlayersTargeted
 	repeatPlayersTargetedAndYou
 	repeatPlayersRemembered
+	repeatPlayersRememberedController
 	repeatPlayersNonTargetedController
 	repeatPlayersOppNonRememberedController
 	repeatPlayersOppNonTriggeredDefender
@@ -2156,7 +2157,7 @@ var repeatPlayersCodes = state.NewStrCodes(
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedController", Val: repeatPlayersTargeted},
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedAndYou", Val: repeatPlayersTargetedAndYou},
 	state.StrEntry[repeatPlayersCode]{Key: "Remembered", Val: repeatPlayersRemembered},
-	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRemembered},
+	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "NonTargetedController", Val: repeatPlayersNonTargetedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonRememberedController", Val: repeatPlayersOppNonRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonTriggeredDefender", Val: repeatPlayersOppNonTriggeredDefender},

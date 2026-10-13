@@ -55,6 +55,7 @@ import (
 // pool event records only the selected colour.
 func (e *Engine) AvailableMana(p state.PlayerID) state.Mana {
 	var out state.Mana
+	committed := int32(0) // life the paid-cost census has committed so far
 	ids := pay.AppendBattlefieldManaSourceIDs(e.G, e.idsBorrow(), p)
 	defer e.idsRelease(ids)
 	for _, id := range ids {
@@ -77,6 +78,16 @@ func (e *Engine) AvailableMana(p state.PlayerID) state.Mana {
 		// report its five alternatives through ProducedCounts; a permanent with
 		// several distinct abilities is omitted because the vector cannot encode
 		// which ability the tap will select.
+		// Config.PaidManaCensus extends "free" with the paid abilities the
+		// shared paid-cost census counts (paid_mana_census.go): a
+		// self-sacrifice or a PayLife<N> that leaves the payer alive.
+		if e.paidManaCensus {
+			paid, lc := e.availablePaidAbilities(p, id, o, e.G.Players[p].Life-committed)
+			if len(paid) > 0 {
+				free = append(free, paid...)
+				committed += lc
+			}
+		}
 		if len(free) == 1 {
 			addAvailable(&out, free[0], pay.ChosenProducedColour(e.G, id))
 		}

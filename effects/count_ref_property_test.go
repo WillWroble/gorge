@@ -52,8 +52,9 @@ func TestRefPropertyCounts(t *testing.T) {
 		{"AllTargeted$Valid Creature.powerLE3", 1}, // Dork (1) matches, Ox (5) does not
 		{"AllTargeted$CardPower/Twice", (3 + 2 + 1) * 2},
 		// An unknown ref or property stays zero (the conservative no-op), and
-		// a /Op suffix applies through the ordinary arithmetic.
-		{"Remembered$ChromaSource", 0},
+		// a /Op suffix applies through the ordinary arithmetic. (The
+		// Remembered$ChromaSource spelling now evaluates and is covered by
+		// count_chroma_test.go.)
 		{"TriggeredTarget$LifeTotal", 0},
 		{"UnknownRef$CardPower", 0},
 		{"Targeted$CardPower/Twice", (3 + 2 + 1) * 2},

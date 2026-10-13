@@ -73,6 +73,13 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		}
 		if o := e.G.Obj(e.inFlightDamageSource()); o != nil && o.IsAttacking {
 			c.DefendingPlayer = player(o.Attacking)
+			// The attacking player is the attacker's controller (Contested
+			// Game Ball's NewController$ TriggeredAttackingPlayer), bound
+			// beside the defending player from the same combat source. Read
+			// through controllerOf so the recurring-Effect overlay, the ONE
+			// home for a source-controller read, is honoured here as at every
+			// sibling capture site (trigger_blocks.go, trigger_granted.go).
+			c.AttackingPlayer = player(e.controllerOf(o.ID))
 		}
 	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll:
 		// The batch size the body reads as TriggerCount$Amount (Simic

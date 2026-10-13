@@ -93,6 +93,23 @@ EOF
 		git -C "$r" push -q origin main
 		echo "operator hold" >"$r/.ds4/orchestrator/pause"
 	fi
+	if [ "${PMB_AHEAD:-1}" -gt 1 ]; then
+		local i
+		for i in $(seq 2 "$PMB_AHEAD"); do
+			echo "$i" >"$r/landed$i.txt"
+			git -C "$r" add "landed$i.txt" && git -C "$r" commit -q -m "landed $i"
+		done
+	fi
+	if [ "${3:-}" = ourpause ]; then
+		# Our own pause marker with the commit still ahead of origin.
+		echo "postmerge_batch RED deadbeef 2026-10-12T21:37:39Z: main->origin full suite failed" \
+			>"$r/.ds4/orchestrator/pause"
+	fi
+	[ -n "${PMB_PRESLEEP:-}" ] && /usr/bin/sleep "$PMB_PRESLEEP"
+	if [ "${3:-}" = idle ]; then
+		# Nothing ahead of origin and no pause at all: the idle fast path.
+		git -C "$r" push -q origin main
+	fi
 	if [ "${3:-}" = handpush ]; then
 		# The loop's own pause is up and the fix was pushed by hand: nothing
 		# is ahead of origin.
@@ -101,7 +118,7 @@ EOF
 			>"$r/.ds4/orchestrator/pause"
 	fi
 	(cd "$r" && PATH="$B:$PATH" PMB_STATE="$d/state" PMB_PAUSE="$r/.ds4/orchestrator/pause" PMB_RERUN="$2" \
-		PMB_FIRST="${4:-red}" timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
+		BATCH_MIN_AHEAD="${PMB_MIN_AHEAD:-1}" BATCH_MAX_AGE_S="${PMB_MAX_AGE:-1800}" PMB_FIRST="${4:-red}" timeout 60 bash scripts/postmerge_batch.sh >"$d/stdout" 2>&1)
 	echo "$d"
 }
 
@@ -141,5 +158,31 @@ d=$(run_scenario foreign green foreign green)
 r=$d/repo
 check "foreign: no full run for someone else's pause" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
 check "foreign: the operator's pause is untouched" "$(has "$r/.ds4/orchestrator/pause" "operator hold"; echo $?)"
+
+# ---- idle: nothing ahead and no pause -> no run ---------------------------
+# The guard's new "our pause is up" disjunct must not fire with no pause, and
+# the head-equality check must still suppress a run when nothing is ahead.
+d=$(run_scenario idle green idle green)
+r=$d/repo
+check "idle: no full run with nothing ahead and no pause" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "idle: no pause marker created" "$([ ! -e "$r/.ds4/orchestrator/pause" ]; echo $?)"
+
+# ---- cadence: green pipeline defers until N ahead or the oldest is old ----
+# (the scenarios above run with BATCH_MIN_AHEAD=1, i.e. the old behaviour)
+# (a) green, 1 ahead, young -> deferred, one DEFER line, no full run
+d=$(PMB_MIN_AHEAD=4 run_scenario defer green plain green)
+r=$d/repo
+check "defer: no full run, 1 ahead and young" "$([ ! -e "$d/state/fulls" ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "defer: DEFER logged once" "$([ "$(/usr/bin/grep -c 'DEFER ahead=1 oldest=' "$r/.ds4/postmerge-batch.log")" = 1 ]; echo $?)"
+# (b) green, 4 ahead -> runs
+d=$(PMB_MIN_AHEAD=4 PMB_AHEAD=4 run_scenario four green plain green)
+check "four: full run with 4 ahead" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+check "four: no DEFER logged" "$(! has "$d/repo/.ds4/postmerge-batch.log" DEFER; echo $?)"
+# (c) green, 1 ahead, oldest older than the max age -> runs
+d=$(PMB_MIN_AHEAD=4 PMB_MAX_AGE=1 PMB_PRESLEEP=2 run_scenario aged green plain green)
+check "aged: full run once the oldest commit exceeds the max age" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
+# (d) our pause marker, 1 ahead, young -> runs immediately
+d=$(PMB_MIN_AHEAD=4 run_scenario paused green ourpause green)
+check "paused: our pause runs immediately with 1 ahead" "$([ "$(cat "$d/state/fulls" 2>/dev/null)" = 1 ]; echo $?)" "fulls=$(cat "$d/state/fulls" 2>/dev/null)"
 
 [ "$fails" = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }

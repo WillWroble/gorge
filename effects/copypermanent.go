@@ -186,7 +186,7 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 				Text: "AddTypes$ " + strings.TrimSpace(raw) + " resolved to no type; no type added"})
 		}
 	}
-	var addColors []string
+	var addColors, extraColors []string
 	setColor := false
 	if raw, ok := cp.SetColor.Text, cp.SetColor.Present; ok {
 		cols, parsed := colorLetters(raw)
@@ -196,6 +196,17 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 		} else {
 			emitNote(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
 				Text: "SetColor$ " + strings.TrimSpace(raw) + " is not a colour; the copy keeps its printed colours"})
+		}
+	}
+	if raw, ok := cp.AddColors.Text, cp.AddColors.Present; ok {
+		// AddColors$ extends the copy's colours (CR 707.9b); an unparseable
+		// word skips the whole grant loudly. "Colorless" adds nothing.
+		cols, parsed := colorLetters(raw)
+		if parsed {
+			extraColors = cols
+		} else {
+			emitNote(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
+				Text: "AddColors$ " + strings.TrimSpace(raw) + " is not a colour; the copy keeps its printed colours"})
 		}
 	}
 	var setPow, setTgh int32
@@ -407,6 +418,27 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 		// selector would fall through Defined's per-member fallback to the
 		// resolving SOURCE, offering the chooser the spell itself.
 		pick := DefinedSpec(h, c, "Valid "+cp.ChoiceFilter)
+		if spec != "" {
+			// Choices$ with Defined$: Forge narrows the Defined$ objects by
+			// the Choices$ filter (Mimic Vat's `Defined$
+			// Imprinted.ExiledWithSource | Choices$ Card` picks one of the
+			// cards exiled with it). The selector stays FAIL-CLOSED like the
+			// plain Defined$ arm below: an unresolvable one is one Note and
+			// no copy, never the battlefield sweep.
+			ts, ok := knownDefinedTargets(h, c, spec)
+			if !ok {
+				emitNote(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
+					Text: "CopyPermanent source " + spec + " is not resolvable; no copy"})
+				return
+			}
+			pick = pick[:0:0]
+			sc := c.SpecContext(c.Controller)
+			for _, t := range dedupeTargets(ts) {
+				if o := g.Obj(t.Obj); !t.IsPlayer && o != nil && MatchesObjectCtx(g, cp.ChoiceFilter, o, sc) {
+					pick = append(pick, t)
+				}
+			}
+		}
 		d := &decision.Decision{Player: chooser, Kind: decision.KChoose, Min: 1, Max: 1,
 			Source: c.Source, ResumeKind: "copypermanent_choice", ResumeSA: sa,
 			Prompt: "Choose a creature to copy"}
@@ -678,6 +710,12 @@ func effCopyPermanent(h Host, c *Ctx, sa *cards.SA) {
 			h.AddContinuous(state.ContinuousEffect{
 				Source: want, Controller: owner, Affects: "Card.Self",
 				Layer: state.LColor, AddColors: addColors, OverwriteColors: true, Permanent: true,
+			})
+		}
+		if len(extraColors) > 0 {
+			h.AddContinuous(state.ContinuousEffect{
+				Source: want, Controller: owner, Affects: "Card.Self",
+				Layer: state.LColor, AddColors: extraColors, Permanent: true,
 			})
 		}
 		if hasSetPow || hasSetTgh {

@@ -661,17 +661,46 @@ func CostStaticParamsReadable(params map[string]string) bool {
 // CanAttackDefenderParamsReadable is the parameter whitelist a FACE
 // CanAttackDefender static must pass before rules' attacker-legality read
 // (rules/combat/defender.go AttackAllowedThroughDefender) enforces it. It is
-// the grant list above PLUS the gate family (IsPresent$/IsPresent2$/
-// CheckSVar$/SVarCompare$/Condition$), which the face read evaluates through
-// the shared continuousGateHolds grammar — the same shape
-// cantAttackUnlessParamsReadable carries for CantAttackUnless. A static
-// carrying any other parameter names a scoping this build does not evaluate;
-// skipping it is the conservative direction for a permission (the creature
-// stays walled, today's behaviour), never the wrong-wide one.
+// the grant list above PLUS the gate family (IsPresent$/IsPresent2$ with
+// their PresentZone$/PresentCompare$ modifiers, CheckSVar$/SVarCompare$/
+// Condition$), which the face read evaluates through the shared
+// continuousGateHolds grammar (rules presentGate reads PresentZone$ and
+// PresentCompare$) — the same shape cantAttackUnlessParamsReadable carries
+// for CantAttackUnless. Platypus-Bear's `IsPresent$ Lesson.YouOwn |
+// PresentZone$ Graveyard` is the corpus row that needs the zone key. A
+// static carrying any other parameter names a scoping this build does not
+// evaluate; skipping it is the conservative direction for a permission (the
+// creature stays walled, today's behaviour), never the wrong-wide one.
+//
+// PresentCompare$ can invert the gate (EQ0: "as long as there is NO ..."),
+// so a compare is admitted only over a non-blank present spec whose
+// predicates the matcher recognises: an unread spec counts 0 and an EQ0
+// compare would then lift the wall unconditionally, the wrong-wide
+// direction. The same guard CantAttackParamsReadableForRules keeps.
 func CanAttackDefenderParamsReadable(params map[string]string) bool {
-	for k := range params {
+	var spec1, spec2 string
+	hasCmp := false
+	for k, v := range params {
 		if !canAttackDefenderParamsReadableKeys.Has(k) {
 			return false
+		}
+		switch cantAttackPresentKeyCodes.Code(k) {
+		case cantAttackPresentKeyPresentCompare:
+			hasCmp = true
+		case cantAttackPresentKeyIsPresent:
+			spec1 = strings.TrimSpace(v)
+		case cantAttackPresentKeyIsPresent2:
+			spec2 = strings.TrimSpace(v)
+		}
+	}
+	if hasCmp {
+		if spec1 == "" && spec2 == "" {
+			return false
+		}
+		for _, spec := range [2]string{spec1, spec2} {
+			if spec != "" && len(UnknownPredicates(spec)) != 0 {
+				return false
+			}
 		}
 	}
 	return true
@@ -802,14 +831,49 @@ func replacementRedirectsToExile(params map[string]string, body string, svars ma
 	if replacementBodyAPI(body) != "ChangeZone" {
 		return false
 	}
-	return redirectExileBody(replacementBodyParams(body), svars)
+	return redirectExileBody(replacementBodyParams(body), svars, redirectLineRemembered(params))
+}
+
+// redirectLineRemembered reports whether the replacement line's ValidCard$
+// pins the effect's remembered card (Card.IsRemembered...), the only shape in
+// which a body's Defined$ Remembered is the very card the replacement
+// discarded.
+func redirectLineRemembered(params map[string]string) bool {
+	return strings.Contains(params["ValidCard"], "IsRemembered")
 }
 
 // redirectExileBody is replacementRedirectsToExile's body gate: body is the
 // Key$ Value map of the ReplaceWith$ SVar body (a parsed SVar line, not a
 // card Params map) and svars the face's SVar table its SubAbility$ names.
-func redirectExileBody(body map[string]string, svars map[string]string) bool {
-	if body["Defined"] != "ReplacedCard" || body["Destination"] != "Exile" {
+//
+// The head is a ChangeZone of the replaced card to exile -- or, from the
+// stack, to its owner's hand (Soulfire Grand Master's "put that card into
+// your hand instead of into your graveyard as it resolves"). Defined$
+// Remembered names the same card only when the line's ValidCard$ pins
+// IsRemembered (checked by the caller's params), so the head can never move
+// a different card than the one the replacement discarded. The head's
+// SubAbility$ chain is the "if you do, ..." rider (Lilah's plot, Feather's
+// delayed return, Gandalf's suspend grant, the one-shot self-exile idiom):
+// the head has already moved the card by then, so a rider this build cannot
+// resolve loses the rider, never the moved object -- but every link must be
+// a registered API so an unmodelled rider stays on the loud Note path.
+func redirectExileBody(body map[string]string, svars map[string]string, remembered bool) bool {
+	switch redirectDefinedCodes.Code(body["Defined"]) {
+	case redirectDefinedReplaced:
+	case redirectDefinedRemembered:
+		if !remembered {
+			return false
+		}
+	default:
+		return false
+	}
+	switch redirectDestinationCodes.Code(body["Destination"]) {
+	case redirectDestinationExile:
+	case redirectDestinationHand:
+		if redirectOriginCodes.Code(body["Origin"]) != redirectOriginStack {
+			return false
+		}
+	default:
 		return false
 	}
 	for k, v := range body {
@@ -820,8 +884,7 @@ func redirectExileBody(body map[string]string, svars map[string]string) bool {
 				return false
 			}
 		case redirectExileBodySubAbility:
-			line := svars[v]
-			if replacementBodyAPI(line) != "ChangeZone" || !selfExileIdiom(replacementBodyParams(line)) {
+			if !redirectRiderChain(v, svars, 0) {
 				return false
 			}
 		default:
@@ -831,11 +894,32 @@ func redirectExileBody(body map[string]string, svars map[string]string) bool {
 	return true
 }
 
-// selfExileIdiom reports whether sub (a parsed SVar body) is exactly the
-// one-shot `DB$ ChangeZone | Defined$ Self | Origin$ Command | Destination$
-// Exile` idiom that ends the Effect's registration (effects/zone.go).
-func selfExileIdiom(sub map[string]string) bool {
-	return len(sub) == 4 && sub["Defined"] == "Self" && sub["Origin"] == "Command" && sub["Destination"] == "Exile"
+// redirectRiderChain reports whether the SubAbility$ chain starting at name
+// is made only of registered effect APIs (bounded by maxChain so a cyclic
+// script cannot spin the registration gate).
+func redirectRiderChain(name string, svars map[string]string, depth int) bool {
+	if depth >= maxChain {
+		return false
+	}
+	line := svars[name]
+	api := replacementBodyAPI(line)
+	if api == "" {
+		return false
+	}
+	if _, ok := registry.load().byName[api]; !ok {
+		return false
+	}
+	sub := redirectSubName(replacementBodyParams(line))
+	if sub == "" {
+		return true
+	}
+	return redirectRiderChain(sub, svars, depth+1)
+}
+
+// redirectSubName is a replacementBodyParams-built SVar body's SubAbility$
+// name ("" when the chain ends).
+func redirectSubName(body map[string]string) string {
+	return body["SubAbility"]
 }
 
 // replacementBodyParams splits one SVar body line into its Key$ Value map.
@@ -1122,7 +1206,7 @@ var manaConvertParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "Valid
 
 var costStaticParamsReadableKeys = state.NewNameSet("Mode", "Type", "ValidCard", "ValidSA", "ValidPlayer", "ValidSpell", "ValidTarget", "Activator", "Caster", "Amount", "Cost", "Announce", "Color", "MinMana", "IgnoreGeneric", "RaiseTo", "OnlyFirstSpell", "IsPresent", "PresentZone", "PresentCompare", "CheckSVar", "SVarCompare", "CheckSecondSVar", "SecondSVarCompare", "Condition", "EffectZone", "AffectedZone", "Secondary", "Relative", "ClassBand", "UnlessValidTarget", "PlayerTurn", "Phases", "Description", "SpellDescription")
 
-var canAttackDefenderParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "ValidCards", "ValidTarget", "ValidAttacked", "Description", "Secondary", "IsPresent", "IsPresent2", "CheckSVar", "SVarCompare", "Condition")
+var canAttackDefenderParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "ValidCards", "ValidTarget", "ValidAttacked", "Description", "Secondary", "IsPresent", "IsPresent2", "PresentZone", "PresentCompare", "CheckSVar", "SVarCompare", "Condition")
 
 var absentDurationMeansThisTurnSet = state.NewNameSet(
 	"CantPutCounter",
@@ -1133,7 +1217,7 @@ var absentDurationMeansThisTurnSet = state.NewNameSet(
 	"CantGainLife",
 )
 
-var replacementRedirectsToExileKeys = state.NewNameSet("Event", "ValidCard", "ValidLKI", "Origin", "Destination", "ActiveZones", "EffectZone", "ReplaceWith", "Description", "Fizzle")
+var replacementRedirectsToExileKeys = state.NewNameSet("Event", "ValidCard", "ValidLKI", "Origin", "Destination", "ActiveZones", "EffectZone", "ReplaceWith", "Description", "Fizzle", "Optional")
 
 var effectOneShotDelayedModeSet = state.NewNameSet(
 	"SpellCast",
@@ -1193,6 +1277,38 @@ var isNextTurnDurationCodes = state.NewStrCodes(
 	state.StrEntry[isNextTurnDurationCode]{Key: "untiltheendofyournextturn", Val: isNextTurnDurationUntilYourNextTurn},
 )
 
+type redirectDefinedCode uint16
+
+const (
+	redirectDefinedReplaced redirectDefinedCode = iota + 1
+	redirectDefinedRemembered
+)
+
+var redirectDefinedCodes = state.NewStrCodes(
+	state.StrEntry[redirectDefinedCode]{Key: "ReplacedCard", Val: redirectDefinedReplaced},
+	state.StrEntry[redirectDefinedCode]{Key: "Remembered", Val: redirectDefinedRemembered},
+)
+
+type redirectDestinationCode uint16
+
+const (
+	redirectDestinationExile redirectDestinationCode = iota + 1
+	redirectDestinationHand
+)
+
+var redirectDestinationCodes = state.NewStrCodes(
+	state.StrEntry[redirectDestinationCode]{Key: "Exile", Val: redirectDestinationExile},
+	state.StrEntry[redirectDestinationCode]{Key: "Hand", Val: redirectDestinationHand},
+)
+
+type redirectOriginCode uint16
+
+const redirectOriginStack redirectOriginCode = 1
+
+var redirectOriginCodes = state.NewStrCodes(
+	state.StrEntry[redirectOriginCode]{Key: "Stack", Val: redirectOriginStack},
+)
+
 type redirectExileBodyCode uint16
 
 const (
@@ -1215,6 +1331,12 @@ var redirectExileBodyCodes = state.NewStrCodes(
 	state.StrEntry[redirectExileBodyCode]{Key: "WithCountersType", Val: redirectExileBodyAllowed},
 	state.StrEntry[redirectExileBodyCode]{Key: "WithCountersAmount", Val: redirectExileBodyAllowed},
 	state.StrEntry[redirectExileBodyCode]{Key: "Hidden", Val: redirectExileBodyHidden},
+	// RememberChanged$ True / ExiledWithEffectSource$ True (Lilah, Feather,
+	// Gandalf; Forger's Foundry): the head ChangeZone records the moved card
+	// for its SubAbility$ rider and tags it exiled-with the effect source --
+	// neither touches where the card goes.
+	state.StrEntry[redirectExileBodyCode]{Key: "RememberChanged", Val: redirectExileBodyHidden},
+	state.StrEntry[redirectExileBodyCode]{Key: "ExiledWithEffectSource", Val: redirectExileBodyHidden},
 	state.StrEntry[redirectExileBodyCode]{Key: "SubAbility", Val: redirectExileBodySubAbility},
 )
 
