@@ -790,6 +790,8 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		if d.Kind == decision.KPriority && e.G.Step == state.StepMain1 && e.G.Turn == targetTurn &&
 			(len(e.G.Stack) == 0 || sc.xmageFixture) {
 			r.logf("setup done: turn %d %s, stack %d", e.G.Turn, e.G.Step, len(e.G.Stack))
+			// A parked placement's drop is setup-only (placeSetupCard).
+			e.setupEntryDrops = nil
 			return nil
 		}
 		if err := r.answer(d, "setup"); err != nil {
@@ -1343,6 +1345,10 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 			if o.Kind == "keep" {
 				choices = []int{o.Index}
 			}
+		}
+	case decision.KChoose:
+		if idx, ok := r.unpayableTriggerCostWindowDone(d); ok {
+			choices = []int{idx}
 		}
 	}
 	if choices == nil {

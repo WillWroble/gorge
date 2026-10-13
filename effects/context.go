@@ -1390,10 +1390,12 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 }
 
 // definedZoneValidTargets resolves a zone-qualified Valid selector. Forge's
-// graveyard form ranges over every living player's graveyard; ownership and
-// control predicates decide which cards qualify from the resolving
-// controller's perspective (Supper for Spiders' OppOwn). Other zone-qualified
-// forms retain their controller-owned zone scope.
+// graveyard and library forms range over every living player's zone (Forge's
+// game.getCardsIn of the zone); ownership and control predicates decide which
+// cards qualify from the resolving controller's perspective (Supper for
+// Spiders' OppOwn, Etrata, Deadly Fugitive's TopLibrary+OwnedBy
+// TriggeredTarget cloaking the DAMAGED player's top card). Other
+// zone-qualified forms retain their controller-owned zone scope.
 func definedZoneValidTargets(h Host, g *state.Game, c *Ctx, spec string) ([]state.Target, bool) {
 	for _, zf := range zoneValidPrefixes {
 		filt, ok := strings.CutPrefix(spec, zf.prefix)
@@ -1405,7 +1407,7 @@ func definedZoneValidTargets(h Host, g *state.Game, c *Ctx, spec string) ([]stat
 		sc.DerivedPTs = append(sc.DerivedPTs, GreatestPowerDerivedPTs(g, filt, h)...)
 		var out []state.Target
 		players := []state.PlayerID{c.Controller}
-		if zf.zone == state.ZGraveyard {
+		if zf.zone == state.ZGraveyard || zf.zone == state.ZLibrary {
 			players = g.AliveFrom(c.Controller)
 		}
 		for _, player := range players {

@@ -101,6 +101,11 @@ type Engine struct {
 	// skipPass is the hypothetical-only auto-pass of quiet priority windows
 	// (skip_pass.go); set by the search's world setup, never cloned.
 	skipPass uint8 `clone:"reset"`
+	// setupEntryDrops is the oracle harness's parked fixture placements
+	// (oracle_setup_triggers.go): a battlefield placement whose entry an
+	// as-enters choice parked, whose entry triggers putTriggersOnStack
+	// discards once the entry completes. nil outside a fixture setup.
+	setupEntryDrops []setupEntryDrop `clone:"reset"`
 	// startingLife is Config.StartingLife with the 0-means-20 convention
 	// already resolved at genesis — the value state.NewGameLife opened the
 	// game with. It is the effects.Host StartingLife backing (the
