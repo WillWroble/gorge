@@ -153,6 +153,7 @@ type group struct {
 	answers []answer
 	kinds   []int // per answer: index into answerKinds
 	xvals   []xans
+	tail    bool // t.tailChoices: dropped when no step can place them
 }
 
 type translator struct {
@@ -175,6 +176,17 @@ type translator struct {
 	choiceList    []choice
 	droppedOrder  int
 	orphanMode    bool // a setModeChoice no action consumes (a trigger's modes)
+	// strict is setStrictChooseMode(true): every choice the game asks is
+	// stated by the test. Without it XMage's AI answers the unstated ones.
+	strict bool
+	// tailChoices are choices of a method with no action to bind them to
+	// (a trigger during the walk to the stop step): placed from step 0.
+	tailChoices []choice
+	// copied are names a copy effect (Clone, CopyPermanent) already emitted
+	// in the walk has given a second permanent: a later by-name ref to one
+	// object is ambiguous (XMage takes whichever it finds first).
+	copied  map[string]bool
+	copyRef map[string]string // "seat|name" -> the ref of seat's copy ("-": several)
 }
 
 func p0(v value) int {
@@ -183,12 +195,21 @@ func p0(v value) int {
 }
 
 func isTriggerOrderText(s string) bool {
+	s = strings.TrimSpace(s) + " "
 	for _, pfx := range []string{"When ", "Whenever ", "At the beginning", "At end"} {
 		if strings.HasPrefix(s, pfx) {
 			return true
 		}
 	}
 	return false
+}
+
+// isAbilityClause reports whether a castSpell/activateAbility spellOnStack
+// argument names a triggered ability ("When {this} enters", "Whenever a
+// creature dies"), not a spell: XMage waits for that trigger to be on the
+// stack, which the generated walk cannot express.
+func isAbilityClause(s string) bool {
+	return isTriggerOrderText(s) || strings.Contains(s, "{this}")
 }
 
 // assignChoices binds each queued XMage choice to the action that consumes
@@ -226,10 +247,13 @@ func (t *translator) assignChoices() {
 				}
 			}
 		}
-		if to != nil {
+		switch {
+		case to != nil:
 			to.choices = append(to.choices, ch)
-		} else if ch.mode > 0 {
+		case ch.mode > 0:
 			t.orphanMode = true
+		default:
+			t.tailChoices = append(t.tailChoices, ch)
 		}
 	}
 }
@@ -255,6 +279,7 @@ type result struct {
 	Status                     string // refused | pass | fail-harness | fail-expect
 	Dropped                    int
 	Unsupported                string         // "Card[prim,...]; ..." for cards gorge's coverage gate does not support
+	Strict                     bool           // setStrictChooseMode(true)
 	XAnswers                   map[int][]xans // final step index -> original XMage choices
 }
 
@@ -336,7 +361,7 @@ func translate(reg *cards.Registry, jc *javaClass, m *javaMethod, family string)
 	if jc.Extends == "CardTestPlayerBaseWithAIHelps" {
 		return fail(refuse("ai", "extends %s", jc.Extends))
 	}
-	t := &translator{reg: reg, jc: jc, m: m, consts: map[string]value{}, allNames: map[string]bool{}}
+	t := &translator{reg: reg, jc: jc, m: m, consts: map[string]value{}, allNames: map[string]bool{}, copied: map[string]bool{}, copyRef: map[string]string{}}
 	for k, v := range jc.Consts {
 		t.consts[k] = v
 	}
@@ -351,6 +376,7 @@ func translate(reg *cards.Registry, jc *javaClass, m *javaMethod, family string)
 	res.Scenario, res.Groups = sc, groups
 	res.Status = "generated"
 	res.Unsupported = t.unsupportedCards()
+	res.Strict = t.strict
 	return res
 }
 
@@ -384,6 +410,7 @@ func (t *translator) read() *refusal {
 		}
 		calls = append(calls, c)
 	}
+	executed := false
 	for i, c := range calls {
 		if c.Recv != "" && c.Recv != "this" && c.Recv != "super" {
 			if c.Recv == "Assert" || strings.HasPrefix(c.Name, "assert") {
@@ -393,6 +420,17 @@ func (t *translator) read() *refusal {
 		}
 		if t.jc.Helpers[c.Name] {
 			return refuse("helper-call", "%s", c.Name)
+		}
+		if c.Name == "setStrictChooseMode" && len(c.Args) == 1 && c.Args[0].kind == vBool {
+			t.strict = c.Args[0].b
+		}
+		if c.Name == "execute" {
+			if executed {
+				// each execute() runs to its own setStopAt and asserts
+				// there; one scenario has one stop and one expect list
+				return refuse("multi-execute", "execute() called more than once")
+			}
+			executed = true
 		}
 		if ignoredCalls[c.Name] {
 			continue
@@ -507,8 +545,11 @@ func (t *translator) readCall(idx int, c call) *refusal {
 			}
 			return refuse("bad-args", "addCard zone %s", c.Args[0].s)
 		}
-		if _, ok := t.lookup(name); !ok {
+		if c, ok := t.lookup(name); !ok {
 			return refuse("unknown-card", "%s", name)
+		} else if len(c.Faces) > 1 && c.Faces[0] != nil && !sameName(c.Faces[0].Name, name) && !strings.Contains(c.Faces[0].Name, " // ") {
+			// The runner deals a card by its front-face name.
+			return refuse("back-face-setup", "%s is a back face of %s", name, c.Faces[0].Name)
 		}
 		if n > 60 {
 			return refuse("bad-args", "addCard count %d", n)
@@ -559,8 +600,12 @@ func (t *translator) readCall(idx int, c call) *refusal {
 					a.resolveAfter = x.b
 				case vStr:
 					if len(a.targets) > 0 {
-						// spellOnStack: ordering condition; the spell is
-						// already on the stack in the generated order.
+						// spellOnStack: ordering condition; a spell is
+						// already on the stack in the generated order, a
+						// triggered ability is not.
+						if isAbilityClause(x.s) {
+							return refuse("stack-clause", "castSpell waits for %q", x.s)
+						}
 						continue
 					}
 					a.targets = append(a.targets, x.s)
@@ -585,6 +630,9 @@ func (t *translator) readCall(idx int, c call) *refusal {
 				switch x.kind {
 				case vStr:
 					if len(a.targets) > 0 {
+						if isAbilityClause(x.s) {
+							return refuse("stack-clause", "activateAbility waits for %q", x.s)
+						}
 						continue
 					}
 					a.targets = append(a.targets, x.s)
@@ -697,6 +745,10 @@ func (t *translator) readCall(idx int, c call) *refusal {
 			}
 			if strings.Contains(v.s, "^") || strings.Contains(v.s, "=") {
 				return refuse("multi-target", "%s %q", c.Name, v.s)
+			}
+			if strings.Contains(v.s, "[only copy]") {
+				// legend rule: keep the copy, not a named card
+				return refuse("special-choice", "%s %q", c.Name, v.s)
 			}
 			ch.pick = "name:" + v.s
 		case v.kind == vIdent:
