@@ -109,7 +109,7 @@ func (b *Best23) Build(set string, pool []limited.CardRef) build.Deck {
 	// scored on its in-pair cards alone (spec §4.6 step 1): a pair short of
 	// MainSize playables pays ShortPairPenalty per unfilled slot instead of
 	// being credited with the off-colour cards the build would pad it with,
-	// so a thin pair padded with other colours' best cards cannot outscores
+	// so a thin pair padded with other colours' best cards cannot outscore
 	// a deep real pair. The build itself still pads the chosen pair with the
 	// best remaining cards of any colour (spec §4.6 step 4's off-colour
 	// fill) — that fill is never scored.
