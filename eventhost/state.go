@@ -62,6 +62,26 @@ func (r *run) seriesFor(seat int, results []event.SeriesOutcome, rd, a, b int) p
 		}
 	}
 	if rd == r.ev.Round() && r.ev.Started(a, b) {
+		// A result still waiting for its pairing-order log slot shows as
+		// ended with its score and winner already; the log catches up in
+		// flush's order, and standings stay log-derived.
+		if o, ok := r.outcomes[[2]int{a, b}]; ok && o.m.State == protocol.MatchFinished {
+			ser.State = "ended"
+			ser.Table = o.m.Table
+			if o.m.Winner != nil {
+				w := a
+				if *o.m.Winner == 1 {
+					w = b
+				}
+				ser.Winner = &w
+				if w == a {
+					ser.Score = [2]int{1, 0}
+				} else {
+					ser.Score = [2]int{0, 1}
+				}
+			}
+			return ser
+		}
 		ser.State = "live"
 		for _, att := range r.ev.InFlight() {
 			if att.A != a || att.B != b {
