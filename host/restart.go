@@ -2,6 +2,7 @@ package host
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -73,16 +74,21 @@ func (r *Registry) load() error {
 			continue
 		}
 		cfg, err := rec.Config.validated(r.opts.LoadDeck)
-		if err != nil {
-			// A table written by an older binary can fail validation the
-			// new process enforces — e.g. a decklist-reading bot policy
-			// (bots.Info.Env) persisted before the allow_decklist_bots
-			// opt-in existed. Skipping it (and rewriting the file below,
-			// with the rest of the dropped tables) beats failing the whole
-			// start over one stale table.
+		if err != nil && errors.Is(err, errDecklistBotRefusal) {
+			// A table written by an older binary can fail the decklist
+			// ruling the new process enforces — e.g. a decklist-reading
+			// bot policy (bots.Info.Env) persisted before the
+			// allow_decklist_bots opt-in existed. Skipping it (and
+			// rewriting the file below, with the rest of the dropped
+			// tables) beats failing the whole start over one stale
+			// table. Every other validation error still fails the
+			// start: TestBotPolicyPersistsItsNormalizedDefaultAndRejectsUnknownRestore
+			// pins that an unknown policy name is a hard error.
 			log.Printf("host: restart: skipping table %s: %v", rec.Config.ID, err)
 			dropped = true
 			continue
+		} else if err != nil {
+			return err
 		}
 		rec.Config = cfg
 		t := newTable(cfg)
