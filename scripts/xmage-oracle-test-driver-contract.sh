@@ -14,8 +14,11 @@ mkdir -p "$out"
 javac -J-Xmx512m -nowarn -d "$out" -cp "$cp" \
   "$here/tools/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java" \
   "$here/tools/xmageoracle/test/org/mage/test/oracle/ScenarioReplayDriverContractTest.java" \
-  "$here/tools/xmageoracle/test/org/mage/test/oracle/OptionalTargetSkipsTest.java"
+  "$here/tools/xmageoracle/test/org/mage/test/oracle/OptionalTargetSkipsTest.java" \
+  "$here/tools/xmageoracle/test/org/mage/test/oracle/ScenarioReplayOpeningPassAttackOrderTest.java"
 java -Xmx512m -XX:ActiveProcessorCount=2 -Dlog4j.configuration=file:/dev/null -cp "$out:$cp" \
   org.mage.test.oracle.ScenarioReplayDriverContractTest
 java -Xmx512m -XX:ActiveProcessorCount=2 -Dlog4j.configuration=file:/dev/null -cp "$out:$cp" \
   org.mage.test.oracle.OptionalTargetSkipsTest
+java -Xmx512m -XX:ActiveProcessorCount=2 -Dlog4j.configuration=file:/dev/null -cp "$out:$cp" \
+  org.mage.test.oracle.ScenarioReplayOpeningPassAttackOrderTest
