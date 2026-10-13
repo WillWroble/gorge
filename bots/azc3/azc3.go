@@ -35,6 +35,7 @@ import (
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/seat"
 )
 
@@ -45,7 +46,18 @@ var (
 	mu      sync.Mutex
 	enabled bool
 	model   *policynet.Model
+	belief  *searchprobe.Belief
 )
+
+// SetBelief closes the opponents' deck lists for every az-c3 seat built
+// afterwards: the search deals each opponent's unknown cards from lists
+// drawn from b (azmcts.WorldRedealClosed) instead of the opponent's real
+// list. gorged calls it for -az-c3-belief. Nil restores the open lists.
+func SetBelief(b *searchprobe.Belief) {
+	mu.Lock()
+	defer mu.Unlock()
+	belief = b
+}
 
 // Enable loads the network at path and registers the az-c3 policy. It must run
 // before the server resolves its policy flags, once per process; a path that
@@ -118,6 +130,18 @@ func Config() azmcts.SeatConfig {
 	return cfg
 }
 
+// ClosedConfig is Config with the opponents' lists closed under b
+// (azmcts.WorldRedealClosed): the seat's own list stays known, the
+// opponent's unknown cards are dealt from lists drawn from b. A nil b is
+// Config, the open lists.
+func ClosedConfig(b *searchprobe.Belief) azmcts.SeatConfig {
+	cfg := Config()
+	if b != nil {
+		cfg.World, cfg.Belief = azmcts.WorldRedealClosed, b
+	}
+	return cfg
+}
+
 // newSeat is the registry factory. The seat pays its own mana through the
 // engine's automatic payment plans, as it did in training, so a table built
 // without them is refused here rather than played at a handicap.
@@ -126,10 +150,10 @@ func newSeat(o bots.Options) (seat.Seat, error) {
 		return nil, errors.New("az-c3 needs automatic mana payment (gorged -bot-auto-mana, the default)")
 	}
 	mu.Lock()
-	m := model
+	m, b := model, belief
 	mu.Unlock()
 	if m == nil {
 		return nil, errors.New("az-c3: no network loaded (Enable was not called)")
 	}
-	return azredeal.NewWithModel(o, Config(), m)
+	return azredeal.NewWithModel(o, ClosedConfig(b), m)
 }

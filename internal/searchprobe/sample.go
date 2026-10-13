@@ -23,6 +23,13 @@ type PublicGame struct {
 	Decks        [][]*cards.Card
 	Tokens       map[string]*cards.Card
 	StartingLife int32
+	// Belief, when non-nil, closes every opponent's list: the redeal (and
+	// only the redeal -- Sample's rejection sampler does not read it) deals
+	// each player other than the History's actor its unknown hidden cards
+	// from a list drawn from this belief, never from Decks, whose entries
+	// for those players may be nil (PublicGame.Closed). Nil is the open
+	// game, every player's list declared.
+	Belief *Belief
 }
 type History struct {
 	Actor   state.PlayerID

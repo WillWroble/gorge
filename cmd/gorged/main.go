@@ -136,7 +136,11 @@ type config struct {
 	// policy to the deck ids reserved for it; serve fills it from -az-c3-decks.
 	az3Net, az3Decks string
 	az3DemoTable     bool
-	policyPools      map[string][]string
+	// az3Belief and az3BeliefPool are -az-c3-belief and -az-c3-belief-pool
+	// (azc3.go): the deck corpus az-c3's closed-list search draws its
+	// opponents' lists from. Empty: the open lists (the opponent's real one).
+	az3Belief, az3BeliefPool string
+	policyPools              map[string][]string
 	// allowDecklistBots is the -allow-decklist-bots flag (azc3.go): the
 	// operator's explicit opt-in that lets the server's own BOT-ONLY tables
 	// run a policy that reads every seat's real decklist (bots.Info.Env).
@@ -338,6 +342,8 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
 	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -allow-decklist-bots, -auto-mana and -bot-auto-mana; runs only on its bot-only demo table, never against a human)")
 	fs.BoolVar(&c.az3DemoTable, "az-c3-demo-table", true, "with -az-c3-net: add one two-seat az-c3 vs az-c3 table, dealt from -az-c3-decks, for spectators")
+	fs.StringVar(&c.az3Belief, "az-c3-belief", "", "with -az-c3-net: close the opponents' deck lists -- az-c3 deals each opponent's unknown cards from lists drawn from the decks in this directory (the TRAIN split of its pool), never from the opponent's real list")
+	fs.StringVar(&c.az3BeliefPool, "az-c3-belief-pool", "", "with -az-c3-belief: a pool.tsv naming the belief decks; only its train split is read (default: every deck file in -az-c3-belief)")
 	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
 	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
@@ -386,6 +392,9 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	reg, err := cards.SharedCorpus(c.cards)
 	if err != nil {
 		return fmt.Errorf("opening corpus at %s: %w (run make fetch-cards compile-cards)", c.cards, err)
+	}
+	if err := c.azc3Belief(reg); err != nil {
+		return err
 	}
 	// -humans applies to table t1 alone by configuration. Claims are now
 	// table-bound, so this is no longer a security restriction; parse it now

@@ -17,6 +17,8 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/gonet/gonettest"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/seat"
 )
 
@@ -168,5 +170,26 @@ func TestWantsEnvCoversEverySearchedKind(t *testing.T) {
 		if got := env.WantsEnv(&c.d); got != c.want {
 			t.Errorf("WantsEnv(%s) = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// ClosedConfig is Config plus the closed world under a belief, and Config
+// itself (the open lists) without one.
+func TestClosedConfigClosesTheOpponentsLists(t *testing.T) {
+	if !reflect.DeepEqual(azc3.ClosedConfig(nil), azc3.Config()) {
+		t.Fatal("ClosedConfig(nil) differs from Config")
+	}
+	_, decks := testutil.SampleDecks(t, 2)
+	b, err := searchprobe.NewBelief(decks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := azc3.ClosedConfig(b)
+	if c.World != azmcts.WorldRedealClosed || c.Belief != b {
+		t.Fatalf("closed config: world %q, belief %v", c.World, c.Belief != nil)
+	}
+	c.World, c.Belief = azc3.Config().World, nil
+	if !reflect.DeepEqual(c, azc3.Config()) {
+		t.Fatal("ClosedConfig changed more than the world and the belief")
 	}
 }

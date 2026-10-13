@@ -58,6 +58,8 @@ func TestAZC3FlagsValidate(t *testing.T) {
 		{"no -allow-decklist-bots", func(c *config) { c.allowDecklistBots = false }, "needs -allow-decklist-bots"},
 		{"no -auto-mana", func(c *config) { c.autoMana = false }, "-auto-mana"},
 		{"no -bot-auto-mana", func(c *config) { c.botAutoPayMana = false }, "-bot-auto-mana"},
+		{"belief without a network", func(c *config) { c.az3Net, c.az3Decks, c.az3Belief = "", "", "b" }, "-az-c3-belief needs -az-c3-net"},
+		{"belief pool without a belief", func(c *config) { c.az3BeliefPool = "pool.tsv" }, "-az-c3-belief-pool needs -az-c3-belief"},
 	}
 	for _, c := range cases {
 		cfg := ok
@@ -340,5 +342,31 @@ func TestAZC3DemoTable(t *testing.T) {
 	}
 	if c.azc3Table(nil, view.Public) != nil {
 		t.Error("an empty pool built a demo table")
+	}
+}
+
+// -az-c3-belief loads its decks (every deck file, or the train split a
+// -az-c3-belief-pool names) and refuses a directory with none.
+func TestAZC3BeliefLoading(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	t.Cleanup(func() { azc3.SetBelief(nil) })
+	if err := (config{}).azc3Belief(reg); err != nil {
+		t.Fatalf("no flag: %v", err)
+	}
+	dir := t.TempDir()
+	writeDeck(t, dir, "FDN_a", "")
+	writeDeck(t, dir, "FDN_b", "")
+	if err := (config{az3Belief: dir}).azc3Belief(reg); err != nil {
+		t.Fatal(err)
+	}
+	pool := filepath.Join(t.TempDir(), "pool.tsv")
+	if err := os.WriteFile(pool, []byte("name\tsplit\tcolors\nFDN_a\ttrain\tRG\nFDN_b\teval\tRG\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (config{az3Belief: dir, az3BeliefPool: pool}).azc3Belief(reg); err != nil {
+		t.Fatal(err)
+	}
+	if err := (config{az3Belief: t.TempDir()}).azc3Belief(reg); err == nil {
+		t.Fatal("an empty belief directory was accepted")
 	}
 }

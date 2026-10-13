@@ -26,6 +26,7 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/seat"
 	"github.com/adams-shaun/gorge/view"
@@ -131,10 +132,11 @@ type hostedSeat struct {
 }
 
 var (
-	_ bots.EnvSeat          = (*hostedSeat)(nil)
-	_ bots.BudgetedSeat     = (*hostedSeat)(nil)
-	_ seat.BoardSeat        = (*hostedSeat)(nil)
-	_ searchseat.SearchSeat = (*hostedSeat)(nil)
+	_ bots.EnvSeat              = (*hostedSeat)(nil)
+	_ bots.BudgetedSeat         = (*hostedSeat)(nil)
+	_ seat.BoardSeat            = (*hostedSeat)(nil)
+	_ searchseat.SearchSeat     = (*hostedSeat)(nil)
+	_ searchseat.ClosedListSeat = (*hostedSeat)(nil)
 )
 
 // Decide is the plain Seat half: the wrapped bot. Decisions where WantsEnv is
@@ -154,6 +156,17 @@ func (s *hostedSeat) SetRecorder(fn func(policynet.VisitRecord)) {
 	}); ok {
 		recorder.SetRecorder(fn)
 	}
+}
+
+// SearchBelief forwards the wrapped seat's closed-list belief
+// (searchseat.ClosedListSeat): the host and the bench close this seat's
+// public game, and so the honest root they build for it, with it. Nil for
+// the open-list config.
+func (s *hostedSeat) SearchBelief() *searchprobe.Belief {
+	if c, ok := s.bot.(searchseat.ClosedListSeat); ok {
+		return c.SearchBelief()
+	}
+	return nil
 }
 
 // DecideSearch keeps this adapter usable by botbench's engine-owning driver.

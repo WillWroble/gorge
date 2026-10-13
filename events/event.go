@@ -1192,10 +1192,23 @@ const (
 	// DrawBatchProposal so every earlier ordinal, hash chain and golden
 	// replay is unaffected.
 	SpellCastReversed
+	// HiddenIdentity re-identifies one hidden card in a HYPOTHETICAL search
+	// world: the closed-decklist redeal (internal/searchprobe) gives an
+	// opponent's unknown hand and library cards identities sampled from a
+	// belief over deck lists instead of permuting the real ones. Obj is the
+	// card (in its owner's hand or library), Player its owner, Amount the new
+	// card's ordinal in state.Game.HypotheticalCards and Text that card's
+	// primary-face name; the fold checks the name against the table, so a
+	// stale ordinal changes nothing (and rules.ReidentifyHidden, the only
+	// emitter, fails loudly on it). It is always Secret and is only ever
+	// emitted on a hypothetical engine -- never in a match, a replay or a
+	// golden game. Appended after SpellCastReversed so every earlier ordinal,
+	// hash chain and golden replay is unchanged.
+	HiddenIdentity
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(SpellCastReversed) + 1
+	NumKinds = int(HiddenIdentity) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving
