@@ -71,11 +71,16 @@ func effGoad(h Host, c *Ctx, sa *cards.SA) {
 // alterAttributeNames lists the supported designation names in their
 // canonical spelling; the index is the alterAttribute* code below. Matching is
 // case-insensitive, like Forge's Attributes$ spelling.
-var alterAttributeNames = [...]string{"Suspected", "Prepared", "Saddled", "Solved", "Harnessed"}
+var alterAttributeNames = [...]string{"Suspected", "Prepared", "Saddled", "Solved", "Harnessed", "Plotted"}
 
 const (
 	alterAttributePrepared = 1
 	alterAttributeSolved   = 3
+	// alterAttributePlotted (CR 701.34): the designation sits on an EXILED
+	// card (Lilah, Undefeated Slickshot's "it becomes plotted" rider, Aven
+	// Interrupter, Kellan Joins Up), so the target zone gate is exile, not the
+	// battlefield every other designation needs.
+	alterAttributePlotted = 5
 )
 
 // effAlterAttribute applies Forge's AlterAttribute effect: it flips a
@@ -98,8 +103,9 @@ const (
 // a controller. Solved never ends while the Case stays on the battlefield,
 // so an already-solved Case emits no second grant: the grant IS the "you
 // solve a Case" event Mode$ CaseSolved matches, and a Case is solved once.
-// A body naming any other attribute (Plotted, Commander -- the
-// corpus's remaining populations) emits the loud unsupported-attribute Note
+// Plotted (CR 701.34) grants the exiled card the plotted designation the free
+// later-turn cast reads. A body naming any other attribute (Commander -- the
+// corpus's remaining population) emits the loud unsupported-attribute Note
 // and moves nothing, exactly like the Manifest/Cloak out-of-scope shapes:
 // registration claims the API, the Note claims the gap.
 //
@@ -128,6 +134,10 @@ func effAlterAttribute(h Host, c *Ctx, sa *cards.SA) {
 		}
 		text := alterAttributeNames[code]
 		prepared, solved := code == alterAttributePrepared, code == alterAttributeSolved
+		zone := state.ZBattlefield
+		if code == alterAttributePlotted {
+			zone = state.ZExile
+		}
 		amount := int32(1)
 		if !activate {
 			amount = -1
@@ -137,7 +147,7 @@ func effAlterAttribute(h Host, c *Ctx, sa *cards.SA) {
 				continue
 			}
 			o := h.Game().Obj(t.Obj)
-			if o == nil || o.Zone != state.ZBattlefield {
+			if o == nil || o.Zone != zone {
 				continue
 			}
 			// CR 722.3a: only a permanent that HAS a prepare spell can gain

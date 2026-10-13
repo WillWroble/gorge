@@ -111,6 +111,12 @@ type offerTry struct {
 	// for "if a creature died this turn"); extraHand is the cards it casts.
 	prelude   []oraclegen.Step
 	extraHand []string
+	// attack is the self-attack prelude a "Card.Self+attackedThisTurn" gate
+	// needs (a Vehicle's crew, its attack, then main 2) and attackXAbility
+	// the XMage rule-text prefix parallel to it. The control omits it: the
+	// source it names is removed.
+	attack         []oraclegen.Step
+	attackXAbility []string
 	// extraBF and extraGY are p0 cards a cost-reduction grant needs to
 	// reduce with (an artifact to affinity or improvise, a graveyard card to
 	// delve): the reduction is exactly one short of what mana pays for.
@@ -168,6 +174,9 @@ func staticOfferItem(reg *cards.Registry, c *cards.Card, f *cards.Face, name str
 	if it, ok := staticExileOfferItem(reg, f, name, req, st); ok {
 		return it, true
 	}
+	if it, ok := staticExileOpponentOfferItem(reg, f, name, req, st); ok {
+		return it, true
+	}
 	return oraclegen.Item{}, false
 }
 
@@ -200,6 +209,14 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 				return nil
 			}
 		}
+		var attack []oraclegen.Step
+		var attackXab, attackBF []string
+		if staticNeedsSelfAttack(st) {
+			var ok bool
+			if attack, attackXab, attackBF, ok = selfAttackPrelude(f, name); !ok {
+				return nil
+			}
+		}
 		probes := offerProbeNames
 		if self {
 			probes = []string{name}
@@ -215,6 +232,7 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 						continue
 					}
 					t.extraGY, t.prelude, t.extraHand = evidence, died, diedHand
+					t.attack, t.attackXAbility, t.extraBF = attack, attackXab, attackBF
 					tries = append(tries, t)
 				}
 			}
@@ -387,6 +405,9 @@ func offerScenario(f *cards.Face, name string, t offerTry, want bool, base *orac
 		if !(t.self && control) {
 			steps = append(steps, t.prelude...)
 		}
+		if !control {
+			steps = append(steps, t.attack...)
+		}
 		sc = staticScenario(f, name, bf, nil, append(steps, tail...))
 	}
 	setup := make(map[string]oraclegen.Seat, len(sc.Setup))
@@ -439,8 +460,45 @@ func offerItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requi
 		}
 	}
 	it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"601.3"}, sc)
+	if len(t.attackXAbility) > 0 && base == nil {
+		// XAbility is parallel to Steps: the main-1 pass is step 0, the
+		// self-attack prelude follows it (after any creature-death prelude).
+		it.XAbility = make([]string, len(sc.Steps))
+		copy(it.XAbility[1+len(t.prelude):], t.attackXAbility)
+	}
 	it.XAnswers = oraclegen.XAnswersForScenario(res, sc, oraclegen.ModeNumbers(f), nil)
 	return it, true
+}
+
+// staticNeedsSelfAttack reports whether st's IsPresent$ gate reads that its
+// own source attacked this turn (The Lunar Whale's "As long as CARDNAME
+// attacked this turn, you may play the top card of your library").
+func staticNeedsSelfAttack(st cards.Static) bool {
+	return strings.Contains(strings.ToLower(st.ParamStr(cards.PKIsPresent)), "card.self+attackedthisturn")
+}
+
+// selfAttackPrelude is the steps that make the source attack: a Vehicle is
+// crewed first (the crew cost's catalogue taps are returned for the caller to
+// place), then attacks, and the scenario moves to main 2 where a play
+// permission is observable. xab is parallel to the returned steps.
+func selfAttackPrelude(f *cards.Face, name string) (steps []oraclegen.Step, xab, taps []string, ok bool) {
+	if crewAbilityIndex(f) >= 0 {
+		var cs []oraclegen.Step
+		var cx []string
+		var cok bool
+		cs, cx, taps, _, cok = crewPrelude(f, name)
+		if !cok {
+			return nil, nil, nil, false
+		}
+		steps, xab = cs, cx
+	} else if !f.IsCreature() {
+		return nil, nil, nil, false
+	}
+	steps = append(steps,
+		oraclegen.Step{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + name}},
+		oraclegen.Step{Op: "pass_to", Step: "main2"})
+	xab = append(xab, "", "")
+	return steps, xab, taps, true
 }
 
 // removeFixtureOnce returns xs without its first name.

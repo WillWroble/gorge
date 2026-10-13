@@ -161,6 +161,14 @@ func effPutCounter(h Host, c *Ctx, sa *cards.SA) {
 		putCounterEachFromSource(h, c, sa, etb, pc.EachFromSource)
 		return
 	}
+	if pc.ExistingCounter && pc.Choices == "" {
+		putCounterExisting(h, c, sa, pc, n)
+		return
+	}
+	if pc.ExistingCounter && pc.Choices != "" {
+		putCounterExistingChoices(h, c, sa, pc, n)
+		return
+	}
 	// CounterType$ comma lists are choices between counter kinds, never a
 	// composite counter name. A bare Choices$ picks its recipient FIRST, then
 	// asks for the individual kind while carrying that answered recipient on

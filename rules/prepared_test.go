@@ -12,6 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestPrepareCensusCountsPreparedAttributeCarriers is the census half of the
@@ -22,10 +25,7 @@ import (
 // ordinary member of this class -- the engine special-cases no card.
 func TestPrepareCensusCountsPreparedAttributeCarriers(t *testing.T) {
 	t.Parallel()
-	dir := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("corpus absent (%v): prepared census needs .cards/cardsfolder", err)
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	var carriers []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".txt") {

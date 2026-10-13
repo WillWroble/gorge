@@ -5,35 +5,14 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/seat"
 )
-
-// corpusDir returns the corpus directory or skips: a fresh worktree without
-// .cards would otherwise run every corpus test vacuously green. The test
-// binary's cwd is this package directory, so the repo root is resolved with
-// git (through cards.GitEnv, so an inherited GIT_* does not misdirect it).
-func corpusDir(t *testing.T) string {
-	t.Helper()
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("could not resolve git repo root: %v", err)
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	return dir
-}
 
 // --- SPSA core -------------------------------------------------------------
 
@@ -181,7 +160,7 @@ func TestSPSAPerturbationsAreDistinctAndDeterministic(t *testing.T) {
 // controller-note requirement: cmd/botbench's package-level cast-profile
 // override would put one profile on both sides; the fit must not.
 func TestTwoWeightSetsReachTheTwoSides(t *testing.T) {
-	dir := corpusDir(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	pairs, err := resolvePairs("mono-black-aggro:mono-white-equipment")
 	if err != nil {
 		t.Fatalf("resolvePairs: %v", err)
@@ -223,7 +202,7 @@ func TestTwoWeightSetsReachTheTwoSides(t *testing.T) {
 // with -workers 1 and -workers 8 and asserts the trace CSV and the final
 // profile are byte-identical: -workers is a scheduling budget only.
 func TestFitIsDeterministicAcrossWorkers(t *testing.T) {
-	dir := corpusDir(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	tmp := t.TempDir()
 	run := func(workers int) (trace string, profile string) {
 		t.Helper()
@@ -269,7 +248,7 @@ func TestFitIsDeterministicAcrossWorkers(t *testing.T) {
 // writes /dev/null -- the command completes and the fitted profile loads
 // back through L2's loader.
 func TestRunSmokeCompletes(t *testing.T) {
-	dir := corpusDir(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var stdout, stderr bytes.Buffer
 	code := mainExit([]string{
 		"-dir", dir,
@@ -332,7 +311,7 @@ func TestHeldOutSeedRefusal(t *testing.T) {
 // TestCliRefusesHeldOutSeed pins the refusal at the CLI: a -seed whose whole
 // block touches the reserved range exits non-zero with a clear message.
 func TestCliRefusesHeldOutSeed(t *testing.T) {
-	dir := corpusDir(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var stdout, stderr bytes.Buffer
 	// 1 pair x 4 games x 3 iters = 12 seeds from 999995 -> [999995, 1000007).
 	code := mainExit([]string{

@@ -137,7 +137,7 @@ func (e *Engine) handlePriority(d *decision.Decision, in decision.Intent) {
 		// the same cost flow a cast drives (rules/activate.go's
 		// beginActivation -> pendingCast -> continueCast -> commitCast).
 		e.emit(events.Event{Kind: events.Priority, Player: e.G.Priority, Amount: 0})
-		e.beginActivation(in.Player, opt)
+		e.beginActivationPaid(in.Player, opt, e.paidManaCensus)
 
 	case optConcede:
 		// M2d-3 (R-M3): choosing the concede option emits the existing

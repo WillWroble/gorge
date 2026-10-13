@@ -94,18 +94,36 @@ var sharedCorpora struct {
 // can stand in for two builds with differing parsers. Production callers use
 // OpenCorpus, which passes the embedded CompilerFingerprint.
 func openCorpus(dir, fingerprint string) (*Registry, error) {
+	return openCorpusWith(dir, fingerprint, CompileDir)
+}
+
+// openCorpusWith is openCorpus with the compiler injected, so a test can count
+// how many openers actually compiled (TestColdCacheCompilesOnce).
+//
+// A miss takes the cache's single-flight lock (lockCache) and checks the
+// cache again under it: a peer that held the lock first has compiled and
+// saved by the time we get it, so we load its cache instead of compiling
+// the corpus a second time. The lock covers check, compile and Save only;
+// loading the saved cache back happens after release so waiters start their
+// own loads in parallel.
+func openCorpusWith(dir, fingerprint string, compile func(string) (*Registry, []Diag, error)) (*Registry, error) {
 	cache := cachePathFor(dir, fingerprint)
-	if cacheFresh(dir, cache) {
-		if r, err := LoadRegistry(cache); err == nil {
-			rerootPaths(r, dir)
-			return r, nil
-		}
+	if r, ok := loadFreshCache(dir, cache); ok {
+		return r, nil
 	}
-	r, _, err := CompileDir(CorpusDir(dir))
+	unlock := lockCache(cache)
+	if r, ok := loadFreshCache(dir, cache); ok {
+		unlock()
+		return r, nil
+	}
+	r, _, err := compile(CorpusDir(dir))
 	if err != nil {
+		unlock()
 		return nil, err
 	}
-	if err := r.Save(cache); err == nil {
+	saveErr := r.Save(cache)
+	unlock()
+	if saveErr == nil {
 		// Serve the imaged registry the cache now holds, so a recompile
 		// costs the GC no more than a cache hit does.
 		if lr, err := LoadRegistry(cache); err == nil {
@@ -126,6 +144,20 @@ func openCorpus(dir, fingerprint string) (*Registry, error) {
 	}
 	rerootPaths(lr, dir)
 	return lr, nil
+}
+
+// loadFreshCache loads cache when it is fresh for dir (cacheFresh) and
+// decodes, re-rooted at dir; ok is false on any miss.
+func loadFreshCache(dir, cache string) (*Registry, bool) {
+	if !cacheFresh(dir, cache) {
+		return nil, false
+	}
+	r, err := LoadRegistry(cache)
+	if err != nil {
+		return nil, false
+	}
+	rerootPaths(r, dir)
+	return r, true
 }
 
 // cacheFresh reports whether cache is a usable IR cache for dir: it exists
@@ -204,6 +236,8 @@ func PruneCaches(dir, keepPath string) {
 			_ = os.Remove(s)
 		}
 	}
+	// So does a single-flight lock file (cache_lock.go), unless it is held.
+	pruneCacheLocks(dir)
 }
 
 func pruneCaches(dir, keepPath string) {

@@ -1,18 +1,15 @@
 package paymirror
 
 import (
-	"bufio"
-	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
-// TestRoundTenFindingsMirror replays the round-10 paymirror finding games
+// TestRoundTenFindingsMirror (TestRoundTenFindingsMirrorChunkNN, sharded per
+// findings_chunks_test.go) replays the round-10 paymirror finding games
 // (testdata/round10.jsonl: repo deck names or random card-name lists, no
 // script text) end to end: no cast is a mismatch, no planned cast falls back
 // or misses its witness, the live-vs-clone control is equivalent, and each
@@ -68,41 +65,38 @@ import (
 // October 5 main merge it reaches seq 6402, with the same card and verdict,
 // and ticket agent-20261006T052735Z-5c29adb5 then removes the cast from the
 // game (see the 12468 entry above), so the seed's pin is now empty.
-func TestRoundTenFindingsMirror(t *testing.T) {
+//
+// roundTenWant holds those pins.
+var roundTenWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
+	12468: {},
+	11828: {},
+	12603: {2298: ""},
+	10877: {2834: ""},
+}
+
+const (
+	roundTenFile   = "testdata/round10.jsonl"
+	roundTenChunks = 4
+)
+
+func TestRoundTenFindingsMirrorChunk00(t *testing.T) { runRoundTenChunk(t, 0) }
+func TestRoundTenFindingsMirrorChunk01(t *testing.T) { runRoundTenChunk(t, 1) }
+func TestRoundTenFindingsMirrorChunk02(t *testing.T) { runRoundTenChunk(t, 2) }
+func TestRoundTenFindingsMirrorChunk03(t *testing.T) { runRoundTenChunk(t, 3) }
+
+// TestRoundTenFindingsMirrorChunksPartitionTheSpecs: the chunks play every
+// round-10 spec exactly once (checkFindingPartition).
+func TestRoundTenFindingsMirrorChunksPartitionTheSpecs(t *testing.T) {
+	checkFindingPartition(t, findingSpecs(t, roundTenFile, 4), roundTenChunks, []func(*testing.T){
+		TestRoundTenFindingsMirrorChunk00, TestRoundTenFindingsMirrorChunk01,
+		TestRoundTenFindingsMirrorChunk02, TestRoundTenFindingsMirrorChunk03})
+}
+
+// runRoundTenChunk is one shard of TestRoundTenFindingsMirror.
+func runRoundTenChunk(t *testing.T, i int) {
 	t.Parallel()
-	reg := testutil.CorpusRegistry(t)
-	d, err := LoadDecks(reg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := os.Open("testdata/round10.jsonl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	var specs []GameSpec
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1<<20), 1<<24)
-	for sc.Scan() {
-		var s GameSpec
-		if err := json.Unmarshal(sc.Bytes(), &s); err != nil {
-			t.Fatal(err)
-		}
-		specs = append(specs, s)
-	}
-	if err := sc.Err(); err != nil {
-		t.Fatal(err)
-	}
-	if len(specs) != 4 {
-		t.Fatalf("testdata holds %d specs, want 4", len(specs))
-	}
-	want := map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-		12468: {},
-		11828: {},
-		12603: {2298: ""},
-		10877: {2834: ""},
-	}
-	for _, spec := range specs {
+	d := findingDecks(t)
+	for _, spec := range findingChunk(findingSpecs(t, roundTenFile, 4), roundTenChunks, i) {
 		reports := round6Game(t, d, spec)
 		seen := map[uint64]bool{}
 		for _, r := range reports {
@@ -116,7 +110,7 @@ func TestRoundTenFindingsMirror(t *testing.T) {
 			if r.Control == nil || r.Control.Status != Equivalent {
 				t.Errorf("seed %d seq %d %q: control %+v", spec.Seed, r.Seq, r.Card, r.Control)
 			}
-			w, ok := want[spec.Seed][r.Seq]
+			w, ok := roundTenWant[spec.Seed][r.Seq]
 			if !ok {
 				continue
 			}
@@ -125,7 +119,7 @@ func TestRoundTenFindingsMirror(t *testing.T) {
 				t.Errorf("seed %d seq %d %q: verdict %s %q, want %q", spec.Seed, r.Seq, r.Card, st, key, w)
 			}
 		}
-		for seq := range want[spec.Seed] {
+		for seq := range roundTenWant[spec.Seed] {
 			if !seen[seq] {
 				t.Errorf("seed %d: no planned cast at seq %d (the game no longer reaches the finding)", spec.Seed, seq)
 			}

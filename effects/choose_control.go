@@ -1284,9 +1284,7 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 			// leg ran), which must not suppress the persistent write a later
 			// Remembered$ count/condition reads.
 			tgt := state.Target{Obj: o.ID}
-			if !targetIn(c.Remembered, tgt) {
-				c.Remembered = append(c.Remembered, tgt)
-			}
+			rememberCtxOnce(h, c, tgt)
 			if src := h.Game().Obj(c.Source); src == nil || !targetIn(src.Remembered, tgt) {
 				eventRemember(h, c, o.ID)
 			}
@@ -1859,13 +1857,17 @@ func repeatPlayers(h Host, c *Ctx, spec string) ([]state.PlayerID, bool) {
 		selected[c.Controller] = true
 	case repeatPlayersRemembered:
 		add(c.Remembered)
+	case repeatPlayersRememberedController:
+		// The Remembered* player spellings read the host list, never the
+		// trigger's capture -- the same hostRemembered Defined$ uses.
+		add(hostRemembered(h, c))
 	case repeatPlayersNonTargetedController:
 		add(c.Targets)
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = !selected[p]
 		}
 	case repeatPlayersOppNonRememberedController:
-		add(c.Remembered)
+		add(hostRemembered(h, c))
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = p != c.Controller && !selected[p]
 		}
@@ -2141,6 +2143,7 @@ const (
 	repeatPlayersTargeted
 	repeatPlayersTargetedAndYou
 	repeatPlayersRemembered
+	repeatPlayersRememberedController
 	repeatPlayersNonTargetedController
 	repeatPlayersOppNonRememberedController
 	repeatPlayersOppNonTriggeredDefender
@@ -2158,7 +2161,7 @@ var repeatPlayersCodes = state.NewStrCodes(
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedController", Val: repeatPlayersTargeted},
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedAndYou", Val: repeatPlayersTargetedAndYou},
 	state.StrEntry[repeatPlayersCode]{Key: "Remembered", Val: repeatPlayersRemembered},
-	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRemembered},
+	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "NonTargetedController", Val: repeatPlayersNonTargetedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonRememberedController", Val: repeatPlayersOppNonRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonTriggeredDefender", Val: repeatPlayersOppNonTriggeredDefender},

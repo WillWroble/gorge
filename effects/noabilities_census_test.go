@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // noAbilitiesCarriers is the pinned set of corpus files carrying the
@@ -33,10 +36,7 @@ var noAbilitiesWordRe = regexp.MustCompile(`\S*NoAbilities\S*`)
 // intersection of "recognised by the census" and "matched by nothing". It
 // skips when the corpus is absent, like the other corpus-backed tests.
 func TestNoAbilitiesCensus(t *testing.T) {
-	root := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(root); err != nil {
-		t.Skip("effects: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
+	root := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	var carriers []string
 	unknownReported := map[string][]string{}
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

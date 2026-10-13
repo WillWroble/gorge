@@ -27,6 +27,12 @@ export HEAVY_START_FLOOR_MB=1 PROBE_START_FLOOR_MB=1
 export HEAVY_MAX_LEASES=5 PROBE_MAX_LEASES=5
 export PAUSE_GRACE_S=2 KILL_FLOOR_MB=1 LOAD_CEIL_FRAC=100
 export GORGE_HEAVY_LOCK=$TMP/lockfile
+# The post-merge suite runs this under gorge_heavy_run, which exports the REAL
+# gate-active flag and lock marker. Inherited, an open ticket gate defers the
+# smoke's own heavy.sh forever ("all 3 lane(s)" held, 2026-10-12 17:39 RED
+# 26c5e5db3). Point both at this test's private state.
+export GORGE_HEAVY_GATE_FLAG=$TMP/reward/gate-active
+unset GORGE_HEAVY_LOCK_HELD
 BROKER=$ROOT/scripts/broker.sh
 HEAVY=$ROOT/scripts/heavy.sh
 fails=0
@@ -61,7 +67,10 @@ export TICKS
 : >"$TICKS"
 "$HEAVY" heavy --name rudeheavy -- "$TMP/rude.sh" >"$TMP/heavy.log" 2>&1 &
 HPID=$!
-for _ in $(seq 60); do
+# Condition-based waits with generous ceilings: the post-merge suite runs this
+# at load 100, where a fixed 15 s / 1 s window failed a healthy supervisor
+# (2026-10-12 17:14 RED cefb6a648; 11:18 RED d9b91b0da).
+for _ in $(seq 480); do
 	[ -n "$(ls "$GORGE_REWARD_DIR"/leases/*.json 2>/dev/null)" ] && break
 	sleep 0.25
 done
@@ -71,10 +80,13 @@ check "heavy lease created" $? "$(cat "$TMP/heavy.log")"
 
 # PRECONDITION: the job is really running and making progress before the pause,
 # so "ticks stopped" below is caused by the pause and not by a dead job.
-sleep 1.5
 before=$(wc -l <"$TICKS")
-sleep 1.0
-grew=$(wc -l <"$TICKS")
+grew=$before
+for _ in $(seq 240); do
+	sleep 0.25
+	grew=$(wc -l <"$TICKS")
+	[ "$grew" -gt "$before" ] && break
+done
 [ "$grew" -gt "$before" ]
 check "heavy job is running and ticking before the pause" $? "before=$before grew=$grew"
 
@@ -96,6 +108,12 @@ check "no stability row before enforce" $? "rows=$pre_rows"
 p1=$(wc -l <"$TICKS")
 sleep 1.5
 p2=$(wc -l <"$TICKS")
+for _ in $(seq 60); do
+	[ "$p1" = "$p2" ] && break
+	p1=$p2
+	sleep 1.5
+	p2=$(wc -l <"$TICKS")
+done
 [ "$p1" = "$p2" ]
 check "supervisor stops the heavy job while paused" $? "before=$p1 after=$p2; $(cat "$TMP/pause.txt")"
 
@@ -123,8 +141,12 @@ fi
 # And it resumes.
 "$BROKER" resume-all heavy >/dev/null
 # The supervisor (1 s loop) re-takes the heavy lock and then continues the job.
-sleep 3.5
-r=$(wc -l <"$TICKS")
+r=$p2
+for _ in $(seq 240); do
+	sleep 0.25
+	r=$(wc -l <"$TICKS")
+	[ "$r" -gt "$p2" ] && break
+done
 [ "$r" -gt "$p2" ]
 check "heavy job resumes after resume-all" $? "parked=$p2 resumed=$r"
 

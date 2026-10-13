@@ -384,10 +384,18 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
 	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && r.lookedFirst(i):
 		// A declined optional Play after a hidden-zone look (Cosmic Cube's
-		// "you may play one of these"): XMage poses the "cast from among
-		// them" ask on the target queue only, so the skip token declines
-		// it. The plain Play carriers (Discover, Cascade) have no look and
-		// stay with the measured chooseUse "no" below.
+		// "you may play one of these"). XMage's
+		// CardUtil.castSpellWithAttributes asks a TargetCard "which card"
+		// pick only when MORE THAN ONE card is castable, so the skip token
+		// declines it there. With exactly one castable card it goes straight
+		// to chooseUse "Cast spell ...?": a target skip would be left unused
+		// and the scripted player would say yes (Cosmic Cube trigger#0.0:
+		// xmage library 37, gorge 38), so the decline is the "no". The
+		// plain Play carriers (Discover, Cascade) have no look and stay
+		// with the measured chooseUse "no" below.
+		if distinctRefs(d.OptionRefs) == 1 {
+			return append(as, XAnswer{d.Seat, "choice", "no"}), true
+		}
 		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
 	case declinedChoice(d) && !r.lookedFirst(i):
 		// One makeChoose "up to" ask however many type slots gorge posed; its
@@ -398,6 +406,16 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return []XAnswer{{d.Seat, "choice", "[choice_skip]"}}, true
 	}
 	return nil, false
+}
+
+// distinctRefs is the number of different object refs among refs: the
+// castable-card count of a Play ask (one option per card or per ability).
+func distinctRefs(refs []string) int {
+	seen := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		seen[ref] = struct{}{}
+	}
+	return len(seen)
 }
 
 // lookedFirst reports a look_ack by the same seat earlier in decision i's

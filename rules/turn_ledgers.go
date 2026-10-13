@@ -237,3 +237,22 @@ func (e *Engine) WasDealtNoncombatDamageThisTurn(p state.PlayerID) bool {
 func (e *Engine) WasDealtNoncombatDamageLastTurn(p state.PlayerID) bool {
 	return p >= 0 && p < 64 && e.noncombatDamagedSeatsLast&(1<<uint(p)) != 0
 }
+
+// maxDamageBySingleSourceThisTurn is the most damage any ONE source p
+// controlled (when each hit landed) dealt this turn, all of that source's
+// hits summed (Dragon Cultist's "a source you controlled dealt 5 or more
+// damage this turn"). Read from the per-object DamageDealtThisTurn ledger the
+// DamageProvenance fold fills and TurnChange clears.
+func maxDamageBySingleSourceThisTurn(g *state.Game, p state.PlayerID) int32 {
+	var best int32
+	for i := range g.Objs {
+		var sum int32
+		for _, hit := range g.Objs[i].DamageDealtThisTurn {
+			if hit.SourceControl == p {
+				sum += hit.Amount
+			}
+		}
+		best = max(best, sum)
+	}
+	return best
+}

@@ -159,8 +159,8 @@ func TestPendingResolutionErrors(t *testing.T) {
 func TestPendingTakesNonLiveBranchWhileMatchGoroutineAlive(t *testing.T) {
 	t.Parallel()
 	o := testOptions(t)
-	o.Sleep = defaultSleep              // real sleep so the perpetual cooldown parks the goroutine
-	o.Cooldown = 500 * time.Millisecond // generous, race-visible window
+	o.Sleep = defaultSleep       // real sleep so the perpetual cooldown parks the goroutine
+	o.Cooldown = 3 * time.Second // >=6x the old 500ms: Pending is polled against the parked cooldown, and match 2 must still start inside the 10s poll below
 	o.Seats = oneSeatHuman
 	r, err := New(o)
 	if err != nil {

@@ -46,6 +46,12 @@ func TestCostStaticOpponentCombatProbes(t *testing.T) {
 			[]string{"Grizzly Bears"}, true, false},
 		{"Dark Endurance", "static#0.0", "Dark Endurance", "B", "CB", 1,
 			nil, false, true},
+		{"Uneasy Partings", "static#0.0", "Uneasy Partings", "CCU", "CCCU", 1,
+			nil, true, false},
+		{"Depower", "static#0.0", "Depower", "U", "CCU", 2,
+			nil, true, false},
+		{"Run Behind", "static#0.0", "Run Behind", "CCU", "CCCU", 1,
+			nil, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			it, skip := GenerateB(reg, tc.name, costRequirement(t, reg, tc.name, tc.key))
@@ -84,6 +90,24 @@ func TestCostStaticOpponentCombatProbes(t *testing.T) {
 			}
 			if tc.wantAttack && !hasStep(it.Steps, "attack") {
 				t.Fatalf("precondition: attacking-creature probe has no attack prelude: %+v", it.Steps)
+			}
+			if tc.wantAttack {
+				// XMage declares attackers in the declare-attackers
+				// beginStep, so a pass_to checkpoint ahead of an opponent
+				// attack already sees "tapped attacking" and diverges.
+				seen := false
+				for _, st := range it.Steps {
+					if st.Op == "attack" && st.Seat == 1 {
+						seen = true
+						break
+					}
+					if st.Op == "pass_to" && st.Step == "declare-attackers" && st.Active == "p1" {
+						t.Fatalf("pass_to declare-attackers precedes the opponent attack: %+v", it.Steps)
+					}
+				}
+				if tc.name != "Static Snare" && !seen {
+					t.Fatalf("precondition: no opponent attack step: %+v", it.Steps)
+				}
 			}
 			if tc.wantBlock && !hasStep(it.Steps, "block") {
 				t.Fatalf("precondition: blocking-target probe has no block prelude: %+v", it.Steps)

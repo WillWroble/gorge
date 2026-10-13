@@ -114,7 +114,6 @@ func TestTriggerFilterGapsAreNamed(t *testing.T) {
 		// Namor's ManaCostPartialBlue and Codie's prepared are served now
 		// (the predicates joined effects' vocabulary); the named-gap property
 		// is pinned on carriers whose predicates are still unknown.
-		{"Melek, Izzet Paragon", "trigger#0.0", "wasCastFromYourLibrary"},
 		{"Providence of Night", "trigger#0.0", "CostsHybridMana"},
 		// Ares, God of War's attacking-victim row is served by the g17
 		// mid-combat destroy cause (trigger_victim_specials.go); no census

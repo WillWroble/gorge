@@ -182,7 +182,9 @@ func (e *Engine) PotentialMana(p state.PlayerID) state.Mana {
 				if ma := flat[k]; !admitted[k] && e.manaAbilityPayablePool(p, id, ma, &others) {
 					admitted[k] = true
 					admittedAny = true
-					e.addPotentialManaOf(&out, ma)
+					if !addPotentialReflected(e, &out, p, id, ma) {
+						e.addPotentialManaOf(&out, ma)
+					}
 				}
 			}
 			if !admittedAny {

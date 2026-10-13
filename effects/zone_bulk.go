@@ -202,6 +202,38 @@ func sacTargetCardReferent(spec string, c *Ctx) (state.ObjID, bool) {
 	return targetedCardSelfReferent(c.SpecContext(c.Controller))
 }
 
+// sacrificeObjectEligible is the plain object-target path's own guard pair:
+// the object must still be on the battlefield, and a CantSacrifice
+// restriction (Call for Aid) or face static stops the pick — this specific
+// object cannot be sacrificed at all, neither offered to its Optional$ ask
+// nor emitted; the targeting already picked it, the restriction is what
+// stops it. sacrificeObjectVictims (the departure-batch pre-pass) shares
+// this predicate so its victim list cannot drift from the sacrifices.
+func sacrificeObjectEligible(h Host, o *state.Object) bool {
+	return o != nil && o.Zone == state.ZBattlefield && !h.SacrificeBlocked(o.ID, false)
+}
+
+// sacrificeObjectVictims lists one effSacrifice call's plain object targets
+// that pass its object-path guards, for the call's departure batch: the
+// object targets sacrifice as one simultaneous event (CR 614.6/616.1 with
+// 603.10), so a departing replacement source among them (Kalitas, Traitor of
+// Ghet) keeps its ActiveZones$ Battlefield replacement for the later members
+// (rules' batchMemberReplActive) and their leaves-the-battlefield triggers
+// see one pre-departure board. An Optional$ ask answered No inside the loop
+// strands a victim, which EndBatchDepartures discards.
+func sacrificeObjectVictims(h Host, g *state.Game, who []state.Target) []state.ObjID {
+	var victims []state.ObjID
+	for _, t := range who {
+		if t.IsPlayer {
+			continue
+		}
+		if o := g.Obj(t.Obj); sacrificeObjectEligible(h, o) {
+			victims = append(victims, o.ID)
+		}
+	}
+	return victims
+}
+
 // effSacrifice moves permanents to the graveyard. Sacrifice ignores
 // Indestructible: sacrificing is not destruction (CR 701.16), so no
 // HasKeyword/Indestructible gate and no ReplaceDestruction/regeneration
@@ -326,6 +358,11 @@ func effSacrifice(h Host, c *Ctx, sa *cards.SA) {
 		if v := strings.TrimSpace(sa.ParamStr(cards.PKSacValid)); v != "" && v != "Self" && v != "Card.Self" {
 			who = []state.Target{{Player: c.Controller, IsPlayer: true}}
 		}
+	}
+	// The plain object targets sacrifice as one batch; see sacrificeObjectVictims.
+	if victims := sacrificeObjectVictims(h, g, who); len(victims) > 0 {
+		h.BatchDepartures(victims)
+		defer h.EndBatchDepartures()
 	}
 	for targetIndex, t := range who {
 		if t.IsPlayer {
@@ -504,14 +541,8 @@ func effSacrifice(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := g.Obj(t.Obj)
-		if o == nil || o.Zone != state.ZBattlefield {
-			continue
-		}
-		if h.SacrificeBlocked(o.ID, false) {
-			// A CantSacrifice restriction (or face static): this specific
-			// object cannot be sacrificed at all — neither offered to its
-			// Optional$ ask nor emitted. The targeting already picked it; the
-			// restriction is what stops the pick.
+		// Zone + CantSacrifice guards, shared with the pre-pass: see sacrificeObjectEligible.
+		if !sacrificeObjectEligible(h, o) {
 			continue
 		}
 		// A specific object target is sacrificed as-is: the choice of which

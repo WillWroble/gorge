@@ -111,7 +111,13 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 		}
 		f := o.Face()
 		switch {
-		case (ref == "TriggerObjectsCards" || ref == "TriggerRemembered") && prop == "CardTypes":
+		case prop == "CardTypes":
+			// Property-scoped, not ref-scoped (task lb-cardtypes): the
+			// distinct card types among the referenced objects, for every
+			// object ref -- Remembered$ (Kefka, Court Mage's draw; Occult
+			// Epiphany), TriggerRemembered$ (Mount Velus Manticore),
+			// TriggerObjectsCards$. A set folded through len, so no order
+			// reaches an event.
 			if f != nil {
 				for _, typ := range f.Types {
 					if cardTypeWords[typ] {
@@ -319,7 +325,7 @@ func evalRefProperty(h Host, c *Ctx, expr string, depth int) (int32, bool) {
 			return 0, false
 		}
 	}
-	if (ref == "TriggerObjectsCards" || ref == "TriggerRemembered") && prop == "CardTypes" {
+	if prop == "CardTypes" {
 		n = int32(len(triggerObjectTypes))
 	}
 	if prop == "Colors" {
