@@ -26,6 +26,17 @@ import (
 // runner addresses as p0:<prepare face>. It is also the engine's own
 // prepared-copy regression carrier (rules/testdata/oracle/conditional-static/
 // whiplash-wordsmith.json), so the flow the cause replays is the tested one.
+//
+// A carrier is usable when XMage's database holds the CARD: the manifests
+// list a prepare card by its creature name only (the spell face is not a
+// separate database entry), so the spell face's own name is never
+// XMageKnown and gating on it served no carrier at all. Hallway Heckler
+// leads: XMage's database holds it, and it carries the same enters-prepared
+// replacement and the same Vicious Verse spell as Whiplash Wordsmith, which
+// XMage lacks. Leading with a carrier XMage holds keeps the pick the same
+// whether or not the manifests are installed.
+var preparedCastCarriers = []string{"Hallway Heckler", preparedCastCarrier}
+
 const preparedCastCarrier = "Whiplash Wordsmith"
 
 func spellCastPreparedCause(reg *cards.Registry, f *cards.Face, name string, t *cards.Trigger) []triggerCause {
@@ -33,12 +44,17 @@ func spellCastPreparedCause(reg *cards.Registry, f *cards.Face, name string, t *
 	if !filterNamesToken(filter, "prepared") {
 		return nil
 	}
-	carrier, ok := reg.Lookup(preparedCastCarrier)
-	if !ok || len(carrier.Faces) < 2 {
-		return nil
+	var carrierName string
+	var prepare *cards.Face
+	for _, n := range preparedCastCarriers {
+		carrier, ok := reg.Lookup(n)
+		if !ok || len(carrier.Faces) < 2 || carrier.Faces[1].SpellAbility() == nil || !oraclegen.XMageKnown(carrier.Faces[0].Name) {
+			continue
+		}
+		carrierName, prepare = n, carrier.Faces[1]
+		break
 	}
-	prepare := carrier.Faces[1]
-	if prepare.SpellAbility() == nil || !oraclegen.XMageKnown(prepare.Name) {
+	if prepare == nil {
 		return nil
 	}
 	pool, why := oraclegen.PoolFor(prepare.ManaCost)
@@ -49,7 +65,7 @@ func spellCastPreparedCause(reg *cards.Registry, f *cards.Face, name string, t *
 	if oraclegenPlayerTargetHead(strings.ToLower(prepare.SpellAbility().ParamStr(cards.PKValidTgts))) {
 		st.Targets = []string{"p1"}
 	}
-	return []triggerCause{{battlefield: []string{preparedCastCarrier}, steps: []oraclegen.Step{st}}}
+	return []triggerCause{{battlefield: []string{carrierName}, steps: []oraclegen.Step{st}}}
 }
 
 // filterNamesToken reports whether the comma/plus/dot-separated filter

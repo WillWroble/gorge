@@ -206,3 +206,7 @@ func WithHand(s Seat, name string) Seat { return withHand(s, name) }
 
 // Repeat is n copies of s.
 func Repeat(s string, n int) []string { return repeat(s, n) }
+
+// DonatedProbe is the self-donating permanent the "permanent you own but
+// don't control" fixture's prelude hands the opponent (candidates_donated.go).
+const DonatedProbe = donatedProbe

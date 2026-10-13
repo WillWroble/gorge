@@ -47,7 +47,52 @@ func spellCastProvenanceCauses(reg *cards.Registry, f *cards.Face, name string, 
 			out = append(out, c)
 		}
 	}
+	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromtreasure") {
+		if c, ok := spellCastTreasureManaCause(reg); ok {
+			c.prelude = prelude
+			out = append(out, c)
+		}
+	}
 	return out
+}
+
+// spellCastTreasureManaCause is the cast a "mana from a Treasure was spent to
+// cast it" provenance (ValidSA$ Spell.ManaFromTreasure, Smaug, Wicked Worm)
+// needs: p0 taps and sacrifices a Treasure for mana, then casts a probe that
+// spends that pool mana. The Treasure is Buried Treasure, a NONTOKEN Artifact
+// -- Treasure card setup can place: a Treasure token would need a maker's
+// cast first, and the XMage driver selects a mana ability through the
+// card database, which holds no token (its activate step then finds no
+// ability). The probe is Sol Ring ({1}), payable by whichever colour the
+// Treasure's any-colour choice takes. The pool is empty otherwise, so the
+// cast spends the Treasure's mana in both engines.
+func spellCastTreasureManaCause(reg *cards.Registry) (triggerCause, bool) {
+	const treasure, probe = "Buried Treasure", "Sol Ring"
+	tc, ok := reg.Lookup(treasure)
+	if !ok || len(tc.Faces) == 0 || !oraclegen.XMageKnown(treasure) || !oraclegen.XMageKnown(probe) {
+		return triggerCause{}, false
+	}
+	if _, ok := reg.Lookup(probe); !ok {
+		return triggerCause{}, false
+	}
+	idx := -1
+	for i, sa := range tc.Faces[0].Abilities {
+		if sa.API == "Mana" && strings.Contains(sa.ParamStr(cards.PKCost), "Sac<1/CARDNAME>") {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return triggerCause{}, false
+	}
+	return triggerCause{
+		battlefield: []string{treasure},
+		hand:        []string{probe},
+		steps: []oraclegen.Step{
+			{Op: "activate", Seat: 0, Card: "p0:" + treasure, AbilityIndex: &idx},
+			{Op: "cast", Seat: 0, Card: "p0:" + probe},
+		},
+	}, true
 }
 
 // spellCastYouDontOwnCause builds the exile-and-grant cast for the ownership

@@ -34,7 +34,7 @@ func TestSpellCastConditionRecipes(t *testing.T) {
 		{"Brineborn Cutthroat", "trigger#0.0", "trigger.spell-cast-opponent-turn", "", "", true},
 		{"Fire Lord Azula", "trigger#0.0", "trigger.spell-cast", "", "", false},
 		{"Spinerock Tyrant", "trigger#0.0", "trigger.spell-cast", "", "", false},
-		{"Codie, Ravenous Codex", "trigger#0.0", "trigger.spell-cast", "prepared_copy", "Whiplash Wordsmith", false},
+		{"Codie, Ravenous Codex", "trigger#0.0", "trigger.spell-cast", "prepared_copy", "Hallway Heckler", false},
 		{"Namor the Sub-Mariner", "trigger#0.0", "trigger.spell-cast", "", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

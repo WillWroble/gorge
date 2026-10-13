@@ -122,11 +122,12 @@ func TestManaColourPickLeadsTriggerOrderSpan(t *testing.T) {
 		t.Fatalf("XAnswers = %#v, want %#v (colour leads, inert texts dropped)", got, want)
 	}
 
-	// Without the colour ask the step keeps the measured inert text form.
+	// Without the colour ask the span keys its first pick in XMage's
+	// rule-text form, which the order ask consumes (trigger_order_text.go).
 	got = XAnswers([]rules.OracleDecision{order, decline}, 3, nil)
-	want = [][]XAnswer{nil, nil, append(triggerOrderTextAnswers(order), XAnswer{0, "choice", "no"})}
+	want = [][]XAnswer{nil, nil, {{0, "choice", "Whenever this creature transforms into {this} and at the beginning of your first main phase, add two mana of any one color."}, {0, "choice", "no"}}}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("span alone = %#v, want the inert texts %#v", got, want)
+		t.Fatalf("span alone = %#v, want the rule-text key %#v", got, want)
 	}
 
 	// A distinct-source span is not hoisted: its step keeps the shared-step
