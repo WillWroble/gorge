@@ -239,6 +239,10 @@ type ConditionParams struct {
 	PhasesOK        bool
 	FirstCombat     string
 	ActivationLimit string
+	// OptionalPaid is ConditionOptionalPaid$, the polarity of a bare
+	// Condition$ OptionalCost gate (True: the optional additional cost was
+	// paid; False: it was not).
+	OptionalPaid string
 }
 
 // Any reports whether any key conditionMet evaluates is written (a lone
@@ -424,6 +428,7 @@ func compileActivation(sa *cards.SA) *ActivationParams {
 	}
 	c.FirstCombat = strings.TrimSpace(sa.ParamStr(cards.PKConditionFirstCombat))
 	c.ActivationLimit = strings.TrimSpace(sa.ParamStr(cards.PKConditionActivationLimit))
+	c.OptionalPaid = strings.TrimSpace(sa.Params["ConditionOptionalPaid"])
 	p2, p2OK := sa.Param(cards.PKConditionPresent2)
 	c.Present2 = paramText(p2, p2OK)
 	c.Compare2 = CompareOf(sa.ParamStr(cards.PKConditionCompare2))
@@ -487,4 +492,5 @@ var conditionEvaluatedKeys = state.NewNameSet(
 	"Condition", "ConditionPlayerTurn", "ConditionPhases",
 	"ConditionFirstCombat", "ConditionActivationLimit",
 	"ConditionPresent2", "ConditionCompare2", "ConditionZone",
+	"ConditionOptionalPaid",
 )

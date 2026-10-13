@@ -458,6 +458,9 @@ func conditionMetCore(h Host, c *Ctx, sa *cards.SA) (met bool, resolved bool) {
 			playerTurn != "" || phases != "" || firstCombat != "" {
 			return false, false
 		}
+		if strings.EqualFold(bare, "OptionalCost") {
+			return conditionOptionalCostMet(h, c, cp.OptionalPaid)
+		}
 		return conditionBareMet(h, c, bare)
 	}
 	if notPresent != "" {
@@ -1704,3 +1707,27 @@ var conditionNotPresentMetCodes = state.NewStrCodes(
 	state.StrEntry[conditionNotPresentMetCode]{Key: "Remembered", Val: conditionNotPresentMetRemembered},
 	state.StrEntry[conditionNotPresentMetCode]{Key: "Targeted", Val: conditionNotPresentMetTargeted},
 )
+
+// conditionOptionalCostMet is the bare Condition$ OptionalCost gate with its
+// ConditionOptionalPaid$ polarity (10 corpus lines over 8 files: Osseous
+// Exhale's "If a Dragon was beheld, you gain 2 life", Piercing Exhale's
+// beheld surveil, Draconic Fealty's beheld graveyard exile). CR 601.2b: the
+// optional additional cost is chosen and paid as the spell is cast; the
+// spell's own "if [the cost] was paid" text reads that payment, which is the
+// same pay-time provenance Count$OptionalGenericCostPaid reads
+// (state.Object.OptionalCostPaid). A copy was never cast (CR 707.10) and
+// reads unpaid. A polarity other than True/False is not a corpus shape and
+// stays unresolved (the walk fails it closed).
+func conditionOptionalCostMet(h Host, c *Ctx, polarity string) (bool, bool) {
+	want := true
+	switch {
+	case polarity == "" || strings.EqualFold(polarity, "True"):
+	case strings.EqualFold(polarity, "False"):
+		want = false
+	default:
+		return false, false
+	}
+	o := h.Game().Obj(c.Source)
+	paid := o != nil && o.OptionalCostPaid
+	return paid == want, true
+}
