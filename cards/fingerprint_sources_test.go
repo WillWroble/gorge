@@ -41,6 +41,7 @@ type fingerprintFile struct {
 var fingerprintCensus = map[string]fingerprintFile{
 	"ability_class.go":        {true, "IsManaAbilitySA/requiresTarget classify abilities during compile"},
 	"affected_defined.go":     {true, "NormalizeAffectedDefined rewrites static params during compile"},
+	"ateot_values.go":         {true, "atEOTValues feeds Primitives, so which AtEOT$ values are unsupported is part of the compiled IR"},
 	"breakdown.go":            {false, "coverage-report grouping (CoverageGroup); report time only, nothing compiled"},
 	"cache_canon.go":          {true, "canonical gob encoding of the cache and segment bytes"},
 	"cache_lock.go":           {false, "single-flight lock around compile+Save; never changes the bytes written"},

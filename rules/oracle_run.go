@@ -1103,14 +1103,20 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 			if used[o.Index] {
 				continue
 			}
-			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" ||
+			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasSuffix(k, "_pay") ||
 				strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "play ") || strings.HasPrefix(l, "cast ")) {
 				return o.Index, nil
 			}
-			if lp == "no" && (k == "no" || k == "decline" || k == "trigger_cost_decline" || o.Mode == "unless_decline" || strings.HasPrefix(l, "no") ||
-				strings.HasPrefix(l, "do not") ||
-				strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") || strings.HasPrefix(l, "don't")) {
+			if lp == "no" && (oracleDeclineOption(o) || strings.HasPrefix(l, "no")) {
 				return o.Index, nil
+			}
+		}
+		if lp == "yes" {
+			// An optional ask with one way to accept ("Exile 1 card" /
+			// "Do not pay", or a lone "Play X" the seat may skip): yes is
+			// that option.
+			if i := oracleSoleAccept(d, used); i >= 0 {
+				return i, nil
 			}
 		}
 	}
@@ -1125,6 +1131,44 @@ func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bo
 		}
 	}
 	return -1, nil
+}
+
+// oracleDeclineOption reports whether o is a decline: a no/decline kind or
+// mode, or a label that says so ("No", "Decline", "Do not pay"). A "no"
+// pick also takes any label starting "no" (matchPick).
+func oracleDeclineOption(o decision.Option) bool {
+	k, l := strings.ToLower(o.Kind), strings.ToLower(o.Label)
+	return k == "no" || k == "decline" || strings.HasSuffix(k, "_decline") || o.Mode == "unless_decline" ||
+		l == "no" || strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") ||
+		strings.HasPrefix(l, "don't") || strings.HasPrefix(l, "do not")
+}
+
+// oracleSoleAccept returns the one unused non-decline option of a choose or
+// modes ask that can be declined (it offers a decline option, or takes zero
+// answers), or -1 when there is no such single option. Declarations
+// (attackers, blockers) and targets are never a yes.
+func oracleSoleAccept(d *decision.Decision, used map[int]bool) int {
+	if d.Kind != decision.KChoose && d.Kind != decision.KModes {
+		return -1
+	}
+	accept, declinable := -1, d.Min == 0
+	for _, o := range d.Options {
+		if used[o.Index] {
+			continue
+		}
+		if oracleDeclineOption(o) {
+			declinable = true
+			continue
+		}
+		if accept >= 0 {
+			return -1
+		}
+		accept = o.Index
+	}
+	if !declinable {
+		return -1
+	}
+	return accept
 }
 
 // oracleColourSet normalises a colour string to its WUBRG letters in fixed

@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -22,14 +23,13 @@ import (
 // do not, so the moved set is passed in rather than read back out of
 // Remembered).
 //
-// TIMING READING (deferred nuance, stated here once): Forge distinguishes
-// "at the beginning of YOUR next end step" (YourExile/YourSacrifice/
-// YourExileUpkeep...) from the bare "the next end step". This build treats
-// the Your-prefixed values as their plain equivalents -- the first end step
-// reached after resolution -- because the corpus's carriers overwhelmingly
-// resolve on their controller's own turn, where the two coincide. The
-// divergence (a rider resolving on an opponent's turn would fire at that
-// opponent's end step, a turn early) is recorded in the report.
+// TIMING READING (deferred nuance, stated here once): for the END-STEP
+// family Forge distinguishes "at the beginning of YOUR next end step"
+// (YourExile/YourSacrifice) from the bare "the next end step"; this build
+// treats the Your-prefixed values as their plain equivalents, because the
+// corpus's carriers overwhelmingly resolve on their controller's own turn.
+// The upkeep family honours Your (ValidPlayer$ You); the end-of-combat
+// family fires at this turn's end-of-combat step only.
 //
 // Values outside the implemented set stay LOUD: one Note per call naming the
 // value, with the body still applied (the CopyPermanent convention). A value
@@ -39,49 +39,53 @@ func scheduleAtEOT(h Host, c *Ctx, sa *cards.SA, affected []state.ObjID) {
 	if value == "" {
 		return
 	}
-	body := atEOTBody(value)
-	if body == "" {
-		// Out of scope (Library shuffle-into, the end-of-combat and
-		// next-upkeep families, an unrecognised spelling): one loud Note
-		// per call -- emitted even when the affected set is EMPTY, so a body
-		// carrying an unimplemented value is never dropped silently (the
-		// affected set is empty exactly when there is nothing to schedule,
-		// which is when a silent drop would be easiest to miss) -- and the
-		// body still stands.
+	rider, ok := atEOTRiders.Get(value)
+	if !ok {
+		// Out of scope (Library shuffle-into, an unrecognised spelling): one
+		// loud Note per call -- emitted even when the affected set is EMPTY,
+		// so a body carrying an unimplemented value is never dropped
+		// silently -- and the body still stands. cards.Primitives reports
+		// the same value as unsupported to `make report`.
 		h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Player: c.Controller,
 			Text: "AtEOT$ " + value + " is not implemented; the affected object stays on the battlefield (one Note per call)"})
 		return
 	}
-	// RememberChanged$'s Ledger of remembered ids is not consulted: the
-	// caller owns the moved set.
+	scheduleAtEOTRider(h, c.Controller, rider, affected)
+}
+
+// scheduleAtEOTRider registers one one-shot delayed promise per affected
+// object. RememberChanged$'s Ledger of remembered ids is not consulted: the
+// caller owns the moved set. The registration's Source IS the affected
+// object, so the builtin body's Defined$ Self resolves to it -- exactly the
+// dash/warp/encore shape.
+func scheduleAtEOTRider(h Host, controller state.PlayerID, r atEOTRider, affected []state.ObjID) {
+	text := ""
+	if r.thisTurn {
+		// CR 511.2 / 603.7: an end-of-combat promise made after this turn's
+		// combat has ended is not carried into a later turn's combat.
+		text = "|TT=" + strconv.Itoa(int(h.Game().Turn))
+	}
+	if r.yours {
+		text += "|VP=You"
+	}
 	for _, id := range affected {
 		if h.Game().Obj(id) == nil {
 			continue // a caller may hand over an id that never resolved
 		}
-		// The registration's Source IS the affected object, so the builtin
-		// body's Defined$ Self resolves to it -- exactly the dash/warp/
-		// encore shape. StepEnd is the first end step reached after
-		// resolution (one-shot, removed by DelayedPush).
 		h.Emit(events.Event{Kind: events.DelayedRegister, Obj: id,
-			Player: c.Controller, Step: state.StepEnd, Counter: body})
+			Player: controller, Step: r.step, Counter: r.body, Text: text})
 	}
 }
 
-// atEOTBody maps an AtEOT$ value to the builtin SVar body its registration
-// fires. Reusing the existing dash/warp/encore bodies gives each family its
-// established semantics for free: __kwWarpExile is incarnation-tracked (a
-// card that left the battlefield and returned as a new incarnation is not
-// exiled by a stale promise; events/apply.go tracks the __kwWarp and
-// __kwAtEOT prefixes), __kwDashReturn and __kwAtEOTDestroy likewise.
-// __kwEncoreSacrifice is not tracked, the CopyPermanent convention. Every
-// off-battlefield stale promise is a no-op at fire time: warp/dash carry an
-// Origin$ Battlefield guard, and effSacrifice's object path skips an object
-// that is not on the battlefield.
-func atEOTBody(value string) string {
-	if v, ok := atEOTBodyTab.Get(value); ok {
-		return v
-	}
-	return ""
+// atEOTRider is the registration one AtEOT$ value schedules: the builtin
+// SVar body, the step it fires at, whether the step is gated to the
+// registering player's own turn (ValidPlayer$ You), and whether the promise
+// expires at the end of the turn it was made in.
+type atEOTRider struct {
+	body     string
+	step     state.Step
+	yours    bool
+	thisTurn bool
 }
 
 // atEOTInclude protects the source from an AtEOT$ Remembered rider unless the
@@ -102,12 +106,29 @@ func atEOTInclude(h Host, c *Ctx, sa *cards.SA, id state.ObjID) bool {
 	return false
 }
 
-var atEOTBodyTab = state.NewStrTable[string](
-	state.StrEntry[string]{Key: "Exile", Val: "__kwWarpExile"},
-	state.StrEntry[string]{Key: "YourExile", Val: "__kwWarpExile"},
-	state.StrEntry[string]{Key: "Sacrifice", Val: "__kwEncoreSacrifice"},
-	state.StrEntry[string]{Key: "YourSacrifice", Val: "__kwEncoreSacrifice"},
-	state.StrEntry[string]{Key: "SacrificeCtrl", Val: "__kwEncoreSacrifice"},
-	state.StrEntry[string]{Key: "Hand", Val: "__kwDashReturn"},
-	state.StrEntry[string]{Key: "Destroy", Val: "__kwAtEOTDestroy"},
+// atEOTRiders maps each AtEOT$ value to its rider. Reusing the existing
+// dash/warp/encore bodies gives each family its established semantics:
+// __kwWarpExile is incarnation-tracked (a card that left the battlefield and
+// returned as a new incarnation is not exiled by a stale promise;
+// events/apply_delayed.go tracks the __kwWarp and __kwAtEOT prefixes),
+// __kwDashReturn and __kwAtEOTDestroy likewise. __kwEncoreSacrifice is not
+// tracked, the CopyPermanent convention. Every off-battlefield stale promise
+// is a no-op at fire time: effSacrifice skips an object that is not on the
+// battlefield and the exile/return bodies carry an Origin$ Battlefield guard.
+// cards.atEOTValues must list exactly these keys.
+var atEOTRiders = state.NewStrTable[atEOTRider](
+	state.StrEntry[atEOTRider]{Key: "Exile", Val: atEOTRider{body: "__kwWarpExile", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "YourExile", Val: atEOTRider{body: "__kwWarpExile", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "Sacrifice", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "YourSacrifice", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "SacrificeCtrl", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "Hand", Val: atEOTRider{body: "__kwDashReturn", step: state.StepEnd}},
+	state.StrEntry[atEOTRider]{Key: "Destroy", Val: atEOTRider{body: "__kwAtEOTDestroy", step: state.StepEnd}},
+	// End of combat (CR 511.2 step; Geist of Saint Traft's Angel token).
+	state.StrEntry[atEOTRider]{Key: "ExileCombat", Val: atEOTRider{body: "__kwWarpExile", step: state.StepEndCombat, thisTurn: true}},
+	state.StrEntry[atEOTRider]{Key: "SacrificeCombat", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepEndCombat, thisTurn: true}},
+	// Next upkeep ("your" next upkeep for the Your-prefixed values).
+	state.StrEntry[atEOTRider]{Key: "SacrificeUpkeep", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepUpkeep}},
+	state.StrEntry[atEOTRider]{Key: "YourSacrificeUpkeep", Val: atEOTRider{body: "__kwEncoreSacrifice", step: state.StepUpkeep, yours: true}},
+	state.StrEntry[atEOTRider]{Key: "YourExileUpkeep", Val: atEOTRider{body: "__kwWarpExile", step: state.StepUpkeep, yours: true}},
 )
