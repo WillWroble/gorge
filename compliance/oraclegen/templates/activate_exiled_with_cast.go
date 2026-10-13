@@ -171,8 +171,10 @@ func revealChosenTokenPrelude(f *cards.Face, sa *cards.SA, name string, p0 *orac
 	return []oraclegen.Step{
 		{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: pool},
 		{Op: "resolve", Answers: []oraclegen.Answer{{Kind: "choose", Pick: []string{chosen}}}},
+		// One pass_to into p0's next upkeep; the attack op reaches that
+		// turn's combat itself (an upkeep+main1 pair ran XMage a full round
+		// further).
 		{Op: "pass_to", Seat: 0, Step: "upkeep", Active: "p0"},
-		{Op: "pass_to", Seat: 0, Step: "main1", Active: "p0"},
 		{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{token}},
 	}, []string{token}, true
 }
