@@ -423,6 +423,15 @@ var predicates = map[string]predFn{
 	"kicked": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
 		return o.CastFlags&state.FlagKicked != 0
 	},
+	// Modal is Forge's Spell.Modal (Riku of Many Paths' "whenever you cast a
+	// modal spell"): CR 700.2 -- a spell whose controller chose one or more
+	// of its bulleted modes. The cast records the choice on the stack object
+	// (ChosenModes, event-backed), so a spell that carries chosen modes is
+	// modal; a modal double-faced card is not (CR 712.1 is a different
+	// "modal") and records none.
+	"Modal": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
+		return len(o.ChosenModes) > 0
+	},
 	// Bargained is CR 702.166's CastFlags provenance: the object is a spell or
 	// permanent whose cast elected the optional additional sacrifice. It is
 	// the SAME state.FlagBargained bit the Count$Bargained/Count$Bargain

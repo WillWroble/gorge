@@ -64,6 +64,9 @@ func triggerSteps(f *cards.Face, name string, c triggerCause, steps []oraclegen.
 				{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: pool, Answers: xAnswers(f)},
 				{Op: "resolve"},
 			}
+			if c.auraBearer != "" {
+				pre[0].Targets = []string{"p0:" + c.auraBearer}
+			}
 		}
 	}
 	return append(pre, fixtureSteps(fx, steps)...)
