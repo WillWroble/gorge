@@ -24,7 +24,7 @@ const (
 	attackOfferFieldCount      = 4
 	blockChargeFieldCount      = 7
 	objectTypesFieldCount      = 3
-	optionFieldCount           = 43
+	optionFieldCount           = 44
 	grantFieldCount            = 3
 )
 
@@ -267,7 +267,8 @@ func optionEqual(a, b *decision.Option) bool {
 		sliceEq(a.GrantStatics, b.GrantStatics) &&
 		a.PlanBacked == b.PlanBacked &&
 		a.Value == b.Value &&
-		a.Value2 == b.Value2
+		a.Value2 == b.Value2 &&
+		a.TargetHints == b.TargetHints
 }
 
 // optionsEqual is reflect.DeepEqual(a, b) for two option lists.

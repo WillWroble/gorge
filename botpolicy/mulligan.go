@@ -39,7 +39,7 @@ func (b Board) mulliganByRule(d *decision.Decision) (choices []int, ok bool) {
 		return nil, false
 	}
 	if d.Options[0].Kind == "bottom" {
-		if b.Mulligan == MulliganLands {
+		if b.Mulligan == MulliganLands || b.Mulligan == MulliganConstructed {
 			return b.landBottoming(d), true
 		}
 		return b.chooseDiscard(d), true
@@ -57,6 +57,9 @@ func (b Board) mulliganByRule(d *decision.Decision) (choices []int, ok bool) {
 		return nil, false // not a keep/mulligan shape: the default arm decides
 	}
 	if mull >= 0 && b.Mulligan == MulliganLands && !b.keepByLands(keepBottomCount(d.Prompt)) {
+		return []int{mull}, true
+	}
+	if mull >= 0 && b.Mulligan == MulliganConstructed && !b.keepConstructed(keepBottomCount(d.Prompt)) {
 		return []int{mull}, true
 	}
 	return []int{keep}, true

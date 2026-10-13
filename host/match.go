@@ -482,6 +482,9 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 	if wantsPlans {
 		m.e.EnsurePaymentActions()
 	}
+	if c, ok := seats[d.Player].(seat.TargetHintConsumer); ok && c.WantsTargetHints() {
+		m.e.EnsureTargetHints()
+	}
 	dc := *d.Clone()
 	// Payment plans are an opt-in human interface. Keep the engine's pending
 	// decision intact for replay and independently configured bots, but never

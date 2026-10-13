@@ -62,6 +62,11 @@
       "status": "SUPP",
       "purpose": "Thin registration of a built-in policy in the bots registry."
     },
+    "bots/sanity": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "Opt-in common-sense guard decorator over engine target hints (default off)."
+    },
     "bots/sbbuiltin": {
       "tier": "bots",
       "status": "EXT"

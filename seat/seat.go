@@ -26,6 +26,13 @@ type PaymentPlanConsumer interface {
 	WantsPaymentActions() bool
 }
 
+// TargetHintConsumer opts into decision.Option.TargetHints on priority
+// decisions (Engine.EnsureTargetHints). Information only; the engine offers
+// every legal action either way.
+type TargetHintConsumer interface {
+	WantsTargetHints() bool
+}
+
 // BoardSeat is a seat that can answer from a botpolicy.Board and needs no
 // projected View. host builds the Board under the engine lock and skips
 // view.Project entirely for such a seat. Implementing it is an opt-in: a

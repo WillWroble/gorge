@@ -1345,6 +1345,12 @@ func (e *canonEncoder) encdecision_Option(v *decision.Option) error {
 		e.buf = append(e.buf, 1)
 		e.buf = binary.AppendVarint(e.buf, int64(v.Value2))
 	}
+	if v.TargetHints == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.buf = binary.AppendUvarint(e.buf, uint64(v.TargetHints))
+	}
 	return nil
 }
 
@@ -1382,6 +1388,12 @@ func (e *canonEncoder) encdecision_PaymentAction(v *decision.PaymentAction) erro
 				return err
 			}
 		}
+	}
+	if v.TargetHints == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.buf = binary.AppendUvarint(e.buf, uint64(v.TargetHints))
 	}
 	return nil
 }

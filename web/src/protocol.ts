@@ -1059,6 +1059,14 @@ export interface Option {
    * budget (Decision.MaxSum2).
    */
   value2?: number;
+  /**
+   * TargetHints is the engine's opt-in hint for a cast or activation whose
+   * first targeting step is a hostile effect: own and opponent legal-target
+   * counts (see TargetHints). Information only; built by
+   * Engine.EnsureTargetHints for seats that ask. omitempty: absent for every
+   * option otherwise, so existing option lists serialise byte-identically.
+   */
+  target_hints?: number;
 }
 
   /**
@@ -1172,6 +1180,13 @@ export interface PaymentAction {
   base_option_index?: number | null;
   label: string;
   plans: PaymentPlan[];
+  /**
+   * TargetHints is the same opt-in hint Option.TargetHints carries, for the
+   * action's card: set by Engine.EnsureTargetHints, including for an action
+   * with no base option (a floating-mana plan) that no Option can carry it
+   * for. omitempty: absent unless the seat asked for hints.
+   */
+  target_hints?: number;
 }
 
   /**
