@@ -146,6 +146,7 @@ var fingerprintCensus = map[string]fingerprintFile{
 	"primitive.go":            {false, "coverage Primitives computed on demand, not stored"},
 	"registry.go":             {true, "Registry, CompileDir, Save/LoadRegistry and cacheVersion"},
 	"registry_lazy.go":        {true, "AllCards (Save's input) dispatches through lazyCards; kept conservatively"},
+	"rider_shape.go":          {true, "prevention rider param shape; kept in the compiler fingerprint"},
 	"saga.go":                 {false, "runtime SagaChapters parse of K:Chapter"},
 	"slot.go":                 {false, "runtime memo slots held in unexported fields gob never encodes"},
 	"strtab.go":               {true, "interned string tables used by compiled params"},

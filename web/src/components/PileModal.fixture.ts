@@ -28,7 +28,7 @@ const card = (id: number): CardView => ({
 });
 const graveyard = Array.from({ length: 52 }, (_, i) => card(i + 1));
 const player: PlayerView = {
-  seat: 0, name: 'Alice', life: 37, lost: false, library_size: 40, hand_size: 1,
+  seat: 0, name: 'Alice', life: 37, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: 1,
   graveyard_size: graveyard.length, hand: [card(100)], battlefield: [], graveyard,
   completed_dungeons: 0,
   exile: [card(200)], pool: {}, command: [], commanders: [], commander_casts: [],
@@ -66,13 +66,13 @@ if (new URLSearchParams(location.search).get('case') === 'shrink') {
   // exactly as Table.svelte resolves it (the decision carries a pass, so
   // the whole bundle reads offered).
   const alice: PlayerView = {
-    seat: 0, name: 'Alice', life: 37, lost: false, library_size: 40, hand_size: 1,
+    seat: 0, name: 'Alice', life: 37, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: 1,
     graveyard_size: 2, hand: [card(100)], battlefield: [], graveyard: [card(1), card(2)],
     completed_dungeons: 0,
     exile: [card(200)], pool: {}, command: [], commanders: [], commander_casts: [],
   };
   const bob: PlayerView = {
-    seat: 1, name: 'Bob', life: 20, lost: false, library_size: 40, hand_size: 0,
+    seat: 1, name: 'Bob', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: 0,
     graveyard_size: 1, hand: null as unknown as CardView[], battlefield: [],
     completed_dungeons: 0,
     graveyard: [card(300)], exile: [], pool: {}, command: [], commanders: [], commander_casts: [],

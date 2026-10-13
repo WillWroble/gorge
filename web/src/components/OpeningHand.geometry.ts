@@ -14,7 +14,7 @@ const requested = Number(new URLSearchParams(location.search).get('cards') ?? '7
 const handCount = Number.isInteger(requested) ? Math.max(0, Math.min(7, requested)) : 7;
 const hand = Array.from({ length: handCount }, (_, i) => card(100 + i));
 const player: PlayerView = {
-  seat: 0, name: 'Player 1', life: 20, lost: false, library_size: 53,
+  seat: 0, name: 'Player 1', life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 53,
   hand_size: hand.length, graveyard_size: 0, hand, battlefield: [], graveyard: [],
   completed_dungeons: 0,
   exile: [], pool: {}, command: [], commanders: [], commander_casts: [],

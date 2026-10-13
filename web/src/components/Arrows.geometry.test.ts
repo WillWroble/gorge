@@ -62,7 +62,7 @@ const stack: StackView[] = [
   { id: 900, kind: 'spell', name: 'Counterspell', text: 'Counter target spell.', controller: 0, targets: [{ obj: 890, player: 1, is_player: false, label: 'spell' }], card: null, optional: false },
 ];
 const players: PlayerView[] = [0, 1].map((seat) => ({
-  seat, name: `Player ${seat + 1}`, life: 20, lost: false, library_size: 60, hand_size: 7,
+  seat, name: `Player ${seat + 1}`, life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 60, hand_size: 7,
   graveyard_size: 0, hand: [], battlefield: [], graveyard: [], exile: [], pool: {},
   completed_dungeons: 0,
   command: [], commanders: [], commander_casts: [],

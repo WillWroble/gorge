@@ -70,8 +70,7 @@
      },
      "pt": "8/8"
     }
-   ],
-   "known_bug": "Test of Faith's prevention works but its +1/+1 counter rider never runs: effects/prevent_damage.go:96 only accepts ShieldEffectTarget$ ParentTarget (Test of Faith says Targeted) and rules/replacement_damage.go:212 resolves only a DealDamage PreventionSubAbility$ (this one is PutCounter); both emit a loud 'unimplemented' Note."
+   ]
   },
   {
    "name": "doubling-season-liliana-plus-one",
@@ -362,8 +361,7 @@
      },
      "pt": "5/5"
     }
-   ],
-   "known_bug": "Same as doubling-season-test-of-faith: PutCounter PreventionSubAbility$ rider unimplemented (rules/replacement_damage.go:212, effects/prevent_damage.go:96)."
+   ]
   },
   {
    "name": "control-kalitas-murder",

@@ -10,7 +10,7 @@ const { MatchState } = await import('./match.svelte');
 const view = (life: number): View => ({
   viewer: 0, visibility: 'omniscient', turn: 1, round: 1, step: 'main', phase: 'main1', active: 0, priority: 0,
   over: false, draw: false, winner: null, stack: [], pending: [],
-  players: [{ seat: 0, name: 'Ari', life, lost: false, library_size: 40, hand_size: 0, graveyard_size: 0, hand: [], battlefield: [], graveyard: [], exile: [], command: [], commanders: [], pool: {}, completed_dungeons: 0, commander_casts: [] }],
+  players: [{ seat: 0, name: 'Ari', life, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 40, hand_size: 0, graveyard_size: 0, hand: [], battlefield: [], graveyard: [], exile: [], command: [], commanders: [], pool: {}, completed_dungeons: 0, commander_casts: [] }],
 });
 
 async function settle(p: () => boolean) {

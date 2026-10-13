@@ -18,6 +18,7 @@ package effects
 import (
 	"strings"
 
+	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -137,6 +138,26 @@ func registerAnimateStaticAbilities(h Host, c *Ctx, id state.ObjID, names []stri
 			h.Emit(events.Event{Kind: events.Note, Obj: c.Source,
 				Text: "Animate staticAbilities$ " + name + " has no static body; ignored"})
 			continue
+		}
+		if cards.StaticModeOf(mode) == cards.StaticContinuous {
+			// A Mode$ Continuous body (Chimeric Mass's "power and toughness are
+			// each equal to the number of charge counters on it"): the animated
+			// object HAS the static, so it registers through the same grant
+			// builder an Effect's StaticAbilities$ body uses, scoped to the
+			// object and riding the animation's own lifetime. The SVar-valued
+			// SetPower$/SetToughness$ stay expressions for the layer walk
+			// (CR 613.4b) rather than collapsing to a number here.
+			if g, _, ok := parseStaticEffectGrant(params, false); ok && len(g.unread) == 0 &&
+				staticKeysReadable(params, "Mode", "Affected", "Description", "EffectZone",
+					"SetPower", "SetToughness", "AddPower", "AddToughness") &&
+				(params["Affected"] == "" || params["Affected"] == "Card.Self") {
+				g.duration, g.permanent, g.untilEOT = dur, permanent, untilEOT
+				lt := staticGrantLifetime{Remembered: remembered, ExileOnMoved: exileOn,
+					ExileOnMovedAlso: exileAlso, DurationSource: durSource}
+				if registerStaticEffectGrant(h, c, id, "Card.Self", g, lt) {
+					continue
+				}
+			}
 		}
 		if mode == ModeNoCleanupDamage && len(params["ValidCard"]) > 0 &&
 			staticKeysReadable(params, "Mode", "ValidCard", "Description") {

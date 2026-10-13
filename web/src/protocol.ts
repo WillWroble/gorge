@@ -554,6 +554,14 @@ export interface PlayerView {
   name: string;
   life: number;
   lost: boolean;
+  /**
+   * Per-turn watchers (state.Player's *ThisTurn tallies): public counts
+   * for this seat since the last turn change, for every viewer.
+   */
+  spells_cast_this_turn: number;
+  life_gained_this_turn: number;
+  life_lost_this_turn: number;
+  tokens_created_this_turn: number;
   library_size: number;
   hand_size: number;
   planar_deck?: CardView[];
