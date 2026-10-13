@@ -447,11 +447,13 @@ func (h *fakeHost) DeliriumHolds(_ state.PlayerID) bool { return h.delirium }
 func (h *fakeHost) MetalcraftHolds(_ state.PlayerID) bool { return h.metalcraft }
 
 // SpellsCastThisTurnMatching has no event log here; the double reports zero.
-func (h *fakeHost) SpellsCastThisTurnMatching(_ state.PlayerID, _ string) int { return 0 }
+func (h *fakeHost) SpellsCastThisTurnMatching(_ state.PlayerID, _ string, _ TriggerContext) int {
+	return 0
+}
 
 // SpellsCastThisTurnMatchingExcluding has no event log here; the double
 // reports zero (the same conservative no-op as SpellsCastThisTurnMatching).
-func (h *fakeHost) SpellsCastThisTurnMatchingExcluding(_ state.PlayerID, _ string, _ state.ObjID) int {
+func (h *fakeHost) SpellsCastThisTurnMatchingExcluding(_ state.PlayerID, _ string, _ state.ObjID, _ TriggerContext) int {
 	return 0
 }
 
@@ -459,7 +461,7 @@ func (h *fakeHost) SpellsCastThisTurnMatchingExcluding(_ state.PlayerID, _ strin
 // ids (the same conservative no-op as SpellsCastThisTurnMatching), so the
 // argumented !CastSaSource aggregate forms' fakeHost evals read an empty
 // cast set (their end-to-end pins live in rules).
-func (h *fakeHost) EachSpellCastThisTurnMatching(_ state.PlayerID, _ string, _ state.ObjID) []state.ObjID {
+func (h *fakeHost) EachSpellCastThisTurnMatching(_ state.PlayerID, _ string, _ state.ObjID, _ TriggerContext) []state.ObjID {
 	return nil
 }
 

@@ -28,7 +28,7 @@ func evalTriggerCurrentCastSpellsOK(h Host, c *Ctx, body string) (int32, bool) {
 		return 0, false
 	}
 	spec = strings.TrimSpace(spec)
-	ids := h.EachSpellCastThisTurnMatching(c.Controller, spec, 0)
+	ids := h.EachSpellCastThisTurnMatching(c.Controller, spec, 0, c.TriggerContext)
 	start := 0
 	if c.TriggerCard != 0 {
 		for i, id := range ids {

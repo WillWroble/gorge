@@ -21,7 +21,7 @@ func evalCountBodyProvenance(h Host, c *Ctx, body string, depth int) (int32, boo
 	// existing carrier is byte-identical.
 	if rest, ok := strings.CutPrefix(body, "ThisTurnCast_"); ok {
 		if stripped, selfExcl := stripBareCastSaSource(rest); selfExcl {
-			return int32(h.SpellsCastThisTurnMatchingExcluding(c.Controller, stripped, c.Source)), true, true
+			return int32(h.SpellsCastThisTurnMatchingExcluding(c.Controller, stripped, c.Source, c.TriggerContext)), true, true
 		}
 		// The ARGUMENTED forms (task castprov2) peel the token and reuse the
 		// same Excluding read:
@@ -39,7 +39,7 @@ func evalCountBodyProvenance(h Host, c *Ctx, body string, depth int) (int32, boo
 		//     heads' `$Property` precedent). An unknown property fails closed
 		//     to (0, false), the unresolvable verdict.
 		if stripped, prop, ok2 := stripCastSaSourceAggregate(rest); ok2 {
-			av, aok := aggregateCastProperty(h, h.EachSpellCastThisTurnMatching(c.Controller, stripped, c.Source), prop)
+			av, aok := aggregateCastProperty(h, h.EachSpellCastThisTurnMatching(c.Controller, stripped, c.Source, c.TriggerContext), prop)
 			return av, aok, true
 		}
 		// The COUNT-level `$<Property>` suffix (rootha_mastering_the_moment's
@@ -55,10 +55,10 @@ func evalCountBodyProvenance(h Host, c *Ctx, body string, depth int) (int32, boo
 		// vocabulary -- an unadmitted suffix keeps the byte-identical
 		// whole-token read below.
 		if stripped, prop, ok3 := stripCastSourceAggregate(rest); ok3 {
-			av, aok := aggregateCastSourceProperty(h, h.EachSpellCastThisTurnMatching(c.Controller, stripped, c.Source), prop)
+			av, aok := aggregateCastSourceProperty(h, h.EachSpellCastThisTurnMatching(c.Controller, stripped, c.Source, c.TriggerContext), prop)
 			return av, aok, true
 		}
-		return int32(h.SpellsCastThisTurnMatching(c.Controller, rest)), true, true
+		return int32(h.SpellsCastThisTurnMatching(c.Controller, rest, c.TriggerContext)), true, true
 	}
 	// ThisTurnActivated_<spec> (Professor Hojo's and Tezzeret, Betrayer of
 	// Flesh's "the first activated ability ... each turn" gates, the Equip/
