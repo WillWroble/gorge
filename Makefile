@@ -63,7 +63,8 @@ FORGE_REF  ?= 098b055313459c4b36c9e1f1d4e81a2c8aef815e
 XMAGE_REF  ?= 6b602a1c85e8ed738a4b40b1ef44c54845b57f68
 XMAGE_ORACLE_DIR ?= /mnt/sata/gorge-training/xmageoracle
 # Forge oracle driver commit (fork, branch oracle-harness): a descendant of FORGE_REF with identical script trees.
-FORGE_ORACLE_REF ?= e27d2bdb25449df986106f0cc9de22078e779a6a
+# da1c712c3 = e27d2bdb2 + fork gorge 098b05531 (restores the pin invariant, 2026-10-13).
+FORGE_ORACLE_REF ?= da1c712c31abec3063b0dbf3b517365f18951f89
 FORGE_ORACLE_DIR ?= /mnt/sata/gorge-training/forgeoracle
 
 .PHONY: help
