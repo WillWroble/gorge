@@ -170,11 +170,28 @@ func (e *Engine) ownArena() *decisionArena {
 	return e.decArena
 }
 
+// arenaLazyAfter is how many priority decisions an engine with no arena yet
+// (a Clone without a Spare) poses on the heap before it creates its live
+// arena. A live arena's first ask allocates a whole option chunk and a
+// decision chunk (~232 KB) per generation, two generations once it flips,
+// while a heap priority decision costs its Decision plus its exact Options
+// (~4 KB at a typical 8 options): the chunks only pay off for an engine
+// that keeps posing, and a one-step search expansion (clone, Submit, read
+// the next ask) poses one or two. Measured on enginebench's step row
+// (2026-10-13): ~230 KB of a 535 KB clone+Submit was that first chunk.
+// rules.New and SetDecisionArena create their arena explicitly and never
+// defer.
+const arenaLazyAfter = 64
+
 // activeArena is e's arena when it is switched on and owned by e, else nil.
-// It creates the (live, on) arena on first use so rules.New's default needs
-// no explicit switch.
+// An engine with no arena -- a Clone without a Spare -- creates its (live,
+// on) arena lazily, once it has posed arenaLazyAfter priority decisions on
+// the heap; until then it answers nil, exactly as an arena-off engine.
 func (e *Engine) activeArena() *decisionArena {
 	a := e.decArena
+	if a == nil && e.arenaHeapAsks < arenaLazyAfter {
+		return nil
+	}
 	if a == nil || a.owner != e {
 		a = e.ownArena()
 	}
@@ -243,6 +260,9 @@ func (t optTail) commit(out []decision.Option, hw int) bool {
 func (e *Engine) arenaDecision() *decision.Decision {
 	if a := e.activeArena(); a != nil {
 		return a.gens[a.cur].decs.one(arenaDecChunk)
+	}
+	if e.decArena == nil {
+		e.arenaHeapAsks++
 	}
 	return &decision.Decision{}
 }

@@ -245,6 +245,7 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 		arena = nil
 	}
 	e.decArena = nil
+	heapAsks := e.arenaHeapAsks
 	sp := e.Release()
 	l.Events, l.Intents = evs, ints
 	sc := s0.CloneInto(&sp)
@@ -264,6 +265,7 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 	if arena != nil {
 		e.decArena = arena
 	}
+	e.arenaHeapAsks = heapAsks
 	e.tapeHeldHook, e.tapeHeldStats = hook, stats
 	tapeRebindOwner(e, sc, arenaOn)
 }

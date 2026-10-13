@@ -941,6 +941,12 @@ func chooseTargets(sc Scenario, ds []rules.OracleDecision) (Scenario, map[int]bo
 		if d.Via != "target" || d.Step < 0 || d.Step >= len(out.Steps) || !carriesTargets(out.Steps[d.Step].Op) {
 			continue
 		}
+		// A copy's CR 707.10c new-target election is never a cast step's own
+		// targets: XMage poses it as per-slot chooseUse dialogs, not through
+		// castSpell, so it must not be folded into the step's fixture targets.
+		if d.Resume == "copy_targets" {
+			continue
+		}
 		chosen[d.Step] = append(chosen[d.Step], d.PickRefs...)
 		castSteps[d.Step] = true
 	}
@@ -1036,9 +1042,11 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			}
 			continue
 		}
-		if d.Step >= steps || (d.Via == "target" && castSteps[d.Step]) {
+		if d.Step >= steps || (d.Via == "target" && d.Resume != "copy_targets" && castSteps[d.Step]) {
 			// A cast step's own targets reach XMage through castSpell; a
-			// target decision posed at a resolve step is scripted below.
+			// target decision posed at a resolve step is scripted below. A
+			// copy's new-target election is never a cast step's targets even
+			// if it shares the step, so it is scripted below regardless.
 			continue
 		}
 		if as, owned := routing.route(i); owned {
@@ -1603,6 +1611,13 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 	d := r.ds[i]
 	as := leadingUnposedSkips(d)
 	switch {
+	case d.Resume == "copy_targets" && d.Divided == 0 && !d.PerPlayer:
+		// A copy's CR 707.10c new-target election: XMage asks one chooseUse
+		// per inherited target before the pick, so this is not one target
+		// dialog and never takes the trailing "up to N" skip below. A divided
+		// (TargetAmount) or per-player copy keeps its existing branch: the
+		// per-slot replace stream for those is unproven, so it is left alone.
+		as = append(as, copyTargetAnswers(d)...)
 	case d.PerPlayer:
 		// TargetsForEachPlayer$ (CR 601.2c): XMage asks one target
 		// per player, in seat order starting at seat 0. Answer each
@@ -1615,30 +1630,8 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 		// completes when the allocation is answered.
 		as = append(as, dividedTargetAnswers(r, i)...)
 	default:
-		for k, ref := range d.PickRefs {
-			if isSeat(ref) {
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			// XMage's chooseTarget parses the same copy marker as
-			// makeChoose and filters on isCopy(), so a target that shares its
-			// name with another offered object needs the discriminator here
-			// too (a token copy of a card, Extravagant Replication). An alias
-			// pick keeps its full ref, which the driver's targetName maps to
-			// the object's @alias.
-			if p := ClassifySameName(d, k); p.Alias != "" {
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			if currentFaceTargetRef(d, k) {
-				// The option label names a different object than the ref --
-				// the permanent's current face (a transformed DFC, a face-down
-				// card). The ref's identity alias selects the live object.
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			_, marker := SameNameAmbiguity(d, k)
-			as = append(as, XAnswer{d.Seat, "target", oraclediffRefName(ref) + marker})
+		for k := range d.PickRefs {
+			as = append(as, singleTargetAnswer(d, k))
 		}
 		if len(d.PickRefs) < d.Max {
 			// Fewer picks than the "up to N" ask allows: XMage keeps
@@ -1651,6 +1644,34 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 		as = append(as, XAnswer{d.Seat, "target", "[target_skip]"})
 	}
 	return as
+}
+
+// singleTargetAnswer is the TARGET-queue answer for one pick: a seat ref, an
+// exact identity ref (a same-name alias, a permanent's current face), or the
+// ref's name with a same-name marker. It is the one home for that spelling,
+// shared by the ordinary target ask and a copy's per-slot replacement, so the
+// two cannot drift.
+func singleTargetAnswer(d rules.OracleDecision, k int) XAnswer {
+	ref := d.PickRefs[k]
+	if isSeat(ref) {
+		return XAnswer{d.Seat, "target", ref}
+	}
+	// XMage's chooseTarget parses the same copy marker as makeChoose and
+	// filters on isCopy(), so a target that shares its name with another
+	// offered object needs the discriminator here too (a token copy of a
+	// card, Extravagant Replication). An alias pick keeps its full ref, which
+	// the driver's targetName maps to the object's @alias.
+	if p := ClassifySameName(d, k); p.Alias != "" {
+		return XAnswer{d.Seat, "target", ref}
+	}
+	if currentFaceTargetRef(d, k) {
+		// The option label names a different object than the ref -- the
+		// permanent's current face (a transformed DFC, a face-down card). The
+		// ref's identity alias selects the live object.
+		return XAnswer{d.Seat, "target", ref}
+	}
+	_, marker := SameNameAmbiguity(d, k)
+	return XAnswer{d.Seat, "target", oraclediffRefName(ref) + marker}
 }
 
 // dividedTargetAnswers answers a divided target ask with each pick's share of

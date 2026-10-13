@@ -178,6 +178,14 @@ type OracleDecision struct {
 	// root slot with no candidate, or a leading link). XMage asks them first,
 	// so the generator closes each with a target skip ahead of the picks.
 	LeadingUnposed int `json:"leading_unposed,omitempty"`
+	// CopyInherited counts the inherited targets of the declaration a
+	// "copy_targets" ask (CR 707.10c) is retargeting. XMage poses one
+	// "Change this N of M target?" chooseUse per inherited target before the
+	// new-target pick, so the generator needs the count to emit the booleans;
+	// gorge offers those slots as the ask's leading keep-current options, so a
+	// pick index below the count keeps that slot. Omitted (zero) for every
+	// other decision, leaving its JSON byte-identical.
+	CopyInherited int `json:"copy_inherited,omitempty"`
 	// AltPayable counts the options of an AlternateAdditionalCost either-or
 	// ask (option kind "altaddcost") the cast could pay. XMage's OrCost poses
 	// its chooseUse only when two or more of its costs can be paid, so the

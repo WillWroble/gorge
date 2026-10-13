@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -130,7 +131,13 @@ func (im *Image) strBytes(id StringID) []byte {
 // cards exactly as gob decoded them (T0, before finishDecoded). The image
 // keeps them; the trees themselves are dropped by the caller.
 func imagedRegistry(decoded []*Card, tokens map[string]*Card) (*Registry, error) {
-	img, err := buildImage(decoded, tokens)
+	return imagedRegistryHashed(decoded, tokens, nil)
+}
+
+// imagedRegistryHashed is imagedRegistry with the corpus's canonical digest
+// supplied (buildImageHashed); nil computes it.
+func imagedRegistryHashed(decoded []*Card, tokens map[string]*Card, canon *[sha256.Size]byte) (*Registry, error) {
+	img, err := buildImageHashed(decoded, tokens, canon)
 	if err != nil {
 		return nil, err
 	}
