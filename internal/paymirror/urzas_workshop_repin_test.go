@@ -106,6 +106,12 @@ func driveUrzasWorkshopGame(t *testing.T, d *Decks, spec GameSpec) []watchedCast
 // the paid artifacts force the planner to tap a land, so at least one planned
 // cast must activate Workshop's Index-1 ability for more than one mana and
 // must mirror the planner's witness through the executor.
+//
+// The seed is 68, not the original 7: the paid-cost census default-on flip
+// (cli-20261012T170859Z) changed the bot's payment so seed 7 no longer pays
+// Cranial Plating through the Workshop's metalcraft ability at all; 68 is the
+// first seed of this list that reaches the same path (one metalcraft cast,
+// Cranial Plating, source exactly the Workshop, >1 mana).
 func TestUrzasWorkshopMetalcraftMirrorsRePin(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -114,7 +120,7 @@ func TestUrzasWorkshopMetalcraftMirrorsRePin(t *testing.T) {
 		t.Fatal(err)
 	}
 	list := urzasWorkshopRepinList()
-	spec := GameSpec{Seed: 7, Policy: "bot",
+	spec := GameSpec{Seed: 68, Policy: "bot",
 		Decks: []string{"urza-workshop-a", "urza-workshop-b"},
 		Lists: [][]string{list, list}}
 	cases := driveUrzasWorkshopGame(t, d, spec)

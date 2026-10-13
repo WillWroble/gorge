@@ -16,7 +16,9 @@ import "testing"
 //     the card list and verdicts of the game are otherwise identical);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
-//   - 10056 seq 6128: Lagomos, Hand of Hatred, equivalent;
+//   - 10056 seq 6750: Lagomos, Hand of Hatred, equivalent (the paid-cost
+//     census default-on flip, cli-20261012T170859Z, moved this cast from
+//     seq 6128);
 //   - 8175: the Hideaway ETB timing correction changes this game before the
 //     former Songs of the Damned finding, so that planned cast is no longer
 //     reached (verified against the pre-fix keyword expansion).
@@ -25,7 +27,7 @@ import "testing"
 var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
 	10860: {3246: ""},
 	11056: {},
-	10056: {6128: ""},
+	10056: {6750: ""},
 	8175:  {},
 }
 

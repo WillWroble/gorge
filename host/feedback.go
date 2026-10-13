@@ -77,6 +77,15 @@ type FeedbackMatch struct {
 	// fixture does, and saying so.
 	NameUniverseNames []string `json:"name_universe_names,omitempty"`
 
+	// PaidManaCensus mirrors the sidecar's field of the same name: whether the
+	// live match ran with the widened paid-cost mana census. Like the name
+	// universe it is a match MODE, not data the log can recover — the census
+	// changes the offered option list, so a replay rebuilt from match.json
+	// alone without the bit takes a different option list and diverges at the
+	// first census-sensitive decision. A pre-flip capture carries no field,
+	// which reads back as census OFF (the narrow census those matches ran).
+	PaidManaCensus bool `json:"paid_mana_census,omitempty"`
+
 	// Tokens carries the raw token scripts — keyed by file stem, the exact
 	// spelling a card's TokenScript$ parameter uses — behind the match's
 	// rules.Config.Tokens. rules.Config.Tokens is replay input (rules.New
@@ -347,6 +356,7 @@ func feedbackMatch(sc sidecar, deckCards [][]string, sideboards [][]string,
 		StartingLife: sc.StartingLife, Commanders: sc.Commanders, BotPolicy: sc.BotPolicy,
 		NameUniverse:      sc.NameUniverse,
 		NameUniverseNames: append([]string(nil), sc.NameUniverseNames...),
+		PaidManaCensus:    sc.PaidManaCensus,
 		Tokens:            tokens, TokensUnread: tokensUnread,
 	}
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Paired A/B of Config.PaidManaCensus (flag off vs on): same decks, same seeds, same policies.
+# Paired A/B of the paid-cost mana census (flag off vs on): same decks, same seeds, same policies.
 # Brief: .ds4/mana-model/D-ab.md. Report: docs/superpowers/reports/2026-10-12-mana-model-ab.md.
 #
 #   OUT=<dir> DZ=<dzgorge binary> W=<workers> PAIRS=600 bash scripts/manamodel_ab.sh [job ...]
@@ -22,7 +22,7 @@ job() { # set run flag
   [ -e "$o.jsonl.summary.json" ] && { echo "skip $o"; return; }
   local src=(-decks "$I/decks" -pool "$I/pool.tsv")
   [ "$set" = cons ] && src=(-decks "$OUT/cdecks" -pool "$OUT/cpool.tsv" -only "$OUT/cons.only")
-  local fl=(); [ "$flag" = on ] && fl=(-paid-mana-census)
+  local fl=(); [ "$flag" = off ] && fl=(-no-paid-mana-census)
   echo "[$(date -u +%FT%TZ)] $o"
   flock -o "$LOCK" timeout 3h "$DZ" play "${src[@]}" -split eval -a "$(policy "${RUNA[$run]}")" -b "$(policy "${RUNB[$run]}")" \
     -pairs "$PAIRS" -seed "$SEED" -workers "$W" -mulligans 2 -mull-heuristic -mm-stats "${fl[@]}" \

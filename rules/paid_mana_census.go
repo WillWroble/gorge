@@ -8,7 +8,8 @@ import (
 )
 
 // paid_mana_census.go is the ONE paid-cost layer over the shared payment
-// census (windowManaUnits). Config.PaidManaCensus (default off) widens what
+// census (windowManaUnits). The census is ON by default; Config.
+// DisablePaidManaCensus restores the pre-flip narrow census. It widens what
 // the attack-tax budget and tap list, the unless-cost windows, AvailableMana
 // and the pool-short ability offer (legal_walk_autopay.go) read: a mana
 // source whose activation cost is more than a bare tap is counted when the
@@ -75,8 +76,8 @@ func (e *Engine) paidManaAbility(p state.PlayerID, id state.ObjID, o *state.Obje
 }
 
 // windowManaUnitsPaid is the census the attack-tax, unless-cost and tap-list
-// readers share: windowManaUnits, plus -- with Config.PaidManaCensus -- the
-// paid-cost layer. Without the flag it IS windowManaUnits.
+// readers share: windowManaUnits, plus -- unless Config.DisablePaidManaCensus
+// -- the paid-cost layer. With the census disabled it IS windowManaUnits.
 func (e *Engine) windowManaUnitsPaid(p state.PlayerID) []windowManaUnit {
 	units := e.windowManaUnits(p)
 	if !e.paidManaCensus {
