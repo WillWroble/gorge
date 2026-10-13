@@ -97,8 +97,11 @@ ORPHAN=""
 python3 -c 'import time; time.sleep(300)' \
 	-addr 127.0.0.1:8093 -tables 1 -dir /tmp/gorge-seed-reap-smoke-orphan &
 ORPHAN=$!
-for _ in $(seq 1 50); do
-	[ -e "/proc/$ORPHAN/stat" ] && break
+# /proc/<pid> exists at fork, before the exec: wait for the python3 cmdline, or
+# the fake-tree carry below copies THIS script's argv and the collector never
+# sees an orphan (2026-10-13 03:13 RED 90a2c6662).
+for _ in $(seq 1 300); do
+	tr '\0' ' ' <"/proc/$ORPHAN/cmdline" 2>/dev/null | grep -q -- '-tables' && break
 	sleep 0.1
 done
 ppid=$(awk '{print $4}' "/proc/$ORPHAN/stat" 2>/dev/null)

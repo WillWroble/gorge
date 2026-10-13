@@ -130,11 +130,24 @@ probe_row() {
 # forged fake-tree carry below; the ownership signals themselves stay
 # covered by reward_collect.py --selftest's fake-tree cases. The port is
 # only ever a FLAG, never bound. Sets <varname>.
+# wait_exec <pid>: the fixture is a background child, so /proc/<pid> exists as
+# soon as it forks -- while its cmdline is still THIS script's, before the exec
+# of python3. Carried into the fake tree at that instant it has no -addr/-tables
+# and the collector never sees it (2026-10-13 03:13 RED 90a2c6662 at load ~60).
+wait_exec() {
+	for _ in $(seq 1 300); do
+		tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null | grep -q -- '-tables' && return 0
+		sleep 0.1
+	done
+	return 1
+}
+
 spawn_orphan() { # <port> <dir> <varname>
 	local -n pidvar=$3
 	python3 -c 'import time; time.sleep(300)' \
 		-addr "127.0.0.1:$1" -tables 1 -dir "$2" &
 	pidvar=$!
+	wait_exec "$pidvar"
 }
 
 # spawn_supervised <port> <dir> — a REAL demo-port neighbour the reaper must
@@ -153,6 +166,7 @@ spawn_supervised() { # <port> <dir>
 	python3 -c 'import time; time.sleep(300)' \
 		-addr "127.0.0.1:$1" -tables 1 -dir "$2" &
 	SUPERVISED_PID=$!
+	wait_exec "$SUPERVISED_PID"
 }
 
 # carry_into_faketree <pid> — put a REAL process's cmdline/stat into the fake
