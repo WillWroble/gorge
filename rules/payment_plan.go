@@ -266,7 +266,7 @@ func (e *Engine) paymentPlanCastShapeDetailUsing(statics costStaticViews, p stat
 	if pay.PlanNonManaAdmissible(spellCost) != "" || pay.PlanNonManaAdmissible(pay.WithSpellAbilityExtras(f, Cost{})) != "" {
 		return "shape:additional_cost"
 	}
-	if e.hasCastConvoke(id) || e.hasCastImprovise(id) || e.hasKeywordH(id, kwhDelve) {
+	if e.hasCastConvoke(id) || e.hasCastImprovise(id) || e.hasCastDelve(id) {
 		return "shape:contribution"
 	}
 	// Waterbend (a RaiseCost static's Waterbend<N>, Benevolent River
