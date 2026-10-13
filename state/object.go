@@ -964,15 +964,18 @@ type Object struct {
 	// Like BlockedBy it is a slice, so CloneDeep backs it independently.
 	BlockedByThisTurn []ObjID
 	// BlockedThisTurn is the blocker-side half of the same this-turn block
-	// history: the creature blocked at least one attacker this turn. Like
-	// BlockedByThisTurn it survives the end-of-combat reset and is reset in
-	// TurnChange and on a battlefield exit (CR 400.7). It backs Forge's
-	// Card.blockedThisTurn ("each creature that blocked this turn": Heat
-	// Stroke, Gideon's Triumph, Hezrou // Demonic Stench, Sizzling Barrage,
-	// Lurker, Inferno Hellion, Vizier of Deferment, Glyph of Delusion).
-	// Set by events.Apply's DeclareBlockers fold; a plain bool, so CloneDeep
-	// carries it by value.
-	BlockedThisTurn bool
+	// history: the attackers this creature blocked this turn (CR 509.1), in
+	// declaration order. Like BlockedByThisTurn it survives the end-of-combat
+	// reset and is reset in TurnChange and on a battlefield exit (CR 400.7).
+	// It backs Forge's Card.blockedThisTurn ("each creature that blocked this
+	// turn": Heat Stroke, Gideon's Triumph, Hezrou // Demonic Stench, Sizzling
+	// Barrage, Lurker, Inferno Hellion, Vizier of Deferment, Glyph of Delusion)
+	// and, because it names the attackers rather than being a flag, the
+	// referent words blockedValidThisTurn / blockedRemembered: an attacker
+	// that has since died is not scanned for, so "blocked a Zombie that then
+	// died" still reads true. Set by events.Apply's DeclareBlockers fold; a
+	// slice, so CloneDeep backs it independently.
+	BlockedThisTurn []ObjID
 	// EncoreAttackTurn/Defender record "attacks that opponent this turn if
 	// able" on an encore token. Zero Turn means no requirement; turns begin
 	// at 1, so the zero value is unambiguous.
@@ -1624,7 +1627,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [74]byte
+	_ [58]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
@@ -2154,7 +2157,7 @@ func carveClone[T any](buf *[]T, src []T) []T {
 
 // cloneArenaNeed adds the element counts o's carved slices need to a.
 func (o *Object) cloneArenaNeed(ids, tgs, ctr *int) {
-	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
+	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.BlockedThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
 		len(o.DamageTakenThisTurnBy) + len(o.ImprintTokens) + len(o.EncodedCards) + len(o.SeekFound) + len(o.ExiledCards)
 	*tgs += len(o.Targets) + len(o.SubTargets) + len(o.Remembered) + len(o.Chosen)
 	*ctr += len(o.Counters)
@@ -2174,6 +2177,7 @@ func (o *Object) cloneDeepIntoArena(c *Object, a *cloneArena) {
 	c.Remembered = carveClone(&a.tgs, o.Remembered)
 	c.BlockedBy = carveClone(&a.ids, o.BlockedBy)
 	c.BlockedByThisTurn = carveClone(&a.ids, o.BlockedByThisTurn)
+	c.BlockedThisTurn = carveClone(&a.ids, o.BlockedThisTurn)
 	c.CrewedVehicles = carveClone(&a.ids, o.CrewedVehicles)
 	c.Chosen = carveClone(&a.tgs, o.Chosen)
 	if c.Chosen == nil && o.Chosen != nil {

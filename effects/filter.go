@@ -377,7 +377,7 @@ var predicates = map[string]predFn{
 	// survive-end-of-combat / clear-on-turn-and-exit lifetimes as
 	// blockedByThisTurn above.
 	"blockedThisTurn": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o != nil && o.BlockedThisTurn
+		return o != nil && len(o.BlockedThisTurn) != 0
 	},
 	// blockedBySourceThisTurn is the this-turn twin of blockedBySource (the
 	// word-predicate at effects/filter_word.go): the object was blocked by
@@ -2255,19 +2255,7 @@ func matchPositive(g *state.Game, p string, o *state.Object, sc SpecContext) (re
 		// capture added this walk, the "each card exiled this way" follow-up
 		// shape), and the source object's event-backed Remembered (what an
 		// earlier resolution remembered durably, Forge's persistent host list).
-		for _, t := range sc.Remembered {
-			if !t.IsPlayer && t.Obj == o.ID {
-				return true, true
-			}
-		}
-		if src := g.Obj(sc.Source); src != nil {
-			for _, t := range src.Remembered {
-				if !t.IsPlayer && t.Obj == o.ID {
-					return true, true
-				}
-			}
-		}
-		return false, true
+		return anyRemembered(g, &sc, func(id state.ObjID) bool { return id == o.ID }), true
 	}
 	if rest, has := strings.CutPrefix(p, "greatestPower"); has {
 		// Forge's greatestPower[ControlledBy <players>] (CardProperty): the

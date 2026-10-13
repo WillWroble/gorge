@@ -737,7 +737,7 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		// too, so a creature that leaves and returns is a new object that
 		// blocked/blocked-by nothing this turn.
 		o.BlockedByThisTurn = nil
-		o.BlockedThisTurn = false
+		o.BlockedThisTurn = nil
 		if !countersRemain || to == state.ZHand || to == state.ZLibrary {
 			o.Counters = nil
 		}

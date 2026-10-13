@@ -54,7 +54,7 @@ func foldDeclareBlockers(g *state.Game, e *Event) {
 		// blocked after EndCombatReset has emptied the live list (Defiant
 		// Vanguard, Heat Stroke).
 		a.BlockedByThisTurn = append(a.BlockedByThisTurn, pr[1])
-		b.BlockedThisTurn = true
+		b.BlockedThisTurn = append(b.BlockedThisTurn, pr[0])
 		g.NoteBlockers()
 	}
 }
