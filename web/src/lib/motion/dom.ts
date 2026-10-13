@@ -37,8 +37,9 @@ function zoneSel(z: ZoneRef, viewerSeat: number | null): string[] {
 /**
  * drawnAsCard: the zones whose cards are on screen as cards — the
  * battlefield, the stack, and the viewer's own hand. Anywhere else a card's
- * [data-obj] element is a list row (a spectator's revealed-hand list, a pile
- * modal), which is no place to fly to or from; the zone's pile is.
+ * [data-obj] element is not used as a flight endpoint (a pile modal row, or a
+ * face in a spectator's passive hand fan); the zone's anchor is — for a
+ * spectator's exposed hand that anchor is the passive fan itself.
  */
 function drawnAsCard(z: ZoneRef, viewerSeat: number | null): boolean {
   return z.zone === 'battlefield' || z.zone === 'stack' || (z.zone === 'hand' && z.seat !== null && z.seat === viewerSeat);

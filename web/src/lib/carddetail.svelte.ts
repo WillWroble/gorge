@@ -4,7 +4,7 @@ import type { CardView } from '../protocol';
  * carddetail.svelte.ts owns the open/close state of the hover detail panel
  * and the viewport-safe placement math for it. The panel itself is
  * CardDetail.svelte; every tile that can show it (CardTile on the board,
- * HandList in the rail) drives one HoverCard and renders CardDetail while
+ * HandFan and PassiveHandFan for hands) drives one HoverCard and renders CardDetail while
  * `show` is true.
  *
  * Pointer enter arms a dwell timer (DWELL ms); if the pointer stays, the
@@ -35,8 +35,8 @@ export class HoverCard {
    * The object the panel is (or would be) describing — learned from arm/open
    * when the caller knows whose panel this is, so a surface can later prove
    * an open panel describes an object it is no longer rendering (see
-   * superviseRendering). Null for callers that never pass one (HandList
-   * manages its subject through supervise instead).
+   * superviseRendering). Null for callers that never pass one (such a
+   * caller manages its subject through supervise instead).
    */
   private showingId: number | null = null;
   private timer: unknown = null;
@@ -54,7 +54,7 @@ export class HoverCard {
    * a pointerenter never stacks two timers. objectId is the object the panel
    * is being prepared for — HoverCard remembers it as the panel's subject, so
    * a surface that later re-renders a different object can prove the open
-   * panel describes the wrong one. A callback-only call (HandList's dwell) is
+   * panel describes the wrong one. A callback-only call (an id-less dwell) is
    * accepted for surfaces that manage the subject themselves via supervise.
    */
   arm(objectIdOrOnOpen?: (() => void) | number | null | undefined, onOpen?: () => void) {
@@ -257,7 +257,7 @@ export function placePanel(anchor: AnchorRect, vw: number, vh: number, panelWidt
  * renders the detail panel needs alongside it: the card the panel describes
  * and the anchor rect it is placed against. CardTile and StackTile own one
  * HoverCard per tile and hand-roll those companions inline; a surface that
- * renders MANY triggers against ONE panel (HandList's hand lines,
+ * renders MANY triggers against ONE panel (a list of hand lines,
  * SeatPanel's arrange strip) owns ONE CardHover instead. Pointer and keyboard
  * focus can belong to different cards at the same time, so CardHover keeps
  * those owners separate and gives focus the active inspector.
