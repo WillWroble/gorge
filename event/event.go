@@ -177,6 +177,22 @@ func (e *Event) SavedDeck(seat int) (build.Deck, bool) {
 	return d, true
 }
 
+// DeckRev returns the seat's saved deck at the given revision, if any
+// (E3-5: the pool view's Playing deck names a specific revision).
+func (e *Event) DeckRev(seat, rev int) (build.Deck, bool) {
+	if seat < 0 || seat >= draft.Seats || rev < 1 {
+		return build.Deck{}, false
+	}
+	for _, sd := range e.decks[seat] {
+		if sd.rev == rev {
+			d := sd.deck
+			d.Main = append([]string(nil), d.Main...)
+			return d, true
+		}
+	}
+	return build.Deck{}, false
+}
+
 // PendingSeries lists the current round's series that have not ended, in
 // pairing order. The caller plays each one and reports its games back as
 // GameEnded entries, then closes it with SeriesEnded.

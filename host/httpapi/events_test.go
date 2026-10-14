@@ -127,6 +127,14 @@ func (f *fakeEvents) Ready(id, token string, req protocol.ReadyRequest) (protoco
 	return f.state, nil
 }
 
+func (f *fakeEvents) Sideboard(id, token string, req protocol.SideboardRequest) (protocol.EventState, error) {
+	f.call("Sideboard", id, token, req)
+	if f.err != nil {
+		return protocol.EventState{}, f.err
+	}
+	return f.state, nil
+}
+
 func (f *fakeEvents) EventLog(id, token string) (protocol.EventLog, error) {
 	f.call("EventLog", id, token, nil)
 	if f.err != nil {
@@ -329,6 +337,12 @@ func TestEventRoutesDispatch(t *testing.T) {
 			req: protocol.DeckRequest{Main: []string{"i2"}, Basics: [5]int{3, 0, 0, 0, 2}}},
 		{name: "ready", method: "POST", path: "/api/events/e1/ready", auth: "Bearer seattok", body: `{"rev":1}`,
 			call: "Ready", id: "e1", token: "seattok", want: 200, req: protocol.ReadyRequest{Rev: 1}},
+		{name: "sideboard", method: "POST", path: "/api/events/e1/sideboard", auth: "Bearer seattok", body: `{"game":2,"keep":true}`,
+			call: "Sideboard", id: "e1", token: "seattok", want: 200, req: protocol.SideboardRequest{Game: 2, Keep: true}},
+		{name: "sideboard deck", method: "POST", path: "/api/events/e1/sideboard", auth: "Bearer seattok",
+			body: `{"game":2,"deck":{"main":["i2"],"basics":[3,0,0,0,2]}}`,
+			call: "Sideboard", id: "e1", token: "seattok", want: 200,
+			req: protocol.SideboardRequest{Game: 2, Deck: &protocol.DeckRequest{Main: []string{"i2"}, Basics: [5]int{3, 0, 0, 0, 2}}}},
 		{name: "log", method: "GET", path: "/api/events/e1/log", auth: "Bearer spectok",
 			call: "EventLog", id: "e1", token: "spectok", want: 200,
 			val: protocol.EventLog{Event: "e1", Complete: false,
@@ -456,6 +470,17 @@ func TestEventRoutesWrongMethod(t *testing.T) {
 	if fake.lastMethod != "sentinel" {
 		t.Errorf("backend called with method %q; the twin must answer before dispatch", fake.lastMethod)
 	}
+	fake.lastMethod = "sentinel"
+	st, raw = doReq(t, srv, "GET", "/api/events/e1/sideboard", "Bearer tok", "")
+	if st != http.StatusMethodNotAllowed {
+		t.Errorf("GET sideboard: status %d, want 405 (body %s)", st, raw)
+	}
+	if code := bodyCode(t, raw); code != "method_not_allowed" {
+		t.Errorf("GET sideboard: code %q, want method_not_allowed", code)
+	}
+	if fake.lastMethod != "sentinel" {
+		t.Errorf("sideboard twin dispatched to the backend (%s)", fake.lastMethod)
+	}
 }
 
 func TestEventMalformedBody(t *testing.T) {
@@ -469,5 +494,15 @@ func TestEventMalformedBody(t *testing.T) {
 	}
 	if fake.lastMethod != "" {
 		t.Errorf("backend was called (%s) on a malformed body; decode must precede dispatch", fake.lastMethod)
+	}
+	st, raw = doReq(t, srv, "POST", "/api/events/e1/sideboard", "Bearer tok", `{"x":1}`)
+	if st != http.StatusBadRequest {
+		t.Errorf("malformed sideboard body: status %d, want 400 (body %s)", st, raw)
+	}
+	if code := bodyCode(t, raw); code != "bad_request" {
+		t.Errorf("malformed sideboard body: code %q, want bad_request", code)
+	}
+	if fake.lastMethod != "" {
+		t.Errorf("sideboard backend was called (%s) on a malformed body; decode must precede dispatch", fake.lastMethod)
 	}
 }

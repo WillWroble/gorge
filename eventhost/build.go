@@ -46,12 +46,40 @@ func (r *run) advanceBuild() bool {
 	return applied
 }
 
+// deckSaveOpen reports whether seat may save a deck revision now: BUILD,
+// or — E3-5 — a round phase whose seat's series is between games with the
+// seat's side still to submit its deck (the sideboard UI saves a new
+// revision in the between window).
+func (r *run) deckSaveOpen(seat int) bool {
+	switch r.ev.Phase() {
+	case event.PhaseBuild:
+		return true
+	case event.RoundPhase(1), event.RoundPhase(2), event.RoundPhase(3):
+	default:
+		return false
+	}
+	a, b, ok := r.ev.SeriesOf(seat)
+	if !ok {
+		return false
+	}
+	v, ok := r.ev.SeriesState(a, b)
+	if !ok || !v.Between {
+		return false
+	}
+	side := 0
+	if seat == b {
+		side = 1
+	}
+	return v.Locked[side] == 0
+}
+
 // saveDeck validates one seat's deck against its pool and persists the
 // revision: the deck file FIRST, then the DeckSaved entry — a crash between
 // the two leaves an orphan file that the next save of that revision
-// overwrites. The event must be in BUILD; an illegal deck is invalid_deck.
+// overwrites. The event must be in BUILD (or the seat must be in its
+// series' between window, E3-5); an illegal deck is invalid_deck.
 func (r *run) saveDeck(seat int, d build.Deck) (int, error) {
-	if r.ev.Phase() != event.PhaseBuild {
+	if !r.deckSaveOpen(seat) {
 		return 0, errConflict("eventhost: the event is not building (phase %s)", r.ev.Phase())
 	}
 	if err := build.Validate(r.ev.Pool(seat), d); err != nil {
@@ -100,6 +128,24 @@ func (r *run) poolFor(seat int) protocol.EventPool {
 	}
 	if d, ok := r.ev.SavedDeck(seat); ok {
 		out.Deck = &protocol.DeckRequest{Main: d.Main, Basics: d.Basics}
+	}
+	// E3-5: in a round, Playing is the deck the seat plays (or last
+	// played) in its series' current games, with PlayingRev naming the
+	// revision — the sideboard UI's starting point.
+	switch r.ev.Phase() {
+	case event.RoundPhase(1), event.RoundPhase(2), event.RoundPhase(3):
+		if a, b, ok := r.ev.SeriesOf(seat); ok {
+			side := 0
+			if seat == b {
+				side = 1
+			}
+			if v, ok := r.ev.SeriesState(a, b); ok && v.PlayRevs[side] != 0 {
+				if d, ok := r.ev.DeckRev(seat, v.PlayRevs[side]); ok {
+					out.Playing = &protocol.DeckRequest{Main: d.Main, Basics: d.Basics}
+					out.PlayingRev = v.PlayRevs[side]
+				}
+			}
+		}
 	}
 	ph := r.ev.Phase()
 	if r.builders[seat] != nil && ph != event.PhaseLobby && ph != event.PhaseDraft {

@@ -23,6 +23,7 @@ type EventService interface {
 	CheckDeck(id, token string, req protocol.DeckRequest) (protocol.DeckCheck, error)
 	SaveDeck(id, token string, req protocol.DeckRequest) (protocol.DeckCheck, error)
 	Ready(id, token string, req protocol.ReadyRequest) (protocol.EventState, error)
+	Sideboard(id, token string, req protocol.SideboardRequest) (protocol.EventState, error)
 	EventLog(id, token string) (protocol.EventLog, error)
 	SubscribeEvent(id, token, session string) error
 	// The two discovery endpoints (E1-8).
@@ -55,6 +56,7 @@ func (h *handler) mountEvents(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/events/{id}/deck/check", h.eventCheckDeck)
 	mux.HandleFunc("POST /api/events/{id}/deck", h.eventSaveDeck)
 	mux.HandleFunc("POST /api/events/{id}/ready", h.eventReady)
+	mux.HandleFunc("POST /api/events/{id}/sideboard", h.eventSideboard)
 	mux.HandleFunc("GET /api/events/{id}/log", h.eventLog)
 	mux.HandleFunc("POST /api/events/{id}/subscribe", h.eventSubscribe)
 	mux.HandleFunc("GET /api/events/sets", h.eventSets)
@@ -79,6 +81,7 @@ func (h *handler) mountEvents(mux *http.ServeMux) {
 		"/api/events/{id}/deck/check",
 		"/api/events/{id}/deck",
 		"/api/events/{id}/ready",
+		"/api/events/{id}/sideboard",
 		"/api/events/{id}/log",
 		"/api/events/{id}/subscribe",
 	} {
@@ -192,6 +195,19 @@ func (h *handler) eventReady(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := h.opts.Events.Ready(r.PathValue("id"), eventToken(r), req)
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
+func (h *handler) eventSideboard(w http.ResponseWriter, r *http.Request) {
+	var req protocol.SideboardRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	st, err := h.opts.Events.Sideboard(r.PathValue("id"), eventToken(r), req)
 	if err != nil {
 		writeEventError(w, err)
 		return

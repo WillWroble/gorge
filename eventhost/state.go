@@ -108,15 +108,7 @@ func (r *run) seriesFor(seat int, results []event.SeriesOutcome, rd, a, b int) p
 				continue
 			}
 			ser.Table, ser.Attempt = att.Table, att.Attempt
-			if (seat == a || seat == b) && r.tokens != nil {
-				if tok, ok := r.tokens[host.TableID(att.Table)]; ok && tok != "" {
-					slot := 0
-					if seat == b {
-						slot = 1
-					}
-					ser.Join = fmt.Sprintf("/t/%s?seat=%d&token=%s", att.Table, slot, tok)
-				}
-			}
+			joinLink(r, &ser, seat, a, b, att.Table)
 			break
 		}
 		return ser
@@ -165,15 +157,7 @@ func (r *run) seriesForBo3(seat int, results []event.SeriesOutcome, rd, a, b int
 			c := v.InFlight.Chooser
 			ser.Chooser = &c
 		}
-		if (seat == a || seat == b) && r.tokens != nil {
-			if tok, ok := r.tokens[host.TableID(ser.Table)]; ok && tok != "" {
-				slot := 0
-				if seat == b {
-					slot = 1
-				}
-				ser.Join = fmt.Sprintf("/t/%s?seat=%d&token=%s", ser.Table, slot, tok)
-			}
-		}
+		joinLink(r, &ser, seat, a, b, v.InFlight.Table)
 		return ser
 	}
 	if v.Between {
@@ -200,6 +184,25 @@ func (r *run) seriesForBo3(seat int, results []event.SeriesOutcome, rd, a, b int
 		ser.Chooser = &c
 	}
 	return ser
+}
+
+// joinLink fills ser.Join for a viewer seated in the series: its own
+// slot's game token (E3-5 — both humans of a series carry distinct ones)
+// and the event id, so the game client knows which event the table
+// belongs to. A spectator's row carries none.
+func joinLink(r *run, ser *protocol.EventSeries, seat, a, b int, table string) {
+	if (seat != a && seat != b) || r.tokens == nil {
+		return
+	}
+	slot := 0
+	if seat == b {
+		slot = 1
+	}
+	tok := r.tokens[host.TableID(table)][slot]
+	if tok == "" {
+		return
+	}
+	ser.Join = fmt.Sprintf("/t/%s?seat=%d&token=%s&event=%s", table, slot, tok, r.meta.ID)
 }
 
 // lastGameTable is the table of the last GameStarted logged for an ended

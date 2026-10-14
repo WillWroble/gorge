@@ -213,7 +213,6 @@ func TestCreateEventValidation(t *testing.T) {
 		{"three seats", seatReq(3, "human"), codeBadRequest},
 		{"five seats", seatReq(5, "human"), codeBadRequest},
 		{"unknown set", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Set = "XXXX"; return r }(), codeBadRequest},
-		{"two humans", twoHumans, codeBadRequest},
 		{"env policy", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Seats[1].Policy = "sb-tactical"; return r }(), codeBadRequest},
 		{"unknown policy", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Seats[1].Policy = "not-a-policy"; return r }(), codeBadRequest},
 		{"unknown drafter", func() protocol.CreateEventRequest {
@@ -226,9 +225,14 @@ func TestCreateEventValidation(t *testing.T) {
 		_, err := h.CreateEvent(tc.req)
 		wantErr(t, err, tc.want, 400)
 	}
+	// E3-5: two humans are legal at the default cap (4, asserted in
+	// sideboard_test.go); a cap of 1 refuses the second one.
+	lim, _ := newHost(t, func(o *Options) { o.MaxHumans = 1 })
+	_, err := lim.CreateEvent(twoHumans)
+	wantErr(t, err, codeBadRequest, 400)
 	cap, _ := newHost(t, func(o *Options) { o.MaxLiveEvents = 1 })
 	createOK(t, cap, oneHumanReq())
-	_, err := cap.CreateEvent(oneHumanReq())
+	_, err = cap.CreateEvent(oneHumanReq())
 	wantErr(t, err, codeCapacity, 409)
 }
 
