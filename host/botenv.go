@@ -184,6 +184,9 @@ func (m *match) envData(p state.PlayerID, dc *decision.Decision, brd *botpolicy.
 	setup := searchseat.SeatSetup(searchprobe.PublicGame{
 		Names: m.cfg.Names, Decks: m.cfg.Decks, Tokens: m.cfg.Tokens, StartingLife: m.cfg.StartingLife,
 	}, es, p)
+	// At a table with a human the Setup must be closed (host/closedlist.go);
+	// an open one is cut to the actor's own list and gets no root.
+	setup, closedOK := closedSetup(m.table.cfg, setup, p)
 	var feed *searchseat.Feed
 	if m.feeds != nil && slot >= 0 && slot < len(m.feeds.bySlot) {
 		feed = m.feeds.bySlot[slot]
@@ -198,13 +201,20 @@ func (m *match) envData(p state.PlayerID, dc *decision.Decision, brd *botpolicy.
 			feed = nil
 		}
 	}
-	root, reason := searchseat.HonestRoot(setup, feed, m.e, seed)
+	var root *rules.Engine
+	reason := openListRefusal
+	if closedOK {
+		reason = closedRootRefusal(m.table.cfg, m.e)
+	}
+	if reason == "" {
+		root, reason = searchseat.HonestRoot(setup, feed, m.e, seed)
+	}
 	if root == nil {
 		m.rootRefusals++
 	}
 	v := view.ProjectForControlled(m.e.G, m.e, p, view.Seat, controlledSeats(m.e.G, p), dc)
 	v.Round = view.RoundOf(m.e.G, m.e.L.Events)
-	b := botpolicy.BoardFromGameInto(m.e.G, m.e, p, brd)
+	b := botpolicy.BoardFromGameInto(m.e.G, m.e, p, brd).Detached()
 	// BP-10 (spec §7): a search table's Env decisions queue on the registry's
 	// FIFO search-slot gate. The flag rides parkedData (set here, under the
 	// match's exclusive lock, exactly where env above is set) so parkSeat

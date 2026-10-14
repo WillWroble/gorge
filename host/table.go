@@ -277,7 +277,13 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 	// stale-table case it recovers (a persisted table written by an older
 	// binary without the opt-in) from a validation failure it must still
 	// fail the start over — an unknown policy name, bad seats, missing decks.
-	if e, ok := bots.Lookup(policy); ok && e.Env {
+	//
+	// A closed-list policy (bots.Info.ClosedLists, az-c4) is an Env policy
+	// that does not read decklists: it needs no opt-in and may seat against
+	// a human. The declaration alone is not trusted -- at a table with a
+	// human, play checks every built seat at match start and envData
+	// refuses an open root at every decision (host/closedlist.go).
+	if e, ok := bots.Lookup(policy); ok && e.ReadsDecklists() {
 		if len(c.Humans) > 0 {
 			return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q %w; it cannot seat at a table with a human", c.ID, policy, errDecklistBotRefusal)
 		}
