@@ -49,6 +49,10 @@ type GameResult struct {
 	OpeningHand [2][]string // the kept hand at the first turn, sorted
 	Drawn       [2][]string // cards put into hand from the library after the first turn began, sorted
 	Head        string      // engine chain head
+	// Tape is the game's recorded accepted intents; nil unless
+	// Options.RecordTape. ReplayTape re-drives the game from it with no
+	// player policy.
+	Tape *Tape
 }
 
 // PlayGame plays one Bo1 game between entrants a (player 0) and b (player 1)
@@ -90,6 +94,13 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 		return GameResult{}, err
 	}
 
+	// E5-d: the GameScoped seats learn their game's begin here; its end is
+	// signalled exactly once — right after the engine stops (before Verify's
+	// replay and foldHand, so the barrier is released as soon as the engine
+	// stops), and on every other return path through the guarded defer.
+	_, endGame := beginGameScoped([2]seat.Seat{s0, s1})
+	defer endGame()
+
 	var mulligans [2]int
 	cfg := l.gameConfig(names, seed, deckA, deckB)
 	hooks := bench.Hooks{
@@ -114,6 +125,7 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 	if err != nil {
 		return GameResult{}, fmt.Errorf("draftlab: seed %d: %w", seed, err)
 	}
+	endGame()
 
 	res := GameResult{
 		Seed:      seed,
@@ -141,6 +153,13 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 		res.Winner = -1
 	default:
 		res.Winner = oc.WinnerSeat
+	}
+	if l.opts.RecordTape {
+		res.Tape = &Tape{
+			Names:     names,
+			Mulligans: cfg.Mulligans,
+			Intents:   append([]decision.Intent(nil), eng.L.Intents...),
+		}
 	}
 	if l.opts.Verify && res.Stall == "" {
 		if _, err := replay.Replay(eng.L, cfg); err != nil {

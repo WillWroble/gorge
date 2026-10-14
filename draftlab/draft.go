@@ -182,7 +182,15 @@ func runDraftLoop(e *event.Event, n int, drafterOf func(int) NamedDrafter, seed 
 			if !ok {
 				continue
 			}
-			id := drafterOf(s).Drafter.Pick(v, rngs[s])
+			var id string
+			if fd, ok := drafterOf(s).Drafter.(FallibleDrafter); ok {
+				var err error
+				if id, err = fd.PickErr(v, rngs[s]); err != nil {
+					return fmt.Errorf("draftlab: draft: pick seat %d round %d pick %d: %w", s, v.Round, v.PickNo, err)
+				}
+			} else {
+				id = drafterOf(s).Drafter.Pick(v, rngs[s])
+			}
 			if err := e.Apply(event.Entry{
 				Kind: event.KindPicked, Round: v.Round, PickNo: v.PickNo, Seat: s, ID: id,
 			}); err != nil {

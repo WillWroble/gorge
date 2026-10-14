@@ -37,6 +37,10 @@ type Options struct {
 	// Mulligans is the London mulligan round per seat; 0 = 2 (draftsim);
 	// < 0 = none.
 	Mulligans int
+	// RecordTape keeps each game's accepted intents in GameResult.Tape so
+	// the game re-drives with no player policy (ReplayTape,
+	// VerifyEventTapes). Off by default.
+	RecordTape bool
 }
 
 // Lab is one opened composition surface: a read-only card corpus plus the
@@ -65,6 +69,12 @@ func Open(corpusDir string, o Options) (*Lab, error) {
 		return nil, fmt.Errorf("draftlab: opening corpus at %s: %w (run `make fetch-cards compile-cards` first)", corpusDir, err)
 	}
 	return &Lab{reg: reg, opts: o}, nil
+}
+
+// Card resolves a card name against the lab's read-only corpus registry
+// (adapters use it to describe a pack or pool to an out-of-process agent).
+func (l *Lab) Card(name string) (*cards.Card, bool) {
+	return l.reg.Lookup(name)
 }
 
 // Options reports the lab's options with the defaults filled: a zero
