@@ -110,16 +110,26 @@ func runDeclaredChunk(t *testing.T, i int) {
 		t.Logf("claim of %d sets leaves chunk %d empty", len(declaredClaim.codes), i)
 		return
 	}
+	var probs []Problem
 	for _, set := range chunk {
 		level := declaredClaim.declared[set]
-		probs, err := checkLevel(declaredClaim.reg, declaredRoot, set, level, declaredClaim.sh)
+		ps, err := checkLevel(declaredClaim.reg, declaredRoot, set, level, declaredClaim.sh)
 		if err != nil {
 			t.Fatalf("%s:%s: %v", set, level, err)
 		}
-		for _, p := range probs {
+		probs = append(probs, ps...)
+		for _, p := range ps {
 			t.Errorf("%s:%s %s: %s", set, level, p.Card, p.Reason)
 		}
 	}
+	// The per-ticket gate's stale-only classifier reads this line (see
+	// CertVerdict and scripts/gate_affected.sh): a chunk whose every problem is
+	// a stale verdict is a host XMage replay's to clear, not a defect to fix, so
+	// the gate requeues it instead of charging a fix round. Emitted on every
+	// run (go test prints it only for a failing test), so a non-stale problem,
+	// or a t.Fatal before this line, leaves no stale-only verdict and the gate
+	// fails closed.
+	t.Logf("GORGE-CERT-RESULT %s %s", t.Name(), CertVerdict(probs))
 	t.Logf("declared chunk %d: %v", i, chunk)
 }
 

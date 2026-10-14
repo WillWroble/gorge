@@ -456,5 +456,86 @@ nkr8=$(grep -cE "^GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -p=1 -run .*TestKr8" "$GA
 [ "$nkr8" = 2 ]
 check "both Kr8 runs override the gate env's GOMAXPROCS (t.Parallel, like the shards)" $? "nkr8=$nkr8"
 
+# --- the stale-only certification classifier: a certification failure whose
+# every failing test logged "GORGE-CERT-RESULT <name> stale-only" (the line
+# gate.CertVerdict and adopt's ratchetVerdict emit) is a host XMage replay's
+# to clear, not the ticket's defect: the heavy pool returns the gate's requeue
+# exit (76) so the ticket is retried without a paid fix round. A non-stale
+# problem, a t.Fatal before the verdict, a package-level failure, or no
+# failing test at all must classify NOT stale-only, so the gate fails closed
+# and a real certification regression still bills the fix round. These cases
+# are synthetic (no XMage host needed) and pin the class, not one card.
+cert() ( bash -c "source '$GATE'; gate_affected_cert_stale_only" )
+
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 stale-only' \
+	'    declared_chunks_test.go:121: BLB:A Thundertrap Trainer: verdict is for an older scenario (Thundertrap Trainer/cast-resolve/v1); re-run the XMage pass' \
+	'--- FAIL: TestCertificationRatchet (9.0s)' \
+	'    ratchet_test.go:130: GORGE-CERT-RESULT TestCertificationRatchet stale-only' \
+	'    ratchet_test.go:131: BLB: 1 outstanding, ratchet 0 -- per-set outstanding only shrinks (oraclediff status -set BLB)' \
+	| cert
+check "a stale-only certification failure is classified stale-only (non-charging path)" $?
+
+# The 2026-10-05..14 non-stale counterexamples the classification must NOT
+# absorb: an unsupported primitive, and an unmet frozen expectation.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk03 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk03 mixed' \
+	'    declared_chunks_test.go:121: OTJ:A Luxurious Locomotive: unsupported [count:CrewSize]' \
+	| cert
+[ "$?" != 0 ]
+check "an unsupported-primitive certification failure is NOT stale-only" $?
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 mixed' \
+	'    declared_chunks_test.go:121: FDN:A Taurean Mauler: gorge no longer meets the frozen expectation: life (id)' \
+	| cert
+[ "$?" != 0 ]
+check "an unmet-expectation certification failure is NOT stale-only" $?
+
+# A failing test that logged no verdict at all (a t.Fatal before the line, e.g.
+# a missing corpus) leaves nothing for the classifier to match: fail closed.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk01 (0.1s)' \
+	'    declared_chunks_test.go:90: declared sets need the corpus (make fetch-cards compile-cards): open ../../.cards/ir-...: no such file or directory' \
+	| cert
+[ "$?" != 0 ]
+check "a certification failure with no verdict line is NOT stale-only (fails closed)" $?
+
+# One stale-only test and one non-stale test is NOT stale-only: the non-stale
+# one is a real regression the gate must still fail.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 stale-only' \
+	'--- FAIL: TestCertificationRatchet (9.0s)' \
+	'    ratchet_test.go:130: GORGE-CERT-RESULT TestCertificationRatchet mixed' \
+	| cert
+[ "$?" != 0 ]
+check "a mixed stale/non-stale certification failure is NOT stale-only" $?
+
+# A clean certification (no failing test) is not a stale-only failure.
+printf 'ok  \tgithub.com/adams-shaun/gorge/compliance/gate\t9.0s\n' | cert
+[ "$?" != 0 ]
+check "a clean certification run is NOT classified stale-only" $?
+
+# Wiring: the pool returns the requeue exit for a stale-only certification, the
+# gate body maps it through (and keeps an ordinary failure a failure), the
+# config maps exit 76 to a non-charging requeue, and both certification tests
+# emit the verdict line the classifier reads. A stale-only path not wired to
+# the requeue exit, or a test that stops emitting the marker, would silently
+# restore the paid fix round this change removes.
+grep -qF 'return 76' "$GATE"
+check "the heavy pool returns the stale-only requeue exit (76)" $?
+grep -qF 'exit 76' "$GATE"
+check "the gate body exits the stale-only requeue exit" $?
+grep -qF 'gate_affected_cert_stale_only' "$GATE"
+check "the heavy pool calls the stale-only classifier" $?
+grep -qE 'requeue_exit *= *\[75, 76\]' "$ROOT/.agentctl/config.toml"
+check "the affected gate maps exit 76 to a non-charging requeue" $?
+grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/gate/declared_chunks_test.go" \
+	&& grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/adopt/ratchet_test.go"
+check "both certification tests emit the GORGE-CERT-RESULT verdict line" $?
+
 printf '\ngate_affected_smoke: %s\n' "$([ $fails = 0 ] && echo ALL GREEN || echo FAILURES ABOVE)"
 exit "$fails"
