@@ -122,6 +122,19 @@ PPROF=${PPROF:-false}
 # against a human, and the play-vs-bot deck list no longer offers it).
 AZ_C3_NET=${AZ_C3_NET-}
 AZ_C3_DECKS=${AZ_C3_DECKS-}
+# AZ_C4_NET / AZ_C4_DECKS / AZ_C4_BELIEF (all three or none) serve the az-c4
+# bot (docs/superpowers/reports/2026-10-14-az-c4-hosted.md): its .dzgw network,
+# the FDN decks it may play (AZ_C3_DECKS's directory may be reused: a shared
+# deck is reserved for both) and the belief corpus it guesses its opponent's
+# list from; AZ_C4_BELIEF_POOL optionally names a pool.tsv whose train split
+# is the belief (the C4 corpus: dzgorge-repro/inputs/decks + pool.tsv).
+# az-c4 never reads an opponent's decklist, so it is offered in the
+# play-vs-bot picker against humans and needs NO -allow-decklist-bots; it also
+# gets its own az-c4 vs az-c4 spectator table.
+AZ_C4_NET=${AZ_C4_NET-}
+AZ_C4_DECKS=${AZ_C4_DECKS-}
+AZ_C4_BELIEF=${AZ_C4_BELIEF-}
+AZ_C4_BELIEF_POOL=${AZ_C4_BELIEF_POOL-}
 PUB_PORT=${PUB_PORT:-8080}
 # OMNI_PORT empty (the default) runs no second server.
 OMNI_PORT=${OMNI_PORT-}
@@ -205,6 +218,14 @@ if [ -n "$AZ_C3_NET$AZ_C3_DECKS" ]; then
 	[ -n "$AZ_C3_NET" ] && [ -n "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET and AZ_C3_DECKS go together" >&2; exit 1; }
 	[ -r "$AZ_C3_NET" ] && [ -d "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET is not a file or AZ_C3_DECKS is not a directory" >&2; exit 1; }
 	AZ_ARGS=(-az-c3-net "$AZ_C3_NET" -az-c3-decks "$AZ_C3_DECKS" -allow-decklist-bots)
+fi
+if [ -n "$AZ_C4_NET$AZ_C4_DECKS$AZ_C4_BELIEF$AZ_C4_BELIEF_POOL" ]; then
+	[ -n "$AZ_C4_NET" ] && [ -n "$AZ_C4_DECKS" ] && [ -n "$AZ_C4_BELIEF" ] || { echo "deploy-demo: AZ_C4_NET, AZ_C4_DECKS and AZ_C4_BELIEF go together" >&2; exit 1; }
+	[ -r "$AZ_C4_NET" ] && [ -d "$AZ_C4_DECKS" ] && [ -d "$AZ_C4_BELIEF" ] || { echo "deploy-demo: AZ_C4_NET is not a file, or AZ_C4_DECKS or AZ_C4_BELIEF is not a directory" >&2; exit 1; }
+	[ -z "$AZ_C4_BELIEF_POOL" ] || [ -r "$AZ_C4_BELIEF_POOL" ] || { echo "deploy-demo: AZ_C4_BELIEF_POOL is not a file" >&2; exit 1; }
+	# No -allow-decklist-bots: az-c4 plays closed lists only.
+	AZ_ARGS+=(-az-c4-net "$AZ_C4_NET" -az-c4-decks "$AZ_C4_DECKS" -az-c4-belief "$AZ_C4_BELIEF")
+	[ -z "$AZ_C4_BELIEF_POOL" ] || AZ_ARGS+=(-az-c4-belief-pool "$AZ_C4_BELIEF_POOL")
 fi
 say() { printf 'deploy-demo: %s\n' "$*"; }
 
@@ -376,6 +397,13 @@ if [ -n "$AZ_C3_DECKS" ]; then
 		-prewarm-art-budget "$ART_FILL_BUDGET" \
 		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
 		-decks "$AZ_C3_DECKS" -art-dir "$ART_DIR" || say "!!! az-c3 art fill incomplete (exit $?); the demo still starts"
+fi
+if [ -n "$AZ_C4_DECKS" ] && [ "$AZ_C4_DECKS" != "$AZ_C3_DECKS" ]; then
+	say "filling card-art cache for the az-c4 decks in $AZ_C4_DECKS"
+	${TIMEOUT:+"$TIMEOUT" -k 5s "$ART_FILL_CEILING"} "$BIN" -prewarm-art-only \
+		-prewarm-art-budget "$ART_FILL_BUDGET" \
+		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
+		-decks "$AZ_C4_DECKS" -art-dir "$ART_DIR" || say "!!! az-c4 art fill incomplete (exit $?); the demo still starts"
 fi
 stop_all
 start_one "$PUB_PORT" "$SPECTATOR" "$PUB_DIR" "$PUB_LOG" "$VSBOT_SPECTATOR" ${AZ_ARGS[@]+"${AZ_ARGS[@]}"}

@@ -21,6 +21,7 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/bots/azc3"
+	"github.com/adams-shaun/gorge/bots/azc4"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/eventhost"
@@ -141,6 +142,14 @@ type config struct {
 	// (azc3.go): the deck corpus az-c3's closed-list search draws its
 	// opponents' lists from. Empty: the open lists (the opponent's real one).
 	az3Belief, az3BeliefPool string
+	// az4Net, az4Decks, az4Belief and az4BeliefPool are the az-c4 flags
+	// (azc4.go): its network, the decks it may play, and the REQUIRED deck
+	// corpus its closed-list search guesses the opponent's list from. az-c4
+	// never reads an opponent's decklist, so it is offered against humans
+	// and needs no -allow-decklist-bots.
+	az4Net, az4Decks         string
+	az4Belief, az4BeliefPool string
+	az4DemoTable             bool
 	policyPools              map[string][]string
 	// allowDecklistBots is the -allow-decklist-bots flag (azc3.go): the
 	// operator's explicit opt-in that lets the server's own BOT-ONLY tables
@@ -356,6 +365,11 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.az3Belief, "az-c3-belief", "", "with -az-c3-net: close the opponents' deck lists -- az-c3 deals each opponent's unknown cards from lists drawn from the decks in this directory (the TRAIN split of its pool), never from the opponent's real list")
 	fs.StringVar(&c.az3BeliefPool, "az-c3-belief-pool", "", "with -az-c3-belief: a pool.tsv naming the belief decks; only its train split is read (default: every deck file in -az-c3-belief)")
 	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
+	fs.StringVar(&c.az4Net, "az-c4-net", "", "enable the az-c4 bot: the path of its .dzgw network (needs -az-c4-decks, -az-c4-belief, -auto-mana and -bot-auto-mana). az-c4 guesses its opponent's deck list instead of reading it, so it is offered for games against a human")
+	fs.StringVar(&c.az4Decks, "az-c4-decks", "", "directory of the decks az-c4 may play: the FDN limited decks it was trained on. They are reserved for it (and for az-c3 too when this is -az-c3-decks), and it plays nothing else")
+	fs.StringVar(&c.az4Belief, "az-c4-belief", "", "with -az-c4-net (required): the deck corpus az-c4 guesses its opponent's list from (the TRAIN split of its pool)")
+	fs.StringVar(&c.az4BeliefPool, "az-c4-belief-pool", "", "with -az-c4-belief: a pool.tsv naming the belief decks; only its train split is read (default: every deck file in -az-c4-belief)")
+	fs.BoolVar(&c.az4DemoTable, "az-c4-demo-table", true, "with -az-c4-net: add one two-seat az-c4 vs az-c4 table, dealt from -az-c4-decks, for spectators")
 	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
@@ -394,6 +408,19 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if err := c.enableAZC3(); err != nil {
 		return err
 	}
+	if err := c.checkAZC4Flags(); err != nil {
+		return err
+	}
+	reg, err := cards.SharedCorpus(c.cards)
+	if err != nil {
+		return fmt.Errorf("opening corpus at %s: %w (run make fetch-cards compile-cards)", c.cards, err)
+	}
+	// az-c4 registers only when asked, like az-c3, but its belief is read
+	// from the corpus, so it registers once the corpus is open and before
+	// the offered set is resolved (azc4.go).
+	if err := c.enableAZC4(reg); err != nil {
+		return err
+	}
 	// -bot-policy and -bot-policies are validated together (BP-18, spec
 	// §9.4): a default that is not offered, or an offered set missing a
 	// registered name, must fail before any listener opens.
@@ -402,10 +429,6 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return err
 	}
 	c.botPolicy, c.botPolicies = def, offered
-	reg, err := cards.SharedCorpus(c.cards)
-	if err != nil {
-		return fmt.Errorf("opening corpus at %s: %w (run make fetch-cards compile-cards)", c.cards, err)
-	}
 	if err := c.azc3Belief(reg); err != nil {
 		return err
 	}
@@ -451,9 +474,20 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if err != nil {
 		return err
 	}
+	az4Pool, az4Catalogue, az3Catalogue, err := c.azc4Pool(reg, cmdPool, conPool, az3Pool, az3Catalogue)
+	if err != nil {
+		return err
+	}
 	if len(az3Pool) > 0 {
 		deckCatalogue = append(deckCatalogue, az3Catalogue...)
 		c.policyPools = map[string][]string{azc3.Policy: az3Pool}
+	}
+	if len(az4Pool) > 0 {
+		deckCatalogue = append(deckCatalogue, az4Catalogue...)
+		if c.policyPools == nil {
+			c.policyPools = map[string][]string{}
+		}
+		c.policyPools[azc4.Policy] = az4Pool
 	}
 	// A format with no deck to deal is a configuration error, not a table
 	// that fills its seats with the wrong pool: name the gap so a misbuild
@@ -465,7 +499,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return fmt.Errorf("-format includes constructed but no deck in %s is a constructed deck", c.decks)
 	}
 
-	load := deckLoaders(reg, c.decks, c.az3Decks, az3Pool)
+	load := reservedLoader(reg, deckLoaders(reg, c.decks, c.az3Decks, az3Pool), c.az4Decks, az4Pool)
 	// -events chains the event store's deck loader in front of the ordinary
 	// loaders and hands serve the relay the registry's OnMatchEnd will run
 	// through. Built before host.New because the registry's deck loader must
@@ -484,6 +518,10 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if len(r.Tables()) == 0 {
 		cfgs := c.tableConfigs(cmdPool, conPool, vis)
 		if t := c.azc3Table(az3Pool, vis); t != nil {
+			cfgs = append(cfgs, *t)
+		}
+		// The az-c4 demo table follows every other startup table.
+		if t := c.azc4Table(host.TableID(fmt.Sprintf("t%d", len(cfgs)+1)), c.seed+uint64(len(cfgs)), az4Pool, vis); t != nil {
 			cfgs = append(cfgs, *t)
 		}
 		for _, cfg := range cfgs {

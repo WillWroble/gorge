@@ -295,6 +295,50 @@ func TestDecksFiltersReservedPoolsByPolicy(t *testing.T) {
 	}
 }
 
+// A deck reserved for two policies (az-c3 and az-c4 sharing one directory)
+// is listed for both.
+func TestDecksListsASharedPoolForEachOwner(t *testing.T) {
+	r, err := host.New(host.Options{LoadDeck: loader(t), Sleep: func(time.Duration, <-chan struct{}) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	shared := JoinPools(JoinPools("", "az-c3"), "az-c4")
+	if shared != "az-c3,az-c4" || JoinPools(shared, "az-c4") != shared || PoolHas(shared, "az-c") || PoolHas("", "") {
+		t.Fatalf("JoinPools/PoolHas: %q", shared)
+	}
+	catalogue := []DeckInfo{
+		{ID: "burn", Name: "Burn", Format: "constructed"},
+		{ID: "fdn1", Name: "FDN 1", Format: "constructed", Pool: shared},
+		{ID: "fdn2", Name: "FDN 2", Format: "constructed", Pool: "az-c4"},
+	}
+	srv := httptest.NewServer(NewHandler(r, Options{Decks: catalogue}))
+	t.Cleanup(srv.Close)
+	for query, want := range map[string][]string{
+		"?policy=bot":   {"burn"},
+		"?policy=az-c3": {"fdn1"},
+		"?policy=az-c4": {"fdn1", "fdn2"},
+	} {
+		resp, err := http.Get(srv.URL + "/api/decks" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []DeckInfo
+		err = json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := []string{}
+		for _, d := range got {
+			ids = append(ids, d.ID)
+		}
+		if !reflect.DeepEqual(ids, want) {
+			t.Errorf("GET /api/decks%s = %v, want %v", query, ids, want)
+		}
+	}
+}
+
 // TestCreateGameDisabledWithoutBuilder covers the server that never wired the
 // flow: POST /api/games answers 404 like any unserved path.
 func TestCreateGameDisabledWithoutBuilder(t *testing.T) {
