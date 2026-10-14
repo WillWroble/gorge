@@ -12,7 +12,6 @@ import (
 	"github.com/adams-shaun/gorge/internal/spellbench"
 	"github.com/adams-shaun/gorge/limited"
 	"github.com/adams-shaun/gorge/limited/build"
-	"github.com/adams-shaun/gorge/limited/draft"
 )
 
 // The gauntlet's seed-stream salts, distinct from the event's own streams
@@ -279,8 +278,8 @@ func (t *gauntletTally) record(winner *int, me int) {
 	}
 }
 
-// poolOf sums a per-seat tally array into its pooled tally.
-func poolOf(ts [draft.Seats]gauntletTally) gauntletTally {
+// poolOf sums a per-seat tally slice into its pooled tally.
+func poolOf(ts []gauntletTally) gauntletTally {
 	var out gauntletTally
 	for _, t := range ts {
 		out.wins += t.wins
@@ -295,9 +294,17 @@ func poolOf(ts [draft.Seats]gauntletTally) gauntletTally {
 // draft seat for the built decks and the random baseline, and the pooled
 // human-vs-human sanity tally.
 type gauntletAccum struct {
-	built  [draft.Seats]gauntletTally
-	random [draft.Seats]gauntletTally
+	built  []gauntletTally
+	random []gauntletTally
 	sanity gauntletTally
+}
+
+// newGauntletAccum sizes the per-seat tallies for the pod.
+func newGauntletAccum(seats int) *gauntletAccum {
+	return &gauntletAccum{
+		built:  make([]gauntletTally, seats),
+		random: make([]gauntletTally, seats),
+	}
 }
 
 // print writes the summary block. The three pooled lines — exactly

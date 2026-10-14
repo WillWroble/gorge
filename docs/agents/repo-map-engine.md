@@ -46,7 +46,7 @@ package that touches the engine is `cmd/draftsim` (see
 | `limited` | The draft stack's shared vocabulary: `CardRef`, `Rarity`, the pool/receipt types every `limited/` package speaks. No behaviour; embeddable in logs and wire payloads. |
 | `limited/setdata` | The embedded set specs (`FDN`, `BLB` as go:generate-refreshed JSON) and `Load`/`Codes`/`Support` over them. |
 | `limited/booster` | Seeded Play-Booster opening: slot-ordered fills, weighted wildcards, colour balance; `OpenPod` opens a whole pod's packs from one seed. |
-| `limited/draft` | The pure four-seat booster-draft state machine (left/right pack flow, FIFO pack queues); interleaving-independent. |
+| `limited/draft` | The pure N-seat (2..8; hosted 4) booster-draft state machine (left/right pack flow, FIFO pack queues); interleaving-independent. |
 | `limited/build` | Pool → engine-loadable 40-card deck: validation, coloured-pip land split, `deck.File` output (`ToDeckFile`). |
 | `limited/pickbot` | The pick decision and pool→deck build policies a drafting bot is made of: `RatingColour` (Drafter), `Best23` (Builder), the shared registry with `Lookup`/`Names`. Registry entries are shared pointers — construct fresh instances with a `CardLookup` injected. |
-| `event` | The draft event: a LOBBY→DRAFT→BUILD→ROUNDn→COMPLETE state machine over an append-only, hash-chained log (`Apply`, `ReplayLog`, `MarshalLog`), the per-seat draft view (`Next`/`Pool`/`SavedDeck`), round-robin pairings, standings and the CSV draft log. Owns the replay-from-log contract `cmd/draftsim -verify` asserts. |
+| `event` | The draft event: a LOBBY→DRAFT→BUILD→ROUNDn→COMPLETE state machine over an append-only, hash-chained log (`Apply`, `ReplayLog`, `MarshalLog`), the per-seat draft view (`Next`/`Pool`/`SavedDeck`), round-robin pairings, sealed supply, Swiss pairings (logged `RoundPaired`), standings and the CSV draft log. Owns the replay-from-log contract `cmd/draftsim -verify` asserts. |

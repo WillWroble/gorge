@@ -82,7 +82,7 @@ help:
 	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
 	@echo "  make compliance-status — generated per-set/per-format compliance status (compliance/status.md, never committed) + ratchet check"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
-	@echo "  make draftsim       — build draftsim and play 2 verified 4-bot draft events (SET/SEED override)"
+	@echo "  make draftsim       — build draftsim and play 2 verified draft events (SET/SEED override)"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
 	@echo "  make deploy-demo    — rebuild and (re)serve the demo on :8080 (bot tables omniscient)"
 	@echo "                        (PACE=1.5s / TABLES / SEATS / FORMATS / SEED override the defaults)"

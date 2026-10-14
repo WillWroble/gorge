@@ -12,7 +12,7 @@ Part of the [repo map](repo-map.md) index. The engine chain is in
 | `forgec` | Fetch and compile the Forge corpus; `report`, `coverage`. |
 | `gorged` | The server: perpetual bot tables, vs-bot games, web client. |
 | `mtgsim` | Headless self-play over the repo decks with replay verification (`make sim`). |
-| `draftsim` | Headless 4-bot draft pods (E0's exit gate): draft an embedded set spec, build 40-card decks, play the Bo1 round-robin through the rules engine; `-verify` replays every event from its log (`make draftsim`). |
+| `draftsim` | Headless 4- or 8-seat draft/sealed pods (E0's exit gate): draft an embedded set spec, build 40-card decks, play the Bo1 series — round robin, Swiss or build-only — through the rules engine; `-verify` replays every event from its log (`make draftsim`). |
 | `repro` | Replays a player feedback snapshot; `-emit-test` writes a failing test. |
 | `headdiff` | Plays the `TestHeads` acceptance games; `-dump` records their event streams, `-against` names the first divergent event between two builds. |
 | `cardfuzz` | Random mono-colour decks over the supported corpus; hunts panics, livelocks, divergences. |
