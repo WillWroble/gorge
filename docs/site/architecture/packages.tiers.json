@@ -429,6 +429,10 @@
       "tier": "host",
       "status": "EXT"
     },
+    "internal/memcap": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
     "internal/mzenc": {
       "tier": "bots",
       "status": "EXT"
