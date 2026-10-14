@@ -48,6 +48,15 @@ type engineContinuation struct {
 	// askCount counts the mid-resolution asks Engine.Ask took, posed or
 	// deferred (effects' askSeam). Transient scratch, never logged.
 	askCount uint64 `clone:"reset"`
+	// AbortTally and LegacyAskTally attribute the notes whose event carries
+	// no source object (CV-6): note text <US> attribution label -> count.
+	// abortCast knows the pending cast's card (the Note event does not), and
+	// Engine.Ask knows the refused decision's source; the cardval note
+	// census reads both tallies at game end. Deep-cloned, not reset: the
+	// tape kernel's checkpoint Restore (a Clone) must not drop the counts of
+	// the log prefix the restore keeps (rules/note_tally.go).
+	AbortTally     map[string]int `clone:"deep"`
+	LegacyAskTally map[string]int `clone:"deep"`
 	// resolvingObj is the stack object whose resolution is running (resolveTop
 	// or a resumed resolution), kept through its final move off the stack so
 	// an entry replacement that asks can tell whether it interrupted that

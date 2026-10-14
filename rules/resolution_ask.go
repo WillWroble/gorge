@@ -22,6 +22,8 @@ func (e *Engine) Ask(d *decision.Decision) bool {
 		return true
 	}
 	tapeLegacyAsked(e, d, false)
+	e.LegacyAskTally = tallyNote(e.LegacyAskTally,
+		string(d.Kind)+"/"+d.ResumeKind, noteAttribution(e.G.Obj(d.Source), false))
 	e.emit(events.Event{Kind: events.Note, Player: d.Player,
 		Text: "ask answered with its default: no resolution run serves it (" + string(d.Kind) + "/" + d.ResumeKind + ")"})
 	return false

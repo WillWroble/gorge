@@ -1133,6 +1133,7 @@ func (e *Engine) abortCast(pc *pendingCast, text string, suppress bool) {
 	e.deferredPush = nil
 	e.deferredPushLKI = nil
 	e.cast, e.choosing = nil, chooseNone
+	e.AbortTally = tallyNote(e.AbortTally, text, noteAttribution(e.G.Obj(pc.card), pc.isAbility()))
 	e.emit(events.Event{Kind: events.Note, Player: pc.player, Text: text})
 	e.suppressedCast = saved
 	e.castAborts = savedAborts

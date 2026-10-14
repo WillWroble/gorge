@@ -293,12 +293,25 @@ func (e *Engine) manaWindowAsk() bool {
 	}
 	var sources []state.ObjID
 	for _, id := range pay.ManaSourceIDs(e.G, pc.player) {
-		if !e.convokeCommitted(pc, id) && e.untappedManaSource(pc.player, id) {
+		if !e.convokeCommitted(pc, id) && e.untappedManaSource(pc.player, id) &&
+			// CR 601.2g: a source that can no longer add a colour the
+			// announced composition absorbs is withheld from the window
+			// (see paymentSourceUseful); if NO source remains the payment
+			// is stranded and the cast aborts exactly as a Done on the
+			// unclamped window would.
+			e.paymentSourceUseful(pc, pc.player, id) {
 			sources = append(sources, id)
 		}
 	}
 	if len(sources) == 0 {
-		return false
+		// A planned cast that just fell back must still pose the window:
+		// the recorded reason (spec §6) is the contract the manual window
+		// carries to the payer, and a Done on it is exactly the CR 601.2h
+		// rewind the silent fall-through would emit without the ask. Only a
+		// cast with no fallback pending falls through to payment.
+		if pc.PaymentFallback == nil {
+			return false
+		}
 	}
 	if pc.Payment != nil {
 		// Every step ran and checked, yet the pool cannot pay: the manual

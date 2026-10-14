@@ -617,8 +617,10 @@ func ManaReachable(e Engine, p state.PlayerID, cost costvocab.Cost, pool, snow s
 				// A PayLife activation spends real life: it must be
 				// present before the tap and is gone for the priced cost
 				// afterwards. Every shared-window alt carries life 0, so
-				// this is inert for the attack and unless windows.
-				if a.Life > lifeLeft || (a.LifeKeep && a.Life >= lifeLeft) {
+				// this is inert for the attack and unless windows. A
+				// zero-debit alt is unaffected by the payer's life total,
+				// even when the payer has been carried below 0.
+				if (a.Life > 0 && a.Life > lifeLeft) || (a.LifeKeep && a.Life >= lifeLeft) {
 					continue
 				}
 				if rec(i+1, remaining-1, ManaAdd(acc, a.Mana()), lifeLeft-a.Life) {
