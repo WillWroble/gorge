@@ -56,7 +56,14 @@ type FeedbackMatch struct {
 	Format       Format              `json:"format,omitempty"`
 	StartingLife int32               `json:"starting_life,omitempty"`
 	Commanders   [][]int             `json:"commanders,omitempty"`
-	BotPolicy    string              `json:"bot_policy"`
+	// StartChooser mirrors the sidecar's field of the same name: the
+	// configured seat posed CR 103.1's starting-player choice in place of
+	// the toss winner (E3-2). It is genesis replay input like Mulligans —
+	// the genesis Note names the chooser — so a replay rebuilt from
+	// match.json alone needs it recorded. Absent = the toss, which every
+	// match before E3 used.
+	StartChooser *int   `json:"start_chooser,omitempty"`
+	BotPolicy    string `json:"bot_policy"`
 
 	// NameUniverse and NameUniverseNames mirror the sidecar's fields of the
 	// same names, and for the same reason the deck contents and the token
@@ -354,6 +361,7 @@ func feedbackMatch(sc sidecar, deckCards [][]string, sideboards [][]string,
 		State:     sc.State, Result: sc.Result, Winner: sc.Winner, Head: sc.Head, Events: sc.Events,
 		Turns: sc.Turns, Reason: sc.Reason, Mulligans: sc.Mulligans, Format: sc.Format,
 		StartingLife: sc.StartingLife, Commanders: sc.Commanders, BotPolicy: sc.BotPolicy,
+		StartChooser:      sc.StartChooser,
 		NameUniverse:      sc.NameUniverse,
 		NameUniverseNames: append([]string(nil), sc.NameUniverseNames...),
 		PaidManaCensus:    sc.PaidManaCensus,

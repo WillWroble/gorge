@@ -227,6 +227,11 @@ type TableConfig struct {
 	// Options.MaxOnDemandTables because eventhost bounds its own events.
 	// "" — every other table — changes nothing.
 	Event string `json:"event,omitempty"`
+	// Series hands the choice of every match's decks and starting-player
+	// chooser to Options.Series; the table plays match after match until the
+	// hook says stop. Requires Event. false — every other table — changes
+	// nothing.
+	Series bool `json:"series,omitempty"`
 }
 
 // autoPayManaEnabled is the effective hosted-bot setting. BotAutoPayMana is
@@ -439,6 +444,11 @@ func (t *table) info() protocol.TableInfo {
 // the intent and stays correct even if the two flags ever disagree (e.g. a
 // hand-edited persisted table).
 func (c TableConfig) singleShot() bool {
+	if c.Series {
+		// E3-2: a series table's end is the hook's decision, not the
+		// match count — ok=false is what stops it.
+		return false
+	}
 	return !c.Perpetual || len(c.Humans) > 0
 }
 

@@ -282,6 +282,15 @@ func (r *Registry) matchForLog(t *table, sc sidecar, l *events.Log) (*match, err
 		archetypes[i] = d.Archetype
 	}
 	cfg := rules.Config{Seed: sc.Seed, Names: sc.Names, PlayerNames: sc.PlayerNames, Decks: decks, Archetypes: archetypes, Sideboards: sideboardConfig(sideboards), Tokens: r.opts.Tokens, Mulligans: sc.Mulligans, WindowDiagnostics: t.cfg.WindowDiagnostics, DisablePaidManaCensus: !sc.PaidManaCensus}
+	// E3-2: a configured starting-player chooser (the seat posed CR 103.1's
+	// choice in place of the toss winner) is replay input exactly like
+	// Mulligans — the genesis Note names it, so a replay rebuilt without it
+	// replays the toss instead and diverges. A copied int, so the sidecar's
+	// pointer is never aliased into a rebuilt Config.
+	if sc.StartChooser != nil {
+		chooser := *sc.StartChooser
+		cfg.StartChooser = &chooser
+	}
 	// NameUniverse is a match MODE, not just data, and NameUniverseNames pins
 	// the exact ordered labels it offered. A pre-feature sidecar (no field)
 	// gets neither and therefore takes the legacy no-universe path, so a log

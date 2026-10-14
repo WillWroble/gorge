@@ -46,6 +46,9 @@ func (c TableConfig) validatedSeatPolicies() (TableConfig, error) {
 	if c.Event != "" && (!c.OnDemand || c.Perpetual) {
 		return TableConfig{}, fmt.Errorf("host: table %s: event %q table must be on-demand and not perpetual", c.ID, c.Event)
 	}
+	if c.Series && c.Event == "" {
+		return TableConfig{}, fmt.Errorf("host: table %s: a series table needs an event", c.ID)
+	}
 	return c, nil
 }
 

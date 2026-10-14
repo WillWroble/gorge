@@ -219,6 +219,21 @@ type Options struct {
 	// terminal state (finished, aborted or crashed), with that match's final
 	// MatchInfo (Task M2c-1). See OnMatchEndFunc.
 	OnMatchEnd OnMatchEndFunc
+	// Series plans the matches of every table whose TableConfig.Series is
+	// set (E3-2): before match k of a series table, run calls this hook with
+	// the table's id and k (1 included) and plays the SeriesGame it returns —
+	// the deck each SEAT plays (never rotated by k) and the seat posed CR
+	// 103.1's starting-player choice (rules.Config.StartChooser; -1 keeps
+	// the seeded toss). The hook runs on the table's own goroutine holding
+	// no Registry or table lock and may block for minutes between the games
+	// of a series — the players are sideboarding — so run takes no lock
+	// around the call and a Registry.Close unblocks it through the hook's
+	// ctx. ok=false ends the table (state idle) without playing match k; an
+	// error halts it. The hook must return promptly once ctx is done and
+	// must not call Registry.Close or Registry.Wait. Nil — every caller
+	// before E3 — means no table may set TableConfig.Series (AddTable
+	// refuses one).
+	Series SeriesFunc
 	// OnRewind, when non-nil, is invoked exactly once per undo an undo-capable
 	// match performs, with the truncation point the match rewound to. See
 	// OnRewindFunc (host/undo.go) — a sink that persists bursts through OnBurst
@@ -317,6 +332,12 @@ func (r *Registry) AddTable(c TableConfig) error {
 	}
 	if _, dup := r.tables[c.ID]; dup {
 		return fmt.Errorf("host: table %s already exists", c.ID)
+	}
+	// E3-2: a series table's matches are planned by the embedder's hook, so
+	// a registry built without one can never play the table — refuse at
+	// registration rather than halt the table at its first match.
+	if c.Series && r.opts.Series == nil {
+		return fmt.Errorf("host: table %s: a series table needs Options.Series", c.ID)
 	}
 	if c.OnDemand && c.Event == "" && r.opts.MaxOnDemandTables > 0 {
 		n := 0
@@ -593,7 +614,40 @@ func (r *Registry) run(t *table) {
 		t.mu.Lock()
 		k := t.k + 1
 		t.mu.Unlock()
-		m, err := r.newMatch(t, k)
+		// E3-2: a series table asks its hook for match k's plan before
+		// building it. The hook runs with NO Registry or table lock held and
+		// may block for minutes between the games of a series; Close
+		// unblocks it by cancelling ctx (the bridging goroutine above), and
+		// the hook's contract is to return promptly on a done ctx.
+		var plan *SeriesGame
+		if t.cfg.Series {
+			select {
+			case <-t.stop:
+				t.setState(protocol.TableIdle)
+				return
+			default:
+			}
+			if k > 1 {
+				// The "between games" state: the players are sideboarding
+				// while the hook plans the next match.
+				t.setState(protocol.TableCooldown)
+			}
+			g, ok, err := r.opts.Series(ctx, t.cfg.ID, k)
+			if err != nil {
+				r.halt(t, k, err)
+				return
+			}
+			if !ok || ctx.Err() != nil {
+				t.setState(protocol.TableIdle)
+				return
+			}
+			if err := g.check(t.cfg.Seats); err != nil {
+				r.halt(t, k, err)
+				return
+			}
+			plan = &g
+		}
+		m, err := r.newMatchWith(t, k, plan)
 		if err != nil {
 			r.halt(t, k, err) // Task 13; sets state halted
 			return
@@ -614,6 +668,12 @@ func (r *Registry) run(t *table) {
 		case protocol.MatchAborted:
 			t.setState(protocol.TableIdle)
 			return
+		}
+		if t.cfg.Series {
+			// E3-2: a series table skips the single-shot exit and the
+			// cooldown sleep — the next loop head asks the hook for match
+			// k+1's plan (and shows the cooldown state while it blocks).
+			continue
 		}
 		// Task M2c-2: a human-seated table stops at game over exactly like a
 		// non-perpetual one; singleShot captures both. StartAll revives a

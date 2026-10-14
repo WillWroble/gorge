@@ -129,11 +129,21 @@ type snapshot struct {
 	e      *rules.Engine
 }
 
-// newMatch resolves decks, seeds and builds the engine through genesis and
-// the first Advance, so the returned match is at intent boundary 0. When
-// persistence is on it also opens the match's files, writes the live
-// sidecar and appends the genesis events; any error halts the table.
+// newMatch is the pre-E3 constructor, still called directly by tests and
+// embedders: it builds match k from the table's own deck list (rotated by
+// k) with the seeded toss.
 func (r *Registry) newMatch(t *table, k int) (*match, error) {
+	return r.newMatchWith(t, k, nil)
+}
+
+// newMatchWith resolves decks, seeds and builds the engine through genesis
+// and the first Advance, so the returned match is at intent boundary 0.
+// When persistence is on it also opens the match's files, writes the live
+// sidecar and appends the genesis events; any error halts the table. A
+// non-nil plan (E3-2) replaces the rotated deck list with the series hook's
+// per-seat decks and, when plan.Chooser >= 0, poses CR 103.1's
+// starting-player choice to that seat in place of the toss winner.
+func (r *Registry) newMatchWith(t *table, k int, plan *SeriesGame) (*match, error) {
 	c := t.cfg
 	seed := MatchSeed(c.Seed, k)
 	names := make([]string, c.Seats)
@@ -163,6 +173,11 @@ func (r *Registry) newMatch(t *table, k int) (*match, error) {
 	infos := make([]protocol.SeatInfo, c.Seats)
 	for i := 0; i < c.Seats; i++ {
 		dn := c.Decks[(i+k)%len(c.Decks)]
+		if plan != nil {
+			// E3-2: a series plan indexes decks by SEAT — the hook decides
+			// who plays what this match; no k rotation.
+			dn = plan.Decks[i]
+		}
 		d, err := r.opts.LoadDeck(dn)
 		if err != nil {
 			return nil, fmt.Errorf("host: table %s match %d: deck %q: %w", c.ID, k, dn, err)
@@ -215,6 +230,14 @@ func (r *Registry) newMatch(t *table, k int) (*match, error) {
 			cfg.Commanders[i] = append([]int(nil), cmds[i]...)
 		}
 	default: // FormatConstructed: the zero rules.Config, every field stays unset.
+	}
+	if plan != nil && plan.Chooser >= 0 {
+		// E3-2: the series hook chose the seat posed CR 103.1's
+		// starting-player choice in place of the toss winner (rules.
+		// Config.StartChooser). A fresh int, so the plan can never be
+		// aliased into the match's Config.
+		chooser := plan.Chooser
+		cfg.StartChooser = &chooser
 	}
 	e := rules.NewStartingPlayerChoice(cfg)
 	// Events growEvents was the top allocator in ./host (2.87 GB of the test
@@ -309,7 +332,8 @@ func (m *match) sidecar() sidecar {
 		NameUniverseNames: append([]string(nil), m.e.G.NameUniverseNames...),
 		PaidManaCensus:    !m.cfg.DisablePaidManaCensus,
 		Format:            Format(m.cfg.Format), StartingLife: m.cfg.StartingLife, Commanders: m.cfg.Commanders, BotPolicy: m.table.cfg.BotPolicy,
-		Refusals: m.refusals, Fallbacks: m.fallbacks, RootRefusals: m.rootRefusals}
+		StartChooser: m.cfg.StartChooser,
+		Refusals:     m.refusals, Fallbacks: m.fallbacks, RootRefusals: m.rootRefusals}
 }
 
 // defaultSeats is PL-14: one bot per seat, seeded from the match seed.

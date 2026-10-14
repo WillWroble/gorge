@@ -61,6 +61,13 @@ type sidecar struct {
 	Format       Format  `json:"format,omitempty"`
 	StartingLife int32   `json:"starting_life,omitempty"`
 	Commanders   [][]int `json:"commanders,omitempty"`
+	// StartChooser is the configured starting-player chooser the match's
+	// rules.Config ran with (E3-2): the seat posed CR 103.1's choice in
+	// place of the toss winner. A replay rebuilt without it would replay the
+	// toss instead and diverge at the genesis Note, so matchForLog restores
+	// it the way it restores Mulligans. Absent = the toss, which every match
+	// before E3 used, so nothing migrates (R-E5-2).
+	StartChooser *int `json:"start_chooser,omitempty"`
 	// NameUniverse records whether the live match was played with a card-name
 	// universe. A missing field is a pre-feature no-universe match, whose ETB
 	// and mid-resolution fallbacks replay unchanged.
