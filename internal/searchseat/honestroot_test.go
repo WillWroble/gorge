@@ -366,3 +366,58 @@ func TestHonestRootAtALibrarySearch(t *testing.T) {
 		t.Fatalf("a redeal from the root refused: %s", refused)
 	}
 }
+
+// TestObservationIgnoresTheLazyPaymentBuild: a position's observation does
+// not depend on whether the pending decision's payment actions have been
+// built. rules.PotentialActions marks a provably unpayable cast only once
+// they are, so a capture before EnsurePaymentActions (the driver's feed) and
+// a probe after it (the az root's payment vocabulary) used to encode two
+// different boards for one position, and the redeal from the root refused
+// with "base engine is not at the observed boundary".
+func TestObservationIgnoresTheLazyPaymentBuild(t *testing.T) {
+	cfg := rootTestConfig(t, "foundations-tramplesaurus-rex", "foundations-wretched-ranks")
+	for seed := uint64(1); seed <= 20; seed++ {
+		cfg.Seed = seed
+		e := rules.New(cfg)
+		e.Advance()
+		feed := ss.NewFeed(0)
+		rngs := searchprobe.BotRandoms(cfg.Seed, 2)
+		board := botpolicy.NewBoard(2)
+		for steps := 0; steps < 3000 && !e.G.Over; steps++ {
+			d := e.Pending()
+			if _, ok := feed.Observe(e); !ok {
+				t.Fatalf("feed stopped: %s", feed.StopReason())
+			}
+			in := botpolicy.Decide(botpolicy.BoardFromGameInto(e.G, e, d.Player, &board), d, rngs[d.Player])
+			if d.Player == 0 && d.Kind == decision.KPriority {
+				c := e.CloneHypothetical(1)
+				c.EnsurePaymentActions()
+				proven := false
+				for _, a := range c.PotentialActions(0) {
+					proven = proven || (a.Payable != nil && !*a.Payable)
+				}
+				if proven {
+					got, err := feed.Collector().Clone().Capture(c, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if got.Board.Sum != feed.LastFrame().Board.Sum {
+						t.Fatalf("seed %d: building the payment actions changed the observed board", seed)
+					}
+					return
+				}
+				if err := feed.RecordAnswer(d, in); err != nil {
+					t.Fatal(err)
+				}
+			} else if d.Player == 0 {
+				if err := feed.RecordAnswer(d, in); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := e.Submit(in); err != nil {
+				t.Fatalf("submit: %v", err)
+			}
+		}
+	}
+	t.Fatal("fixture: no seat-0 priority with a provably unpayable cast in 20 seeds")
+}

@@ -653,8 +653,17 @@ func (c *Collector) remap(v *view.View) {
 		// a sampled world whose hidden objects were allocated different IDs
 		// can never serialize the same board, and every world is rejected at
 		// its first frame. Map them through the same observation refs.
+		//
+		// Payable is dropped: rules.PotentialActions reads it from the
+		// pending decision's lazily built payment actions only, so it says
+		// whether someone has called EnsurePaymentActions yet, not anything
+		// about the board. Kept, the same position observed before and after
+		// that build (the driver's capture, then the az root's payment
+		// vocabulary) encoded two boards, and every redeal from the root
+		// refused "base engine is not at the observed boundary".
 		for j := range p.PotentialActions {
 			p.PotentialActions[j].Obj = state.ObjID(c.ref(p.PotentialActions[j].Obj))
+			p.PotentialActions[j].Payable = nil
 		}
 	}
 	for i := range v.Stack {
