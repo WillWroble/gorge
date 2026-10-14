@@ -293,7 +293,13 @@ func (e *Engine) manaWindowAsk() bool {
 	}
 	var sources []state.ObjID
 	for _, id := range pay.ManaSourceIDs(e.G, pc.player) {
-		if !e.convokeCommitted(pc, id) && e.untappedManaSource(pc.player, id) {
+		if !e.convokeCommitted(pc, id) && e.untappedManaSource(pc.player, id) &&
+			// CR 601.2g: a source that can no longer add a colour the
+			// announced composition absorbs is withheld from the window
+			// (see paymentSourceUseful); if NO source remains the payment
+			// is stranded and the cast aborts exactly as a Done on the
+			// unclamped window would.
+			e.paymentSourceUseful(pc, pc.player, id) {
 			sources = append(sources, id)
 		}
 	}
