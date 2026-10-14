@@ -32,7 +32,7 @@ func TestTriggerOrderSetupPosedQueuesNameAsSetupChoice(t *testing.T) {
 	if !triggerOrderSetupPosed(d, setup) {
 		t.Fatalf("precondition: %v must be setup-posed", d.PickRefs)
 	}
-	got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup)
+	got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup, nil)
 	want := [][]XAnswer{{{0, "setup_choice", "Adrenaline Jockey"}}, nil}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (setup-posed order queues the name before build)", got, want)
@@ -73,7 +73,7 @@ func TestTriggerOrderSetupPosedRequiresSetupSources(t *testing.T) {
 	if triggerOrderSetupPosed(d, setup) {
 		t.Fatalf("precondition: %v must not be setup-posed", d.PickRefs)
 	}
-	if got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup); got != nil {
+	if got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup, nil); got != nil {
 		t.Fatalf("xanswersSetup = %#v, want nil (non-setup sources keep the old drop)", got)
 	}
 }
@@ -91,7 +91,7 @@ func TestTriggerOrderSetupSameSourceQueuesRuleText(t *testing.T) {
 	if triggerOrderNamesDistinct(d) {
 		t.Fatalf("precondition: picks must share one source name, refs %v", d.PickRefs)
 	}
-	got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup)
+	got := xanswersSetup([]rules.OracleDecision{d}, 2, nil, nil, setup, nil)
 	want := [][]XAnswer{{{0, "setup_choice", "Whenever this creature transforms into {this} and at the beginning of your first main phase, add two mana of any one color."}}, nil}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (a keyable same-source setup order is queued)", got, want)
@@ -102,7 +102,7 @@ func TestTriggerOrderSetupSameSourceQueuesRuleText(t *testing.T) {
 	if _, ok := xmageTriggerOrderKeys(unkeyable); ok {
 		t.Fatalf("precondition: %q is a prefix of the other pick and must not key", unkeyable.Picks[0])
 	}
-	if got := xanswersSetup([]rules.OracleDecision{unkeyable}, 2, nil, nil, setupWith("p0", "Thundertrap Trainer")); got != nil {
+	if got := xanswersSetup([]rules.OracleDecision{unkeyable}, 2, nil, nil, setupWith("p0", "Thundertrap Trainer"), nil); got != nil {
 		t.Fatalf("xanswersSetup = %#v, want nil (an unkeyable same-source setup order stays unqueued)", got)
 	}
 }
@@ -121,7 +121,7 @@ func TestTriggerOrderSetupQueueFollowsAsEntersChoice(t *testing.T) {
 	if !IsSetupChoice(color) {
 		t.Fatalf("precondition: %+v must be an as-enters setup choice", color)
 	}
-	got := xanswersSetup([]rules.OracleDecision{order, color}, 1, nil, nil, setup)
+	got := xanswersSetup([]rules.OracleDecision{order, color}, 1, nil, nil, setup, nil)
 	want := [][]XAnswer{{{0, "setup_choice", "White"}, {0, "setup_choice", "Adrenaline Jockey"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (as-enters choice leads the pre-build queue)", got, want)
@@ -148,7 +148,7 @@ func TestTriggerOrderGameplaySharedStepStaysDemoted(t *testing.T) {
 	if !triggerOrderNamesDistinct(order) {
 		t.Fatalf("precondition: picks must have distinct source names, refs %v", order.PickRefs)
 	}
-	got := xanswersSetup([]rules.OracleDecision{target, order}, 2, nil, nil, setup)
+	got := xanswersSetup([]rules.OracleDecision{target, order}, 2, nil, nil, setup, nil)
 	want := [][]XAnswer{
 		nil,
 		{{0, "target", "Wastes"}, {0, "choice", "When this enters, do a thing."}, {0, "choice", "When this enters, do a thing."}},

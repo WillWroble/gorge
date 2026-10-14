@@ -33,7 +33,7 @@ func TestSetupDriveModeScriptsNumericMode(t *testing.T) {
 	if n, ok := modeNumberFor(d, 0, modes); !ok || n != 1 {
 		t.Fatalf("precondition: mode map must resolve %q to 1, got %d ok=%v", d.Picks[0], n, ok)
 	}
-	got := xanswersSetup([]rules.OracleDecision{d}, 1, modes, nil, nil)
+	got := xanswersSetup([]rules.OracleDecision{d}, 1, modes, nil, nil, nil)
 	want := [][]XAnswer{{{0, "setup_mode", "1"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (setup mode scripts the numeric mode)", got, want)
@@ -68,7 +68,7 @@ func TestSetupDriveOptionalBooleansScriptYes(t *testing.T) {
 			t.Fatalf("precondition: decision %d must be a yes boolean, got %q ok=%v", i, v, ok)
 		}
 	}
-	got := xanswersSetup(ds, 2, nil, nil, nil)
+	got := xanswersSetup(ds, 2, nil, nil, nil, nil)
 	want := [][]XAnswer{{{0, "setup_choice", "yes"}, {0, "setup_choice", "yes"}}, nil}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (setup booleans script yes in order)", got, want)
@@ -97,7 +97,7 @@ func TestSetupDriveLeavesAsEntersAndOrderPaths(t *testing.T) {
 	if as := setupDriveAnswers(order, nil); len(as) != 0 {
 		t.Fatalf("setupDriveAnswers swallowed a trigger order: %v", as)
 	}
-	got := xanswersSetup([]rules.OracleDecision{order, color}, 1, nil, nil, setup)
+	got := xanswersSetup([]rules.OracleDecision{order, color}, 1, nil, nil, setup, nil)
 	want := [][]XAnswer{{{0, "setup_choice", "White"}, {0, "setup_choice", "Adrenaline Jockey"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("xanswersSetup = %#v, want %#v (as-enters leads, order follows)", got, want)

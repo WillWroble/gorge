@@ -162,7 +162,7 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 			return oraclegen.Item{}, false
 		}
 		it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"611.3", "613"}, base.Scenario)
-		it.XAnswers = base.XAnswers
+		it.XAnswers = withStaticSetupChoices(base.XAnswers, res)
 		it.Ignore = base.Ignore
 		it.XAbility = base.XAbility
 		// An evergreen grant keeps the evergreen opt-in; a grant of a named

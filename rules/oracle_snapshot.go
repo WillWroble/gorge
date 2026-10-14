@@ -220,6 +220,21 @@ type OracleDecision struct {
 	CostPosed bool `json:"cost_posed,omitempty"`
 }
 
+// OracleFlip is one canonical coin-flip result the run's seeded RNG produced,
+// read off the engine log's flip Note (effects.FlipNoteResult), in log order.
+// Step is the scenario step whose window the flip fell in; -1 is the setup
+// drive's window (a flip the drive walked into before the first gameplay
+// step, e.g. Mana Crypt's turn-1 upkeep trigger). Turn is the turn the
+// runner was on when the window's scan ran; Seat the flipper; Win the side
+// (heads wins). The generator scripts each flip for XMage's choice queue, so
+// the two engines do not each flip on their own seed.
+type OracleFlip struct {
+	Turn int  `json:"turn"`
+	Step int  `json:"step"`
+	Seat int  `json:"seat"`
+	Win  bool `json:"win"`
+}
+
 const oracleLibraryTopN = 5
 
 // oracleDecisionKind normalizes a decision kind to the cross-engine

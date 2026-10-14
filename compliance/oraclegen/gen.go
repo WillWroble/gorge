@@ -1049,8 +1049,11 @@ func arrangeEmptyGraveyard(d rules.OracleDecision) bool {
 // answers, grouped by the step that posed them. setup is the scenario's setup
 // (nil when the caller has none): it lets a trigger-order decision recorded
 // before step zero be retimed as setup_choice when its sources are the
-// setup-placed permanents (triggerOrderSetupPosed).
-func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, castSteps map[int]bool, setup map[string]Seat) [][]XAnswer {
+// setup-placed permanents (triggerOrderSetupPosed). flips are the run's
+// recorded coin-flip results (rules.OracleResult.Flips): a drive-window flip
+// (step < 0) queues on the setup family, a step flip leads its own step's
+// answer stream, each as the XMage flip token the choice queue consumes.
+func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, castSteps map[int]bool, setup map[string]Seat, flips []rules.OracleFlip) [][]XAnswer {
 	out := make([][]XAnswer, steps)
 	any := false
 	// A step whose card name is then searched for (Ancient Vendetta's "choose
@@ -1102,6 +1105,32 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	// dialogs during build(), the ordering ask at the first priority, and
 	// these asks as the setup drive reaches their trigger.
 	var setupAsks []XAnswer
+	// Drive-window coin flips (Mana Crypt's turn-1 upkeep) queue after the
+	// as-enters choices: the placement dialogs are consumed during build()
+	// and the flip while the drive walks to the target turn. A flip that
+	// shares the drive with a setup ask (setupAsks) has no recorded
+	// interleaving against it — the flips are read off the log after the
+	// drive — so the queue order between the two is the drive's phase order
+	// only where the scenario poses no setup ask (the measured flip rows:
+	// Mana Crypt trigger/activate pose none).
+	var setupFlips []XAnswer
+	// Gameplay-window flips, per step, in log order; prepended ahead of the
+	// step's decision answers once the decisions are placed (a gameplay
+	// flip resolves before the step's scripted dialogs re-read the queue;
+	// the measured rows script nothing else on the flip's step).
+	stepFlips := make([][]XAnswer, steps)
+	for _, f := range flips {
+		v := map[bool]string{true: "win", false: "lose"}[f.Win]
+		if f.Step < 0 {
+			setupFlips = append(setupFlips, XAnswer{f.Seat, "setup_flip", v})
+			any = true
+			continue
+		}
+		if f.Step < steps {
+			stepFlips[f.Step] = append(stepFlips[f.Step], XAnswer{f.Seat, "flip", v})
+			any = true
+		}
+	}
 	for i, d := range ds {
 		if d.Step < 0 {
 			switch {
@@ -1526,15 +1555,24 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	if !any {
 		return nil
 	}
+	// Gameplay flips lead their steps: prepend in log order, which the
+	// per-step slices accumulated, ahead of every decision answer the loop
+	// appended.
+	for st, fs := range stepFlips {
+		if len(fs) > 0 {
+			out[st] = append(fs, out[st]...)
+		}
+	}
 	demoteTriggerOrderSpans(out, trigSpans)
-	if len(setupAnswers) > 0 || len(setupTrigAnswers) > 0 || len(setupAsks) > 0 {
+	if len(setupAnswers) > 0 || len(setupTrigAnswers) > 0 || len(setupAsks) > 0 || len(setupFlips) > 0 {
 		// Setup answers are read from xmage_answers[0] before build(), even
 		// when the scenario has no gameplay steps.
 		if len(out) == 0 {
 			out = append(out, nil)
 		}
-		lead := make([]XAnswer, 0, len(setupAnswers)+len(setupTrigAnswers)+len(setupAsks))
+		lead := make([]XAnswer, 0, len(setupAnswers)+len(setupTrigAnswers)+len(setupAsks)+len(setupFlips))
 		lead = append(lead, setupAnswers...)
+		lead = append(lead, setupFlips...)
 		lead = append(lead, setupTrigAnswers...)
 		lead = append(lead, setupAsks...)
 		out[0] = append(lead, out[0]...)
