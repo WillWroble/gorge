@@ -30,7 +30,7 @@ func TestLazySeriesParksUntilSet(t *testing.T) {
 	select {
 	case a := <-got:
 		t.Fatalf("unset LazySeries answered %+v ok=%v instead of parking", a.g, a.ok)
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(parkDwell): // dwell window, see parkDwell
 	}
 	l.Set(func(_ context.Context, _ host.TableID, k int) (host.SeriesGame, bool, error) {
 		return host.SeriesGame{Chooser: k}, true, nil
