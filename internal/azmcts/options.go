@@ -322,6 +322,18 @@ type Stats struct {
 	PriorFallbacks int // network priors that fell back to uniform, at the root and at in-walk points (a discarded simulation's included)
 	FeedStopped    int // decisions the driver routed around the search (its observation feed stopped): the bot's answer was played
 	RedealRefused  int // decisions whose honest (redeal) world source refused to prepare: no world, the bot's answer was played
+	// RootRefused is the share of FeedStopped whose feed was LIVE but whose
+	// honest root (searchseat.HonestRoot) refused to build: the driver
+	// routed around the search for the root, not for a stopped feed. It is
+	// additive -- FeedStopped keeps counting every routed-around decision --
+	// so a true feed stop is FeedStopped - RootRefused.
+	RootRefused int
+	// Livelocks counts simulations whose world tripped the engine's
+	// livelock contract (*rules.LivelockError: the token-plan mint cap, the
+	// runaway watchers) -- an unrepresentable game the bench ends as a
+	// stall. The walk scores it a terminal draw (also counted Terminal and
+	// Completed); it is no longer a Panic.
+	Livelocks int
 	// Truncated counts searched points -- the root and in-walk decisions
 	// (an opponent's too, under OpponentNodes), a discarded simulation's
 	// included -- whose candidate list the Limit cut; RootTruncated is the
@@ -509,6 +521,8 @@ func (s *Stats) Add(o Stats) {
 	s.PriorFallbacks += o.PriorFallbacks
 	s.FeedStopped += o.FeedStopped
 	s.RedealRefused += o.RedealRefused
+	s.RootRefused += o.RootRefused
+	s.Livelocks += o.Livelocks
 	s.DeadlineHits += o.DeadlineHits
 	s.OppPoints += o.OppPoints
 	s.OppExpanded += o.OppExpanded

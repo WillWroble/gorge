@@ -79,13 +79,13 @@ func TestAZSearchRatchet(t *testing.T) {
 			t.Fatalf("game %v: %v", g, err)
 		}
 	}
-	t.Logf("searched %d decisions: sims %d completed %d panics %d no-world %d all-failed %d feed-stopped %d",
-		searched, st.Simulations, st.Completed, st.Panics, st.NoWorld, st.AllFailed, st.FeedStopped)
+	t.Logf("searched %d decisions: sims %d completed %d panics %d no-world %d all-failed %d feed-stopped %d (root-refused %d)",
+		searched, st.Simulations, st.Completed, st.Panics, st.NoWorld, st.AllFailed, st.FeedStopped, st.RootRefused)
 	if searched == 0 {
 		t.Fatal("no decision was searched: the ratchet measures nothing")
 	}
-	if st.Panics != 0 || st.FeedStopped != 0 || st.NoWorld != 0 || st.AllFailed != 0 {
-		t.Fatalf("az search failures: panics %d feed-stopped %d no-world %d all-failed %d",
-			st.Panics, st.FeedStopped, st.NoWorld, st.AllFailed)
+	if st.Panics != 0 || st.FeedStopped != 0 || st.RootRefused != 0 || st.NoWorld != 0 || st.AllFailed != 0 {
+		t.Fatalf("az search failures: panics %d feed-stopped %d (true stops %d, root-refused %d) no-world %d all-failed %d",
+			st.Panics, st.FeedStopped, st.FeedStopped-st.RootRefused, st.RootRefused, st.NoWorld, st.AllFailed)
 	}
 }

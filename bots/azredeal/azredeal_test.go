@@ -321,3 +321,35 @@ func TestHostedAZSeatRoutesTheEnv(t *testing.T) {
 		}
 	})
 }
+
+// TestHostedAZSplitsRootRefusedFromFeedStop: the routed-around decisions are
+// both counted FeedStopped (its historical meaning), and only the live-feed
+// refused-root one is also RootRefused, with the builder's reason.
+func TestHostedAZSplitsRootRefusedFromFeedStop(t *testing.T) {
+	s, err := NewWithModel(bots.Options{Seed: 7}, Hosted(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []azmcts.Diag
+	prev := azmcts.Watch
+	azmcts.Watch = func(d azmcts.Diag) { got = append(got, d) }
+	t.Cleanup(func() { azmcts.Watch = prev })
+	board := botpolicy.NewBoard(2)
+	d := decision.Decision{Kind: decision.KPriority, Seq: 3}
+	feed := searchseat.NewFeed(state.PlayerID(0))
+	es := s.(bots.EnvSeat)
+	// The bot's own answer to an empty decision may error; only the counts matter.
+	_, _ = es.DecideEnv(context.Background(), bots.Env{Board: board, RootRefused: "deal failed",
+		Search: searchseat.Env{Board: board, Feed: feed}}, d)
+	_, _ = es.DecideEnv(context.Background(), bots.Env{Board: board,
+		Search: searchseat.Env{Board: board, Feed: nil}}, d)
+	if len(got) != 2 {
+		t.Fatalf("diags %d, want 2", len(got))
+	}
+	if g := got[0]; g.Stats.FeedStopped != 1 || g.Stats.RootRefused != 1 || g.Refused != "deal failed" || g.Seq != 3 || g.Seed != 7 {
+		t.Fatalf("refused root diag %+v, want FeedStopped 1 RootRefused 1 reason, seq 3, seed 7", g)
+	}
+	if g := got[1]; g.Stats.FeedStopped != 1 || g.Stats.RootRefused != 0 {
+		t.Fatalf("stopped feed diag %+v, want FeedStopped 1 RootRefused 0", g)
+	}
+}

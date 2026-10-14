@@ -2,7 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"sync"
+
+	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/internal/bench"
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
@@ -29,8 +34,16 @@ const beliefSeedBase = 1_000_000
 // fallbacks and search panics are reported instead of hidden.
 type azCount struct {
 	mu                                                                  sync.Mutex
+	trace                                                               bool
 	Decisions, Searched, Skipped, FeedStopped, Refused, AllFailed, Sims int
 	Completed, Panics, NoWorld                                          int
+	// RootRefused is FeedStopped's share whose feed was live but whose
+	// honest root refused (azmcts.Stats.RootRefused); FeedStopped keeps
+	// counting both, so a true feed stop is FeedStopped - RootRefused.
+	RootRefused int
+	// Livelocks are simulations whose world tripped the engine's livelock
+	// contract, scored as stall draws (azmcts.Stats.Livelocks).
+	Livelocks int
 }
 
 func (c *azCount) watch(d azmcts.Diag) {
@@ -38,6 +51,7 @@ func (c *azCount) watch(d azmcts.Diag) {
 	defer c.mu.Unlock()
 	if d.Stats.FeedStopped > 0 {
 		c.FeedStopped++
+		c.RootRefused += d.Stats.RootRefused
 		return
 	}
 	c.Decisions++
@@ -53,13 +67,18 @@ func (c *azCount) watch(d azmcts.Diag) {
 	c.Completed += d.Stats.Completed
 	c.Panics += d.Stats.Panics
 	c.NoWorld += d.Stats.NoWorld
+	c.Livelocks += d.Stats.Livelocks
+	if d.Stats.Panics > 0 && c.trace {
+		fmt.Fprintf(os.Stderr, "draftrl: az panic x%d: seat seed %d (game seed %d or %d), decision seq %d, turn %d, kind %s\n",
+			d.Stats.Panics, d.Seed, d.Seed^1, d.Seed^2, d.Seq, d.Turn, d.Kind)
+	}
 }
 
 func (c *azCount) summary() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return fmt.Sprintf("decisions %d searched %d refused %d feed-stopped %d all-failed %d sims %d completed %d panics %d no-world %d",
-		c.Decisions, c.Searched, c.Refused, c.FeedStopped, c.AllFailed, c.Sims, c.Completed, c.Panics, c.NoWorld)
+	return fmt.Sprintf("decisions %d searched %d refused %d feed-stopped %d (root-refused %d) all-failed %d sims %d completed %d panics %d no-world %d livelocks %d",
+		c.Decisions, c.Searched, c.Refused, c.FeedStopped, c.RootRefused, c.AllFailed, c.Sims, c.Completed, c.Panics, c.NoWorld, c.Livelocks)
 }
 
 // registerAZ registers the closed-list az pilot (az-c4's search config,
@@ -122,8 +141,12 @@ func registerAZ(lab *draftlab.Lab, o gateOpts) (*azCount, string, error) {
 	if m != nil {
 		net = o.azNet
 	}
-	stats := &azCount{}
+	stats := &azCount{trace: o.azPanics > 0}
 	azmcts.Watch = stats.watch
+	tracePanics(o.azPanics)
+	bench.FallbackTrace = func(seed uint64, seatIdx int, d *decision.Decision, reason string) {
+		fmt.Fprintf(os.Stderr, "draftrl: az fallback: game seed %d, seat %d, decision seq %d kind %s: %s\n", seed, seatIdx, d.Seq, d.Kind, reason)
+	}
 	if !registered {
 		bots.Register(bots.Entry{
 			Info: bots.Info{
@@ -154,3 +177,38 @@ var (
 		m   *policynet.Model
 	}
 )
+
+// panicLog groups recovered search panics by where they were recovered and
+// their message (digits blanked), printing the first limit distinct stacks
+// (cmd/cardval's -az-panics).
+var panicLog struct {
+	mu    sync.Mutex
+	limit int
+	n     map[string]int
+	order []string
+}
+
+func tracePanics(limit int) {
+	if limit <= 0 {
+		azmcts.PanicTrace = nil
+		return
+	}
+	panicLog.limit, panicLog.n, panicLog.order = limit, map[string]int{}, nil
+	azmcts.PanicTrace = func(where string, p any, stack []byte) {
+		key := where + ": " + strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return '#'
+			}
+			return r
+		}, fmt.Sprint(p))
+		panicLog.mu.Lock()
+		defer panicLog.mu.Unlock()
+		if panicLog.n[key] == 0 {
+			panicLog.order = append(panicLog.order, key)
+			if len(panicLog.order) <= panicLog.limit {
+				fmt.Fprintf(os.Stderr, "draftrl: az panic %s\n  raw: %v\n%s\n", key, p, stack)
+			}
+		}
+		panicLog.n[key]++
+	}
+}

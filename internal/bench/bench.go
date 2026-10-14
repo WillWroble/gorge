@@ -129,6 +129,21 @@ func IsAbort(stallOn string) bool { return stallOn == "livelock" || stallOn == "
 // with that StallOn kind and diag in Livelock -- a harness-side watchdog
 // (cmd/cardfuzz's board-size cap) that needs the engine rather than the
 // seat's board. It must only read the engine. Nil costs nothing.
+// FallbackTrace, when set, receives every decision the Env branch routes
+// around a seat's search -- a feed that stopped (its capture or answer
+// record failed) or an honest root that refused on a live feed -- with the
+// game seed, the seat index, the decision and the reason. Diagnostic only
+// (cmd/draftrl -az-fallbacks); set once before any game starts, and the
+// consumer synchronises itself.
+var FallbackTrace func(seed uint64, seatIdx int, d *decision.Decision, reason string)
+
+// rootRefuser is a search seat's live-feed refused-root fallback
+// (*azmcts.Seat and the hosted az adapter): counted apart from a stopped
+// feed.
+type rootRefuser interface {
+	DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error)
+}
+
 type Hooks struct {
 	Decision func(seatIdx int, d *decision.Decision, in decision.Intent, board *botpolicy.Board) error
 	// Submit may consume an intent instead of the ordinary Engine.Submit. It
@@ -305,6 +320,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 						continue
 					}
 					if _, ok := f.Observe(e); !ok {
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, i, d, "feed stopped: "+f.StopReason())
+						}
 						// The host's observe: a capture failure stops that one
 						// feed (so its stale history is never read again and
 						// the Env branch below passes it as nil); the game
@@ -336,6 +354,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				}
 				root, reason := searchseat.HonestRoot(seatSetup, fd, e,
 					bots.RootSeed(cfg.Seed^(uint64(d.Player)+1), d.Seq))
+				if reason != "" && fd != nil && FallbackTrace != nil {
+					FallbackTrace(cfg.Seed, int(d.Player), d, "honest root refused: "+reason)
+				}
 				v := view.Project(e.G, e, d.Player, d)
 				v.Round = rounds.Of(e.G, e.L.Events)
 				in, err = es.DecideEnv(context.Background(), bots.Env{
@@ -359,6 +380,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 						e.EnsurePaymentActions()
 					}
 					if rerr := fd.RecordAnswer(d, in); rerr != nil {
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, int(d.Player), d, "feed stopped: record answer: "+rerr.Error())
+						}
 						stopped[d.Player] = true
 					}
 				}
@@ -378,6 +402,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				decisionBoard = &board // b is a copy of board; &b would escape per decision
 				rootEngine := e
 				fdLive := fdFrame
+				rootRefused := ""
 				// A closed-list seat sees the game without its opponents'
 				// lists (searchseat.SeatSetup): its root and Setup both.
 				seatSetup := searchseat.SeatSetup(setup, seats[d.Player], d.Player)
@@ -390,7 +415,11 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 						if hooks.RootRefused != nil {
 							hooks.RootRefused(int(d.Player), d, reason)
 						}
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, int(d.Player), d, "honest root refused (search branch): "+reason)
+						}
 						fdLive = false
+						rootRefused = reason
 					}
 				}
 				if fdLive {
@@ -405,7 +434,14 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					if err == nil {
 						err = fd.RecordAnswer(d, in)
 					}
+				} else if rr, ok := seats[d.Player].(rootRefuser); ok && rootRefused != "" {
+					// A live feed whose honest root refused: counted apart
+					// from a true feed stop (azmcts.Stats.RootRefused).
+					in, err = rr.DecideRootRefused(context.Background(), b, *d, rootRefused)
 				} else {
+					if !fdFrame && FallbackTrace != nil {
+						FallbackTrace(cfg.Seed, int(d.Player), d, "feed stopped (search branch): "+fd.StopReason())
+					}
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideBoard(context.Background(), b, *d)
 				}
 			} else if s, ok := seats[d.Player].(seat.BoardSeat); ok {

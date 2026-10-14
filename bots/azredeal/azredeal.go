@@ -125,6 +125,21 @@ func (s *hostedSeat) DecisionBudgetMS() int { return s.budgetMS }
 // Search's ctx bail-out, which plays the wrapped bot's answer -- this
 // policy's non-searched fallback. Zero -- bench and training -- is
 // unbounded.
+// DecideRootRefused forwards the driver's live-feed refused-root fallback
+// (bench's search branch) to the wrapped seat, or plays DecideBoard.
+func (s *hostedSeat) DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error) {
+	if rr, ok := s.bot.(rootRefuser); ok {
+		return rr.DecideRootRefused(ctx, b, d, reason)
+	}
+	return s.bot.DecideBoard(ctx, b, d)
+}
+
+// rootRefuser is the wrapped seat's root-refused fallback (*azmcts.Seat's
+// DecideRootRefused); a delegate without it plays DecideBoard.
+type rootRefuser interface {
+	DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error)
+}
+
 type hostedSeat struct {
 	bot      searchseat.SearchSeat
 	cfg      azmcts.SeatConfig
@@ -217,6 +232,13 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 func (s *hostedSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
 	if env.Search.Engine != nil && env.Search.Feed != nil && env.Search.Feed.Live() {
 		return s.bot.DecideSearch(ctx, env.Search, d)
+	}
+	if env.Search.Feed != nil && env.Search.Feed.Live() {
+		// A live feed whose honest root refused: counted apart from a true
+		// feed stop (azmcts.Stats.RootRefused), with the builder's reason.
+		if rr, ok := s.bot.(rootRefuser); ok {
+			return rr.DecideRootRefused(ctx, env.Board, d, env.RootRefused)
+		}
 	}
 	return s.bot.DecideBoard(ctx, env.Board, d)
 }

@@ -41,6 +41,23 @@ type GauntletResult struct {
 	Manifest Manifest
 }
 
+// GauntletGameSeed is the engine seed of game g against opponent j in the
+// gauntlet seeded seed.
+func GauntletGameSeed(seed uint64, j, g int) uint64 {
+	return rand.New(rand.NewPCG(seed, gauntletSaltBase<<32|uint64(j)<<16|uint64(g))).Uint64()
+}
+
+// GauntletGame plays exactly one gauntlet game -- game g against opp at the
+// engine seed gs (GauntletGameSeed) -- as Gauntlet plays it, so a single
+// game of a long run can be reproduced on its own.
+func (l *Lab) GauntletGame(hero, opp Entrant, g int, gs uint64) (GameResult, error) {
+	a, b := hero, opp
+	if g%2 == 1 { // the player seat the hero sits in for game g
+		a, b = b, a
+	}
+	return l.playGame(a, b, entrantNames(a, b), gs, false)
+}
+
 // Gauntlet plays the hero deck against every opponent games times — game
 // n of a pairing alternates which side sits in player 0's seat (one on the
 // play's seat, one on the draw's; the engine's CR 103.1 toss still decides
@@ -58,13 +75,7 @@ func (l *Lab) Gauntlet(hero Entrant, opponents []Entrant, games int, seed uint64
 	}
 	results, err := l.runGames(len(opponents)*games, func(i int) (GameResult, error) {
 		j, g := i/games, i%games
-		me := g % 2 // the player seat the hero sits in for game g
-		a, b := hero, opponents[j]
-		if me == 1 {
-			a, b = b, a
-		}
-		gs := rand.New(rand.NewPCG(seed, gauntletSaltBase<<32|uint64(j)<<16|uint64(g))).Uint64()
-		res, err := l.playGame(a, b, entrantNames(a, b), gs, false)
+		res, err := l.GauntletGame(hero, opponents[j], g, GauntletGameSeed(seed, j, g))
 		if err != nil {
 			return GameResult{}, err
 		}

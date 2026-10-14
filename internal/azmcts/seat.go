@@ -82,6 +82,11 @@ type Diag struct {
 	// it prepared (or the source is clairvoyant); DealFailed its first
 	// per-world deal failure (those simulations counted in Stats.NoWorld).
 	Refused, DealFailed string
+	// Seed and Seq locate the decision: the seat's seed (NewSeat's) and the
+	// decision's sequence number, so a driver can name the game a failure
+	// came from. Diagnostic only.
+	Seed uint64
+	Seq  uint64
 }
 
 // Millis is the monotonic elapsed-milliseconds clock the driving command
@@ -182,7 +187,18 @@ func (s *Seat) Decide(ctx context.Context, v view.View, d decision.Decision) (de
 // stopped: the wrapped bot, counted (FeedStopped) so it is never silent.
 func (s *Seat) DecideBoard(ctx context.Context, b botpolicy.Board, d decision.Decision) (decision.Intent, error) {
 	if Watch != nil {
-		Watch(Diag{Stats: Stats{FeedStopped: 1}})
+		Watch(Diag{Stats: Stats{FeedStopped: 1}, Seed: s.seed, Seq: d.Seq})
+	}
+	return s.def.DecideBoard(ctx, b, d)
+}
+
+// DecideRootRefused is DecideBoard for a decision whose feed is live but
+// whose honest root refused to build (reason is the builder's): the wrapped
+// bot, counted as FeedStopped (its historical meaning: the driver routed
+// around the search) and as RootRefused, with the reason in Diag.Refused.
+func (s *Seat) DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error) {
+	if Watch != nil {
+		Watch(Diag{Stats: Stats{FeedStopped: 1, RootRefused: 1}, Refused: reason, Seed: s.seed, Seq: d.Seq})
 	}
 	return s.def.DecideBoard(ctx, b, d)
 }
@@ -255,6 +271,7 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 		dg := Diag{
 			Turn: env.Engine.G.Turn, Kind: res.Kind, Searched: res.Stats.Searched == 1,
 			Candidates: len(res.Candidates), Choice: res.Choice, Stats: res.Stats, Refused: refused, DealFailed: dealFailed,
+			Seed: s.seed, Seq: d.Seq,
 		}
 		if Millis != nil {
 			dg.MS = Millis() - t0

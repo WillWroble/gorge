@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/draftlab"
 	"github.com/adams-shaun/gorge/limited/pickbot"
 	"github.com/adams-shaun/gorge/limited/setdata"
@@ -39,6 +40,9 @@ type gateOpts struct {
 	azSims, azBelief       int
 	azBeliefDir            string
 	azBeliefPool           string
+	azPanics               int
+	onlyGame               uint64
+	onlyGameTape           string
 	workers, maxObjs       int
 	maxHuman               int
 	out                    string
@@ -106,6 +110,9 @@ func parseGate(args []string) (gateOpts, error) {
 	fs.IntVar(&o.azBelief, "az-belief", 500, "az: random decks (from training-seed sealed pools) in the closed-list belief, when -az-belief-dir is empty")
 	fs.StringVar(&o.azBeliefDir, "az-belief-dir", "", "az: deck directory for searchprobe.LoadBeliefDir")
 	fs.StringVar(&o.azBeliefPool, "az-belief-pool", "", "az: pool.tsv naming the train split of -az-belief-dir")
+	fs.IntVar(&o.azPanics, "az-panics", 3, "az: print the first N distinct recovered search-panic stacks (and every panic's game seed) to stderr; 0 = off")
+	fs.Uint64Var(&o.onlyGame, "only-game", 0, "debug: play only the gauntlet game with this engine seed (as printed by -az-panics / the fallback trace) and print where it sits; 0 = the whole gate")
+	fs.StringVar(&o.onlyGameTape, "only-game-tape", "", "debug: with -only-game, write the game's tape (seed, names, deck lists, intents) as JSON to this path, for a capped regression test")
 	fs.IntVar(&o.workers, "workers", 4, "concurrent gauntlets")
 	fs.IntVar(&o.maxObjs, "max-objs", 2000, "engine board-size cap (0 = off)")
 	fs.IntVar(&o.maxHuman, "max-human", 0, "cap the gauntlet's human decks (tests); 0 = all")
@@ -159,7 +166,7 @@ func gate(args []string, out io.Writer) (*gateResult, error) {
 		return nil, err
 	}
 	az := o.pilot == "az"
-	lab, err := draftlab.Open(o.corpus, draftlab.Options{AllowDecklistBots: az, MaxObjs: o.maxObjs, Workers: 1})
+	lab, err := draftlab.Open(o.corpus, draftlab.Options{AllowDecklistBots: az, MaxObjs: o.maxObjs, Workers: 1, RecordTape: o.onlyGameTape != ""})
 	if err != nil {
 		return nil, err
 	}
@@ -291,6 +298,45 @@ func gate(args []string, out io.Writer) (*gateResult, error) {
 		}
 	}
 
+	if o.onlyGame != 0 {
+		for _, j := range jobs {
+			for oi := range opponents {
+				for g := 0; g < o.games; g++ {
+					if draftlab.GauntletGameSeed(j.seed, oi, g) != o.onlyGame {
+						continue
+					}
+					fmt.Fprintf(out, "only-game %d: hero %s vs %s, game %d\n", o.onlyGame, j.deck.Name, opponents[oi].Deck.Name, g)
+					res, err := lab.GauntletGame(draftlab.Entrant{Deck: j.deck, Player: player}, opponents[oi], g, o.onlyGame)
+					if err != nil {
+						return nil, err
+					}
+					fmt.Fprintf(out, "only-game: winner %d turns %d intents %d head %x\n", res.Winner, res.Turns, res.Intents, res.Head)
+					if o.onlyGameTape != "" && res.Tape != nil {
+						b, err := json.MarshalIndent(struct {
+							Seed      uint64            `json:"seed"`
+							Names     [2]string         `json:"names"`
+							Mulligans int               `json:"mulligans"`
+							MaxObjs   int               `json:"max_objs"`
+							Decks     [2][]string       `json:"decks"`
+							Intents   []decision.Intent `json:"intents"`
+						}{o.onlyGame, res.Tape.Names, res.Tape.Mulligans, o.maxObjs, seatLists(j.deck, opponents[oi].Deck, g), res.Tape.Intents}, "", " ")
+						if err != nil {
+							return nil, err
+						}
+						if err := os.WriteFile(o.onlyGameTape, b, 0o644); err != nil {
+							return nil, err
+						}
+					}
+					if stats != nil {
+						fmt.Fprintf(out, "  az: %s\n", stats.summary())
+					}
+					return &gateResult{AZ: stats}, nil
+				}
+			}
+		}
+		return nil, fmt.Errorf("-only-game %d: no gauntlet game has this seed", o.onlyGame)
+	}
+
 	// Phase 2: every gauntlet, -workers at once, results in job order.
 	tallies := make([]draftlab.Tally, len(jobs))
 	errs := make([]error, len(jobs))
@@ -390,4 +436,23 @@ func wilsonCI(wins, n int) (p, lo, hi float64) {
 	center := (p + z*z/(2*float64(n))) / den
 	rad := z / den * math.Sqrt(p*(1-p)/float64(n)+z*z/(4*float64(n)*float64(n)))
 	return p, math.Max(0, center-rad), math.Min(1, center+rad)
+}
+
+// seatLists is game g's two deck lists in engine seat order and deck-file
+// order (the order the engine's libraries are built in): the hero sits in
+// seat g%2, as draftlab.GauntletGame seats it.
+func seatLists(hero, opp draftlab.Deck, g int) [2][]string {
+	list := func(d draftlab.Deck) []string {
+		var out []string
+		for _, e := range d.File.Cards {
+			for k := 0; k < e.Count; k++ {
+				out = append(out, e.Name)
+			}
+		}
+		return out
+	}
+	if g%2 == 1 {
+		return [2][]string{list(opp), list(hero)}
+	}
+	return [2][]string{list(hero), list(opp)}
 }
