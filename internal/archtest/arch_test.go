@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -18,6 +19,7 @@ const module = "github.com/adams-shaun/gorge"
 
 type pkg struct {
 	path    string
+	dir     string          // absolute package directory (go list .Dir)
 	imports map[string]bool // direct, non-test
 	deps    map[string]bool // transitive, non-test
 }
@@ -25,25 +27,100 @@ type pkg struct {
 // packages lists every package in the module with its direct and transitive
 // non-test imports. Test files are excluded on purpose: tests may import
 // anything (view's tests import rules; cards' tests import time).
+//
+// It also opens every package directory from the test process. go test's
+// result cache tracks only the files the test process itself opens
+// (os.Open/os.Stat, via internal/testlog) — never the files a `go list`/
+// `go doc`/`go build` subprocess reads — and a directory open hashes the
+// directory's entry names and their size/mtime (cmd/go/internal/test/test.go
+// hashOpen). Opening every package dir therefore makes the go-list-based
+// checks cache-correct: adding, removing or editing any module source file
+// invalidates this package's cached test result instead of being served a
+// stale pass. The subprocess checks that do not otherwise need the package
+// map (TestNoExportLeaksAnEngineGame's `go doc`, TestEngineCompilesFor32Bit's
+// `go build`) call openModulePackageDirs for the same side effect.
 func packages(t *testing.T) map[string]pkg {
 	t.Helper()
-	out, err := exec.Command("go", "list", "-f", `{{.ImportPath}}|{{join .Imports " "}}|{{join .Deps " "}}`, module+"/...").Output()
+	out, err := exec.Command("go", "list", "-f", `{{.ImportPath}}|{{join .Imports " "}}|{{join .Deps " "}}|{{.Dir}}`, module+"/...").Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
 	}
 	pkgs := map[string]pkg{}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		parts := strings.SplitN(line, "|", 3)
-		if len(parts) != 3 {
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
 			t.Fatalf("unexpected go list line %q", line)
 		}
-		p := pkg{path: parts[0], imports: set(parts[1]), deps: set(parts[2])}
+		p := pkg{path: parts[0], imports: set(parts[1]), deps: set(parts[2]), dir: parts[3]}
 		pkgs[p.path] = p
 	}
 	if len(pkgs) < 10 {
 		t.Fatalf("go list found only %d packages", len(pkgs))
 	}
+	openModulePackageDirs(t, pkgs)
 	return pkgs
+}
+
+// openModulePackageDirs opens every package directory in pkgs from the test
+// process so go test's result cache tracks the module's source files (see
+// packages' doc comment). The directory's entries and their size/mtime are
+// what hashOpen folds into the cache key, so the open is enough — the files
+// need not be read. It runs once per test binary: the test log is shared by
+// every test in the run, so the first open covers them all, and a test
+// selected with -run still triggers it because it goes through packages().
+// A package with no directory, or a directory that cannot be opened, is
+// fatal: silently skipping it would reintroduce the stale-cache hole this
+// open closes.
+//
+// The number of directories opened is recorded in openModuleDirsN so
+// TestOpenPackageDirsCoversEveryPackage can assert that packages() actually
+// performed the open — removing the openModulePackageDirs call from
+// packages() leaves the count at zero and fails that test, instead of
+// silently reintroducing the stale-cache hole.
+func openModulePackageDirs(t *testing.T, pkgs map[string]pkg) {
+	t.Helper()
+	openModuleDirsOnce.Do(func() {
+		openModuleDirsN, openModuleDirsErr = openPackageDirs(pkgs)
+	})
+	if openModuleDirsErr != nil {
+		t.Fatal(openModuleDirsErr)
+	}
+}
+
+var (
+	openModuleDirsOnce sync.Once
+	openModuleDirsErr  error
+	openModuleDirsN    int // directories openModulePackageDirs opened through packages()
+)
+
+// openPackageDirs opens the directory of every package in pkgs and returns
+// how many it opened. It returns an error instead of calling t.Fatal so the
+// guards can be unit tested (TestOpenPackageDirsCoversEveryPackage): a caller
+// that opens fewer directories than there are packages has silently left the
+// stale-cache hole open. The paths are iterated in sorted order so the first
+// failure reported (and the "opened" count in its message) is stable across
+// runs.
+func openPackageDirs(pkgs map[string]pkg) (int, error) {
+	if len(pkgs) == 0 {
+		return 0, fmt.Errorf("no packages to open; the cache-tracking open would run vacuously")
+	}
+	paths := make([]string, 0, len(pkgs))
+	for path := range pkgs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	opened := 0
+	for _, path := range paths {
+		p := pkgs[path]
+		if p.dir == "" {
+			return opened, fmt.Errorf("go list reported no directory for %s; the cache-tracking open would be skipped", path)
+		}
+		if _, err := os.ReadDir(p.dir); err != nil {
+			return opened, fmt.Errorf("open package dir %s (go test's cache must track it): %w", p.dir, err)
+		}
+		opened++
+	}
+	return opened, nil
 }
 
 func set(s string) map[string]bool {
@@ -370,6 +447,11 @@ func TestManaBrewWireIsStdlibOnly(t *testing.T) {
 // of these type names (were state.GameX or rules.EngineY ever to exist)
 // still does not trip it.
 func TestNoExportLeaksAnEngineGame(t *testing.T) {
+	// `go doc` reads host's source through a subprocess, invisible to go
+	// test's result cache. packages() opens every module package directory
+	// so a source change invalidates this test's cached result (see its doc
+	// comment); the returned map is unused here.
+	packages(t)
 	// These exact type names (state.Game, rules.Engine) are what a leak's
 	// signature would carry; a legitimate client-facing type never has an
 	// element in either package. Word boundaries stop the match from
@@ -584,6 +666,11 @@ func mustCwd() string {
 // the `/...` pattern never names them and this build cannot race their
 // cleanup.
 func TestEngineCompilesFor32Bit(t *testing.T) {
+	// `go build` reads the module's source through a subprocess, invisible to
+	// go test's result cache. packages() opens every module package directory
+	// so a source change invalidates this test's cached result (see its doc
+	// comment); the returned map is unused here.
+	packages(t)
 	env := append(os.Environ(), "GOOS=linux", "GOARCH=386", "CGO_ENABLED=0")
 	cmd := exec.Command("go", "build", module+"/...")
 	cmd.Env = env
