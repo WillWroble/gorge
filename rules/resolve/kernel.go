@@ -131,15 +131,38 @@ func (k *Kernel) ForClone() Kernel {
 }
 
 // Fork gives a hypothetical world forked at a posed tape resolution its own
-// checkpoint copy carrying the world's RNG splice; forkAt is the world's log
-// length, where whatever its builder appends before its first Submit (a
-// redeal's Secret events) is injected (spec §7.3). Call it only when Posed.
-func (k *Kernel) Fork(world any, forkAt int) {
+// checkpoint copy carrying the world's RNG splice; the world's log length
+// (len(l.Events)) is where whatever its builder appends before its first
+// Submit (a redeal's Secret events) is injected (spec §7.3). Call it only
+// when Posed.
+//
+// The engine forked may itself be a world forked at this same posed
+// resolution (a redeal of a redeal: the az seat's search worlds are redeals
+// of the honest root). Its builder's events, appended after its own fork
+// and not yet folded into the checkpoint (only its own answering Submit
+// would fold them), are part of the posed state this fork copies, so they
+// become an injection on the copy here; otherwise the copy's re-run from S0
+// skips them and diverges at the first one.
+func (k *Kernel) Fork(world any, l *events.Log) {
 	atomic.StoreInt32(&k.posed.shared, 1)
 	cp := *k.posed
+	forkAt := len(l.Events)
+	if forkAt > k.posedLen && k.posedLen >= cp.base {
+		cp.injects = append(append([]injection(nil), cp.injects...),
+			injection{at: k.posedLen, evs: append([]events.Event(nil), l.Events[k.posedLen:forkAt]...)})
+	}
 	cp.World = world
 	k.posed = &cp
 	k.posedLen = forkAt
+}
+
+// PosedWorld is the posed checkpoint's World (nil when none is posed, or the
+// posed resolution was not forked into a hypothetical world).
+func (k *Kernel) PosedWorld() any {
+	if k.posed == nil {
+		return nil
+	}
+	return k.posed.World
 }
 
 // Watching reports whether the engine's ask choke point must call OnAsk.

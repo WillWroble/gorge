@@ -205,7 +205,30 @@ func (e *Engine) CloneHypotheticalInto(seed uint64, sp *Spare) *Engine {
 		// its own checkpoint copy whose re-run draws S0's values only up to
 		// the fork and the world's own after it, and re-applies the world's
 		// redeal at the fork point (lasagna spec §7.3).
-		c.tape.Fork(&rngSplice{at: e.rng.Draws, next: c.rng.clone()}, len(c.L.Events))
+		c.tape.Fork(e.forkSplice(c.rng), c.L)
 	}
+	c.rng.forked = true
 	return c
+}
+
+// forkSplice is the RNG splice of a world forked from e at e's posed tape
+// resolution: the world's re-run from S0 draws what e's own re-run would up
+// to the fork, then next's values.
+//
+// When e is itself a world forked at this resolution (a redeal of a redeal),
+// its draw counter is not S0's: it continues S0's only once e has re-run.
+// Unre-run, e's re-run would switch generators at its own splice point and
+// draw nothing more before the posed decision, so the new world switches
+// there too. Re-run, e drew its own generator from its splice point to now,
+// so the new world's chain follows e's and switches at e's current count.
+func (e *Engine) forkSplice(next *rng) *rngSplice {
+	prev, _ := e.tape.PosedWorld().(*rngSplice)
+	switch {
+	case prev == nil:
+		return &rngSplice{at: e.rng.Draws, next: next.clone()}
+	case e.rng.forked:
+		return &rngSplice{at: prev.at, next: next.clone()}
+	default:
+		return prev.then(e.rng.Draws, next.clone())
+	}
 }

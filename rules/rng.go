@@ -22,6 +22,12 @@ type rng struct {
 	// S0's generator to the world's own at the draw count the world was
 	// forked at. Immutable, shared by clones; nil for every ordinary game.
 	splice *rngSplice
+	// forked marks a hypothetical world's own generator that no tape re-run
+	// has replaced since the world was cloned (CloneHypotheticalInto sets
+	// it; a tape Restore installs S0's generator and clears it). Such a
+	// world's re-run has drawn nothing past its fork's splice point, which
+	// is what a world forked FROM it needs to know (Engine.forkSplice).
+	forked bool
 }
 
 // rngSplice is where a re-executed prefix switches generators.
@@ -88,11 +94,11 @@ func (r *rng) clone() *rng {
 	if err := pcg.UnmarshalBinary(raw); err != nil {
 		panic("rules: PCG UnmarshalBinary: " + err.Error())
 	}
-	return &rng{src: rand.New(pcg), pcg: pcg, Draws: r.Draws, seed: r.seed, chance: r.chance.clone(), splice: r.splice}
+	return &rng{src: rand.New(pcg), pcg: pcg, Draws: r.Draws, seed: r.seed, chance: r.chance.clone(), splice: r.splice, forked: r.forked}
 }
 
 func (r *rng) IntN(n int) int {
-	if r.splice != nil && r.Draws >= r.splice.at {
+	for r.splice != nil && r.Draws >= r.splice.at {
 		nx := r.splice.next.clone()
 		r.src, r.pcg, r.seed, r.chance, r.splice = nx.src, nx.pcg, nx.seed, nx.chance, nil
 	}
@@ -123,3 +129,18 @@ func (r *rng) Shuffle(ids []state.ObjID) {
 // this is the cheap complementary check alongside the hash chain that this
 // type's own doc comment above already promises.
 func (e *Engine) RNGDraws() uint64 { return e.rng.Draws }
+
+// then is the splice chain s with one more link appended at its tail: once
+// the chain's last generator reaches draw at, continue on next. The chain is
+// immutable and shared, so the links are copied.
+func (s *rngSplice) then(at uint64, next *rng) *rngSplice {
+	cp := *s
+	nx := *cp.next
+	if nx.splice != nil {
+		nx.splice = nx.splice.then(at, next)
+	} else {
+		nx.splice = &rngSplice{at: at, next: next}
+	}
+	cp.next = &nx
+	return &cp
+}
