@@ -106,6 +106,9 @@ func observationBlind(e *rules.Engine, actor state.PlayerID, plans []redealPlan)
 			for _, id := range plans[i].unknown {
 				replaced[id] = true
 			}
+			for _, id := range plans[i].side {
+				replaced[id] = true
+			}
 		}
 	}
 	for i := range e.G.Objs {

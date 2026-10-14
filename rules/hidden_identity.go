@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -11,7 +12,7 @@ import (
 // ReidentifyHidden gives hidden cards of a HYPOTHETICAL engine (a search
 // world: CloneHypothetical, NewHypothetical) new card identities: objs[i]
 // becomes card ords[i] of u, face 0. Every object must be a card in its
-// owner's hand or library. It is the closed-decklist redeal's
+// owner's hand, library or sideboard. It is the closed-decklist redeal's
 // re-identification (internal/searchprobe): a world in which an opponent's
 // unknown cards are drawn from a belief over deck lists rather than
 // permuted from the real ones.
@@ -41,8 +42,8 @@ func ReidentifyHidden(e *Engine, u *cards.Universe, objs []state.ObjID, ords []i
 	e.G.HypotheticalCards = u
 	for i, id := range objs {
 		o := e.G.Obj(id)
-		if o == nil || o.IsToken || o.IsCopy || (o.Zone != state.ZHand && o.Zone != state.ZLibrary) {
-			return fmt.Errorf("rules: ReidentifyHidden: object %d is not a hand or library card", id)
+		if o == nil || o.IsToken || o.IsCopy || (o.Zone != state.ZHand && o.Zone != state.ZLibrary && o.Zone != state.ZSideboard) {
+			return fmt.Errorf("rules: ReidentifyHidden: object %d is not a hand, library or sideboard card", id)
 		}
 		ord := ords[i]
 		if ord < 0 || int(ord) >= u.Len() {
@@ -54,6 +55,49 @@ func ReidentifyHidden(e *Engine, u *cards.Universe, objs []state.ObjID, ords []i
 			return fmt.Errorf("rules: ReidentifyHidden: object %d did not take card %q", id, u.Name(int(ord)))
 		}
 		e.notePoolCard(c)
+		e.forgetWalkClass(id)
 	}
+	return nil
+}
+
+// forgetWalkClass drops id's cached offer-walk class (walkObjCls). The
+// cache is refreshed from the log before it is read, so this changes no
+// answer; it only keeps a re-identified object's PREVIOUS card -- in a
+// closed search world, the opponent's real hidden card -- from lingering in
+// the world as the stale entry's fingerprint.
+func (e *Engine) forgetWalkClass(id state.ObjID) {
+	e.ownWalkClasses()
+	if i := int(id) - 1; i >= 0 && i < len(e.walkObjCls) {
+		e.walkObjCls[i] = walkObjClass{}
+	}
+}
+
+// ClosedDeckManifests is e's genesis manifest table (OwnDeck's source) as a
+// seat that does not know its opponents' lists may hold it: keep's own
+// manifest, shared and read-only, and an empty manifest for every other
+// seat. The closed-decklist redeal installs it on every world it deals
+// (UseDeckManifests), so a closed world's OwnDeck(opponent) -- and every
+// Board or View an opponent-perspective simulation builds from it -- names
+// nothing of the opponent's real list or sideboard.
+func (e *Engine) ClosedDeckManifests(keep state.PlayerID) []deck.Manifest {
+	out := make([]deck.Manifest, len(e.deckManifests))
+	if int(keep) >= 0 && int(keep) < len(out) {
+		out[keep] = e.deckManifests[keep]
+	}
+	return out
+}
+
+// UseDeckManifests replaces a HYPOTHETICAL engine's genesis manifest table
+// with ms (ClosedDeckManifests), shared and never written. The table is
+// observer data that no event reads, so the world's play is unchanged; a
+// real match engine is refused, as ReidentifyHidden refuses one.
+func (e *Engine) UseDeckManifests(ms []deck.Manifest) error {
+	if e == nil || e.rng == nil || e.rng.chance == nil {
+		return fmt.Errorf("rules: UseDeckManifests requires a hypothetical engine")
+	}
+	if len(ms) != len(e.deckManifests) {
+		return fmt.Errorf("rules: UseDeckManifests: %d manifests for %d seats", len(ms), len(e.deckManifests))
+	}
+	e.deckManifests = ms
 	return nil
 }

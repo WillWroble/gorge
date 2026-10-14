@@ -129,3 +129,57 @@ func TestReidentifiedWorldSurvivesATapeReRun(t *testing.T) {
 		t.Fatal("the real engine took the world's table")
 	}
 }
+
+// A closed world's genesis manifest table holds only the searching seat's
+// own list (ClosedDeckManifests), a real engine refuses the swap, and the
+// table survives a posed-resolution re-run from S0 -- whose own table is the
+// real one with every seat's list.
+func TestClosedManifestsSurviveATapeReRun(t *testing.T) {
+	e, _ := kr8Fixture(t, 2, 9903, tapeDrawVoteSrc,
+		"Name:Tape Filler A\nManaCost:1\nTypes:Artifact\nOracle:x\n",
+		"Name:Tape Filler B\nManaCost:2\nTypes:Artifact\nOracle:x\n",
+		"Name:Tape Filler C\nManaCost:3\nTypes:Artifact\nOracle:x\n")
+	if len(e.OwnDeck(0).Main) == 0 || len(e.OwnDeck(1).Main) == 0 {
+		t.Fatal("precondition: the fixture's seats have no genesis lists")
+	}
+	ms := e.ClosedDeckManifests(1)
+	if len(ms) != 2 || len(ms[0].Main) != 0 || ms[0].Name != "" || len(ms[1].Main) != len(e.OwnDeck(1).Main) {
+		t.Fatalf("closed table: %d seats, seat 0 %q/%d rows, seat 1 %d rows", len(ms), ms[0].Name, len(ms[0].Main), len(ms[1].Main))
+	}
+	if err := e.UseDeckManifests(ms); err == nil {
+		t.Fatal("a match engine took a closed manifest table")
+	}
+	addMana(t, e, 0, "B")
+	submitChoices(t, e, castOptionFor(t, e, fixtureInHand(t, e, "Tape Draw Vote")).Index)
+	for i := 0; i < 20; i++ {
+		d := e.Pending()
+		if d.Kind == decision.KChoose && d.Player == 1 {
+			break
+		}
+		if d.Kind == decision.KPriority {
+			submitChoices(t, e, tapePassIndex(d))
+			continue
+		}
+		submitChoices(t, e, 0)
+	}
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KChoose || d.Player != 1 || !TapePosed(e) {
+		t.Fatalf("precondition: seat 1's vote not posed on a tape resolution: %+v", d)
+	}
+	w := e.CloneHypothetical(0xbeef)
+	if err := w.UseDeckManifests(w.ClosedDeckManifests(1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SubmitHypothetical(decision.Intent{Seq: d.Seq, Player: 1, Choices: []int{1}}); err != nil {
+		t.Fatalf("world submit: %v", err)
+	}
+	if got := w.OwnDeck(0); len(got.Main) != 0 {
+		t.Fatalf("the re-run restored seat 0's real list into the closed world (%d rows)", len(got.Main))
+	}
+	if len(w.OwnDeck(1).Main) == 0 {
+		t.Fatal("the re-run dropped the searching seat's own list")
+	}
+	if len(e.OwnDeck(0).Main) == 0 {
+		t.Fatal("closing the world changed the real engine's table")
+	}
+}

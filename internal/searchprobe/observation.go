@@ -498,6 +498,10 @@ func (c *Collector) observe(e *rules.Engine, burst []events.Event, withPotential
 	// them byte-identical.
 	c.noPot.Chars = e
 	c.noPot.keepPotential = withPotential
+	// The wrapper is per-capture scratch: drop the engine when the capture
+	// ends, so a collector (and every feed and clone holding one) never keeps
+	// a reference to the live engine it observed.
+	defer func() { c.noPot = noPotentialChars{} }()
 	var chars view.Chars = &c.noPot
 	if c.view.Decision == nil {
 		c.view.Decision = c.viewDec

@@ -664,7 +664,10 @@ func (k KnownCards) holds(e *rules.Engine, c *Collector) error {
 			name = o.Card.Faces[0].Name
 		}
 		if name != identity.Name || o.Owner != identity.Owner {
-			return nil, fmt.Errorf("known card %d is %s/%d, want %s/%d", identity.ID, name, o.Owner, identity.Name, identity.Owner)
+			// The reason reaches the seat (bots.Env.RootRefused), so it
+			// names only what the seat believes, never the engine's card:
+			// that object may be a hidden card the seat has not seen.
+			return nil, fmt.Errorf("known card %d (%s/%d) is not that card in the engine", identity.ID, identity.Name, identity.Owner)
 		}
 		return o, nil
 	}

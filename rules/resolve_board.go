@@ -246,6 +246,11 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 	}
 	e.decArena = nil
 	heapAsks := e.arenaHeapAsks
+	// The genesis manifest table is immutable for a game's whole lineage, so
+	// S0's is the live engine's -- except in a closed search world, whose
+	// table is redacted to the searching seat's own list (UseDeckManifests).
+	// Keep the live one: a re-run must not restore the opponents' real lists.
+	manifests := e.deckManifests
 	sp := e.Release()
 	l.Events, l.Intents = evs, ints
 	sc := s0.CloneInto(&sp)
@@ -270,6 +275,7 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 	sc.L = l
 	*e = *sc
 	e.G, e.L = g, l
+	e.deckManifests = manifests
 	if hypCards != nil {
 		e.setNameInPool = e.setNameInPool || gates[0]
 		e.layer4InPool = e.layer4InPool || gates[1]
