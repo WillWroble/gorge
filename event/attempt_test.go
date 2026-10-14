@@ -288,10 +288,10 @@ func TestLogForRedactsUntilComplete(t *testing.T) {
 		}
 		if en.Kind == event.KindDeckSaved {
 			sawDeck = true
-			if en.Seat == 0 && len(en.Deck.Main) == 0 {
+			if en.Seat == 0 && (en.Deck == nil || len(en.Deck.Main) == 0) {
 				t.Errorf("LogFor(0) hid seat 0's own deck list (entry %d)", i)
 			}
-			if en.Seat != 0 && len(en.Deck.Main) != 0 {
+			if en.Seat != 0 && en.Deck != nil {
 				t.Errorf("LogFor(0) leaked seat %d's deck list (entry %d)", en.Seat, i)
 			}
 		}
