@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"sort"
 
 	"github.com/adams-shaun/gorge/draftlab"
+	"github.com/adams-shaun/gorge/draftlab/extern"
 	"github.com/adams-shaun/gorge/event"
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
@@ -58,8 +60,12 @@ type runResult struct {
 
 // run is main's testable body: the whole example workflow over the flags.
 // Every step seeds itself from o.seed, so two runs with the same flags are
-// byte-identical, artifacts included.
-func run(o options, out io.Writer) error {
+// byte-identical, artifacts included. The -drafter/-builder/-player/
+// -opponent-players agents resolve through extern.Registry, so any of them
+// may be an ext: spec (dialed once per endpoint and shared across roles);
+// with default flags every resolved agent is exactly the built-in the
+// workflow hard-coded before E5d-5.
+func run(o options, out io.Writer) (retErr error) {
 	switch {
 	case o.randomGames < 0:
 		return fmt.Errorf("-random-games %d is negative", o.randomGames)
@@ -77,18 +83,29 @@ func run(o options, out io.Writer) error {
 		return fmt.Errorf("-games %d, want at least 1", o.games)
 	case o.workers < 0:
 		return fmt.Errorf("-workers %d is negative", o.workers)
+	case o.extMaxBatch < 0:
+		return fmt.Errorf("-ext-max-batch %d is negative", o.extMaxBatch)
+	case o.extFlush != "" && o.extFlush != string(extern.FlushBarrier) && o.extFlush != string(extern.FlushReady):
+		return fmt.Errorf("-ext-flush %q, want %q or %q", o.extFlush, extern.FlushBarrier, extern.FlushReady)
+	case o.extFail != "" && o.extFail != string(extern.FailError) && o.extFail != string(extern.FailFallback):
+		return fmt.Errorf("-ext-fail %q, want %q or %q", o.extFail, extern.FailError, extern.FailFallback)
 	}
-	l, err := draftlab.Open(o.dir, draftlab.Options{Workers: o.workers})
+	if err := validateSpecs(o); err != nil {
+		return err
+	}
+	l, err := draftlab.Open(o.dir, draftlab.Options{Workers: o.workers, RecordTape: o.verifyTapes})
 	if err != nil {
 		return err
 	}
-	playerRef, err := draftlab.ParseAgent(o.player)
+	reg := extern.NewRegistry(context.Background(), l, extOptions(o))
+	defer func() {
+		if err := reg.Close(); err != nil && retErr == nil {
+			retErr = fmt.Errorf("closing external agents: %w", err)
+		}
+	}()
+	player, err := reg.Player(o.player)
 	if err != nil {
-		return err
-	}
-	player, err := l.Player(playerRef)
-	if err != nil {
-		return fmt.Errorf("freezing %s: %w", playerRef, err)
+		return fmt.Errorf("freezing %s: %w", o.player, err)
 	}
 	coll := collation(o)
 	sheets, err := l.CardNames(o.set, coll)
@@ -117,20 +134,44 @@ func run(o options, out io.Writer) error {
 	// Step 2: freeze the player (the ref the rest of the workflow plays).
 	fmt.Fprintf(out, "frozen player %s\n", player.Ref)
 
-	// Step 3: sealed builds.
-	res.sealed, err = stepSealedBuilds(l, o, coll)
+	// Step 3: sealed builds (the -builder agent, only when builds run).
+	var builder draftlab.NamedBuilder
+	if o.sealed > 0 || o.pods > 0 {
+		builder, err = reg.Builder(builderSpec(o))
+		if err != nil {
+			return fmt.Errorf("builder %s: %w", builderSpec(o), err)
+		}
+	}
+
+	// Step 4: draft pods (the -drafter and -builder agents, only when pods
+	// run).
+	var drafter draftlab.NamedDrafter
+	if o.pods > 0 {
+		drafter, err = reg.Drafter(drafterSpec(o))
+		if err != nil {
+			return fmt.Errorf("drafter %s: %w", drafterSpec(o), err)
+		}
+	}
+	res.sealed, err = stepSealedBuilds(l, o, coll, builder)
 	if err != nil {
 		return err
 	}
-
-	// Step 4: draft pods.
-	res.pods, err = stepPods(l, o, coll, player)
+	res.pods, err = stepPods(l, o, coll, player, drafter, builder)
 	if err != nil {
 		return err
 	}
+	if o.verifyTapes {
+		for k, pod := range res.pods {
+			if err := l.VerifyEventTapes(pod); err != nil {
+				return fmt.Errorf("pod %d: %w", k, err)
+			}
+		}
+		fmt.Fprintf(out, "tapes verified: %d pod(s)\n", len(res.pods))
+	}
 
-	// Step 5: gauntlets.
-	res.gauntlets, err = stepGauntlet(l, o, player, res.sealed, res.pods)
+	// Step 5: gauntlets (opponent players resolved through the registry
+	// too, so they may be ext: specs).
+	res.gauntlets, err = stepGauntlet(l, o, reg, player, res.sealed, res.pods)
 	if err != nil {
 		return err
 	}
@@ -141,7 +182,73 @@ func run(o options, out io.Writer) error {
 		}
 	}
 	printSummary(o, out, res)
+	printExternStats(o, reg)
 	return nil
+}
+
+// drafterSpec is the run's drafter spec: the empty flag means the
+// built-in default rating-colour@1.
+func drafterSpec(o options) string {
+	if o.drafter == "" {
+		return "rating-colour@1"
+	}
+	return o.drafter
+}
+
+// builderSpec is the run's builder spec: the empty flag means the
+// built-in default best23@1.
+func builderSpec(o options) string {
+	if o.builder == "" {
+		return "best23@1"
+	}
+	return o.builder
+}
+
+// validateSpecs rejects a malformed ext: spec before any corpus work: the
+// flags that may name an external agent each parse the same way the
+// registry will.
+func validateSpecs(o options) error {
+	specs := append([]string{o.player, drafterSpec(o), builderSpec(o)}, playerList(o.opponentPlayers)...)
+	for _, spec := range specs {
+		if !extern.IsSpec(spec) {
+			continue
+		}
+		if _, _, err := extern.ParseSpec(spec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// extOptions translates the -ext-* flags into extern session options. Log
+// (the sessions' death and end lines) goes to errOut when it is set; the
+// child stderr keeps extern's own default.
+func extOptions(o options) extern.Options {
+	eo := extern.Options{
+		Flush:          extern.FlushMode(o.extFlush),
+		MaxBatch:       o.extMaxBatch,
+		OnFailure:      extern.Failure(o.extFail),
+		StrictRefusals: o.extStrict,
+	}
+	if o.errOut != nil {
+		w := o.errOut
+		eo.Log = func(line string) { fmt.Fprintln(w, line) }
+	}
+	return eo
+}
+
+// printExternStats writes one line per dialed external agent, in dial
+// order, to errOut (nil discards).
+func printExternStats(o options, reg *extern.Registry) {
+	if o.errOut == nil {
+		return
+	}
+	for _, a := range reg.Agents() {
+		s := a.Stats()
+		fmt.Fprintf(o.errOut,
+			"extern %s: picks %d builds %d decides %d batches %d max-batch %d forced %d refused %d fallbacks %d\n",
+			a.Ref(), s.Picks, s.Builds, s.Decides, s.Batches, s.MaxBatch, s.Forced, s.Refused, s.Fallbacks)
+	}
 }
 
 // stepRandomGames plays -random-games Bo1 games between two random decks
@@ -179,15 +286,12 @@ func randomSealedDeck(l *draftlab.Lab, o options, coll setdata.Collation, s uint
 	return l.RandomDeck(pool, s)
 }
 
-// stepSealedBuilds builds a best23@1 deck from each of -sealed sealed
-// pools. The decks carry no draft_id: they were not drafted.
-func stepSealedBuilds(l *draftlab.Lab, o options, coll setdata.Collation) ([]draftlab.Deck, error) {
+// stepSealedBuilds builds a deck from each of -sealed sealed pools with
+// the run's builder (default best23@1). The decks carry no draft_id: they
+// were not drafted.
+func stepSealedBuilds(l *draftlab.Lab, o options, coll setdata.Collation, builder draftlab.NamedBuilder) ([]draftlab.Deck, error) {
 	if o.sealed == 0 {
 		return nil, nil
-	}
-	b, err := l.Builder(draftlab.AgentRef{Name: "best23", Version: "1"})
-	if err != nil {
-		return nil, err
 	}
 	decks := make([]draftlab.Deck, 0, o.sealed)
 	for i := 0; i < o.sealed; i++ {
@@ -195,7 +299,7 @@ func stepSealedBuilds(l *draftlab.Lab, o options, coll setdata.Collation) ([]dra
 		if err != nil {
 			return nil, fmt.Errorf("sealed pool %d: %w", i, err)
 		}
-		d, err := l.Build(pool, b)
+		d, err := l.Build(pool, builder)
 		if err != nil {
 			return nil, fmt.Errorf("sealed build %d: %w", i, err)
 		}
@@ -206,19 +310,12 @@ func stepSealedBuilds(l *draftlab.Lab, o options, coll setdata.Collation) ([]dra
 }
 
 // stepPods runs -pods draft pods of -pod-seats seats under Swiss: the
-// rating-colour@1 drafter and best23@1 builder at every seat, the frozen
-// player piloting, each pod from its own derived event seed.
-func stepPods(l *draftlab.Lab, o options, coll setdata.Collation, player draftlab.NamedPlayer) ([]draftlab.EventResult, error) {
+// run's drafter and builder (defaults rating-colour@1 and best23@1) at
+// every seat, the frozen player piloting, each pod from its own derived
+// event seed.
+func stepPods(l *draftlab.Lab, o options, coll setdata.Collation, player draftlab.NamedPlayer, dr draftlab.NamedDrafter, bd draftlab.NamedBuilder) ([]draftlab.EventResult, error) {
 	if o.pods == 0 {
 		return nil, nil
-	}
-	dr, err := l.Drafter(draftlab.AgentRef{Name: "rating-colour", Version: "1"})
-	if err != nil {
-		return nil, err
-	}
-	bd, err := l.Builder(draftlab.AgentRef{Name: "best23", Version: "1"})
-	if err != nil {
-		return nil, err
 	}
 	pods := make([]draftlab.EventResult, 0, o.pods)
 	for k := 0; k < o.pods; k++ {
@@ -245,8 +342,9 @@ func stepPods(l *draftlab.Lab, o options, coll setdata.Collation, player draftla
 // the pod decks, capped by -gauntlet-heroes (0 = every built deck) — each
 // with the frozen player against the -opponents catalog's head
 // -opponent-count decks (clamped to the catalog's size), the
-// -opponent-players policies cycled over them, -games per pairing.
-func stepGauntlet(l *draftlab.Lab, o options, player draftlab.NamedPlayer, sealed []draftlab.Deck, pods []draftlab.EventResult) ([]draftlab.GauntletResult, error) {
+// -opponent-players policies (resolved through the registry, so they may
+// be ext: specs) cycled over them, -games per pairing.
+func stepGauntlet(l *draftlab.Lab, o options, reg *extern.Registry, player draftlab.NamedPlayer, sealed []draftlab.Deck, pods []draftlab.EventResult) ([]draftlab.GauntletResult, error) {
 	heroes := make([]draftlab.Deck, 0, len(sealed)+len(podDecks(pods)))
 	heroes = append(heroes, sealed...)
 	heroes = append(heroes, podDecks(pods)...)
@@ -268,13 +366,9 @@ func stepGauntlet(l *draftlab.Lab, o options, player draftlab.NamedPlayer, seale
 	}
 	var oppPlayers []draftlab.NamedPlayer
 	for _, name := range playerList(o.opponentPlayers) {
-		ref, err := draftlab.ParseAgent(name)
+		np, err := reg.Player(name)
 		if err != nil {
-			return nil, err
-		}
-		np, err := l.Player(ref)
-		if err != nil {
-			return nil, fmt.Errorf("opponent player %s: %w", ref, err)
+			return nil, fmt.Errorf("opponent player %s: %w", name, err)
 		}
 		oppPlayers = append(oppPlayers, np)
 	}
