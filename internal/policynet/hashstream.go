@@ -92,3 +92,20 @@ func (s *sink) h(h uint64, val float32) { s.fs = append(s.fs, Feature{Row: fnvRo
 func (s *sink) str(str string, val float32) {
 	s.fs = append(s.fs, Feature{Row: hashID(str), Value: val})
 }
+
+// fnvCounterString folds counterString(m) into h: "-" when empty, else
+// "Kind=v" in sorted key order joined by ",".
+func fnvCounterString(h uint64, m map[string]int32) uint64 {
+	if len(m) == 0 {
+		return fnvAdd(h, "-")
+	}
+	first := true
+	eachCounterSorted(m, func(k string, n int32) {
+		if !first {
+			h = fnvAdd(h, ",")
+		}
+		first = false
+		h = fnvAddInt(fnvAdd(fnvAdd(h, k), "="), int64(n))
+	})
+	return h
+}

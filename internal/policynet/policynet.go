@@ -182,15 +182,22 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 	dense[denseStackDepth] = float32(len(v.Stack))
 
 	sparse := buf.sparseBuf()
-	push := func(s string) { sparse = append(sparse, Feature{Row: hashID(s), Value: 1}) }
-	decorated := func(cv view.CardView) string {
-		return cv.Name + "|t" + bit(cv.Tapped) + "|a" + bit(cv.Attacking) +
-			"|s" + bit(cv.SummonSick) + "|c" + counterString(cv.Counters)
+	// Every id is hashed as it is streamed (hashstream.go): the row is
+	// hashID of the string spelt beside it, which is never built.
+	pushH := func(h uint64) { sparse = append(sparse, Feature{Row: fnvRow(h), Value: 1}) }
+	// "<name>|<tag>"
+	nameTag := func(name, tag string) { pushH(fnvAdd(fnvAdd(fnvAdd(fnvOffset, name), "|"), tag)) }
+	// "<name>|t<b>|a<b>|s<b>|c<counterString>"
+	decorated := func(cv *view.CardView) {
+		h := fnvAdd(fnvAdd(fnvAdd(fnvOffset, cv.Name), "|t"), bit(cv.Tapped))
+		h = fnvAdd(fnvAdd(h, "|a"), bit(cv.Attacking))
+		h = fnvAdd(fnvAdd(h, "|s"), bit(cv.SummonSick))
+		pushH(fnvCounterString(fnvAdd(h, "|c"), cv.Counters))
 	}
 	battleBlock := func(tag string, cards []view.CardView) {
-		for _, cv := range cards {
-			push(cv.Name + "|" + tag)
-			push(decorated(cv))
+		for i := range cards {
+			nameTag(cards[i].Name, tag)
+			decorated(&cards[i])
 		}
 	}
 
@@ -199,7 +206,8 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 	// cap at maxSeatBlocks (a fixed-width vector must); the sparse bag below
 	// iterates everyOther uncapped — its length is variable by design.
 	var me *view.PlayerView
-	var everyOther []*view.PlayerView
+	var othersBuf [8]*view.PlayerView
+	everyOther := othersBuf[:0]
 	for i := range v.Players {
 		pv := &v.Players[i]
 		if pv.ID == seat {
@@ -234,8 +242,8 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 
 	// Sparse bag, in the fixed zone order documented above.
 	if me := seats[0]; me != nil {
-		for _, cv := range me.Hand {
-			push(cv.Name + "|" + zoneTagHand)
+		for i := range me.Hand {
+			nameTag(me.Hand[i].Name, zoneTagHand)
 		}
 		battleBlock(zoneTagBattleMe, me.Battlefield)
 	}
@@ -243,27 +251,27 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 		battleBlock(zoneTagBattleOpp, pv.Battlefield)
 	}
 	if me := seats[0]; me != nil {
-		for _, cv := range me.Graveyard {
-			push(cv.Name + "|" + zoneTagGraveMe)
+		for i := range me.Graveyard {
+			nameTag(me.Graveyard[i].Name, zoneTagGraveMe)
 		}
 	}
 	for _, pv := range everyOther {
-		for _, cv := range pv.Graveyard {
-			push(cv.Name + "|" + zoneTagGraveOpp)
+		for i := range pv.Graveyard {
+			nameTag(pv.Graveyard[i].Name, zoneTagGraveOpp)
 		}
 	}
 	if me := seats[0]; me != nil {
-		for _, cv := range me.Exile {
-			push(cv.Name + "|" + zoneTagExileMe)
+		for i := range me.Exile {
+			nameTag(me.Exile[i].Name, zoneTagExileMe)
 		}
 	}
 	for _, pv := range everyOther {
-		for _, cv := range pv.Exile {
-			push(cv.Name + "|" + zoneTagExileOpp)
+		for i := range pv.Exile {
+			nameTag(pv.Exile[i].Name, zoneTagExileOpp)
 		}
 	}
-	for _, sv := range v.Stack {
-		push(sv.Name + "|" + zoneTagStack)
+	for i := range v.Stack {
+		nameTag(v.Stack[i].Name, zoneTagStack)
 	}
 
 	if me := seats[0]; me != nil {
