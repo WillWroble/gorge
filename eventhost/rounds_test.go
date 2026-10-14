@@ -2,6 +2,7 @@ package eventhost
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -38,6 +39,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		t.Fatal(err)
 	}
 	relay := &Relay{}
+	seriesHook := NewLazySeries()
 	ho := host.Options{
 		LoadDeck:              store.DeckLoader(corpus, nil),
 		Tokens:                corpus.Tokens,
@@ -46,6 +48,12 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		MaxDecisionsPerTurn:   host.DefaultMaxDecisionsPerTurn,
 		Dir:                   dir,
 		OnMatchEnd:            relay.OnMatchEnd,
+		// A Series table asks the lazy hook; the Host's Series is
+		// installed below, once the Host exists. New's resume advance can
+		// start series tables before that, and a call landing in the
+		// window parks on the lazy hook instead of reading no plan — a
+		// "no plan" answer would end the table and wedge the event.
+		Series: seriesHook.Series,
 	}
 	eo := Options{Store: store, Cards: corpus, Seed: func() uint64 { return 11 }}
 	if mut != nil {
@@ -62,6 +70,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		t.Fatal(err)
 	}
 	relay.Set(h.OnMatchEnd)
+	seriesHook.Set(h.Series)
 	p := &gamePair{h: h, reg: reg, store: store}
 	t.Cleanup(func() { h.Close(); reg.Close() })
 	return p
@@ -126,6 +135,21 @@ func TestRelayChains(t *testing.T) {
 	relay.Next = func(host.TableID, int, protocol.MatchInfo) error { return errors.New("next failed") }
 	if err := relay.OnMatchEnd("t", 1, protocol.MatchInfo{}); err == nil || err.Error() != "next failed" {
 		t.Fatalf("chained error = %v", err)
+	}
+
+	// Series before SetSeries answers no; after it, the target receives
+	// the call with its context, table and match number.
+	if g, ok, err := relay.Series(context.Background(), "t", 1); ok || err != nil || g.Chooser != 0 {
+		t.Fatalf("Series before SetSeries = %+v ok=%v err=%v", g, ok, err)
+	}
+	got := ""
+	relay.SetSeries(func(_ context.Context, t host.TableID, k int) (host.SeriesGame, bool, error) {
+		got = fmt.Sprintf("%s/%d", t, k)
+		return host.SeriesGame{Chooser: 2}, true, nil
+	})
+	if g, ok, err := relay.Series(context.Background(), "tt", 2); err != nil || !ok ||
+		g.Chooser != 2 || got != "tt/2" {
+		t.Fatalf("Series after SetSeries = %+v ok=%v err=%v got=%q", g, ok, err, got)
 	}
 }
 

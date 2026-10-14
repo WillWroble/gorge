@@ -16,7 +16,8 @@ func (r *run) stateFor(seat int) protocol.EventState {
 	st := protocol.EventState{
 		Event: r.meta.ID, Set: r.meta.Set,
 		Phase: string(r.ev.Phase()), Round: r.ev.Round(),
-		Error: firstNonEmpty(r.halted, r.blocked),
+		BestOf: r.bestOf(),
+		Error:  firstNonEmpty(r.halted, r.blocked),
 	}
 	if seat >= 0 {
 		s := seat
@@ -50,8 +51,23 @@ func (r *run) stateFor(seat int) protocol.EventState {
 	return st
 }
 
-// seriesFor builds one pairing's row for a viewer.
+// bestOf is the event's series format: meta.BestOf 0 or 1 mean Bo1 (a meta
+// written before the field existed, and Bo1 itself), 3 Bo3.
+func (r *run) bestOf() int {
+	if r.meta.BestOf == 3 {
+		return 3
+	}
+	return 1
+}
+
+// seriesFor builds one pairing's row for a viewer. A Bo3 event's rows add
+// the series' live games: score, per-game winners, the live game number
+// and its play/draw chooser, and — between games — the seats still to
+// submit their deck.
 func (r *run) seriesFor(seat int, results []event.SeriesOutcome, rd, a, b int) protocol.EventSeries {
+	if r.meta.BestOf == 3 {
+		return r.seriesForBo3(seat, results, rd, a, b)
+	}
 	ser := protocol.EventSeries{Round: rd, A: a, B: b, BestOf: 1}
 	for _, res := range results {
 		if res.Round == rd && res.A == a && res.B == b {
@@ -106,6 +122,83 @@ func (r *run) seriesFor(seat int, results []event.SeriesOutcome, rd, a, b int) p
 		return ser
 	}
 	ser.State = "pending"
+	return ser
+}
+
+// seriesForBo3 builds one Bo3 pairing's row for a viewer (E3-4). An ended
+// series shows its score, winner and per-game winners from the event's
+// results; a live one its in-flight game, chooser and running score; a
+// between one the next game, its chooser and the seats still to sideboard.
+// A Bo1 series row never carries these fields, so a Bo1 event's state JSON
+// is byte-identical to E1's.
+func (r *run) seriesForBo3(seat int, results []event.SeriesOutcome, rd, a, b int) protocol.EventSeries {
+	ser := protocol.EventSeries{Round: rd, A: a, B: b, BestOf: 3}
+	for _, res := range results {
+		if res.Round == rd && res.A == a && res.B == b {
+			ser.State = "ended"
+			ser.Score = res.Score
+			ser.Games = res.Games
+			if res.Winner >= 0 {
+				w := res.Winner
+				ser.Winner = &w
+			}
+			ser.Table = r.lastGameTable(rd, a, b)
+			return ser
+		}
+	}
+	if rd != r.ev.Round() || !r.ev.Started(a, b) {
+		ser.State = "pending"
+		return ser
+	}
+	v, ok := r.ev.SeriesState(a, b)
+	if !ok {
+		ser.State = "pending"
+		return ser
+	}
+	ser.Score = v.Wins
+	ser.Games = v.Games
+	if v.InFlight != nil {
+		ser.State = "live"
+		ser.Table, ser.Attempt = v.InFlight.Table, v.InFlight.Attempt
+		ser.Game = v.InFlight.Game
+		if v.InFlight.Chooser >= 0 {
+			c := v.InFlight.Chooser
+			ser.Chooser = &c
+		}
+		if (seat == a || seat == b) && r.tokens != nil {
+			if tok, ok := r.tokens[host.TableID(ser.Table)]; ok && tok != "" {
+				slot := 0
+				if seat == b {
+					slot = 1
+				}
+				ser.Join = fmt.Sprintf("/t/%s?seat=%d&token=%s", ser.Table, slot, tok)
+			}
+		}
+		return ser
+	}
+	if v.Between {
+		ser.State = "between"
+		ser.Table = r.lastGameTable(rd, a, b)
+		ser.Game = v.NextGame
+		if v.NextChooser >= 0 {
+			c := v.NextChooser
+			ser.Chooser = &c
+		}
+		for side, s := range []int{a, b} {
+			if v.Locked[side] == 0 {
+				ser.Waiting = append(ser.Waiting, s)
+			}
+		}
+		return ser
+	}
+	// Started, next game not yet on the log (its GameStarted is between
+	// here and the table): live like a Bo1 series awaiting its table.
+	ser.State = "live"
+	ser.Game = v.NextGame
+	if v.NextGame > 1 && v.NextChooser >= 0 {
+		c := v.NextChooser
+		ser.Chooser = &c
+	}
 	return ser
 }
 

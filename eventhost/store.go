@@ -29,6 +29,11 @@ type meta struct {
 	Seed      uint64      `json:"seed"`
 	Seats     [4]metaSeat `json:"seats"`
 	CreatedAt time.Time   `json:"created_at,omitempty"`
+	// BestOf is the event's series format: 1 (Bo1, the default, stored
+	// omitted) or 3 (Bo3, E3-4). Stored so a restart replays the same
+	// format; the log's SeriesStarted/GameStarted entries re-derive the
+	// game state either way.
+	BestOf int `json:"best_of,omitempty"`
 }
 
 // metaSeat is one stored seat. Kind is "human" or "bot"; Name is the human
