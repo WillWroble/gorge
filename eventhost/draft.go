@@ -67,7 +67,7 @@ func (r *run) advanceLobby() bool {
 		seats[i] = spec
 	}
 	if err := r.apply(event.Entry{
-		Kind: event.KindEventCreated, Seed: r.meta.Seed, Set: r.meta.Set, Seats: seats,
+		Kind: event.KindEventCreated, Seed: r.meta.Seed, Set: r.meta.Set, Seats: seats[:],
 	}); err != nil {
 		return false
 	}

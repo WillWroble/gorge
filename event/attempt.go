@@ -1,7 +1,6 @@
 package event
 
 import (
-	"github.com/adams-shaun/gorge/limited/build"
 	"github.com/adams-shaun/gorge/limited/draft"
 )
 
@@ -147,7 +146,7 @@ func (e *Event) LogFor(viewer int) []Entry {
 				}
 			case KindDeckSaved:
 				if en.Seat != viewer {
-					en.Deck = build.Deck{}
+					en.Deck = nil
 				}
 			case KindGameStarted:
 				en.GameSeed = 0

@@ -25,6 +25,9 @@ type EventService interface {
 	Ready(id, token string, req protocol.ReadyRequest) (protocol.EventState, error)
 	EventLog(id, token string) (protocol.EventLog, error)
 	SubscribeEvent(id, token, session string) error
+	// The two discovery endpoints (E1-8).
+	Sets() []protocol.EventSetInfo
+	Personas() protocol.EventPersonas
 }
 
 // eventStatusCoder is the error shape the backend reports its protocol
@@ -54,6 +57,15 @@ func (h *handler) mountEvents(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/events/{id}/ready", h.eventReady)
 	mux.HandleFunc("GET /api/events/{id}/log", h.eventLog)
 	mux.HandleFunc("POST /api/events/{id}/subscribe", h.eventSubscribe)
+	mux.HandleFunc("GET /api/events/sets", h.eventSets)
+	mux.HandleFunc("GET /api/events/personas", h.eventPersonas)
+	// The two literals' method twins are registered per method: a
+	// method-less twin of /api/events/sets would conflict with
+	// GET /api/events/{id} in the mux (more specific path, broader method
+	// set). A POST twin answers 405; any other method falls through to the
+	// method-less /api/events/{id} twin below, which also answers 405.
+	mux.HandleFunc("POST /api/events/sets", methodNotAllowed)
+	mux.HandleFunc("POST /api/events/personas", methodNotAllowed)
 	// Method-less twins of every pattern above: the mux prefers the
 	// method-specific pattern, so these only ever see the wrong method and
 	// answer 405 in JSON.
@@ -206,6 +218,21 @@ func (h *handler) eventSubscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// eventSets answers GET /api/events/sets with the draftable set catalogue.
+func (h *handler) eventSets(w http.ResponseWriter, r *http.Request) {
+	sets := h.opts.Events.Sets()
+	if sets == nil {
+		sets = []protocol.EventSetInfo{}
+	}
+	writeJSON(w, http.StatusOK, sets)
+}
+
+// eventPersonas answers GET /api/events/personas with the pickbot persona
+// names a create body's Drafter fields accept.
+func (h *handler) eventPersonas(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.opts.Events.Personas())
 }
 
 // eventToken reads the event seat token the way cmd/gorged reads a seat

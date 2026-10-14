@@ -63,7 +63,7 @@ func (r *run) saveDeck(seat int, d build.Deck) (int, error) {
 		r.halted = fmt.Sprintf("event %s: persistence failed: %v", r.meta.ID, err)
 		return 0, errUnavailable("%s", r.halted)
 	}
-	if err := r.apply(event.Entry{Kind: event.KindDeckSaved, Seat: seat, Rev: rev, Deck: d}); err != nil {
+	if err := r.apply(event.Entry{Kind: event.KindDeckSaved, Seat: seat, Rev: rev, Deck: &d}); err != nil {
 		return 0, err
 	}
 	return rev, nil
@@ -94,7 +94,7 @@ func (h *Host) EventPool(id, token string) (protocol.EventPool, error) {
 func (r *run) poolFor(seat int) protocol.EventPool {
 	out := protocol.EventPool{
 		Event: r.meta.ID, Seat: seat,
-		Pool:  draftCards(r.ev.Pool(seat)),
+		Pool:  r.draftCards(r.ev.Pool(seat)),
 		Rev:   r.ev.SavedRev(seat),
 		Ready: r.ev.ReadyRev(seat) != 0,
 	}
@@ -126,6 +126,10 @@ func (h *Host) CheckDeck(id, token string, req protocol.DeckRequest) (protocol.D
 	if r.ev.Phase() == event.PhaseLobby {
 		return protocol.DeckCheck{}, errConflict("eventhost: the event has not drafted yet (phase %s)", r.ev.Phase())
 	}
+	// No markAct here: CheckDeck is a read-only check, and a client that
+	// only polls it must not keep an otherwise-idle event live past its
+	// idle window. Only state-changing actions (join, pick, save, ready)
+	// refresh the window.
 	return r.deckCheck(seat, req), nil
 }
 
@@ -162,6 +166,7 @@ func (h *Host) SaveDeck(id, token string, req protocol.DeckRequest) (protocol.De
 		return protocol.DeckCheck{}, serr
 	}
 	r.advance()
+	r.markAct(seat, r.h.opts.Now())
 	r.broadcast()
 	out := r.deckCheck(seat, req)
 	out.Rev = rev
@@ -199,5 +204,6 @@ func (h *Host) Ready(id, token string, req protocol.ReadyRequest) (protocol.Even
 		r.advance()
 		r.broadcast()
 	}
+	r.markAct(seat, r.h.opts.Now())
 	return r.stateFor(seat), nil
 }

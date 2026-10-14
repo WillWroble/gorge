@@ -37,6 +37,12 @@ const (
 	KindEventEnded    Kind = "EventEnded"
 	KindGameStarted   Kind = "GameStarted"
 	KindGameAborted   Kind = "GameAborted"
+	// The two timeout entries (E1-8) are appended after every earlier kind.
+	// A LobbyTimeout cancels an event nobody joined in time; an IdleTimeout
+	// marks one seat the host acted for because its human went quiet. The
+	// timer appends entries only; replay never reads the clock.
+	KindLobbyTimeout Kind = "LobbyTimeout"
+	KindIdleTimeout  Kind = "IdleTimeout"
 )
 
 // Entry is one log entry: a Kind discriminator plus the fields of that
@@ -48,9 +54,9 @@ type Entry struct {
 	Kind Kind `json:"kind"`
 
 	// Seed, Set and Seats are the EventCreated fields.
-	Seed  uint64      `json:"seed,omitempty"`
-	Set   string      `json:"set,omitempty"`
-	Seats [4]SeatSpec `json:"seats,omitempty"`
+	Seed  uint64     `json:"seed,omitempty"`
+	Set   string     `json:"set,omitempty"`
+	Seats []SeatSpec `json:"seats,omitempty"`
 
 	// Round is the 1-based draft round or event round the entry belongs to.
 	Round int `json:"round,omitempty"`
@@ -78,8 +84,9 @@ type Entry struct {
 	// Cards is a PackOpened's full CardRef list, logged when the pack is
 	// opened so a replay survives a later change to the set data.
 	Cards []limited.CardRef `json:"cards,omitempty"`
-	// Deck is a DeckSaved's deck list.
-	Deck build.Deck `json:"deck,omitempty"`
+	// Deck is a DeckSaved's deck list. A nil deck means no deck (a
+	// redacted LogFor line, or a non-DeckSaved entry).
+	Deck *build.Deck `json:"deck,omitempty"`
 	// Winner is the GameEnded winner's seat, or nil for a draw.
 	Winner *int `json:"winner,omitempty"`
 	// Score is a SeriesEnded's [A wins, B wins].
@@ -106,8 +113,13 @@ func cloneEntry(en Entry) Entry {
 	if en.Cards != nil {
 		en.Cards = append([]limited.CardRef(nil), en.Cards...)
 	}
-	if en.Deck.Main != nil {
-		en.Deck.Main = append([]string(nil), en.Deck.Main...)
+	if en.Deck != nil {
+		d := *en.Deck
+		d.Main = append([]string(nil), d.Main...)
+		en.Deck = &d
+	}
+	if en.Seats != nil {
+		en.Seats = append([]SeatSpec(nil), en.Seats...)
 	}
 	if en.Winner != nil {
 		w := *en.Winner
@@ -151,7 +163,8 @@ func ParseLog(data []byte) ([]Entry, error) {
 		switch en.Kind {
 		case KindEventCreated, KindPackOpened, KindPicked, KindDeckSaved,
 			KindReady, KindSeriesStarted, KindGameEnded, KindSeriesEnded,
-			KindEventEnded, KindGameStarted, KindGameAborted:
+			KindEventEnded, KindGameStarted, KindGameAborted,
+			KindLobbyTimeout, KindIdleTimeout:
 		default:
 			return nil, fmt.Errorf("event: parse log line %d: unknown kind %q", i+1, en.Kind)
 		}

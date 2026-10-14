@@ -15,12 +15,15 @@ import (
 type Phase string
 
 // The lifecycle phases. LOBBY is a fresh event before its EventCreated;
-// COMPLETE is reached only through the EventEnded entry.
+// COMPLETE is reached only through the EventEnded entry; CANCELLED (E1-8)
+// is reached only through the LobbyTimeout entry, when nobody joined an
+// event within its lobby window.
 const (
-	PhaseLobby    Phase = "LOBBY"
-	PhaseDraft    Phase = "DRAFT"
-	PhaseBuild    Phase = "BUILD"
-	PhaseComplete Phase = "COMPLETE"
+	PhaseLobby     Phase = "LOBBY"
+	PhaseDraft     Phase = "DRAFT"
+	PhaseBuild     Phase = "BUILD"
+	PhaseComplete  Phase = "COMPLETE"
+	PhaseCancelled Phase = "CANCELLED"
 )
 
 // RoundPhase spells the phase of event round r (1..3).
@@ -260,6 +263,10 @@ func (e *Event) apply(en *Entry) error {
 		return e.applyGameStarted(en)
 	case KindGameAborted:
 		return e.applyGameAborted(en)
+	case KindLobbyTimeout:
+		return e.applyLobbyTimeout(en)
+	case KindIdleTimeout:
+		return e.applyIdleTimeout(en)
 	default:
 		return fmt.Errorf("event: unknown entry kind %q", en.Kind)
 	}
@@ -293,6 +300,9 @@ func (e *Event) applyEventCreated(en *Entry) error {
 	if en.Set == "" {
 		return fmt.Errorf("event: EventCreated: set code is empty")
 	}
+	if len(en.Seats) != draft.Seats {
+		return fmt.Errorf("event: EventCreated: got %d seats, want %d", len(en.Seats), draft.Seats)
+	}
 	for i, s := range en.Seats {
 		if s.Kind == "" {
 			return fmt.Errorf("event: EventCreated: seat %d has no kind", i)
@@ -303,7 +313,9 @@ func (e *Event) applyEventCreated(en *Entry) error {
 	}
 	e.seed = en.Seed
 	e.set = en.Set
-	e.seats = en.Seats
+	for i, s := range en.Seats {
+		e.seats[i] = s
+	}
 	e.cooked = true
 	e.phase = PhaseDraft
 	return nil
@@ -413,10 +425,13 @@ func (e *Event) applyDeckSaved(en *Entry) error {
 	if en.Rev != len(e.decks[en.Seat])+1 {
 		return fmt.Errorf("event: DeckSaved: seat %d revision %d is not the next revision", en.Seat, en.Rev)
 	}
-	if err := build.Validate(e.Pool(en.Seat), en.Deck); err != nil {
+	if en.Deck == nil {
+		return fmt.Errorf("event: DeckSaved: seat %d has no deck", en.Seat)
+	}
+	if err := build.Validate(e.Pool(en.Seat), *en.Deck); err != nil {
 		return fmt.Errorf("event: DeckSaved: seat %d: %w", en.Seat, err)
 	}
-	d := en.Deck
+	d := *en.Deck
 	d.Main = append([]string(nil), d.Main...)
 	e.decks[en.Seat] = append(e.decks[en.Seat], savedDeck{rev: en.Rev, deck: d})
 	e.ready[en.Seat] = 0 // a new revision must be readied again

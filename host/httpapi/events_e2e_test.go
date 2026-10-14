@@ -256,8 +256,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 	}
 
 	// Create the event: seat 0 human, seats 1-3 bots on three policies.
-	seed := uint64(5)
-	req := protocol.CreateEventRequest{Set: "FDN", Seed: &seed, Seats: []protocol.CreateEventSeat{
+	req := protocol.CreateEventRequest{Set: "FDN", Seats: []protocol.CreateEventSeat{
 		{Kind: "human"}, {Kind: "bot", Policy: "bot"},
 		{Kind: "bot", Policy: "lethal-pressure"}, {Kind: "bot", Policy: "cast-profile"},
 	}}

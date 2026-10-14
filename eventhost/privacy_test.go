@@ -14,7 +14,7 @@ import (
 // pack or pool before COMPLETE.
 func TestSeatResponsesHideOtherSeatsPacks(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	p := packOf(t, h, resp.Event, tok)

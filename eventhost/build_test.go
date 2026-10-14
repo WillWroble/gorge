@@ -26,8 +26,6 @@ func TestBotOnlyEventReachesRound1(t *testing.T) {
 	}
 	h, corpus := newHost(t, func(o *Options) { o.Store = store })
 	req := protocol.CreateEventRequest{Set: "FDN"}
-	seed := uint64(7)
-	req.Seed = &seed
 	for _, p := range []string{"bot", "lethal-pressure", "cast-profile", "bot"} {
 		req.Seats = append(req.Seats, protocol.CreateEventSeat{Kind: "bot", Policy: p})
 	}
@@ -59,7 +57,7 @@ func TestBotOnlyEventReachesRound1(t *testing.T) {
 
 func TestHumanBuildFlow(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	id, tok := resp.Event, func() string { tk, _ := humanToken(t, resp); return tk }()
 	if _, err := h.EventPool(id, tok); err == nil {
 		t.Fatal("EventPool before the draft succeeded")
@@ -225,7 +223,7 @@ func TestDeckLoaderChains(t *testing.T) {
 
 func TestEventLogRedactedForSeat(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	id, tok := resp.Event, func() string { tk, _ := humanToken(t, resp); return tk }()
 	joinOK(t, h, id, tok, "Ann")
 	pickTop(t, h, id, tok, 64)
@@ -310,7 +308,7 @@ func TestResumeMidBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	pickTop(t, h, resp.Event, tok, 64)
@@ -356,7 +354,7 @@ func TestResumeMidBuild(t *testing.T) {
 // never carries another seat's cards before COMPLETE.
 func TestBuildResponsesHideOtherSeatsPools(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	pickTop(t, h, resp.Event, tok, 64)

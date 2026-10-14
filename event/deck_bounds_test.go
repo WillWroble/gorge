@@ -70,7 +70,7 @@ func TestDeckSavedRejectsOutOfBoundsDecks(t *testing.T) {
 		{"overflowing count", build.Deck{Basics: [5]int{1 << 62, 0, 0, 0, 0}}},
 	}
 	for _, tc := range cases {
-		if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: tc.deck}); err == nil {
+		if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: &tc.deck}); err == nil {
 			t.Errorf("DeckSaved with %s: want error, got nil", tc.name)
 		}
 	}
@@ -78,7 +78,7 @@ func TestDeckSavedRejectsOutOfBoundsDecks(t *testing.T) {
 	// The handler still accepts a legal deck, so the rejections above are
 	// the bounds and not a broken apply path.
 	legal := build.Deck{Main: mainOf(35), Basics: [5]int{5, 0, 0, 0, 0}}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: legal}); err != nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: &legal}); err != nil {
 		t.Fatalf("DeckSaved with a legal 40-card deck: %v", err)
 	}
 	if _, ok := e.SavedDeck(0); !ok {

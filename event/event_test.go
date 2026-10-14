@@ -33,8 +33,8 @@ func packCards(round, seat int) []limited.CardRef {
 }
 
 // testSeats are four bot entrants.
-func testSeats() [4]event.SeatSpec {
-	return [4]event.SeatSpec{
+func testSeats() []event.SeatSpec {
+	return []event.SeatSpec{
 		{Kind: "bot", Name: "bot-a", Persona: "persona-a"},
 		{Kind: "bot", Name: "bot-b", Persona: "persona-b"},
 		{Kind: "bot", Name: "bot-c", Persona: "persona-c"},
@@ -134,7 +134,7 @@ func newScriptedEvent(t *testing.T) *event.Event {
 		if build.Validate(pool, d) != nil {
 			t.Fatalf("seat %d scripted deck invalid: %v", s, build.Validate(pool, d))
 		}
-		mustApply(t, e, event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: d})
+		mustApply(t, e, event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: &d})
 		mustApply(t, e, event.Entry{Kind: event.KindReady, Seat: s, Rev: 1})
 	}
 	for r := 1; r <= draft.Rounds; r++ {
@@ -413,7 +413,7 @@ func newScriptedEventToRound1(t *testing.T) *event.Event {
 		for _, c := range pool[:35] {
 			d.Main = append(d.Main, c.ID)
 		}
-		mustApply(t, e, event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: d})
+		mustApply(t, e, event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: &d})
 		mustApply(t, e, event.Entry{Kind: event.KindReady, Seat: s, Rev: 1})
 	}
 	return e
@@ -451,20 +451,20 @@ func TestDeckGuards(t *testing.T) {
 
 	// A too-small deck fails build.Validate.
 	small := build.Deck{Main: []string{pool[0].ID}, Basics: [5]int{5}}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: small}); err == nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: &small}); err == nil {
 		t.Errorf("DeckSaved with a 6-card deck: want error")
 	}
 	// A maindeck card from another seat's pool is rejected.
 	stranger := build.Deck{Main: []string{e.Pool(1)[0].ID}, Basics: [5]int{39}}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: stranger}); err == nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: &stranger}); err == nil {
 		t.Errorf("DeckSaved with a card from another pool: want error")
 	}
 	// Revision numbering is enforced.
 	ok := build.Deck{Main: []string{pool[0].ID}, Basics: [5]int{39}}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 2, Deck: ok}); err == nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 2, Deck: &ok}); err == nil {
 		t.Errorf("DeckSaved rev 2 before rev 1: want error")
 	}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: ok}); err != nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 1, Deck: &ok}); err != nil {
 		t.Fatalf("DeckSaved rev 1: %v", err)
 	}
 	if err := e.Apply(event.Entry{Kind: event.KindReady, Seat: 0, Rev: 3}); err == nil {
@@ -476,7 +476,7 @@ func TestDeckGuards(t *testing.T) {
 	if err := e.Apply(event.Entry{Kind: event.KindReady, Seat: 0, Rev: 1}); err == nil {
 		t.Errorf("second Ready: want error")
 	}
-	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 2, Deck: ok}); err != nil {
+	if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: 0, Rev: 2, Deck: &ok}); err != nil {
 		t.Fatalf("DeckSaved rev 2 after readying: %v", err)
 	}
 	if err := e.Apply(event.Entry{Kind: event.KindEventEnded}); err == nil {
