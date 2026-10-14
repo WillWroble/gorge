@@ -6,6 +6,8 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -429,6 +431,51 @@ func foldClonePermanent(g *state.Game, e *Event) {
 		o.CopyGainThisAbility = true
 	} else {
 		o.CopyGainThisAbility = false
+	}
+	// A Clone's conditional keyword rider (CloneParams.IfNew; Flesh
+	// Duplicate's "vanishing 3 if that creature doesn't have vanishing",
+	// CR 707.9b) rides Counter's "ifnew " payload, the lines semicolon-
+	// joined. The condition was evaluated at resolution against the source's
+	// printed face; the fold applies the granted lines' expansion onto the
+	// copy basis face, so a replay rebuilds the identical face and every
+	// downstream reader -- the entry counter fold, the trigger walk, the
+	// keyword census -- sees a printed-shaped face. The compile whitelist
+	// (effects/cloneETBShapeOK) admits only heads cards can expand, so the
+	// false return is a defensive skip.
+	if kw, ok := strings.CutPrefix(e.Counter, "ifnew "); ok {
+		// sf is a SHALLOW value copy: for a plain battlefield creature its
+		// Face backing fields -- SVars, Keywords, Triggers, Repls -- alias
+		// the copied template's face, which for a printed card is the
+		// SHARED corpus face (state/object.go returns o.Card.Faces[i]).
+		// ApplyKeywordExpansion appends to Keywords/Triggers/Repls and
+		// setSVar writes the SVars map it binds from, so without a copy
+		// the expansion would mutate the process-global corpus face --
+		// cross-match contamination on a live server, and a latent
+		// concurrent-map race on the shared cards.SharedCorpus. Deep-copy
+		// the mutable fields before expanding (the gain-this-ability arm
+		// above already does this for SVars).
+		if len(sf.SVars) > 0 {
+			svars := make(map[string]string, len(sf.SVars))
+			for k, v := range sf.SVars {
+				svars[k] = v
+			}
+			sf.SVars = svars
+		}
+		sf.Keywords = append([]string(nil), sf.Keywords...)
+		sf.Triggers = append([]cards.Trigger(nil), sf.Triggers...)
+		sf.Repls = append([]cards.Repl(nil), sf.Repls...)
+		for line := range strings.SplitSeq(kw, ";") {
+			if line != "" {
+				sf.ApplyKeywordExpansion(line)
+			}
+		}
+		// The expansion minted triggers (a granted vanishing's upkeep and
+		// last-counter lines) the copied source's compiled row knows
+		// nothing about: the value-copied binding would gate the minted
+		// triggers off the source's empty interest set forever. Drop the
+		// binding so the synthetic face takes the computed paths a token
+		// face takes.
+		sf.ForgetCompiled()
 	}
 	o.SetCopyFace(&sf)
 }

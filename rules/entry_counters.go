@@ -224,7 +224,44 @@ func (e *Engine) entryBodyCandidates(ev *events.Event) bool {
 			return true
 		}
 	}
+	// An ETB clone whose conditional-keyword rider grants entry counters
+	// (Flesh Duplicate's vanishing, CR 707.9b) stages this entry too; see
+	// entryBodyCounterGrants's rider scan for the derivation.
+	for i := range f.Repls {
+		r := &f.Repls[i]
+		if r.Event != "Moved" || r.With == nil || r.With.API != "Clone" ||
+			r.ParamStr(cards.PKKeyword) != "ETBReplacement" {
+			continue
+		}
+		tpl := e.cloneRiderTemplate(ev.Obj)
+		if tpl == nil {
+			continue
+		}
+		for _, kw := range effects.CloneIfNew(r.With) {
+			if tpl.Face().HasKeyword(cards.KeywordHead(kw)) {
+				continue
+			}
+			if counters, complete := cards.KeywordEntryCounters(kw); complete && len(counters) > 0 {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// cloneRiderTemplate is the chosen copy template of an entry whose as-enters
+// clone election was answered for a template (the decline carries none), or
+// nil. The template's printed face is what CR 707.9b's conditional compares.
+func (e *Engine) cloneRiderTemplate(entrant state.ObjID) *state.Object {
+	o := e.G.Obj(entrant)
+	if o == nil || !o.ETBCloneChoiceValid {
+		return nil
+	}
+	tpl := e.G.Obj(o.ETBCloneChoice)
+	if tpl == nil || tpl.Face() == nil {
+		return nil
+	}
+	return tpl
 }
 
 // entryBodyKindEncodable reports whether a PutCounter|ETB$ True body's
@@ -404,6 +441,50 @@ func (e *Engine) entryBodyCounterGrants(ev events.Event, entrant state.ObjID) ([
 			continue
 		}
 		absorb(replMatch{id: entrant, face: f, repl: r})
+	}
+	// The ETB clone's conditional-keyword riders (effects CloneParams.IfNew;
+	// Flesh Duplicate's `AddKeywords$ IfNew Vanishing:3` -- "vanishing 3 if
+	// that creature doesn't have vanishing", CR 707.9b) grant their counters
+	// here rather than through the basis face, because the clone body applies
+	// the copy face only AFTER the move folds (composeUpdatedReplacements:
+	// the Updated bodies run post-fold), so a repl on the swapped basis face
+	// is never collected for this entry. The rider's own expansion names the
+	// counters (cards.KeywordEntryCounters), the condition compares the
+	// CHOSEN template's printed face -- the copiable characteristics the
+	// fold will snapshot -- and the grant folds into the move's Pairs
+	// payload exactly as a printed body's would. The granted keyword's
+	// repl-based machinery (upkeep and last-counter triggers) rides the
+	// basis face the fold applies; only the entry placement needed this
+	// bridge.
+	for i := range f.Repls {
+		r := &f.Repls[i]
+		if r.Event != "Moved" || r.With == nil || r.With.API != "Clone" ||
+			r.ParamStr(cards.PKKeyword) != "ETBReplacement" ||
+			!e.replacementMatches(*r, entrant, matchEv) {
+			continue
+		}
+		tpl := e.cloneRiderTemplate(entrant)
+		if tpl == nil {
+			continue
+		}
+		for _, kw := range effects.CloneIfNew(r.With) {
+			if tpl.Face().HasKeyword(cards.KeywordHead(kw)) {
+				// The copied template already carries the keyword: the
+				// exception does not apply (CR 707.9b), and its own printed
+				// machinery is the one grant.
+				continue
+			}
+			counters, complete := cards.KeywordEntryCounters(kw)
+			if !complete {
+				continue
+			}
+			for _, c := range counters {
+				if c.N <= 0 || !events.EntryCounterKindEncodable(c.Kind) {
+					continue
+				}
+				grants = append(grants, entryGrant{kind: c.Kind, amount: c.N})
+			}
+		}
 	}
 	// A minted token's foreign entry bodies match the synthetic ZCeased-origin
 	// move applyTokenEntryUpdates reads, so an Origin$-scoped line absorbs

@@ -82,10 +82,16 @@ type CloneParams struct {
 	AddTriggers  []string
 	StaticNames  []string
 	// AddKeywords and PumpKeywords are the keyword lists; PumpDuration is
-	// PumpDuration$.
+	// PumpDuration$. IfNew are AddKeywords$'s "IfNew <keyword>" conditional
+	// riders, split out at compile: each member is the INNER keyword line
+	// ("Vanishing:3") the copy gains only when the copied template's printed
+	// face does not already carry that keyword's head (CR 707.9b; Flesh
+	// Duplicate is the corpus's only instance). AddKeywords keeps the
+	// unconditional members, which ride the ordinary layer-6 grant.
 	AddKeywords  []string
 	PumpKeywords []string
 	PumpDuration string
+	IfNew        []string
 	// NewName is NewName$; GainThisAbility is GainThisAbility$ True.
 	NewName         string
 	GainThisAbility bool
@@ -232,7 +238,7 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.StaticNames = strings.FieldsFunc(sa.ParamStr(cards.PKAddStaticAbilities), func(r rune) bool {
 		return r == ',' || r == ' ' || r == '\t' || r == '\n'
 	})
-	p.AddKeywords = cards.SplitKeywordList(sa.ParamStr(cards.PKAddKeywords))
+	p.AddKeywords, p.IfNew = cloneSplitIfNew(cards.SplitKeywordList(sa.ParamStr(cards.PKAddKeywords)))
 	p.PumpKeywords = cards.SplitKeywordList(sa.ParamStr(cards.PKPumpKeywords))
 	p.PumpDuration = strings.TrimSpace(sa.ParamStr(cards.PKPumpDuration))
 	p.NewName = strings.TrimSpace(rawParamText(sa, "NewName").Text)
@@ -262,6 +268,15 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	return p
 }
 
+// CloneIfNew returns the conditional keyword riders of an api:Clone body,
+// each already trimmed of Forge's "IfNew " prefix (Flesh Duplicate's
+// `AddKeywords$ IfNew Vanishing:3`). The entry-counter machinery reads them
+// at the entry's body scan (rules/entry_counters.go): the clone body applies
+// the copy basis face only after the move folds, so a rider's counters are
+// derived from the rider itself, its condition compared against the chosen
+// template's printed face.
+func CloneIfNew(sa *cards.SA) []string { return CloneOf(sa).IfNew }
+
 // cloneETBShapeOK is ETBShapeOK's computation: rules' etbCloneWhitelist's
 // POSITIVE key whitelist (Choices$, AddKeywords$, AddTypes$,
 // SpellDescription$, AddStaticAbilities$, IntoPlayTapped$, AddTriggers$,
@@ -282,10 +297,56 @@ func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
 			return false
 		}
 	}
+	for _, kw := range p.IfNew {
+		// The conditional rider's inner keyword must be a single-word head
+		// the fold-time expansion can mint on the copy basis face
+		// (cards.ApplyKeywordExpansion), and its entry-counter grants must be
+		// fully derivable from the line AND nonempty (cards.
+		// KeywordEntryCounters) -- the counters are folded into the move's
+		// Pairs payload from the rider, before the basis face exists, so a
+		// rider that names no counters or names them underivably fails
+		// closed. The body stays withheld and the carrier keeps its loud
+		// fallback, the same boundary every out-of-scope ETB rider lives
+		// behind.
+		if strings.ContainsAny(cards.KeywordHead(kw), " \t") ||
+			!cards.KeywordExpandable(cards.KeywordHead(kw)) {
+			return false
+		}
+		cs, complete := cards.KeywordEntryCounters(kw)
+		if !complete || len(cs) == 0 {
+			return false
+		}
+	}
+	// The rider rides the ClonePermanent event's variant payload, whose
+	// Counter is already taken by the gain-this-ability provenance and whose
+	// basis face is resolved from the name universe on the chosen-name
+	// route (where the conditional's template face is not the copied face).
+	// A rider next to either is out of scope and fails closed.
+	if len(p.IfNew) > 0 && (p.GainThisAbility || p.CopyFromChosenName) {
+		return false
+	}
 	if _, ok := sa.Param(cards.PKIntoPlayTapped); ok && !p.IntoPlayTappedTrue {
 		return false
 	}
 	return true
+}
+
+// cloneSplitIfNew moves every "IfNew <keyword>" member of a Clone's
+// AddKeywords$ list into the conditional rider list and returns the
+// unconditional remainder. The prefix is Forge's spelling (Flesh Duplicate's
+// `AddKeywords$ IfNew Vanishing:3`); an "IfNew" member with no keyword after
+// it is not a rider this build can read, so it is dropped from the remainder
+// and kept as a rider with an empty keyword -- whose head check in
+// cloneETBShapeOK then fails closed.
+func cloneSplitIfNew(kws []string) (rest, ifNew []string) {
+	for _, kw := range kws {
+		if inner, ok := strings.CutPrefix(kw, "IfNew "); ok {
+			ifNew = append(ifNew, strings.TrimSpace(inner))
+			continue
+		}
+		rest = append(rest, kw)
+	}
+	return rest, ifNew
 }
 
 // CloneKnownKeys is a copy of cloneKnownKeys, for the census check.

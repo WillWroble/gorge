@@ -550,6 +550,13 @@ func effClone(h Host, c *Ctx, sa *cards.SA) {
 				ev.Counter = "gain-this-ability"
 				ev.Amount = cloneAbilityIndex
 			}
+		} else if kw := cloneIfNewPayload(h, c, cp, t.Obj); kw != "" {
+			// The conditional keyword riders (CR 707.9b, Flesh Duplicate's
+			// "vanishing 3 if that creature doesn't have vanishing") ride the
+			// ClonePermanent event as an "ifnew " payload; the fold expands
+			// them onto the copy basis face, where their printed-shaped
+			// entry counters and triggers are ordinary face machinery.
+			ev.Counter = "ifnew " + kw
 		}
 		h.Emit(ev)
 		for _, raw := range staticBodies {

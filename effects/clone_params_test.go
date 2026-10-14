@@ -69,9 +69,21 @@ func TestCompileClone(t *testing.T) {
 	if !CloneOf(&cards.SA{API: "Clone", Params: map[string]string{"Choices": "Creature.Other+cmcLEY"}}).ETBShapeOK {
 		t.Fatal("Mockingbird's cast-spend selector must pass the text-only ETB gate")
 	}
+	// The conditional-keyword rider is inside the scope when its entry
+	// counters derive from the line (Flesh Duplicate's vanishing; the
+	// granted head expands on the copy basis face).
+	if !CloneOf(&cards.SA{API: "Clone", Params: map[string]string{
+		"Choices": "Creature", "AddKeywords": "IfNew Vanishing:3"}}).ETBShapeOK {
+		t.Fatal("Flesh Duplicate's IfNew Vanishing:3 rider must pass the ETB gate")
+	}
 	for _, params := range []map[string]string{
 		{"Choices": "Creature.Other+cmcLEX"},
-		{"Choices": "Creature", "AddKeywords": "IfNew Vanishing:3"},
+		// A rider whose counters the line cannot name (non-literal count)
+		// fails closed, a counterless rider stays withheld, and a head with
+		// no expansion is out of scope outright.
+		{"Choices": "Creature", "AddKeywords": "IfNew Fading:X"},
+		{"Choices": "Creature", "AddKeywords": "IfNew Storm"},
+		{"Choices": "Creature", "AddKeywords": "IfNew Voltron"},
 		{"Choices": "Creature", "IntoPlayTapped": "False"},
 		{"Choices": "Creature", "ChoiceTitle": "Pick"},
 	} {
