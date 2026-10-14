@@ -193,7 +193,7 @@ func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag
 	st.Sparse = sk.fs
 	stableSortByRow(st.Sparse)
 	if fs == FeaturesEntity {
-		st.Cards, _ = entityCards(v, seat)
+		st.Cards = entityCardList(&v, seat)
 	}
 	return st
 }
@@ -230,7 +230,7 @@ func mzBucket(v int32, hi int32) string {
 	return formatInt(int64(v))
 }
 
-func hasKeyword(cv view.CardView, kw string) bool {
+func hasKeyword(cv *view.CardView, kw string) bool {
 	for _, k := range cv.Keywords {
 		if strings.EqualFold(k, kw) {
 			return true
@@ -318,10 +318,10 @@ func mzState(v view.View, seat state.PlayerID, sk *sink) {
 		for _, k := range cv.Keywords {
 			sk.h(fnvAddLower(crkw, k), 1)
 		}
-		if hasKeyword(*cv, "Flying") {
+		if hasKeyword(cv, "Flying") {
 			a.flyers++
 		}
-		canAttack := !cv.Tapped && (!cv.SummonSick || hasKeyword(*cv, "Haste")) && !hasKeyword(*cv, "Defender")
+		canAttack := !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, "Haste")) && !hasKeyword(cv, "Defender")
 		if canAttack {
 			sk.h(fnvAdd(zh, "canattack"), 1)
 			sk.h(fnvAddInt(fnvAdd(zh, "canattack|p"), p), 1)
@@ -450,7 +450,7 @@ func handCard(z string, cv *view.CardView, avail int32, sk *sink) {
 	mv := int32(mvOf(cv.ManaCost))
 	eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "type|"), t), 1) })
 	sk.h(fnvAddInt(fnvAdd(zh, "mv"), mzClamp(mv, 8)), 1)
-	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(*cv, "Flash")
+	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash")
 	if instant {
 		sk.h(fnvAdd(zh, "instant-speed"), 1)
 	}
