@@ -44,6 +44,16 @@ func triggerCostWindowAsk(t *testing.T, e *Engine) (pay, decline int) {
 	return pay, decline
 }
 
+// assertNoOptionalAsk pins the folded OptionalDecider$ (optionalFoldsIntoCost):
+// the next non-priority ask is the trigger-cost election, never a
+// trigger_optional yes/no in front of it.
+func assertNoOptionalAsk(t *testing.T, e *Engine) {
+	t.Helper()
+	if d := passUntilNonPriority(t, e, 20); d.Kind == decision.KTriggerOptional {
+		t.Fatalf("OptionalDecider$ was asked separately from the Cost$ election: %+v", d)
+	}
+}
+
 // answerPlayerTargetAsk drives until the pending target ask and submits the
 // option naming the given seat (the Kalastria ask's ValidTgts$ Player options).
 func answerPlayerTargetAsk(t *testing.T, e *Engine, seat state.PlayerID) {
@@ -84,12 +94,9 @@ func TestKalastriaTriggerCostPayChargesAndDrains(t *testing.T) {
 	killOnBattlefield(t, e, id)
 	answerPlayerTargetAsk(t, e, 1) // target the opponent
 
-	// The optional ask: "Apply this triggered ability's effect?" -- yes.
-	d := passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional || len(d.Options) == 0 || d.Options[0].Kind != "yes" {
-		t.Fatalf("expected the trigger_optional yes ask, got %+v", d)
-	}
-	submitChoices(t, e, 0)
+	// OptionalDecider$ You folds into the Cost$ election (optionalFoldsIntoCost):
+	// no "Apply this triggered ability's effect?" ask precedes the pay ask.
+	assertNoOptionalAsk(t, e)
 
 	pay, _ := triggerCostWindowAsk(t, e)
 	if pay < 0 {
@@ -123,11 +130,7 @@ func TestKalastriaTriggerCostDeclineChangesNothing(t *testing.T) {
 	killOnBattlefield(t, e, id)
 	answerPlayerTargetAsk(t, e, 1)
 
-	d := passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional {
-		t.Fatalf("expected the trigger_optional ask, got %+v", d)
-	}
-	submitChoices(t, e, 0)
+	assertNoOptionalAsk(t, e)
 
 	_, decline := triggerCostWindowAsk(t, e)
 	mark := len(e.L.Events)
@@ -400,11 +403,7 @@ func TestKuldothaFlamefiendOptionalSacCostPays(t *testing.T) {
 	// paid damage is observable.
 	answerPlayerTargetAsk(t, e, 1)
 
-	d := passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional {
-		t.Fatalf("expected the trigger_optional ask, got %+v", d)
-	}
-	submitChoices(t, e, 0) // yes, attempt the effect
+	assertNoOptionalAsk(t, e)
 
 	pay, _ := triggerCostWindowAsk(t, e)
 	if pay < 0 {
@@ -446,11 +445,7 @@ func TestKuldothaFlamefiendOptionalSacCostDeclineChangesNothing(t *testing.T) {
 
 	answerPlayerTargetAsk(t, e, 1)
 
-	d := passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional {
-		t.Fatalf("expected the trigger_optional ask, got %+v", d)
-	}
-	submitChoices(t, e, 0)
+	assertNoOptionalAsk(t, e)
 
 	_, decline := triggerCostWindowAsk(t, e)
 	mark := len(e.L.Events)
@@ -599,19 +594,9 @@ func TestElendaAndAzorAttackXFoldDeclineDrawsNothing(t *testing.T) {
 	d := passUntilNonPriority(t, e, 40)
 	submitChoices(t, e, xFoldAskIndex(t, d, 1))
 
-	// Pass the mana window unspent: the pending mana ask's "done".
-	md := passUntilNonPriority(t, e, 40)
-	done := -1
-	for _, o := range md.Options {
-		if o.Kind == "done" {
-			done = o.Index
-		}
-	}
-	if done < 0 {
-		t.Fatalf("expected the mana-activation ask with a done option, got %+v", md)
-	}
-	submitChoices(t, e, done)
-
+	// Pay first (respay.go): the election follows the X announcement
+	// directly -- no mana window is posed before it -- so declining it
+	// taps nothing.
 	mark := len(e.L.Events)
 	_, decline := triggerCostWindowAsk(t, e)
 	submitChoices(t, e, decline)

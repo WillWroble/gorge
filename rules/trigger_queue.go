@@ -2068,26 +2068,61 @@ func (e *Engine) askOptionalAtResolution(who state.PlayerID, o *state.Object, sa
 	// complete the resolution and log its priority grant, so handlePriority
 	// must not log a second one (tapeGranted).
 	in := tapeServe(e, d)
-	rp := &resumePoint{kind: "optional", obj: o.ID, sa: sa}
 	chosen := d.Chosen(in)
 	if len(chosen) == 1 && chosen[0].Kind == "yes" {
-		// ResolvedLimit$: an ACCEPTED optional trigger is one the effect runs
-		// for, so it consumes the per-turn resolution count (a decline never
-		// does). The check is on the resolved line's own param, never the
-		// source's other lines (Tidus's non-RL BeginCombat line).
-		if t, ok := e.triggerForAbilityObject(o.ID, o); ok {
-			if _, limited := resolvedLimitValue(t); limited {
-				e.noteTriggerResolved(o.Source)
-			}
-		}
-		e.resumeResolution(rp, chosen)
-	} else {
-		e.finishResumption(rp.obj)
-		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+		e.acceptOptionalAtResolution(o, sa, chosen)
+		return
 	}
+	e.finishResumption(o.ID)
+	e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
 	if !e.Suspended() {
 		e.tapeGranted = true
 	}
+}
+
+// acceptOptionalAtResolution is the CR 603.5 "yes" continuation: the effect
+// is applied (resumeResolution's "optional" arm). It serves both an answered
+// yes and the folded ask (optionalFoldsIntoCost), where the trigger's own
+// "you may pay" election is the only question posed.
+func (e *Engine) acceptOptionalAtResolution(o *state.Object, sa *cards.SA, chosen []decision.Option) {
+	// ResolvedLimit$: an ACCEPTED optional trigger is one the effect runs
+	// for, so it consumes the per-turn resolution count (a decline never
+	// does). The check is on the resolved line's own param, never the
+	// source's other lines (Tidus's non-RL BeginCombat line).
+	if t, ok := e.triggerForAbilityObject(o.ID, o); ok {
+		if _, limited := resolvedLimitValue(t); limited {
+			e.noteTriggerResolved(o.Source)
+		}
+	}
+	e.resumeResolution(&resumePoint{kind: "optional", obj: o.ID, sa: sa}, chosen)
+	if !e.Suspended() {
+		e.tapeGranted = true
+	}
+}
+
+// optionalFoldsIntoCost reports whether an optional trigger's CR 603.5 yes/no
+// is the same question as its body's optional Cost$ election ("you may pay
+// {R}. If you do, ..."): the body enters the triggered-cost window on a yes
+// (resumeResolution's armed gate), its cost is not a `Mandatory` one (whose
+// payment is owed once the effect is applied, so the yes/no is the only
+// "may"), and the decider is the payer -- the window asks the ability's
+// controller. Declining the cost then leaves the ability unexecuted exactly
+// as a "no" did, so the yes/no is not posed and the pay/decline ask alone
+// carries the choice. A decider other than the controller keeps both asks.
+func (e *Engine) optionalFoldsIntoCost(who state.PlayerID, o *state.Object) bool {
+	sa := o.Ability
+	if sa == nil || who != o.Controller {
+		return false
+	}
+	raw := sa.ParamStr(cards.PKCost)
+	if raw == "" || strings.HasPrefix(raw, "Mandatory") {
+		return false
+	}
+	if e.triggerBodyNeedsCostWindow(sa) {
+		return true
+	}
+	tc := e.triggerContexts[o.ID]
+	return sa.API == "CopySpellAbility" && (tc.TriggerAbility != 0 || tc.TriggerCard != 0)
 }
 
 // optionalAtResolutionDecision is CR 603.5's yes/no at resolution.

@@ -36,12 +36,6 @@
      "op": "resolve",
      "answers": [
       {
-       "kind": "trigger_optional",
-       "pick": [
-        "yes"
-       ]
-      },
-      {
        "kind": "choose",
        "pick": [
         "{G}"
@@ -153,12 +147,6 @@
        "kind": "any",
        "pick": [
         "yes"
-       ]
-      },
-      {
-       "kind": "choose",
-       "pick": [
-        "trigger_cost_pay"
        ]
       }
      ]

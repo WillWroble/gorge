@@ -76,6 +76,13 @@ import { parseSymbol } from './mana';
  * the manual tap; hiding their taps left only Done, which abandons the
  * payment.
  *
+ * A resolution-time PAY-FIRST election (rules/respay.go: a triggered "you
+ * may pay" cost, cumulative upkeep, echo) is not a manual window and carries
+ * no taps: it offers a planner-paid pay and, beside it, a manual route that
+ * opens the window. paymentRouteHidden picks which of the two a surface draws
+ * — the planner pay under auto-pay, the manual one without it — so the
+ * player sees one pay button either way.
+ *
  * web/src/lib/autopayreach.test.ts pins the consequence: for a table of
  * windows, every label Auto's actionables() stops for, and every play the
  * window can reach, is on a surface while auto-pay is on.
@@ -102,6 +109,34 @@ export function isManualManaOption(option: Pick<Option, 'kind' | 'label'>): bool
  */
 export function isPlainManualTap(option: Option): boolean {
   return isManualManaOption(option) && !isCostlyManaActivation(option);
+}
+
+/**
+ * MANUAL_ROUTE_SUFFIX marks the manual route of a resolution-time pay-first
+ * election (rules/respay.go): a triggered "you may pay" cost
+ * (trigger_cost_pay), cumulative upkeep (cumulative_pay) and echo (echo_pay)
+ * offer their plain pay — which taps sources through the engine's payment
+ * planner — and, beside it, `<pay kind>_manual`, which opens the manual
+ * "Tap <source> for mana / Done" window. The engine offers the manual
+ * sibling only when the planner can fund the cost; without one the plain pay
+ * already IS the manual route.
+ */
+const MANUAL_ROUTE_SUFFIX = '_manual';
+
+/**
+ * paymentRouteHidden is the one rule for which of an election's two pay
+ * routes a surface draws, so the player sees ONE pay button: under auto-pay
+ * the manual route is hidden (pay taps for them); with auto-pay off the plain
+ * pay is hidden when its manual sibling is offered (pay opens the manual
+ * window, the cast-style select-mana model). The decline and every other
+ * option are never hidden, and a plain pay with no manual sibling never is.
+ */
+export function paymentRouteHidden(decision: Decision, option: Option, autoPayMana: boolean): boolean {
+  if (decision.kind !== 'choose') return false;
+  if (option.kind.endsWith('_pay' + MANUAL_ROUTE_SUFFIX)) return autoPayMana;
+  if (!option.kind.endsWith('_pay') || autoPayMana) return false;
+  const manual = option.kind + MANUAL_ROUTE_SUFFIX;
+  return decision.options.some((o) => o.kind === manual);
 }
 
 /** MANA_FREE_KINDS are the play kinds whose cost can never include mana: a land drop, and a station (tap another creature). */

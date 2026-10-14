@@ -7,6 +7,7 @@ package rules
 // and on the kernel and must stay byte-identical.
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/adams-shaun/gorge/decision"
@@ -40,6 +41,23 @@ func tapeWindowPick(pay bool) func(d *decision.Decision) []int {
 			}
 		}
 		return tapePick(d)
+	}
+}
+
+// tapeWindowPickManual is tapeWindowPick electing the manual route of a
+// pay-first election (respay.go) when one is offered, so the mana window --
+// and the asks its activations pose -- is reached.
+func tapeWindowPickManual() func(d *decision.Decision) []int {
+	pick := tapeWindowPick(true)
+	return func(d *decision.Decision) []int {
+		if d.Kind == decision.KChoose && d.ResumeKind == "" {
+			for _, o := range d.Options {
+				if strings.HasSuffix(o.Kind, "_pay_manual") {
+					return []int{o.Index}
+				}
+			}
+		}
+		return pick(d)
 	}
 }
 

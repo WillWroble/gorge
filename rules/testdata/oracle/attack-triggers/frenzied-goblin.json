@@ -221,15 +221,7 @@
      ]
     },
     {
-     "op": "resolve",
-     "answers": [
-      {
-       "kind": "any",
-       "pick": [
-        "yes"
-       ]
-      }
-     ]
+     "op": "resolve"
     },
     {
      "op": "pass_to",
@@ -300,15 +292,7 @@
      "mana": "G"
     },
     {
-     "op": "resolve",
-     "answers": [
-      {
-       "kind": "any",
-       "pick": [
-        "yes"
-       ]
-      }
-     ]
+     "op": "resolve"
     },
     {
      "op": "pass_to",

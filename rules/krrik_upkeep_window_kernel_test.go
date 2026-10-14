@@ -26,23 +26,12 @@ func TestKrrikCumulativeUpkeepPosesManaWindowWhenSourceCanPay(t *testing.T) {
 	// the life route as paid and this ask was SKIPPED entirely.
 	d := e.Pending()
 	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("the cumulative-upkeep mana window must be posed, got %+v", d)
+		t.Fatalf("the cumulative-upkeep election must be posed, got %+v", d)
 	}
+	d = krrikElectManual(t, e, d, "cumulative")
 	swampOpt := krrikFindWindowOption(t, d, "activate", swamp)
 	krrikFindWindowOption(t, d, "done", 0)
-	submitChoices(t, e, swampOpt) // tap the Swamp
-
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the cumulative election after tapping the Swamp, got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "cumulative_pay" {
-		t.Fatalf("cumulative election = %+v, want a pay option once black is in the pool", d.Options)
-	}
-	if pool := e.G.Players[0].Pool; pool[state.MB] != 1 {
-		t.Fatalf("pool after tapping = %+v, want exactly one black floating", pool)
-	}
-	submitChoices(t, e, 0) // pay
+	submitChoices(t, e, swampOpt) // tap the Swamp: the elected pay settles
 
 	if o := e.G.Obj(bear); o == nil || o.Zone != state.ZBattlefield {
 		t.Fatalf("paid the upkeep but the permanent is %+v", o)
@@ -65,21 +54,13 @@ func TestKrrikCumulativeUpkeepWindowDonePaysLife(t *testing.T) {
 
 	d := e.Pending()
 	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("the cumulative-upkeep mana window must be posed, got %+v", d)
+		t.Fatalf("the cumulative-upkeep election must be posed, got %+v", d)
 	}
+	d = krrikElectManual(t, e, d, "cumulative")
 	doneOpt := krrikFindWindowOption(t, d, "done", 0)
+	// The payment keeps the grant, so "done" settles the elected pay with
+	// the 2 granted life.
 	submitChoices(t, e, doneOpt)
-
-	// The offer gate that follows keeps the grant, so a pay option is still
-	// offered; paying it spends the 2 granted life.
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the cumulative election after \"done\", got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "cumulative_pay" {
-		t.Fatalf("cumulative election = %+v, want a pay option (the grant keeps the offer alive)", d.Options)
-	}
-	submitChoices(t, e, 0) // pay
 
 	if o := e.G.Obj(bear); o == nil || o.Zone != state.ZBattlefield {
 		t.Fatalf("paid the upkeep with life but the permanent is %+v", o)

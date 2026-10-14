@@ -2250,7 +2250,7 @@ func xmQueue(kind, label string) string {
 		// Nature's Rhythm, Solemn Simulacrum, ...) and Feed the Cycle /
 		// Soaring Stoneglider agree only with a target answer.
 		return "target"
-	case "trigger_cost_pay":
+	case "trigger_cost_pay", "trigger_cost_pay_manual":
 		return "skip"
 	case "mana":
 		if _, ok := manaColourLabel(label); ok {

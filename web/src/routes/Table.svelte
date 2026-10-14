@@ -34,7 +34,7 @@
     toneOf,
   } from '../lib/seatpanel.svelte';
   import { laterByObj, optionsByObj, optionsByPlayer, resolveCardFollowUp, type CardOptions } from '../lib/cardoptions';
-  import { isPlainManualTap, manualManaHidden } from '../lib/manualmana';
+  import { isPlainManualTap, manualManaHidden, paymentRouteHidden } from '../lib/manualmana';
   import { castableActions } from '../lib/announcepay';
   import { rematchDecks, startRematch } from '../lib/playvsbot';
   import { stuckDecision } from '../lib/prompt';
@@ -367,6 +367,12 @@
         if (visible.length === 0) byObj.delete(obj);
         else if (visible.length !== offered.length) byObj.set(obj, visible);
       }
+    }
+    // A pay-first election's source tile carries one pay route, the same
+    // one the option list draws (manualmana.paymentRouteHidden).
+    for (const [obj, offered] of byObj) {
+      const visible = offered.filter((option) => !paymentRouteHidden(d, option, panel.autoPayMana));
+      if (visible.length !== offered.length) byObj.set(obj, visible);
     }
     return {
       source: d.source,

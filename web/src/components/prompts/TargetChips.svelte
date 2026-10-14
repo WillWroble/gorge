@@ -22,7 +22,7 @@
    */
   let { decision, view, logic }: { decision: Decision; view: View; logic: SeatPanelState } = $props();
 
-  const rows = $derived(orderedOptions(decision, { filter: '' }) ?? []);
+  const rows = $derived(orderedOptions(decision, { filter: '', autoPayMana: logic.autoPayMana }) ?? []);
   const digits = $derived(digitMap(rows.map((o) => o.index)));
 
   interface Chip { name: string; detail: string | null; card: ReturnType<typeof findCardAnywhere>; seat: number | null }

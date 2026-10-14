@@ -458,7 +458,7 @@ func triggerCostAnswer(d rules.OracleDecision) string {
 		return ""
 	}
 	switch pickKind(d, 0) {
-	case "trigger_cost_pay":
+	case "trigger_cost_pay", "trigger_cost_pay_manual":
 		return "yes"
 	case "trigger_cost_decline":
 		return "no"

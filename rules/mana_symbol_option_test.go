@@ -46,10 +46,7 @@ func TestNestedManaColorAnswerUsesStructuredSymbol(t *testing.T) {
 		t.Fatalf("precondition: luck counters = %d, want 1", got)
 	}
 	resolveUpkeepCumulative(t, e)
-	d := e.Pending()
-	if d == nil || !strings.Contains(d.Prompt, "cumulative upkeep") {
-		t.Fatalf("precondition: want cumulative mana window, got %+v", d)
-	}
+	d := cumulativeElectByHand(t, e)
 	submitChoices(t, e, optionIndex(t, d, func(o decision.Option) bool { return o.Kind == "activate" && o.Obj == grotto }))
 	d = e.Pending()
 	if d == nil || d.Kind != decision.KChoose || len(d.Options) != 5 {
@@ -60,9 +57,18 @@ func TestNestedManaColorAnswerUsesStructuredSymbol(t *testing.T) {
 		t.Fatalf("precondition: prompt=%q selected option=%+v options=%+v, want distinct label and U symbol", d.Prompt, opt, d.Options)
 	}
 	d.Options[1].Label = "presentation changed"
+	mark := len(e.L.Events)
 	submitChoices(t, e, opt.Index)
-	if got := e.G.Players[0].Pool[state.MU]; got != 1 {
-		t.Fatalf("pool after nested colour answer = %d blue, want 1", got)
+	// The elected upkeep payment settles at once and spends the {U}, so the
+	// produced colour is read off the log rather than the pool.
+	blue := false
+	for _, ev := range e.L.Events[mark:] {
+		if ev.Kind == events.ManaAdd && ev.Player == 0 && strings.HasSuffix(ev.Counter, "U") {
+			blue = true
+		}
+	}
+	if !blue {
+		t.Fatalf("the nested colour answer added no blue mana: %+v", e.L.Events[mark:])
 	}
 	for _, ev := range e.L.Events {
 		if ev.Kind == events.Note && strings.Contains(ev.Text, "unimplemented API") {

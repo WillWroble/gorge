@@ -47,6 +47,9 @@ type echoFlow struct {
 	amount     Cost
 	costLabel  string
 	windowDone bool
+	// res is the pay-first funding state (respay.go): the pay/sacrifice
+	// election comes before any mana window.
+	res resPay
 
 	// pips carries the flexible-pip payment announcement (CR 601.2b/107.4e-f)
 	// for this window, exactly as triggeredEffectCost.pips does: pipAnnounceAsk
@@ -169,8 +172,14 @@ func (e *Engine) echoElectionAsk() {
 		return
 	}
 	announced := ef.pips.fold(ef.amount)
-	if ef.action == nil && e.paymentManaAsk(ef.player, ef.source, announced, ef.windowDone,
-		"Activate mana abilities to pay echo", chooseEcho) {
+	if ef.action == nil && ef.res.chosen {
+		// The payer already elected to pay (respay.go): fund what the pool
+		// lacks, then charge.
+		if e.resPayFund(&ef.res, ef.player, ef.source, announced, ef.windowDone,
+			"Activate mana abilities to pay echo", chooseEcho, paymentOther) {
+			return
+		}
+		e.echoAnswer([]decision.Option{{Kind: "echo_pay", Obj: ef.source}})
 		return
 	}
 	payable := false
@@ -181,13 +190,21 @@ func (e *Engine) echoElectionAsk() {
 			action: ef.action, actionRemaining: 1}
 		payable = e.cumulativeActionPayable(shim)
 	}
-	var opts []decision.Option
-	if payable {
-		opts = append(opts, decision.Option{Index: 0, Kind: "echo_pay", Obj: ef.source,
+	var opts, manual []decision.Option
+	if ef.action == nil && e.resPayNeedsMana(ef.player, ef.source, announced, paymentOther) {
+		// Pay first: an untapped source can fund what the pool lacks.
+		routes := e.resPayOptions(ef.player, ef.source, announced, "echo_pay", "echo_pay_manual", capitaliseFirst(ef.costLabel))
+		opts, manual = []decision.Option{routes[0]}, routes[1:]
+	} else if payable {
+		opts = append(opts, decision.Option{Kind: "echo_pay", Obj: ef.source,
 			Label: capitaliseFirst(ef.costLabel)})
 	}
-	opts = append(opts, decision.Option{Index: len(opts), Kind: "echo_sac", Obj: ef.source,
+	opts = append(opts, decision.Option{Kind: "echo_sac", Obj: ef.source,
 		Label: "Sacrifice " + o.Face().Name})
+	opts = append(opts, manual...)
+	for i := range opts {
+		opts[i].Index = i
+	}
 	windowAsk(e, &decision.Decision{Player: ef.player, Kind: decision.KChoose, Min: 1, Max: 1,
 		Prompt: o.Face().Name + " — echo: " + ef.costLabel + " or sacrifice",
 		Source: ef.source, Options: opts}, chooseEcho)
@@ -220,6 +237,11 @@ func (e *Engine) echoAnswer(chosen []decision.Option) {
 			return
 		}
 		announced := ef.pips.fold(ef.amount)
+		if !ef.res.chosen && e.resPayNeedsMana(ef.player, ef.source, announced, paymentOther) {
+			ef.res.elect(chosen[0].Kind == "echo_pay_manual")
+			e.echoElectionAsk()
+			return
+		}
 		if announced.Priceable() &&
 			pay.PayManaConv(asPayer(e), ef.player, announced, asEval(e).Conv(ef.player, ef.source, false)) {
 			e.finishEcho()
@@ -328,5 +350,6 @@ var echoAnswerCodes = state.NewStrCodes(
 	state.StrEntry[echoAnswerCode]{Key: "activate", Val: echoAnswerActivate},
 	state.StrEntry[echoAnswerCode]{Key: "done", Val: echoAnswerDone},
 	state.StrEntry[echoAnswerCode]{Key: "echo_pay", Val: echoAnswerEchoPay},
+	state.StrEntry[echoAnswerCode]{Key: "echo_pay_manual", Val: echoAnswerEchoPay},
 	state.StrEntry[echoAnswerCode]{Key: "echo_action_pick", Val: echoAnswerEchoActionPick},
 )

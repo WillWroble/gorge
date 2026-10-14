@@ -3,14 +3,21 @@ import { searchOptions } from '../search';
 import { NAME_PICK_RENDER_LIMIT, nameOptions } from '../name-pick';
 import { manaSourceRows, windowAction } from '../announcepay';
 import { genericListOptions, mulliganPhase, primaryOf } from './decision';
+import { paymentRouteHidden } from '../manualmana';
 import { rendererFor } from './renderer';
 
 /** NO_BASES is the empty paymentBases every non-priority decision has. */
 const NO_BASES: ReadonlySet<number> = new Set<number>();
 
-/** OrderContext is the display-only state a rendered order depends on: the picker filter the search and name-pick layouts share. */
+/**
+ * OrderContext is the display-only state a rendered order depends on: the
+ * picker filter the search and name-pick layouts share, and the seat's
+ * auto-pay preference, which picks the one pay route a pay-first election
+ * draws (manualmana.paymentRouteHidden). Absent reads as auto-pay off.
+ */
 export interface OrderContext {
   filter: string;
+  autoPayMana?: boolean;
 }
 
 /**
@@ -32,7 +39,8 @@ export interface OrderContext {
  *    panel's rows), then Auto-fill, Pay, Undo last tap and Cancel cast —
  *    the panel's own button order.
  *  - everything else: the generic rows — every option except a separately
- *    drawn pass/resolve primary and concede.
+ *    drawn pass/resolve primary and concede, and the pay route a pay-first
+ *    election hides for the seat's auto-pay preference.
  */
 export function orderedOptions(d: Decision | null, ctx: OrderContext): Option[] | null {
   if (d === null) return null;
@@ -60,7 +68,8 @@ export function orderedOptions(d: Decision | null, ctx: OrderContext): Option[] 
       return out;
     }
     default:
-      return genericListOptions(d, primaryOf(d), NO_BASES, false);
+      return genericListOptions(d, primaryOf(d), NO_BASES, false)
+        .filter((o) => !paymentRouteHidden(d, o, ctx.autoPayMana === true));
   }
 }
 

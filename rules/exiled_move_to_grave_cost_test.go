@@ -242,11 +242,7 @@ func TestWastelandStranglerTriggerCostMovesTheCard(t *testing.T) {
 		t.Fatalf("pump target ask does not offer the Wurm: %+v", d.Options)
 	}
 	submitChoices(t, e, idx)
-	d = passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional || len(d.Options) == 0 || d.Options[0].Kind != "yes" {
-		t.Fatalf("expected the trigger_optional yes ask, got %+v", d)
-	}
-	submitChoices(t, e, 0)
+	assertNoOptionalAsk(t, e)
 
 	pay, _ := triggerCostWindowAsk(t, e)
 	if pay < 0 {
@@ -296,11 +292,7 @@ func TestWastelandStranglerTriggerCostDeclineChangesNothing(t *testing.T) {
 		t.Fatalf("pump target ask does not offer the bear: %+v", d.Options)
 	}
 	submitChoices(t, e, idx)
-	d = passUntilNonPriority(t, e, 20)
-	if d.Kind != decision.KTriggerOptional {
-		t.Fatalf("expected the trigger_optional ask, got %+v", d)
-	}
-	submitChoices(t, e, 0)
+	assertNoOptionalAsk(t, e)
 
 	_, decline := triggerCostWindowAsk(t, e)
 	submitChoices(t, e, decline)

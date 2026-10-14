@@ -206,6 +206,12 @@ func (e *Engine) resolveTop() {
 					"ability ceased to exist (CR 800.4a) and was parked in exile")
 				return
 			}
+			if e.optionalFoldsIntoCost(who, o) {
+				// The yes/no is the body's own pay/decline election: apply the
+				// effect, whose cost window poses the one question.
+				e.acceptOptionalAtResolution(o, o.Ability, nil)
+				return
+			}
 			label := e.abilityLabel(o, cards.Trigger{})
 			if triggered {
 				label = e.abilityLabel(o, rt)

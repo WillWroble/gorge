@@ -94,7 +94,8 @@ func TestFellwarStoneAndChromeMoxReflectedShapesKernel(t *testing.T) {
 
 // TestMysticRemoraCumulativeUpkeep proves the keyword is a real upkeep
 // trigger. Its age counter is absent while the ability waits on the stack;
-// only resolution places it, then opens the mana-only payment window.
+// only resolution places it, then poses the pay-or-sacrifice election FIRST
+// (respay.go), whose pay taps the untapped Mountain through the planner.
 func TestMysticRemoraCumulativeUpkeepKernel(t *testing.T) {
 	t.Parallel()
 	e := handEngine(t)
@@ -115,24 +116,21 @@ func TestMysticRemoraCumulativeUpkeepKernel(t *testing.T) {
 	e.pending = nil // resolve directly, outside the pending priority window
 	e.resolveTop()
 	d := e.Pending()
-	if d == nil || len(d.Options) != 2 || d.Options[0].Kind != "activate" || d.Options[1].Kind != "done" {
-		t.Fatalf("expected cumulative mana window at resolution, got %+v", d)
+	if d == nil || len(d.Options) != 3 || d.Options[0].Kind != "cumulative_pay" ||
+		d.Options[1].Kind != "cumulative_sac" || d.Options[2].Kind != "cumulative_pay_manual" {
+		t.Fatalf("expected the pay-or-sacrifice election at resolution, got %+v", d)
 	}
 	if got := e.G.Obj(remora).Counter("AGE"); got != 1 {
 		t.Fatalf("resolution placed %d age counters, want 1", got)
-	}
-	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}); err != nil {
-		t.Fatalf("activate mana: %v", err)
-	}
-	d = e.Pending()
-	if d == nil || len(d.Options) != 2 || d.Options[0].Kind != "cumulative_pay" {
-		t.Fatalf("expected pay-or-sacrifice after mana, got %+v", d)
 	}
 	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}); err != nil {
 		t.Fatalf("pay upkeep: %v", err)
 	}
 	if e.G.Obj(remora).Zone != state.ZBattlefield || len(e.G.Stack) != 0 {
 		t.Fatalf("paid Remora/stack = %s/%v", e.G.Obj(remora).Zone, e.G.Stack)
+	}
+	if got := e.G.Players[0].Pool.Total(); got != 0 {
+		t.Fatalf("pool after the auto-paid {1} = %d, want 0", got)
 	}
 }
 
@@ -154,11 +152,18 @@ func TestManaVaultTriggerCanActivateManaAndPayKernel(t *testing.T) {
 	// the engine that took it.
 	e.pending = nil
 	e.priorityRound()
+	// OptionalDecider$ You folds into the pay election (optionalFoldsIntoCost),
+	// which is posed before any mana window (respay.go). The manual route
+	// opens the window; four taps fund the {4} and settle it with no second
+	// election.
 	d := passUntilNonPriority(t, e, 10)
-	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}); err != nil {
+	if d == nil || d.Options[0].Kind != "trigger_cost_pay" || d.Options[len(d.Options)-1].Kind != "trigger_cost_pay_manual" {
+		t.Fatalf("Mana Vault election = %+v", d)
+	}
+	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{len(d.Options) - 1}}); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		d = e.Pending()
 		if d == nil || d.Options[0].Kind != "activate" {
 			t.Fatalf("mana payment window %d = %+v", i, d)
@@ -168,8 +173,8 @@ func TestManaVaultTriggerCanActivateManaAndPayKernel(t *testing.T) {
 		}
 	}
 	d = e.Pending()
-	if d == nil || d.Options[0].Kind != "trigger_cost_pay" {
-		t.Fatalf("paid trigger choice = %+v", d)
+	if d == nil || d.Options[0].Kind != "activate" {
+		t.Fatalf("last mana payment window = %+v", d)
 	}
 	clone := e.Clone()
 	in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}
@@ -184,5 +189,43 @@ func TestManaVaultTriggerCanActivateManaAndPayKernel(t *testing.T) {
 	}
 	if e.G.Obj(vault).Tapped || e.G.Players[0].Pool.Total() != 0 || len(e.G.Stack) != 0 {
 		t.Fatalf("paid Mana Vault result: tapped=%v pool=%v stack=%v", e.G.Obj(vault).Tapped, e.G.Players[0].Pool, e.G.Stack)
+	}
+}
+
+// TestManaVaultTriggerAutoPayReplaysKernel is the auto route: the plain pay
+// taps all four Mountains through the planner in one answer, and a clone
+// replaying the same answer reaches the identical game (the planner's taps
+// are re-derived, never recorded as choices).
+func TestManaVaultTriggerAutoPayReplaysKernel(t *testing.T) {
+	t.Parallel()
+	e := handEngine(t)
+	vault := onBoard(t, e, 0, "Name:Mana Vault\nManaCost:1\nTypes:Artifact\n"+
+		"T:Mode$ Phase | Phase$ Upkeep | ValidPlayer$ You | OptionalDecider$ You | Execute$ TrigUntap\n"+
+		"SVar:TrigUntap:AB$ Untap | Cost$ 4 | Defined$ Self\nOracle:x\n")
+	for i := 0; i < 4; i++ {
+		_ = onBoard(t, e, 0, mountainScript())
+	}
+	e.emit(events.Event{Kind: events.Tap, Obj: vault})
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepUpkeep})
+	e.putTriggersOnStack()
+	e.pending = nil
+	e.priorityRound()
+	d := passUntilNonPriority(t, e, 10)
+	if d == nil || d.Options[0].Kind != "trigger_cost_pay" {
+		t.Fatalf("Mana Vault election = %+v", d)
+	}
+	clone := e.Clone()
+	in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}
+	if err := e.Submit(in); err != nil {
+		t.Fatal(err)
+	}
+	if err := clone.Submit(in); err != nil {
+		t.Fatal(err)
+	}
+	if diff := diffGames(e.G, clone.G); diff != "" {
+		t.Fatalf("auto-pay replay diverged:\n%s", diff)
+	}
+	if e.G.Obj(vault).Tapped || e.G.Players[0].Pool.Total() != 0 || len(e.G.Stack) != 0 {
+		t.Fatalf("auto-paid Mana Vault result: tapped=%v pool=%v stack=%v", e.G.Obj(vault).Tapped, e.G.Players[0].Pool, e.G.Stack)
 	}
 }

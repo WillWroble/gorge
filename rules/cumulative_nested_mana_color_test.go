@@ -43,6 +43,33 @@ func optionIndex(t *testing.T, d *decision.Decision, pred func(decision.Option) 
 	return -1
 }
 
+// cumulativeElectByHand answers the pending cumulative-upkeep election --
+// posed before any mana window (respay.go) -- with a pay by hand: the manual
+// route when the planner funds the cost, else the plain pay, which then IS
+// the manual route. It returns the mana window that opens.
+func cumulativeElectByHand(t *testing.T, e *Engine) *decision.Decision {
+	t.Helper()
+	d := e.Pending()
+	if d == nil || !strings.Contains(d.Prompt, "cumulative upkeep") {
+		t.Fatalf("precondition: want the cumulative election, got %+v", d)
+	}
+	route := -1
+	for _, o := range d.Options {
+		if o.Kind == "cumulative_pay_manual" || (route < 0 && o.Kind == "cumulative_pay") {
+			route = o.Index
+		}
+	}
+	if route < 0 {
+		t.Fatalf("the cumulative election offers no pay: %+v", d.Options)
+	}
+	submitChoices(t, e, route)
+	d = e.Pending()
+	if d == nil || !strings.Contains(d.Prompt, "cumulative upkeep") {
+		t.Fatalf("precondition: want the cumulative mana window, got %+v", d)
+	}
+	return d
+}
+
 // A mana ability's SubAbility$ chain must still run in full when the ability
 // is activated inside the cumulative window: rules' Suspended() is widened by
 // the window itself, which must not read as "this resolution suspended".
@@ -53,10 +80,7 @@ func TestCumulativeWindowManaAbilitySubChainRuns(t *testing.T) {
 	spring := onBoard(t, e, 0, lifeSpring)
 	life := e.G.Players[0].Life
 	resolveUpkeepCumulative(t, e)
-	d := e.Pending()
-	if d == nil || !strings.Contains(d.Prompt, "cumulative upkeep") {
-		t.Fatalf("precondition: want the cumulative mana window, got %+v", d)
-	}
+	d := cumulativeElectByHand(t, e)
 	submitChoices(t, e, optionIndex(t, d, func(o decision.Option) bool { return o.Kind == "activate" && o.Obj == spring }))
 	if got := e.G.Players[0].Life; got != life+1 {
 		t.Fatalf("life after the in-window activation = %d, want %d (the SubAbility$ was dropped)", got, life+1)

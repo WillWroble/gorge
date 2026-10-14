@@ -96,9 +96,11 @@ func driveEchoQuiet(t *testing.T, e *Engine, id state.ObjID, turn int32, active 
 	return nil
 }
 
-// tapUntilElection drains the payment window an openable echo cost poses
-// first (the shared paymentManaAsk window): tap the first offered source
-// until the window stops reopening, then return the election.
+// tapUntilElection returns the echo election. Since the pay-first model
+// (respay.go) the election is posed before any mana window, so there is
+// nothing to drain; a window still in front of it (a regression) is drained
+// by tapping the first offered source so the caller's option assertions
+// report the shape.
 func tapUntilElection(t *testing.T, e *Engine, id state.ObjID, taps int) *decision.Decision {
 	t.Helper()
 	d := e.Pending()
@@ -139,14 +141,16 @@ func TestEchoKarmicGuidePaysEchoOrIsSacrificed(t *testing.T) {
 	if d == nil {
 		t.Fatal("no echo election at the first upkeep after the entry")
 	}
-	// (b) the shared payment window opens first (pool empty, untapped
-	// sources); tap five Plains, then the election shows pay FIRST (option 0
-	// is the bot clamp fallback's sane default) with the sacrifice below it.
+	// (b) the election comes first (pool empty, five untapped Plains): pay
+	// FIRST (option 0 is the bot clamp fallback's sane default, and the
+	// planner's auto route), the sacrifice below it, then the manual route.
 	d = tapUntilElection(t, e, guide, 8)
-	if len(d.Options) != 2 || d.Options[0].Kind != "echo_pay" || d.Options[1].Kind != "echo_sac" {
+	if len(d.Options) != 3 || d.Options[0].Kind != "echo_pay" || d.Options[1].Kind != "echo_sac" ||
+		d.Options[2].Kind != "echo_pay_manual" {
 		t.Fatalf("echo election = %+v", d.Options)
 	}
-	// (c) paying keeps the Angel, empties the pool and the stack.
+	// (c) paying taps the Plains, keeps the Angel, empties the pool and the
+	// stack.
 	submitChoices(t, e, 0)
 	if e.G.Obj(guide).Zone != state.ZBattlefield {
 		t.Fatalf("paid echo but the guide is in %s", e.G.Obj(guide).Zone)
@@ -164,18 +168,12 @@ func TestEchoKarmicGuidePaysEchoOrIsSacrificed(t *testing.T) {
 func TestEchoKarmicGuideDeclineSacrificesWithEchoText(t *testing.T) {
 	t.Parallel()
 	e, guide := echoEntryEngine(t, "Karmic Guide", 2)
-	// Two Plains only: the payment window can never float {3}{W}{W}, so
-	// "done" closes it and the election has NO pay option — sacrifice only.
+	// Two Plains only: the sources can never float {3}{W}{W}, so no mana
+	// window is posed and the election has NO pay option — sacrifice only.
 	d := driveEchoQuiet(t, e, guide, 3, 0, state.StepDraw)
 	if d == nil {
 		t.Fatal("no echo election at the first upkeep after the entry")
 	}
-	if len(d.Options) == 0 || d.Options[0].Kind != "activate" {
-		t.Fatalf("expected the payment window first, got %+v", d.Options)
-	}
-	done := d.Options[len(d.Options)-1].Index
-	submitChoices(t, e, done)
-	d = e.Pending()
 	if d == nil || len(d.Options) != 1 || d.Options[0].Kind != "echo_sac" {
 		t.Fatalf("unpayable echo election = %+v, want sacrifice-only", d)
 	}
@@ -235,14 +233,11 @@ func TestEchoKarmicGuideControlChangeRearms(t *testing.T) {
 	if d == nil {
 		t.Fatal("no re-armed echo election at turn 5's upkeep")
 	}
-	// No floating mana: close the window, take the sacrifice-only election.
-	done := d.Options[len(d.Options)-1].Index
-	submitChoices(t, e, done)
-	d = e.Pending()
-	if d == nil || len(d.Options) != 1 || d.Options[0].Kind != "echo_sac" {
+	// The re-armed election is posed again (pay first): take the sacrifice.
+	if len(d.Options) < 2 || d.Options[0].Kind != "echo_pay" || d.Options[1].Kind != "echo_sac" {
 		t.Fatalf("re-armed echo election = %+v", d)
 	}
-	submitChoices(t, e, 0)
+	submitChoices(t, e, 1)
 	if o := e.G.Obj(guide); o == nil || o.Zone != state.ZGraveyard {
 		t.Fatalf("re-armed echo answered with sacrifice but the guide is in %v", o)
 	}
