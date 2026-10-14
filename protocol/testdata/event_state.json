@@ -10,6 +10,7 @@
     "set": "FDN",
     "phase": "ROUND1",
     "round": 1,
+    "best_of": 0,
     "seats": [
       {
         "seat": 0,
