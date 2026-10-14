@@ -173,6 +173,19 @@ func RedactEvent(g *state.Game, e events.Event, viewer state.PlayerID) events.Ev
 	return e
 }
 
+// secretShape is the shape a Secret event keeps when its payload is not for
+// the viewer: Seq, Kind, Player, From, To, Step and Secret survive, every
+// payload field (Obj, Amount, Counter, Text, IDs, Pairs) is zero -- the same
+// allowlist rule (1)'s opponent arm applies, factored out so the pregame
+// blind (RedactEventForPregameBlind) redacts a viewer's own Secret event to
+// exactly the shape an opponent gets.
+func secretShape(e events.Event) events.Event {
+	return events.Event{
+		Seq: e.Seq, Kind: e.Kind, Player: e.Player,
+		From: e.From, To: e.To, Step: e.Step, Secret: e.Secret,
+	}
+}
+
 // controlsSeat reports whether viewer controls seat under CR 720 -- that is,
 // seat's owner is controlled by viewer while the control is live. It is the
 // ONE home of the CR 720.4 view predicate ("you may look at all cards that

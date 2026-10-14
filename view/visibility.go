@@ -207,6 +207,30 @@ func RedactEventFor(g *state.Game, e events.Event, viewer state.PlayerID, vis Vi
 	}
 }
 
+// RedactEventForPregameBlind is RedactEventFor with the CR 103.5 pregame
+// blind: a Secret event that is the VIEWER's own -- its Player is the viewer,
+// or a seat the viewer controls (CR 720.4, the same widening rule 1 grants)
+// -- is redacted to exactly the shape an opponent gets (secretShape) instead
+// of passing through, because while the CR 103.1 starting-player choice is
+// pending no player may see any hand and the opening-hand deal reaches the
+// log as the seat's own Secret Draw events. It is seat-scoped by
+// construction: the blind arm fires only under Seat visibility, and a
+// spectator viewer (NoSeat, the only viewer Public and Omniscient serve) is
+// never a Secret event's Player, so the omniscient spectator's event stream
+// is unchanged. Serving paths set it from the engine's
+// StartingChoicePending probe at serve time (Ruling F7 passes the probe
+// through host, which imports rules); nothing recorded in the log, no event
+// kind and no chain head moves -- this is the redaction of what a seat is
+// SERVED, not of what happened. g may be nil: the blind arm then keys on the
+// event's own Player alone (no control relationship can be checked), and the
+// degrade falls through to RedactEvent as usual.
+func RedactEventForPregameBlind(g *state.Game, e events.Event, viewer state.PlayerID, vis Visibility) events.Event {
+	if vis == Seat && e.Secret && (e.Player == viewer || controlsSeat(g, viewer, e.Player)) {
+		return secretShape(e)
+	}
+	return RedactEventFor(g, e, viewer, vis)
+}
+
 // poolView is the viewer-facing mana pool: only the symbols with mana in
 // them, always non-nil so an empty pool marshals "{}" rather than null.
 // pool is the previous projection's map when non-nil (ProjectInto's reuse),

@@ -439,7 +439,7 @@ func (r *Registry) pushRewind(t *table, m *match) {
 				// The widget's Last is re-derived over the whole truncated log —
 				// the same full-log scan onMatchStart runs — so an undone line can
 				// never be carried into the rewound overview.
-				bodies := eventBodiesFor(view.NoSeat, t.cfg.Spectator, m.e.G, m.e.L.Events)
+				bodies := eventBodiesFor(view.NoSeat, t.cfg.Spectator, m.e.G, m.e.L.Events, false)
 				t.lastLine = lastLine(bodies, "")
 				widget = r.widgetFrame(t, m, t.lastLine)
 			}
