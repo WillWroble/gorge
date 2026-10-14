@@ -146,6 +146,32 @@ templates_shard_patterns() {
   printf '%s\n' "$even" "$odd" "$named" "^(${rest})$"
 }
 
+# gate_affected_cert_stale_only reads a certification package's `go test`
+# output -- ./compliance/gate and ./compliance/adopt are the two packs that
+# notice a moved scenario sha -- on stdin and exits 0 iff EVERY failing test in
+# it logged "GORGE-CERT-RESULT <name> stale-only" (the line gate.CertVerdict
+# and adopt's ratchetVerdict emit). A stale-only certification is a host XMage
+# replay's to clear (scripts/compliance-pass.sh), not a defect the ticket can
+# fix, so the pool returns the gate's requeue exit instead of a fix round.
+# Any failing test with a non-stale verdict, any t.Fatal before the verdict, a
+# package-level failure (build/panic), or no failing test at all exits 1: the
+# gate then fails closed and the ticket takes the ordinary path. The tests
+# classify each problem exactly (gate.Stale), so the gate never re-parses
+# problem wording.
+gate_affected_cert_stale_only() {
+  awk '
+    /^--- FAIL: / { n = $3; sub(/\(.*/, "", n); fail[n] = 1; nf++ }
+    /GORGE-CERT-RESULT / {
+      for (i = 1; i <= NF; i++)
+        if ($i == "GORGE-CERT-RESULT") res[$(i + 1)] = $(i + 2)
+    }
+    END {
+      if (nf == 0) exit 1
+      for (n in fail) if (res[n] != "stale-only") exit 1
+      exit 0
+    }'
+}
+
 # --- selection gaps (docs/agents/test-throughput-2026-10-12.md §2.7) --------
 # Most post-merge RED culprits on .ds4/postmerge-culprits.log (2026-10-05..12)
 # were cheap tests in packages this gate never selected: structural censuses
@@ -557,6 +583,7 @@ heavy_shard_pool() (
   }
   local jobs=("$@")
   for job in "${jobs[@]}"; do
+    printf '%s\n' "$job" >"$WORK/hjob-$i"
     ( dispatch_heavy_shard "$job" ) >"$WORK/hshard-$i.log" 2>&1 &
     i=$((i + 1))
     running=$((running + 1))
@@ -578,6 +605,32 @@ heavy_shard_pool() (
       echo "gate_affected: failed heavy pack log $f:"
       cat "$f"
     done || true
+  fi
+  # A stale-only certification failure (./compliance/gate + ./compliance/adopt,
+  # the only packs that notice a moved scenario sha) is a host XMage replay's
+  # to clear, not a defect: return the gate's requeue exit so the ticket is
+  # retried without a fix round (scripts/compliance-pass.sh refreshes the
+  # verdicts; operator-compliance-refresh.md). Any other failed pack, or a
+  # certification pack whose failure is not stale-only, keeps the ordinary
+  # nonzero exit and the fix round.
+  if [ "$bad" = 1 ]; then
+    local cert_logs=() other_fail=0 jf idx pkg log
+    for jf in "$WORK"/hjob-*; do
+      [ -e "$jf" ] || continue
+      idx=${jf##*-}
+      pkg=$(cut -f2 "$jf")
+      log="$WORK/hshard-$idx.log"
+      /usr/bin/grep -qE '^(FAIL|panic)|--- FAIL' "$log" || continue
+      case $pkg in
+        ./compliance/gate | ./compliance/adopt) cert_logs+=("$log") ;;
+        *) other_fail=1 ;;
+      esac
+    done
+    if [ "$other_fail" = 0 ] && [ "${#cert_logs[@]}" -gt 0 ] \
+      && cat "${cert_logs[@]}" | gate_affected_cert_stale_only; then
+      echo "gate_affected: heavy certification failure is stale-only (a moved scenario sha; see the GORGE-CERT-RESULT lines) -- a host XMage replay clears it, not a fix round. Requeuing (exit 76)."
+      return 76
+    fi
   fi
   return "$bad"
 )
@@ -650,5 +703,20 @@ if [ "$traj" = 1 ]; then
   go test -p=1 -run '^(TestRoundTenFindings|TestForbiddenRitualRepeatYesFinding)$' ./cmd/cardfuzz/ & g=$!
   pids="$pids $g"
 fi
-for p in $pids; do wait "$p" || rc=1; done
+for p in $pids; do
+  # The heavy pool is waited separately so its stale-only requeue exit (76)
+  # can be told from an ordinary failure (see heavy_shard_pool).
+  [ -n "${hp:-}" ] && [ "$p" = "$hp" ] && continue
+  wait "$p" || rc=1
+done
+if [ -n "${hp:-}" ]; then
+  hp_rc=0
+  wait "$hp" || hp_rc=$?
+  if [ "$hp_rc" = 76 ] && [ "$rc" = 0 ]; then
+    # A stale-only certification failure: the pool already printed the note.
+    # 76 is the config's requeue exit (a non-charging retry), not a fix round.
+    exit 76
+  fi
+  [ "$hp_rc" = 0 ] || rc=1
+fi
 exit "$rc"

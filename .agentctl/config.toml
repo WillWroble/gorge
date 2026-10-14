@@ -360,8 +360,15 @@ cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then
 # 2026-10-12 (operator): exit 75 is "every heavy lane still held" -- an
 # infrastructure wait, not the ticket's defect. Requeue it with no fix round
 # (18 of 45 gate_fails 10-09..10-12 were this, each billed a paid round).
+# 2026-10-14: exit 76 is the same shape for a stale-only certification failure
+# (scripts/gate_affected.sh's heavy pool: every failing ./compliance/gate or
+# ./compliance/adopt test logged GORGE-CERT-RESULT <name> stale-only, a moved
+# scenario sha a host XMage replay clears, not the ticket's defect -- 69 of 74
+# certification-only gate_fails 10-05..10-14 were stale-only, each billed a
+# paid round). Requeue it too; a non-stale certification failure still exits 1
+# and still bills the fix round.
 on_fail = "requeue"
-requeue_exit = [75]
+requeue_exit = [75, 76]
 requeue_max = 3
 # 2026-10-05 (operator): this gate is HEAVY-class work, so it takes a lane of
 # the repo heavy pool like postmerge_batch.sh and heavy.sh. The lane
