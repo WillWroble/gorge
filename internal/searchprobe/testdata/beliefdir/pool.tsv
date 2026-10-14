@@ -1,0 +1,4 @@
+deck	split	source
+mono-red-prowess	train	x
+mono-blue-tempo	train	x
+mono-green-stompy	eval	x

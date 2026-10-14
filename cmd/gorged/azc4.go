@@ -14,15 +14,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc4"
 	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
 	"github.com/adams-shaun/gorge/internal/searchprobe"
@@ -68,50 +65,22 @@ func (c config) enableAZC4(reg *cards.Registry) error {
 	return azc4.Enable(c.az4Net, b)
 }
 
-// loadBelief builds a closed-list belief from dir: the decks pool (a
-// pool.tsv of "deck<TAB>split<TAB>...") names as its train split, or every
-// deck file in dir without one. A deck the corpus cannot resolve is skipped.
-// dirFlag and poolFlag name the flags in its errors. It is the one reader
-// behind -az-c3-belief (azc3Belief) and -az-c4-belief.
+// loadBelief is searchprobe.LoadBeliefDir with dirFlag and poolFlag naming
+// the flags in its errors. It is the one reader behind -az-c3-belief
+// (azc3Belief) and -az-c4-belief.
 func loadBelief(reg *cards.Registry, dir, pool, dirFlag, poolFlag string) (*searchprobe.Belief, error) {
-	var names []string
-	if pool != "" {
-		raw, err := os.ReadFile(pool)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", poolFlag, err)
-		}
-		for i, line := range strings.Split(string(raw), "\n") {
-			v := strings.Split(line, "\t")
-			if i == 0 || len(v) < 2 || v[1] != "train" {
-				continue
-			}
-			names = append(names, v[0]+".json")
-		}
-	} else {
-		ents, err := os.ReadDir(dir)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", dirFlag, err)
-		}
-		for _, e := range ents {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
-				names = append(names, e.Name())
-			}
-		}
+	b, err := searchprobe.LoadBeliefDir(reg, dir, pool)
+	var pe *searchprobe.PoolError
+	var de *searchprobe.DirError
+	switch {
+	case err == nil:
+		return b, nil
+	case errors.As(err, &pe):
+		return nil, fmt.Errorf("%s: %w", poolFlag, pe.Err)
+	case errors.As(err, &de):
+		return nil, fmt.Errorf("%s: %w", dirFlag, de.Err)
 	}
-	sort.Strings(names)
-	var decks [][]*cards.Card
-	for _, n := range names {
-		_, d, err := deck.Load(reg, filepath.Join(dir, n))
-		if err != nil {
-			continue // a deck the corpus cannot resolve is no evidence either way
-		}
-		decks = append(decks, d)
-	}
-	b, err := searchprobe.NewBelief(decks)
-	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", dirFlag, dir, err)
-	}
-	return b, nil
+	return nil, fmt.Errorf("%s %w", dirFlag, err)
 }
 
 // azc4Pool loads the decks az-c4 may play from -az-c4-decks, exactly as
