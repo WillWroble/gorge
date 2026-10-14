@@ -26,7 +26,15 @@ type Tape struct {
 // answer from the tape. a and b are the decks the game was recorded with,
 // seed the engine seed it ran under. The replayed chain head is the record's
 // (a tape of a stalled game verifies by head too: the same watchdog caps
-// stop the re-drive at the same intent). The two seats of the game share one
+// stop the re-drive at the same intent). The re-drive runs under THIS lab's
+// own watchdog caps — playGame reads MaxTurns/MaxIntents off the verifying
+// lab, never off the tape — so construct the lab with the recorded run's
+// caps (read them off the run's Manifest: MaxTurns/MaxIntents, the defaults
+// filled in). With LARGER caps the re-drive plays past the recorded end and
+// fails "tape exhausted at decision seq %d"; with SMALLER caps it stalls at
+// its own earlier watchdog and fails "tape has %d unused intents" (or a
+// head mismatch); only matching caps reproduce the recorded head. The two
+// seats of the game share one
 // cursor; a game is serial — one seat answers at a time — so it needs no
 // lock. A nil tape and a tape recorded under a different mulligan round are
 // refused; intents left over after the re-drive are an error. The re-drive
@@ -60,7 +68,13 @@ func (l *Lab) ReplayTape(a, b Deck, seed uint64, t *Tape) (string, error) {
 // carries the manifest seed — and then re-drives every logged game from its
 // recorded tape instead of player policies: the re-driven chain head must
 // equal the logged one. Every GameResult in r must carry a tape (run with
-// Options.RecordTape); a stalled game's tape verifies by head too.
+// Options.RecordTape); a stalled game's tape verifies by head too. The
+// re-drives run under THIS lab's own watchdog caps (ReplayTape reads
+// MaxTurns/MaxIntents off the verifying lab, never off the tape), so
+// construct the lab with the result's Manifest caps: with larger caps a
+// stalled game's re-drive overruns its tape ("tape exhausted"), with
+// smaller caps it stalls early ("tape has N unused intents" or a head
+// mismatch), and only matching caps reproduce the logged heads.
 func (l *Lab) VerifyEventTapes(r EventResult) error {
 	ev, err := verifyEventLog(r)
 	if err != nil {
