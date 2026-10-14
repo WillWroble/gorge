@@ -61,7 +61,15 @@ func (l *Lab) buildNamed(pool []limited.CardRef, b NamedBuilder, name string) (D
 	if name == "" {
 		name = fmt.Sprintf("%s %s", set, b.Ref)
 	}
-	d := b.Builder.Build(set, pool)
+	var d build.Deck
+	if fb, ok := b.Builder.(FallibleBuilder); ok {
+		var err error
+		if d, err = fb.BuildErr(set, pool); err != nil {
+			return Deck{}, fmt.Errorf("draftlab: build %s: %w", b.Ref, err)
+		}
+	} else {
+		d = b.Builder.Build(set, pool)
+	}
 	if err := build.Validate(pool, d); err != nil {
 		return Deck{}, fmt.Errorf("draftlab: build %s: %w", b.Ref, err)
 	}

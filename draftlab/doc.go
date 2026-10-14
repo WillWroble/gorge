@@ -29,9 +29,14 @@
 // driven with its bots.Env — the honest root, never the live engine — and
 // its result is marked for the manifest (E5-c3's AllowDecklistBots).
 //
-// The E5-d seam (out-of-process agents) is designed, not implemented: an
-// external drafter/builder plugs in as a pickbot.Drafter / pickbot.Builder
-// adapter and the lab's value types carry it unchanged.
+// The E5-d seam (out-of-process agents): an external drafter/builder plugs
+// in as a pickbot.Drafter / pickbot.Builder adapter and may implement
+// FallibleDrafter / FallibleBuilder to report a failure; adapters describe
+// cards through Lab.Card; a game seat whose answers are batched across
+// concurrent games implements GameScoped and is told each game's begin and
+// end; and Options.RecordTape keeps each game's accepted intents in
+// GameResult.Tape, so ReplayTape / VerifyEventTapes re-drive a game with no
+// player policy at all.
 //
 // The package imports the engine tier freely (bots, seat, event, deck,
 // limited) but never the wall clock: no `time`, no legacy math/rand —

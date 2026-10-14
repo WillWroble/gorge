@@ -338,19 +338,9 @@ func (l *Lab) eventManifest(spec setdata.Spec, mode string, structure Structure,
 // takes). A stalled replay is an error: a capped game's chain is not
 // verified.
 func (l *Lab) VerifyEvent(r EventResult, players []NamedPlayer) error {
-	ev, err := event.ReplayLog(r.Log)
+	ev, err := verifyEventLog(r)
 	if err != nil {
-		return fmt.Errorf("draftlab: VerifyEvent: event log replay: %w", err)
-	}
-	again, err := event.MarshalLog(ev.Log())
-	if err != nil {
-		return fmt.Errorf("draftlab: VerifyEvent: event log re-marshal: %w", err)
-	}
-	if !bytes.Equal(again, r.Log) {
-		return fmt.Errorf("draftlab: VerifyEvent: event log replay diverges at %s", firstDiffLine(r.Log, again))
-	}
-	if ev.Seed() != r.Manifest.Seed {
-		return fmt.Errorf("draftlab: VerifyEvent: event log replay carries seed %d, manifest says %d", ev.Seed(), r.Manifest.Seed)
+		return fmt.Errorf("draftlab: VerifyEvent: %w", err)
 	}
 	n := ev.NumSeats()
 	if len(players) != 1 && len(players) != n {
@@ -372,25 +362,51 @@ func (l *Lab) VerifyEvent(r EventResult, players []NamedPlayer) error {
 	return nil
 }
 
+// verifyEventLog is the log half of VerifyEvent, shared with
+// VerifyEventTapes: the log replays event-for-event and re-marshals to the
+// identical bytes, and the replayed event carries the manifest seed.
+func verifyEventLog(r EventResult) (*event.Event, error) {
+	ev, err := event.ReplayLog(r.Log)
+	if err != nil {
+		return nil, fmt.Errorf("event log replay: %w", err)
+	}
+	again, err := event.MarshalLog(ev.Log())
+	if err != nil {
+		return nil, fmt.Errorf("event log re-marshal: %w", err)
+	}
+	if !bytes.Equal(again, r.Log) {
+		return nil, fmt.Errorf("event log replay diverges at %s", firstDiffLine(r.Log, again))
+	}
+	if ev.Seed() != r.Manifest.Seed {
+		return nil, fmt.Errorf("event log replay carries seed %d, manifest says %d", ev.Seed(), r.Manifest.Seed)
+	}
+	return ev, nil
+}
+
+// eventDeck rebuilds seat st's deck from the replayed event's own state: its
+// saved deck rewritten as a deck file over the event's pool (the way
+// RunEvent's build stage did). Shared by VerifyEvent's re-drive and
+// VerifyEventTapes.
+func eventDeck(ev *event.Event, set, mode string, st int) (Deck, error) {
+	d, ok := ev.SavedDeck(st)
+	if !ok {
+		return Deck{}, fmt.Errorf("seat %d has no saved deck in the log", st)
+	}
+	f := build.ToDeckFile(ev.Pool(st), d, fmt.Sprintf("p%d %s %s", st, set, mode))
+	return Deck{Name: f.Name, File: f}, nil
+}
+
 // replayGameHead re-drives one logged event game from the replayed event's
 // own state: seat seat's saved deck is rewritten as a deck file over the
 // event's pool (the way RunEvent's build stage did), the two files are
 // resolved against the lab's registry, and the game plays with the event's
 // own game seed (gameSeed(event seed, round, a, b, game)).
 func (l *Lab) replayGameHead(ev *event.Event, set, mode string, players []NamedPlayer, round, a, b, game int) (string, error) {
-	buildDeck := func(st int) (Deck, error) {
-		d, ok := ev.SavedDeck(st)
-		if !ok {
-			return Deck{}, fmt.Errorf("seat %d has no saved deck in the log", st)
-		}
-		f := build.ToDeckFile(ev.Pool(st), d, fmt.Sprintf("p%d %s %s", st, set, mode))
-		return Deck{Name: f.Name, File: f}, nil
-	}
-	da, err := buildDeck(a)
+	da, err := eventDeck(ev, set, mode, a)
 	if err != nil {
 		return "", err
 	}
-	db, err := buildDeck(b)
+	db, err := eventDeck(ev, set, mode, b)
 	if err != nil {
 		return "", err
 	}
