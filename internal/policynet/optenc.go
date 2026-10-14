@@ -298,3 +298,18 @@ func EncodeOptionsWith(fs FeatureSet, v *view.View, seat state.PlayerID, d decis
 	optionEncoders.Put(x)
 	return dst
 }
+
+// ViewOmit is the lean-projection mask (view.ProjectLeanInto) of the view
+// parts fs's encoders never read: the own-library list, the opponent
+// archetype posterior, ability and effective costs, the copied decision, the
+// own deck manifest and the potential actions. A set that reads any of them
+// (FeaturesMZOwnLib reads the deck manifest; the diagnostic sets are not
+// played) omits nothing, so its projection is ProjectInto's.
+func (fs FeatureSet) ViewOmit() view.Omit {
+	switch fs {
+	case FeaturesV1, FeaturesMZ, FeaturesEntity, FeaturesMZGrave:
+		return view.OmitLibrary | view.OmitArchetype | view.OmitAbilityCosts | view.OmitEffectiveCost |
+			view.OmitDecision | view.OmitOwnDeck | view.OmitPotential
+	}
+	return 0
+}

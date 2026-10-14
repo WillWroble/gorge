@@ -912,7 +912,8 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 	if pv == nil {
 		pv = new(view.View)
 	}
-	view.ProjectInto(pv, e.G, e, d.Player, d)
+	// Only the parts the network's encoders read are projected.
+	view.ProjectLeanInto(pv, e.G, e, d.Player, d, net.Features.ViewOmit())
 	v := *pv
 	st := policynet.EncodeStateWith(net.Features, v, d.Player, nil)
 	opts := d.Options
