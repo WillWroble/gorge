@@ -7,4 +7,4 @@ if [ -n "$bad" ]; then
 	echo "$bad" >&2
 	exit 1
 fi
-exit 0
+exec "$(dirname "$0")/pkgmap-check" pre-commit
