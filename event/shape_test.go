@@ -20,7 +20,6 @@ func TestEventCreatedShapeValidation(t *testing.T) {
 		{"unknown mode", event.Entry{Set: "TST", Seats: testSeats(), Mode: "cube"}, `unknown mode "cube"`},
 		{"draft packs 6", event.Entry{Set: "TST", Seats: testSeats(), Packs: 6}, "draft packs 6, want 3"},
 		{"sealed packs 13", event.Entry{Set: "TST", Seats: testSeats(), Mode: "sealed", Packs: 13}, "sealed packs 13, want 1..12"},
-		{"structure swiss", event.Entry{Set: "TST", Seats: testSeats(), Structure: "swiss"}, "structure swiss is not implemented yet (E5-b3)"},
 		{"unknown structure", event.Entry{Set: "TST", Seats: testSeats(), Structure: "ladder"}, `unknown structure "ladder"`},
 		{"rounds 8 at 8 seats", event.Entry{Set: "TST", Seats: eightSeats(), Rounds: 8}, "rounds 8 out of range 1..7"},
 		{"none with rounds", event.Entry{Set: "TST", Seats: testSeats(), Structure: "none", Rounds: 1}, "structure none takes no rounds"},
@@ -62,6 +61,8 @@ func TestEventCreatedShapeValidation(t *testing.T) {
 		{"8 seats roundrobin", event.Entry{Seats: eightSeats()}, 8, event.ModeDraft, event.StructureRoundRobin, 7, event.DraftPacks},
 		{"8 seats custom rounds", event.Entry{Seats: eightSeats(), Rounds: 3}, 8, event.ModeDraft, event.StructureRoundRobin, 3, event.DraftPacks},
 		{"structure none", event.Entry{Seats: eightSeats(), Structure: "none"}, 8, event.ModeDraft, event.StructureNone, 0, event.DraftPacks},
+		{"4 seats swiss", event.Entry{Seats: testSeats(), Structure: "swiss"}, 4, event.ModeDraft, event.StructureSwiss, 2, event.DraftPacks},
+		{"8 seats swiss", event.Entry{Seats: eightSeats(), Structure: "swiss"}, 8, event.ModeDraft, event.StructureSwiss, 3, event.DraftPacks},
 		{"collation logged", event.Entry{Seats: testSeats(), Collation: "fdn-premium"}, 4, event.ModeDraft, event.StructureRoundRobin, 3, event.DraftPacks},
 	}
 	for _, tc := range ok {

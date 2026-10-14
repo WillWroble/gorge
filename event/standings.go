@@ -156,8 +156,10 @@ func pct(points, n int) float64 {
 	return v
 }
 
-// Standings computes the event's current table from its completed series.
-func (e *Event) Standings() []Standing {
+// SeriesResults lists the event's finished series as the standings input
+// shape, in the order they ended: the conversion the standings table and
+// the Swiss pairing function both read.
+func (e *Event) SeriesResults() []SeriesResult {
 	rs := make([]SeriesResult, 0, len(e.results))
 	for _, f := range e.results {
 		games := make([]GameOutcome, len(f.games))
@@ -173,5 +175,10 @@ func (e *Event) Standings() []Standing {
 		}
 		rs = append(rs, SeriesResult{Round: f.round, A: f.a, B: f.b, Score: f.score, Games: games})
 	}
-	return ComputeStandingsN(e.NumSeats(), rs)
+	return rs
+}
+
+// Standings computes the event's current table from its completed series.
+func (e *Event) Standings() []Standing {
+	return ComputeStandingsN(e.NumSeats(), e.SeriesResults())
 }
