@@ -1,13 +1,13 @@
-// Package draft runs the four-seat booster-draft state machine: the pure
-// pod half of spec §4.4. Packs are supplied by the caller (limited/booster
-// generates them from the event seed), so this package depends only on the
-// limited vocabulary.
+// Package draft runs an N-seat (2..8) booster-draft state machine — the
+// pure pod half of spec §4.4; the hosted pod is 4 seats × 3 rounds. Packs
+// are supplied by the caller (limited/booster generates them from the event
+// seed), so this package depends only on the limited vocabulary.
 //
-// Seats 0..3 draft three packs. Packs 1 and 3 pass left — a seat passes to
-// (seat+1)%4 — and pack 2 passes right, to (seat+3)%4. Each seat holds a
-// FIFO queue of packs; a seat picks from the pack at the head of its queue,
-// and the remainder moves on. The next round's packs open only when every
-// seat has emptied the current round.
+// Packs 1 and 3 pass left — a seat passes to (seat+1)%n — and pack 2 passes
+// right, to (seat+n-1)%n. Each seat holds a FIFO queue of packs; a seat
+// picks from the pack at the head of its queue, and the remainder moves on.
+// The next round's packs open only when every seat has emptied the current
+// round.
 //
 // The pod is deterministic regardless of interleaving: a pack visits seats
 // in a fixed order and a pick depends only on the pack's contents, so any
@@ -22,7 +22,8 @@ import (
 	"github.com/adams-shaun/gorge/limited"
 )
 
-// Seats is the pod size and Rounds the number of packs each seat opens.
+// Seats and Rounds are the hosted pod's shape (eventhost, New); NewPod
+// takes any shape in [MinSeats, MaxSeats] × [1, …].
 const (
 	Seats  = 4
 	Rounds = 3
@@ -79,28 +80,37 @@ type packState struct {
 
 // Pod is one draft's state machine.
 type Pod struct {
-	seed  uint64 // the event seed, carried for the event log layer
-	packs [Seats][Rounds][]limited.CardRef
+	seed   uint64                // the event seed, carried for the event log layer
+	packs  [][][]limited.CardRef // packs[seat][round-1] is what the seat opens that round
+	seats  int
+	rounds int
 
 	round  int // the round currently in progress, 1-based
-	queues [Seats][]packState
-	pools  [Seats][]limited.CardRef
-	seen   [Seats][][]limited.CardRef
-	pickNo [Seats]int // picks made by each seat in the current round
+	queues [][]packState
+	pools  [][]limited.CardRef
+	seen   [][][]limited.CardRef
+	pickNo []int // picks made by each seat in the current round
 
 	record []Picked
 }
 
-// New starts a pod of three rounds. packs[s][r-1] is the pack seat s opens
-// in round r; the caller generates it (booster, seeded from the event seed)
-// so the pod never depends on set data. The seed is accepted for symmetry
-// with the event layer's API and carried on the pod; the state machine
-// itself uses no randomness, because a pick's outcome depends only on the
-// pack contents and the seat's own history.
+// New starts a pod of the hosted 4×3 shape. packs[s][r-1] is the pack seat
+// s opens in round r; the caller generates it (booster, seeded from the
+// event seed) so the pod never depends on set data. The seed is accepted
+// for symmetry with the event layer's API and carried on the pod; the state
+// machine itself uses no randomness, because a pick's outcome depends only
+// on the pack contents and the seat's own history.
+//
+// A [4][3] array is always in shape, so NewPod cannot fail here; an
+// impossible error panics.
 func New(seed uint64, packs [Seats][Rounds][]limited.CardRef) *Pod {
-	p := &Pod{seed: seed, packs: packs, round: 1}
-	for s := range p.queues {
-		p.queues[s] = []packState{{originSeat: s, round: 1, remaining: append([]limited.CardRef(nil), packs[s][0]...)}}
+	sliced := make([][][]limited.CardRef, Seats)
+	for s := range packs {
+		sliced[s] = packs[s][:]
+	}
+	p, err := NewPod(seed, sliced)
+	if err != nil {
+		panic("draft: New: a 4×3 array is always in shape, got: " + err.Error())
 	}
 	return p
 }
@@ -111,6 +121,9 @@ func (p *Pod) Seed() uint64 { return p.seed }
 // Next reports whether seat has a pack to pick from, and what it looks like.
 // It never mutates the pod.
 func (p *Pod) Next(seat int) (PickView, bool) {
+	if seat < 0 || seat >= p.seats {
+		return PickView{}, false
+	}
 	q := p.queues[seat]
 	if len(q) == 0 {
 		return PickView{}, false
@@ -135,6 +148,9 @@ func (p *Pod) Next(seat int) (PickView, bool) {
 // direction; an emptied pack is dropped. When every queue is empty and
 // rounds remain, the next round's packs open.
 func (p *Pod) Pick(seat int, pickNo int, id string) error {
+	if seat < 0 || seat >= p.seats {
+		return ErrNotYourTurn
+	}
 	q := p.queues[seat]
 	if len(q) == 0 {
 		return ErrNotYourTurn
@@ -164,7 +180,7 @@ func (p *Pod) Pick(seat int, pickNo int, id string) error {
 	passed := *head
 	p.queues[seat] = q[1:]
 	if len(passed.remaining) > 0 {
-		next := (seat + passOffset(p.round)) % Seats
+		next := (seat + passOffset(p.round, p.seats)) % p.seats
 		p.queues[next] = append(p.queues[next], passed)
 	}
 	p.openNextRound()
@@ -174,7 +190,7 @@ func (p *Pod) Pick(seat int, pickNo int, id string) error {
 // Done reports whether the draft is finished: every pack of every round has
 // been emptied.
 func (p *Pod) Done() bool {
-	if p.round < Rounds {
+	if p.round < p.rounds {
 		return false
 	}
 	for s := range p.queues {
@@ -185,24 +201,34 @@ func (p *Pod) Done() bool {
 	return true
 }
 
-// Pool returns a copy of seat's drafted cards so far.
+// Pool returns a copy of seat's drafted cards so far; an out-of-range seat
+// gets nil.
 func (p *Pod) Pool(seat int) []limited.CardRef {
+	if seat < 0 || seat >= p.seats {
+		return nil
+	}
 	return append([]limited.CardRef(nil), p.pools[seat]...)
 }
 
-// QueueLen returns how many packs are waiting in seat's queue.
-func (p *Pod) QueueLen(seat int) int { return len(p.queues[seat]) }
+// QueueLen returns how many packs are waiting in seat's queue; an
+// out-of-range seat gets 0.
+func (p *Pod) QueueLen(seat int) int {
+	if seat < 0 || seat >= p.seats {
+		return 0
+	}
+	return len(p.queues[seat])
+}
 
 // Record returns a copy of the append-only pick record.
 func (p *Pod) Record() []Picked {
 	return append([]Picked(nil), p.record...)
 }
 
-// passOffset is how far a pack travels in a round's direction: left for
-// rounds 1 and 3, right for round 2.
-func passOffset(round int) int {
-	if round == 2 {
-		return Seats - 1
+// passOffset is how far a pack travels in a round's direction in an n-seat
+// pod: left for odd rounds, right for even rounds.
+func passOffset(round int, n int) int {
+	if round%2 == 0 {
+		return n - 1
 	}
 	return 1
 }
@@ -210,7 +236,7 @@ func passOffset(round int) int {
 // openNextRound starts the next round when the round barrier is reached:
 // every seat's queue empty and rounds left to play.
 func (p *Pod) openNextRound() {
-	if p.round >= Rounds {
+	if p.round >= p.rounds {
 		return
 	}
 	for s := range p.queues {
