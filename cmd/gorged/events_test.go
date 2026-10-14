@@ -17,6 +17,12 @@ import (
 	"github.com/adams-shaun/gorge/protocol"
 )
 
+// eventsPollEvery is the sleep between polls. It is a poll interval, not a
+// threshold: every wait it paces has a deadline of 10s or more, so load only
+// slows a poll and never turns PASS into FAIL (the wall-clock ratchet,
+// internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+const eventsPollEvery = time.Second / 20
+
 // startEventsServer serves one config on a loopback port and waits until
 // the API answers, the way TestServesTablesOverHTTP does. The server stops
 // at cleanup; errc carries serve's return value into the same cleanup.
@@ -47,7 +53,7 @@ func startEventsServer(t *testing.T, cfg config) string {
 		if time.Now().After(deadline) {
 			t.Fatalf("server did not come up: %v", err)
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(eventsPollEvery)
 	}
 }
 
@@ -107,7 +113,7 @@ func TestEventsBotOnlyPodCompletesOverHTTP(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("event not COMPLETE in 50s (phase %s)", st.Phase)
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(eventsPollEvery)
 	}
 
 	// The store: the event's log.jsonl exists and ends with EventEnded.

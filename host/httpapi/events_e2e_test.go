@@ -23,6 +23,12 @@ import (
 	"github.com/adams-shaun/gorge/state"
 )
 
+// eventsPollEvery is the sleep between polls. It is a poll interval, not a
+// threshold: every wait it paces has a deadline of 10s or more, so load only
+// slows a poll and never turns PASS into FAIL (the wall-clock ratchet,
+// internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+const eventsPollEvery = time.Second / 20
+
 // mapGate is the seat gate the e2e stands in for cmd/gorged's seatGate: a
 // mint/resolve pair over two maps, reading the bearer header and the ?token=
 // query exactly like the production gate, so the event game tokens the
@@ -309,7 +315,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 			t.Fatalf("pack: %d %s", code, e.Code)
 		}
 		if pack.Waiting || len(pack.Pack) == 0 {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(eventsPollEvery)
 			continue
 		}
 		ids := make([]string, 0, len(pack.Pack))
@@ -409,7 +415,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("round-1 (0,3) series never went live with a join link: %+v", series)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(eventsPollEvery)
 	}
 	u, err := url.Parse(series.Join)
 	if err != nil {
@@ -431,7 +437,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("seat-scoped game view never answered 200 (last %d %s)", code, e.Code)
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(eventsPollEvery)
 	}
 
 	// The rounds: the event completes with a sane standings table and a
@@ -449,7 +455,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("event not COMPLETE in 50s (phase %s)", final.Phase)
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(eventsPollEvery)
 	}
 	if final.You == nil || *final.You != 0 {
 		t.Fatalf("token'd state You=%v, want 0", final.You)
