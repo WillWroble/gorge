@@ -18,13 +18,13 @@
    * replaces it; when the next game starts the series is live again and
    * both disappear, leaving the board and its prompt dock alone.
    *
-   * `onInPlay` reports whether the viewer's series on this table is still being
-   * played (live, or between games). The table page reads it so a series
-   * table between two matches keeps the finished board: the client's table
-   * store guesses "idle" at a non-perpetual table's match_end, but a series
-   * table goes on to its next match (the server shows it as cooldown).
+   * Whether the table page shows the finished board or the match list is
+   * not this component's business: the table store learns a series table's
+   * between-games state from the server (TableInfo.series and the table_state
+   * frame), so the board stays up between games whether or not this overlay
+   * is mounted.
    */
-  let { table, onInPlay = null }: { table: string; onInPlay?: ((inPlay: boolean) => void) | null } = $props();
+  let { table }: { table: string } = $props();
 
   const ctx = tableEventSeat(typeof location === 'undefined' ? '' : location.search);
   const client = ctx ? new EventClient(ctx.event, ctx.seat) : null;
@@ -53,9 +53,6 @@
   const row = $derived(st ? viewerSeries(st, table) : null);
   const between = $derived(row !== null && row.state === 'between' && you !== null);
   const waiting = $derived(between && row !== null && you !== null && waitingOn(row, you));
-  $effect(() => {
-    onInPlay?.(row !== null && (row.state === 'live' || row.state === 'between'));
-  });
   // The player may fold the panel away to look at the finished board.
   let folded = $state(false);
 </script>

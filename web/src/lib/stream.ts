@@ -21,8 +21,7 @@ export interface Stream {
 // the way table_state (E3-fx2) was by the old hand-maintained list. The four
 // draft-event frames (event_state, draft_pack, pod_progress, series_update)
 // ride the same session stream once POST /api/events/{id}/subscribe binds the
-// session to an event; table_state is listed ahead of its generated union
-// member so the client accepts the frame the moment the server emits it.
+// session to an event.
 const FRAME_TYPES = [
   'hello', 'widget', 'match_start', 'snapshot', 'event', 'decision', 'match_end', 'table_halted', 'table_state', 'overflow', 'error', 'rewind',
   'event_state', 'draft_pack', 'pod_progress', 'series_update',
