@@ -220,7 +220,18 @@ func BoardFromGameInto(g *state.Game, ch Chars, me state.PlayerID, b *Board) Boa
 	if !b.noOwnLibrary {
 		fillOwnLibrary(g, me, b.OwnDeck, &b.OwnLibrary)
 	}
-	if b.fillTablesInc(g, ch, me) {
+	// CR 103.5: while the CR 103.1 play/draw choice is unresolved no player
+	// may see any hand, so the deciding seat's own hand-cards census is
+	// skipped (the count stays in HandSize). ch's optional
+	// StartingChoicePending capability (rules.Engine) answers it; a Chars
+	// without it (a snapshot, a test stand-in) never blinds, matching the
+	// R-9 no-ask host. Both the incremental and the scratch fill honour it,
+	// so the two agree (boardIncVerify).
+	hideHand := false
+	if s, ok := ch.(interface{ StartingChoicePending() bool }); ok {
+		hideHand = s.StartingChoicePending()
+	}
+	if b.fillTablesInc(g, ch, me, hideHand) {
 		fillCommanders(g, b)
 		if boardIncVerify {
 			verifyIncBoard(g, ch, me, b)
@@ -285,6 +296,9 @@ func BoardFromGameInto(g *state.Game, ch Chars, me state.PlayerID, b *Board) Boa
 	// off the same Derived keyword list the View projects), and false for
 	// the battlefield, whose permanents are already cast.
 	for _, z := range [...]state.Zone{state.ZHand, state.ZGraveyard, state.ZBattlefield, state.ZCommand} {
+		if hideHand && z == state.ZHand {
+			continue
+		}
 		for _, id := range g.Zone(z, me) {
 			o := g.Obj(id)
 			if o == nil || o.Ephemeral() {

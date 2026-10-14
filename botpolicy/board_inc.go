@@ -197,8 +197,10 @@ func (r *boardRow) keywords() []string {
 // fillTablesInc fills Life, Creatures and Cards (the creature census and
 // both card censuses of BoardFromGameInto, in the same order) from the row
 // cache, reporting false -- having written nothing -- when ch cannot key it.
-// The tables were Reset by the caller.
-func (b *Board) fillTablesInc(g *state.Game, ch Chars, me state.PlayerID) bool {
+// The tables were Reset by the caller. hideHand (CR 103.5, BoardFromGameInto)
+// skips the deciding seat's hand cards so the census matches the scratch
+// fill's.
+func (b *Board) fillTablesInc(g *state.Game, ch Chars, me state.PlayerID, hideHand bool) bool {
 	k, ok := ch.(boardReadKeyer)
 	if !ok {
 		return false
@@ -252,6 +254,9 @@ func (b *Board) fillTablesInc(g *state.Game, ch Chars, me state.PlayerID) bool {
 		}
 	}
 	for _, z := range [...]state.Zone{state.ZHand, state.ZGraveyard, state.ZBattlefield, state.ZCommand} {
+		if hideHand && z == state.ZHand {
+			continue
+		}
 		for _, id := range g.Zone(z, me) {
 			o := g.Obj(id)
 			if o == nil || o.Ephemeral() {

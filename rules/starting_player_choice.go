@@ -75,6 +75,18 @@ func (e *Engine) tossOutcome(cfg Config, toss int) (seat int, note string, confi
 	return seat, note, configured
 }
 
+// StartingChoicePending reports whether the CR 103.1 play/draw choice is
+// still unresolved. It is true from the end of New's deal (once the opening
+// deal has fixed the survivors) until the choice is answered or defaulted --
+// the window in which CR 103.5's "no player may see any hand" rule binds, so
+// a seat-scoped projection or bot input suppresses every hand-derived fact
+// while it holds. It is the read side of tossChoice.active for the view and
+// botpolicy layers, which reach it through an optional capability interface
+// rather than importing rules (Ruling F7).
+func (e *Engine) StartingChoicePending() bool {
+	return e != nil && e.tossChoice.active
+}
+
 // AskStartingPlayer poses the CR 103.1 winner-chooses decision when one is
 // available and returns it, or nil when there is nothing to choose (a
 // terminal deal, a sole survivor, an eliminated winner, a choice already
