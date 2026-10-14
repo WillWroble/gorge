@@ -17,6 +17,11 @@
 //	          files: the repro path for a faulted game
 //	cards     write cards.json only
 //
+// -hands (on by default) adds each seat's in-hand cards to every row (ha,
+// hb): its opening hand after mulligans plus every card it later drew, the
+// 17Lands GIH set. -az pilots both seats with the az search instead of
+// -pilot (az.go).
+//
 // -notes adds a census of every engine Note by its source card
 // (notes.json), the way to find cards the engine plays approximately.
 // Data and analysis scripts live in /mnt/sata/gorge-training/cardval.
@@ -81,6 +86,8 @@ type gameLine struct {
 	Turns   int    `json:"turns"`
 	Stall   string `json:"stall,omitempty"`
 	Mull    [2]int `json:"mull"`
+	HA      []int  `json:"ha,omitempty"` // seat 0's in-hand cards (handLog)
+	HB      []int  `json:"hb,omitempty"`
 	Err     string `json:"err,omitempty"`
 }
 
@@ -100,6 +107,12 @@ func main() {
 		notes    = flag.Bool("notes", false, "census every engine Note by its source card into notes.json")
 		line     = flag.String("line", "", "replay: a games.jsonl row to replay; writes the two deck files and the result")
 		dumplog  = flag.Bool("dumplog", false, "replay: also dump the replayed game's event log to replay-events.json")
+		inHand   = flag.Bool("hands", true, "record each seat's in-hand cards (opening hand + draws) per game")
+		az       = flag.Bool("az", false, "pilot both seats with the az search (az.go) instead of -pilot")
+		azNet    = flag.String("az-net", "", "with -az: the .dzgw network; empty = no network (knows no card)")
+		azSims   = flag.Int("az-sims", 25, "with -az: simulations per searched decision")
+		azBelief = flag.Int("az-belief", 2000, "with -az: random decks in the closed-list belief")
+		maxObjs  = flag.Int("max-objs", 2000, "board-size cap: a game past it is a stall, not a 20 GB process (0 = off)")
 	)
 	flag.Parse()
 	if *out == "" {
@@ -109,12 +122,21 @@ func main() {
 		fail("%v", err)
 	}
 	var nc *noteCensus
-	opts := draftlab.Options{}
+	var hl *handLog
 	if *notes {
 		nc = &noteCensus{by: map[string]map[string]int{}, attributed: map[string]map[string]int{},
 			playMiss: map[string][]playMissSet{}, seeds: map[string][]uint64{},
 			abortAttr: map[string]map[string]int{}}
-		opts.OnEngine = nc.add
+	}
+	// the az pilot is an Env seat with a closed list: a bot-only game
+	opts := draftlab.Options{AllowDecklistBots: *az, MaxObjs: *maxObjs}
+	opts.OnEngine = func(seed uint64, eng *rules.Engine) {
+		if nc != nil {
+			nc.add(seed, eng)
+		}
+		if hl != nil {
+			hl.add(seed, eng)
+		}
 	}
 	if *dumplog {
 		if nc != nil {
@@ -130,6 +152,22 @@ func main() {
 	if err != nil {
 		fail("%v", err)
 	}
+	cs, err := eligible(lab, *set)
+	if err != nil {
+		fail("%v", err)
+	}
+	pairs := pairsOf(cs)
+	if *inHand {
+		hl = newHandLog(cs)
+	}
+	g := gen{cs: cs, pairs: pairs, creatures: *creature, lab: lab, hands: hl}
+	label := *pilot
+	if *az {
+		if label, err = registerAZ(&g, *azNet, *azSims, *azBelief, *seed); err != nil {
+			fail("%v", err)
+		}
+		*pilot = azPolicy
+	}
 	ref, err := draftlab.ParseAgent(*pilot)
 	if err != nil {
 		fail("%v", err)
@@ -138,14 +176,13 @@ func main() {
 	if err != nil {
 		fail("%v", err)
 	}
-	cs, err := eligible(lab, *set)
-	if err != nil {
-		fail("%v", err)
+	g.player = player
+	if !*az {
+		label = player.Ref.String()
 	}
-	pairs := pairsOf(cs)
 	writeJSON(*out+"/cards.json", cs)
 	writeJSON(*out+"/run.json", map[string]any{
-		"set": *set, "mode": *mode, "pilot": player.Ref.String(), "n": *n,
+		"set": *set, "mode": *mode, "pilot": label, "n": *n,
 		"decks": *decks, "per": *per, "seed": *seed, "creatures": *creature,
 	})
 
@@ -156,7 +193,6 @@ func main() {
 		replayLine(lab, player, cs, pairs, *line, *out)
 		return
 	}
-	g := gen{cs: cs, pairs: pairs, creatures: *creature, lab: lab, player: player}
 	var jobs []func() []gameLine
 	switch *mode {
 	case "random":
@@ -186,6 +222,11 @@ func main() {
 		writeJSON(*out+"/notes-aborts.json", nc.abortAttr)
 		writeJSON(*out+"/notes-playmiss.json", nc.playMiss)
 		writeJSON(*out+"/notes-seeds.json", nc.seeds)
+	}
+	if *az {
+		writeJSON(*out+"/az.json", &azStats)
+		fmt.Fprintf(os.Stderr, "cardval: az: %d decisions, %d searched, %d feed-stopped, %d refused, %.1f sims/searched\n",
+			azStats.Decisions, azStats.Searched, azStats.FeedStopped, azStats.Refused, float64(azStats.Sims)/max(1, float64(azStats.Searched)))
 	}
 }
 
@@ -398,6 +439,7 @@ type gen struct {
 	creatures int
 	lab       *draftlab.Lab
 	player    draftlab.NamedPlayer
+	hands     *handLog
 }
 
 // randomDeck draws a pair and 23 distinct nonland cards (g.creatures of them
@@ -465,6 +507,11 @@ func (g *gen) play(a, b draftlab.Deck, s uint64, line gameLine) gameLine {
 		return line
 	}
 	line.Winner, line.Starter, line.Turns, line.Stall, line.Mull = r.Winner, r.Starter, r.Turns, r.Stall, r.Mulligans
+	if g.hands != nil {
+		if h, ok := g.hands.take(s); ok {
+			line.HA, line.HB = h[0], h[1]
+		}
+	}
 	return line
 }
 

@@ -35,6 +35,12 @@ type Options struct {
 	MaxTurns int
 	// MaxIntents caps a game's intents; 0 = 40000 (draftsim).
 	MaxIntents int
+	// MaxObjs arms the engine's board-size cap (rules.LoopGuard.MaxObjs):
+	// a game whose object arena passes it stops as a stall instead of
+	// growing without bound (a token-doubling board such as Doubling Season
+	// with Extravagant Replication doubles every upkeep until the turn cap,
+	// and one such game held 20 GB). 0 = off, the historical default.
+	MaxObjs int
 	// Mulligans is the London mulligan round per seat; 0 = 2 (draftsim);
 	// < 0 = none.
 	Mulligans int
