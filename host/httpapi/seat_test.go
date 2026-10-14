@@ -139,6 +139,44 @@ func parkedSeat(t *testing.T, r *host.Registry) (parked, other state.PlayerID) {
 	}
 }
 
+// pastStartingChoice parks a human seat on a decision AFTER the CR 103.1
+// starting-player choice. While that choice is pending no seat may see any
+// hand card (CR 103.5, E3-fx1), so a test about hand redaction between seats
+// has to look at the next decision (the London mulligan), where each seat
+// sees its own opening hand again. The choice is answered over HTTP by the
+// seat that owns it, exactly as a client would.
+func pastStartingChoice(t *testing.T, srv *httptest.Server, r *host.Registry) (parked, other state.PlayerID) {
+	t.Helper()
+	for i := 0; i < 8; i++ {
+		parked, other = parkedSeat(t, r)
+		d, err := r.Pending("t1", 1, parked)
+		if err != nil {
+			t.Fatalf("pending for parked seat %d: %v", parked, err)
+		}
+		if d.Kind != decision.KStartingPlayer {
+			return parked, other
+		}
+		sess := "s" + strconv.Itoa(int(parked))
+		if code, e, _ := seatReq(t, http.MethodPost, srv.URL+"/api/tables/t1/matches/1/intent", sess, answerFor(d)); code >= 300 {
+			t.Fatalf("answering the starting-player choice: %d %+v", code, e)
+		}
+		// Wait for the head to move past the answered choice before re-parking.
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			nd, err := r.Pending("t1", 1, parked)
+			if err != nil || nd.Seq != d.Seq {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("the starting-player answer was never consumed")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	t.Fatal("still parked on a starting-player choice after 8 answers")
+	return 0, 0
+}
+
 // seatReq runs an HTTP request carrying the X-Seat-Session claim header
 // ("" = no claim presented, the spectator path) and returns the status, the
 // decoded error body (zero when the status is < 400) and the raw body, so a
@@ -330,7 +368,7 @@ func TestSeatParamAbsentIsByteIdenticalToToday(t *testing.T) {
 // seat's ?seat= is refused before any projection runs.
 func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	srv, r := parkedSeatServer(t, seatClaims)
-	parked, other := parkedSeat(t, r)
+	parked, other := pastStartingChoice(t, srv, r)
 	ps, os := "s"+strconv.Itoa(int(parked)), "s"+strconv.Itoa(int(other))
 	head := liveHead(t, r)
 
