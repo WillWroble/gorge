@@ -119,6 +119,35 @@ describe('images', () => {
     tick(60_000);
     expect(im.offline()).toBe(false);
   });
+  it('retries a 503 pending name on its own, never going offline, and keeps resolving other names', async () => {
+    // cmd/gorged answers 503 when its Scryfall fetch outlives the wait
+    // budget (errArtPending): a cold cache does this for a burst of names.
+    // It used to take the 60s offline rest and blank every later card.
+    const { env, calls, tick, store } = fakeEnv({ B: { image_uris: { normal: '/art/blob/b.jpg' } } });
+    let aTries = 0;
+    const base = env.fetch;
+    env.fetch = (async (url: string, init?: RequestInit) => {
+      if (url.includes('exact=A')) {
+        calls.push(url);
+        aTries++;
+        if (aTries <= 2) return new Response('pending', { status: 503 });
+        return new Response(JSON.stringify({ image_uris: { normal: '/art/blob/a.jpg' } }), { status: 200 });
+      }
+      return base(url, init);
+    }) as unknown as typeof fetch;
+    const im = createImages(env);
+    const a = im.url('A');
+    await Promise.resolve(); await Promise.resolve();
+    expect(im.offline()).toBe(false);
+    const b = im.url('B');
+    for (let i = 0; i < 4; i++) { tick(100); for (let k = 0; k < 6; k++) await Promise.resolve(); }
+    expect(await b).toBe('/art/blob/b.jpg');
+    for (let i = 0; i < 3; i++) { tick(3_000); for (let k = 0; k < 6; k++) await Promise.resolve(); }
+    expect(await a).toBe('/art/blob/a.jpg');
+    expect(aTries).toBe(3);
+    expect(im.offline()).toBe(false);
+    expect(store.get(IMAGE_KEY + 'A')).toBe('/art/blob/a.jpg');
+  });
   it('aborts a lookup still in flight after the 10s timeout, resolves null, and never stores the miss', async () => {
     // The production failure this pins (task fb-20260916T225456Z): gorged's
     // /art/named proxy queues behind the art cache's pacing semaphore while
