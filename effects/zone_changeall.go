@@ -158,7 +158,11 @@ func effChangeZoneAll(h Host, c *Ctx, sa *cards.SA) {
 	// a card moved (read off the object, not the source-zone player), in the
 	// loop's own deterministic (zone-major, AliveFrom(0)-minor) order.
 	position := cza.LibraryPosition
-	shuffle := cza.ShuffleTrue
+	// NoShuffle$ (the TwoPiles pile body's forced opt-out) wins over an
+	// explicit Shuffle$ True, exactly as ChangeZone's objectPathShuffleOwed
+	// resolves the pair; noShuffleBody only forces it on a body that named
+	// neither flag, so the two never actually co-occur.
+	shuffle := cza.ShuffleTrue && !cza.NoShuffle
 	type ownerMoved struct {
 		owner state.PlayerID
 		ids   []state.ObjID
@@ -412,7 +416,8 @@ func effChangeZoneAll(h Host, c *Ctx, sa *cards.SA) {
 		// Shuffle$ True shuffles each destination library that received a card,
 		// AFTER the placement (Gomazoa's "put on top ..., then those players
 		// shuffle" order), through the same Secret events.Shuffle every other
-		// library shuffle emits.
+		// library shuffle emits. NoShuffle$ True (the forced TwoPiles opt-out)
+		// suppresses it.
 		if shuffle {
 			for _, pm := range placements {
 				shuffleLibraryOrder(h, pm.owner)

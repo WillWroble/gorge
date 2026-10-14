@@ -67,9 +67,15 @@ type ChangeZoneAllParams struct {
 	DefinedPresent    bool
 	DefinedText       string
 
-	// The library tail: LibraryPosition$ and Shuffle$ True.
+	// The library tail: LibraryPosition$, Shuffle$ True and NoShuffle$ True.
 	LibraryPosition string
 	ShuffleTrue     bool
+	// NoShuffle$ is the opt-out a TwoPiles pile body forces (noShuffleBody):
+	// ChangeZoneAll has no default search shuffle to suppress, but the key
+	// must still be consumed so the forced flag is not reported unread.
+	// noShuffleBody forces it only on a body that named neither Shuffle$ nor
+	// NoShuffle$, so an explicit Shuffle$ True is never paired with it.
+	NoShuffle bool
 
 	// Flags.
 	RandomOrder     bool
@@ -111,7 +117,7 @@ var changeZoneAllKnownKeys = [...]string{
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IsCurse",
 	"IsPresent", "KW", "Keyword", "KeywordLine", "LibraryPosition",
 	"MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity",
-	"NewController", "OpponentTurn",
+	"NewController", "NoShuffle", "OpponentTurn",
 	"Origin", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "RandomOrder", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberChanged", "RememberCostMana", "RememberLKI",
@@ -205,6 +211,7 @@ func compileChangeZoneAll(sa *cards.SA, tp *TargetParams, dp *DefinedParams) *Ch
 
 	p.LibraryPosition = strings.TrimSpace(sa.ParamStr(cards.PKLibraryPosition))
 	p.ShuffleTrue = strings.EqualFold(sa.ParamStr(cards.PKShuffle), "True")
+	p.NoShuffle = isTrue(sa.ParamStr(cards.PKNoShuffle))
 
 	p.RandomOrder = compileChangeZoneRandomOrder(sa)
 	p.RememberLKI = isTrue(sa.ParamStr(cards.PKRememberLKI))
