@@ -3,6 +3,7 @@ package botpolicy
 import (
 	"testing"
 
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -34,10 +35,14 @@ func (c blindChars) Characteristics(id state.ObjID) (int32, int32, []string) {
 // TestStartingChoiceBoardHidesHand is the botpolicy half of CR 103.5: while
 // the CR 103.1 choice is pending, the deciding seat's own hand cards must not
 // reach the Board a bot decision is answered from (the count stays in
-// HandSize). It asserts the hand card is absent while a pending-capable Chars
-// is handed in and present for the same game without that capability (the
-// R-9 no-ask control), through both the scratch fill and the incremental
-// refill of one reused Board.
+// HandSize). The own-library fold is hidden with them: it folds the seat's
+// own hand (botpolicy/ownlibrary.go), so an OwnLibrary filled while the
+// choice is pending would be the complement of the hidden hand and reveal it
+// (hand = decklist − OwnLibrary). It asserts the hand card is absent and
+// OwnLibrary zero while a pending-capable Chars is handed in, and present --
+// with a nonzero (no-manifest) composition -- for the same game without that
+// capability (the R-9 no-ask control), through both the scratch fill and the
+// incremental refill of one reused Board.
 func TestStartingChoiceBoardHidesHand(t *testing.T) {
 	g := state.NewGame([]string{"alice", "bob"})
 	hand := g.AddObject(cardFace(t, "Ambusher", "Creature Rogue", 3, 9), 0)
@@ -62,10 +67,16 @@ func TestStartingChoiceBoardHidesHand(t *testing.T) {
 
 	// Control: the same game with a Chars that carries no pending capability
 	// (the R-9 no-ask host) keeps the hand card, so the redaction is the
-	// capability's doing, not a blanket drop.
+	// capability's doing, not a blanket drop. The control's OwnLibrary is
+	// nonzero (the no-manifest unknown) -- the precondition that proves the
+	// fold actually ran and the field is reachable, i.e. the blind's zero is
+	// the skip's doing and not a stub that never fills it.
 	open := BoardFromGame(g, stubChars{}, 0)
 	if _, ok := open.Cards.Lookup(hand.ID); !ok {
 		t.Errorf("control: hand card %d absent without the pending capability", hand.ID)
+	}
+	if open.OwnLibrary.Unknown != deck.UnknownNoManifest {
+		t.Errorf("control: OwnLibrary = %+v, want the no-manifest unknown (the fold ran)", open.OwnLibrary)
 	}
 }
 
@@ -81,5 +92,11 @@ func assertHandRedacted(t *testing.T, path string, b Board, hand state.ObjID, pr
 	}
 	if b.HandSize != 1 {
 		t.Errorf("%s fill: HandSize = %d, want 1 (the count is public)", path, b.HandSize)
+	}
+	// The library composition is the hand's complement (hand = decklist −
+	// OwnLibrary), so it must be zero while the choice is pending.
+	if b.OwnLibrary.Known || b.OwnLibrary.Unknown != 0 || b.OwnLibrary.Size != 0 ||
+		b.OwnLibrary.Lands != 0 || b.OwnLibrary.Nonlands != 0 || len(b.OwnLibrary.Counts) != 0 {
+		t.Errorf("%s fill: OwnLibrary = %+v, want zero while the starting choice is pending", path, b.OwnLibrary)
 	}
 }

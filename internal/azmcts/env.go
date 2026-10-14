@@ -114,12 +114,24 @@ type heuristicLeafChars struct{ view.Chars }
 
 func (heuristicLeafChars) PotentialActions(state.PlayerID) []decision.PotentialAction { return nil }
 func (heuristicLeafChars) OwnDeck(state.PlayerID) *deck.Manifest                      { return nil }
-func (heuristicLeafChars) AvailableMana(state.PlayerID) state.Mana                    { return state.Mana{} }
-func (heuristicLeafChars) AbilityCosts(state.PlayerID, state.ObjID) []string          { return nil }
-func (heuristicLeafChars) Keywords(state.ObjID) []string                              { return nil }
-func (heuristicLeafChars) MayLookAtLibraryTop(state.PlayerID) bool                    { return false }
-func (heuristicLeafChars) SuppressOwnLibrary() bool                                   { return true }
-func (heuristicLeafChars) SuppressCardTokens() bool                                   { return true }
+
+// StartingChoicePending forwards the engine's CR 103.5 pending-answer
+// capability (rules.Engine.StartingChoicePending) through the wrapper: it
+// embeds the view.Chars INTERFACE, so the projector's and
+// botpolicy.BoardFromGameInto's capability assertions would silently see
+// "not pending" and leave the hand visible without it.
+func (c heuristicLeafChars) StartingChoicePending() bool {
+	if s, ok := c.Chars.(interface{ StartingChoicePending() bool }); ok {
+		return s.StartingChoicePending()
+	}
+	return false
+}
+func (heuristicLeafChars) AvailableMana(state.PlayerID) state.Mana           { return state.Mana{} }
+func (heuristicLeafChars) AbilityCosts(state.PlayerID, state.ObjID) []string { return nil }
+func (heuristicLeafChars) Keywords(state.ObjID) []string                     { return nil }
+func (heuristicLeafChars) MayLookAtLibraryTop(state.PlayerID) bool           { return false }
+func (heuristicLeafChars) SuppressOwnLibrary() bool                          { return true }
+func (heuristicLeafChars) SuppressCardTokens() bool                          { return true }
 
 // priorView is the config's reusable prior projection, nil without scratch.
 func (c *walkConfig) priorView() *view.View {

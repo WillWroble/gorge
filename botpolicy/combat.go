@@ -217,9 +217,6 @@ func BoardFromGameInto(g *state.Game, ch Chars, me state.PlayerID, b *Board) Boa
 	b.PoolRestricted = RestrictedPool(g.Players[me].RestrictedMana)
 	b.LibrarySize = int32(len(g.Zone(state.ZLibrary, me)))
 	b.HandSize = int32(len(g.Zone(state.ZHand, me)))
-	if !b.noOwnLibrary {
-		fillOwnLibrary(g, me, b.OwnDeck, &b.OwnLibrary)
-	}
 	// CR 103.5: while the CR 103.1 play/draw choice is unresolved no player
 	// may see any hand, so the deciding seat's own hand-cards census is
 	// skipped (the count stays in HandSize). ch's optional
@@ -230,6 +227,19 @@ func BoardFromGameInto(g *state.Game, ch Chars, me state.PlayerID, b *Board) Boa
 	hideHand := false
 	if s, ok := ch.(interface{ StartingChoicePending() bool }); ok {
 		hideHand = s.StartingChoicePending()
+	}
+	// The own-library fold walks the deciding seat's own hand
+	// (botpolicy/ownlibrary.go), so while the choice is pending it would be
+	// the complement of the hidden hand and reveal it -- the same rationale
+	// the view half gates the viewer's own Library on (view/view.go
+	// pr.hideHand). While it holds the fold is skipped and the composition
+	// zeroed (the noOwnLibrary callers' documented "untouched (zero)"),
+	// which the explicit zero makes hold even for a Board refilled from a
+	// previously filled state.
+	if !b.noOwnLibrary && !hideHand {
+		fillOwnLibrary(g, me, b.OwnDeck, &b.OwnLibrary)
+	} else {
+		b.OwnLibrary = deck.LibraryComposition{}
 	}
 	if b.fillTablesInc(g, ch, me, hideHand) {
 		fillCommanders(g, b)
