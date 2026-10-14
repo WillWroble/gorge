@@ -604,7 +604,13 @@ fi
 # finish first.
 go test -p=1 ./internal/searchprobe/ & e=$!
 go test -p=1 -run '^TestCommittedOvershootCaptureReplaysToTheParkedAsk$' ./host/ & f=$!
-pids="$a1 $a2 $a3 $a4 $a5 $a6 $b $c $d $e $f${hp:+ $hp}"
+# The wall-clock ratchet is a tree census (it reads every *_test.go in the
+# repo), so an import-based selection never picks internal/testutil for a
+# ticket that only adds a sleep to its own tests. Three seat tickets in a row
+# (E1-5 5a52e10ce, E1-7 0106f8c26, E3-4 3858457ec) turned main RED on it
+# post-merge. ~1 s alone; always run.
+go test -p=1 -run '^TestNoNewSubSecondWallClockThresholdInTests$' ./internal/testutil/ & wc=$!
+pids="$a1 $a2 $a3 $a4 $a5 $a6 $b $c $d $e $f $wc${hp:+ $hp}"
 # The four templates shards (tpl=1, extracted above): three named -run
 # patterns plus the -skip remainder, read one per line from
 # templates_shard_patterns. Each stays under the operator's 1-minute
