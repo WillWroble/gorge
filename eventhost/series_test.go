@@ -427,6 +427,12 @@ func parkSeries(h *Host, ctx context.Context, id host.TableID, k int) <-chan ser
 }
 
 // assertParked fails if the parked call answers within d.
+// parkDwell is how long a "still parked" check waits for an early answer. It
+// is a dwell window, not a threshold: a correct park never answers, so load
+// can only make the check weaker, never turn PASS into FAIL (the wall-clock
+// ratchet, internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+const parkDwell = time.Second / 2
+
 func assertParked(t *testing.T, ch <-chan seriesRes, d time.Duration) {
 	t.Helper()
 	select {
@@ -512,7 +518,7 @@ func TestSeriesHookWaitsAndCloseReleases(t *testing.T) {
 	// unblocks it.
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := parkSeries(p.h, ctx, tableID, 2)
-	assertParked(t, ch, 500*time.Millisecond)
+	assertParked(t, ch, parkDwell)
 	cancel()
 	if res := assertAnswered(t, ch, 10*time.Second); res.ok {
 		t.Fatalf("cancelled park answered ok: %+v", res.g)
@@ -521,7 +527,7 @@ func TestSeriesHookWaitsAndCloseReleases(t *testing.T) {
 	// A second park is released by Close: the call answers no and Close
 	// returns.
 	ch = parkSeries(p.h, context.Background(), tableID, 2)
-	assertParked(t, ch, 500*time.Millisecond)
+	assertParked(t, ch, parkDwell)
 	closed := make(chan error, 1)
 	go func() { closed <- p.h.Close() }()
 	if res := assertAnswered(t, ch, 10*time.Second); res.ok {
