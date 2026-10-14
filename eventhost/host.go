@@ -85,7 +85,7 @@ type run struct {
 	seriesTable map[[2]int]host.TableID
 	waiters     map[host.TableID]waiter
 	live        atomic.Bool // phase not COMPLETE or CANCELLED; read under Host.mu for the capacity bound
-	justDraft  bool        // the draft ended since the last broadcast: one last pod_progress
+	justDraft   bool        // the draft ended since the last broadcast: one last pod_progress
 	// E1-8: when the event was created, and when each human seat last
 	// acted successfully. The sweep reads them under mu; replay never does.
 	createdAt time.Time
