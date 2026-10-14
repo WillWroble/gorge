@@ -71,7 +71,7 @@ func TestOldLogReplaysAfterTagChange(t *testing.T) {
 	if !reflect.DeepEqual(d0, want) {
 		t.Errorf("seat 0 deck %+v, want %+v", d0, want)
 	}
-	if got, want := e2.Seats(), e.Seats(); got != want {
+	if got, want := e2.Seats(), e.Seats(); !reflect.DeepEqual(got, want) {
 		t.Errorf("seats %+v, want %+v", got, want)
 	}
 	if !reflect.DeepEqual(e2.Standings(), e.Standings()) {

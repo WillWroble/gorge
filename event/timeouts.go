@@ -2,8 +2,6 @@ package event
 
 import (
 	"fmt"
-
-	"github.com/adams-shaun/gorge/limited/draft"
 )
 
 // The two timeout entries (E1-8) let the host tear down or carry an
@@ -30,11 +28,13 @@ func (e *Event) applyIdleTimeout(en *Entry) error {
 		return fmt.Errorf("event: IdleTimeout: event not created")
 	}
 	switch e.phase {
-	case PhaseDraft, PhaseBuild, RoundPhase(1), RoundPhase(2), RoundPhase(3):
+	case PhaseDraft, PhaseBuild:
 	default:
-		return fmt.Errorf("event: IdleTimeout: illegal in phase %s", e.phase)
+		if !e.inRound() {
+			return fmt.Errorf("event: IdleTimeout: illegal in phase %s", e.phase)
+		}
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: IdleTimeout: seat %d out of range", en.Seat)
 	}
 	return nil

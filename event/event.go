@@ -18,6 +18,10 @@ type Phase string
 // COMPLETE is reached only through the EventEnded entry; CANCELLED (E1-8)
 // is reached only through the LobbyTimeout entry, when nobody joined an
 // event within its lobby window.
+//
+// PhaseDraft is the supply phase of BOTH modes: a draft event drafts its
+// pod there, and a sealed event only opens its packs into the seats' pools
+// (the name predates the sealed mode and is kept so logs stay comparable).
 const (
 	PhaseLobby     Phase = "LOBBY"
 	PhaseDraft     Phase = "DRAFT"
@@ -26,7 +30,8 @@ const (
 	PhaseCancelled Phase = "CANCELLED"
 )
 
-// RoundPhase spells the phase of event round r (1..3).
+// RoundPhase spells the phase of event round r (1..the event's round
+// count).
 func RoundPhase(r int) Phase { return Phase("ROUND" + strconv.Itoa(r)) }
 
 // SeatSpec describes one entrant. Kind is the entrant's broad type ("bot"
@@ -58,20 +63,29 @@ type Event struct {
 	phase  Phase
 	seed   uint64
 	set    string
-	seats  [4]SeatSpec
+	seats  []SeatSpec
 	cooked bool // an EventCreated has been applied
+
+	// The EventCreated shape, normalized: the logged entry keeps the values
+	// exactly as given (mode "" stays "", Packs 0 stays 0).
+	mode      string // ModeDraft or ModeSealed; "" before EventCreated
+	structure string // StructureRoundRobin or StructureNone; "" before EventCreated
+	packsPer  int
+	rounds    int // 0 for StructureNone
+	collation string
 
 	log []Entry
 
-	packs      [draft.Rounds][draft.Seats][]limited.CardRef
-	packOpen   [draft.Rounds][draft.Seats]bool
+	packs      [][][]limited.CardRef // [pack-1][seat]
+	packOpen   [][]bool              // [pack-1][seat]
 	packCount  int
 	packIDs    map[string]struct{} // every CardRef ID seen in a pack
 	pod        *draft.Pod
 	podStarted bool
+	podErr     error // a draft.NewPod failure (impossible for a validated event)
 
-	decks [draft.Seats][]savedDeck
-	ready [draft.Seats]int // the readied revision, 0 = not ready
+	decks [][]savedDeck
+	ready []int // the readied revision, 0 = not ready
 
 	round    int // the current event round, 0 outside the rounds
 	pairings [][2]int
@@ -137,8 +151,11 @@ func (e *Event) Seed() uint64 { return e.seed }
 // SetCode reports the drafted set code from its EventCreated entry.
 func (e *Event) SetCode() string { return e.set }
 
-// Seats reports the four entrants from the EventCreated entry.
-func (e *Event) Seats() [4]SeatSpec { return e.seats }
+// Seats reports the event's entrants from the EventCreated entry, as a
+// copy.
+func (e *Event) Seats() []SeatSpec {
+	return append([]SeatSpec(nil), e.seats...)
+}
 
 // Log returns a copy of the append-only log.
 func (e *Event) Log() []Entry {
@@ -149,19 +166,27 @@ func (e *Event) Log() []Entry {
 func (e *Event) Done() bool { return e.phase == PhaseComplete }
 
 // Next returns seat's draft view when a pack waits for it. It is read-only:
-// the actual pick goes through a Picked entry.
+// the actual pick goes through a Picked entry. A sealed event never offers
+// one.
 func (e *Event) Next(seat int) (draft.PickView, bool) {
+	if e.mode == ModeSealed {
+		return draft.PickView{}, false
+	}
 	e.ensurePod()
-	if e.pod == nil || seat < 0 || seat >= draft.Seats {
+	if e.pod == nil || seat < 0 || seat >= e.NumSeats() {
 		return draft.PickView{}, false
 	}
 	return e.pod.Next(seat)
 }
 
-// Pool returns seat's drafted cards, or nil before any packs are open.
+// Pool returns seat's cards — a draft's picks through its pod, a sealed
+// event's opened packs in pack order — or nil before any packs are open.
 func (e *Event) Pool(seat int) []limited.CardRef {
+	if e.mode == ModeSealed {
+		return e.poolSealed(seat)
+	}
 	e.ensurePod()
-	if e.pod == nil || seat < 0 || seat >= draft.Seats {
+	if e.pod == nil || seat < 0 || seat >= e.NumSeats() {
 		return nil
 	}
 	return e.pod.Pool(seat)
@@ -169,7 +194,7 @@ func (e *Event) Pool(seat int) []limited.CardRef {
 
 // SavedDeck returns the seat's latest saved deck revision, if any.
 func (e *Event) SavedDeck(seat int) (build.Deck, bool) {
-	if seat < 0 || seat >= draft.Seats || len(e.decks[seat]) == 0 {
+	if seat < 0 || seat >= e.NumSeats() || len(e.decks[seat]) == 0 {
 		return build.Deck{}, false
 	}
 	d := e.decks[seat][len(e.decks[seat])-1].deck
@@ -180,7 +205,7 @@ func (e *Event) SavedDeck(seat int) (build.Deck, bool) {
 // DeckRev returns the seat's saved deck at the given revision, if any
 // (E3-5: the pool view's Playing deck names a specific revision).
 func (e *Event) DeckRev(seat, rev int) (build.Deck, bool) {
-	if seat < 0 || seat >= draft.Seats || rev < 1 {
+	if seat < 0 || seat >= e.NumSeats() || rev < 1 {
 		return build.Deck{}, false
 	}
 	for _, sd := range e.decks[seat] {
@@ -215,42 +240,10 @@ func (e *Event) PendingSeries() []SeriesSpec {
 	return out
 }
 
-// Pairings returns event round r's circle-method pairs, seat 0 fixed, each
-// ordered lower seat first: R1 0–3, 1–2; R2 0–2, 1–3; R3 0–1, 2–3.
-func Pairings(round int) [][2]int {
-	return roundRobin(draft.Seats, round)
-}
-
-// roundRobin pairs n seats (even) for round r (1-based) with the circle
-// method: seat 0 is fixed and the other n-1 seats rotate one place right
-// each round; position i is paired with position n-1-i.
-func roundRobin(n, r int) [][2]int {
-	if n%2 != 0 || r < 1 || r >= n {
-		return nil
-	}
-	tail := make([]int, n-1)
-	for i := range tail {
-		tail[i] = i + 1
-	}
-	shift := (r - 1) % (n - 1)
-	rot := make([]int, n-1)
-	for i := range rot {
-		rot[(i+shift)%(n-1)] = tail[i]
-	}
-	out := make([][2]int, 0, n/2)
-	for i := 0; i < n/2; i++ {
-		a, b := 0, 0
-		if i == 0 {
-			b = rot[n-2]
-		} else {
-			a, b = rot[i-1], rot[n-2-i]
-		}
-		if a > b {
-			a, b = b, a
-		}
-		out = append(out, [2]int{a, b})
-	}
-	return out
+// inRound reports whether a round phase is live: the event round is set
+// and the phase spells it.
+func (e *Event) inRound() bool {
+	return e.round >= 1 && e.phase == RoundPhase(e.round)
 }
 
 // Apply validates one entry against the current state, applies it and
@@ -323,6 +316,9 @@ func ReplayLog(data []byte) (*Event, error) {
 	return Replay(entries)
 }
 
+// applyEventCreated validates the EventCreated shape and stores the
+// normalized values; the logged entry keeps the values exactly as given,
+// so old logs re-marshal byte-identically.
 func (e *Event) applyEventCreated(en *Entry) error {
 	if e.cooked {
 		return fmt.Errorf("event: EventCreated: event already created")
@@ -330,8 +326,9 @@ func (e *Event) applyEventCreated(en *Entry) error {
 	if en.Set == "" {
 		return fmt.Errorf("event: EventCreated: set code is empty")
 	}
-	if len(en.Seats) != draft.Seats {
-		return fmt.Errorf("event: EventCreated: got %d seats, want %d", len(en.Seats), draft.Seats)
+	n := len(en.Seats)
+	if n != 4 && n != 8 {
+		return fmt.Errorf("event: EventCreated: got %d seats, want 4 or 8", n)
 	}
 	for i, s := range en.Seats {
 		if s.Kind == "" {
@@ -341,13 +338,65 @@ func (e *Event) applyEventCreated(en *Entry) error {
 			return fmt.Errorf("event: EventCreated: seat %d has no name", i)
 		}
 	}
+	mode := ModeDraft
+	switch en.Mode {
+	case "":
+	case ModeDraft, ModeSealed:
+		mode = en.Mode
+	default:
+		return fmt.Errorf("event: EventCreated: unknown mode %q", en.Mode)
+	}
+	packs := en.Packs
+	switch {
+	case mode == ModeDraft && packs == 0:
+		packs = DraftPacks
+	case mode == ModeDraft && packs != DraftPacks:
+		return fmt.Errorf("event: EventCreated: draft packs %d, want %d", packs, DraftPacks)
+	case packs == 0:
+		packs = DefaultSealedPacks
+	case packs < 1 || packs > MaxSealedPacks:
+		return fmt.Errorf("event: EventCreated: sealed packs %d, want 1..%d", packs, MaxSealedPacks)
+	}
+	structure := StructureRoundRobin
+	switch en.Structure {
+	case "":
+	case StructureRoundRobin, StructureNone:
+		structure = en.Structure
+	case StructureSwiss:
+		return fmt.Errorf("event: EventCreated: structure swiss is not implemented yet (E5-b3)")
+	default:
+		return fmt.Errorf("event: EventCreated: unknown structure %q", en.Structure)
+	}
+	rounds := 0
+	if structure == StructureRoundRobin {
+		rounds = n - 1
+		if en.Rounds != 0 {
+			if en.Rounds < 1 || en.Rounds >= n {
+				return fmt.Errorf("event: EventCreated: rounds %d out of range 1..%d", en.Rounds, n-1)
+			}
+			rounds = en.Rounds
+		}
+	} else if en.Rounds != 0 {
+		return fmt.Errorf("event: EventCreated: structure none takes no rounds")
+	}
 	e.seed = en.Seed
 	e.set = en.Set
-	for i, s := range en.Seats {
-		e.seats[i] = s
-	}
+	e.seats = append([]SeatSpec(nil), en.Seats...)
+	e.mode = mode
+	e.structure = structure
+	e.packsPer = packs
+	e.rounds = rounds
+	e.collation = en.Collation
 	e.cooked = true
 	e.phase = PhaseDraft
+	e.packs = make([][][]limited.CardRef, packs)
+	e.packOpen = make([][]bool, packs)
+	for i := range e.packs {
+		e.packs[i] = make([][]limited.CardRef, n)
+		e.packOpen[i] = make([]bool, n)
+	}
+	e.decks = make([][]savedDeck, n)
+	e.ready = make([]int, n)
 	return nil
 }
 
@@ -358,10 +407,10 @@ func (e *Event) applyPackOpened(en *Entry) error {
 	if e.phase != PhaseDraft {
 		return fmt.Errorf("event: PackOpened: illegal in phase %s", e.phase)
 	}
-	if en.Round < 1 || en.Round > draft.Rounds {
+	if en.Round < 1 || en.Round > e.packsPer {
 		return fmt.Errorf("event: PackOpened: round %d out of range", en.Round)
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: PackOpened: seat %d out of range", en.Seat)
 	}
 	if e.packOpen[en.Round-1][en.Seat] {
@@ -389,23 +438,33 @@ func (e *Event) applyPackOpened(en *Entry) error {
 	e.packs[en.Round-1][en.Seat] = append([]limited.CardRef(nil), en.Cards...)
 	e.packOpen[en.Round-1][en.Seat] = true
 	e.packCount++
+	if e.sealedSupplyDone() {
+		e.phase = PhaseBuild
+	}
 	return nil
 }
 
 // ensurePod builds the event's draft pod from the logged PackOpened entries
 // once all of them are in. The driver opens every pack of the event at DRAFT
-// start, so a pick cannot precede the pod.
+// start, so a pick cannot precede the pod. A sealed event never builds one.
 func (e *Event) ensurePod() {
-	if e.podStarted || e.packCount < draft.Seats*draft.Rounds {
+	n := e.NumSeats()
+	if e.podStarted || e.mode != ModeDraft || e.packCount < n*DraftPacks {
 		return
 	}
-	var packs [draft.Seats][draft.Rounds][]limited.CardRef
-	for r := 0; r < draft.Rounds; r++ {
-		for s := 0; s < draft.Seats; s++ {
+	packs := make([][][]limited.CardRef, n)
+	for s := 0; s < n; s++ {
+		packs[s] = make([][]limited.CardRef, e.packsPer)
+		for r := 0; r < e.packsPer; r++ {
 			packs[s][r] = e.packs[r][s]
 		}
 	}
-	e.pod = draft.New(e.seed, packs)
+	p, err := draft.NewPod(e.seed, packs)
+	if err != nil {
+		e.podErr = err // impossible for a validated event
+	} else {
+		e.pod = p
+	}
 	e.podStarted = true
 }
 
@@ -413,14 +472,20 @@ func (e *Event) applyPicked(en *Entry) error {
 	if !e.cooked {
 		return fmt.Errorf("event: Picked: event not created")
 	}
+	if e.mode == ModeSealed {
+		return fmt.Errorf("event: Picked: a sealed event has no draft")
+	}
 	if e.phase != PhaseDraft {
 		return fmt.Errorf("event: Picked: illegal in phase %s", e.phase)
 	}
 	e.ensurePod()
 	if e.pod == nil {
+		if e.podErr != nil {
+			return fmt.Errorf("event: Picked: %w", e.podErr)
+		}
 		return fmt.Errorf("event: Picked: packs not opened yet")
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: Picked: seat %d out of range", en.Seat)
 	}
 	v, ok := e.pod.Next(en.Seat)
@@ -455,12 +520,13 @@ func (e *Event) applyDeckSaved(en *Entry) error {
 	switch e.phase {
 	case PhaseBuild:
 		// the ordinary BUILD-phase save
-	case RoundPhase(1), RoundPhase(2), RoundPhase(3):
-		inRound = true
 	default:
-		return fmt.Errorf("event: DeckSaved: illegal in phase %s", e.phase)
+		if !e.inRound() {
+			return fmt.Errorf("event: DeckSaved: illegal in phase %s", e.phase)
+		}
+		inRound = true
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: DeckSaved: seat %d out of range", en.Seat)
 	}
 	if inRound {
@@ -505,7 +571,7 @@ func (e *Event) applyReady(en *Entry) error {
 	if e.phase != PhaseBuild {
 		return fmt.Errorf("event: Ready: illegal in phase %s", e.phase)
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: Ready: seat %d out of range", en.Seat)
 	}
 	found := false
@@ -529,6 +595,9 @@ func (e *Event) applyReady(en *Entry) error {
 }
 
 func (e *Event) allReady() bool {
+	if len(e.ready) == 0 {
+		return false // before EventCreated nothing is ready
+	}
 	for s := range e.ready {
 		if e.ready[s] == 0 {
 			return false
@@ -538,10 +607,13 @@ func (e *Event) allReady() bool {
 }
 
 // startRounds opens the first event round: its pairings become the current
-// series set.
+// series set. A StructureNone event opens no round and stays in BUILD.
 func (e *Event) startRounds() {
+	if e.structure == StructureNone {
+		return
+	}
 	e.round = 1
-	e.pairings = Pairings(1)
+	e.pairings = RoundRobinPairings(e.NumSeats(), 1)
 	e.series = map[[2]int]*seriesState{}
 	e.phase = RoundPhase(1)
 }
@@ -727,7 +799,7 @@ func (e *Event) applySideboarded(en *Entry) error {
 	if en.Game != len(st.games)+1 {
 		return fmt.Errorf("event: Sideboarded: game %d is not the series' next game (%d)", en.Game, len(st.games)+1)
 	}
-	if en.Seat < 0 || en.Seat >= draft.Seats {
+	if en.Seat < 0 || en.Seat >= e.NumSeats() {
 		return fmt.Errorf("event: Sideboarded: seat %d out of range", en.Seat)
 	}
 	if en.Seat != en.A && en.Seat != en.B {
@@ -804,7 +876,7 @@ func seriesWinner(a, b int, score [2]int) int {
 }
 
 // roundAdvance opens the next round once every current series has ended;
-// after round 3 the event stays in ROUND3 until the EventEnded entry.
+// after the event's last round it stays there until the EventEnded entry.
 func (e *Event) roundAdvance() {
 	for _, p := range e.pairings {
 		st := e.series[p]
@@ -812,11 +884,11 @@ func (e *Event) roundAdvance() {
 			return
 		}
 	}
-	if e.round >= draft.Rounds {
+	if e.round >= e.rounds {
 		return
 	}
 	e.round++
-	e.pairings = Pairings(e.round)
+	e.pairings = RoundRobinPairings(e.NumSeats(), e.round)
 	e.series = map[[2]int]*seriesState{}
 	e.phase = RoundPhase(e.round)
 }
@@ -825,13 +897,25 @@ func (e *Event) applyEventEnded(en *Entry) error {
 	if !e.cooked {
 		return fmt.Errorf("event: EventEnded: event not created")
 	}
-	if e.phase != RoundPhase(draft.Rounds) {
-		return fmt.Errorf("event: EventEnded: illegal in phase %s", e.phase)
-	}
-	for _, p := range e.pairings {
-		st := e.series[p]
-		if st == nil || !st.ended {
-			return fmt.Errorf("event: EventEnded: round %d series seats %d–%d not ended", e.round, p[0], p[1])
+	if e.structure == StructureNone {
+		// A no-games event ends from BUILD once every seat is ready.
+		if e.phase != PhaseBuild {
+			return fmt.Errorf("event: EventEnded: illegal in phase %s", e.phase)
+		}
+		for s := range e.ready {
+			if e.ready[s] == 0 {
+				return fmt.Errorf("event: EventEnded: seat %d is not ready", s)
+			}
+		}
+	} else {
+		if e.phase != RoundPhase(e.rounds) {
+			return fmt.Errorf("event: EventEnded: illegal in phase %s", e.phase)
+		}
+		for _, p := range e.pairings {
+			st := e.series[p]
+			if st == nil || !st.ended {
+				return fmt.Errorf("event: EventEnded: round %d series seats %d–%d not ended", e.round, p[0], p[1])
+			}
 		}
 	}
 	st := e.Standings()
@@ -856,7 +940,7 @@ func (e *Event) seriesEntryOK(en *Entry) error {
 	if en.Round != e.round {
 		return fmt.Errorf("event: %s: round %d is not the current round %d", en.Kind, en.Round, e.round)
 	}
-	if en.A < 0 || en.B < 0 || en.A >= draft.Seats || en.B >= draft.Seats {
+	if en.A < 0 || en.B < 0 || en.A >= e.NumSeats() || en.B >= e.NumSeats() {
 		return fmt.Errorf("event: %s: seats %d–%d out of range", en.Kind, en.A, en.B)
 	}
 	if en.A >= en.B {
@@ -885,22 +969,46 @@ func (e *Event) StateJSON() ([]byte, error) {
 		Winner int    `json:"winner"`
 	}
 	type snapshot struct {
-		Phase     Phase                `json:"phase"`
-		Round     int                  `json:"round"`
-		Seed      uint64               `json:"seed"`
-		Set       string               `json:"set"`
-		Seats     [4]SeatSpec          `json:"seats"`
-		Pools     [4][]limited.CardRef `json:"pools"`
-		Decks     [4][]deckJSON        `json:"decks"`
-		Ready     [4]int               `json:"ready"`
-		Results   []resultJSON         `json:"results"`
-		Standings []Standing           `json:"standings"`
+		Phase Phase  `json:"phase"`
+		Round int    `json:"round"`
+		Seed  uint64 `json:"seed"`
+		Set   string `json:"set"`
+		// Mode, Structure, Packs and Rounds appear only when the event's
+		// shape is not the default, so a 4-seat draft round-robin event
+		// marshals exactly as it did before the shape fields existed.
+		Mode      string              `json:"mode,omitempty"`
+		Structure string              `json:"structure,omitempty"`
+		Packs     int                 `json:"packs,omitempty"`
+		Rounds    int                 `json:"rounds,omitempty"`
+		Seats     []SeatSpec          `json:"seats"`
+		Pools     [][]limited.CardRef `json:"pools"`
+		Decks     [][]deckJSON        `json:"decks"`
+		Ready     []int               `json:"ready"`
+		Results   []resultJSON        `json:"results"`
+		Standings []Standing          `json:"standings"`
 	}
+	n := e.NumSeats()
 	s := snapshot{
-		Phase: e.phase, Round: e.round, Seed: e.seed, Set: e.set, Seats: e.seats,
-		Ready: e.ready, Standings: e.Standings(),
+		Phase: e.phase, Round: e.round, Seed: e.seed, Set: e.set,
+		Seats:     append([]SeatSpec(nil), e.seats...),
+		Ready:     append([]int(nil), e.ready...),
+		Standings: e.Standings(),
 	}
-	for seat := range s.Pools {
+	if e.mode == ModeSealed {
+		s.Mode = e.mode
+	}
+	if e.structure == StructureNone {
+		s.Structure = e.structure
+	}
+	if e.packsPer != e.defaultPacks() {
+		s.Packs = e.packsPer
+	}
+	if e.structure == StructureRoundRobin && n > 0 && e.rounds != n-1 {
+		s.Rounds = e.rounds
+	}
+	s.Pools = make([][]limited.CardRef, n)
+	s.Decks = make([][]deckJSON, n)
+	for seat := 0; seat < n; seat++ {
 		if pool := e.Pool(seat); pool != nil {
 			s.Pools[seat] = append([]limited.CardRef(nil), pool...)
 		}

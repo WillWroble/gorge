@@ -1,8 +1,6 @@
 package event
 
-import (
-	"github.com/adams-shaun/gorge/limited/draft"
-)
+import ()
 
 // GameAttempt is one started-but-not-yet-resulted game of a series: the
 // host table it is being played on and its 1-based attempt number. A game
@@ -105,7 +103,7 @@ func (e *Event) Results() []SeriesOutcome {
 // SavedRev reports the seat's latest saved deck revision, or 0 when the
 // seat is out of range or has saved no deck.
 func (e *Event) SavedRev(seat int) int {
-	if seat < 0 || seat >= draft.Seats || len(e.decks[seat]) == 0 {
+	if seat < 0 || seat >= e.NumSeats() || len(e.decks[seat]) == 0 {
 		return 0
 	}
 	return e.decks[seat][len(e.decks[seat])-1].rev
@@ -114,20 +112,21 @@ func (e *Event) SavedRev(seat int) int {
 // ReadyRev reports the revision the seat has readied, or 0 when the seat is
 // out of range or not ready.
 func (e *Event) ReadyRev(seat int) int {
-	if seat < 0 || seat >= draft.Seats {
+	if seat < 0 || seat >= e.NumSeats() {
 		return 0
 	}
 	return e.ready[seat]
 }
 
 // Queued reports how many packs are waiting in the seat's draft queue, or 0
-// when the event is not drafting or the pod is not built yet.
+// when the event is not drafting (including a sealed event, which has no
+// draft) or the pod is not built yet.
 func (e *Event) Queued(seat int) int {
-	if e.phase != PhaseDraft {
+	if e.phase != PhaseDraft || e.mode == ModeSealed {
 		return 0
 	}
 	e.ensurePod()
-	if e.pod == nil || seat < 0 || seat >= draft.Seats {
+	if e.pod == nil || seat < 0 || seat >= e.NumSeats() {
 		return 0
 	}
 	return e.pod.QueueLen(seat)
@@ -135,11 +134,11 @@ func (e *Event) Queued(seat int) int {
 
 // LogFor returns the log as a viewer sees it. Once the event is COMPLETE
 // the whole log is public history: a deep copy of every entry. Before that
-// it is redacted per seat: for every seat other than viewer (viewer < 0 or
-// >= 4 is a spectator, for whom every seat is "other"), a PackOpened's card
-// list, a Picked's card ID and a DeckSaved's deck list are hidden, and every
-// GameStarted's seed is hidden from everyone. The event's own log is never
-// mutated.
+// it is redacted per seat: for every seat other than viewer (a viewer
+// outside 0..n-1 is a spectator, for whom every seat is "other"), a
+// PackOpened's card list, a Picked's card ID and a DeckSaved's deck list are
+// hidden, and every GameStarted's seed is hidden from everyone. The event's
+// own log is never mutated.
 func (e *Event) LogFor(viewer int) []Entry {
 	out := make([]Entry, 0, len(e.log))
 	for i := range e.log {

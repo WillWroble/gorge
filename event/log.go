@@ -114,6 +114,27 @@ type Entry struct {
 	// winner; later games: MTR 2.2's loser of the previous game, or that
 	// game's chooser after a draw). nil in every Bo1 log.
 	Chooser *int `json:"chooser,omitempty"`
+
+	// Mode, Structure, Packs, Rounds and Collation are the E5-b2
+	// EventCreated fields; zero values mean the defaults (draft,
+	// roundrobin, the mode's pack count, the structure's round count, no
+	// collation), so a 4-seat draft round-robin EventCreated marshals
+	// exactly as before.
+	// Mode is the supply mode: "" or "draft" = a booster draft, "sealed" =
+	// each seat opens Packs packs straight into its pool.
+	Mode string `json:"mode,omitempty"`
+	// Structure is the series structure: "" or "roundrobin" = the circle
+	// method, "none" = no games (the event ends after BUILD).
+	Structure string `json:"structure,omitempty"`
+	// Packs is the packs-per-seat supply; 0 = the mode's default (3 in a
+	// draft, 6 in sealed).
+	Packs int `json:"packs,omitempty"`
+	// Rounds is the event round count; 0 = the structure's default (n-1 in
+	// a round robin).
+	Rounds int `json:"rounds,omitempty"`
+	// Collation is the booster collation the packs came from,
+	// informational only (the packs are logged in full).
+	Collation string `json:"collation,omitempty"`
 }
 
 // cloneEntry deep-copies an entry's slice and pointer fields so the log
