@@ -176,3 +176,52 @@ func TestDescribeLeavesANonGenesisTossPhraseAlone(t *testing.T) {
 		t.Fatalf("non-genesis toss phrase = %q, want %q", got, want)
 	}
 }
+
+// TestDescribeRendersTheChooserNoteThroughThePlayerName mirrors the toss
+// branch above for E3-1's configured chooser: a Config.StartChooser genesis
+// emits "<name> chooses who takes the first turn" as its Seq 1 Note, and the
+// transcript reads it through player() exactly like the toss Note -- the
+// chain text carries the deck identity, the line the human reads carries the
+// display name.
+func TestDescribeRendersTheChooserNoteThroughThePlayerName(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		deckNames []string
+		chainText string
+	}{
+		{name: "deck identity", deckNames: []string{"a", "b"}, chainText: "b chooses who takes the first turn"},
+		{name: "empty deck identity", deckNames: []string{"", ""}, chainText: "seat 1 chooses who takes the first turn"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			chooser := 1
+			e := rules.New(rules.Config{Seed: 1, Names: tc.deckNames,
+				Decks: mountainDecks(t, 2), Mulligans: 1,
+				PlayerNames: []string{"Alice", "Bob"}, StartChooser: &chooser})
+			var note events.Event
+			for _, ev := range e.L.Events {
+				if ev.Kind == events.Note && ev.Text == tc.chainText {
+					note = ev
+					break
+				}
+			}
+			if note.Text != tc.chainText || note.Player != 1 {
+				t.Fatalf("fixture precondition: chooser Note = %+v, want seat 1 %q", note, tc.chainText)
+			}
+			if got, want := view.Describe(e.G, note), "Bob chooses who takes the first turn"; got != want {
+				t.Fatalf("describe chooser note = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// TestDescribeLeavesANonGenesisChooserPhraseAlone is the non-genesis guard
+// for the new phrase, like the toss one above: a later card-effect Note may
+// use the exact words and must stay verbatim.
+func TestDescribeLeavesANonGenesisChooserPhraseAlone(t *testing.T) {
+	g := state.NewGame([]string{"a", "b"})
+	g.Players[0].PlayerName = "Alice"
+	ev := events.Event{Seq: 9, Kind: events.Note, Player: 0, Text: "a chooses who takes the first turn"}
+	if got, want := view.Describe(g, ev), ev.Text; got != want {
+		t.Fatalf("non-genesis chooser phrase = %q, want %q", got, want)
+	}
+}

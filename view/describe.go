@@ -543,6 +543,9 @@ func Describe(g *state.Game, ev events.Event) string {
 			if ev.Seq == 1 && g != nil && ev.Text == tossNoteText(g, ev.Player) {
 				return player(g, ev.Player) + " won the toss"
 			}
+			if ev.Seq == 1 && g != nil && ev.Text == chooserNoteText(g, ev.Player) {
+				return player(g, ev.Player) + " chooses who takes the first turn"
+			}
 			return ev.Text
 		}
 		if ev.Secret {
@@ -930,6 +933,21 @@ func tossNoteText(g *state.Game, p state.PlayerID) string {
 		name = "seat " + strconv.Itoa(int(p))
 	}
 	return name + " won the toss"
+}
+
+// chooserNoteText is the deterministic chain text a Config.StartChooser
+// genesis emits for its chooser Note (E3-1). It deliberately follows
+// tossNoteText's deck-name fallback but excludes PlayerName, which is
+// display-only and must not reach the hash chain.
+func chooserNoteText(g *state.Game, p state.PlayerID) string {
+	name := ""
+	if g != nil && int(p) < len(g.Players) {
+		name = g.Players[p].Name
+	}
+	if name == "" {
+		name = "seat " + strconv.Itoa(int(p))
+	}
+	return name + " chooses who takes the first turn"
 }
 
 // life is the seat's life total as of g, or "?" when unresolvable.
