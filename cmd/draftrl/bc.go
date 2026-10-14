@@ -33,6 +33,10 @@ import (
 // and seats.jsonl carries its true colour pair, the seat-head label. No
 // games are played.
 
+// kindMu serialises DrafterKind constructors, which the registry contract
+// calls serially.
+var kindMu sync.Mutex
+
 // bcSalt tags a pod's seat-assignment stream.
 const bcSalt = 0xD4A7E8
 
@@ -52,8 +56,9 @@ type bcOpts struct {
 // bcVariant is one non-teacher seat kind.
 type bcVariant struct {
 	text string
-	kind string  // "teacher", "temp", "eps", "cfm", "17l", "random"
+	kind string  // "teacher", "temp", "eps", "cfm", "17l", "random", or a registered DrafterKind
 	x    float64 // temperature, epsilon or ColourFitMax
+	arg  string  // a DrafterKind's argument
 }
 
 func parseBCVariants(s string) ([]bcVariant, error) {
@@ -81,7 +86,11 @@ func parseBCVariants(s string) ([]bcVariant, error) {
 				return nil, fmt.Errorf("variant %q takes no argument", tok)
 			}
 		default:
-			return nil, fmt.Errorf("unknown variant %q (want teacher | temp:T | eps:E | cfm:K | 17l | random)", tok)
+			if _, ok := lookupDrafterKind(kind); ok && hasArg {
+				v.arg = arg
+				break
+			}
+			return nil, fmt.Errorf("unknown variant %q (want teacher | temp:T | eps:E | cfm:K | 17l | random | KIND:ARG, a registered drafter kind such as net:WEIGHTS)", tok)
 		}
 		out = append(out, v)
 	}
@@ -385,8 +394,16 @@ func bc(args []string, out io.Writer) (*bcResult, error) {
 					if inner, err = newRC(-1, nil); err != nil {
 						return bcPod{err: err}
 					}
-				default:
+				case "temp", "eps", "random":
 					inner = &bcVariantDrafter{teacher: teacher, v: v}
+				default:
+					k, _ := lookupDrafterKind(v.kind)
+					kindMu.Lock()
+					inner, _, err = k(lab, v.arg, o.set)
+					kindMu.Unlock()
+					if err != nil {
+						return bcPod{err: fmt.Errorf("variant %s: %w", v.text, err)}
+					}
 				}
 			}
 			ts := &teacherScored{teacher: teacher, inner: inner, table: table, seat: s, pod: p}

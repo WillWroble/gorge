@@ -95,7 +95,7 @@ never gates anything.
   - Scripted bot: 160–200 games/s on 16 workers (`cardval/runs.log`).
   - `BenchmarkGames` (`draftlab/extern/bench_test.go:33`, operator numbers, 4 workers, 40-turn
     cap): builtin 1.25 M games/h, ext-stdio-lean ~327 k games/h. Not re-measured here.
-- **Baselines** (operator, not re-measured): `rating-colour` 48.1%, random-from-pool 25.7%.
+- **Baselines** (operator): `rating-colour` 48.1%, random-from-pool 31.5% under the `bot` pilot (an earlier draft said 25.7%; 31.5% is the measured figure).
   Both are draftsim homogeneous pods, `play-arena`, seeds 201–224, fdn-limited gauntlet.
   **INFERRED**: the pilot was draftsim's default `-gauntlet-player bot`, since az-c4 cannot be
   seated there.
@@ -137,8 +137,8 @@ never gates anything.
 
 **Protocol.**
 - Homogeneous 4-seat pods, `play-arena` packs, event seeds 201–224 (24 events, 96 seats).
-- Each seat's `best23` deck plays the 16 fdn-limited decks, 2 games each with sides alternated:
-  3,072 games per arm, 95% CI half-width ≈ 1.8 pp.
+- Each seat's `best23` deck plays the 16 fdn-limited decks, 4 games each with sides alternated:
+  6,144 games per arm, 95% CI half-width ≈ 1.25 pp.
 - Arms compare **paired**: the same seeds give the same packs.
 - Seeds 201–248 never appear in training. Training seeds start at 1,000,000.
 
@@ -153,7 +153,7 @@ relative to those numbers.
 
 **Where it runs.** The gate is `cmd/draftrl gate` over `draftlab`, not draftsim. draftsim
 cannot seat an Env pilot (§1) or mix drafters per seat. DR-4's acceptance requires the
-`bot`-pilot arms to reproduce 48.1% and 25.7% within their CIs. Pack and game seed streams
+`bot`-pilot arms to reproduce 48.1% and 31.5% within their CIs. Pack and game seed streams
 differ between draftsim and draftlab, so agreement is statistical, not byte-identical
 (**INFERRED**).
 
@@ -390,7 +390,7 @@ temperature 1 using the seat rng.
 | Drafting + Go inference per iteration | 256 × 168 picks × ≲ 2 ms ≈ 86 CPU-s ≈ 6 s wall | **INFERRED** |
 | PPO update (21.5k learner picks × 4 epochs, CPU torch) | < 1 min | **INFERRED** |
 | S2, 100 iterations | ≈ 28 h, ≈ 820k games | derived |
-| Gate arm at sims=25 (3,072 games) | ≈ 6 min; ≈ 25 min at sims=100 (**INFERRED** 4×) | derived |
+| Gate arm at sims=25 (6,144 games) | ≈ 12 min measured (G0); ≈ 50 min at sims=100 (**INFERRED** 4×) | measured |
 | S1: 30k draft-only pods | minutes to draft; ~5 M picks, ~6 GB of features | **INFERRED** |
 | S1 training (5 M picks × 3 epochs, CPU) | 30–60 min | **INFERRED** |
 | Ablation, 30 iterations each | ≈ 9 h each | derived |
@@ -447,7 +447,7 @@ case) touch existing hot paths. `docs/agents/repo-map*.md` rows land in DR-10 al
 | DR-1 | `limited/draft/draft.go`: `PickView.Seats`, set in `Next`. Drafter fingerprints must not move. | `draft_test.go`: Seats = pod size for 4 and 8. `draftlab` `TestBuiltinFingerprints` unchanged. | — |
 | DR-2 | Extract `cmd/gorged/azc4.go:76 loadBelief` into `internal/searchprobe/beliefdir.go` (`LoadBeliefDir(reg, dir, pool)`); gorged calls it. | Tiny `testdata` pool.tsv (3 decks, 1 eval) loads only the train decks. Corpus-gated. | — |
 | DR-3 | New pure `limited/draftfeat`: `SetTable` (+ JSON codec), `Extract`, groups P/S/T. Wheel detection, exact-permutation posteriors, rejection likelihood, availability, wheel probability. `imports_test.go`. | Golden features on a hand-built 4-seat history. Posterior recovers a scripted opponent's pair (≥ 80% top-1 by round 2 pick 5 over 200 draft-only pods, < 20 s). n = 8 wheel update ≤ 1 ms (benchmark, not a gate). Determinism (twice → equal). | DR-1 |
-| DR-4 | New `cmd/draftrl`. `gate` subcommand: pods from seeds, per-seat drafters/builders as `NamedDrafter`s, `Lab.Gauntlet` vs `CatalogDecks("fdn-limited")`. Pilot `bot` or the closed-list az (registered like `cmd/cardval/az.go:66-114`, belief via DR-2). Prints draftsim's `built:`/`random:` contract. `calibrate` subcommand fits the opponent-model constants into `SetTable`. | Smoke: 1 event, `maxHuman` 1, 1 game, `bot` pilot; and the no-net az at sims 2. **Operator-run acceptance (not a test):** the `bot` pilot reproduces 48.1% / 25.7% within CI. | DR-2, DR-3 |
+| DR-4 | New `cmd/draftrl`. `gate` subcommand: pods from seeds, per-seat drafters/builders as `NamedDrafter`s, `Lab.Gauntlet` vs `CatalogDecks("fdn-limited")`. Pilot `bot` or the closed-list az (registered like `cmd/cardval/az.go:66-114`, belief via DR-2). Prints draftsim's `built:`/`random:` contract. `calibrate` subcommand fits the opponent-model constants into `SetTable`. | Smoke: 1 event, `maxHuman` 1, 1 game, `bot` pilot; and the no-net az at sims 2. **Operator-run acceptance (not a test):** the `bot` pilot reproduces 48.1% / 31.5% within CI. | DR-2, DR-3 |
 | DR-5 | New pure `limited/draftnet`: `.dpkw` format (header + named float32 tensors), `Load([]byte)` (refuses unknown tensors), `Forward`. `NetDrafter` in `limited/pickbot/netdrafter.go` (argmax or temperature, optional `Recorder` hook for logits and features). | Parity: committed fixture (tiny random weights + inputs + expected logits from the Python trainer) within 1e-4. `critic.*` tensor refused. imports test. | DR-3 |
 | DR-6 | Hosting: `eventhost/persona.go` accepts a registered `NetDrafter` persona; gorged `-draft-net`/`-draft-table` flags register it (mirrors `azc4.Enable`). | `eventhost` persona test with a fixture net. A privacy test asserts the persona is constructed from the `PickView` path only. | DR-5, operator ruling Q4 |
 | DR-7 | `cmd/draftrl rollout`: league pods, `best23` with value-table ratings (`RatingsOverride`), K games/seat vs train-split decks (gate decks excluded by card-list hash), az pilot. Writes per-iteration `picks.bin` + `picks.jsonl` + `seats.jsonl` + `GameDataCSV` + event logs + manifest. Honours `GORGE_PAUSE_FILE`. | Smoke: 1 pod, `bot` pilot, 2 games/seat; records reproduce from the seed. Gate-deck exclusion test. | DR-4, DR-5, S0 merged |
