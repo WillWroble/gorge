@@ -62,6 +62,12 @@ func (e *Engine) ProposeCopyTokens(player state.PlayerID, src state.ObjID, n int
 // ev.Obj, every applicable match applied in scan order without asking. The
 // returned event's Amount is the number of copies the caller mints.
 func (e *Engine) continueCopyTokenProposal(ev events.Event, matches []replMatch) (events.Event, bool) {
+	// The caller's Amount is card-driven and small, but the cap is the
+	// abort contract, not an optimization: an unrepresentable creation
+	// aborts here before the plan exists, whoever drove the Amount up.
+	if ev.Amount > tokenPlanMintCap {
+		tokenPlanAbort(ev, ev.Obj, int(ev.Amount))
+	}
 	plan := make([]tokenPlanMint, ev.Amount)
 	for i := range plan {
 		plan[i] = tokenPlanMint{copyOf: ev.Obj}

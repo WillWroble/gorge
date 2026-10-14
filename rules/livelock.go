@@ -138,8 +138,12 @@ func (g *LoopGuard) filled() LoopGuard {
 // a string) so a harness can record the pieces (object, kind, repeat
 // count, cycle length) structurally as well as render the text.
 type LivelockError struct {
-	// Reason is "repeating cycle" or "runaway resolution" -- which of the
-	// two triggers fired.
+	// Reason is "repeating cycle", "runaway resolution", "object cap" or
+	// "token plan" -- which trigger fired. The first three are the
+	// watcher's; "token plan" is raised by the CreateToken replacement
+	// plan driver when a creation's honest answer exceeds
+	// tokenPlanMintCap mints (a doubler stack whose exponential plan
+	// cannot be represented), under the same abort contract.
 	Reason string
 	// Kind and Object identify the repeating event shape: for a cycle, the
 	// first event of one period; for a runaway, the last event emitted.
@@ -171,6 +175,8 @@ func (e *LivelockError) Error() string {
 		fmt.Fprintf(&b, "cycle of %d event(s) repeated %d time(s), events %d-%d", e.CycleLen, e.Repeats, e.FirstSeq, e.LastSeq)
 	case livelockReasonObjectCap:
 		fmt.Fprintf(&b, "the object arena holds %d object(s), cap %d", e.Count, e.Cap)
+	case livelockReasonTokenPlan:
+		fmt.Fprintf(&b, "the token-creation plan would hold %d mint(s), cap %d", e.Count, e.Cap)
 	default:
 		fmt.Fprintf(&b, "%d event(s) with no decision, step or turn change, events %d-%d", e.QuietEvents, e.FirstSeq, e.LastSeq)
 	}
@@ -803,9 +809,11 @@ type livelockReasonCode uint16
 const (
 	livelockReasonRepeatingCycle livelockReasonCode = iota + 1
 	livelockReasonObjectCap
+	livelockReasonTokenPlan
 )
 
 var livelockReasonCodes = state.NewStrCodes(
 	state.StrEntry[livelockReasonCode]{Key: "repeating cycle", Val: livelockReasonRepeatingCycle},
 	state.StrEntry[livelockReasonCode]{Key: "object cap", Val: livelockReasonObjectCap},
+	state.StrEntry[livelockReasonCode]{Key: "token plan", Val: livelockReasonTokenPlan},
 )
