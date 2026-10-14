@@ -61,6 +61,17 @@ func TestRegistryBuiltinPassThrough(t *testing.T) {
 	if d.Ref != want.Ref {
 		t.Errorf("registry ref %s != lab ref %s", d.Ref, want.Ref)
 	}
+	p, err := reg.Player("bot@1")
+	if err != nil {
+		t.Fatalf("Player: %v", err)
+	}
+	wantP, err := l.Player(draftlab.AgentRef{Name: "bot", Version: "1"})
+	if err != nil {
+		t.Fatalf("lab Player: %v", err)
+	}
+	if p.Ref != wantP.Ref {
+		t.Errorf("player ref %s != lab ref %s", p.Ref, wantP.Ref)
+	}
 	if got := len(reg.Agents()); got != 0 {
 		t.Errorf("registry dialed %d agents for a built-in spec", got)
 	}
