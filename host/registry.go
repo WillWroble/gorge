@@ -382,7 +382,7 @@ func (r *Registry) AddTable(c TableConfig) error {
 			}
 		}
 	}
-	r.tables[c.ID] = newTable(c)
+	r.tables[c.ID] = newTable(r, c)
 	return r.saveLocked() // Task 12; a no-op in memory mode
 }
 
@@ -653,8 +653,12 @@ func (r *Registry) run(t *table) {
 			return
 		}
 		t.mu.Lock()
-		t.k, t.cur, t.state = k, m, protocol.TableLive
+		t.k, t.cur = k, m
 		t.mu.Unlock()
+		// setState, not a bare write: a subscriber learns the table went
+		// live (E3-fx2) through the same table_state frame every other
+		// transition emits.
+		t.setState(protocol.TableLive)
 		r.mu.Lock()
 		r.saveLocked() // tables.json records the new match index before it plays
 		r.mu.Unlock()

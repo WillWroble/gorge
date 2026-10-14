@@ -55,6 +55,7 @@ func fixtures(t *testing.T) []Frame {
 		mk(TDecision, 9131, DecisionBody{Player: 2, Kind: "priority", Prompt: "You have priority."}),
 		mk(TMatchEnd, 9500, MatchEnd{Result: "win", Winner: seat(2), Head: "6c8f9e4512366476"}),
 		mk(TTableHalted, 9500, TableHaltedBody{Reason: "intent rejected: choice 3 out of range (2 options)"}),
+		mk(TTableState, 9500, TableStateBody{State: TableBetweenGames}),
 		mk(TOverflow, 0, Overflow{Dropped: 17}),
 		mk(TError, 0, ErrorBody{Code: "unknown_table", Message: "no table t9"}),
 		mk(TRewind, 900, Snapshot{View: v, TurnStarts: []uint64{0, 402}, Head: 900, Seats: []SeatInfo{{Name: "mono-red-goblins", Deck: "mono-red-goblins", Colour: SeatColours[0], Human: true, DeckID: "mono-red-goblins"}}}),
