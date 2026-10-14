@@ -295,6 +295,11 @@
       "tier": "core",
       "status": "CORE"
     },
+    "draftlab": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "Training composition API over the draft stack: open packs, draft, build, play, gauntlet and whole events with named, versioned built-in agents; every call a pure function of inputs and seed; 17Lands-shaped artifacts."
+    },
     "effects": {
       "tier": "core",
       "status": "CORE"
