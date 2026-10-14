@@ -127,6 +127,10 @@
       "tier": "cmd",
       "status": "TOOL"
     },
+    "cmd/draftrl": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
     "cmd/labdemo": {
       "tier": "cmd",
       "status": "TOOL"
