@@ -18,7 +18,10 @@ package host
 // not its Obj), so its fixture must have cards still sitting in hands at
 // head — the shared finished match does not (every seat plays its hand out,
 // hand sizes are 0), which is exactly why (c) runs against a live match
-// parked on its first decision, where the openers are still in hand.
+// parked on its first decision, where the openers are still in hand. Since
+// E3-fx3 (CR 103.5) that first decision is the CR 103.1 starting-player
+// ask, so the pregame blind redacts the seat's own Secret draws too; the
+// (c) assertions below pin the blind shape.
 
 import (
 	"strings"
@@ -249,16 +252,20 @@ func TestViewAtSeatAndEventsSeatDuringALiveMatch(t *testing.T) {
 		}
 		bySeq[b.Event.Seq] = b
 	}
-	// The viewer's own draw keeps its card, and the transcript names it.
+	// The viewer's own draw: since E3-fx3 (CR 103.5) the fixture's parked
+	// state is the CR 103.1 starting-player ask, so the CR 103.5 pregame
+	// blind redacts the viewer's OWN Secret draws too — no object, the
+	// shape line. After the choice resolves the same request serves the
+	// card again (host/starting_choice_events_test.go pins both halves).
 	b, ok := bySeq[own.Seq]
 	if !ok {
 		t.Fatalf("viewer %d's own draw at seq %d is missing", asked, own.Seq)
 	}
-	if b.Event.Obj != uint32(own.Obj) {
-		t.Fatalf("viewer %d's own draw at seq %d lost its card: obj %d, want %d", asked, own.Seq, b.Event.Obj, own.Obj)
+	if b.Event.Obj != 0 {
+		t.Fatalf("viewer %d's own draw at seq %d still carries obj %d while the starting-player choice is pending", asked, own.Seq, b.Event.Obj)
 	}
-	if name := m.e.G.Obj(own.Obj).Face().Name; !strings.Contains(b.Line, name) {
-		t.Fatalf("viewer %d's own draw does not name the card %q: %q", asked, name, b.Line)
+	if name := m.e.G.Obj(own.Obj).Face().Name; strings.Contains(b.Line, name) {
+		t.Fatalf("viewer %d's blind draw still names the card %q: %q", asked, name, b.Line)
 	}
 	// Another seat's draw keeps its shape, never its card.
 	c, ok := bySeq[otherDraw.Seq]
@@ -286,8 +293,10 @@ func TestViewAtSeatAndEventsSeatDuringALiveMatch(t *testing.T) {
 	if cb.Event.Seq != otherDraw.Seq {
 		t.Fatalf("seat %d's own draw at seq %d is missing from its own stream", other, otherDraw.Seq)
 	}
-	if cb.Event.Obj != uint32(otherDraw.Obj) {
-		t.Fatalf("seat %d's own draw at seq %d lost its card: obj %d, want %d", other, otherDraw.Seq, cb.Event.Obj, otherDraw.Obj)
+	// The mirror's own draw is under the same pregame blind (CR 103.5, the
+	// window binds for every seat).
+	if cb.Event.Obj != 0 {
+		t.Fatalf("seat %d's own draw at seq %d still carries obj %d while the starting-player choice is pending", other, otherDraw.Seq, cb.Event.Obj)
 	}
 
 	r.Close()
