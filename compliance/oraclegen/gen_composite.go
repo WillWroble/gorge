@@ -85,7 +85,7 @@ func xanswersForScenario(res rules.OracleResult, sc Scenario, modes map[string]i
 		castSteps = stepsWithOwnTargets(sc)
 	}
 	castSteps = withoutDividedActivations(castSteps, ds, sc)
-	out := xanswersSetup(ds, len(sc.Steps), modes, castSteps, sc.Setup)
+	out := xanswersSetup(ds, len(sc.Steps), modes, castSteps, sc.Setup, res.Flips)
 	// The deterministic trample assignment XMage poses as a multi-amount
 	// dialog is no decision the engine recorded, so it is synthesized from
 	// the scenario's own attack/block steps and leads the pass_to step that

@@ -3517,6 +3517,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
             TestPlayer p = seat(a.get("seat").getAsInt());
             String value = str(a, "value");
+            if (kind.equals("setup_flip")) {
+                // A coin flip the setup drive walked into before the first
+                // gameplay step (Mana Crypt's turn-1 upkeep trigger): XMage
+                // poses the same flip during the drive, so the result must be
+                // queued ahead of build() or TestPlayer's unscripted
+                // flipCoinResult fails the run (oraclegen emits "win"/"lose").
+                queueFlipResult(p, value);
+                continue;
+            }
             if (kind.equals("setup_mode")) {
                 // A setup-drive modal pick (Zuko, Conflicted's turn-1 charm):
                 // XMage poses chooseMode, or chooseUse for a yes/no
@@ -3544,6 +3553,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     static void queueSetupChoices(TestPlayer player, String value) {
         queueChoice(player, value);
+    }
+
+    /** Queue one scripted coin-flip result on the player's CHOICE queue:
+     * "win" maps to TestPlayer.FLIPCOIN_RESULT_TRUE ("[flipcoin_true]"),
+     * "lose" to FLIPCOIN_RESULT_FALSE — the tokens TestPlayer.flipCoinResult
+     * consumes from the queue head, which unscripted fails the replay with
+     * "Missing FLIP COIN RESULT def". */
+    static void queueFlipResult(TestPlayer p, String value) {
+        p.addChoice(value.equals("win") ? TestPlayer.FLIPCOIN_RESULT_TRUE : TestPlayer.FLIPCOIN_RESULT_FALSE);
     }
 
     /** Whether the generator scripted a divided-target share
@@ -3607,9 +3625,19 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         setModeChoice(p, v);
                     }
                     break;
+                case "flip":
+                    // A coin flip the scenario's runner recorded (Mana
+                    // Crypt's upkeep): XMage poses the same flip while this
+                    // step executes, and TestPlayer's flipCoinResult consumes
+                    // the token from the CHOICE queue head (oraclegen emits
+                    // "win"/"lose"; the drive-window "setup_flip" kind is
+                    // queued before build() and never reaches this switch).
+                    queueFlipResult(p, v);
+                    break;
                 case "setup_choice":
                 case "setup_target":
                 case "setup_mode":
+                case "setup_flip":
                     // Queued before setup placement; never enqueue it again at
                     // the corresponding gameplay step.
                     break;

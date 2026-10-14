@@ -311,7 +311,13 @@ type oracleRun struct {
 	extraFails        []string
 	snaps             []OracleSnapshot
 	decisions         []OracleDecision
-	noSnapshot        bool // runOracleScenarioWith's switch
+	// flips records every coin-flip result Note the run's log holds, in log
+	// order; flipScan is how far of the log recordFlips has already read.
+	// OracleResult reports the flips so the generator can script XMage's
+	// side of each one.
+	flips      []OracleFlip
+	flipScan   int
+	noSnapshot bool // runOracleScenarioWith's switch
 	// xmageFixture mirrors sc.xmageFixture: this run replays a GENERATED
 	// compliance scenario, where XMage is the reference engine. The
 	// hand-authored audit fixtures are gorge-internal (no XMage snapshot to
@@ -350,6 +356,27 @@ type oracleRun struct {
 
 func (r *oracleRun) logf(format string, a ...any) {
 	r.log = append(r.log, fmt.Sprintf(format, a...))
+}
+
+// recordFlips scans the log's new events for canonical coin-flip result
+// Notes (effects.FlipNoteResult) and records one OracleFlip per flip: the
+// turn the runner is on, the scenario step whose window the flip fell in
+// (step < 0 is the setup drive, before the first gameplay step), the
+// flipper's seat and the side the seeded RNG landed. The runner calls it
+// once after the setup drive and once per gameplay step, so each flip is
+// attributed to exactly one window. Rewinding inside the resolution kernel
+// re-executes the recorded events byte for byte, so the scan never sees a
+// flip twice.
+func (r *oracleRun) recordFlips(step int) {
+	evs := r.e.L.Events
+	for i := r.flipScan; i < len(evs); i++ {
+		flipper, win, ok := effects.FlipNoteResult(evs[i])
+		if !ok {
+			continue
+		}
+		r.flips = append(r.flips, OracleFlip{Turn: int(r.e.G.Turn), Step: step, Seat: int(flipper), Win: win})
+	}
+	r.flipScan = len(evs)
 }
 
 var oracleZones = map[string]state.Zone{
@@ -817,6 +844,13 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		}
 		if d.Kind == decision.KPriority && e.G.Step == state.StepMain1 && e.G.Turn == targetTurn &&
 			(len(e.G.Stack) == 0 || sc.xmageFixture) {
+			// The drive window's flip attribution point. A drive flip that
+			// fired here is attributed to step < 0; if the drive ever stopped
+			// short of this exact state, the next call (after the first
+			// gameplay step) would misattribute it as a step-0 gameplay flip
+			// -- unreachable, because a generated scenario must replay clean
+			// and build() fails loudly ("setup never reached") otherwise.
+			r.recordFlips(-1)
 			r.logf("setup done: turn %d %s, stack %d", e.G.Turn, e.G.Step, len(e.G.Stack))
 			// A parked placement's drop is setup-only (placeSetupCard).
 			e.setupEntryDrops = nil
@@ -2466,6 +2500,7 @@ func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot b
 		if err := r.settleTriggerAsks(sc.Steps, i); err != nil {
 			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
 		}
+		r.recordFlips(i)
 		if r.pendingTriggerAsk() {
 			r.askedAtCheckpoint++
 		}
