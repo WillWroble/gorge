@@ -1,0 +1,2 @@
+{"shape":{"template":"static","op":"setup","field":"permanents","diff":"Grizzly Bears gorge+[3/3] xmage+[2/2]"},"key":"static | setup | permanents | Grizzly Bears gorge+[3/3] xmage+[2/2]","cards":1}
+{"card":"Door of Destinies","template":"static#0.0","status":"diverge","api":"SpellCast:PutCounter","detail":"setup permanents: gorge \"c0 o0 Grizzly Bears [bear creature] {G} 3/3\", xmage \"c0 o0 Grizzly Bears [bear creature] {G} 2/2\""}
