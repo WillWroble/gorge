@@ -122,13 +122,67 @@ func effectCorpusModes(t *testing.T) (static, trigger map[string]map[string]bool
 	return static, trigger
 }
 
+// effectRowStillNotes parses AGENTS.md's Known-approximations row for the
+// Effect-delivered StaticAbilities$/Triggers$ registration and returns the
+// static and trigger modes the row names as still unimplemented. Reading the
+// row (rather than a second hand list) is what makes the census a ratchet on
+// the row itself: a registration change fails the census, and the only way to
+// pass is to change the row.
+func effectRowStillNotes(t *testing.T) (statics, triggers []string) {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	var cell string
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(line, "| `Effect` registers") {
+			continue
+		}
+		// The Stand-in cell is everything before the last two cells (Where,
+		// Removed by); a Forge fragment in a description carries its own "|".
+		cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
+		if len(cells) < 3 {
+			t.Fatalf("AGENTS.md: Effect row has %d cells, want at least 3", len(cells))
+		}
+		cell = strings.Join(cells[:len(cells)-2], "|")
+		break
+	}
+	if cell == "" {
+		t.Fatal("AGENTS.md: `Effect` StaticAbilities$/Triggers$ row not found -- did it move or get deleted?")
+	}
+	backtick := regexp.MustCompile("`([A-Za-z][A-Za-z0-9]*)`")
+	section := func(start, end string) []string {
+		i := strings.Index(cell, start)
+		if i < 0 {
+			t.Fatalf("AGENTS.md: Effect row has no %q section", strings.TrimSpace(start))
+		}
+		rest := cell[i+len(start):]
+		if end != "" {
+			j := strings.Index(rest, end)
+			if j < 0 {
+				t.Fatalf("AGENTS.md: Effect row %q section has no %q terminator", strings.TrimSpace(start), strings.TrimSpace(end))
+			}
+			rest = rest[:j]
+		}
+		var out []string
+		for _, m := range backtick.FindAllStringSubmatch(rest, -1) {
+			out = append(out, m[1])
+		}
+		return out
+	}
+	return section("statics ", "; triggers "), section("triggers ", "")
+}
+
 // TestEffectStaticCensus is a report: it logs every mode reached through an
 // Effect in the corpus and whether the code registers it, and pins the modes
-// that still Note so a mode silently gaining or losing its registration fails
-// here and the AGENTS.md row cannot drift from the code.
+// that still Note to AGENTS.md's row for the same registration, so a mode
+// silently gaining or losing its registration fails here and the row cannot
+// drift from the code.
 func TestEffectStaticCensus(t *testing.T) {
 	staticHandled := effectRegisteredStaticModes(t)
 	staticCorpus, triggerCorpus := effectCorpusModes(t)
+	rowStatic, rowTrigger := effectRowStillNotes(t)
 
 	names := func(m map[string]map[string]bool) []string {
 		out := make([]string, 0, len(m))
@@ -160,23 +214,17 @@ func TestEffectStaticCensus(t *testing.T) {
 	}
 	t.Logf("\n%s", b.String())
 
-	gotStatic := strings.Join(staticNotes, ",")
-	if gotStatic != effectStaticStillNotes {
-		t.Errorf("Effect static modes that still Note changed:\n got %s\nwant %s", gotStatic, effectStaticStillNotes)
+	// Compare as sets (sorted), so the row's prose order is not load-bearing
+	// while a mode silently added or removed still fails.
+	set := func(s []string) string {
+		c := append([]string(nil), s...)
+		sort.Strings(c)
+		return strings.Join(c, ",")
 	}
-	gotTrigger := strings.Join(triggerNotes, ",")
-	if gotTrigger != effectTriggerStillNotes {
-		t.Errorf("Effect trigger modes that still Note changed:\n got %s\nwant %s", gotTrigger, effectTriggerStillNotes)
+	if got, want := set(staticNotes), set(rowStatic); got != want {
+		t.Errorf("Effect static modes that still Note differ from the AGENTS.md row:\n census: %s\n    row: %s", got, want)
+	}
+	if got, want := set(triggerNotes), set(rowTrigger); got != want {
+		t.Errorf("Effect trigger modes that still Note differ from the AGENTS.md row:\n census: %s\n    row: %s", got, want)
 	}
 }
-
-// effectStaticStillNotes and effectTriggerStillNotes pin the census above.
-// They are the modes AGENTS.md's Effect row names as still unimplemented.
-const (
-	effectStaticStillNotes = "AssignCombatDamageAsUnblocked,AssignNoCombatDamage,AttackVigilance," +
-		"BlockRestrict,CanAdapt,CantBeActivated,CantBeCast,CantBecomeMonarch,CantBlock," +
-		"CantChangeLife,CantLoseLife,CantPhaseIn,CantPhaseOut,IgnoreLegendRule,IgnoreShroud," +
-		"MinMaxBlocker,UntapOtherPlayer"
-	effectTriggerStillNotes = "Abandoned,Adapt,AttackerBlocked,AttackerBlockedByCreature," +
-		"AttackerUnblocked,Blocks,Shuffled,VisitAttraction"
-)

@@ -178,3 +178,29 @@ func TestEffectStaticVivienReid(t *testing.T) {
 	             {"card": "p1:Grizzly Bears", "pt": "2/2"}]
 	}`)
 }
+
+// TestEffectStaticKaitoCunningInfiltratorEmblem: the -9 emblem's `Triggers$
+// CastTrig | Duration$ Permanent` grant (SVar CastTrig: Mode$ SpellCast) is
+// real. The +1 CantBlockBy grant is covered by the test above; this is the
+// second behaviour the card routes through Effect. After the emblem resolves,
+// casting a spell makes a 2/1 blue Ninja token, and the emblem keeps firing
+// after Kaito has left the battlefield (a permanent-duration Effect trigger,
+// not a delayed one).
+func TestEffectStaticKaitoCunningInfiltratorEmblem(t *testing.T) {
+	t.Parallel()
+	runInlineOracle(t, `{
+	  "name": "kaito-cunning-infiltrator-emblem-ninja-on-spell-cast",
+	  "setup": {"p0": {"battlefield": ["Kaito, Cunning Infiltrator"],
+	                   "hand": ["Lightning Bolt"],
+	                   "counters": {"Kaito, Cunning Infiltrator": {"LOYALTY": 9}}}},
+	  "steps": [
+	    {"op": "activate", "seat": 0, "card": "p0:Kaito, Cunning Infiltrator", "ability": "emblem"},
+	    {"op": "resolve",
+	     "expect": [{"card": "p0:Kaito, Cunning Infiltrator", "counters": {"loyalty": 3}}]},
+	    {"op": "cast", "seat": 0, "card": "p0:Lightning Bolt", "mana": "R", "targets": ["p1"]},
+	    {"op": "resolve"}
+	  ],
+	  "expect": [{"card": "p0:token:Ninja", "zone": "battlefield", "pt": "2/1"},
+	             {"life": {"p1": 17}}]
+	}`)
+}
