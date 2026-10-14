@@ -61,19 +61,28 @@ func (h *Host) checkTimeouts(now time.Time) {
 	}
 }
 
-// expire is one sweep pass for one run. It cancels an abandoned lobby and
-// acts for human seats whose idle window closed with a decision owed. The
-// sweep clock only ever APPENDS entries (LobbyTimeout / IdleTimeout
-// markers, then the ordinary entries the actions take); replay never
-// reads the clock. It is called under run.mu.
+// expire is one sweep pass for one run. It closes an abandoned lobby —
+// cancelled outright when no human ever joined, filled with bot seats when
+// at least one did (E3-5 operator decision 3) — and acts for human seats
+// whose idle window closed with a decision owed. The sweep clock only ever
+// APPENDS entries (LobbyTimeout / IdleTimeout markers, then the ordinary
+// entries the actions take); replay never reads the clock. It is called
+// under run.mu.
 func (r *run) expire(now time.Time) {
 	if r.halted != "" {
 		return
 	}
 	if r.ev.Phase() == event.PhaseLobby {
 		if r.lobbyAbandoned(now) {
-			if err := r.apply(event.Entry{Kind: event.KindLobbyTimeout}); err != nil {
-				return
+			if r.joinedHumans() == 0 {
+				if err := r.apply(event.Entry{Kind: event.KindLobbyTimeout}); err != nil {
+					return
+				}
+			} else {
+				if !r.fillLobbyWithBots() {
+					return
+				}
+				r.advance()
 			}
 			r.broadcast()
 		}
@@ -113,6 +122,69 @@ func (r *run) lobbyAbandoned(now time.Time) bool {
 		}
 	}
 	return unjoined && now.Sub(r.createdAt) > d
+}
+
+// joinedHumans counts the human seats that have joined the lobby. The
+// caller holds run.mu.
+func (r *run) joinedHumans() int {
+	n := 0
+	for _, ms := range r.meta.Seats {
+		if ms.Kind == "human" && ms.Name != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// fillLobbyWithBots converts every unjoined human seat of an abandoned
+// lobby into a bot seat (E3-5 operator decision 3): the default drafter
+// persona and the host's default game policy, named like a created bot.
+// The seat's invite token dies with its humanity — the stored sha256 is
+// cleared, so a stale join link can no longer act for the seat. The
+// converted seats are logged as bots by the EventCreated the next advance
+// applies. It saves the meta first and reports whether the event may go on;
+// a persistence failure halts the run read-only instead. The caller holds
+// run.mu.
+func (r *run) fillLobbyWithBots() bool {
+	policy, perr := r.h.botPolicy(r.h.opts.DefaultPolicy)
+	if perr != nil {
+		for _, cand := range r.h.opts.Policies {
+			if p2, e2 := r.h.botPolicy(cand); e2 == nil {
+				policy = p2
+				break
+			}
+		}
+	}
+	if policy == "" {
+		if r.halted == "" {
+			r.halted = fmt.Sprintf("event %s: lobby fill found no bot policy", r.meta.ID)
+		}
+		return false
+	}
+	changed := false
+	for s := range r.meta.Seats {
+		ms := r.meta.Seats[s]
+		if ms.Kind != "human" || ms.Name != "" {
+			continue
+		}
+		ms.Kind = "bot"
+		ms.Policy = policy
+		ms.Drafter = "rating-colour"
+		ms.Name = fmt.Sprintf("Bot %d (%s)", s+1, policy)
+		ms.TokenSHA256 = ""
+		r.meta.Seats[s] = ms
+		changed = true
+	}
+	if !changed {
+		return true
+	}
+	if err := r.h.opts.Store.saveMeta(r.meta); err != nil {
+		if r.halted == "" {
+			r.halted = fmt.Sprintf("event %s: persistence failed: %v", r.meta.ID, err)
+		}
+		return false
+	}
+	return true
 }
 
 // idleOwed lists the human seats whose idle window closed while a decision

@@ -129,6 +129,73 @@ func waitSeriesInFlight(t *testing.T, r *run, a, b, game int, d time.Duration) (
 	}
 }
 
+// driveSeriesToEnd drives a series (a,b) all the way to its SeriesEnded:
+// between games every side with a token keeps via the Sideboard API (bot
+// sides are locked by the advance path themselves), and while a game is
+// live the human seats submit their first-legal intents while the bots
+// answer theirs. A token of "" marks a bot side.
+func driveSeriesToEnd(t *testing.T, h *Host, reg *host.Registry, r *run, id, tokA, tokB string, a, b int) {
+	t.Helper()
+	deadline := time.Now().Add(50 * time.Second)
+	var last [2]uint64
+	for {
+		r.mu.Lock()
+		v, ok := r.ev.SeriesState(a, b)
+		entries := append([]event.Entry(nil), r.ev.Log()...)
+		table := r.seriesTable[[2]int{a, b}]
+		r.mu.Unlock()
+		if !ok {
+			// The round rolled over and the pairing is no longer current:
+			// ended only if its SeriesEnded is on the log.
+			for _, en := range entries {
+				if en.Kind == event.KindSeriesEnded && en.A == a && en.B == b {
+					return
+				}
+			}
+			t.Fatalf("series (%d,%d) missing before its SeriesEnded", a, b)
+		}
+		if v.Ended {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("series (%d,%d) never ended: %+v", a, b, v)
+		}
+		acted := false
+		if v.Between && v.NextGame > 0 {
+			for i, tok := range []string{tokA, tokB} {
+				if tok == "" || v.Locked[i] != 0 {
+					continue
+				}
+				if _, err := h.Sideboard(id, tok, protocol.SideboardRequest{Game: v.NextGame, Keep: true}); err != nil {
+					// The state may have moved on between the read and
+					// the call; the loop re-reads it either way.
+					continue
+				}
+				acted = true
+			}
+		} else if table != "" && v.InFlight != nil {
+			k := v.InFlight.Game // the series table plays game k as match k
+			for slot := 0; slot < 2; slot++ {
+				d, err := reg.Pending(table, k, state.PlayerID(slot))
+				if err != nil || d.Seq == last[slot] {
+					continue
+				}
+				if err := reg.SubmitIntent(table, k, state.PlayerID(slot), legalIntent(d)); err != nil {
+					// The table may have been replaced by a fresh attempt
+					// between the Pending and the submit; start over.
+					last = [2]uint64{}
+					break
+				}
+				last[slot] = d.Seq
+				acted = true
+			}
+		}
+		if !acted {
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
+
 // pickTwoHumans drives two human seats through the draft, alternating
 // picks: a seat's next pack arrives through the other human's pick, so
 // neither can be driven to completion alone.
@@ -209,6 +276,10 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 	if row == nil || row.State != "between" || row.Game != 2 {
 		t.Fatalf("seat 0 series row = %+v, want between/game 2", row)
 	}
+	if row.Waiting == nil || len(row.Waiting) != 2 || row.Waiting[0] != 0 || row.Waiting[1] != 3 {
+		t.Fatalf("between row Waiting = %v, want [0 3] before either side locks", row.Waiting)
+	}
+	table1 := row.Table // game 1's table; the series plays every game on it
 
 	// A stale game number, a both-set body and a neither-set body are all
 	// refused, in that order.
@@ -230,18 +301,52 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 		t.Fatalf("seat 0 pool Playing = %+v/%d, want rev 1", pool0.Playing, pool0.PlayingRev)
 	}
 
-	// Seat 0 keeps the deck it played: the lock lands, Waiting drops it.
-	if _, err := p.h.Sideboard(id, tok0, protocol.SideboardRequest{Game: 2, Keep: true}); err != nil {
-		t.Fatalf("Sideboard(keep): %v", err)
+	// Seat 0 sideboards a new deck revision: its first main card is
+	// swapped for an unused pool card, so the submission is real. The
+	// revision is saved, becomes the playing deck and locks ONLY seat 0's
+	// side — seat 3's token never touches it, and until seat 3 acts its
+	// side stays unlocked.
+	d := pool0.Suggestion
+	if len(d.Main) < 1 {
+		t.Fatalf("seat 0 suggestion too small: %+v", d)
+	}
+	used := map[string]bool{}
+	for _, mid := range d.Main {
+		used[mid] = true
+	}
+	swap := ""
+	for _, c := range pool0.Pool {
+		if !used[c.ID] {
+			swap = c.ID
+			break
+		}
+	}
+	if swap == "" {
+		t.Fatal("precondition: seat 0's pool has no unused card to swap in")
+	}
+	d.Main[0] = swap
+	if _, err := p.h.Sideboard(id, tok0, protocol.SideboardRequest{Game: 2, Deck: &d}); err != nil {
+		t.Fatalf("Sideboard(seat 0 deck): %v", err)
 	}
 	r.mu.Lock()
 	v, ok := r.ev.SeriesState(0, 3)
 	r.mu.Unlock()
-	if !ok || v.Locked != [2]int{1, 0} {
-		t.Fatalf("Locked after seat 0 keep = %+v", v)
+	if !ok || v.Locked != [2]int{2, 0} {
+		t.Fatalf("Locked after seat 0's deck = %+v, want [2 0]", v)
 	}
 	if _, err := p.h.Sideboard(id, tok0, protocol.SideboardRequest{Game: 2, Keep: true}); err == nil {
 		t.Fatal("second Sideboard by seat 0 succeeded")
+	}
+
+	// Seat 3 keeps the deck it played: that locks ONLY seat 3's side.
+	if _, err := p.h.Sideboard(id, tok3, protocol.SideboardRequest{Game: 2, Keep: true}); err != nil {
+		t.Fatalf("Sideboard(seat 3 keep): %v", err)
+	}
+	r.mu.Lock()
+	v, ok = r.ev.SeriesState(0, 3)
+	r.mu.Unlock()
+	if !ok || v.Locked != [2]int{2, 1} {
+		t.Fatalf("Locked after seat 3 keep = %+v, want [2 1]", v)
 	}
 
 	// Neither pool body carries the other human's cards.
@@ -249,51 +354,109 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EventPool(seat 3): %v", err)
 	}
+	if pool3.Playing == nil || pool3.PlayingRev != 1 {
+		t.Fatalf("seat 3 pool Playing = %+v/%d, want rev 1 (its keep)", pool3.Playing, pool3.PlayingRev)
+	}
+	in0, in3 := map[string]bool{}, map[string]bool{}
+	for _, c := range pool0.Pool {
+		in0[c.ID] = true
+	}
+	for _, c := range pool3.Pool {
+		in3[c.ID] = true
+	}
 	b0, _ := json.Marshal(pool0)
 	b3, _ := json.Marshal(pool3)
 	for _, c := range pool3.Pool {
-		if strings.Contains(string(b0), `"`+c.ID+`"`) {
+		if !in0[c.ID] && strings.Contains(string(b0), `"`+c.ID+`"`) {
 			t.Errorf("seat 0's pool body leaks seat 3 card %q", c.ID)
 		}
 	}
 	for _, c := range pool0.Pool {
-		if strings.Contains(string(b3), `"`+c.ID+`"`) {
+		if !in3[c.ID] && strings.Contains(string(b3), `"`+c.ID+`"`) {
 			t.Errorf("seat 3's pool body leaks seat 0 card %q", c.ID)
 		}
 	}
 
-	// Seat 3 sideboards a mutated suggestion: a new revision, locked and
-	// served as the playing deck.
-	d := pool3.Suggestion
-	if len(d.Main) < 2 {
-		t.Fatalf("suggestion too small: %+v", d)
-	}
-	d.Main[0], d.Main[1] = d.Main[1], d.Main[0]
-	if _, err := p.h.Sideboard(id, tok3, protocol.SideboardRequest{Game: 2, Deck: &d}); err != nil {
-		t.Fatalf("Sideboard(deck): %v", err)
-	}
-	pool3, err = p.h.EventPool(id, tok3)
+	// The serialized event log each seat reads is redacted exactly as
+	// event.LogFor promises while the event is incomplete: another seat's
+	// PackOpened card list, Picked card and DeckSaved deck are hidden, and
+	// no seat sees a GameStarted seed. (An id-contains scan would
+	// false-positive: a card that later lands in seat 0's pool was
+	// legitimately listed in packs opened to seat 3 on its way around the
+	// pod.)
+	log0, err := p.h.EventLog(id, tok0)
 	if err != nil {
-		t.Fatalf("EventPool(seat 3) after save: %v", err)
+		t.Fatalf("EventLog(seat 0): %v", err)
 	}
-	if pool3.Rev != 2 || pool3.PlayingRev != 2 || pool3.Playing == nil {
-		t.Fatalf("seat 3 pool after sideboard: rev %d playing %d/%+v, want rev 2", pool3.Rev, pool3.PlayingRev, pool3.Playing)
+	log3, err := p.h.EventLog(id, tok3)
+	if err != nil {
+		t.Fatalf("EventLog(seat 3): %v", err)
 	}
-	got := *pool3.Playing
-	if len(got.Main) != len(d.Main) || len(got.Basics) != len(d.Basics) {
-		t.Fatalf("playing deck = %+v, want %+v", got, d)
-	}
-	for i := range d.Main {
-		if got.Main[i] != d.Main[i] {
-			t.Fatalf("playing main[%d] = %q, want %q", i, got.Main[i], d.Main[i])
+	for _, chk := range []struct {
+		viewer int
+		log    protocol.EventLog
+	}{{0, log0}, {3, log3}} {
+		for _, raw := range chk.log.Entries {
+			var en event.Entry
+			if err := json.Unmarshal(raw, &en); err != nil {
+				t.Fatalf("log entry for seat %d: %v", chk.viewer, err)
+			}
+			switch en.Kind {
+			case event.KindPackOpened:
+				if en.Seat != chk.viewer && len(en.Cards) != 0 {
+					t.Errorf("seat %d's log shows seat %d's pack cards", chk.viewer, en.Seat)
+				}
+			case event.KindPicked:
+				if en.Seat != chk.viewer && en.ID != "" {
+					t.Errorf("seat %d's log shows seat %d's pick %q", chk.viewer, en.Seat, en.ID)
+				}
+			case event.KindDeckSaved:
+				if en.Seat != chk.viewer && en.Deck != nil {
+					t.Errorf("seat %d's log shows seat %d's saved deck", chk.viewer, en.Seat)
+				}
+			case event.KindGameStarted:
+				if en.GameSeed != 0 {
+					t.Errorf("seat %d's log shows a GameStarted seed", chk.viewer)
+				}
+			}
 		}
 	}
 
-	// The next game starts on the series' own table; each seat's join link
-	// names its own slot and token.
+	// The next game starts on the series' own table — the same table game
+	// 1 was played on; each seat's join link names its own slot and token.
 	att, table := waitSeriesInFlight(t, r, 0, 3, 2, 50*time.Second)
 	if att.Game != 2 {
 		t.Fatalf("game 2 attempt = %+v", att)
+	}
+	if string(table) != table1 {
+		t.Fatalf("game 2 table %q, want the series' own table %q", table, table1)
+	}
+	// Game 2 is live: both saved revisions are the playing decks now.
+	pool0, err = p.h.EventPool(id, tok0)
+	if err != nil {
+		t.Fatalf("EventPool(seat 0) after game 2 started: %v", err)
+	}
+	if pool0.Rev != 2 || pool0.PlayingRev != 2 || pool0.Playing == nil {
+		t.Fatalf("seat 0 pool after game 2 started: rev %d playing %d/%+v, want rev 2", pool0.Rev, pool0.PlayingRev, pool0.Playing)
+	}
+	if got := *pool0.Playing; len(got.Main) != len(d.Main) || got.Main[0] != swap {
+		t.Fatalf("seat 0 playing deck = %+v, want main[0] %q", got, swap)
+	}
+	var m2 *protocol.MatchInfo
+	deadline := time.Now().Add(50 * time.Second)
+	for {
+		mi, merr := p.reg.Matches(table)
+		if merr == nil && len(mi) >= 2 {
+			m2 = &mi[1]
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("match 2 never appeared on %s: %d matches, %v", table, len(mi), merr)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if m2.Seats[0].DeckID != DeckID(id, 0, 2) || m2.Seats[1].DeckID != DeckID(id, 3, 1) {
+		t.Fatalf("match 2 decks = %q/%q, want %q/%q", m2.Seats[0].DeckID, m2.Seats[1].DeckID, DeckID(id, 0, 2), DeckID(id, 3, 1))
 	}
 	st0 = stateOf(t, p.h, id, tok0)
 	st3 := stateOf(t, p.h, id, tok3)
@@ -307,11 +470,22 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 		t.Fatalf("seat 3 join = %+v, want %q", row3, want3)
 	}
 
-	// The log carries both Sideboarded entries with the revisions played.
+	// The public state — what a spectator without a token reads — shows
+	// the series but never a join link.
+	pub := stateOf(t, p.h, id, "")
+	for i := range pub.Series {
+		if pub.Series[i].Join != "" {
+			t.Errorf("public series row %+v carries a join link", pub.Series[i])
+		}
+	}
+
+	// The log carries both Sideboarded entries with the revisions played,
+	// and seat 0's DeckSaved for the new revision.
 	r.mu.Lock()
 	entries := append([]event.Entry(nil), r.ev.Log()...)
 	r.mu.Unlock()
 	saw := map[int]int{} // seat -> Rev
+	sawDeckSave := false
 	for _, en := range entries {
 		if en.Kind == event.KindSideboarded && en.A == 0 && en.B == 3 && en.Game == 2 {
 			if en.Auto {
@@ -319,23 +493,120 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 			}
 			saw[en.Seat] = en.Rev
 		}
+		if en.Kind == event.KindDeckSaved && en.Seat == 0 && en.Rev == 2 {
+			sawDeckSave = true
+		}
 	}
-	if saw[0] != 1 || saw[3] != 2 {
-		t.Errorf("sideboarded revisions = %v, want seat 0 rev 1, seat 3 rev 2", saw)
+	if saw[0] != 2 || saw[3] != 1 {
+		t.Errorf("sideboarded revisions = %v, want seat 0 rev 2, seat 3 rev 1", saw)
 	}
+	if !sawDeckSave {
+		t.Error("no DeckSaved entry for seat 0's revision 2")
+	}
+
+	// Both sides keep their way through the rest of the series, and the
+	// series ends with a log entry. (After the last game the round rolls
+	// over and the pairing leaves SeriesState, so the log is the record.)
+	driveSeriesToEnd(t, p.h, p.reg, r, id, tok0, tok3, 0, 3)
+	r.mu.Lock()
+	entries = append([]event.Entry(nil), r.ev.Log()...)
+	r.mu.Unlock()
+	sawEnd := false
+	for _, en := range entries {
+		if en.Kind == event.KindSeriesEnded && en.A == 0 && en.B == 3 {
+			sawEnd = true
+			if en.Score[0]+en.Score[1] < 2 || en.Score[0] > 2 || en.Score[1] > 2 {
+				t.Errorf("SeriesEnded score = %v, impossible for a Bo3", en.Score)
+			}
+		}
+	}
+	if !sawEnd {
+		t.Fatal("no SeriesEnded entry for (0,3)")
+	}
+	// After the series ended the sideboard window is closed for good.
+	_, err = p.h.Sideboard(id, tok0, protocol.SideboardRequest{Game: 2, Keep: true})
+	wantErr(t, err, codeConflict, 409)
 }
 
-// TestSideboardErrors refuses a sideboard outside a round's between
-// window: in BUILD the deck flow is save/ready, not sideboard.
+// TestSideboardErrors drives the error surface: before game 1 ends the
+// series is not between games; identity comes only from the token; a
+// stale game number, a both-set or neither-set body, a card not in the
+// seat's pool and a second submission are each refused.
 func TestSideboardErrors(t *testing.T) {
-	p := startGamePair(t, "", nil)
-	resp := createOK(t, p.h, oneHumanReq())
+	p := startGamePair(t, "", func(eo *Options, _ *host.Options) {
+		eo.MintSeat = func(table host.TableID, seat int) (string, error) {
+			return fmt.Sprintf("tok-%s-%d", table, seat), nil
+		}
+	})
+	req := oneHumanReq()
+	req.BestOf = 3
+	resp := createOK(t, p.h, req)
 	id := resp.Event
 	tok, _ := humanToken(t, resp)
 	joinOK(t, p.h, id, tok, "Ann")
-	pickTop(t, p.h, id, tok, 1)
+	pickTop(t, p.h, id, tok, 45)
+	finishHumanBuild(t, p.h, id, tok)
+	waitPhase(t, p.h, id, "ROUND1", 50*time.Second)
+
+	// Before game 1 ends the series is not between games: neither keep
+	// nor a deck may be submitted.
 	_, err := p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 1, Keep: true})
 	wantErr(t, err, codeConflict, 409)
+	// Identity comes only from the event seat token: an empty token and a
+	// token no seat owns (the bot seats have no invites at all) are both
+	// 401, and nothing is locked by either.
+	_, err = p.h.Sideboard(id, "", protocol.SideboardRequest{Game: 1, Keep: true})
+	wantErr(t, err, codeUnauthorized, 401)
+	_, err = p.h.Sideboard(id, "deadbeef", protocol.SideboardRequest{Game: 1, Keep: true})
+	wantErr(t, err, codeUnauthorized, 401)
+
+	r := runOf(t, p.h, id)
+	humanDriveUntilBetween(t, p.reg, r, 0, 3)
+
+	_, err = p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 3, Keep: true})
+	wantErr(t, err, codeConflict, 409)
+	_, err = p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 2, Keep: true,
+		Deck: &protocol.DeckRequest{Main: []string{"x"}}})
+	wantErr(t, err, codeBadRequest, 400)
+	_, err = p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 2})
+	wantErr(t, err, codeBadRequest, 400)
+	_, err = p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 2,
+		Deck: &protocol.DeckRequest{Main: []string{"no-such-card"}}})
+	wantErr(t, err, codeInvalidDeck, 422)
+	r.mu.Lock()
+	saved := r.ev.SavedRev(0)
+	r.mu.Unlock()
+	if saved != 1 {
+		t.Fatalf("SavedRev after the refused deck = %d, want 1 (a 422 writes nothing)", saved)
+	}
+
+	// A token no seat owns cannot act while seat 0's side is unlocked —
+	// and nothing is locked by it.
+	_, err = p.h.Sideboard(id, "deadbeef", protocol.SideboardRequest{Game: 2, Keep: true})
+	wantErr(t, err, codeUnauthorized, 401)
+	r.mu.Lock()
+	v, ok := r.ev.SeriesState(0, 3)
+	r.mu.Unlock()
+	if !ok || v.Locked != [2]int{0, 0} {
+		t.Fatalf("Locked after the garbage token = %+v, want [0 0]", v)
+	}
+
+	// The seat's own token locks its side; a second submission is a 409.
+	if _, err := p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 2, Keep: true}); err != nil {
+		t.Fatalf("Sideboard(keep): %v", err)
+	}
+	_, err = p.h.Sideboard(id, tok, protocol.SideboardRequest{Game: 2, Keep: true})
+	wantErr(t, err, codeConflict, 409)
+	// A token no seat owns still cannot act, and the garbage token never
+	// locked seat 3's side — that side belongs to the bot path.
+	_, err = p.h.Sideboard(id, "deadbeef", protocol.SideboardRequest{Game: 2, Keep: true})
+	wantErr(t, err, codeUnauthorized, 401)
+	r.mu.Lock()
+	v, ok = r.ev.SeriesState(0, 3)
+	r.mu.Unlock()
+	if !ok || v.Locked[0] != 1 {
+		t.Fatalf("Locked after the error tour = %+v, want seat 0's own side locked", v)
+	}
 }
 
 // TestIdleSeatAutoKeepsBetweenGames is the E1-8 half: a human that played
