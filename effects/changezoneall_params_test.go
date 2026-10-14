@@ -12,7 +12,7 @@ import (
 // table.
 func TestChangeZoneAllKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(changeZoneAllKnownKeys[:]) || len(slices.Compact(slices.Clone(changeZoneAllKnownKeys[:]))) != len(changeZoneAllKnownKeys) {
-		t.Fatal("changeZoneAllKnownKeys must be sorted and duplicate-free")
+		t.Fatal("changeZoneAllKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 // table.
 func TestCopyPermanentKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(copyPermanentKnownKeys[:]) || len(slices.Compact(slices.Clone(copyPermanentKnownKeys[:]))) != len(copyPermanentKnownKeys) {
-		t.Fatal("copyPermanentKnownKeys must be sorted and duplicate-free")
+		t.Fatal("copyPermanentKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

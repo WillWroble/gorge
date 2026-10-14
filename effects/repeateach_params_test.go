@@ -13,7 +13,7 @@ import (
 func TestRepeatEachKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(repeatEachKnownKeys[:]) ||
 		len(slices.Compact(slices.Clone(repeatEachKnownKeys[:]))) != len(repeatEachKnownKeys) {
-		t.Fatal("repeatEachKnownKeys must be sorted and duplicate-free")
+		t.Fatal("repeatEachKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

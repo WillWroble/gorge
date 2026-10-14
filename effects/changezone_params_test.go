@@ -11,7 +11,7 @@ import (
 // TestChangeZoneKnownKeysSorted: the unread lookup binary-searches the table.
 func TestChangeZoneKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(changeZoneKnownKeys[:]) || len(slices.Compact(slices.Clone(changeZoneKnownKeys[:]))) != len(changeZoneKnownKeys) {
-		t.Fatal("changeZoneKnownKeys must be sorted and duplicate-free")
+		t.Fatal("changeZoneKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

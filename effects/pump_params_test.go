@@ -11,7 +11,7 @@ import (
 // TestPumpKnownKeysSorted: the unread lookup binary-searches the table.
 func TestPumpKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(pumpKnownKeys[:]) || len(slices.Compact(slices.Clone(pumpKnownKeys[:]))) != len(pumpKnownKeys) {
-		t.Fatal("pumpKnownKeys must be sorted and duplicate-free")
+		t.Fatal("pumpKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

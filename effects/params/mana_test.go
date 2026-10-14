@@ -12,7 +12,11 @@ import (
 func TestManaKnownKeysSorted(t *testing.T) {
 	for name, tab := range map[string][]string{"manaKnownKeys": manaKnownKeys[:], "plainManaKeys": plainManaKeys[:]} {
 		if !slices.IsSorted(tab) || len(slices.Compact(slices.Clone(tab))) != len(tab) {
-			t.Fatalf("%s must be sorted and duplicate-free", name)
+			if name == "plainManaKeys" {
+				// Not a known-key table: no census regenerate path owns it.
+				t.Fatalf("%s must be sorted and duplicate-free", name)
+			}
+			t.Fatalf("%s must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update", name)
 		}
 	}
 }
