@@ -93,7 +93,7 @@ var effectKnownKeys = [...]string{
 	"ImprintOnHost", "ImprintPlayed", "InstantSpeed", "IsCurse",
 	"IsPresent", "KW", "Keyword", "KeywordLine", "MaxTotalTargetCMC",
 	"MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity", "Name",
-	"NewController", "OneOff", "OpponentTurn", "OptionalDecider", "Phase",
+	"NewController", "NoShuffle", "OneOff", "OpponentTurn", "OptionalDecider", "Phase",
 	"Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "ReduceAmount", "ReduceCost",
 	"RememberAnimated", "RememberCostMana", "RememberLKI", "RememberObjects", "RememberTargets", "ReplaceColor",
@@ -169,6 +169,13 @@ func compileEffect(sa *cards.SA) *EffectParams {
 	p.RememberLKI = strings.TrimSpace(sa.ParamStr(cards.PKRememberLKI))
 	p.SetChosenNumber = strings.TrimSpace(sa.ParamStr(cards.PKSetChosenNumber))
 	p.EffectOwner = strings.TrimSpace(sa.ParamStr(cards.PKEffectOwner))
+	// NoShuffle$ is the opt-out twopiles' noShuffleBody forces onto EVERY pile
+	// body (a pile split is not a search, so the shared library-origin tail's
+	// CR 701.23d shuffle must be suppressed). An Effect body has no library
+	// movement to suppress, so the key is meaningless here; the recognition
+	// read documents it so the census never flags it unread (Fight or Flight's
+	// ChosenPile$ DBEffect is the carrier).
+	_ = sa.ParamStr(cards.PKNoShuffle)
 	p.Unread = unreadKeys(sa, effectKnownKeys[:])
 	return p
 }
