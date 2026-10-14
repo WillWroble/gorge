@@ -912,9 +912,12 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 	if pv == nil {
 		pv = new(view.View)
 	}
-	view.ProjectInto(pv, e.G, e, d.Player, d)
-	v := *pv
-	st := policynet.EncodeStateWith(net.Features, v, d.Player, nil)
+	// Only the parts the network's encoders read are projected.
+	view.ProjectLeanInto(pv, e.G, e, d.Player, d, net.Features.ViewOmit())
+	// The state is encoded into pooled storage: it is read only by Score.
+	sb := policynet.AcquireStateBuf()
+	defer policynet.ReleaseStateBuf(sb)
+	st := policynet.EncodeStateWithInto(sb, net.Features, pv, d.Player, nil)
 	opts := d.Options
 	// synth[i] is the index in opts of candidate i's synthetic cast option,
 	// -1 for none; nil when no candidate has one.
@@ -937,10 +940,7 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 			opts = append(opts, o)
 		}
 	}
-	enc := make([]policynet.Option, len(opts))
-	for i := range opts {
-		enc[i] = policynet.EncodeOptionWith(net.Features, v, d.Player, d.Kind, opts[i], i, len(opts))
-	}
+	enc := policynet.EncodeOptionsWith(net.Features, pv, d.Player, d.Kind, opts, nil)
 	seat.MarkBotPicks(d, enc[:len(d.Options)], bot)
 	if payCasts && bot.Payment != nil {
 		for i, c := range cands {

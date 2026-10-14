@@ -220,7 +220,9 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 		}
 	}
 	played := playedOption(rec)
-	idx := cardIndex(v, rec.Seat)
+	idx := optionEncoders.Get().(*OptionEncoder)
+	idx.Reset(&v, rec.Seat)
+	defer func() { idx.v = nil; clear(idx.refs); optionEncoders.Put(idx) }()
 	var opts []Option
 	var card []int
 	for i, o := range base {
@@ -256,7 +258,7 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 			chosen[0] = true
 		}
 		src := ""
-		if ref, ok := idx[rec.Options[i].Obj]; ok && rec.Options[i].Obj != 0 {
+		if ref, ok := idx.lookup(rec.Options[i].Obj); ok && rec.Options[i].Obj != 0 {
 			src = ref.cv.Name
 		}
 		for k, t := range ft.Targets {
@@ -273,7 +275,7 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 
 // jointTargetFeatures are the hashed rows a joint option adds for its target
 // (appended after the card option's own hashed ids, in this fixed order).
-func jointTargetFeatures(src string, t decision.Option, idx map[state.ObjID]cardRef, seat state.PlayerID) []Feature {
+func jointTargetFeatures(src string, t decision.Option, idx *OptionEncoder, seat state.PlayerID) []Feature {
 	var out []Feature
 	push := func(s string) { out = append(out, Feature{Row: hashID(s), Value: 1}) }
 	push("jt|tkind|" + t.Kind)
@@ -289,7 +291,7 @@ func jointTargetFeatures(src string, t decision.Option, idx map[state.ObjID]card
 		push("jt|" + src + "|player|" + side)
 		return out
 	}
-	ref, ok := idx[t.Obj]
+	ref, ok := idx.lookup(t.Obj)
 	if !ok {
 		push("jt|tgt|unknown")
 		return out

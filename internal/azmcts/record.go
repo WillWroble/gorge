@@ -88,10 +88,7 @@ func visitRecord(e *rules.Engine, d *decision.Decision, res Result, fs policynet
 		}
 	}
 	bot := res.Candidates[0]
-	enc := make([]policynet.Option, len(opts))
-	for i := range opts {
-		enc[i] = policynet.EncodeOptionWith(fs, v, d.Player, d.Kind, opts[i], i, len(opts))
-	}
+	enc := policynet.EncodeOptionsWith(fs, &v, d.Player, d.Kind, opts, nil)
 	seat.MarkBotPicks(d, enc[:len(d.Options)], bot)
 	if payChoice[0] >= 0 {
 		enc[payChoice[0]].BotPick = true
