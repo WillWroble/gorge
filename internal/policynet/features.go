@@ -2,7 +2,6 @@ package policynet
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/adams-shaun/gorge/decision"
@@ -178,19 +177,20 @@ func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag
 	if fs == FeaturesV1 {
 		return st
 	}
-	var extra []Feature
-	push := func(s string, val float32) { extra = append(extra, Feature{Row: hashID(s), Value: val}) }
-	mzState(v, seat, push)
+	// The mz rows are appended straight after the v1 bag, then the whole
+	// bag is stably sorted by row.
+	sk := &sink{fs: st.Sparse}
+	mzState(v, seat, sk)
 	if fs == FeaturesMZOwnLib {
-		ownLibState(v, seat, push)
+		ownLibState(v, seat, sk.str)
 	}
 	if fs == FeaturesMZGrave {
-		graveyardState(v, seat, push)
+		graveyardState(v, seat, sk.str)
 	}
 	if fs.Diagnostic() && diag != nil {
-		mzDiag(v, seat, fs, diag, push)
+		mzDiag(v, seat, fs, diag, sk)
 	}
-	st.Sparse = append(st.Sparse, extra...)
+	st.Sparse = sk.fs
 	stableSortByRow(st.Sparse)
 	if fs == FeaturesEntity {
 		st.Cards, _ = entityCards(v, seat)
@@ -252,10 +252,13 @@ func seatAvailable(pv *view.PlayerView) int32 {
 
 // mzState emits the MZ per-card and per-seat tokens in a fixed order: the
 // viewer's battlefield, every other battlefield (seat order), the viewer's
-// hand, the stack, then the seat aggregates.
-func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
+// hand, the stack, then the seat aggregates. Each token is hashed as it is
+// streamed (hashstream.go): the row is hashID of the token string the
+// comment beside it spells, which is never built.
+func mzState(v view.View, seat state.PlayerID, sk *sink) {
 	var me *view.PlayerView
-	var others []*view.PlayerView
+	var othersBuf [8]*view.PlayerView
+	others := othersBuf[:0]
 	for i := range v.Players {
 		if v.Players[i].ID == seat {
 			me = &v.Players[i]
@@ -263,95 +266,91 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 			others = append(others, &v.Players[i])
 		}
 	}
-	names := map[state.ObjID]string{}
-	for i := range v.Players {
-		for _, cv := range v.Players[i].Battlefield {
-			names[cv.ID] = cv.Name
-		}
-	}
 	type agg struct{ canAttack, canAttackPower, canBlock, canBlockTough, flyers int32 }
-	perm := func(z string, cv view.CardView, a *agg) {
-		eachField(cv.Types, func(t string) { push("mz|"+z+"|type|"+t, 1) })
+	perm := func(z string, cv *view.CardView, a *agg) {
+		zh := fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), z), "|") // "mz|<z>|"
+		eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "type|"), t), 1) })
 		creature := hasTypeWord(cv.Types, "Creature")
 		if cv.Tapped {
-			push("mz|"+z+"|tapped", 1)
+			sk.h(fnvAdd(zh, "tapped"), 1)
 		} else {
-			push("mz|"+z+"|untapped", 1)
+			sk.h(fnvAdd(zh, "untapped"), 1)
 		}
 		if cv.SummonSick {
-			push("mz|"+z+"|sick", 1)
+			sk.h(fnvAdd(zh, "sick"), 1)
 		}
 		if cv.Damage > 0 {
-			push("mz|"+z+"|damaged", 1)
+			sk.h(fnvAdd(zh, "damaged"), 1)
 		}
 		if cv.Attacking {
-			push("mz|"+z+"|attacking", 1)
+			sk.h(fnvAdd(zh, "attacking"), 1)
 		}
 		if len(cv.BlockedBy) > 0 {
-			push("mz|"+z+"|blocked", 1)
+			sk.h(fnvAdd(zh, "blocked"), 1)
 		}
+		kwh := fnvAdd(zh, "kw|")
 		for _, k := range cv.Keywords {
-			push("mz|"+z+"|kw|"+strings.ToLower(k), 1)
+			sk.h(fnvAddLower(kwh, k), 1) // "mz|<z>|kw|<lower k>"
 		}
-		keys := make([]string, 0, len(cv.Counters))
-		for k := range cv.Counters {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			push("mz|"+z+"|ctr|"+k, float32(cv.Counters[k]))
+		if len(cv.Counters) > 0 {
+			ctrh := fnvAdd(zh, "ctr|")
+			eachCounterSorted(cv.Counters, func(k string, n int32) { sk.h(fnvAdd(ctrh, k), float32(n)) })
 		}
 		if cv.AttachedTo != 0 {
-			push("mz|"+z+"|attached", 1)
-			if host, ok := names[cv.AttachedTo]; ok {
-				push("mz|"+z+"|attached|"+host, 1)
-				push("mz|"+cv.Name+"|on|"+host, 1)
+			sk.h(fnvAdd(zh, "attached"), 1)
+			if host, ok := battlefieldName(&v, cv.AttachedTo); ok {
+				sk.h(fnvAdd(fnvAdd(zh, "attached|"), host), 1)
+				sk.h(fnvAdd(fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), cv.Name), "|on|"), host), 1)
 			}
 		}
 		if !creature {
 			return
 		}
-		p, t := mzBucket(cv.Power, 9), mzBucket(cv.Toughness-cv.Damage, 9)
-		push("mz|"+z+"|cr|p"+p+"|t"+t, 1)
-		push("mz|"+z+"|cr|p"+p, 1)
-		push("mz|"+z+"|cr|t"+t, 1)
-		push("mz|"+cv.Name+"|"+z+"|p"+p+"|t"+t, 1)
+		p, t := mzClamp(cv.Power, 9), mzClamp(cv.Toughness-cv.Damage, 9)
+		crh := fnvAdd(zh, "cr|")
+		crp := fnvAddInt(fnvAdd(crh, "p"), p)
+		sk.h(fnvAddInt(fnvAdd(crp, "|t"), t), 1)                                // "mz|<z>|cr|p<p>|t<t>"
+		sk.h(crp, 1)                                                            // "mz|<z>|cr|p<p>"
+		sk.h(fnvAddInt(fnvAdd(crh, "t"), t), 1)                                 // "mz|<z>|cr|t<t>"
+		nh := fnvAdd(fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), cv.Name), "|"), z) // "mz|<name>|<z>"
+		sk.h(fnvAddInt(fnvAdd(fnvAddInt(fnvAdd(nh, "|p"), p), "|t"), t), 1)
+		crkw := fnvAdd(crh, "kw|")
 		for _, k := range cv.Keywords {
-			push("mz|"+z+"|cr|kw|"+strings.ToLower(k), 1)
+			sk.h(fnvAddLower(crkw, k), 1)
 		}
-		if hasKeyword(cv, "Flying") {
+		if hasKeyword(*cv, "Flying") {
 			a.flyers++
 		}
-		canAttack := !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, "Haste")) && !hasKeyword(cv, "Defender")
+		canAttack := !cv.Tapped && (!cv.SummonSick || hasKeyword(*cv, "Haste")) && !hasKeyword(*cv, "Defender")
 		if canAttack {
-			push("mz|"+z+"|canattack", 1)
-			push("mz|"+z+"|canattack|p"+p, 1)
+			sk.h(fnvAdd(zh, "canattack"), 1)
+			sk.h(fnvAddInt(fnvAdd(zh, "canattack|p"), p), 1)
 			a.canAttack++
 			a.canAttackPower += cv.Power
 		}
 		if !cv.Tapped {
-			push("mz|"+z+"|canblock", 1)
-			push("mz|"+z+"|canblock|t"+t, 1)
+			sk.h(fnvAdd(zh, "canblock"), 1)
+			sk.h(fnvAddInt(fnvAdd(zh, "canblock|t"), t), 1)
 			a.canBlock++
 			a.canBlockTough += cv.Toughness - cv.Damage
 		}
 	}
 	var mine, theirs agg
 	if me != nil {
-		for _, cv := range me.Battlefield {
-			perm("bf-me", cv, &mine)
+		for i := range me.Battlefield {
+			perm("bf-me", &me.Battlefield[i], &mine)
 		}
 	}
 	for _, pv := range others {
-		for _, cv := range pv.Battlefield {
-			perm("bf-opp", cv, &theirs)
+		for i := range pv.Battlefield {
+			perm("bf-opp", &pv.Battlefield[i], &theirs)
 		}
 	}
 	var myAvail int32
 	if me != nil {
 		myAvail = seatAvailable(me)
-		for _, cv := range me.Hand {
-			handCard("hand", cv, myAvail, push)
+		for i := range me.Hand {
+			handCard("hand", &me.Hand[i], myAvail, sk)
 		}
 	}
 	for _, sv := range v.Stack {
@@ -362,17 +361,19 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 		if sv.Card.Controller == seat {
 			side = "me"
 		}
-		push("mz|stack|"+side, 1)
+		sh := fnvAdd(fnvAdd(fnvOffset, "mz|stack|"), side) // "mz|stack|<side>"
+		sk.h(sh, 1)
 		if sv.Card.SpellAPI != "" {
-			push("mz|stack|"+side+"|api|"+sv.Card.SpellAPI, 1)
+			sk.h(fnvAdd(fnvAdd(sh, "|api|"), sv.Card.SpellAPI), 1)
 		}
-		eachField(sv.Card.Types, func(t string) { push("mz|stack|"+side+"|type|"+t, 1) })
+		eachField(sv.Card.Types, func(t string) { sk.h(fnvAdd(fnvAdd(sh, "|type|"), t), 1) })
 	}
 	// Seat aggregates: numeric-valued rows (the embedding row times the count)
 	// plus a bucketed one-hot, so both a linear and a threshold read exist.
 	num := func(key string, val int32, hi int32) {
-		push("mz|"+key, float32(val))
-		push("mz|"+key+"="+mzBucket(val, hi), 1)
+		kh := fnvAdd(fnvAdd(fnvOffset, "mz|"), key)
+		sk.h(kh, float32(val))                                // "mz|<key>"
+		sk.h(fnvAddInt(fnvAdd(kh, "="), mzClamp(val, hi)), 1) // "mz|<key>=<bucket>"
 	}
 	num("me|avail", myAvail, 8)
 	var oppAvail int32
@@ -391,61 +392,101 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 	num("opp|flyers", theirs.flyers, 4)
 	if me != nil && len(others) > 0 {
 		diff := me.Life - others[0].Life
-		push("mz|lifediff="+mzBucket(diff/3+7, 14), 1)
-		push("mz|opp|life="+mzBucket(others[0].Life/2, 12), 1)
-		push("mz|me|life="+mzBucket(me.Life/2, 12), 1)
+		sk.h(fnvAddInt(fnvAdd(fnvOffset, "mz|lifediff="), mzClamp(diff/3+7, 14)), 1)
+		sk.h(fnvAddInt(fnvAdd(fnvOffset, "mz|opp|life="), mzClamp(others[0].Life/2, 12)), 1)
+		sk.h(fnvAddInt(fnvAdd(fnvOffset, "mz|me|life="), mzClamp(me.Life/2, 12)), 1)
 		// Lethal reads: can my untapped attackers' power alone kill through no
 		// blocks; can theirs kill me.
 		if mine.canAttackPower >= others[0].Life {
-			push("mz|me|lethal-unblocked", 1)
+			sk.h(fnvAdd(fnvOffset, "mz|me|lethal-unblocked"), 1)
 		}
 		if theirs.canAttackPower >= me.Life {
-			push("mz|opp|lethal-unblocked", 1)
+			sk.h(fnvAdd(fnvOffset, "mz|opp|lethal-unblocked"), 1)
 		}
+	}
+}
+
+// battlefieldName is the name the attached-host lookup reads: the LAST
+// battlefield card (players in order, each battlefield in order) with id --
+// the old per-encode name map's last-write-wins value.
+func battlefieldName(v *view.View, id state.ObjID) (string, bool) {
+	for i := len(v.Players) - 1; i >= 0; i-- {
+		bf := v.Players[i].Battlefield
+		for j := len(bf) - 1; j >= 0; j-- {
+			if bf[j].ID == id {
+				return bf[j].Name, true
+			}
+		}
+	}
+	return "", false
+}
+
+// eachCounterSorted calls f for each counter in ascending key order (the
+// sorted-keys walk the encoders always used), without allocating for up
+// to eight kinds.
+func eachCounterSorted(m map[string]int32, f func(string, int32)) {
+	var buf [8]string
+	keys := buf[:0]
+	for k := range m {
+		keys = append(keys, k)
+	}
+	// Insertion sort: the keys are distinct, so the order is the unique
+	// ascending one, as sort.Strings leaves it.
+	for i := 1; i < len(keys); i++ {
+		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
+			keys[j], keys[j-1] = keys[j-1], keys[j]
+		}
+	}
+	for _, k := range keys {
+		f(k, m[k])
 	}
 }
 
 // handCard emits one hand card's tokens under zone tag z; avail is the
 // holder's available mana (castability is mana-value-only, an approximation:
 // colours are not checked).
-func handCard(z string, cv view.CardView, avail int32, push func(string, float32)) {
+func handCard(z string, cv *view.CardView, avail int32, sk *sink) {
+	zh := fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), z), "|") // "mz|<z>|"
 	mv := int32(mvOf(cv.ManaCost))
-	eachField(cv.Types, func(t string) { push("mz|"+z+"|type|"+t, 1) })
-	push("mz|"+z+"|mv"+mzBucket(mv, 8), 1)
-	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash")
+	eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "type|"), t), 1) })
+	sk.h(fnvAddInt(fnvAdd(zh, "mv"), mzClamp(mv, 8)), 1)
+	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(*cv, "Flash")
 	if instant {
-		push("mz|"+z+"|instant-speed", 1)
+		sk.h(fnvAdd(zh, "instant-speed"), 1)
 	}
 	land := hasTypeWord(cv.Types, "Land")
 	if !land && mv <= avail {
-		push("mz|"+z+"|castable", 1)
-		eachField(cv.Types, func(t string) { push("mz|"+z+"|castable|type|"+t, 1) })
+		sk.h(fnvAdd(zh, "castable"), 1)
+		eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "castable|type|"), t), 1) })
 		if instant {
-			push("mz|"+z+"|castable|instant-speed", 1)
+			sk.h(fnvAdd(zh, "castable|instant-speed"), 1)
 		}
 	}
 	if cv.SpellAPI != "" {
-		push("mz|"+z+"|api|"+cv.SpellAPI, 1)
+		sk.h(fnvAdd(fnvAdd(zh, "api|"), cv.SpellAPI), 1)
 	}
+	kwh := fnvAdd(zh, "kw|")
 	for _, k := range cv.Keywords {
-		push("mz|"+z+"|kw|"+strings.ToLower(k), 1)
+		sk.h(fnvAddLower(kwh, k), 1)
 	}
 	if hasTypeWord(cv.Types, "Creature") {
-		push("mz|"+z+"|cr|p"+mzBucket(cv.Power, 9)+"|t"+mzBucket(cv.Toughness, 9), 1)
+		sk.h(fnvAddInt(fnvAdd(fnvAddInt(fnvAdd(zh, "cr|p"), mzClamp(cv.Power, 9)), "|t"), mzClamp(cv.Toughness, 9)), 1)
 	}
 }
 
 // mzDiag emits the diagnostic hidden-information tokens.
-func mzDiag(v view.View, seat state.PlayerID, fs FeatureSet, diag *Diag, push func(string, float32)) {
+func mzDiag(v view.View, seat state.PlayerID, fs FeatureSet, diag *Diag, sk *sink) {
+	push := sk.str
 	var oppAvail int32
 	for i := range v.Players {
 		if v.Players[i].ID != seat {
 			oppAvail += seatAvailable(&v.Players[i])
 		}
 	}
-	for _, cv := range diag.OppHand {
+	for i := range diag.OppHand {
+		cv := &diag.OppHand[i]
 		push("mz|opphand|"+cv.Name, 1)
-		handCard("opphand", cv, oppAvail, push)
+		handCard("opphand", cv, oppAvail, sk)
 	}
 	if fs < FeaturesMZOracle {
 		return
