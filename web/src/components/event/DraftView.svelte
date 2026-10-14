@@ -4,6 +4,7 @@
   import CardImage from '../CardImage.svelte';
   import MvColumns from './MvColumns.svelte';
   import PodStatus from './PodStatus.svelte';
+  import PickClock from './PickClock.svelte';
   import Attribution from './Attribution.svelte';
 
   /**
@@ -49,6 +50,11 @@
           {opener === null || opener === you ? 'your own pack' : `opened by ${seatLabel(opener, ev?.seats[opener]?.name, you)}`}
         </span>
         <span class="dir data">passing {dir} {dir === 'left' ? '←' : '→'}</span>
+        {#if (pack.time_limit_ms ?? 0) > 0}
+          <PickClock remainingMs={pack.remaining_ms ?? 0} arrivedAt={client.packAt} />
+        {:else}
+          <span class="data dim" data-testid="no-pick-timer">no pick timer</span>
+        {/if}
         <span class="sp"></span>
         <button type="button" class="ev-btn primary" data-testid="take" disabled={!selected || client.busy} onclick={() => void client.pick()}>
           {client.busy ? 'Taking…' : selected ? `Take ${selected.name}` : 'Take card'}

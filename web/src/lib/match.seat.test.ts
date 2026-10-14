@@ -128,3 +128,41 @@ describe('MatchState — seated (M2e-4)', () => {
     expect(fetchEventsMock).not.toHaveBeenCalled(); // no transcript backfill for a spectator
   });
 });
+
+// E3-9 relies on this (plan §10 risk 3, verified here rather than
+// inferred): a Bo3 series plays games 2 and 3 as matches 2 and 3 of the SAME
+// table, and the human stays on /t/{table} with the one game token the
+// table's seat claim honours for every match. The seated MatchState must
+// follow the table's next match on its own: drop match 1's board at
+// match_start, and fetch match 2's seat-scoped view with the same seat.
+describe('MatchState — seated, across a table\'s next match (E3-9)', () => {
+  it('match_start for match 2 clears match 1\'s board; match 2\'s snapshot and decisions fetch match 2 with the same seat', async () => {
+    fetchViewMock.mockReset();
+    fetchEventsMock.mockReset();
+    fetchEventsMock.mockResolvedValue([]);
+    fetchViewMock.mockResolvedValueOnce({ ...seatView(5), over: true, winner: 1 });
+    const m = new MatchState('t1', seat);
+    m.apply({ v: 1, t: 'match_start', table: 't1', match: 1, seq: 0, body: matchStart() });
+    m.apply({ v: 1, t: 'snapshot', table: 't1', match: 1, seq: 0, body: { view: spectatorView(5), turn_starts: [0], head: 40 } });
+    await settle(() => m.view !== null);
+    m.apply({ v: 1, t: 'match_end', table: 't1', match: 1, seq: 41, body: {} });
+    expect(m.match).toBe(1);
+
+    m.apply({ v: 1, t: 'match_start', table: 't1', match: 2, seq: 0, body: matchStart() });
+    expect(m.match).toBe(2);
+    expect(m.view).toBeNull(); // never match 1's finished board under match 2
+
+    fetchViewMock.mockResolvedValueOnce(seatView(0));
+    m.apply({ v: 1, t: 'snapshot', table: 't1', match: 2, seq: 0, body: { view: spectatorView(0), turn_starts: [0], head: 3 } });
+    await settle(() => m.view !== null);
+    expect(fetchViewMock).toHaveBeenLastCalledWith('t1', 2, 3, seat);
+    expect(m.view?.turn).toBe(0);
+
+    // match 2's first ask (the loser's starting_player choice) refreshes match 2
+    fetchViewMock.mockResolvedValueOnce(seatView(0));
+    m.apply({ v: 1, t: 'decision', table: 't1', match: 2, seq: 4, body: { player: 0, kind: 'starting_player', prompt: 'Choose who takes the first turn.' } });
+    await settle(() => fetchViewMock.mock.calls.length >= 3);
+    expect(fetchViewMock.mock.calls.at(-1)?.slice(0, 2)).toEqual(['t1', 2]);
+    expect(fetchViewMock.mock.calls.at(-1)?.[3]).toBe(seat);
+  });
+});

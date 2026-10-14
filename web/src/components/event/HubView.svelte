@@ -4,15 +4,35 @@
   import { seatLabel } from '../../lib/draftcards';
   import { standingRows } from '../../lib/standings';
   import { countNames, pickHistory, revealDecks } from '../../lib/eventlog';
+  import { gameDots, inPlay, seriesScore, seriesStatus } from '../../lib/series';
   import Standings from './Standings.svelte';
+  import BetweenGames from './BetweenGames.svelte';
 
   /**
    * The event hub (mockup 3d) for ROUND1..3, and the results page for
    * COMPLETE. Pairings, scores and standings are the server's; the viewer's
    * own live game carries the server's seat-tokenised join path, every
    * other game a spectate link to its table.
+   *
+   * Between two games of the viewer's own Bo3 series the row carries the
+   * between-games panel (E3-9) — the place to sideboard when the table page
+   * is gone (a restart moves the series to a new table). `token` is the
+   * viewer's event seat token; `onstate` adopts a submit's EventState and
+   * `onstale` refetches after a 409.
    */
-  let { ev, log = null }: { ev: EventState; log?: unknown[] | null } = $props();
+  let {
+    ev,
+    log = null,
+    token = null,
+    onstate = null,
+    onstale = null,
+  }: {
+    ev: EventState;
+    log?: unknown[] | null;
+    token?: string | null;
+    onstate?: ((st: EventState) => void) | null;
+    onstale?: (() => void | Promise<void>) | null;
+  } = $props();
 
   const you = $derived(ev.you ?? null);
   const complete = $derived(ev.phase === 'COMPLETE');
@@ -41,14 +61,17 @@
 
   function roundStatus(series: EventSeries[]): string {
     if (series.every((s) => s.state === 'ended')) return 'complete';
-    if (series.some((s) => s.state === 'live')) return 'playing';
+    if (series.some(inPlay)) return 'playing';
     return 'upcoming';
   }
 
-  function score(s: EventSeries): string {
-    if (s.state === 'pending') return 'vs';
-    return `${s.score?.[0] ?? 0} – ${s.score?.[1] ?? 0}`;
+  // A row's game dots read from the viewer's side when it is their series,
+  // else from the left-hand seat's.
+  function side(s: EventSeries): number {
+    return you !== null && s.b === you ? s.b : s.a;
   }
+
+  const DOT_WORD = { w: 'won', l: 'lost', d: 'drawn' } as const;
 
   function outcome(s: EventSeries, seat: number): 'w' | 'l' | 'd' | '' {
     if (s.state !== 'ended') return '';
@@ -69,12 +92,20 @@
         <div class="pair" class:mine data-testid="pairing">
           <div class="who"><b class={outcome(s, s.a)}>{label(s.a)}</b></div>
           <div class="mid">
-            <div class="score data">{score(s)}</div>
-            <div class="state data">{s.state === 'live' ? `live${s.attempt && s.attempt > 1 ? ` · attempt ${s.attempt}` : ''}` : s.state === 'ended' ? (s.winner === null ? 'draw' : 'final') : 'pending'}</div>
+            <div class="score data">{seriesScore(s)}</div>
+            {#if s.best_of > 1 && (s.games?.length ?? 0) > 0}
+              {@const dots = gameDots(s, side(s))}
+              <div class="dots" data-testid="game-dots" aria-label={`Games from ${label(side(s))}'s side: ${dots.map((d) => DOT_WORD[d]).join(', ')}`}>
+                {#each dots as d, g (g)}<i class="dot {d}" title={`Game ${g + 1}: ${DOT_WORD[d]}`}>{d.toUpperCase()}</i>{/each}
+              </div>
+            {/if}
+            <div class="state data">{seriesStatus(s)}</div>
           </div>
           <div class="who r"><b class={outcome(s, s.b)}>{label(s.b)}</b></div>
           <div class="act">
-            {#if s.join}
+            {#if mine && s.state === 'between' && s.game}
+              <a class="ev-btn primary" href={s.join ? withBase(s.join) : '#between-games'} data-testid="your-deck">your deck for game {s.game}</a>
+            {:else if s.join}
               <a class="ev-btn primary" href={withBase(s.join)} data-testid="join-game">Play your game</a>
             {:else if s.table && s.state === 'live'}
               <a class="ev-btn" href={withBase(`/t/${encodeURIComponent(s.table)}`)}>Watch</a>
@@ -82,9 +113,16 @@
               <a class="ev-btn sm" href={withBase(`/t/${encodeURIComponent(s.table)}`)}>Replay</a>
             {:else if mine && s.state === 'live'}
               <span class="data dim">starting…</span>
+            {:else if s.table && s.state === 'between'}
+              <a class="ev-btn sm" href={withBase(`/t/${encodeURIComponent(s.table)}`)}>Watch</a>
             {/if}
           </div>
         </div>
+        {#if mine && you !== null && token && s.state === 'between' && s.game}
+          {#key `${ev.event}-${s.round}-${s.game}`}
+            <BetweenGames event={ev.event} {token} {you} series={s} seats={ev.seats} {onstate} {onstale} />
+          {/key}
+        {/if}
       {/each}
     {/each}
 
@@ -176,6 +214,29 @@
   .score {
     font-size: 1.1rem;
     color: var(--ink);
+  }
+  .dots {
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+    margin: 2px 0;
+  }
+  .dot {
+    display: inline-grid;
+    place-items: center;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    font: 600 0.55rem/1 var(--font-data);
+    font-style: normal;
+    color: var(--felt-sunk);
+    background: var(--ink-faint);
+  }
+  .dot.w {
+    background: var(--verdigris);
+  }
+  .dot.l {
+    background: var(--ember);
   }
   .state {
     font-size: var(--t-10);

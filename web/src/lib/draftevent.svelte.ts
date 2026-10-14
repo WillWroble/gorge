@@ -25,6 +25,8 @@ export class EventClient {
   pack = $state<DraftPack | null>(null);
   progress = $state<PodProgress | null>(null);
   selected = $state<string | null>(null);
+  /** packAt is the client clock (ms) when the current pack arrived: the pick countdown starts from the pack's remaining_ms there. */
+  packAt = $state(0);
   busy = $state(false);
   /** error is a failure the player must see (a refused join, an unreachable server). */
   error = $state<string | null>(null);
@@ -150,6 +152,7 @@ export class EventClient {
   adoptPack(p: DraftPack): void {
     if (this.you !== null && p.seat !== this.you) return;
     this.pack = { ...p, pack: p.pack ?? [], pool: p.pool ?? [] };
+    this.packAt = Date.now();
     if (this.selected && !this.pack.pack.some((c) => c.id === this.selected)) this.selected = null;
   }
 

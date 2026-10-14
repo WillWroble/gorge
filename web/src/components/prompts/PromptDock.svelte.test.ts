@@ -150,6 +150,35 @@ describe('PromptDock', () => {
   });
 });
 
+describe('starting_player: Play first / Draw first (E3-9)', () => {
+  const ask = (prompt: string, options: Option[], player = 0): Decision => ({
+    seq: 3, player, kind: 'starting_player', prompt, min: 1, max: 1, options,
+  } as Decision);
+
+  it('a two-seat ask labels the asking seat "Play first" and the other "Draw first", under the server\'s prompt', () => {
+    // The server lists seats in turn order from seat 0, so the asking seat
+    // may be either row; the label follows each option's player.
+    for (const player of [0, 1]) {
+      const d = ask('Choose who takes the first turn.', [opt(0, 'player', 'Ari', { player: 0 }), opt(1, 'player', 'Mira', { player: 1 })], player);
+      const { body } = render(PromptDock, { props: { view: view(d), logic: seatState(d), seat: player, placement: 'rail' } });
+      expect(body).toMatch(/data-prompt-title[^>]*>Choose who takes the first turn\.</);
+      expect(body).toMatch(new RegExp(`data-option="${player}"[^]*?class="label[^"]*">(?:<!--[^>]*-->)*Play first<`));
+      expect(body).toMatch(new RegExp(`data-option="${1 - player}"[^]*?class="label[^"]*">(?:<!--[^>]*-->)*Draw first<`));
+      expect(body).not.toContain('>Ari<');
+    }
+  });
+
+  it('a multi-seat ask keeps the seat names', () => {
+    const d = ask('You won the toss. Choose who takes the first turn.', [
+      opt(0, 'player', 'Ari', { player: 0 }), opt(1, 'player', 'Mira', { player: 1 }), opt(2, 'player', 'Bo', { player: 2 }),
+    ]);
+    const { body } = render(PromptDock, { props: { view: view(d), logic: seatState(d), seat: 0, placement: 'rail' } });
+    expect(body).toMatch(/data-prompt-title[^>]*>You won the toss\. Choose who takes the first turn\.</);
+    expect(body).not.toContain('Play first');
+    for (const n of ['Ari', 'Mira', 'Bo']) expect(body).toMatch(new RegExp(`class="label[^"]*">(?:<!--[^>]*-->)*${n}<`));
+  });
+});
+
 describe('SeatPanel strip while a dock is mounted', () => {
   it('points at the dock instead of drawing a second answer surface', () => {
     const logic = seatState(target);

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { EventState } from '../../protocol';
   import { seatLabel } from '../../lib/draftcards';
+  import { timerLabel } from '../../lib/newevent';
 
   /**
    * LOBBY: the pod waits for every human seat to type a display name. The
@@ -34,7 +35,7 @@
 
 <section class="lobby ev-main">
   <h2>Waiting for the pod</h2>
-  <p class="dim">{ev.set} draft · 4 seats · pick one · best of 1. The packs open once every human seat has joined.</p>
+  <p class="dim" data-testid="lobby-summary">{ev.set} draft · {ev.seats.length} seats · pick one · best of {ev.best_of === 3 ? 3 : 1} · {timerLabel(ev.pick_timer)}. The packs open once every human seat has joined.</p>
   {#if canJoin}
     <form class="join" onsubmit={submit} data-testid="join-form">
       <label>

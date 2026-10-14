@@ -97,7 +97,7 @@
   }
 
   const phaseLabel = $derived(
-    phase === 'LOBBY' ? 'lobby' : phase === 'DRAFT' ? 'draft' : phase === 'BUILD' ? 'build' : isRound(phase) ? `round ${st?.round ?? ''} of 3 · Bo1` : phase === 'COMPLETE' ? 'results' : '',
+    phase === 'LOBBY' ? 'lobby' : phase === 'DRAFT' ? 'draft' : phase === 'BUILD' ? 'build' : isRound(phase) ? `round ${st?.round ?? ''} of 3 · Bo${st?.best_of === 3 ? 3 : 1}` : phase === 'COMPLETE' ? 'results' : '',
   );
 </script>
 
@@ -151,7 +151,7 @@
         </section>
       {/if}
     {:else}
-      <HubView ev={st} {log} />
+      <HubView ev={st} {log} token={client.token} onstate={(s) => (client.state = s)} onstale={() => client.load()} />
     {/if}
   {/if}
 </main>

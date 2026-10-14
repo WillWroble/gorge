@@ -1,7 +1,11 @@
 import type { BotPolicyInfo, CreateEventRequest, EventSetInfo } from '../protocol';
+import { withBase } from './basepath';
 
-/** BOT_SEATS is the pod's bot count: E1 seats one human (seat 1) and three bots. */
-export const BOT_SEATS = 3;
+/** POD_SEATS is the pod size: four seats, each a human (an invite link) or a bot. */
+export const POD_SEATS = 4;
+
+/** BOT_SEATS is the default bot count: seat 1 is you, seats 2–4 bots. */
+export const BOT_SEATS = POD_SEATS - 1;
 
 /** DEFAULT_PERSONA is the pickbot persona the server seats when a create body names none (eventhost: Drafter "" = "rating-colour"). */
 export const DEFAULT_PERSONA = 'rating-colour';
@@ -40,23 +44,92 @@ export function eventPolicies(list: BotPolicyInfo[]): BotPolicyInfo[] {
   return list.filter((p) => p.formats.includes('constructed'));
 }
 
-/**
- * createRequest builds the POST /api/events body: seat 0 is the human, then
- * the bots with their chosen game policies and pickbot personas ("" = the
- * server's default for either). It never carries a seed: the server mints
- * it, and an unknown body field is a 400.
- */
-export function createRequest(set: string, botPolicies: string[], drafters: string[] = []): CreateEventRequest {
-  return {
-    set,
-    seats: [
-      { kind: 'human' },
-      ...botPolicies.map((p, i) => {
-        const seat: CreateEventRequest['seats'][number] = { kind: 'bot' };
-        if (p) seat.policy = p;
-        if (drafters[i]) seat.drafter = drafters[i];
-        return seat;
-      }),
-    ],
-  };
+/** SeatKind is a create-screen seat: a human (who gets an invite link) or a bot. */
+export type SeatKind = 'human' | 'bot';
+
+/** SeatChoice is one seat row of the create screen. policy/drafter apply to a bot ("" = the server default). */
+export interface SeatChoice {
+  kind: SeatKind;
+  policy: string;
+  drafter: string;
 }
+
+/** PickTimer is the create body's pick_timer: "" leaves the choice to the server. */
+export type PickTimer = '' | 'off' | 'standard' | 'relaxed';
+
+/** PICK_TIMERS are the offered pick-timer modes, in segmented-control order. */
+export const PICK_TIMERS: { mode: Exclude<PickTimer, ''>; label: string }[] = [
+  { mode: 'off', label: 'Off' },
+  { mode: 'standard', label: 'Standard' },
+  { mode: 'relaxed', label: 'Relaxed' },
+];
+
+/** defaultSeats is the create screen's starting pod: seat 1 is you (human), seats 2–4 bots. */
+export function defaultSeats(): SeatChoice[] {
+  return Array.from({ length: POD_SEATS }, (_, i) => ({ kind: i === 0 ? 'human' : 'bot', policy: '', drafter: '' }));
+}
+
+/** humanCount counts the human seats of a pod. */
+export const humanCount = (seats: readonly SeatChoice[]): number => seats.filter((s) => s.kind === 'human').length;
+
+/**
+ * timerOffered reports whether a pick timer can be chosen: the server
+ * stores "off" for a pod with fewer than two humans whatever is sent, so
+ * the control is disabled (showing Off) there.
+ */
+export const timerOffered = (seats: readonly SeatChoice[]): boolean => humanCount(seats) >= 2;
+
+/** CreateOptions are the create screen's format choices. */
+export interface CreateOptions {
+  bestOf?: 1 | 3;
+  /** pickTimer is sent only when the player chose one and the pod has two or more humans. */
+  pickTimer?: PickTimer;
+}
+
+/**
+ * createRequest builds the POST /api/events body: each seat's kind, and for
+ * a bot its chosen game policy and pickbot persona ("" = the server's
+ * default for either). best_of is sent only for best of 3 (omitted = 1),
+ * pick_timer only when one was chosen for a pod the server times. It never
+ * carries a seed: the server mints it, and an unknown body field is a 400.
+ */
+export function createRequest(set: string, seats: readonly SeatChoice[], opts: CreateOptions = {}): CreateEventRequest {
+  const req: CreateEventRequest = {
+    set,
+    seats: seats.map((s) => {
+      if (s.kind === 'human') return { kind: 'human' };
+      const seat: CreateEventRequest['seats'][number] = { kind: 'bot' };
+      if (s.policy) seat.policy = s.policy;
+      if (s.drafter) seat.drafter = s.drafter;
+      return seat;
+    }),
+  };
+  if (opts.bestOf === 3) req.best_of = 3;
+  if (opts.pickTimer && timerOffered(seats)) req.pick_timer = opts.pickTimer;
+  return req;
+}
+
+/** timerLabel names an event's stored pick-timer mode for the lobby and topbar. */
+export function timerLabel(mode: string | undefined): string {
+  switch (mode) {
+    case 'standard':
+      return 'standard pick timer';
+    case 'relaxed':
+      return 'relaxed pick timer';
+    default:
+      return 'no pick timer';
+  }
+}
+
+/**
+ * inviteURL is the full link a create screen hands out for one invite: the
+ * page origin plus the server's join path (under the mount base).
+ */
+export const inviteURL = (origin: string, join: string): string => origin + withBase(join);
+
+/**
+ * maskToken hides an invite link's seat token for display: the link is a
+ * bearer credential, so the Invites panel shows it masked until the player
+ * asks to see it (Copy always copies the real link).
+ */
+export const maskToken = (url: string): string => url.replace(/([?&]token=)[^&#]*/, '$1••••••');

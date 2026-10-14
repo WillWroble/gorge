@@ -1,21 +1,40 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../components/event/event.css';
-  import type { BotPolicyInfo, EventSetInfo } from '../protocol';
+  import type { BotPolicyInfo, EventInvite, EventSetInfo } from '../protocol';
   import { fetchBotPolicies } from '../lib/api';
   import { createEvent, listEventPersonas, listEventSets } from '../lib/eventapi';
   import { navigateTo } from '../lib/router';
   import { message } from '../lib/draftevent.svelte';
-  import { BOT_SEATS, DEFAULT_PERSONA, RATINGS_17LANDS, createRequest, eventPolicies, setNote } from '../lib/newevent';
+  import {
+    DEFAULT_PERSONA,
+    PICK_TIMERS,
+    RATINGS_17LANDS,
+    createRequest,
+    defaultSeats,
+    eventPolicies,
+    humanCount,
+    inviteURL,
+    maskToken,
+    setNote,
+    timerOffered,
+    type PickTimer,
+    type SeatKind,
+  } from '../lib/newevent';
   import Attribution from '../components/event/Attribution.svelte';
 
   /**
-   * /events/new (mockup 3a): a 4-player pod, pick one, best of 1. Seat 1 is
-   * you; seats 2–4 are bots. Everything offered is the server's: the sets
-   * (GET /api/events/sets), the pickbot personas (GET /api/events/personas)
-   * and the bot game policies (/api/bot-policies, which never lists a policy
-   * that reads opponents' decklists). Creating the event sends you to your
-   * own invite link.
+   * /events/new (mockup 3a): a 4-player pod, pick one. Each seat is a bot
+   * (with its game policy and pickbot persona) or a human who gets an
+   * invite link; seat 1 starts as you. Best of 1 or 3, and — for a pod with
+   * two or more humans — the pick timer. Everything offered is the
+   * server's: the sets (GET /api/events/sets), the pickbot personas (GET
+   * /api/events/personas) and the bot game policies (/api/bot-policies,
+   * which never lists a policy that reads opponents' decklists).
+   *
+   * With one human, creating the event sends you to your own invite link.
+   * With more, the server's invite links are shown once (it keeps only
+   * their hashes), in an Invites panel with a Copy button per seat.
    *
    * sets0 and personas0 seed the two catalogues for the SSR test harness,
    * where onMount never runs; production passes neither and fetches both.
@@ -31,14 +50,24 @@
   let set = $state(sets0?.[0]?.code ?? '');
   let policies = $state<BotPolicyInfo[]>([]);
   let defaultPolicy = $state('');
-  let botPolicy = $state<string[]>(Array(BOT_SEATS).fill(''));
-  let botDrafter = $state<string[]>(Array(BOT_SEATS).fill(''));
+  let seats = $state(defaultSeats());
+  let bestOf = $state<1 | 3>(1);
+  let pickTimer = $state<PickTimer>('');
   let busy = $state(false);
   let error = $state<string | null>(null);
+  /** invites is the create reply's links, kept only while this page shows them (never stored). */
+  let invites = $state<EventInvite[] | null>(null);
+  let copied = $state<number | null>(null);
+  let revealed = $state<number[]>([]);
 
   const offered = $derived(eventPolicies(policies));
   const chosen = $derived(sets?.find((s) => s.code === set) ?? null);
   const defaultLabel = $derived(policies.find((p) => p.name === defaultPolicy)?.label ?? defaultPolicy);
+  const humans = $derived(humanCount(seats));
+  const timed = $derived(timerOffered(seats));
+  // The segment shown as on: Off when the server will not time this pod;
+  // otherwise the player's choice, else the server's default (standard).
+  const timerShown = $derived(!timed ? 'off' : pickTimer || 'standard');
 
   onMount(() => {
     fetchBotPolicies()
@@ -65,18 +94,71 @@
     return p.tier && p.tier !== 'production' ? `${p.label} (${p.tier})` : p.label;
   }
 
+  function setKind(i: number, kind: SeatKind) {
+    seats[i].kind = kind;
+  }
+
+  function seatTitle(i: number): string {
+    if (seats[i].kind === 'bot') return 'Bot';
+    return seats.findIndex((s) => s.kind === 'human') === i ? 'You' : 'Human';
+  }
+
   async function open() {
     if (!set) return;
     busy = true;
     error = null;
     try {
-      const res = await createEvent(createRequest(set, botPolicy, botDrafter));
-      const mine = res.invites?.[0];
+      const res = await createEvent(createRequest(set, seats, { bestOf, pickTimer }));
+      const links = res.invites ?? [];
+      if (links.length > 1) {
+        invites = links;
+        busy = false;
+        return;
+      }
+      const mine = links[0];
       navigateTo(mine ? mine.join : `/e/${encodeURIComponent(res.event)}`);
     } catch (e) {
       error = message(e);
       busy = false;
     }
+  }
+
+  function link(inv: EventInvite): string {
+    return inviteURL(typeof location === 'undefined' ? '' : location.origin, inv.join);
+  }
+
+  // copy puts one invite link on the clipboard. Where the Clipboard API is
+  // missing or refused (an insecure origin), it falls back to a selected
+  // off-screen textarea; failing both, the link is revealed for a manual copy.
+  async function copy(inv: EventInvite) {
+    const url = link(inv);
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = inv.seat;
+      return;
+    } catch {
+      /* fall through */
+    }
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.append(ta);
+    ta.select();
+    let ok: boolean;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    ta.remove();
+    if (ok) copied = inv.seat;
+    else reveal(inv.seat);
+  }
+
+  function reveal(seat: number) {
+    if (!revealed.includes(seat)) revealed = [...revealed, seat];
   }
 </script>
 
@@ -85,8 +167,38 @@
     <a class="brand" href="/">gorge</a>
     <span class="crumbs">Events / New</span>
     <span class="sp"></span>
-    <a class="ev-btn sm" href="/">Cancel</a>
+    <a class="ev-btn sm" href="/">{invites ? 'Done' : 'Cancel'}</a>
   </header>
+  {#if invites}
+    <section class="ev-main invites" data-testid="invites">
+      <h2>Invites</h2>
+      <p class="warn" role="note">These links are shown once. Copy them now.</p>
+      <p class="dim small">Each human seat joins with its own link. The server keeps no copy it can show again.</p>
+      <ul class="invlist">
+        {#each invites as inv, j (inv.seat)}
+          {@const url = link(inv)}
+          <li class="invrow" data-testid="invite-row">
+            <span class="idx data">{inv.seat + 1}</span>
+            <b>{j === 0 ? 'You' : `Seat ${inv.seat + 1}`}</b>
+            {#if revealed.includes(inv.seat)}
+              <input class="link data" type="text" readonly value={url} aria-label={`Seat ${inv.seat + 1} invite link`} onfocus={(e) => e.currentTarget.select()} />
+            {:else}
+              <span class="link data dim" title="The seat token is hidden; Copy copies the full link.">{maskToken(url)}</span>
+            {/if}
+            <span class="btns">
+              <button type="button" class="ev-btn sm" data-testid="copy-invite" onclick={() => void copy(inv)}>{copied === inv.seat ? 'Copied ✓' : 'Copy'}</button>
+              {#if !revealed.includes(inv.seat)}
+                <button type="button" class="ev-btn sm" onclick={() => reveal(inv.seat)}>Show</button>
+              {/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+      <div>
+        <button type="button" class="ev-btn primary" data-testid="go-to-seat" onclick={() => invites && navigateTo(invites[0].join)}>Go to my seat</button>
+      </div>
+    </section>
+  {:else}
   <div class="ev-split create">
     <section class="ev-main form">
       <div class="field">
@@ -97,47 +209,73 @@
         </div>
       </div>
       <div class="field">
-        <span class="ev-h5">Seats · pod of 4</span>
+        <span class="ev-h5">Seats · pod of 4 · {humans} {humans === 1 ? 'human' : 'humans'}</span>
         <div class="seats">
-          <div class="seatrow">
-            <span class="idx data">1</span>
-            <b>You</b>
-            <span class="data dim">human · you type your name next</span>
-          </div>
-          {#each botPolicy as _, i (i)}
-            <div class="seatrow">
-              <span class="idx data">{i + 2}</span>
-              <span class="kind">Bot</span>
-              <span class="persona">
-                <select aria-label={`Seat ${i + 2} drafts as`} bind:value={botDrafter[i]} data-testid={`seat-${i + 2}-drafter`}>
-                  <option value="">Drafter: server default ({DEFAULT_PERSONA})</option>
-                  {#each personas as name (name)}
-                    <option value={name}>Drafter: {name}</option>
-                  {/each}
-                </select>
-                <span class="data dim">Builder: {botDrafter[i] || DEFAULT_PERSONA}</span>
-              </span>
-              <label class="plays">
-                <span class="sr">Seat {i + 2} plays</span>
-                <select aria-label={`Seat ${i + 2} plays`} bind:value={botPolicy[i]} data-testid={`seat-${i + 2}-policy`}>
-                  <option value="">{defaultLabel ? `Plays: server default (${defaultLabel})` : 'Plays: server default'}</option>
-                  {#each offered as p (p.name)}
-                    <option value={p.name}>Plays: {policyLabel(p)}</option>
-                  {/each}
-                </select>
-              </label>
+          {#each seats as seat, i (i)}
+            <div class="seatrow" class:human={seat.kind === 'human'} data-testid={`seat-${i + 1}`}>
+              <span class="idx data">{i + 1}</span>
+              <div class="seg kindseg" role="group" aria-label={`Seat ${i + 1} kind`}>
+                <button type="button" class:on={seat.kind === 'human'} aria-pressed={seat.kind === 'human'} data-testid={`seat-${i + 1}-human`} onclick={() => setKind(i, 'human')}>{i === 0 ? 'You' : 'Invite human'}</button>
+                <button type="button" class:on={seat.kind === 'bot'} aria-pressed={seat.kind === 'bot'} data-testid={`seat-${i + 1}-bot`} onclick={() => setKind(i, 'bot')}>Bot</button>
+              </div>
+              {#if seat.kind === 'human'}
+                <span class="data dim humannote">
+                  {seatTitle(i) === 'You' ? 'human · you type your name next' : 'human · gets an invite link once the pod opens'}
+                </span>
+              {:else}
+                <span class="persona">
+                  <select aria-label={`Seat ${i + 1} drafts as`} bind:value={seat.drafter} data-testid={`seat-${i + 1}-drafter`}>
+                    <option value="">Drafter: server default ({DEFAULT_PERSONA})</option>
+                    {#each personas as name (name)}
+                      <option value={name}>Drafter: {name}</option>
+                    {/each}
+                  </select>
+                  <span class="data dim">Builder: {seat.drafter || DEFAULT_PERSONA}</span>
+                </span>
+                <label class="plays">
+                  <span class="sr">Seat {i + 1} plays</span>
+                  <select aria-label={`Seat ${i + 1} plays`} bind:value={seat.policy} data-testid={`seat-${i + 1}-policy`}>
+                    <option value="">{defaultLabel ? `Plays: server default (${defaultLabel})` : 'Plays: server default'}</option>
+                    {#each offered as p (p.name)}
+                      <option value={p.name}>Plays: {policyLabel(p)}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
             </div>
           {/each}
         </div>
-        <p class="dim small">Only bots that cannot see your decklist are offered. Inviting more humans comes later.</p>
+        <p class="dim small">Only bots that cannot see your decklist are offered. Every human seat after yours gets its own invite link.</p>
       </div>
       <div class="field">
         <span class="ev-h5">Matches</span>
         <div class="seg" role="group" aria-label="Matches">
-          <button type="button" class="on" aria-pressed="true">Best of 1</button>
-          <button type="button" disabled>Best of 3 (later)</button>
+          <button type="button" class:on={bestOf === 1} aria-pressed={bestOf === 1} data-testid="best-of-1" onclick={() => (bestOf = 1)}>Best of 1</button>
+          <button type="button" class:on={bestOf === 3} aria-pressed={bestOf === 3} data-testid="best-of-3" onclick={() => (bestOf = 3)}>Best of 3</button>
         </div>
-        <p class="dim small">Round robin: three rounds, everyone plays everyone once.</p>
+        <p class="dim small">
+          Round robin: three rounds, everyone plays everyone once{bestOf === 3 ? ', each pairing a best-of-three series with sideboarding between games' : ''}.
+        </p>
+      </div>
+      <div class="field">
+        <span class="ev-h5">Pick timer</span>
+        <div class="seg" role="group" aria-label="Pick timer" data-testid="pick-timer">
+          {#each PICK_TIMERS as t (t.mode)}
+            <button
+              type="button"
+              class:on={timerShown === t.mode}
+              aria-pressed={timerShown === t.mode}
+              disabled={!timed}
+              data-testid={`timer-${t.mode}`}
+              onclick={() => (pickTimer = t.mode)}
+            >{t.label}</button>
+          {/each}
+        </div>
+        <p class="dim small">
+          {timed
+            ? 'Each pick has a time limit (shorter as the pack empties); the server picks for a seat that runs out.'
+            : 'A pod with one human drafts without a timer.'}
+        </p>
       </div>
     </section>
     <aside class="ev-rail">
@@ -164,6 +302,7 @@
       <button type="button" class="ev-btn primary" data-testid="open-pod" disabled={busy || !set} onclick={open}>{busy ? 'Opening…' : 'Open the pod'}</button>
     </aside>
   </div>
+  {/if}
 </main>
 
 <style>
@@ -217,7 +356,7 @@
   }
   .seatrow {
     display: grid;
-    grid-template-columns: 1.5rem 3rem minmax(0, 1fr) minmax(0, 15rem);
+    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 15rem);
     gap: var(--sp-2);
     align-items: center;
     padding: 0.45rem 0.6rem;
@@ -226,8 +365,15 @@
     border-radius: var(--radius);
     font-size: var(--t-14);
   }
-  .seatrow:first-child {
-    grid-template-columns: 1.5rem 3rem minmax(0, 1fr);
+  .seatrow.human {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .kindseg button {
+    padding: 0.25rem 0.55rem;
+    font-size: var(--t-12);
+  }
+  .humannote {
+    font-size: var(--t-12);
   }
   .persona {
     display: flex;
@@ -257,11 +403,12 @@
     .seatrow {
       grid-template-columns: 1.5rem minmax(0, 1fr);
     }
-    .seatrow:first-child {
+    .seatrow.human {
       grid-template-columns: 1.5rem minmax(0, 1fr);
     }
     .persona,
-    .plays {
+    .plays,
+    .humannote {
       grid-column: 2;
     }
   }
@@ -300,5 +447,66 @@
   }
   .sp {
     flex: 1;
+  }
+  .invites {
+    max-width: 52rem;
+  }
+  .invites h2 {
+    margin: 0;
+    font: 600 1.5rem var(--font-serif);
+  }
+  .warn {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--gilt);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--gilt) 12%, transparent);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .invlist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .invrow {
+    display: grid;
+    grid-template-columns: 1.5rem 4rem minmax(0, 1fr) auto;
+    gap: var(--sp-2);
+    align-items: center;
+    padding: 0.45rem 0.6rem;
+    background: var(--felt-raised);
+    border: 1px solid var(--edge-felt);
+    border-radius: var(--radius);
+    font-size: var(--t-14);
+  }
+  .invrow .link {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--t-12);
+  }
+  .invrow input.link {
+    width: 100%;
+    background: var(--instrument);
+    color: var(--ink);
+    border: 1px solid var(--edge-inst);
+    border-radius: var(--radius);
+    padding: 0.25rem 0.4rem;
+  }
+  .btns {
+    display: inline-flex;
+    gap: var(--sp-1);
+  }
+  @media (max-width: 600px) {
+    .invrow {
+      grid-template-columns: 1.5rem minmax(0, 1fr);
+    }
+    .invrow .link,
+    .btns {
+      grid-column: 1 / -1;
+    }
   }
 </style>

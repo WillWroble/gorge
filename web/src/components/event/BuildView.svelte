@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { EventState } from '../../protocol';
   import { basicsTotal, STEPPER_MAX, type DeckBuilder, type Zone } from '../../lib/deckbuild.svelte';
   import { BASIC_NAMES, COLOUR_FILTERS, COLOURS, factsOf, passesFilter, seatLabel } from '../../lib/draftcards';
@@ -13,8 +14,11 @@
    *
    * The count, validity and error shown are the server's DeckCheck for the
    * current working copy, never a client-side verdict.
+   *
+   * `actions` replaces the Ready block: the between-games sheet (E3-9)
+   * edits a sideboarding working copy with its own Keep / Submit buttons.
    */
-  let { builder, ev, rated = true }: { builder: DeckBuilder; ev: EventState | null; rated?: boolean } = $props();
+  let { builder, ev, rated = true, actions }: { builder: DeckBuilder; ev: EventState | null; rated?: boolean; actions?: Snippet } = $props();
 
   const you = $derived(ev?.you ?? null);
   const deckCards = $derived(builder.deckCards);
@@ -175,6 +179,9 @@
       <button type="button" class="ev-btn sm" onclick={() => void builder.resetToSuggestion()} disabled={!builder.suggestion}>Reset to bot suggestion</button>
     </div>
 
+    {#if actions}
+      <div class="block grow">{@render actions()}</div>
+    {:else}
     <div class="block grow">
       <div class="readyrow">
         {#each others as s (s.seat)}
@@ -184,6 +191,7 @@
       <button type="button" class="ev-btn primary" data-testid="ready" disabled={builder.busy || !check?.valid} onclick={() => void builder.readyUp()}>{readyLabel}</button>
       {#if builder.ready && !builder.dirty}<p class="dim small">Waiting for the pod. Change anything and Ready again to resubmit.</p>{/if}
     </div>
+    {/if}
   </aside>
 </div>
 

@@ -48,7 +48,12 @@ describe('promptAnatomy titles and plain lines', () => {
     expect(promptAnatomy(dec('attackers', [], { min: 0, max: 3 }), v).title).toBe('Declare attackers');
     expect(promptAnatomy(dec('blockers', [], { min: 0, max: 3 }), v).title).toBe('Declare blockers');
     expect(promptAnatomy(dec('trigger_order', [opt(0, 'trigger', 'A'), opt(1, 'trigger', 'B')], { min: 2, max: 2 }), v).title).toBe('Order your triggers');
-    expect(promptAnatomy(dec('starting_player', [opt(0, 'player', 'Ari')], { prompt: 'You won the toss. Choose who takes the first turn.' }), v).title).toBe('Who plays first?');
+    // starting_player keeps the server's prompt as its heading (E3-9): a Bo3
+    // game's chooser won no toss, so a fixed "You won the toss." would lie.
+    expect(promptAnatomy(dec('starting_player', [opt(0, 'player', 'Ari')], { prompt: 'You won the toss. Choose who takes the first turn.' }), v).title).toBe('You won the toss. Choose who takes the first turn.');
+    const chooser = promptAnatomy(dec('starting_player', [opt(0, 'player', 'Ari')], { prompt: 'Choose who takes the first turn.' }), v);
+    expect(chooser.title).toBe('Choose who takes the first turn.');
+    expect(chooser.plain).toBeNull();
   });
 
   it('keeps a choose prompt as the question', () => {
