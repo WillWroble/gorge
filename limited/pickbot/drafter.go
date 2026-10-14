@@ -18,6 +18,9 @@ type RatingColour struct {
 	// path's type lines). The FDN rated path works without it.
 	Lookup CardLookup
 	Tuning Tuning
+	// Ratings, when non-nil, replaces the embedded rating file as the rated
+	// path (see ParseRatingsOverride); a card it lacks is neutral.
+	Ratings *RatingsOverride
 }
 
 // tuning returns the drafter's knob set, filling the zero value with the
@@ -63,6 +66,9 @@ func factsOf(lookup CardLookup, name string) cardFacts {
 // rough scale otherwise.
 func (d *RatingColour) centred(set string, ref limited.CardRef) float64 {
 	t := d.tuning()
+	if d.Ratings != nil {
+		return (d.Ratings.Value(ref.Name) - t.RatingCentre) * t.RatingScale
+	}
 	if e, ok := RawRating(set, ref.Name); ok {
 		return (e.GihWr - t.RatingCentre) * t.RatingScale
 	}
@@ -113,6 +119,9 @@ func (d *RatingColour) colourFit(mask uint8, picks []limited.CardRef, set string
 // ratingWeight is a past pick's raw rating, the share weight: the rated
 // metric where a file covers the set, the heuristic points elsewhere.
 func (d *RatingColour) ratingWeight(set string, ref limited.CardRef) float64 {
+	if d.Ratings != nil {
+		return d.Ratings.Value(ref.Name)
+	}
 	if e, ok := RawRating(set, ref.Name); ok {
 		return e.GihWr
 	}
