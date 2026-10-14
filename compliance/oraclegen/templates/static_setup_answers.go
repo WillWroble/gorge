@@ -31,7 +31,7 @@ func withStaticSetupChoices(base [][]oraclegen.XAnswer, res rules.OracleResult) 
 			continue
 		}
 		if oraclegen.IsSetupChoice(d) {
-			lead = append(lead, oraclegen.XAnswer{d.Seat, "setup_choice", d.Picks[0]})
+			lead = append(lead, oraclegen.XAnswer{Seat: d.Seat, Kind: "setup_choice", Value: d.Picks[0]})
 			continue
 		}
 		if a, ok := oraclegen.SetupNumberChoice(d); ok {
