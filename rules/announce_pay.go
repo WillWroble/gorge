@@ -112,12 +112,6 @@ func (e *Engine) announcedManaWindowAsk(pc *pendingCast, mana Cost) bool {
 		if e.convokeCommitted(pc, id) || !e.untappedManaSource(p, id) {
 			continue
 		}
-		// CR 601.2g: the same withhold rule the manual window applies --
-		// this window always poses (undo and cancel stay), so only the
-		// dead source's options disappear.
-		if !e.paymentSourceUseful(pc, p, id) {
-			continue
-		}
 		chosen := pay.ChosenProducedColour(e.G, id)
 		for i, ma := range e.availableManaAbilitiesForWindow(p, id, false) {
 			marker := e.manaActivationCostMarker([]*cards.SA{ma})
