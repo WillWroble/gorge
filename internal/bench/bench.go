@@ -463,6 +463,12 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 		}
 		return o, e, nil
 	}
+	if lle != nil && lle.Reason == rules.RunawayBigBoardReason {
+		// A runaway burst on a board past rules.RunawayBigBoardObjs is
+		// volume, not a loop: a stalled game (the cardfuzz "bigboard"
+		// kind), excluded from rates like any watchdog cap.
+		return finish(Outcome{StallOn: "bigboard", Turns: e.G.Turn, Intents: n, Livelock: lle.Error()})
+	}
 	if lle != nil {
 		return finish(Outcome{StallOn: "livelock", Turns: e.G.Turn, Intents: n, Livelock: lle.Error()})
 	}
