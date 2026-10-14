@@ -13,6 +13,23 @@ function seatsFromInfo(info: TableInfo): SeatInfo[] {
   return (info.seat_names ?? []).map((n, i) => ({ name: n, deck: n, colour: SEAT_COLOURS[i % SEAT_COLOURS.length] }));
 }
 
+// isSeries reads TableInfo.series, which arrives with E3-fx2's protocol.ts.
+// The intersection keeps the read correct whether or not the pinned union has
+// the field yet: before it lands the value is simply undefined (false).
+function isSeries(info: TableInfo): boolean {
+  return (info as TableInfo & { series?: boolean }).series === true;
+}
+
+// tableStateName maps a table_state frame's value onto the client's own state
+// spelling: the server names a series table's between-games cooldown
+// "between_games" (protocol.TableBetweenGames) while TableInfo.State and this
+// store call it "cooldown". A frame for a table this client does not know, or
+// with no state, is left alone.
+function tableStateName(state: string | undefined): string | null {
+  if (state === 'between_games') return 'cooldown';
+  return state ?? null;
+}
+
 class Tables {
   #list = $state<TableState[]>([]);
   get list(): TableState[] { return this.#list; }
@@ -62,7 +79,18 @@ class Tables {
       }
       case 'match_end': {
         const t = this.find(f.table ?? '');
-        if (t) t.info = { ...t.info, state: t.info.perpetual ? 'cooldown' : 'idle' };
+        // A series table (E3-2) goes on to its next match, so its match_end
+        // is the between-games state, never idle. A perpetual table cools
+        // down and restarts; only an ordinary table is idle. The table_state
+        // frame confirms the series state, but a spectator that missed it
+        // still reads series from TableInfo.
+        if (t) t.info = { ...t.info, state: t.info.perpetual || isSeries(t.info) ? 'cooldown' : 'idle' };
+        break;
+      }
+      case 'table_state': {
+        const t = this.find(f.table ?? '');
+        const state = tableStateName((f.body as { state?: string }).state);
+        if (t && state !== null) t.info = { ...t.info, state };
         break;
       }
       case 'table_halted': {
