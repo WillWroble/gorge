@@ -22,7 +22,6 @@
 package policynet
 
 import (
-	"slices"
 	"sort"
 	"strings"
 
@@ -267,7 +266,7 @@ func EncodeState(v view.View, seat state.PlayerID) State {
 		}
 	}
 
-	slices.SortStableFunc(sparse, cmpFeatureRow)
+	stableSortByRow(sparse)
 	return State{Dense: dense, Sparse: sparse}
 }
 
