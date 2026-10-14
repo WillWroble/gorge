@@ -781,11 +781,8 @@ func TestManaVaultTriggerChargesItsRealCost(t *testing.T) {
 	e.emit(events.Event{Kind: events.StepChange, Step: state.StepUpkeep})
 	e.putTriggersOnStack()
 	e.resolveTop()
+	// OptionalDecider$ You folds into the pay election (optionalFoldsIntoCost).
 	d := e.Pending()
-	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{0}}); err != nil {
-		t.Fatal(err)
-	}
-	d = e.Pending()
 	if d == nil || d.Options[0].Kind != "trigger_cost_pay" {
 		t.Fatalf("Mana Vault did not ask for its {4}: %+v", d)
 	}

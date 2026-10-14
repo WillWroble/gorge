@@ -101,25 +101,13 @@ func TestEchoFlexiblePipPayment(t *testing.T) {
 	}
 	submitChoices(t, e, 1) // elect blue
 
-	// The mana window can now float blue; tap the Island and re-open the
-	// election. A Forest is on the board too, so electing blue and paying
-	// from blue is a genuine colour choice, not the only producer available.
+	// Pay first (respay.go): the election follows the announcement, and its
+	// plain pay funds the elected blue face through the planner -- the
+	// Island, since the Forest cannot pay it -- with no mana window.
 	d = e.Pending()
 	if d == nil || d.Kind != decision.KChoose || d.Source != bear ||
-		len(d.Options) == 0 || d.Options[0].Kind != "activate" {
-		t.Fatalf("expected the mana-ability window after the announcement, got %+v", d)
-	}
-	submitChoices(t, e, 0)
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the echo election, got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "echo_pay" {
-		t.Fatalf("hybrid echo election = %+v, want a pay option once blue is in the pool", d.Options)
-	}
-	poolBefore := e.G.Players[0].Pool
-	if poolBefore[state.MU] != 1 || poolBefore[state.MW] != 0 {
-		t.Fatalf("precondition: pool before payment = %+v, want exactly one blue", poolBefore)
+		len(d.Options) == 0 || d.Options[0].Kind != "echo_pay" {
+		t.Fatalf("expected the echo election after the announcement, got %+v", d)
 	}
 	submitChoices(t, e, 0) // pay
 

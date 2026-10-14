@@ -66,13 +66,15 @@ func TestOracleSetupDropsParkedAndDestinationlessEntryTriggers(t *testing.T) {
 	}
 }
 
-// The harness's fallback for a triggered "you may pay" cost's mana window:
-// with a cost no potential mana can cover (Esoteric Duplicator's {2} with one
-// Llanowar Elves), "done" is answered instead of tapping, so no mana floats
-// before the decline (XMage never activates a mana ability for a cost it
-// cannot pay: its pool is empty at the measured D6 checkpoint, gorge's was
-// "G"). A payable cost keeps the tapping fallback (CR 605.3a lets the payer
-// activate mana abilities in the window either way).
+// A triggered "you may pay" cost no potential mana can cover (Esoteric
+// Duplicator's {2} with one Llanowar Elves) is posed decline-only, so no
+// mana floats before the decline (XMage never activates a mana ability for a
+// cost it cannot pay: its pool is empty at the measured D6 checkpoint). Since
+// the pay-first model (respay.go) the engine itself withholds both the pay
+// and the mana window there, so the harness's "done" fallback
+// (unpayableTriggerCostWindowDone) is never reached. A payable cost is
+// offered pay first, and the harness's first-option fallback pays it, the
+// planner tapping both Elves.
 func TestOracleUnpayableTriggerCostWindowAnswersDone(t *testing.T) {
 	res, _ := runFixtureScenario(t, `{"name":"duplicator","setup":{"p0":{"battlefield":["Esoteric Duplicator","Ornithopter","Llanowar Elves"],"hand":["Deadly Dispute"]},"p1":{"battlefield":["Grizzly Bears"]}},"steps":[{"op":"cast","seat":0,"card":"p0:Deadly Dispute","mana":"CB","answers":[{"kind":"choose","pick":["Ornithopter"]}]},{"op":"resolve","seat":0}]}`)
 	last := res.Snapshots[len(res.Snapshots)-1]
@@ -80,13 +82,16 @@ func TestOracleUnpayableTriggerCostWindowAnswersDone(t *testing.T) {
 		t.Errorf("p0 pool = %q after the declined {2}, want empty (the fallback tapped Llanowar Elves)", pool)
 	}
 	transcript := strings.Join(res.Transcript, "\n")
-	if !strings.Contains(transcript, `choose -> ["Done"]`) || !strings.Contains(transcript, `choose -> ["Do not pay"]`) {
-		t.Errorf("want the Done + Do not pay fallback pair:\n%s", transcript)
+	if strings.Contains(transcript, `choose -> ["Done"]`) || !strings.Contains(transcript, `choose -> ["Do not pay"]`) {
+		t.Errorf("want the decline-only ask answered with no mana window:\n%s", transcript)
 	}
 
 	// A payable {2} (two Llanowar Elves) still taps through the window.
 	res, _ = runFixtureScenario(t, `{"name":"duplicator-pay","setup":{"p0":{"battlefield":["Esoteric Duplicator","Ornithopter","Llanowar Elves","Llanowar Elves"],"hand":["Deadly Dispute"]},"p1":{"battlefield":["Grizzly Bears"]}},"steps":[{"op":"cast","seat":0,"card":"p0:Deadly Dispute","mana":"CB","answers":[{"kind":"choose","pick":["Ornithopter"]}]},{"op":"resolve","seat":0}]}`)
-	if transcript := strings.Join(res.Transcript, "\n"); !strings.Contains(transcript, `choose -> ["Tap Llanowar Elves for mana"]`) {
-		t.Errorf("a payable cost must keep the tapping fallback:\n%s", transcript)
+	if transcript := strings.Join(res.Transcript, "\n"); !strings.Contains(transcript, `choose -> ["Pay 2"]`) {
+		t.Errorf("a payable cost must be offered and paid:\n%s", transcript)
+	}
+	if pool := res.Snapshots[len(res.Snapshots)-1].Players[0].Pool; pool != "" {
+		t.Errorf("p0 pool = %q after the paid {2}, want empty (the planner tapped exactly the cost)", pool)
 	}
 }

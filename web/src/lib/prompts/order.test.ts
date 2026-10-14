@@ -26,6 +26,37 @@ describe('rendererFor', () => {
 });
 
 describe('orderedOptions / renderedOrder', () => {
+  // The Frenzied Goblin election (rules/respay.go): the engine offers the
+  // plain pay (planner taps), the decline and the manual route; each surface
+  // draws exactly one pay button for the seat's auto-pay preference, and the
+  // digits follow what is drawn.
+  const goblin = dec('choose', [
+    opt(0, 'trigger_cost_pay', 'Pay R', { obj: 1 }),
+    opt(1, 'trigger_cost_decline', 'Do not pay', { obj: 1 }),
+    opt(2, 'trigger_cost_pay_manual', 'Pay R (choose mana sources)', { obj: 1 }),
+  ]);
+  it('draws the planner pay under auto-pay and the manual pay without it', () => {
+    expect(renderedOrder(goblin, { filter: '', autoPayMana: true })).toEqual([0, 1]);
+    expect(renderedOrder(goblin, { filter: '', autoPayMana: false })).toEqual([1, 2]);
+    expect(renderedOrder(goblin, none)).toEqual([1, 2]);
+  });
+
+  it('keeps a lone pay in both modes: with no manual sibling it is the only route', () => {
+    for (const kind of ['trigger_cost_pay', 'cumulative_pay', 'echo_pay']) {
+      const d = dec('choose', [opt(0, kind, 'Pay 4', { obj: 1 }), opt(1, 'decline', 'Do not pay', { obj: 1 })]);
+      expect(renderedOrder(d, { filter: '', autoPayMana: true })).toEqual([0, 1]);
+      expect(renderedOrder(d, { filter: '', autoPayMana: false })).toEqual([0, 1]);
+    }
+  });
+
+  it('picks the route for cumulative upkeep and echo the same way', () => {
+    for (const k of ['cumulative', 'echo']) {
+      const d = dec('choose', [opt(0, `${k}_pay`, 'Pay 1', { obj: 1 }), opt(1, `${k}_sac`, 'Sacrifice', { obj: 1 }), opt(2, `${k}_pay_manual`, 'Pay 1 (choose mana sources)', { obj: 1 })]);
+      expect(renderedOrder(d, { filter: '', autoPayMana: true })).toEqual([0, 1]);
+      expect(renderedOrder(d, { filter: '', autoPayMana: false })).toEqual([1, 2]);
+    }
+  });
+
   it('refuses priority: the action list is not numbered', () => {
     expect(renderedOrder(dec('priority', [opt(0, 'cast', 'Cast Bolt'), opt(1, 'pass', 'Pass')]), none)).toBeNull();
     expect(renderedOrder(null, none)).toBeNull();

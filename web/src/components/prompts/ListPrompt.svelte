@@ -36,7 +36,7 @@
     children?: Snippet;
   } = $props();
 
-  const rows = $derived(orderedOptions(decision, { filter: logic.searchFilter }) ?? []);
+  const rows = $derived(orderedOptions(decision, { filter: logic.searchFilter, autoPayMana: logic.autoPayMana }) ?? []);
   const digits = $derived(digitMap(rows.map((o) => o.index)));
   const primary = $derived(primaryOf(decision));
   const multi = $derived(decision.max > 1 || decision.repeatable === true);

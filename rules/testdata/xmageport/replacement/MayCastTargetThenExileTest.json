@@ -45,12 +45,6 @@
      "active": "p0",
      "answers": [
       {
-       "kind": "any",
-       "pick": [
-        "yes"
-       ]
-      },
-      {
        "kind": "choose",
        "pick": [
         "1"

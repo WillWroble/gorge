@@ -43,6 +43,9 @@ type cumulativeUpkeep struct {
 	action     *cumulativeAction
 	costLabel  string
 	windowDone bool
+	// res is the pay-first funding state (respay.go): the pay/sacrifice
+	// election comes before any mana window.
+	res resPay
 
 	// pips carries the flexible-pip payment announcement (CR 601.2b/107.4e-f)
 	// for this window, exactly as triggeredEffectCost.pips does:
@@ -158,6 +161,10 @@ type triggeredEffectCost struct {
 	// removes (RemoveAnyCounter<N/Any/CARDNAME>), recorded in cost order by
 	// subCounterKindAsk and settled by subCounterSettle.
 	counterPicks []string
+	// res is the pay-first funding state (respay.go): the pay/decline
+	// election is posed before any mana window, and a pay the pool does not
+	// cover is funded afterwards, by the planner or the manual window.
+	res resPay
 }
 
 // xFoldBoundCap is the defensive ceiling on an announced trigger-cost X when
@@ -559,22 +566,37 @@ func (e *Engine) cumulativePaymentAsk() {
 		cu.costLabel, chooseCumulative) {
 		return
 	}
-	if cu.action == nil && e.paymentManaAskClass(cu.player, cu.source, announced, cu.windowDone,
-		"Activate mana abilities to pay cumulative upkeep", chooseCumulative, paymentCumulativeUpkeep) {
+	if cu.action == nil && cu.res.chosen {
+		// The payer already elected to pay (respay.go): fund what the pool
+		// lacks, then charge.
+		if e.resPayFund(&cu.res, cu.player, cu.source, announced, cu.windowDone,
+			"Activate mana abilities to pay cumulative upkeep", chooseCumulative, paymentCumulativeUpkeep) {
+			return
+		}
+		e.cumulativeAnswer([]decision.Option{{Kind: "cumulative_pay", Obj: cu.source}})
 		return
 	}
 	age := strconv.FormatInt(int64(o.Counter("AGE")), 10)
 	var opts []decision.Option
+	payLabel := capitaliseFirst(cu.costLabel) + " per age (" + age + " age counter(s))"
 	payable := cu.action != nil && e.cumulativeActionPayable(cu)
 	if cu.action == nil {
 		payable = announced.Priceable() && pay.CostPayableClass(asPayer(e), cu.player, paymentDescriptor{ID: cu.source, Class: paymentCumulativeUpkeep, Cost: &announced}, asEval(e).MayPlayRider(cu.player, cu.source), announced)
 	}
-	if payable {
-		opts = append(opts, decision.Option{Index: 0, Kind: "cumulative_pay", Obj: cu.source,
-			Label: capitaliseFirst(cu.costLabel) + " per age (" + age + " age counter(s))"})
+	var manual []decision.Option
+	if cu.action == nil && e.resPayNeedsMana(cu.player, cu.source, announced, paymentCumulativeUpkeep) {
+		// Pay first: an untapped source can fund what the pool lacks.
+		routes := e.resPayOptions(cu.player, cu.source, announced, "cumulative_pay", "cumulative_pay_manual", payLabel)
+		opts, manual = []decision.Option{routes[0]}, routes[1:]
+	} else if payable {
+		opts = append(opts, decision.Option{Kind: "cumulative_pay", Obj: cu.source, Label: payLabel})
 	}
-	opts = append(opts, decision.Option{Index: len(opts), Kind: "cumulative_sac", Obj: cu.source,
+	opts = append(opts, decision.Option{Kind: "cumulative_sac", Obj: cu.source,
 		Label: "Sacrifice " + o.Face().Name})
+	opts = append(opts, manual...)
+	for i := range opts {
+		opts[i].Index = i
+	}
 	windowAsk(e, &decision.Decision{Player: cu.player, Kind: decision.KChoose, Min: 1, Max: 1,
 		Prompt: o.Face().Name + " — cumulative upkeep: pay or sacrifice", Source: cu.source, Options: opts}, chooseCumulative)
 }
@@ -1363,8 +1385,15 @@ func (e *Engine) triggeredCostPaymentAsk() {
 	if e.triggeredCostPipAsk(tc) {
 		return
 	}
-	if e.paymentManaAsk(tc.player, tc.source, tc.announcedCost(), tc.windowDone,
-		"Activate mana abilities to "+tc.costLabel, chooseTriggeredCost) {
+	announced := tc.announcedCost()
+	if tc.res.chosen {
+		// The payer already elected to pay: fund what the pool lacks (the
+		// planner's taps, or the manual window), then charge.
+		if e.resPayFund(&tc.res, tc.player, tc.source, announced, tc.windowDone,
+			"Activate mana abilities to "+tc.costLabel, chooseTriggeredCost, paymentOther) {
+			return
+		}
+		e.triggeredCostAnswer([]decision.Option{{Kind: "trigger_cost_pay", Obj: tc.source}})
 		return
 	}
 	name := "triggered ability"
@@ -1373,6 +1402,27 @@ func (e *Engine) triggeredCostPaymentAsk() {
 	}
 	opts := []decision.Option{{Index: 0, Kind: "trigger_cost_pay", Obj: tc.source, Label: capitaliseFirst(tc.costLabel)},
 		{Index: 1, Kind: "trigger_cost_decline", Obj: tc.source, Label: "Do not pay"}}
+	if e.resPayNeedsMana(tc.player, tc.source, announced, paymentOther) {
+		// Pay first (respay.go): the pool does not cover the cost yet, but an
+		// untapped source can help, so "pay" is offered and funded after the
+		// election -- the planner's taps, or the manual route offered beside
+		// it. An energy part the payer cannot cover still keeps the
+		// decline-only ask.
+		if pay.EnergyPayable(e.G, tc.player, &announced) {
+			routes := e.resPayOptions(tc.player, tc.source, announced, "trigger_cost_pay", "trigger_cost_pay_manual",
+				capitaliseFirst(tc.costLabel))
+			opts = []decision.Option{routes[0], {Kind: "trigger_cost_decline", Obj: tc.source, Label: "Do not pay"}}
+			opts = append(opts, routes[1:]...)
+		} else {
+			opts = []decision.Option{{Kind: "trigger_cost_decline", Obj: tc.source, Label: "Do not pay"}}
+		}
+		for i := range opts {
+			opts[i].Index = i
+		}
+		windowAsk(e, &decision.Decision{Player: tc.player, Kind: decision.KChoose, Min: 1, Max: 1,
+			Prompt: name + " — " + tc.costLabel + "?", Source: tc.source, Options: opts}, chooseTriggeredCost)
+		return
+	}
 	// A Draw-bearing cost is Priceable()==false by construction (payMana
 	// cannot charge the draw), but it IS payable when every Draw component's
 	// count resolves and the mana half -- if any -- is covered. The dynamic
@@ -1429,6 +1479,11 @@ func (e *Engine) cumulativeAnswer(chosen []decision.Option) {
 			return
 		}
 		announced := cu.pips.fold(cu.amount)
+		if !cu.res.chosen && e.resPayNeedsMana(cu.player, cu.source, announced, paymentCumulativeUpkeep) {
+			cu.res.elect(chosen[0].Kind == "cumulative_pay_manual")
+			e.cumulativePaymentAsk()
+			return
+		}
 		if announced.Priceable() &&
 			pay.PayManaCumulative(asPayer(e), cu.player, cu.source, announced, asEval(e).Conv(cu.player, cu.source, false)) {
 			e.finishCumulative()
@@ -1610,8 +1665,16 @@ func (e *Engine) triggeredCostAnswer(chosen []decision.Option) {
 		e.triggeredCostPaymentAsk()
 		return
 	}
+	payArm := chosen[0].Kind == "trigger_cost_pay" || chosen[0].Kind == "trigger_cost_pay_manual"
+	if payArm && !tc.res.chosen && e.resPayNeedsMana(tc.player, tc.source, tc.announcedCost(), paymentOther) {
+		// The pay election on a cost the pool does not cover yet: fund it
+		// first (respay.go). The re-entered ask funds and then charges.
+		tc.res.elect(chosen[0].Kind == "trigger_cost_pay_manual")
+		e.triggeredCostPaymentAsk()
+		return
+	}
 	paid := false
-	if chosen[0].Kind == "trigger_cost_pay" {
+	if payArm {
 		// The announced cost: every hybrid/Phyrexian pip is folded to the face
 		// the payer elected, so the mana half the gates priced and the pay arm
 		// charges is exactly the cost triggeredCostPayable proved. A cost with
@@ -2360,6 +2423,7 @@ var cumulativeAnswerCodes = state.NewStrCodes(
 	state.StrEntry[cumulativeAnswerCode]{Key: "activate", Val: cumulativeAnswerActivate},
 	state.StrEntry[cumulativeAnswerCode]{Key: "done", Val: cumulativeAnswerDone},
 	state.StrEntry[cumulativeAnswerCode]{Key: "cumulative_pay", Val: cumulativeAnswerCumulativePay},
+	state.StrEntry[cumulativeAnswerCode]{Key: "cumulative_pay_manual", Val: cumulativeAnswerCumulativePay},
 	state.StrEntry[cumulativeAnswerCode]{Key: "cumulative_action_sac", Val: cumulativeAnswerCumulativeActionSac},
 	state.StrEntry[cumulativeAnswerCode]{Key: "cumulative_action_discard", Val: cumulativeAnswerCumulativeActionDiscard},
 	state.StrEntry[cumulativeAnswerCode]{Key: "cumulative_action_counter", Val: cumulativeAnswerCumulativeActionCounter},

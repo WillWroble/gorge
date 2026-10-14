@@ -95,6 +95,23 @@ func krrikFindWindowOption(t *testing.T, d *decision.Decision, kind string, obj 
 	return -1
 }
 
+// krrikElectManual answers the pay-first election (respay.go) -- posed
+// before any mana window, with the plain pay (the planner's route), the
+// sacrifice and the manual route in that order -- with the manual route, and
+// returns the manual mana window it opens.
+func krrikElectManual(t *testing.T, e *Engine, d *decision.Decision, kw string) *decision.Decision {
+	t.Helper()
+	if len(d.Options) != 3 || d.Options[0].Kind != kw+"_pay" || d.Options[1].Kind != kw+"_sac" || d.Options[2].Kind != kw+"_pay_manual" {
+		t.Fatalf("%s election = %+v, want pay / sacrifice / manual pay", kw, d.Options)
+	}
+	submitChoices(t, e, 2)
+	w := e.Pending()
+	if w == nil || w.Kind != decision.KChoose {
+		t.Fatalf("the manual route posed %+v, want the mana window", w)
+	}
+	return w
+}
+
 func TestKrrikEchoPosesManaWindowWhenSourceCanPay(t *testing.T) {
 	t.Parallel()
 	e, cfg, bear, swamp := krrikUpkeepWindowEngine(t, krrikEchoFixture)
@@ -108,23 +125,12 @@ func TestKrrikEchoPosesManaWindowWhenSourceCanPay(t *testing.T) {
 		t.Fatal("the echo payment window must be posed at the first upkeep after entry")
 	}
 	if d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("the echo payment window must be posed, got %+v", d)
+		t.Fatalf("the echo election must be posed, got %+v", d)
 	}
+	d = krrikElectManual(t, e, d, "echo")
 	swampOpt := krrikFindWindowOption(t, d, "activate", swamp)
 	krrikFindWindowOption(t, d, "done", 0)
-	submitChoices(t, e, swampOpt) // tap the Swamp
-
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the echo election after tapping the Swamp, got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "echo_pay" {
-		t.Fatalf("echo election = %+v, want a pay option once black is in the pool", d.Options)
-	}
-	if pool := e.G.Players[0].Pool; pool[state.MB] != 1 {
-		t.Fatalf("pool after tapping = %+v, want exactly one black floating", pool)
-	}
-	submitChoices(t, e, 0) // pay
+	submitChoices(t, e, swampOpt) // tap the Swamp: the elected pay settles
 
 	if o := e.G.Obj(bear); o == nil || o.Zone != state.ZBattlefield {
 		t.Fatalf("paid the echo but the permanent is %+v", o)
@@ -148,19 +154,11 @@ func TestKrrikEchoWindowDonePaysLife(t *testing.T) {
 		t.Fatal("the echo payment window must be posed at the first upkeep after entry")
 	}
 	if d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("the echo payment window must be posed, got %+v", d)
+		t.Fatalf("the echo election must be posed, got %+v", d)
 	}
+	d = krrikElectManual(t, e, d, "echo")
 	doneOpt := krrikFindWindowOption(t, d, "done", 0)
-	submitChoices(t, e, doneOpt)
-
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the echo election after \"done\", got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "echo_pay" {
-		t.Fatalf("echo election = %+v, want a pay option (the grant keeps the offer alive)", d.Options)
-	}
-	submitChoices(t, e, 0) // pay
+	submitChoices(t, e, doneOpt) // the elected pay settles with the granted life
 
 	if o := e.G.Obj(bear); o == nil || o.Zone != state.ZBattlefield {
 		t.Fatalf("paid the echo with life but the permanent is %+v", o)
@@ -170,6 +168,33 @@ func TestKrrikEchoWindowDonePaysLife(t *testing.T) {
 	}
 	if e.G.Obj(swamp).Tapped {
 		t.Fatal("the Swamp must stay untapped when the payer answers \"done\"")
+	}
+	replayCheck(t, e, cfg)
+}
+
+// TestKrrikEchoAutoPayTapsTheSwamp is the auto route under K'rrik's grant:
+// the plain pay funds the {B} pip from the untapped Swamp through the
+// planner (the pool alone did not pay it, so the grant was suspended for the
+// funding gate), and no life is spent.
+func TestKrrikEchoAutoPayTapsTheSwamp(t *testing.T) {
+	t.Parallel()
+	e, cfg, bear, swamp := krrikUpkeepWindowEngine(t, krrikEchoFixture)
+	krrikUpkeepPreconditions(t, e, bear, swamp, "Echo")
+
+	d := driveEchoQuiet(t, e, bear, 3, 0, state.StepDraw)
+	if d == nil || d.Kind != decision.KChoose || d.Source != bear || len(d.Options) == 0 || d.Options[0].Kind != "echo_pay" {
+		t.Fatalf("the echo election must be posed with pay first, got %+v", d)
+	}
+	submitChoices(t, e, 0)
+
+	if o := e.G.Obj(bear); o == nil || o.Zone != state.ZBattlefield {
+		t.Fatalf("paid the echo but the permanent is %+v", o)
+	}
+	if !e.G.Obj(swamp).Tapped {
+		t.Fatal("the auto route must tap the Swamp for the pip")
+	}
+	if life := e.G.Players[0].Life; life != 20 {
+		t.Fatalf("life=%d, want 20 (the planner paid with mana, not K'rrik's life)", life)
 	}
 	replayCheck(t, e, cfg)
 }

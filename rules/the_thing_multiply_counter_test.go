@@ -98,71 +98,33 @@ func thingBoard(t *testing.T, e *Engine) (thingID, bearID state.ObjID) {
 }
 
 // thingAttackToTargetAsk drives the whole paid flow up to the optional target
-// ask and returns it: declare The Thing as the only attacker, tap one land per
-// colour symbol of `Cost$ R G W U` in the mana-activation window, answer PAY,
-// and stop at the KChoose target ask.
-//
-// The mana-activation window re-renders after each activation (the tapped land
-// disappears from the options), so each round re-reads e.Pending(); the colour
-// is chosen from the untapped land's name so a wrong colour can never fund the
-// cost.
+// ask and returns it: declare The Thing as the only attacker, answer the
+// `Cost$ R G W U` election's PAY -- posed before any mana window (respay.go),
+// so the planner taps one basic per colour -- and stop at the target ask.
 func thingAttackToTargetAsk(t *testing.T, e *Engine, thingID state.ObjID) *decision.Decision {
 	t.Helper()
 	driveToStep(t, e, 3, 0, state.StepDeclareAttackers)
 	passToKind(t, e, decision.KAttackers)
 	submitAttackersOnly(t, e, thingID)
 
-	// The activation / pay window: tap one land per colour symbol of the
-	// {R}{G}{W}{U} cost until the engine offers the paid branch, then take it.
-	// The prompt names the FULL cost (it does not decrement), so the symbols
-	// already produced are tracked locally; the tapped land disappears from
-	// the options, so each round re-reads e.Pending().
-	needed := []string{"W", "U", "R", "G"}
-	for i := 0; i < 20; i++ {
-		d := passUntilNonPriority(t, e, 40)
-		if d.Kind != decision.KChoose {
-			t.Fatalf("expected the KChoose cost window, got %+v", d)
-		}
-		paid := false
-		for _, o := range d.Options {
-			if o.Kind == "trigger_cost_pay" {
-				if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{o.Index}}); err != nil {
-					t.Fatalf("submit pay: %v", err)
-				}
-				paid = true
-				break
-			}
-		}
-		if paid {
-			break
-		}
-		// Not payable yet: tap the first still-needed colour's land (labels
-		// are "Tap <Basic> for mana").
-		next := -1
-		for _, o := range d.Options {
-			if o.Kind != "activate" {
-				continue
-			}
-			for ni, sym := range needed {
-				if strings.Contains(o.Label, "Tap "+thingLandName(sym)) {
-					next = ni
-					break
-				}
-			}
-			if next >= 0 {
-				if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{o.Index}}); err != nil {
-					t.Fatalf("submit activate: %v", err)
-				}
-				needed = append(needed[:next], needed[next+1:]...)
-				break
-			}
-		}
-		if next < 0 {
-			t.Fatalf("cost window offers no untapped land for any of %v (pool cannot reach {R}{G}{W}{U}): %+v", needed, d)
-		}
+	d := passUntilNonPriority(t, e, 40)
+	if d.Kind != decision.KChoose || len(d.Options) == 0 || d.Options[0].Kind != "trigger_cost_pay" {
+		t.Fatalf("expected the cost election with pay first, got %+v", d)
 	}
-	if len(needed) > 0 {
-		t.Fatalf("the cost window never offered the paid branch; still needed %v", needed)
+	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{d.Options[0].Index}}); err != nil {
+		t.Fatalf("submit pay: %v", err)
+	}
+	// The planner funded exactly {R}{G}{W}{U}: one basic of each colour.
+	for _, sym := range []string{"W", "U", "R", "G"} {
+		tapped := 0
+		for _, id := range e.G.Zone(state.ZBattlefield, 0) {
+			if o := e.G.Obj(id); o.Tapped && o.Face() != nil && o.Face().Name == thingLandName(sym) {
+				tapped++
+			}
+		}
+		if tapped != 1 {
+			t.Fatalf("%d %s tapped after the auto-paid cost, want exactly 1", tapped, thingLandName(sym))
+		}
 	}
 	return passUntilNonPriority(t, e, 40)
 }

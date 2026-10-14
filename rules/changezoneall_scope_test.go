@@ -51,9 +51,19 @@ func TestNihilSpellbombExilesOnlyTargetedGraveyard(t *testing.T) {
 		if d == nil {
 			t.Fatalf("no decision while draining (stack depth %d)", len(e.G.Stack))
 		}
-		if d.Kind == decision.KTriggerOptional {
-			submitChoices(t, e, 1) // decline the {B} draw
-			continue
+		if d.Kind == decision.KChoose && len(d.Options) > 0 {
+			// The folded "you may pay {B}" election (optionalFoldsIntoCost):
+			// decline the draw.
+			decline := -1
+			for _, o := range d.Options {
+				if o.Kind == "trigger_cost_decline" {
+					decline = o.Index
+				}
+			}
+			if decline >= 0 {
+				submitChoices(t, e, decline)
+				continue
+			}
 		}
 		if d.Kind != decision.KPriority {
 			t.Fatalf("unexpected %s decision while draining: %+v", d.Kind, d)

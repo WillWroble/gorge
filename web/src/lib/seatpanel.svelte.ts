@@ -792,7 +792,7 @@ export class SeatPanelState {
   pickHotkey(n: number): boolean {
     const d = this.pending;
     if (d === null || d.seq === this.postedSeq || this.busy) return false;
-    const order = renderedOrder(d, { filter: this.searchFilter });
+    const order = renderedOrder(d, { filter: this.searchFilter, autoPayMana: this.autoPayMana });
     if (order === null || n < 1 || n > MAX_DIGIT) return false;
     const index = order[n - 1];
     if (index === undefined) return false;

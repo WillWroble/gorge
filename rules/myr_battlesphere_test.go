@@ -59,18 +59,17 @@ func battlesphereFixture(t *testing.T) (*Engine, state.ObjID, state.ObjID, state
 }
 
 // battlesphereTrigger drives the attack declaration through the trigger
-// queue and answers the optional-apply ask "yes" -- the state where the
-// tap-election decision is pending.
+// queue to the state where the tap-election decision is pending: its
+// OptionalDecider$ You folds into the election (optionalFoldsIntoCost), whose
+// empty answer is the decline.
 func battlesphereTrigger(t *testing.T, e *Engine, sphere state.ObjID) {
 	t.Helper()
 	e.emit(events.Event{Kind: events.DeclareAttackers, Player: 1, IDs: []state.ObjID{sphere}})
 	e.putTriggersOnStack()
 	e.resolveTop()
-	d := e.Pending()
-	if d == nil || d.Kind != decision.KTriggerOptional {
-		t.Fatalf("optional-apply ask missing: %+v", d)
+	if d := e.Pending(); d == nil || d.Kind == decision.KTriggerOptional {
+		t.Fatalf("want the tap election with no optional-apply ask in front of it: %+v", d)
 	}
-	submitChoices(t, e, 0) // yes
 }
 
 func TestMyrBattlesphereTapXEmptyElectionDeclines(t *testing.T) {

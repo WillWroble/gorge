@@ -27,8 +27,9 @@ const settleOrderScenario = `{
   ]
 }`
 
-// Trystan, Penitent Culler's first-main trigger asks "pay {G}" (a mana-source
-// tap, then the pay answer) while it resolves, scripted on the resolve step.
+// Trystan, Penitent Culler's first-main trigger asks "pay {G}" while it
+// resolves, scripted on the resolve step: the pay election comes first and
+// its plain pay taps the Forest through the planner (respay.go).
 const settleCostScenario = `{
   "name": "settle-trigger-cost",
   "setup": {"p0": {"battlefield": ["Trystan, Callous Cultivator", "Forest"], "back_face": ["Trystan, Callous Cultivator"]}, "p1": {"battlefield": ["Grizzly Bears"]}},
@@ -36,7 +37,7 @@ const settleCostScenario = `{
     {"op": "pass_to", "seat": 0, "decision": "priority"},
     {"op": "pass", "seat": 0},
     {"op": "pass", "seat": 1},
-    {"op": "resolve", "seat": 0, "answers": [{"kind": "choose", "pick": ["Tap Forest for mana"]}, {"kind": "choose", "pick": ["Pay G"]}]}
+    {"op": "resolve", "seat": 0, "answers": [{"kind": "choose", "pick": ["trigger_cost_pay"]}]}
   ]
 }`
 
