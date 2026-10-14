@@ -38,10 +38,14 @@ func (r *run) stateFor(seat int) protocol.EventState {
 			st.Series = append(st.Series, r.seriesFor(seat, results, rd, p[0], p[1]))
 		}
 	}
-	for _, s := range r.ev.Standings() {
-		st.Standings = append(st.Standings, protocol.EventStanding{
-			Seat: s.Seat, Points: s.Points, MW: s.MW, OMW: s.OMW, GW: s.GW, OGW: s.OGW,
-		})
+	// E1-8: no standings rows until the first series has ended — a
+	// pre-result table is empty, not a table of floor percentages.
+	if len(results) > 0 {
+		for _, s := range r.ev.Standings() {
+			st.Standings = append(st.Standings, protocol.EventStanding{
+				Seat: s.Seat, Points: s.Points, MW: s.MW, OMW: s.OMW, GW: s.GW, OGW: s.OGW,
+			})
+		}
 	}
 	return st
 }
@@ -122,7 +126,7 @@ func (r *run) lastGameTable(rd, a, b int) string {
 func (r *run) packFor(seat int) protocol.DraftPack {
 	out := protocol.DraftPack{
 		Event: r.meta.ID, Seat: seat,
-		Pool: draftCards(r.ev.Pool(seat)),
+		Pool: r.draftCards(r.ev.Pool(seat)),
 	}
 	if r.ev.Phase() != event.PhaseDraft {
 		out.Waiting = true
@@ -134,7 +138,7 @@ func (r *run) packFor(seat int) protocol.DraftPack {
 		return out
 	}
 	out.Round, out.PickNo = v.Round, v.PickNo
-	out.Pack = draftCards(v.Pack)
+	out.Pack = r.draftCards(v.Pack)
 	return out
 }
 

@@ -42,7 +42,7 @@ func newHost(t *testing.T, mut func(*Options)) (*Host, *cards.Registry) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := Options{Registry: reg, Store: store, Cards: corpus}
+	opts := Options{Registry: reg, Store: store, Cards: corpus, Seed: func() uint64 { return 7 }}
 	if mut != nil {
 		mut(&opts)
 	}
@@ -69,7 +69,7 @@ func newHostR(t *testing.T, mut func(*Options)) (*Host, *host.Registry) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := Options{Registry: reg, Store: store, Cards: corpus}
+	opts := Options{Registry: reg, Store: store, Cards: corpus, Seed: func() uint64 { return 7 }}
 	if mut != nil {
 		mut(&opts)
 	}
@@ -81,11 +81,11 @@ func newHostR(t *testing.T, mut func(*Options)) (*Host, *host.Registry) {
 	return h, reg
 }
 
-// oneHumanReq is the standard request: FDN, a fixed seed, one human and
-// three default bots.
-func oneHumanReq(seed uint64) protocol.CreateEventRequest {
+// oneHumanReq is the standard request: FDN, one human and three default
+// bots. The seed comes from the harness's fixed Options.Seed.
+func oneHumanReq() protocol.CreateEventRequest {
 	return protocol.CreateEventRequest{
-		Set: "FDN", Seed: &seed,
+		Set:   "FDN",
 		Seats: []protocol.CreateEventSeat{{Kind: "human"}, {Kind: "bot"}, {Kind: "bot"}, {Kind: "bot"}},
 	}
 }
@@ -195,14 +195,14 @@ func wantErr(t *testing.T, err error, codeName string, status int) {
 func TestCreateEventValidation(t *testing.T) {
 	h, _ := newHost(t, nil)
 	seatReq := func(n int, kind string) protocol.CreateEventRequest {
-		req := oneHumanReq(1)
+		req := oneHumanReq()
 		req.Seats = nil
 		for i := 0; i < n; i++ {
 			req.Seats = append(req.Seats, protocol.CreateEventSeat{Kind: kind})
 		}
 		return req
 	}
-	twoHumans := oneHumanReq(1)
+	twoHumans := oneHumanReq()
 	twoHumans.Seats[1] = protocol.CreateEventSeat{Kind: "human"}
 
 	cases := []struct {
@@ -212,12 +212,12 @@ func TestCreateEventValidation(t *testing.T) {
 	}{
 		{"three seats", seatReq(3, "human"), codeBadRequest},
 		{"five seats", seatReq(5, "human"), codeBadRequest},
-		{"unknown set", func() protocol.CreateEventRequest { r := oneHumanReq(1); r.Set = "XXXX"; return r }(), codeBadRequest},
+		{"unknown set", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Set = "XXXX"; return r }(), codeBadRequest},
 		{"two humans", twoHumans, codeBadRequest},
-		{"env policy", func() protocol.CreateEventRequest { r := oneHumanReq(1); r.Seats[1].Policy = "sb-tactical"; return r }(), codeBadRequest},
-		{"unknown policy", func() protocol.CreateEventRequest { r := oneHumanReq(1); r.Seats[1].Policy = "not-a-policy"; return r }(), codeBadRequest},
+		{"env policy", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Seats[1].Policy = "sb-tactical"; return r }(), codeBadRequest},
+		{"unknown policy", func() protocol.CreateEventRequest { r := oneHumanReq(); r.Seats[1].Policy = "not-a-policy"; return r }(), codeBadRequest},
 		{"unknown drafter", func() protocol.CreateEventRequest {
-			r := oneHumanReq(1)
+			r := oneHumanReq()
 			r.Seats[1].Drafter = "not-a-drafter"
 			return r
 		}(), codeBadRequest},
@@ -227,14 +227,14 @@ func TestCreateEventValidation(t *testing.T) {
 		wantErr(t, err, tc.want, 400)
 	}
 	cap, _ := newHost(t, func(o *Options) { o.MaxLiveEvents = 1 })
-	createOK(t, cap, oneHumanReq(1))
-	_, err := cap.CreateEvent(oneHumanReq(2))
+	createOK(t, cap, oneHumanReq())
+	_, err := cap.CreateEvent(oneHumanReq())
 	wantErr(t, err, codeCapacity, 409)
 }
 
 func TestHumanDraftWithBots(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, url := humanToken(t, resp)
 	if url == "" || !strings.Contains(url, resp.Event) {
 		t.Fatalf("invite url %q does not name event %s", url, resp.Event)
@@ -289,7 +289,7 @@ func TestDraftIsDeterministic(t *testing.T) {
 	var first []byte
 	for i := 0; i < 2; i++ {
 		h, _ := newHost(t, nil)
-		resp := createOK(t, h, oneHumanReq(7))
+		resp := createOK(t, h, oneHumanReq())
 		tok, _ := humanToken(t, resp)
 		joinOK(t, h, resp.Event, tok, "Ann")
 		pickTop(t, h, resp.Event, tok, 64)
@@ -306,7 +306,7 @@ func TestDraftIsDeterministic(t *testing.T) {
 
 func TestPickErrors(t *testing.T) {
 	h, _ := newHost(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	id, tok := resp.Event, func() string { t2, _ := humanToken(t, resp); return t2 }()
 	_, err := h.Pick(id, tok, protocol.PickRequest{Round: 1, PickNo: 1})
 	wantErr(t, err, codeConflict, 409)
@@ -333,7 +333,7 @@ func TestPickErrors(t *testing.T) {
 	// A second human seat needs a host that allows two: after it spends
 	// its three round-1 picks the pod must refuse it.
 	h2, _ := newHost(t, func(o *Options) { o.MaxHumans = 2 })
-	two := oneHumanReq(7)
+	two := oneHumanReq()
 	two.Seats[1] = protocol.CreateEventSeat{Kind: "human"}
 	resp2 := createOK(t, h2, two)
 	tok0, _ := humanToken(t, resp2)
@@ -380,7 +380,7 @@ func TestResumeMidDraft(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	pickTop(t, h, resp.Event, tok, 3)
@@ -420,7 +420,7 @@ func TestTornLogTailRecovered(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, _ := newHost(t, func(o *Options) { o.Store = store })
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	pickTop(t, h, resp.Event, tok, 3)
@@ -467,7 +467,7 @@ func TestInviteTokenNeverStoredInClear(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, _ := newHost(t, func(o *Options) { o.Store = store })
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 	h.Close()
@@ -484,7 +484,7 @@ func TestInviteTokenNeverStoredInClear(t *testing.T) {
 
 func TestSubscribeFrames(t *testing.T) {
 	h, reg := newHostR(t, nil)
-	resp := createOK(t, h, oneHumanReq(7))
+	resp := createOK(t, h, oneHumanReq())
 	tok, _ := humanToken(t, resp)
 	joinOK(t, h, resp.Event, tok, "Ann")
 
@@ -504,11 +504,22 @@ func TestSubscribeFrames(t *testing.T) {
 		t.Fatalf("You = %v", st.You)
 	}
 	f2 := readFrame(t, s0)
-	if f2.T != protocol.TDraftPack {
+	if f2.T != protocol.TPodProgress {
 		t.Fatalf("second frame %s", f2.T)
 	}
+	var prog protocol.PodProgress
+	if err := json.Unmarshal(f2.Body, &prog); err != nil {
+		t.Fatal(err)
+	}
+	if prog.Event != resp.Event || len(prog.Picks) != 4 {
+		t.Fatalf("pod_progress = %+v", prog)
+	}
+	f3 := readFrame(t, s0)
+	if f3.T != protocol.TDraftPack {
+		t.Fatalf("third frame %s", f3.T)
+	}
 	var pack protocol.DraftPack
-	if err := json.Unmarshal(f2.Body, &pack); err != nil {
+	if err := json.Unmarshal(f3.Body, &pack); err != nil {
 		t.Fatal(err)
 	}
 	if pack.Waiting || pack.PickNo != 1 || len(pack.Pack) == 0 {
@@ -526,8 +537,8 @@ func TestSubscribeFrames(t *testing.T) {
 		t.Fatalf("frames after pick = %v, want %v", kinds, want)
 	}
 	var pack2 protocol.DraftPack
-	var f3 = func() []byte {
-		// the third frame body, already read: re-fetch from the run
+	var f4 = func() []byte {
+		// the pack frame body, already read: re-fetch from the run
 		r := runOf(t, h, resp.Event)
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -537,7 +548,7 @@ func TestSubscribeFrames(t *testing.T) {
 		}
 		return b
 	}()
-	if err := json.Unmarshal(f3, &pack2); err != nil {
+	if err := json.Unmarshal(f4, &pack2); err != nil {
 		t.Fatal(err)
 	}
 	if pack2.PickNo != 2 {
@@ -559,6 +570,9 @@ func TestSubscribeFrames(t *testing.T) {
 	}
 	if sst.You != nil {
 		t.Fatal("spectator state carries You")
+	}
+	if f2 := readFrame(t, sp); f2.T != protocol.TPodProgress {
+		t.Fatalf("spectator second frame %s", f2.T)
 	}
 	p2 := packOf(t, h, resp.Event, tok)
 	if _, err := h.Pick(resp.Event, tok, protocol.PickRequest{

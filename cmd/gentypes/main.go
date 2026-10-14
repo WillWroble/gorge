@@ -38,6 +38,7 @@ func Render() (string, error) {
 		{protoPkg, "JoinEventRequest"}, {protoPkg, "PickRequest"}, {protoPkg, "DeckRequest"},
 		{protoPkg, "DeckCheck"}, {protoPkg, "EventPool"}, {protoPkg, "ReadyRequest"},
 		{protoPkg, "EventLog"}, {protoPkg, "EventSubscribe"},
+		{protoPkg, "EventSetInfo"}, {protoPkg, "EventPersonas"},
 		// decision.Intent is the client's ANSWER — the one wire type a human
 		// needs. Every other decision type reaches the client through View,
 		// but nothing reaches it from the server's offered decisions, so

@@ -63,7 +63,7 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 			Persona: fmt.Sprintf("%s/%s/%s", r.spec.Code, drafterLabel(r), p),
 		}
 	}
-	if err := e.Apply(event.Entry{Kind: event.KindEventCreated, Seed: seed, Set: r.spec.Code, Seats: seats}); err != nil {
+	if err := e.Apply(event.Entry{Kind: event.KindEventCreated, Seed: seed, Set: r.spec.Code, Seats: seats[:]}); err != nil {
 		return nil, nil, err
 	}
 
@@ -185,7 +185,7 @@ func buildDecks(r *runner, e *event.Event) ([][]*cards.Card, error) {
 		pool := e.Pool(s)
 		d := r.builder.Build(r.spec.Code, pool)
 		f := build.ToDeckFile(pool, d, fmt.Sprintf("p%d %s draft", s, r.spec.Code))
-		if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: d}); err != nil {
+		if err := e.Apply(event.Entry{Kind: event.KindDeckSaved, Seat: s, Rev: 1, Deck: &d}); err != nil {
 			return nil, fmt.Errorf("seat %d deck save: %w", s, err)
 		}
 		if err := e.Apply(event.Entry{Kind: event.KindReady, Seat: s, Rev: 1}); err != nil {

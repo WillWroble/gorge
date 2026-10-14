@@ -47,7 +47,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		Dir:                   dir,
 		OnMatchEnd:            relay.OnMatchEnd,
 	}
-	eo := Options{Store: store, Cards: corpus}
+	eo := Options{Store: store, Cards: corpus, Seed: func() uint64 { return 11 }}
 	if mut != nil {
 		mut(&eo, &ho)
 	}
@@ -67,10 +67,10 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 	return p
 }
 
-// botEventReq is a bot-only four-seat request: FDN, a fixed seed, the given
-// game policies.
-func botEventReq(seed uint64, policies ...string) protocol.CreateEventRequest {
-	req := protocol.CreateEventRequest{Set: "FDN", Seed: &seed}
+// botEventReq is a bot-only four-seat request: FDN and the given game
+// policies. The seed comes from the pair's fixed Options.Seed.
+func botEventReq(policies ...string) protocol.CreateEventRequest {
+	req := protocol.CreateEventRequest{Set: "FDN"}
 	for _, p := range policies {
 		req.Seats = append(req.Seats, protocol.CreateEventSeat{Kind: "bot", Policy: p})
 	}
@@ -130,16 +130,16 @@ func TestRelayChains(t *testing.T) {
 }
 
 // playBotEvent drives a bot-only event to COMPLETE and returns the run.
-func playBotEvent(t *testing.T, p *gamePair, seed uint64) *run {
+func playBotEvent(t *testing.T, p *gamePair) *run {
 	t.Helper()
-	resp := createOK(t, p.h, botEventReq(seed, "bot", "lethal-pressure", "cast-profile", "bot"))
+	resp := createOK(t, p.h, botEventReq("bot", "lethal-pressure", "cast-profile", "bot"))
 	waitPhase(t, p.h, resp.Event, "COMPLETE", 50*time.Second)
 	return runOf(t, p.h, resp.Event)
 }
 
 func TestBotOnlyEventCompletes(t *testing.T) {
 	p := startGamePair(t, "", nil)
-	r := playBotEvent(t, p, 11)
+	r := playBotEvent(t, p)
 
 	r.mu.Lock()
 	log, standings := r.ev.Log(), r.ev.Standings()
@@ -193,7 +193,7 @@ func TestBotOnlyEventCompletes(t *testing.T) {
 func TestBotOnlyEventIsDeterministic(t *testing.T) {
 	mk := func() []byte {
 		p := startGamePair(t, "", nil)
-		r := playBotEvent(t, p, 11)
+		r := playBotEvent(t, p)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		b, err := event.MarshalLog(r.ev.Log())
@@ -233,7 +233,7 @@ func TestHumanGameGetsJoinLink(t *testing.T) {
 			return fmt.Sprintf("tok-%s-%d", table, seat), nil
 		}
 	})
-	resp := createOK(t, p.h, oneHumanReq(11))
+	resp := createOK(t, p.h, oneHumanReq())
 	id := resp.Event
 	tok, _ := humanToken(t, resp)
 	joinOK(t, p.h, id, tok, "Ann")
@@ -296,7 +296,7 @@ func TestCrashedGamesRetryThenDraw(t *testing.T) {
 		eo.MaxAttempts = 2
 		ho.MaxDecisionsPerTurn = 1 // every game stalls in its first turn
 	})
-	r := playBotEvent(t, p, 11)
+	r := playBotEvent(t, p)
 
 	r.mu.Lock()
 	log := r.ev.Log()
@@ -354,7 +354,7 @@ func TestRestartReplaysInFlightGames(t *testing.T) {
 		}
 	}
 	p := startGamePair(t, dir, mut)
-	resp := createOK(t, p.h, oneHumanReq(11))
+	resp := createOK(t, p.h, oneHumanReq())
 	id := resp.Event
 	tok, _ := humanToken(t, resp)
 	joinOK(t, p.h, id, tok, "Ann")

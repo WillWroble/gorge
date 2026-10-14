@@ -39,7 +39,27 @@ type Options struct {
 	BotCommonSense bool
 	MintSeat       func(table host.TableID, seat int) (string, error) // E1-5
 	PickTimeout    time.Duration
+
+	// Seed mints every new event's seed (E1-8: the seed is never a client
+	// field). nil = crypto/rand.
+	Seed func() uint64
+	// LobbyTimeout is how long an event may sit in LOBBY with an unjoined
+	// human seat before the sweep cancels it: 0 = 15 minutes, negative =
+	// disabled. IdleTimeout is how long a human seat may owe a decision
+	// without acting before the sweep acts for it (auto-pick, auto-submit
+	// or concede): 0 = 2 hours, negative = disabled.
+	LobbyTimeout time.Duration
+	IdleTimeout  time.Duration
+	// Now is the clock the timeouts read; nil = time.Now (tests inject one
+	// and drive the sweep with checkTimeouts directly).
+	Now func() time.Time
 }
+
+// The timeout defaults and the sweep cadence (E1-8).
+const (
+	defaultLobbyTimeout = 15 * time.Minute
+	defaultIdleTimeout  = 2 * time.Hour
+)
 
 // run is one event's live state, guarded by its own mutex.
 type run struct {
@@ -59,8 +79,12 @@ type run struct {
 	// each series' last published public JSON. Both guarded by mu.
 	outcomes   map[[2]int]outcome
 	lastSeries map[[3]int]string
-	live       atomic.Bool // phase != COMPLETE; read under Host.mu for the capacity bound
+	live       atomic.Bool // phase not COMPLETE or CANCELLED; read under Host.mu for the capacity bound
 	justDraft  bool        // the draft ended since the last broadcast: one last pod_progress
+	// E1-8: when the event was created, and when each human seat last
+	// acted successfully. The sweep reads them under mu; replay never does.
+	createdAt time.Time
+	lastAct   [draft.Seats]time.Time
 }
 
 // subscriber is one SSE session watching this event, at its seat (-1 for a
@@ -77,9 +101,11 @@ type Host struct {
 	events map[string]*run
 	// tables maps every live event game table to the attempt it is playing,
 	// so OnMatchEnd can drop a match it did not start. Guarded by mu.
-	tables map[host.TableID]gameRef
-	closed bool
-	wg     sync.WaitGroup
+	tables   map[host.TableID]gameRef
+	closed   bool
+	wg       sync.WaitGroup
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 // New validates Options and resumes every stored event.
@@ -89,6 +115,15 @@ func New(o Options) (*Host, error) {
 	}
 	if o.PickTimeout != 0 {
 		return nil, fmt.Errorf("eventhost: PickTimeout is E3 work; E1 accepts only 0")
+	}
+	if o.LobbyTimeout == 0 {
+		o.LobbyTimeout = defaultLobbyTimeout
+	}
+	if o.IdleTimeout == 0 {
+		o.IdleTimeout = defaultIdleTimeout
+	}
+	if o.Now == nil {
+		o.Now = time.Now
 	}
 	dp, err := bots.Normalize(o.DefaultPolicy)
 	if err != nil {
@@ -106,7 +141,7 @@ func New(o Options) (*Host, error) {
 		policies[i] = n
 	}
 	o.DefaultPolicy, o.Policies = dp, policies
-	h := &Host{opts: o, events: map[string]*run{}, tables: map[host.TableID]gameRef{}}
+	h := &Host{opts: o, events: map[string]*run{}, tables: map[host.TableID]gameRef{}, stop: make(chan struct{})}
 	lookup := h.lookup()
 	ids, err := o.Store.ids()
 	if err != nil {
@@ -126,6 +161,15 @@ func New(o Options) (*Host, error) {
 			continue
 		}
 		r.meta = m
+		// E1-8: a meta written before CreatedAt existed (or a halted run)
+		// gets fresh timeout windows from now.
+		now := o.Now()
+		if m.CreatedAt.IsZero() {
+			r.createdAt = now
+		} else {
+			r.createdAt = m.CreatedAt
+		}
+		r.lastAct = [draft.Seats]time.Time{now, now, now, now}
 		entries, lerr := o.Store.readLog(id)
 		ev, rerr := event.Replay(entries)
 		switch {
@@ -149,10 +193,18 @@ func New(o Options) (*Host, error) {
 			r.advance()
 			r.mu.Unlock()
 		}
-		r.live.Store(r.phase() != event.PhaseComplete)
+		r.live.Store(eventLive(r.phase()))
 		h.events[id] = r
 	}
+	h.wg.Add(1)
+	go h.sweepLoop()
 	return h, nil
+}
+
+// eventLive reports whether a phase still occupies a live-event slot:
+// a cancelled event freed its slot, exactly like a completed one.
+func eventLive(p event.Phase) bool {
+	return p != event.PhaseComplete && p != event.PhaseCancelled
 }
 
 // prepare loads the set spec and builds the run's drafters and builders.
@@ -194,6 +246,7 @@ func (h *Host) lookup() pickbotCardLookup {
 
 // Close stops the host. Afterwards every method answers unavailable.
 func (h *Host) Close() error {
+	h.stopOnce.Do(func() { close(h.stop) })
 	h.mu.Lock()
 	h.closed = true
 	h.mu.Unlock()
@@ -275,18 +328,12 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errBadRequest("eventhost: %v", err)
 	}
-	seed := uint64(0)
-	if req.Seed != nil {
-		seed = *req.Seed
-	} else {
-		var b [8]byte
-		if _, err := rand.Read(b[:]); err != nil {
-			h.mu.Unlock()
-			return protocol.CreateEventResponse{}, errUnavailable("eventhost: minting seed: %v", err)
-		}
-		seed = binary.LittleEndian.Uint64(b[:])
+	seed, serr := h.mintSeed()
+	if serr != nil {
+		h.mu.Unlock()
+		return protocol.CreateEventResponse{}, errUnavailable("eventhost: minting seed: %v", serr)
 	}
-	m := meta{Set: req.Set, Seed: seed}
+	m := meta{Set: req.Set, Seed: seed, CreatedAt: h.opts.Now()}
 	humans := 0
 	var invites []protocol.EventInvite
 	for s, cs := range req.Seats {
@@ -351,6 +398,8 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		lastSeries: map[[3]int]string{},
 		justDraft:  false,
 	}
+	r.createdAt = m.CreatedAt
+	r.lastAct = [draft.Seats]time.Time{m.CreatedAt, m.CreatedAt, m.CreatedAt, m.CreatedAt}
 	r.live.Store(true)
 	h.events[id] = r
 	h.mu.Unlock()
@@ -440,6 +489,33 @@ func mintToken() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
+// mintSeed is the default event-seed source: 8 crypto/rand bytes.
+func mintSeed() (uint64, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(b[:]), nil
+}
+
+// mintSeed mints one event seed: the injected Options.Seed when set, else
+// crypto/rand.
+func (h *Host) mintSeed() (uint64, error) {
+	if h.opts.Seed != nil {
+		return h.opts.Seed(), nil
+	}
+	return mintSeed()
+}
+
+// markAct records a human seat's successful action for the idle sweep.
+// The host's own auto-actions never call it: an idle seat stays idle
+// until its human acts. The caller holds run.mu.
+func (r *run) markAct(seat int, now time.Time) {
+	if seat >= 0 && seat < draft.Seats && r.meta.Seats[seat].Kind == "human" {
+		r.lastAct[seat] = now
+	}
+}
+
 // JoinEvent records a human seat's display name. In LOBBY it joins; later
 // it only confirms the same name (idempotent) or refuses another.
 func (h *Host) JoinEvent(id, token string, req protocol.JoinEventRequest) (protocol.EventState, error) {
@@ -470,7 +546,10 @@ func (h *Host) JoinEvent(id, token string, req protocol.JoinEventRequest) (proto
 			return protocol.EventState{}, errUnavailable("%s", r.halted)
 		}
 		r.advance()
+		r.markAct(seat, r.h.opts.Now())
 		r.broadcast()
+	} else if r.ev.Phase() == event.PhaseCancelled {
+		return protocol.EventState{}, errConflict("eventhost: event %s was cancelled", r.meta.ID)
 	} else if r.meta.Seats[seat].Name != name {
 		return protocol.EventState{}, errConflict("eventhost: seat %d already joined as %q", seat, r.meta.Seats[seat].Name)
 	}
@@ -549,6 +628,7 @@ func (h *Host) Pick(id, token string, req protocol.PickRequest) (protocol.DraftP
 		return protocol.DraftPack{}, err
 	}
 	r.advance()
+	r.markAct(seat, r.h.opts.Now())
 	r.broadcast()
 	return r.packFor(seat), nil
 }
@@ -584,8 +664,13 @@ func (h *Host) SubscribeEvent(id, token, session string) error {
 		r.subs = append(r.subs, subscriber{session: session, seat: seat})
 	}
 	r.publish(s, protocol.TEventState, r.stateFor(seat))
-	if seat >= 0 && r.ev.Phase() == event.PhaseDraft {
-		r.publish(s, protocol.TDraftPack, r.packFor(seat))
+	if r.ev.Phase() == event.PhaseDraft {
+		// E1-8: a mid-draft subscriber learns the pod's progress before
+		// its pack, so a fresh UI renders the table first.
+		r.publish(s, protocol.TPodProgress, r.progress())
+		if seat >= 0 {
+			r.publish(s, protocol.TDraftPack, r.packFor(seat))
+		}
 	}
 	return nil
 }
@@ -629,7 +714,7 @@ func (r *run) apply(en event.Entry) error {
 		r.halted = fmt.Sprintf("event %s: persistence failed: %v", r.meta.ID, err)
 		return errUnavailable("%s", r.halted)
 	}
-	r.live.Store(r.ev.Phase() != event.PhaseComplete)
+	r.live.Store(eventLive(r.ev.Phase()))
 	return nil
 }
 

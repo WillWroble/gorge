@@ -15,11 +15,15 @@ const (
 // instance ID to answer a pick with, plus the printed facts it renders.
 // Rarity is one letter: C U R M (mythic) L (special) S.
 type DraftCard struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Set    string `json:"set"`
-	Number string `json:"number"`
-	Rarity string `json:"rarity"` // one letter: C U R M L S
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Set       string `json:"set"`
+	Number    string `json:"number"`
+	Rarity    string `json:"rarity"`              // one letter: C U R M L S
+	ManaCost  string `json:"mana_cost,omitempty"` // printed cost; "" when the card has none
+	ManaValue int    `json:"mana_value,omitempty"`
+	Colors    string `json:"colors,omitempty"`    // subset of "WUBRG", in WUBRG order
+	TypeLine  string `json:"type_line,omitempty"` // face types, space-joined
 }
 
 // EventSeat is one entrant of a draft event. Kind is "human" or "bot";
@@ -123,11 +127,11 @@ type CreateEventSeat struct {
 }
 
 // CreateEventRequest is the POST /api/events body: the drafted set and the
-// four seats. Seed nil means the server mints one.
+// four seats. The seed is always minted by the server; no client field may
+// choose it.
 type CreateEventRequest struct {
 	Set   string            `json:"set"`
-	Seed  *uint64           `json:"seed,omitempty"` // nil = server-minted
-	Seats []CreateEventSeat `json:"seats"`          // exactly 4
+	Seats []CreateEventSeat `json:"seats"` // exactly 4
 }
 
 // EventInvite is one seat's join token in a CreateEventResponse. Join is the
@@ -144,6 +148,23 @@ type CreateEventResponse struct {
 	Event   string        `json:"event"`
 	Invites []EventInvite `json:"invites"`
 	State   EventState    `json:"state"`
+}
+
+// EventSetInfo is one draftable set as GET /api/events/sets reports it.
+// Ratings is the rating source the pickbot uses for it: "17lands" when a
+// ratings manifest exists, "heuristic" otherwise.
+type EventSetInfo struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	PackSize int    `json:"pack_size"`
+	Ratings  string `json:"ratings"` // "17lands" | "heuristic"
+}
+
+// EventPersonas is the GET /api/events/personas reply: the registered
+// pickbot persona names, offered to a create body's Drafter fields.
+type EventPersonas struct {
+	Drafters []string `json:"drafters"`
+	Builders []string `json:"builders"`
 }
 
 // JoinEventRequest is the POST /api/events/{id}/join body: the joining

@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/event"
@@ -18,14 +19,16 @@ import (
 
 // meta is one stored event's header, the <dir>/<id>/event.json file. It
 // carries everything a run needs before (and without) its log: the drafted
-// set, the seed and the four seats. A seat's token is stored only as its
-// sha256; the clear token is returned once by CreateEvent and never
-// written.
+// set, the seed, the four seats and when the event was created (E1-8's
+// lobby-timeout window; a meta written before the field existed resumes
+// with a fresh window). A seat's token is stored only as its sha256; the
+// clear token is returned once by CreateEvent and never written.
 type meta struct {
-	ID    string      `json:"id"`
-	Set   string      `json:"set"`
-	Seed  uint64      `json:"seed"`
-	Seats [4]metaSeat `json:"seats"`
+	ID        string      `json:"id"`
+	Set       string      `json:"set"`
+	Seed      uint64      `json:"seed"`
+	Seats     [4]metaSeat `json:"seats"`
+	CreatedAt time.Time   `json:"created_at,omitempty"`
 }
 
 // metaSeat is one stored seat. Kind is "human" or "bot"; Name is the human

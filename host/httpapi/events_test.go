@@ -43,6 +43,7 @@ type fakeEvents struct {
 	pool    protocol.EventPool
 	check   protocol.DeckCheck
 	log     protocol.EventLog
+	sets    []protocol.EventSetInfo
 }
 
 func (f *fakeEvents) call(method, id, token string, req any) {
@@ -137,6 +138,19 @@ func (f *fakeEvents) EventLog(id, token string) (protocol.EventLog, error) {
 func (f *fakeEvents) SubscribeEvent(id, token, session string) error {
 	f.call("SubscribeEvent", id, token, protocol.EventSubscribe{Session: session})
 	return f.err
+}
+
+func (f *fakeEvents) Sets() []protocol.EventSetInfo {
+	f.call("Sets", "", "", nil)
+	if f.sets == nil {
+		return []protocol.EventSetInfo{{Code: "FDN", Name: "Foundations", PackSize: 14, Ratings: "17lands"}}
+	}
+	return f.sets
+}
+
+func (f *fakeEvents) Personas() protocol.EventPersonas {
+	f.call("Personas", "", "", nil)
+	return protocol.EventPersonas{Drafters: []string{"rating-colour"}, Builders: []string{"best23"}}
 }
 
 // eventsServer builds a registry-backed handler with the given backend. The
@@ -262,7 +276,6 @@ func eventsServerOff(t *testing.T) (*httptest.Server, *fakeEvents) {
 }
 
 func TestEventRoutesDispatch(t *testing.T) {
-	seed := uint64(9)
 	cases := []struct {
 		name    string
 		method  string
@@ -280,9 +293,9 @@ func TestEventRoutesDispatch(t *testing.T) {
 	}{
 		{
 			name: "create", method: "POST", path: "/api/events", auth: "Bearer hosttok",
-			body: `{"set":"FDN","seed":9,"seats":[{"kind":"human"},{"kind":"bot","policy":"mucm"},{"kind":"bot"},{"kind":"bot","drafter":"rating-bombs"}]}`,
+			body: `{"set":"FDN","seats":[{"kind":"human"},{"kind":"bot","policy":"mucm"},{"kind":"bot"},{"kind":"bot","drafter":"rating-bombs"}]}`,
 			call: "CreateEvent", want: 200,
-			req: protocol.CreateEventRequest{Set: "FDN", Seed: &seed, Seats: []protocol.CreateEventSeat{
+			req: protocol.CreateEventRequest{Set: "FDN", Seats: []protocol.CreateEventSeat{
 				{Kind: "human"}, {Kind: "bot", Policy: "mucm"}, {Kind: "bot"}, {Kind: "bot", Drafter: "rating-bombs"}}},
 		},
 		{name: "list", method: "GET", path: "/api/events", call: "Events", want: 200, raw: "[]", nilList: true},
@@ -324,6 +337,12 @@ func TestEventRoutesDispatch(t *testing.T) {
 			body: `{"session":"s9"}`,
 			call: "SubscribeEvent", id: "e1", token: "seattok", want: 204,
 			req: protocol.EventSubscribe{Session: "s9"}},
+		{name: "sets", method: "GET", path: "/api/events/sets",
+			call: "Sets", want: 200,
+			val: []protocol.EventSetInfo{{Code: "FDN", Name: "Foundations", PackSize: 14, Ratings: "17lands"}}},
+		{name: "personas", method: "GET", path: "/api/events/personas",
+			call: "Personas", want: 200,
+			val: protocol.EventPersonas{Drafters: []string{"rating-colour"}, Builders: []string{"best23"}}},
 	}
 	srv, fake := eventsServer(t, Options{})
 	for _, tc := range cases {

@@ -21,7 +21,7 @@ func csvCard(id, name string) limited.CardRef {
 func newCSVEvent(t *testing.T) *event.Event {
 	t.Helper()
 	e := event.New()
-	seats := [4]event.SeatSpec{{Kind: "bot", Name: "a"}, {Kind: "bot", Name: "b"}, {Kind: "bot", Name: "c"}, {Kind: "bot", Name: "d"}}
+	seats := []event.SeatSpec{{Kind: "bot", Name: "a"}, {Kind: "bot", Name: "b"}, {Kind: "bot", Name: "c"}, {Kind: "bot", Name: "d"}}
 	mustApply(t, e, event.Entry{Kind: event.KindEventCreated, Seed: 7, Set: "TST", Seats: seats})
 	names := [][]string{
 		{"Alpha", "Beta"},  // round 1: seat 0's pack

@@ -67,8 +67,7 @@ func TestEventsBotOnlyPodCompletesOverHTTP(t *testing.T) {
 	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks",
 		tables: 1, seats: 2, pace: 0, cooldown: 0, dir: dir, spectator: "omniscient", seed: 1,
 		perpetual: false, events: true})
-	seed := uint64(5)
-	req := protocol.CreateEventRequest{Set: "FDN", Seed: &seed, Seats: []protocol.CreateEventSeat{
+	req := protocol.CreateEventRequest{Set: "FDN", Seats: []protocol.CreateEventSeat{
 		{Kind: "bot", Policy: "bot"}, {Kind: "bot", Policy: "bot"},
 		{Kind: "bot", Policy: "lethal-pressure"}, {Kind: "bot", Policy: "cast-profile"},
 	}}

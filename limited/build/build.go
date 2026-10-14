@@ -34,9 +34,14 @@ const MaxDeckSize = 100
 // unlimited, and there is no other copy limit in limited play).
 type Deck struct {
 	// Main is the deck's non-basic cards, as IDs of the pool's CardRefs.
-	Main []string
-	// Basics counts each basic land by colour: W, U, B, R, G.
-	Basics [5]int
+	// omitempty keeps a deck-less line from carrying an empty block;
+	// encoding/json matches the old capitalised field names case-blind,
+	// so a log written before the tags still decodes.
+	Main []string `json:"main,omitempty"`
+	// Basics counts each basic land by colour: W, U, B, R, G. omitempty
+	// is a no-op on an array; the all-zero Basics block stays visible,
+	// exactly as before the tags.
+	Basics [5]int `json:"basics"`
 }
 
 // Total is the deck's card count: maindeck cards plus basics. It saturates at

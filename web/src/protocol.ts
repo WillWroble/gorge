@@ -1781,6 +1781,10 @@ export interface DraftCard {
   set: string;
   number: string;
   rarity: string;
+  mana_cost?: string;
+  mana_value?: number;
+  colors?: string;
+  type_line?: string;
 }
 
   /**
@@ -1831,11 +1835,11 @@ export interface CreateEventSeat {
 
   /**
    * CreateEventRequest is the POST /api/events body: the drafted set and the
-   * four seats. Seed nil means the server mints one.
+   * four seats. The seed is always minted by the server; no client field may
+   * choose it.
    */
 export interface CreateEventRequest {
   set: string;
-  seed?: number | null;
   seats: CreateEventSeat[];
 }
 
@@ -1940,6 +1944,27 @@ export interface EventLog {
    */
 export interface EventSubscribe {
   session: string;
+}
+
+  /**
+   * EventSetInfo is one draftable set as GET /api/events/sets reports it.
+   * Ratings is the rating source the pickbot uses for it: "17lands" when a
+   * ratings manifest exists, "heuristic" otherwise.
+   */
+export interface EventSetInfo {
+  code: string;
+  name: string;
+  pack_size: number;
+  ratings: string;
+}
+
+  /**
+   * EventPersonas is the GET /api/events/personas reply: the registered
+   * pickbot persona names, offered to a create body's Drafter fields.
+   */
+export interface EventPersonas {
+  drafters: string[];
+  builders: string[];
 }
 
   /**
