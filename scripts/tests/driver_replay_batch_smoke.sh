@@ -310,6 +310,47 @@ EOF
 	[ -z "$extra" ] || printf -- '- 2026-10-06T08:00:00Z %s\n' "$extra" >>"$R/.ds4/issues/$id.md"
 }
 status_of() { sed -n 's/^status: //p' "$R/.ds4/issues/$1.md"; }
+# mkrequeue <id> <stamp> <file> <content> <exit> <note|dry|nolog>: a ticket
+# parked past requeue_max (agentctl ladder.py requeue_gate_failure's park
+# line, History entry with the gate-output tail embedded), whose last gate
+# log is agentctl's full-output copy
+# .ds4/orchestrator/gates/<id>/<tag>/go-test-affected.log. note: the log
+# carries gate_affected's stale-only marker; dry: it does not; nolog: no
+# gate log exists at all.
+mkrequeue() {
+	local id=$1 stamp=$2 file=$3 content=$4 exit=$5 mode=$6
+	git -C "$R" worktree add -q -b "wt/$id" "$R/.worktrees/$id" main
+	mkdir -p "$R/.worktrees/$id/$(dirname "$file")"
+	printf '%s\n' "$content" >"$R/.worktrees/$id/$file"
+	git -C "$R/.worktrees/$id" add -A && git -C "$R/.worktrees/$id" commit -q -m "feat: $id"
+	{
+		echo '---'
+		echo "id: $id"
+		echo "title: ticket $id"
+		echo 'status: human_needed'
+		echo "branch: wt/$id"
+		echo "worktree: .worktrees/$id"
+		echo '---'
+		echo
+		echo '## Brief'
+		echo 'an engine change moved the scenario shas the committed verdicts hash'
+		echo
+		echo '## History'
+		echo '- 2026-10-14T09:00:00Z queued via agentctl issue add'
+		echo "- $stamp gate go test (affected) exited $exit (requeue) 4 times in a row, past requeue_max = 3: parking for a human; no round charged."
+		echo '### go test (affected)'
+		case $mode in
+			note) echo "$STALE_NOTE" ;;
+			dry) echo 'FAIL compliance/gate: verdict is for an older scenario' ;;
+		esac
+	} >"$R/.ds4/issues/$id.md"
+	case $mode in
+		note) mkdir -p "$R/.ds4/orchestrator/gates/$id/r2"
+			printf 'ok compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
+		dry) mkdir -p "$R/.ds4/orchestrator/gates/$id/r2"
+			printf 'FAIL compliance/gate: verdict is for an older scenario\n' >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
+	esac
+}
 # runpass: one pass of the script against $R.
 runpass() {
 	(
@@ -980,6 +1021,61 @@ check "O the batch lands despite a non-conflicting generator move on main" $?
 check "O last-main is not advanced past the unreplayed generator commit" $?
 [ "$(cat "$R/.ds4/driver-replay-last-main")" = "$o_main0" ]
 check "O last-main stays at the replayed main M0" $?
+
+# ---- Q: tickets parked past requeue_max on gate_affected's stale-only exit 76 ----
+STALE_NOTE='gate_affected: heavy certification failure is stale-only (a moved scenario sha; see the GORGE-CERT-RESULT lines) -- a host XMage replay clears it, not a fix round. Requeuing (exit 76).'
+mkrepo Q1
+mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 note
+main0=$(git -C "$R" rev-parse main)
+runpass
+has "$L" 'SELECT-STALE76 t1'
+check "Q1 a stale-only requeue-parked ticket is selected" $?
+/usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1$' "$L" && [ "$(status_of t1)" = merged ] && [ "$(git -C "$R" rev-parse main)" != "$main0" ]
+check "Q1 the stale-only ticket lands" $?
+git -C "$R" cat-file -e main:rules/oracle_run.go && git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
+check "Q1 the landing carries the branch and the replay-refreshed verdict rows" $?
+[ ! -e "$R/.worktrees/t1" ]
+check "Q1 the ticket's worktree is removed" $?
+
+mkrepo Q2
+mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 nolog
+runpass
+hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH' && [ "$(status_of t1)" = human_needed ]
+check "Q2 a stale-only park with NO gate log is not selected" $?
+
+mkrepo Q3
+mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 75 dry
+runpass
+hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH' && [ "$(status_of t1)" = human_needed ]
+check "Q3 a requeue park on exit 75 (dry log) is not selected" $?
+
+mkrepo Q4
+mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 dry
+mkdir -p "$R/.ds4/orchestrator/gates/t1/r1"
+printf 'ok compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/t1/r1/go-test-affected.log"
+touch -d '2026-10-14 10:00' "$R/.ds4/orchestrator/gates/t1/r1/go-test-affected.log"
+runpass
+hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH'
+check "Q4 the LAST gate log rules: a newer dry log overrides an older stale-only one" $?
+
+mkrepo Q5
+mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'Beta/cast-resolve/v1' 76 note
+mkrequeue t8 2026-10-14T21:00:00Z tools/xmageoracle/t8.txt eight 76 note
+runpass
+has "$L" 'CULPRIT t1 row Beta/cast-resolve/v1'
+check "Q5 a stale-only ticket whose change REALLY regresses a row is the CULPRIT" $?
+[ "$(status_of t1)" = human_needed ] && has "$R/.ds4/issues/t1.md" 'driver_replay_batch: HELD CULPRIT regresses row'
+check "Q5 the regressing stale-only ticket stays parked with a HELD line" $?
+/usr/bin/grep -qE 'LANDED [0-9a-f]{9} t8$' "$L" && [ "$(status_of t8)" = merged ]
+check "Q5 the innocent stale-only ticket lands" $?
+
+mkrepo Q6
+mkrequeue t1 2026-10-14T19:00:00Z rules/oracle_run.go 'gorge: fix thing' 76 note
+mkticket t2 2026-10-14T20:00:00Z tools/xmageoracle/t2.txt two
+runpass
+[ "$(/usr/bin/grep -c 'MERGED-INTO-BATCH' "$L")" = 2 ] && has "$L" 'SELECT-STALE76 t1' &&
+	/usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1 t2$' "$L"
+check "Q6 a stale76 ticket and a driver-park ticket batch and land together, oldest first" $?
 
 echo
 [ "$fails" = 0 ] && echo "driver_replay_batch smoke: all passed" || echo "driver_replay_batch smoke: $fails FAILED"
