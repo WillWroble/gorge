@@ -194,14 +194,28 @@ func DialConn(ctx context.Context, conn io.ReadWriteCloser, o Options) (*Agent, 
 
 // dial is Dial/DialConn's shared body: handshake, then start the session
 // goroutines on hub h. finish runs after the reader exits (exec's
-// cmd.Wait).
+// cmd.Wait). The handshake is read from the session's own *wire.Reader:
+// a Reader owns a bufio.Reader, so reading the hello through a throwaway
+// reader would silently discard agent bytes that followed it in one
+// coalesced write.
 func dial(ctx context.Context, conn io.ReadWriteCloser, o Options, h *hub, finish func() error) (*Agent, error) {
 	wr := wire.NewWriter(conn)
 	if err := wr.Write(gorgeHello()); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("%w: write: %v", ErrHandshake, err)
 	}
-	m, err := wire.NewReader(conn, 0).Read()
+	s := &session{
+		wr:           wr,
+		rd:           wire.NewReader(conn, 0),
+		conn:         conn,
+		pending:      map[uint64]*reqRec{},
+		doneCh:       make(chan struct{}),
+		writerDoneCh: make(chan struct{}),
+	}
+	s.cond = sync.NewCond(&s.mu)
+	s.tr = transportFor(conn)
+
+	m, err := s.rd.Read()
 	if err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("%w: read: %v", ErrHandshake, err)
@@ -227,17 +241,7 @@ func dial(ctx context.Context, conn io.ReadWriteCloser, o Options, h *hub, finis
 		maxBatch: effectiveMaxBatch(o, m),
 		hub:      h,
 	}
-	s := &session{
-		agent:        a,
-		wr:           wire.NewWriter(conn),
-		rd:           wire.NewReader(conn, 0),
-		conn:         conn,
-		pending:      map[uint64]*reqRec{},
-		doneCh:       make(chan struct{}),
-		writerDoneCh: make(chan struct{}),
-	}
-	s.cond = sync.NewCond(&s.mu)
-	s.tr = transportFor(conn)
+	s.agent = a
 	a.sess = s
 
 	h.register(s)

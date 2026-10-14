@@ -90,12 +90,18 @@ type transport struct {
 }
 
 // gone builds a session-death error: always wrapping ErrAgentGone, and
-// also wrapping ErrProtocol when the cause is a wire violation.
+// also wrapping ErrProtocol when the cause is a wire violation. The
+// ErrProtocol wrap is added at most once: a violation that already carries
+// it (a wire.Validate error) is wrapped directly, so the chain never
+// repeats the sentinel.
 func gone(cause string, violation error) error {
 	if violation == nil {
 		return fmt.Errorf("%w: %s", ErrAgentGone, cause)
 	}
-	return fmt.Errorf("%w: %s: %w", ErrAgentGone, cause, fmt.Errorf("%w: %v", ErrProtocol, violation))
+	if !errors.Is(violation, ErrProtocol) {
+		violation = fmt.Errorf("%w: %v", ErrProtocol, violation)
+	}
+	return fmt.Errorf("%w: %s: %w", ErrAgentGone, cause, violation)
 }
 
 // call sends one item and waits for its answer. game is the caller's game
@@ -312,8 +318,10 @@ func (s *session) failRemaining() {
 	s.pendingNo = 0
 	s.cond.Broadcast()
 	s.mu.Unlock()
-	if s.agent.opts.Log != nil {
-		s.agent.opts.Log("extern: session ended: " + err.Error())
+	// kill logged the death already; a clean end after bye logs its own
+	// distinct line instead of repeating a death-shaped error.
+	if s.agent.opts.Log != nil && !s.deadFlag.Load() {
+		s.agent.opts.Log("extern: session ended")
 	}
 	s.failWaiters(recs, err)
 	s.agent.hub.release(recs...)
@@ -422,14 +430,15 @@ func answerFits(kind string, a wire.Answer) bool {
 
 // kill ends the session once: it fails every tracked request with err,
 // releases their hub counts, logs one line, wakes the writer and closes
-// the read side so a blocked reader exits. Later kills are no-ops.
+// both the write side (so a child blocked reading stdin sees EOF and is
+// reaped) and the read side (so a blocked reader exits). Later kills are
+// no-ops.
 func (s *session) kill(err error) {
 	s.mu.Lock()
-	if s.deadFlag.Load() {
+	if !s.deadFlag.CompareAndSwap(false, true) {
 		s.mu.Unlock()
 		return
 	}
-	s.deadFlag.Store(true)
 	s.deadErr = err
 	recs := s.queue
 	s.queue = nil
@@ -445,6 +454,9 @@ func (s *session) kill(err error) {
 	}
 	s.failWaiters(recs, err)
 	s.agent.hub.release(recs...)
+	if s.tr.writeCloser != nil {
+		_ = s.tr.writeCloser.Close()
+	}
 	if s.tr.closer != nil {
 		_ = s.tr.closer.Close()
 	}
