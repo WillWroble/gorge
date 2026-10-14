@@ -254,6 +254,7 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 	sp := e.Release()
 	l.Events, l.Intents = evs, ints
 	sc := s0.CloneInto(&sp)
+	sc.rng.forked = false
 	if w, ok := cp.World.(*rngSplice); ok {
 		sc.rng.splice = w
 		// Stay a hypothetical engine across the prefix (SubmitHypothetical

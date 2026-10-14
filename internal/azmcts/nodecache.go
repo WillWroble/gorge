@@ -368,6 +368,7 @@ func (f *fixedEnvs) Save(env Env, final bool) (snap any, err error) {
 	}
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("cache-save", p)
 			snap, err = nil, fmt.Errorf("%w: node cache save: %v", ErrPanic, p)
 		}
 	}()
@@ -394,6 +395,7 @@ func (f *fixedEnvs) Resume(snap any) (env Env, err error) {
 	}
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("cache-resume", p)
 			env, err = nil, fmt.Errorf("%w: node cache resume: %v", ErrPanic, p)
 		}
 	}()

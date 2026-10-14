@@ -2,6 +2,7 @@ package azmcts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -205,6 +206,12 @@ type engineEnv struct {
 	cands  []cand
 	steps  int
 	capped bool
+	// stalled is set when a submit tripped the engine's livelock contract
+	// (*rules.LivelockError, e.g. the token-plan mint cap): the game is
+	// unrepresentable from here, and the real harness (internal/bench)
+	// ends exactly that game as a stall -- a draw. The walk stops at a
+	// terminal draw leaf (Stats.Livelocks), not a discarded panic.
+	stalled bool
 	// plies counts every submit on this world since the root, the
 	// searched intents included (PathEnv).
 	plies int
@@ -307,6 +314,7 @@ func botStreams(seed uint64, seats int) ([]*rand.Rand, []*rand.PCG) {
 func (e *engineEnv) matchRoot() (err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("match-root", p)
 			err = fmt.Errorf("%w: matching the root: %v", ErrPanic, p)
 		}
 	}()
@@ -368,6 +376,7 @@ func (e *engineEnv) Turn() int { return int(e.e.G.Turn) }
 func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("play", p)
 			pt, err = nil, fmt.Errorf("%w: %v", ErrPanic, p)
 		}
 	}()
@@ -386,10 +395,10 @@ func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 	}
 	if m := e.cands[i].macro; m != nil {
 		if err := e.playMacro(m); err != nil {
-			return nil, err
+			return e.stallLeaf(err)
 		}
 	} else if err := e.submit(e.cur, e.cands[i].in); err != nil {
-		return nil, err
+		return e.stallLeaf(err)
 	}
 	e.plies++
 	return e.advance()
@@ -497,7 +506,7 @@ func (e *engineEnv) advance() (*Point, error) {
 			return nil, nil
 		}
 		if err := e.submit(pd, in); err != nil {
-			return nil, err
+			return e.stallLeaf(err)
 		}
 		e.steps++
 		e.plies++
@@ -645,6 +654,14 @@ func cloneObservers(obs []*searchprobe.Collector) []*searchprobe.Collector {
 func (e *engineEnv) submit(d *decision.Decision, in decision.Intent) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			if lle, ok := p.(*rules.LivelockError); ok {
+				// The engine's livelock contract, not a bug: the bench
+				// ends this game as a stall, so the walk does too.
+				e.stalled = true
+				err = fmt.Errorf("%w: %v", errStalled, lle)
+				return
+			}
+			tracePanic("submit", p)
 			err = fmt.Errorf("%w: %v", ErrPanic, p)
 		}
 	}()
@@ -663,15 +680,36 @@ func (e *engineEnv) submit(d *decision.Decision, in decision.Intent) (err error)
 	return nil
 }
 
+// errStalled is submit's livelock-contract outcome (engineEnv.stalled).
+var errStalled = errors.New("azmcts: the world stalled (engine livelock contract)")
+
+// stallLeaf turns a submit error into the walk's result: a stalled world
+// ends the walk at a leaf (Leaf scores it a draw), every other error is
+// returned unchanged.
+func (e *engineEnv) stallLeaf(err error) (*Point, error) {
+	if !errors.Is(err, errStalled) {
+		return nil, err
+	}
+	e.cur, e.cands = nil, nil
+	return nil, nil
+}
+
 // Leaf is 1/0/0.5 at game over, else the leaf evaluator on the searching
 // seat's redacted view. A panic in the evaluator (view.Project, the network)
 // is recovered into Leaf.Err wrapping ErrPanic.
 func (e *engineEnv) Leaf() (l Leaf) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("leaf", p)
 			l = Leaf{Err: fmt.Errorf("%w: leaf: %v", ErrPanic, p)}
 		}
 	}()
+	if e.stalled {
+		// The bench's stall outcome is a draw; the engine is mid-abort and
+		// is never read.
+		e.cfg.stats.Livelocks++
+		return Leaf{V: 0.5, Terminal: true}
+	}
 	g := e.e.G
 	if g.Over {
 		v := 0.0
