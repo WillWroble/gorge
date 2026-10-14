@@ -43,6 +43,10 @@
       "tier": "bots",
       "status": "EXT"
     },
+    "bots/azc4": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "bots/azredeal": {
       "tier": "bots",
       "status": "EXT"
@@ -124,6 +128,10 @@
       "status": "TOOL"
     },
     "cmd/labdemo": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
+    "cmd/cardval": {
       "tier": "cmd",
       "status": "TOOL"
     },
