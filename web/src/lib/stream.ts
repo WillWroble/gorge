@@ -15,19 +15,29 @@ export interface Stream {
   close(): void;
 }
 
-// The four draft-event frames (event_state, draft_pack, pod_progress,
-// series_update) ride the same session stream once POST
-// /api/events/{id}/subscribe binds the session to an event.
-const FRAME_TYPES: FrameType[] = [
-  'hello', 'widget', 'match_start', 'snapshot', 'event', 'decision', 'match_end', 'table_halted', 'overflow', 'error', 'rewind',
+// Every frame kind the session stream may carry, in one place. A new kind in
+// the generated FrameType union must be added here: the exhaustiveness guard
+// below fails the build otherwise, so a kind can never be silently dropped
+// the way table_state (E3-fx2) was by the old hand-maintained list. The four
+// draft-event frames (event_state, draft_pack, pod_progress, series_update)
+// ride the same session stream once POST /api/events/{id}/subscribe binds the
+// session to an event; table_state is listed ahead of its generated union
+// member so the client accepts the frame the moment the server emits it.
+const FRAME_TYPES = [
+  'hello', 'widget', 'match_start', 'snapshot', 'event', 'decision', 'match_end', 'table_halted', 'table_state', 'overflow', 'error', 'rewind',
   'event_state', 'draft_pack', 'pod_progress', 'series_update',
-];
+] as const;
+type KnownFrameType = (typeof FRAME_TYPES)[number];
+// Compile-time guard: if protocol.ts declares a frame kind this list omits,
+// the Exclude stops being never and this initialiser fails to type-check.
+const frameTypesCoverEveryKind: [Exclude<FrameType, KnownFrameType>] extends [never] ? true : false = true;
+void frameTypesCoverEveryKind;
 
 /** parseFrame decodes one SSE data line; anything malformed or from another protocol version is dropped. */
 export function parseFrame(data: string): Frame | null {
   try {
     const f = JSON.parse(data) as Frame;
-    if (f.v !== 1 || !FRAME_TYPES.includes(f.t as FrameType)) return null;
+    if (f.v !== 1 || !(FRAME_TYPES as readonly string[]).includes(f.t)) return null;
     return f;
   } catch {
     return null;
