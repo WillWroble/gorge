@@ -6,6 +6,8 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -429,6 +431,30 @@ func foldClonePermanent(g *state.Game, e *Event) {
 		o.CopyGainThisAbility = true
 	} else {
 		o.CopyGainThisAbility = false
+	}
+	// A Clone's conditional keyword rider (CloneParams.IfNew; Flesh
+	// Duplicate's "vanishing 3 if that creature doesn't have vanishing",
+	// CR 707.9b) rides Counter's "ifnew " payload, the lines semicolon-
+	// joined. The condition was evaluated at resolution against the source's
+	// printed face; the fold applies the granted lines' expansion onto the
+	// copy basis face, so a replay rebuilds the identical face and every
+	// downstream reader -- the entry counter fold, the trigger walk, the
+	// keyword census -- sees a printed-shaped face. The compile whitelist
+	// (effects/cloneETBShapeOK) admits only heads cards can expand, so the
+	// false return is a defensive skip.
+	if kw, ok := strings.CutPrefix(e.Counter, "ifnew "); ok {
+		for line := range strings.SplitSeq(kw, ";") {
+			if line != "" {
+				sf.ApplyKeywordExpansion(line)
+			}
+		}
+		// The expansion minted triggers (a granted vanishing's upkeep and
+		// last-counter lines) the copied source's compiled row knows
+		// nothing about: the value-copied binding would gate the minted
+		// triggers off the source's empty interest set forever. Drop the
+		// binding so the synthetic face takes the computed paths a token
+		// face takes.
+		sf.ForgetCompiled()
 	}
 	o.SetCopyFace(&sf)
 }

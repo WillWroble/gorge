@@ -2215,7 +2215,15 @@ var handRoots = struct {
 	// through the decision resume path rather than the pipeline. The optional
 	// phase resume callback is passed as a function value, so the scanner cannot
 	// infer this edge from handleReplacement; declare its read root explicitly.
-	repl: []string{"Engine.applyReplacements", "Engine.handleReplacement", "Engine.resumeParkedPhase"},
+	repl: []string{"Engine.applyReplacements", "Engine.handleReplacement", "Engine.resumeParkedPhase",
+		// The entry-counter body scan (entryBodyCounterGrants, from
+		// foldEntryMove) reads the as-enters clone repl's Keyword$ directly --
+		// the same direct-scan shape mustAttackRequired has for statics: the
+		// ETB clone rider's counters are derived from the repl at the entry
+		// fold, outside the replacement pipeline (the copy basis face is
+		// applied after the move folds). Its reads are gated on
+		// Event$ Moved, so the bucket stays repl:Moved.
+		"Engine.entryBodyCounterGrants"},
 }
 
 // derivedReads is the per-primitive read set the scan attributes.
