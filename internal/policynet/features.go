@@ -2,6 +2,7 @@ package policynet
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -190,8 +191,11 @@ func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag
 	if fs.Diagnostic() && diag != nil {
 		mzDiag(v, seat, fs, diag, push)
 	}
-	st.Sparse = append(st.Sparse, extra...)
-	sort.SliceStable(st.Sparse, func(i, j int) bool { return st.Sparse[i].Row < st.Sparse[j].Row })
+	// The stable sort of st.Sparse ++ extra by row: st.Sparse is already
+	// sorted, so sort extra stably and merge, a tie keeping st.Sparse's
+	// entry first (its position came first).
+	slices.SortStableFunc(extra, cmpFeatureRow)
+	st.Sparse = mergeByRow(st.Sparse, extra)
 	if fs == FeaturesEntity {
 		st.Cards, _ = entityCards(v, seat)
 	}
@@ -466,4 +470,26 @@ func mzDiag(v view.View, seat state.PlayerID, fs FeatureSet, diag *Diag, push fu
 		push("mz|ownlib"+formatInt(int64(i+1))+"|"+n, 1)
 		push("mz|ownlib|"+n, 1)
 	}
+}
+
+// cmpFeatureRow orders features by row alone (a stable sort keeps a tie's
+// input order).
+func cmpFeatureRow(a, b Feature) int { return int(a.Row) - int(b.Row) }
+
+// mergeByRow merges two row-sorted lists into a new one, a tie taking a's
+// entry first: the stable sort of a ++ b.
+func mergeByRow(a, b []Feature) []Feature {
+	out := make([]Feature, 0, len(a)+len(b))
+	i, j := 0, 0
+	for i < len(a) && j < len(b) {
+		if b[j].Row < a[i].Row {
+			out = append(out, b[j])
+			j++
+		} else {
+			out = append(out, a[i])
+			i++
+		}
+	}
+	out = append(out, a[i:]...)
+	return append(out, b[j:]...)
 }
