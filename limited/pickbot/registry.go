@@ -82,7 +82,7 @@ var DefaultTuning = Tuning{
 	ColourlessFit:    0.5,
 	MainSize:         23,
 	DeckSize:         40,
-	MinCreatures:     14,
+	MinCreatures:     17,
 	HighValueMV:      6,
 	MaxHighValue:     3,
 	ShortPairPenalty: -15,

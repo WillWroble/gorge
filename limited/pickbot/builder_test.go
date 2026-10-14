@@ -66,8 +66,9 @@ func builderPool(t *testing.T) []limited.CardRef {
 
 // TestBuilderBest23TwoColourDeck builds from the fixed FDN pool and asserts
 // the spec's contract: a valid 40-card deck, two-coloured (white-green
-// here), at least 14 creatures, at most 3 cards of mana value 6+, and
-// deterministic across calls.
+// here), at least DefaultTuning.MinCreatures creatures (the pool carries 22
+// in-pair creatures, so the preference is fully satisfiable), at most 3
+// cards of mana value 6+, and deterministic across calls.
 func TestBuilderBest23TwoColourDeck(t *testing.T) {
 	reg := corpus(t)
 	pool := builderPool(t)
@@ -109,8 +110,8 @@ func TestBuilderBest23TwoColourDeck(t *testing.T) {
 			highMV++
 		}
 	}
-	if creatures < 14 {
-		t.Fatalf("built deck runs %d creatures, want at least 14", creatures)
+	if min := pb.DefaultTuning.MinCreatures; creatures < min {
+		t.Fatalf("built deck runs %d creatures, want at least %d", creatures, min)
 	}
 	if highMV > 3 {
 		t.Fatalf("built deck runs %d cards of mana value 6+, want at most 3", highMV)
@@ -144,7 +145,8 @@ var capPoolNames = []string{
 
 // TestBuilderCapsHighManaValue pins the builder's mana-value cap on the
 // heuristic path: with four giants of mana value 6+ the deck plays exactly
-// three, and stays a valid 40-card two-colour deck with 14 creatures.
+// three, and stays a valid 40-card two-colour deck satisfying the creature
+// preference.
 func TestBuilderCapsHighManaValue(t *testing.T) {
 	reg := corpus(t)
 	pool := make([]limited.CardRef, len(capPoolNames))
@@ -189,8 +191,8 @@ func TestBuilderCapsHighManaValue(t *testing.T) {
 	if highMV != 3 {
 		t.Fatalf("built deck runs %d cards of mana value 6+, want exactly 3 (the cap)", highMV)
 	}
-	if creatures < 14 {
-		t.Fatalf("built deck runs %d creatures, want at least 14", creatures)
+	if min := pb.DefaultTuning.MinCreatures; creatures < min {
+		t.Fatalf("built deck runs %d creatures, want at least %d", creatures, min)
 	}
 	_ = rand.NewPCG // referenced only to keep the rng import honest for later tests
 }

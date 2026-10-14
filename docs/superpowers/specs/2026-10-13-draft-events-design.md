@@ -219,7 +219,7 @@ types. A test pins its ordering on a handful of named FDN cards.
 1. Choose the colour pair that maximises the summed rating of its best 23
    playable cards (cards whose colours are a subset of the pair, plus
    colourless).
-2. Take those 23, preferring a creature count of at least 14 and capping
+2. Take those 23, preferring a creature count of at least 17 and capping
    mana value 6+ at 3.
 3. Add 17 basics via `AutoLands`.
 4. If fewer than 23 playables exist, fill with the best off-colour cards and
