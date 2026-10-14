@@ -118,6 +118,16 @@ func main() {
 	if *out == "" {
 		fail("-out is required")
 	}
+	if *az {
+		// Fail fast when the memory this run is given cannot hold the az
+		// working set: a kernel memcg OOM kill is exactly what the reward
+		// loop's stability veto counts, and 2026-10-14's seven-kill retry
+		// burst came from a run launched far under its need. Checked before
+		// the corpus loads, so the refusal costs nothing. See memguard.go.
+		if err := checkAZCaps(*workers, *azSims); err != nil {
+			fail("%v", err)
+		}
+	}
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		fail("%v", err)
 	}
