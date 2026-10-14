@@ -42,6 +42,13 @@
 // # Clock
 //
 // eventhost is the only package of the event stack that may read the
-// clock, and today it reads it for nothing: PickTimeout (E3, pick timers)
-// is the seam, and New refuses a non-zero one.
+// clock. The abandonment sweep reads it through E1-8's Options.Now.
+// E3-6's pick timers read and arm through Options.Clock (Now and
+// AfterFunc; nil = the real clock): in a pod with two or more humans every
+// human pick has a deadline — XMage's table by the cards left in the pack,
+// ×1.5 relaxed, replaced by a positive Options.PickTimeout — and an
+// expired pick is taken by the seat's own drafter and logged as
+// Picked{Auto: true}. Single-human pods have no timer at all. Nothing
+// about a deadline is persisted: a restart re-arms every timer with its
+// full limit, and replay never reads the clock.
 package eventhost

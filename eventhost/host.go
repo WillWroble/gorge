@@ -38,7 +38,16 @@ type Options struct {
 	BotAutoPayMana bool
 	BotCommonSense bool
 	MintSeat       func(table host.TableID, seat int) (string, error) // E1-5
-	PickTimeout    time.Duration
+	// PickTimeout, when positive, replaces the standard per-pick limit
+	// table for every pick-timer mode (E3-6); 0 uses the table.
+	PickTimeout time.Duration
+	// Clock is the pick-timer seam (E3-6): Now reads the time the armed
+	// timers and their pack views count against, AfterFunc arms one; nil
+	// is the real clock.
+	Clock interface {
+		Now() time.Time
+		AfterFunc(d time.Duration, f func()) (stop func() bool)
+	}
 
 	// Seed mints every new event's seed (E1-8: the seed is never a client
 	// field). nil = crypto/rand.
@@ -94,6 +103,9 @@ type run struct {
 	// acted successfully. The sweep reads them under mu; replay never does.
 	createdAt time.Time
 	lastAct   [draft.Seats]time.Time
+	// E3-6: each human seat's armed pick timer, guarded by mu. A timer
+	// with stop == nil is not armed.
+	timers [4]pickTimer
 }
 
 // subscriber is one SSE session watching this event, at its seat (-1 for a
@@ -122,8 +134,8 @@ func New(o Options) (*Host, error) {
 	if o.Registry == nil || o.Store == nil || o.Cards == nil {
 		return nil, fmt.Errorf("eventhost: Options.Registry, Store and Cards are required")
 	}
-	if o.PickTimeout != 0 {
-		return nil, fmt.Errorf("eventhost: PickTimeout is E3 work; E1 accepts only 0")
+	if o.PickTimeout < 0 {
+		return nil, fmt.Errorf("eventhost: PickTimeout must not be negative, got %v", o.PickTimeout)
 	}
 	if o.LobbyTimeout == 0 {
 		o.LobbyTimeout = defaultLobbyTimeout
@@ -174,7 +186,7 @@ func New(o Options) (*Host, error) {
 		r.meta = m
 		// E1-8: a meta written before CreatedAt existed (or a halted run)
 		// gets fresh timeout windows from now.
-		now := o.Now()
+		now := optsNow(o)
 		if m.CreatedAt.IsZero() {
 			r.createdAt = now
 		} else {
@@ -265,6 +277,7 @@ func (h *Host) Close() error {
 	h.mu.Unlock()
 	for _, r := range h.events {
 		r.mu.Lock()
+		r.stopPickTimers()
 		r.releaseWaiters()
 		r.mu.Unlock()
 	}
@@ -350,12 +363,20 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errBadRequest("eventhost: best_of must be 1 or 3, got %d", req.BestOf)
 	}
+	// E3-6: the pick-timer mode is a bounded create option, decided here
+	// from the seat list, never echoed straight into the meta.
+	switch req.PickTimer {
+	case "", "off", "standard", "relaxed":
+	default:
+		h.mu.Unlock()
+		return protocol.CreateEventResponse{}, errBadRequest("eventhost: pick_timer must be off, standard or relaxed, got %q", req.PickTimer)
+	}
 	seed, serr := h.mintSeed()
 	if serr != nil {
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errUnavailable("eventhost: minting seed: %v", serr)
 	}
-	m := meta{Set: req.Set, Seed: seed, BestOf: req.BestOf, CreatedAt: h.opts.Now()}
+	m := meta{Set: req.Set, Seed: seed, BestOf: req.BestOf, CreatedAt: h.clockNow()}
 	humans := 0
 	var invites []protocol.EventInvite
 	for s, cs := range req.Seats {
@@ -396,6 +417,14 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 			return protocol.CreateEventResponse{}, errBadRequest("eventhost: seat %d kind %q is neither human nor bot", s, cs.Kind)
 		}
 		m.Seats[s] = ms
+	}
+	// E3-6: two or more humans draft against the clock (standard unless
+	// the request named a mode); one human or none has no timer at all.
+	m.PickTimer = req.PickTimer
+	if humans <= 1 {
+		m.PickTimer = "off"
+	} else if m.PickTimer == "" {
+		m.PickTimer = "standard"
 	}
 	if live := h.liveCount(); live >= h.maxLive() {
 		h.mu.Unlock()
@@ -570,7 +599,7 @@ func (h *Host) JoinEvent(id, token string, req protocol.JoinEventRequest) (proto
 			return protocol.EventState{}, errUnavailable("%s", r.halted)
 		}
 		r.advance()
-		r.markAct(seat, r.h.opts.Now())
+		r.markAct(seat, r.h.clockNow())
 		r.broadcast()
 	} else if r.ev.Phase() == event.PhaseCancelled {
 		return protocol.EventState{}, errConflict("eventhost: event %s was cancelled", r.meta.ID)
@@ -652,7 +681,7 @@ func (h *Host) Pick(id, token string, req protocol.PickRequest) (protocol.DraftP
 		return protocol.DraftPack{}, err
 	}
 	r.advance()
-	r.markAct(seat, r.h.opts.Now())
+	r.markAct(seat, r.h.clockNow())
 	r.broadcast()
 	return r.packFor(seat), nil
 }

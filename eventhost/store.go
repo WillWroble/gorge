@@ -34,6 +34,10 @@ type meta struct {
 	// format; the log's SeriesStarted/GameStarted entries re-derive the
 	// game state either way.
 	BestOf int `json:"best_of,omitempty"`
+	// PickTimer is the event's pick-timer mode (E3-6): "off", "standard"
+	// or "relaxed". Stored so a restart re-arms the same deadlines; a
+	// meta written before the field existed reads back as "" (= off).
+	PickTimer string `json:"pick_timer,omitempty"`
 }
 
 // metaSeat is one stored seat. Kind is "human" or "bot"; Name is the human
