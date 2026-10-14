@@ -53,9 +53,26 @@ func (e *Engine) protectedFrom(target, source state.ObjID) bool {
 	if target == 0 || source == 0 {
 		return false
 	}
-	for _, kw := range e.Keywords(target) {
-		if q, ok := protectionQuality(kw); ok && e.sourceHasQuality(source, q) {
-			return true
+	// The ranged list must be a private copy: sourceHasQuality inside the
+	// loop derives the SOURCE's characteristics, and a Derived build rewrites
+	// the chars scratch in place (chars/derive.go's Compute), so ranging
+	// e.Keywords(target) directly reads whichever list the nested build left
+	// in the buffer -- and whether that build rewrote in place or reallocated
+	// depends on the buffer's growth history, which differs between an
+	// execution and its re-execution (the derived memo serves owned arrays in
+	// one and misses to the shared scratch in the other). That read made the
+	// CR 608.2b recheck diverge from the recorded event stream. Every other
+	// caller of e.Keywords/Derived ranges with a pure-string body, so the
+	// scratch discipline (layers_derived.go) holds everywhere else.
+	kws := e.Keywords(target)
+	if len(kws) > 0 {
+		kws = append([]string(nil), kws...)
+	}
+	for _, kw := range kws {
+		if q, ok := protectionQuality(kw); ok {
+			if e.sourceHasQuality(source, q) {
+				return true
+			}
 		}
 	}
 	return false
