@@ -28,6 +28,14 @@ func (o *RatingsOverride) Value(name string) float64 {
 	return o.neutral
 }
 
+// The fixed gih_wr-equivalent scale an override takes on a set with no
+// embedded 17Lands file (DR-11): roughly FDN's own gih_wr mean and
+// population std, so the drafter's tuning constants keep their meaning.
+const (
+	FallbackScaleMean = 0.5425
+	FallbackScaleStd  = 0.0435
+)
+
 func meanStd(xs []float64) (float64, float64) {
 	m := 0.0
 	for _, x := range xs {
@@ -43,12 +51,13 @@ func meanStd(xs []float64) (float64, float64) {
 
 // ParseRatingsOverride takes field from every card entry of the JSON in b
 // (read from path by the caller; path only labels errors) and rescales it
-// onto set's embedded 17Lands scale. The package stays pure: no file I/O.
+// onto set's embedded 17Lands scale. A set with no embedded rating file (a
+// cold start: BLB, a new set) takes the fixed fallback scale instead
+// (FallbackScaleMean/FallbackScaleStd), and its Missing list is empty since
+// there is no 17Lands card list to compare against. The package stays
+// pure: no file I/O.
 func ParseRatingsOverride(b []byte, path, field, set string) (*RatingsOverride, error) {
-	ref, ok := rated[set]
-	if !ok {
-		return nil, fmt.Errorf("ratings override: set %s has no embedded rating file to take the scale from", set)
-	}
+	ref, haveRef := rated[set]
 	var raw map[string]map[string]float64
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return nil, fmt.Errorf("ratings override %s: %w", path, err)
@@ -67,17 +76,21 @@ func ParseRatingsOverride(b []byte, path, field, set string) (*RatingsOverride, 
 	for i, n := range names {
 		xs[i] = raw[n][field]
 	}
-	refNames := make([]string, 0, len(ref.Cards))
-	for n := range ref.Cards {
-		refNames = append(refNames, n)
-	}
-	sort.Strings(refNames)
-	ys := make([]float64, len(refNames))
-	for i, n := range refNames {
-		ys[i] = ref.Cards[n].GihWr
+	var refNames []string
+	my, sy := FallbackScaleMean, FallbackScaleStd
+	if haveRef {
+		refNames = make([]string, 0, len(ref.Cards))
+		for n := range ref.Cards {
+			refNames = append(refNames, n)
+		}
+		sort.Strings(refNames)
+		ys := make([]float64, len(refNames))
+		for i, n := range refNames {
+			ys[i] = ref.Cards[n].GihWr
+		}
+		my, sy = meanStd(ys)
 	}
 	mx, sx := meanStd(xs)
-	my, sy := meanStd(ys)
 	if sx == 0 {
 		return nil, fmt.Errorf("ratings override %s: field %q has zero spread", path, field)
 	}
