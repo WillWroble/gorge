@@ -311,3 +311,29 @@ functions.
 - 17Lands public datasets are CC BY 4.0 and need attribution. The 17Lands
   website's card-data pages fall under 17Lands' separate usage guidelines and
   are not used here.
+
+## 7. E5: training-facing extensions (feedback 2026-10-13)
+
+External feedback asked for genuine pack distributions, 8-agent drafts,
+1 human vs 7 agents, sealed (bot- and human-built), and Drafter / Builder /
+Player components that a separate training system can compose into
+non-linear workflows (e.g. random-deck play, freeze the player, build, then
+draft). Operator decisions:
+
+| # | Question | Decision |
+|---|---|---|
+| E5-Q1 | Who runs the game loop for external players | gorge drives games; an external model sits behind a seat adapter |
+| E5-Q2 | Process boundary | compiled Go for now (no RPC service); external agents later via a seat/bot (and Drafter/Builder) adapter to an external interface |
+| E5-Q3 | Collation | selectable: MTGJSON `play` (paper) or `play-arena`; default `play-arena` (ratings are 17Lands Arena data) |
+| E5-Q4 | Cards on bonus sheets | FDN and BLB start; their 20 SPG special guests (1.5% of packs) are all engine-supported; 18 lack XMage verdicts and get hand oracle scenarios (E5-a3) |
+| E5-Q5 | Post-draft structure for 1 human vs 7 agents | deferred (Swiss vs an Arena-style 7-wins/3-losses gauntlet) |
+| E5-Q6 | Priority | E3 first; E5 behind it at normal priority |
+
+Phases: **E5-a** MTGJSON-backed packs (inputs committed under
+`limited/setdata/mtgjson/`, MIT; `scripts/mtgjson_trim.py`), **E5-b** pod size
+as a parameter (4 | 8), sealed supply (6 packs → pool), Swiss pairing,
+8-pod and sealed in draftsim, **E5-c** a Go composition API for training
+workflows (open packs / draft / build / play with named built-in agents and
+seeds, artifacts + 17Lands-shaped CSVs), **E5-d** external-agent adapters
+(Drafter, Builder; batched Player), **E5-e** hosted 1 human + 7 bots and
+sealed for humans.
