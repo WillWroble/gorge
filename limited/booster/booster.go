@@ -76,10 +76,17 @@ func openPack(spec setdata.Spec, rng *rand.Rand, ids IDSource, colourOf ColourOf
 		return nil, -1, errors.New("booster: Open needs a non-nil ID allocator")
 	}
 	if colourOf == nil {
+		// Sorted: the error text must not depend on the map's iteration
+		// order when several sheets balance colours.
+		balancing := make([]string, 0, len(spec.Config.Sheets))
 		for name, sheet := range spec.Config.Sheets {
 			if sheet.BalanceColors {
-				return nil, -1, fmt.Errorf("booster: sheet %q balances colours but no ColourOf was supplied", name)
+				balancing = append(balancing, name)
 			}
+		}
+		sort.Strings(balancing)
+		for _, name := range balancing {
+			return nil, -1, fmt.Errorf("booster: sheet %q balances colours but no ColourOf was supplied", name)
 		}
 	}
 	v := pickVariant(spec.Config, rng)

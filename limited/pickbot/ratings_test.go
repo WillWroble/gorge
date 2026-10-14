@@ -7,9 +7,10 @@ import (
 	pb "github.com/adams-shaun/gorge/limited/pickbot"
 )
 
-// TestRatingFDNMainSetFullyRated pins that every FDN main-set card the
-// booster spec names has a 17Lands rating: 271 cards over the five sheets,
-// all present in the embedded file.
+// TestRatingFDNMainSetFullyRated pins that every distinct card name on the
+// FDN booster spec's sheets has a 17Lands rating: 286 names (every printing
+// a pack can carry, special-guest sheets included — 17Lands rates the SPG
+// guests under FDN), all present in the embedded file.
 func TestRatingFDNMainSetFullyRated(t *testing.T) {
 	if !pb.RatedSet("FDN") {
 		t.Fatal("no rating file for FDN")
@@ -24,8 +25,8 @@ func TestRatingFDNMainSetFullyRated(t *testing.T) {
 		t.Fatal("an unrated set returned an attribution")
 	}
 	names := fdnMainSetNames(t)
-	if len(names) != 271 {
-		t.Fatalf("FDN main set has %d cards, want 271", len(names))
+	if len(names) != 286 {
+		t.Fatalf("FDN main set has %d distinct names, want 286", len(names))
 	}
 	missing := 0
 	for _, n := range names {

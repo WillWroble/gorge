@@ -1,6 +1,7 @@
 package pickbot_test
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -61,22 +62,33 @@ func sheetRarities(t *testing.T, spec setdata.Spec) map[string]limited.Rarity {
 	return rarity
 }
 
-// fdnMainSetNames lists every FDN sheet card's name from the embedded
-// booster spec.
+// fdnMainSetNames lists the DISTINCT names across every FDN sheet card of
+// the embedded booster spec (the default collation's sheets, special-guest
+// and wildcard included), sorted. Entries repeat across sheets —
+// foilReplacement mirrors the main-set printings, wildcard repeats
+// uncommons — so the count that means anything is the distinct-name count.
 func fdnMainSetNames(t *testing.T) []string {
 	t.Helper()
 	spec, err := setdata.Load("FDN")
 	if err != nil {
 		t.Fatalf("setdata FDN: %v", err)
 	}
-	var names []string
+	seen := map[string]bool{}
 	for sheetName, sheet := range spec.Config.Sheets {
 		if len(sheet.Cards) == 0 {
 			t.Fatalf("FDN sheet %q is empty", sheetName)
 		}
 		for _, c := range sheet.Cards {
-			names = append(names, c.Name)
+			seen[c.Name] = true
 		}
 	}
+	if len(seen) == 0 {
+		t.Fatal("booster spec yielded no sheet cards")
+	}
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	sort.Strings(names)
 	return names
 }

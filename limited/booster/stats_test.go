@@ -98,8 +98,9 @@ func TestBoosterFDNArenaStats(t *testing.T) {
 }
 
 // TestBoosterFDNPlayStats opens 2,000 Foundations packs at the paper Play
-// Booster collation: 14 cards each, no duplicate names, and the
-// special-guest share at its collation's 15/1000.
+// Booster collation from a fixed seed: 14 cards each, no duplicate names,
+// the special-guest share at its collation's 15/1000 — plus the same seed
+// opening an identical pack set, exactly as the arena gate does.
 func TestBoosterFDNPlayStats(t *testing.T) {
 	spec, err := setdata.LoadCollation("FDN", setdata.Play)
 	if err != nil {
@@ -115,16 +116,14 @@ func TestBoosterFDNPlayStats(t *testing.T) {
 		t.Fatalf("precondition: FDN play special-guest weight is %d of %d, want 15 of 1000", guestWeight, spec.Config.TotalWeight)
 	}
 	const packs = 2000
+	const seed = 0xFD00F00D
 	ids := &booster.IDs{}
+	all := openPacks(t, spec, seed, packs, nil, ids)
+	if ids.Count() != packs*spec.PackSize {
+		t.Errorf("allocator handed out %d IDs, want %d (one per card, event-wide)", ids.Count(), packs*spec.PackSize)
+	}
 	guests := 0
-	for i := 0; i < packs; i++ {
-		pack, err := booster.Open(spec, rand.New(rand.NewPCG(0xFD00F00D, uint64(i))), ids, nil)
-		if err != nil {
-			t.Fatalf("Open play pack %d: %v", i, err)
-		}
-		if len(pack) != 14 {
-			t.Fatalf("play pack %d has %d cards, want 14", i, len(pack))
-		}
+	for _, pack := range all {
 		for _, c := range pack {
 			if c.Set == "SPG" {
 				guests++
@@ -136,6 +135,16 @@ func TestBoosterFDNPlayStats(t *testing.T) {
 	t.Logf("FDN play special-guest pack share: %.4f", share)
 	if share < 0.005 || share > 0.025 {
 		t.Errorf("FDN play special-guest pack share = %.4f over %d packs, want 0.015 ± 0.01 at this sample size", share, packs)
+	}
+
+	// Same seed, same packs, as at the arena collation.
+	again := openPacks(t, spec, seed, 200, nil, &booster.IDs{})
+	for i, pack := range again {
+		for j, c := range pack {
+			if c != all[i][j] {
+				t.Fatalf("the same seed opened a different play pack: pack %d card %d is %+v, want %+v", i, j, c, all[i][j])
+			}
+		}
 	}
 }
 

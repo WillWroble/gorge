@@ -96,7 +96,12 @@ func run(o options, out io.Writer) (*result, error) {
 	}
 	spec, err := setdata.LoadCollation(o.set, setdata.Collation(o.collation))
 	if err != nil {
-		return nil, fmt.Errorf("%w (collations: %s)", err, strings.Join(specCollations(o.set), ", "))
+		if colls := specCollations(o.set); len(colls) > 0 {
+			return nil, fmt.Errorf("%w (collations: %s)", err, strings.Join(colls, ", "))
+		}
+		// An unknown set carries no collations to list; say so distinctly
+		// instead of an empty list.
+		return nil, fmt.Errorf("unknown set %q (known: %s)", o.set, strings.Join(setdata.Codes(), ", "))
 	}
 
 	reg, err := testutil.OpenCorpusRegistry(o.dir)
