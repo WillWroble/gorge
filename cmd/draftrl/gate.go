@@ -14,6 +14,7 @@ import (
 
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/draftlab"
+	"github.com/adams-shaun/gorge/internal/memcap"
 	"github.com/adams-shaun/gorge/limited/pickbot"
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
@@ -166,6 +167,13 @@ func gate(args []string, out io.Writer) (*gateResult, error) {
 		return nil, err
 	}
 	az := o.pilot == "az"
+	if az {
+		// Refuse an az run whose memory settings cannot hold its working set,
+		// before the corpus loads, exactly as cardval does. See internal/memcap.
+		if err := memcap.CheckAzCaps(o.workers, o.azSims); err != nil {
+			return nil, err
+		}
+	}
 	lab, err := draftlab.Open(o.corpus, draftlab.Options{AllowDecklistBots: az, MaxObjs: o.maxObjs, Workers: 1, RecordTape: o.onlyGameTape != ""})
 	if err != nil {
 		return nil, err
