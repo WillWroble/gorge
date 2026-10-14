@@ -138,6 +138,9 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64, verbatim bool
 		return GameResult{}, fmt.Errorf("draftlab: seed %d: %w", seed, err)
 	}
 	endGame()
+	if l.opts.OnEngine != nil {
+		l.opts.OnEngine(seed, eng)
+	}
 
 	res := GameResult{
 		Seed:      seed,
