@@ -123,6 +123,10 @@
       "tier": "cmd",
       "status": "TOOL"
     },
+    "cmd/labdemo": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
     "cmd/dzbroker": {
       "tier": "cmd",
       "status": "EXT"
