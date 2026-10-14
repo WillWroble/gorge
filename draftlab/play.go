@@ -243,7 +243,17 @@ func (l *Lab) gameConfig(names [2]string, seed uint64, deckA, deckB []*cards.Car
 		Tokens:       l.reg.Tokens,
 		NameUniverse: l.reg.Universe(),
 		Mulligans:    l.mulliganRound(),
+		LoopGuard:    l.loopGuard(),
 	}
+}
+
+// loopGuard is Options.MaxObjs as the engine's watcher config; nil (the
+// default thresholds, no cap) when it is off.
+func (l *Lab) loopGuard() *rules.LoopGuard {
+	if l.opts.MaxObjs <= 0 {
+		return nil
+	}
+	return &rules.LoopGuard{MaxObjs: l.opts.MaxObjs}
 }
 
 // maxTurns is the effective turn watchdog: Options.MaxTurns or draftsim's
