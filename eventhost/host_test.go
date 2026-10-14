@@ -600,10 +600,3 @@ func readFrame(t *testing.T, s *host.Session) protocol.Frame {
 		return protocol.Frame{}
 	}
 }
-
-func TestPickTimeoutRefused(t *testing.T) {
-	_, err := New(Options{Registry: newRegistry(t), Store: mustStore(t, ""), Cards: testutil.CorpusRegistry(t), PickTimeout: time.Second})
-	if err == nil || !strings.Contains(err.Error(), "PickTimeout") {
-		t.Fatalf("PickTimeout accepted: %v", err)
-	}
-}

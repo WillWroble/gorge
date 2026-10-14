@@ -47,6 +47,8 @@ func (r *run) advance() {
 	// whose plan changed, so a between-games table resumes the moment the
 	// next GameStarted is on the log and an ended series' table stops.
 	r.wakeWaiters()
+	// E3-6: re-evaluate every human seat's pick timer against the new log.
+	r.armPickTimers()
 }
 
 // advanceLobby creates the event once every human seat has a name, then

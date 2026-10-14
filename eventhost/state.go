@@ -17,7 +17,10 @@ func (r *run) stateFor(seat int) protocol.EventState {
 		Event: r.meta.ID, Set: r.meta.Set,
 		Phase: string(r.ev.Phase()), Round: r.ev.Round(),
 		BestOf: r.bestOf(),
-		Error:  firstNonEmpty(r.halted, r.blocked),
+		// E3-6: the pick-timer mode as the meta stores it; a meta written
+		// before the field existed reads back as "" (no timer).
+		PickTimer: r.meta.PickTimer,
+		Error:     firstNonEmpty(r.halted, r.blocked),
 	}
 	if seat >= 0 {
 		s := seat
@@ -235,6 +238,16 @@ func (r *run) packFor(seat int) protocol.DraftPack {
 	}
 	out.Round, out.PickNo = v.Round, v.PickNo
 	out.Pack = r.draftCards(v.Pack)
+	// E3-6: the seat's armed pick deadline, when its armed key is still
+	// the pack at its queue head.
+	if t := r.timers[seat]; t.stop != nil && t.round == v.Round && t.pickNo == v.PickNo {
+		out.TimeLimitMS = t.limit.Milliseconds()
+		remaining := t.limit - r.h.clockNow().Sub(t.started)
+		if remaining < 0 {
+			remaining = 0
+		}
+		out.RemainingMS = remaining.Milliseconds()
+	}
 	return out
 }
 

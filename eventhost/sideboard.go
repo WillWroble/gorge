@@ -68,7 +68,7 @@ func (h *Host) Sideboard(id, token string, req protocol.SideboardRequest) (proto
 		return protocol.EventState{}, err
 	}
 	r.advance()
-	r.markAct(seat, r.h.opts.Now())
+	r.markAct(seat, r.h.clockNow())
 	r.broadcast()
 	return r.stateFor(seat), nil
 }

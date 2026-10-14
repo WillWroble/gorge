@@ -27,7 +27,7 @@ func (h *Host) sweepLoop() {
 	for {
 		select {
 		case <-t.C:
-			h.checkTimeouts(h.opts.Now())
+			h.checkTimeouts(h.clockNow())
 		case <-h.stop:
 			return
 		}

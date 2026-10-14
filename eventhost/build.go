@@ -212,7 +212,7 @@ func (h *Host) SaveDeck(id, token string, req protocol.DeckRequest) (protocol.De
 		return protocol.DeckCheck{}, serr
 	}
 	r.advance()
-	r.markAct(seat, r.h.opts.Now())
+	r.markAct(seat, r.h.clockNow())
 	r.broadcast()
 	out := r.deckCheck(seat, req)
 	out.Rev = rev
@@ -250,6 +250,6 @@ func (h *Host) Ready(id, token string, req protocol.ReadyRequest) (protocol.Even
 		r.advance()
 		r.broadcast()
 	}
-	r.markAct(seat, r.h.opts.Now())
+	r.markAct(seat, r.h.clockNow())
 	return r.stateFor(seat), nil
 }
