@@ -14,6 +14,7 @@ Part of the [repo map](repo-map.md) index. The engine chain is in
 | `mtgsim` | Headless self-play over the repo decks with replay verification (`make sim`). |
 | `draftsim` | Headless 4- or 8-seat draft/sealed pods (E0's exit gate): draft an embedded set spec, build 40-card decks, play the Bo1 series — round robin, Swiss or build-only — through the rules engine; `-verify` replays every event from its log (`make draftsim`). |
 | `labdemo` | The E5-c4 example workflow: random-deck games, a frozen player, sealed builds, 8-seat Swiss draft pods and gauntlets over the catalog, writing the 17Lands-shaped `draft_data.csv`/`game_data.csv`/`decks.json`/`manifests.json` artifacts to `-out` — a pure function of the flags, byte-identical per seed. |
+| `extagent` | The reference `gorge-agent/1` agent as a process: `refagent` over stdin/stdout by default, or each accepted connection on its own goroutine with `-listen unix:<path>`. The Python example agent a training team starts from is `examples/extagent/` (stdio or `ext:unix:`). |
 | `repro` | Replays a player feedback snapshot; `-emit-test` writes a failing test. |
 | `headdiff` | Plays the `TestHeads` acceptance games; `-dump` records their event streams, `-against` names the first divergent event between two builds. |
 | `cardfuzz` | Random mono-colour decks over the supported corpus; hunts panics, livelocks, divergences. |
