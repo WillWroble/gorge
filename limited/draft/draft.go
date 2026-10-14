@@ -57,6 +57,9 @@ type PickView struct {
 	// Seen is every pack the seat has already picked from this draft, in
 	// pick order, each as it stood when the seat saw it.
 	Seen [][]limited.CardRef
+	// Seats is the pod size: a public table fact every seat knows before
+	// its first pick (it is what makes a wheel recognisable).
+	Seats int
 }
 
 // Picked is one entry of the pod's append-only record.
@@ -132,6 +135,7 @@ func (p *Pod) Next(seat int) (PickView, bool) {
 	v := PickView{
 		Round:  p.round,
 		PickNo: p.pickNo[seat] + 1,
+		Seats:  p.seats,
 	}
 	if len(head.remaining) > 0 {
 		v.Set = head.remaining[0].Set
