@@ -101,17 +101,15 @@ func (e *Engine) cyclingKeyword(pc *pendingCast) string {
 }
 
 // resolvedMana returns the cost the announced payment actually commits: X
-// folded, every hybrid and Phyrexian pip removed (each was announced by
-// manaAsk into payColor/payLife), and the announced coloured spend folded
-// into Colored so payMana charges it from the pool. payLife is applied
-// separately by payCast. For a cost with no hybrid or Phyrexian pip this is
-// just the X-folded cost, so ordinary casting is unchanged.
+// folded, every announced hybrid and Phyrexian pip removed (each was
+// announced by manaAsk into payColor/payLife), and the announced coloured
+// spend folded into Colored so payMana charges it from the pool. payLife is
+// applied separately by payCast. At payment every pip has been announced, so
+// this is the pip-free folded cost; for a cost with no announcement pip it
+// is just the X-folded cost, so ordinary casting is unchanged.
 func (pc *pendingCast) resolvedMana() Cost {
 	m := pc.cost.WithX(pc.x)
-	m.Hybrid = nil
-	m.Phyrexian = nil
-	m.Twobrid = nil
-	m.HybridPhyrexian = nil
+	m = m.DropAnnouncePrefix(pc.PayIdx)
 	for i := range pc.PayColor {
 		m.Colored[i] += pc.PayColor[i]
 	}
@@ -119,14 +117,20 @@ func (pc *pendingCast) resolvedMana() Cost {
 	return m
 }
 
-// resolvedMana is the X-folded, pip-resolved cost (see above). manaToPay is
-// the full CR 601.2f composition on top of it.
+// resolvedManaX is the X-folded cost with every pip the announcement has not
+// settled yet still live (see resolvedMana for the announced half). manaToPay
+// is the full CR 601.2f composition on top of it. The pips that are still
+// unannounced at an xAsk (CR 601.2b announces X before the pip faces) must
+// price the candidate X: they each need one unit of their colour from the
+// same pool the folded X will spend, and a candidate X priced against the
+// pips-free cost can promise an announcement no pip-face assignment can pay
+// (Fiend Artisan's {X}{B/G} at pool {G}{G} offering X=2), which then strands
+// the pip ask and aborts the cast/activation at payCast. DropAnnouncePrefix
+// removes exactly the pips already announced (their faces ride PayColor and
+// PayGeneric), so the two forms agree whenever the announcement is complete.
 func (pc *pendingCast) resolvedManaX(x int32) Cost {
 	m := pc.cost.WithX(x)
-	m.Hybrid = nil
-	m.Phyrexian = nil
-	m.Twobrid = nil
-	m.HybridPhyrexian = nil
+	m = m.DropAnnouncePrefix(pc.PayIdx)
 	for i := range pc.PayColor {
 		m.Colored[i] += pc.PayColor[i]
 	}
@@ -285,13 +289,18 @@ func (e *Engine) affordableTargetCandidates(pc *pendingCast, candidates []target
 		return nil
 	}
 	pl := e.G.Players[pc.player]
-	// Only a root-target-dependent own reduction needs a proven window
-	// reachability check. Other activations retain their existing mana-window
-	// offer semantics (including sources this static probe cannot price).
+	// A root-target-dependent own reduction needs a proven window
+	// reachability check, and so does every other pool-short candidate once
+	// the window census is complete (see the pool-short arm below): the
+	// CR 601.2g window's concrete productions are the difference between a
+	// candidate whose repriced cost the payment can reach and one the
+	// payment is certain to abort (CR 601.2h).
 	targetDiscount := pc.isAbility() && pc.ownReduce > e.ownReduceCost(pc.player, pc.card, e.pcAbility(pc), nil, nil, pc.abilityMerged)
 	var windowUnits []windowManaUnit
-	if targetDiscount {
+	censusComplete := false
+	if targetDiscount || e.hasUntappedManaSource(pc.player) {
 		windowUnits = e.castWindowUnits(pc)
+		censusComplete = e.castWindowCensusComplete(pc, windowUnits)
 	}
 	out := make([]targetCandidate, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -399,19 +408,30 @@ func (e *Engine) affordableTargetCandidates(pc *pendingCast, candidates []target
 		if !cost.HasManaPayment() {
 			continue
 		}
-		if targetDiscount {
-			// A best-target discount can make this option affordable before
-			// choosing targets while a weaker target is not. An arbitrary
-			// untapped source is not proof that the 601.2g window can cover
-			// the difference. Probe the window's concrete free productions,
-			// one alternative per source, instead of offering a target whose
-			// activation will abort at payment (CR 601.2h).
-			av := pay.AvailableFor(asPayer(e), pc.player, desc)
+		if !targetDiscount && !e.hasUntappedManaSource(pc.player) {
+			continue
+		}
+		// A best-target discount can make this option affordable before
+		// choosing targets while a weaker target is not. And for every other
+		// pool-short candidate an arbitrary untapped source is not proof that
+		// the 601.2g window can cover the repriced cost. Probe the window's
+		// concrete productions, one alternative per source, instead of
+		// offering a target whose activation will abort at payment
+		// (CR 601.2h). The discount arm judges on the concrete productions
+		// alone (its fail-closed boundary is the committed contract: a
+		// RestrictValid$-governed source stays unpriced and unpromised); the
+		// census fallback applies to the OTHER arm only, where the probe's
+		// fail-closed exclusions leave a source unpriced that the historical
+		// offer assumed -- there an incomplete census keeps the historical
+		// offer rather than withholding on productions the census could not
+		// see.
+		av := pay.AvailableFor(asPayer(e), pc.player, desc)
+		if targetDiscount || censusComplete {
 			if e.castWindowReachable(pc.player, convoked, av.Pool, pl.Snow, av.Typed, pl.Life,
 				asEval(e).Conv(pc.player, desc.ID, desc.Class == paymentActivated), windowUnits) {
 				out = append(out, candidate)
 			}
-		} else if e.hasUntappedManaSource(pc.player) {
+		} else {
 			out = append(out, candidate)
 		}
 	}

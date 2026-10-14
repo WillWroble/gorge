@@ -222,6 +222,90 @@ func (e *Engine) castWindowProbeAbilities(p state.PlayerID, id state.ObjID) []*c
 	return out
 }
 
+// castWindowSourceExcluded reports whether source id's probe-admitted mana
+// abilities stay unpriced for a reason that can never become a unit inside
+// this window: a fail-closed grammar exclusion (RestrictValid$, an
+// unresolvable Amount$, an unpriced paid shape, a Chosen colour with no
+// record) or a free plain literal the shared census withheld (its domain).
+// A source whose every admitted ability is merely TAP-BLOCKED (a tapped
+// permanent with a tap-required activation) would be priced the moment it
+// untaps, so it leaves the census complete rather than failing it open:
+// "priced everything the window can offer" and "priced everything, because
+// the one unpriced source simply has nothing to offer right now" are the
+// same fact. The gates mirror castWindowProbeUnits' skip order so the
+// verdict describes that loop's own reason for leaving no unit.
+func (e *Engine) castWindowSourceExcluded(p state.PlayerID, id state.ObjID) bool {
+	o := e.G.Obj(id)
+	if o == nil || o.Face() == nil {
+		return false
+	}
+	for _, ma := range e.castWindowProbeAbilities(p, id) {
+		mp := effects.ManaOf(ma)
+		if mp.RestrictValid != "" {
+			return true
+		}
+		cost := e.parseCost(ma.ParamStr(cards.PKCost))
+		if pay.ActivationTapCostUnavailable(o, &cost) {
+			continue
+		}
+		free := pay.ManaFreeCost(cost)
+		if !free && !castWindowGenericCostShape(cost) {
+			if _, ok := e.paidCostShape(p, id, cost, e.G.Players[p].Life); !ok {
+				return true
+			}
+		}
+		if _, ok := e.castWindowAmount(p, id, o, ma); !ok {
+			return true
+		}
+		produced := mp.Produced
+		if producedNeedsChosen(produced) {
+			chosen := pay.ChosenProducedColour(e.G, id)
+			if chosen == "" {
+				return true
+			}
+			produced = pay.SubstituteChosenProduced(produced, chosen)
+		}
+		counts, any := cards.ProducedCounts(produced)
+		total := int32(0)
+		for _, n := range counts {
+			total += n
+		}
+		if total <= 0 {
+			return true
+		}
+		if free && !any && availableAmountOf(mp) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// castWindowCensusComplete reports whether castWindowUnits priced every
+// source the CR 601.2g window can offer: a permanent with a mana ability the
+// shared gate walk admits (ignoring the live-pool gate, which a later step
+// in the same window can satisfy) but that the probe's fail-closed exclusions
+// left with no priced production makes the census incomplete, because that
+// unpriced ability might be the production that closes the gap the probe
+// measured short. A census that is complete lets a pool-short target-menu
+// candidate be judged on the concrete reachability search alone; an
+// incomplete one falls back to keeping the historical offer.
+func (e *Engine) castWindowCensusComplete(pc *pendingCast, units []windowManaUnit) bool {
+	p := pc.player
+	priced := make(map[state.ObjID]bool, len(units))
+	for _, u := range units {
+		priced[u.ID] = true
+	}
+	for _, id := range pay.BattlefieldManaSourceIDs(e.G, p) {
+		if priced[id] || e.convokeCommitted(pc, id) {
+			continue
+		}
+		if len(e.castWindowProbeAbilities(p, id)) > 0 && e.castWindowSourceExcluded(p, id) {
+			return false
+		}
+	}
+	return true
+}
+
 // castWindowAmount resolves a window mana ability's Amount$ the way the
 // activation's own manaEffectAmount does -- the source face's SVar table and
 // effects.Num's grammar -- but with the resolvability verdict the count
@@ -362,7 +446,13 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 				continue
 			}
 			for _, a := range ordered[i].Alts {
-				if a.Life > lifeLeft {
+				// A positive life debit must be present before the tap; a
+				// zero-debit alt is unaffected by the payer's life total,
+				// even when the game has carried the payer below 0 (the
+				// loser's remaining priority turns) -- a zero-debit guard
+				// that reads lifeLeft directly would strand every alt
+				// there.
+				if a.Life > 0 && a.Life > lifeLeft {
 					continue
 				}
 				// Pay a generic activation fee from mana the live activation
