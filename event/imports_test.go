@@ -63,7 +63,11 @@ func TestImportsStayPure(t *testing.T) {
 		for _, imp := range f.Imports {
 			p := strings.Trim(imp.Path.Value, `"`)
 			for _, bad := range forbiddenImports {
-				if p == bad || strings.HasPrefix(p, bad+"/") {
+				// math/rand is matched exactly so its v2 successor — the
+				// spec's only sanctioned randomness (spec §3: seeded
+				// rand.New(rand.NewPCG(seed, salt))) — is not caught by the
+				// subpackage prefix.
+				if p == bad || (bad != "math/rand" && strings.HasPrefix(p, bad+"/")) {
 					t.Errorf("%s imports %q: %s must stay pure (spec invariant 3)", f.Name.Name, p, dir)
 				}
 			}

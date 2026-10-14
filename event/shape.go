@@ -9,8 +9,9 @@ const (
 )
 
 // The series structures. StructureRoundRobin is the zero Structure (circle
-// method, n-1 rounds by default). StructureNone plays no series: the event
-// ends after BUILD. StructureSwiss is accepted from E5-b3.
+// method, n-1 rounds by default). StructureSwiss pairs by SwissPairings;
+// each round opens when the driver logs a RoundPaired entry. StructureNone
+// plays no series: the event ends after BUILD.
 const (
 	StructureRoundRobin = "roundrobin"
 	StructureSwiss      = "swiss"
@@ -32,14 +33,16 @@ func (e *Event) NumSeats() int { return len(e.seats) }
 // from its EventCreated entry, "" meaning ModeDraft). "" before EventCreated.
 func (e *Event) Mode() string { return e.mode }
 
-// Structure reports the event's series structure: StructureRoundRobin or
-// StructureNone (normalized from its EventCreated entry, "" meaning
-// StructureRoundRobin). "" before EventCreated.
+// Structure reports the event's series structure: StructureRoundRobin,
+// StructureSwiss or StructureNone (normalized from its EventCreated entry,
+// "" meaning StructureRoundRobin). "" before EventCreated.
 func (e *Event) Structure() string { return e.structure }
 
 // Rounds reports the event's round count: for StructureRoundRobin the
-// normalized round count (n-1 unless the EventCreated entry named one), and
-// 0 for StructureNone, which plays no rounds.
+// normalized round count (n-1 unless the EventCreated entry named one), for
+// StructureSwiss the normalized round count (ceil(log2 n) unless the
+// EventCreated entry named one), and 0 for StructureNone, which plays no
+// rounds.
 func (e *Event) Rounds() int { return e.rounds }
 
 // PacksPerSeat reports the event's pack count per seat: 3 in draft mode,

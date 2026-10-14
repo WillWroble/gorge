@@ -47,6 +47,13 @@ const (
 	// side's deck revision for its series' next game. Auto marks the server
 	// keeping the deck for an absent human.
 	KindSideboarded Kind = "Sideboarded"
+	// RoundPaired (E5-b3) is appended after every earlier kind: it opens a
+	// Swiss round with the pairs the driver chose (normally
+	// SuggestedPairings). Apply validates the pairs' shape only and never
+	// equality with SuggestedPairings — the same reason packs are logged in
+	// full: a log keeps its meaning after a later change to the pairing
+	// algorithm.
+	KindRoundPaired Kind = "RoundPaired"
 )
 
 // Entry is one log entry: a Kind discriminator plus the fields of that
@@ -135,6 +142,9 @@ type Entry struct {
 	// Collation is the booster collation the packs came from,
 	// informational only (the packs are logged in full).
 	Collation string `json:"collation,omitempty"`
+
+	// Pairs is a RoundPaired's pairs: lower seat first, table order.
+	Pairs [][2]int `json:"pairs,omitempty"`
 }
 
 // cloneEntry deep-copies an entry's slice and pointer fields so the log
@@ -161,6 +171,9 @@ func cloneEntry(en Entry) Entry {
 	if en.Chooser != nil {
 		c := *en.Chooser
 		en.Chooser = &c
+	}
+	if en.Pairs != nil {
+		en.Pairs = append([][2]int(nil), en.Pairs...)
 	}
 	return en
 }
@@ -198,7 +211,7 @@ func ParseLog(data []byte) ([]Entry, error) {
 		case KindEventCreated, KindPackOpened, KindPicked, KindDeckSaved,
 			KindReady, KindSeriesStarted, KindGameEnded, KindSeriesEnded,
 			KindEventEnded, KindGameStarted, KindGameAborted,
-			KindLobbyTimeout, KindIdleTimeout, KindSideboarded:
+			KindLobbyTimeout, KindIdleTimeout, KindSideboarded, KindRoundPaired:
 		default:
 			return nil, fmt.Errorf("event: parse log line %d: unknown kind %q", i+1, en.Kind)
 		}

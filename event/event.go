@@ -69,7 +69,7 @@ type Event struct {
 	// The EventCreated shape, normalized: the logged entry keeps the values
 	// exactly as given (mode "" stays "", Packs 0 stays 0).
 	mode      string // ModeDraft or ModeSealed; "" before EventCreated
-	structure string // StructureRoundRobin or StructureNone; "" before EventCreated
+	structure string // StructureRoundRobin, StructureSwiss or StructureNone; "" before EventCreated
 	packsPer  int
 	rounds    int // 0 for StructureNone
 	collation string
@@ -286,6 +286,8 @@ func (e *Event) apply(en *Entry) error {
 		return e.applyGameAborted(en)
 	case KindSideboarded:
 		return e.applySideboarded(en)
+	case KindRoundPaired:
+		return e.applyRoundPaired(en)
 	case KindLobbyTimeout:
 		return e.applyLobbyTimeout(en)
 	case KindIdleTimeout:
@@ -360,15 +362,14 @@ func (e *Event) applyEventCreated(en *Entry) error {
 	structure := StructureRoundRobin
 	switch en.Structure {
 	case "":
-	case StructureRoundRobin, StructureNone:
+	case StructureRoundRobin, StructureNone, StructureSwiss:
 		structure = en.Structure
-	case StructureSwiss:
-		return fmt.Errorf("event: EventCreated: structure swiss is not implemented yet (E5-b3)")
 	default:
 		return fmt.Errorf("event: EventCreated: unknown structure %q", en.Structure)
 	}
 	rounds := 0
-	if structure == StructureRoundRobin {
+	switch structure {
+	case StructureRoundRobin:
 		rounds = n - 1
 		if en.Rounds != 0 {
 			if en.Rounds < 1 || en.Rounds >= n {
@@ -376,8 +377,20 @@ func (e *Event) applyEventCreated(en *Entry) error {
 			}
 			rounds = en.Rounds
 		}
-	} else if en.Rounds != 0 {
-		return fmt.Errorf("event: EventCreated: structure none takes no rounds")
+	case StructureSwiss:
+		// A Swiss event's default round count is ceil(log2 n): 2 for 4
+		// seats, 3 for 8.
+		rounds = swissDefaultRounds(n)
+		if en.Rounds != 0 {
+			if en.Rounds < 1 || en.Rounds >= n {
+				return fmt.Errorf("event: EventCreated: rounds %d out of range 1..%d", en.Rounds, n-1)
+			}
+			rounds = en.Rounds
+		}
+	default: // StructureNone
+		if en.Rounds != 0 {
+			return fmt.Errorf("event: EventCreated: structure none takes no rounds")
+		}
 	}
 	e.seed = en.Seed
 	e.set = en.Set
@@ -607,9 +620,11 @@ func (e *Event) allReady() bool {
 }
 
 // startRounds opens the first event round: its pairings become the current
-// series set. A StructureNone event opens no round and stays in BUILD.
+// series set. A StructureNone event opens no round and stays in BUILD. A
+// Swiss event stays in BUILD too: it awaits the driver's first RoundPaired
+// entry (see AwaitingPairing).
 func (e *Event) startRounds() {
-	if e.structure == StructureNone {
+	if e.structure != StructureRoundRobin {
 		return
 	}
 	e.round = 1
@@ -876,13 +891,18 @@ func seriesWinner(a, b int, score [2]int) int {
 }
 
 // roundAdvance opens the next round once every current series has ended;
-// after the event's last round it stays there until the EventEnded entry.
+// after the event's last round it stays there until the EventEnded entry. A
+// Swiss event stays in ROUND r instead: round r+1 opens when the driver
+// logs its RoundPaired entry (see AwaitingPairing).
 func (e *Event) roundAdvance() {
 	for _, p := range e.pairings {
 		st := e.series[p]
 		if st == nil || !st.ended {
 			return
 		}
+	}
+	if e.structure == StructureSwiss {
+		return
 	}
 	if e.round >= e.rounds {
 		return
@@ -893,6 +913,10 @@ func (e *Event) roundAdvance() {
 	e.phase = RoundPhase(e.round)
 }
 
+// applyEventEnded completes the event. A StructureNone event ends from
+// BUILD once every seat is ready; a round-robin or Swiss event ends from
+// its last round's phase (RoundPhase(rounds)) once every series of that
+// round has ended.
 func (e *Event) applyEventEnded(en *Entry) error {
 	if !e.cooked {
 		return fmt.Errorf("event: EventEnded: event not created")
@@ -997,14 +1021,21 @@ func (e *Event) StateJSON() ([]byte, error) {
 	if e.mode == ModeSealed {
 		s.Mode = e.mode
 	}
-	if e.structure == StructureNone {
+	if e.structure == StructureNone || e.structure == StructureSwiss {
 		s.Structure = e.structure
 	}
 	if e.packsPer != e.defaultPacks() {
 		s.Packs = e.packsPer
 	}
-	if e.structure == StructureRoundRobin && n > 0 && e.rounds != n-1 {
-		s.Rounds = e.rounds
+	switch e.structure {
+	case StructureRoundRobin:
+		if n > 0 && e.rounds != n-1 {
+			s.Rounds = e.rounds
+		}
+	case StructureSwiss:
+		if n > 0 && e.rounds != swissDefaultRounds(n) {
+			s.Rounds = e.rounds
+		}
 	}
 	s.Pools = make([][]limited.CardRef, n)
 	s.Decks = make([][]deckJSON, n)
