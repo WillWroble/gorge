@@ -47,20 +47,30 @@ type Deck struct {
 // the file is checked to resolve against the lab's registry. The deck's
 // name is "<set> <ref>".
 func (l *Lab) Build(pool []limited.CardRef, b NamedBuilder) (Deck, error) {
+	return l.buildNamed(pool, b, "")
+}
+
+// buildNamed is Build's body with an explicit deck-file name ("" names the
+// deck "<set> <ref>"); the event driver names its decks
+// "p<seat> <set> <mode>" instead.
+func (l *Lab) buildNamed(pool []limited.CardRef, b NamedBuilder, name string) (Deck, error) {
 	set, err := refsSet(pool)
 	if err != nil {
 		return Deck{}, fmt.Errorf("draftlab: build %s: %w", b.Ref, err)
+	}
+	if name == "" {
+		name = fmt.Sprintf("%s %s", set, b.Ref)
 	}
 	d := b.Builder.Build(set, pool)
 	if err := build.Validate(pool, d); err != nil {
 		return Deck{}, fmt.Errorf("draftlab: build %s: %w", b.Ref, err)
 	}
-	f := build.ToDeckFile(pool, d, fmt.Sprintf("%s %s", set, b.Ref))
+	f := build.ToDeckFile(pool, d, name)
 	if _, err := f.Resolve(l.reg); err != nil {
 		return Deck{}, fmt.Errorf("draftlab: build %s deck file: %w", b.Ref, err)
 	}
 	return Deck{
-		Name:   fmt.Sprintf("%s %s", set, b.Ref),
+		Name:   name,
 		Set:    set,
 		Source: "build:" + b.Ref.String(),
 		Pool:   append([]limited.CardRef(nil), pool...),

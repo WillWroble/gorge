@@ -41,6 +41,8 @@ type Tournament struct {
 	Pairings  [][][2]int   // per round
 	Games     []GameResult // round order, pairing order within a round
 	Standings []event.Standing
+	// Manifest is the run's provenance (kind "tournament").
+	Manifest Manifest
 }
 
 // Play runs a Bo1 tournament between an even number (2..maxEntrants) of
@@ -66,6 +68,7 @@ func (l *Lab) Play(entrants []Entrant, o PlayOptions, seed uint64) (Tournament, 
 	t := Tournament{Structure: structure, Rounds: rounds}
 	if structure == NoGames {
 		t.Standings = event.ComputeStandingsN(n, nil)
+		t.Manifest = l.NewManifest("tournament", seed, playerRoleRefs(entrants), nil)
 		return t, nil
 	}
 	var results []event.SeriesResult
@@ -112,6 +115,7 @@ func (l *Lab) Play(entrants []Entrant, o PlayOptions, seed uint64) (Tournament, 
 		}
 	}
 	t.Standings = event.ComputeStandingsN(n, results)
+	t.Manifest = l.NewManifest("tournament", seed, playerRoleRefs(entrants), t.Games)
 	return t, nil
 }
 

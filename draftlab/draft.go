@@ -88,30 +88,8 @@ func (l *Lab) Draft(packs [][][]limited.CardRef, drafters []NamedDrafter, seed u
 		}
 	}
 
-	// One persistent rng per seat, used in pick order only: the picks are a
-	// pure function of (seed, seat, pick history).
-	rngs := make([]*rand.Rand, n)
-	for s := range rngs {
-		rngs[s] = rand.New(rand.NewPCG(seed, pickSaltBase<<32|uint64(s)))
-	}
-	for e.Phase() == event.PhaseDraft {
-		progressed := false
-		for s := 0; s < n; s++ {
-			v, ok := e.Next(s)
-			if !ok {
-				continue
-			}
-			id := drafterOf(s).Drafter.Pick(v, rngs[s])
-			if err := e.Apply(event.Entry{
-				Kind: event.KindPicked, Round: v.Round, PickNo: v.PickNo, Seat: s, ID: id,
-			}); err != nil {
-				return DraftResult{}, fmt.Errorf("draftlab: draft: pick seat %d round %d pick %d: %w (open a pod's packs with one OpenPod call)", s, v.Round, v.PickNo, err)
-			}
-			progressed = true
-		}
-		if !progressed {
-			return DraftResult{}, fmt.Errorf("draftlab: draft: stuck in phase %s with no legal pick", e.Phase())
-		}
+	if err := runDraftLoop(e, n, drafterOf, seed); err != nil {
+		return DraftResult{}, err
 	}
 
 	log, err := event.MarshalLog(e.Log())
@@ -182,4 +160,39 @@ func bonusOnly(packs [][][]limited.CardRef) bool {
 		}
 	}
 	return false
+}
+
+// runDraftLoop drives a draft-mode event from its pack openings to BUILD:
+// every seat in order picks whenever its queue head has a pack, one
+// persistent rng per seat from rand.NewPCG(seed, pickSaltBase<<32|seat) —
+// the picks are a pure function of (seed, seat, pick history) — until the
+// pod is done and the event stands in BUILD. Both Draft and the event
+// driver funnel through it.
+func runDraftLoop(e *event.Event, n int, drafterOf func(int) NamedDrafter, seed uint64) error {
+	// One persistent rng per seat, used in pick order only: the picks are a
+	// pure function of (seed, seat, pick history).
+	rngs := make([]*rand.Rand, n)
+	for s := range rngs {
+		rngs[s] = rand.New(rand.NewPCG(seed, pickSaltBase<<32|uint64(s)))
+	}
+	for e.Phase() == event.PhaseDraft {
+		progressed := false
+		for s := 0; s < n; s++ {
+			v, ok := e.Next(s)
+			if !ok {
+				continue
+			}
+			id := drafterOf(s).Drafter.Pick(v, rngs[s])
+			if err := e.Apply(event.Entry{
+				Kind: event.KindPicked, Round: v.Round, PickNo: v.PickNo, Seat: s, ID: id,
+			}); err != nil {
+				return fmt.Errorf("draftlab: draft: pick seat %d round %d pick %d: %w (open a pod's packs with one OpenPod call)", s, v.Round, v.PickNo, err)
+			}
+			progressed = true
+		}
+		if !progressed {
+			return fmt.Errorf("draftlab: draft: stuck in phase %s with no legal pick", e.Phase())
+		}
+	}
+	return nil
 }
