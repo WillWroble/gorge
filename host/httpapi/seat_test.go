@@ -400,14 +400,15 @@ func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	if pv.Viewer != parked || pv.Visibility != view.Seat.String() {
 		t.Fatalf("parked seat view: viewer %d visibility %q", pv.Viewer, pv.Visibility)
 	}
-	// E3-fx3 (CR 103.5): the fixture parks on the CR 103.1 starting-player
-	// ask, so the CR 103.5 blind binds — no player may see any hand while
-	// it is pending, including the parked seat's own. The served hand is
-	// the blind non-nil empty list with the count kept (the shape
-	// view/starting_choice_test.go pins); once the choice resolves the
-	// hand returns (the blind is serve-time state, never a deletion).
-	if pv.Players[parked].Hand == nil || len(pv.Players[parked].Hand) != 0 || pv.Players[parked].HandSize == 0 {
-		t.Fatalf("the parked seat's own hand is not the pregame blind (empty list, count kept): %+v", pv.Players[parked])
+	// The fixture parks PAST the CR 103.1 starting-player ask (see
+	// pastStartingChoice), so the CR 103.5 pregame blind has lifted by the
+	// time this reads: the parked seat's own hand is visible again in full,
+	// count matching. While the choice is pending the blind hides it (the
+	// shape view/starting_choice_test.go pins) and the seat's own Secret
+	// draws are served shape-only (host/starting_choice_events_test.go pins
+	// both halves of the window).
+	if pv.Players[parked].Hand == nil || len(pv.Players[parked].Hand) != int(pv.Players[parked].HandSize) || pv.Players[parked].HandSize == 0 {
+		t.Fatalf("the parked seat's own hand is not present: %+v", pv.Players[parked])
 	}
 	if pv.Players[other].Hand != nil {
 		t.Fatalf("seat %d reads seat %d's hand through its own seat view", parked, other)
@@ -430,12 +431,11 @@ func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	} else if err := json.Unmarshal(raw, &ov); err != nil {
 		t.Fatal(err)
 	}
-	// E3-fx3 (CR 103.5): the other seat's own hand is under the same
-	// pregame blind (the window binds for every seat), so its view is the
-	// blind empty list with its count, and the parked seat's hand is nil.
-	if ov.Viewer != other || ov.Players[other].Hand == nil || len(ov.Players[other].Hand) != 0 ||
-		ov.Players[other].HandSize == 0 || ov.Players[parked].Hand != nil {
-		t.Fatalf("the other seat's view is not its own blind game: viewer %d hands %v/%v", ov.Viewer, ov.Players[parked].Hand, ov.Players[other].Hand)
+	// The other seat's view is under the same post-choice terms: its own
+	// hand visible (the blind lifted once the choice resolved), the parked
+	// seat's hand nil.
+	if ov.Viewer != other || ov.Players[other].Hand == nil || ov.Players[parked].Hand != nil {
+		t.Fatalf("the other seat's view is not its own game: viewer %d hands %v/%v", ov.Viewer, ov.Players[parked].Hand, ov.Players[other].Hand)
 	}
 	if ov.Decision != nil {
 		t.Fatalf("seat %d sees the decision asked of seat %d: %+v", other, parked, ov.Decision)
