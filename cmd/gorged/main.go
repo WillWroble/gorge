@@ -680,9 +680,13 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...)
 	}
 	if c.prewarm {
-		go prewarmArt(ctx, ac, c.decks, func(f string, a ...any) {
-			fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...)
-		})
+		logf := func(f string, a ...any) { fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...) }
+		go func() {
+			prewarmArt(ctx, ac, c.decks, logf)
+			if c.events {
+				prewarmSetArt(ctx, ac, logf)
+			}
+		}()
 	}
 	// closeAll shuts the eventhost down BEFORE the registry: an event game
 	// that finishes during shutdown reports through OnMatchEnd, and a relay
