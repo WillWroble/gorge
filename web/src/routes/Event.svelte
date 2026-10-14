@@ -4,9 +4,9 @@
   import { session } from '../lib/session.svelte';
   import { EventClient, isRound } from '../lib/draftevent.svelte';
   import { DeckBuilder } from '../lib/deckbuild.svelte';
-  import { CardFactsStore } from '../lib/cardfacts.svelte';
   import { eventSeatFor, forgetEventSeat, rememberName, rememberedName } from '../lib/eventseat';
-  import { eventApi } from '../lib/eventapi';
+  import { eventApi, listEventSets } from '../lib/eventapi';
+  import { ratedBy17Lands } from '../lib/newevent';
   import { seatLabel } from '../lib/draftcards';
   import PhaseRail from '../components/event/PhaseRail.svelte';
   import LobbyView from '../components/event/LobbyView.svelte';
@@ -14,7 +14,7 @@
   import BuildView from '../components/event/BuildView.svelte';
   import HubView from '../components/event/HubView.svelte';
   import PodStatus from '../components/event/PodStatus.svelte';
-  import type { Frame } from '../protocol';
+  import type { EventSetInfo, Frame } from '../protocol';
 
   /**
    * /e/{id}: one draft event, whatever its phase. The viewer's seat comes
@@ -32,7 +32,9 @@
   const seat = eventSeatFor(event, typeof location === 'undefined' ? '' : location.search);
   // svelte-ignore state_referenced_locally
   const client = new EventClient(event, seat);
-  const facts = new CardFactsStore();
+  // The set catalogue says whether this set's bot ratings are 17Lands' (the
+  // CC BY credit) or the card heuristic; until it loads the credit stays.
+  let sets = $state<EventSetInfo[] | null>(null);
   let builder = $state<DeckBuilder | null>(null);
   let log = $state<unknown[] | null>(null);
   let name = $state(rememberedName());
@@ -40,6 +42,7 @@
   const st = $derived(client.state);
   const you = $derived(client.you);
   const phase = $derived(client.phase);
+  const rated = $derived(ratedBy17Lands(sets, st?.set));
 
   onMount(() => {
     let hellos = 0;
@@ -55,6 +58,9 @@
       }
       client.handleFrame(f);
     });
+    listEventSets()
+      .then((l) => (sets = l ?? []))
+      .catch(() => {});
     void client.load().then(() => {
       if (client.unauthorised) forgetEventSeat(event);
       void session.watchEvent(event, client.token);
@@ -123,7 +129,7 @@
       <LobbyView ev={st} canJoin={you !== null && !client.joined} busy={client.busy} error={client.error} bind:name onjoin={join} />
     {:else if st.phase === 'DRAFT'}
       {#if you !== null}
-        <DraftView {client} {facts} />
+        <DraftView {client} {rated} />
       {:else}
         <section class="ev-main">
           <h2>Drafting</h2>
@@ -133,7 +139,7 @@
       {/if}
     {:else if st.phase === 'BUILD'}
       {#if you !== null && builder}
-        <BuildView {builder} ev={st} {facts} />
+        <BuildView {builder} ev={st} {rated} />
       {:else}
         <section class="ev-main">
           <h2>Building decks</h2>

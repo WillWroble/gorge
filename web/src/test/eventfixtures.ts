@@ -6,9 +6,26 @@
  */
 import { vi } from 'vitest';
 import type { DraftCard, DraftPack, EventPool, EventState } from '../protocol';
-import type { CardFacts } from '../lib/draftcards';
 
-export const card = (id: string, name: string, rarity = 'C'): DraftCard => ({ id, name, set: 'FDN', number: '1', rarity });
+/**
+ * WIRE is the printed facts the server puts on each DraftCard (E1-8), in its
+ * wire spelling: a Forge-notation cost, the mana value (omitted at zero),
+ * the colour identity as a WUBRG subset and the space-joined type line. A
+ * name missing here arrives with no facts, as a card the server's corpus
+ * does not know would.
+ */
+export const WIRE: Record<string, Pick<DraftCard, 'mana_cost' | 'mana_value' | 'colors' | 'type_line'>> = {
+  'Serra Angel': { mana_cost: '3 W W', mana_value: 5, colors: 'W', type_line: 'Creature Angel' },
+  'Lightning Bolt': { mana_cost: 'R', mana_value: 1, colors: 'R', type_line: 'Instant' },
+  'Llanowar Elves': { mana_cost: 'G', mana_value: 1, colors: 'G', type_line: 'Creature Elf Druid' },
+  'Giant Growth': { mana_cost: 'G', mana_value: 1, colors: 'G', type_line: 'Instant' },
+  'Shivan Dragon': { mana_cost: '4 R R', mana_value: 6, colors: 'R', type_line: 'Creature Dragon' },
+  'Evolving Wilds': { type_line: 'Land' },
+  'Ornithopter': { type_line: 'Artifact Creature Thopter' },
+  'Fusion Elemental': { mana_cost: 'W U B R G', mana_value: 5, colors: 'WUBRG', type_line: 'Creature Elemental' },
+};
+
+export const card = (id: string, name: string, rarity = 'C'): DraftCard => ({ id, name, set: 'FDN', number: '1', rarity, ...WIRE[name] });
 
 export function eventState(over: Partial<EventState> = {}): EventState {
   return {
@@ -55,15 +72,6 @@ export function eventPool(over: Partial<EventPool> = {}): EventPool {
     ...over,
   };
 }
-
-export const FACTS: Record<string, CardFacts> = {
-  'Serra Angel': { mv: 5, colours: ['W'], land: false, creature: true, cost: '3 W W', types: 'Creature — Angel' },
-  'Lightning Bolt': { mv: 1, colours: ['R'], land: false, creature: false, cost: 'R', types: 'Instant' },
-  'Llanowar Elves': { mv: 1, colours: ['G'], land: false, creature: true, cost: 'G', types: 'Creature — Elf Druid' },
-  'Giant Growth': { mv: 1, colours: ['G'], land: false, creature: false, cost: 'G', types: 'Instant' },
-  'Shivan Dragon': { mv: 6, colours: ['R'], land: false, creature: true, cost: '4 R R', types: 'Creature — Dragon' },
-  'Evolving Wilds': { mv: 0, colours: [], land: true, creature: false, cost: '', types: 'Land' },
-};
 
 export interface Recorded {
   method: string;

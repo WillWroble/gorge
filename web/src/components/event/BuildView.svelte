@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { EventState } from '../../protocol';
-  import type { CardFactsStore } from '../../lib/cardfacts.svelte';
   import { basicsTotal, STEPPER_MAX, type DeckBuilder, type Zone } from '../../lib/deckbuild.svelte';
-  import { BASIC_NAMES, COLOUR_FILTERS, COLOURS, passesFilter, seatLabel } from '../../lib/draftcards';
+  import { BASIC_NAMES, COLOUR_FILTERS, COLOURS, factsOf, passesFilter, seatLabel } from '../../lib/draftcards';
   import MvColumns from './MvColumns.svelte';
   import Attribution from './Attribution.svelte';
 
@@ -15,23 +14,19 @@
    * The count, validity and error shown are the server's DeckCheck for the
    * current working copy, never a client-side verdict.
    */
-  let { builder, ev, facts }: { builder: DeckBuilder; ev: EventState | null; facts: CardFactsStore } = $props();
+  let { builder, ev, rated = true }: { builder: DeckBuilder; ev: EventState | null; rated?: boolean } = $props();
 
   const you = $derived(ev?.you ?? null);
   const deckCards = $derived(builder.deckCards);
-  const sideCards = $derived(builder.sideCards.filter((c) => passesFilter(builder.filter, facts.of(c.name))));
+  const sideCards = $derived(builder.sideCards.filter((c) => passesFilter(builder.filter, factsOf(c))));
   const check = $derived(builder.check);
-  const spells = $derived(deckCards.filter((c) => !facts.of(c.name).land).length);
+  const spells = $derived(deckCards.filter((c) => !factsOf(c).land).length);
   const lands = $derived(deckCards.length - spells + basicsTotal(builder.basics));
-
-  $effect(() => {
-    facts.want(builder.pool.map((c) => c.name));
-  });
 
   const curve = $derived.by(() => {
     const out = [0, 0, 0, 0, 0, 0, 0];
     for (const c of deckCards) {
-      const f = facts.of(c.name);
+      const f = factsOf(c);
       if (f.land || f.mv === null) continue;
       out[Math.min(f.mv, 6)]++;
     }
@@ -42,7 +37,7 @@
   const pips = $derived.by(() => {
     const out = [0, 0, 0, 0, 0];
     for (const c of deckCards) {
-      const f = facts.of(c.name);
+      const f = factsOf(c);
       if (f.land) continue;
       for (const tok of f.cost.split(' ')) for (const ch of tok) {
         const i = COLOURS.indexOf(ch as (typeof COLOURS)[number]);
@@ -96,7 +91,7 @@
         <span class="data dim">{spells} spells · {lands} lands</span>
       </div>
       {#if deckCards.length === 0}<p class="dim small">Drag cards here, or tap one in the pool.</p>{/if}
-      <MvColumns cards={deckCards} {facts} draggable onactivate={(id) => builder.move(id, 'side')} label="Deck cards" />
+      <MvColumns cards={deckCards} draggable onactivate={(id) => builder.move(id, 'side')} label="Deck cards" />
     </div>
     <div
       class="zone"
@@ -117,9 +112,9 @@
           {/each}
         </div>
       </div>
-      <MvColumns cards={sideCards} {facts} draggable onactivate={(id) => builder.move(id, 'deck')} label="Pool cards" />
+      <MvColumns cards={sideCards} draggable onactivate={(id) => builder.move(id, 'deck')} label="Pool cards" />
     </div>
-    <Attribution what="Pick ratings and the suggested deck" />
+    {#if rated}<Attribution what="Pick ratings and the suggested deck" />{/if}
   </section>
 
   <aside class="ev-rail">

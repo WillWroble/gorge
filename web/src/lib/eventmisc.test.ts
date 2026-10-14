@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eventSeatFor, forgetEventSeat } from './eventseat';
 import { cardNames, countNames, pickHistory, revealDecks } from './eventlog';
 import { pct, record, standingRows } from './standings';
-import { createRequest, eventPolicies } from './newevent';
-import { eventState } from '../test/eventfixtures';
-import type { BotPolicyInfo, EventSeries } from '../protocol';
+import { createRequest, eventPolicies, ratedBy17Lands, setNote } from './newevent';
+import { createEvent, listEventPersonas, listEventSets } from './eventapi';
+import { eventState, fakeFetch } from '../test/eventfixtures';
+import type { BotPolicyInfo, EventSeries, EventSetInfo } from '../protocol';
+
+afterEach(() => vi.unstubAllGlobals());
 
 function memStorage(): Storage {
   const m = new Map<string, string>();
@@ -36,7 +39,7 @@ describe('eventSeatFor', () => {
 });
 
 describe('eventlog reveal', () => {
-  // build.Deck carries no JSON tags on the server, so DeckSaved's deck is {Main, Basics}.
+  // build.Deck's JSON tags are snake_case: DeckSaved's deck is {main, basics}, main omitted when empty.
   const log = [
     { kind: 'EventCreated', seed: 7, set: 'FDN' },
     { kind: 'PackOpened', round: 1, cards: [{ id: 'c1', name: 'Serra Angel' }, { id: 'c2', name: 'Lightning Bolt' }] },
@@ -44,9 +47,9 @@ describe('eventlog reveal', () => {
     { kind: 'Picked', round: 1, pick_no: 1, id: 'c1' },
     { kind: 'Picked', round: 1, pick_no: 1, seat: 1, id: 'c3', auto: true },
     { kind: 'Picked', round: 1, pick_no: 2, id: 'c4' },
-    { kind: 'DeckSaved', rev: 1, deck: { Main: ['c1'], Basics: [17, 0, 0, 0, 0] } },
-    { kind: 'DeckSaved', rev: 2, deck: { Main: ['c1', 'c4'], Basics: [16, 0, 0, 0, 0] } },
-    { kind: 'DeckSaved', seat: 1, rev: 1, deck: { Main: ['c3', 'c2'], Basics: [0, 0, 0, 20, 0] } },
+    { kind: 'DeckSaved', rev: 1, deck: { main: ['c1'], basics: [17, 0, 0, 0, 0] } },
+    { kind: 'DeckSaved', rev: 2, deck: { main: ['c1', 'c4'], basics: [16, 0, 0, 0, 0] } },
+    { kind: 'DeckSaved', seat: 1, rev: 1, deck: { main: ['c3', 'c2'], basics: [0, 0, 0, 20, 0] } },
   ];
   it('maps ids to names from the opened packs', () => {
     expect(cardNames(log).get('c4')).toBe('Shock');
@@ -62,8 +65,13 @@ describe('eventlog reveal', () => {
     expect(pickHistory(log, 0).map((p) => p.name)).toEqual(['Serra Angel', 'Shock']);
     expect(pickHistory(log, 1)).toEqual([{ round: 1, pickNo: 1, name: 'Lightning Bolt', auto: true }]);
   });
+  it('a basics-only deck (main omitted) still reveals its lands', () => {
+    expect(revealDecks([{ kind: 'DeckSaved', seat: 3, rev: 1, deck: { basics: [0, 0, 0, 0, 40] } }])).toEqual([
+      { seat: 3, rev: 1, cards: [], basics: [{ name: 'Forest', count: 40 }], total: 40 },
+    ]);
+  });
   it('a redacted (pre-COMPLETE) log reveals nothing it hides', () => {
-    expect(revealDecks([{ kind: 'DeckSaved', seat: 2, rev: 1, deck: { Main: null, Basics: [0, 0, 0, 0, 0] } }])).toEqual([]);
+    expect(revealDecks([{ kind: 'DeckSaved', seat: 2, rev: 1, deck: { basics: [0, 0, 0, 0, 0] } }])).toEqual([]);
   });
 });
 
@@ -109,25 +117,45 @@ describe('create request', () => {
   });
 });
 
-describe('CardFactsStore', () => {
-  it('resolves each name once, and asks again only after a null (the catalog may have been backed off)', async () => {
-    const { CardFactsStore } = await import('./cardfacts.svelte');
-    const asked: string[] = [];
-    let online = false;
-    const store = new CardFactsStore(async (n) => {
-      asked.push(n);
-      return online ? { name: n, mana_cost: '{1}{G}', type_line: 'Creature — Elf' } : null;
+describe('create request: personas, no seed', () => {
+  it('names a bot\'s pickbot persona only when one was chosen', () => {
+    expect(createRequest('BLB', ['', 'bot', ''], ['best23', '', 'rating-colour'])).toEqual({
+      set: 'BLB',
+      seats: [{ kind: 'human' }, { kind: 'bot', drafter: 'best23' }, { kind: 'bot', policy: 'bot' }, { kind: 'bot', drafter: 'rating-colour' }],
     });
-    store.want(['Elf']);
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(store.of('Elf').mv).toBeNull();
-    online = true;
-    store.want(['Elf']);
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(store.of('Elf')).toMatchObject({ mv: 2, colours: ['G'], creature: true });
-    store.want(['Elf']);
-    expect(asked).toEqual(['Elf', 'Elf']);
+  });
+  it('never sends a seed (the server mints it; an unknown field is a 400)', async () => {
+    const { calls } = fakeFetch({ 'POST /api/events': { body: { event: 'e9', invites: [], state: eventState() } } });
+    await createEvent(createRequest('FDN', ['', '', ''], ['', '', '']));
+    expect(calls).toHaveLength(1);
+    const body = calls[0].body as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['seats', 'set']);
+    expect(JSON.stringify(body)).not.toContain('seed');
+  });
+});
+
+describe('event discovery', () => {
+  const sets: EventSetInfo[] = [
+    { code: 'BLB', name: 'Bloomburrow', pack_size: 14, ratings: 'heuristic' },
+    { code: 'FDN', name: 'Foundations', pack_size: 14, ratings: '17lands' },
+  ];
+  it('reads the server\'s set catalogue and persona list', async () => {
+    const { calls } = fakeFetch({
+      'GET /api/events/sets': { body: sets },
+      'GET /api/events/personas': { body: { drafters: ['best23', 'rating-colour'], builders: ['best23', 'rating-colour'] } },
+    });
+    expect(await listEventSets()).toEqual(sets);
+    expect((await listEventPersonas()).drafters).toEqual(['best23', 'rating-colour']);
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['GET /api/events/sets', 'GET /api/events/personas']);
+    expect(calls.every((c) => c.auth === null)).toBe(true);
+  });
+  it('credits 17Lands only for a 17lands-rated set', () => {
+    expect(setNote(sets[1])).toBe('14-card packs · ratings: 17Lands');
+    expect(setNote(sets[0])).toBe('14-card packs · ratings: card heuristic');
+    expect(ratedBy17Lands(sets, 'FDN')).toBe(true);
+    expect(ratedBy17Lands(sets, 'BLB')).toBe(false);
+    // Unknown (catalogue not loaded, or unlisted): keep the credit.
+    expect(ratedBy17Lands(null, 'BLB')).toBe(true);
+    expect(ratedBy17Lands(sets, 'XYZ')).toBe(true);
   });
 });

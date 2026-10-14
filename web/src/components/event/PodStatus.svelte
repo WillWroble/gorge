@@ -5,8 +5,9 @@
   /**
    * The pod (mockup 3b rail): one box per seat with its public pick count
    * and how many packs wait in its queue. Picks come from the live
-   * pod_progress frame when one has arrived, else from EventState; queue
-   * counts exist only in pod_progress, so they read "—" until the first one.
+   * pod_progress frame (the server sends one as the stream subscribes), else
+   * from EventState; queue counts exist only in pod_progress, so a seat
+   * whose count has not arrived simply shows its picks.
    */
   let { seats, you, progress = null }: { seats: EventSeat[]; you: number | null; progress?: PodProgress | null } = $props();
 
@@ -20,7 +21,7 @@
     <div class="seat" class:me={s.seat === you}>
       <b>{seatLabel(s.seat, s.name, you)}</b>
       <span class="data dim">{s.kind === 'bot' ? `bot · ${s.policy ?? ''}` : s.joined ? 'human' : 'human · not joined'}</span>
-      <span class="data dim">picks {picks} · queued {queued ?? '—'}</span>
+      <span class="data dim">picks {picks}{queued !== undefined ? ` · queued ${queued}` : ''}</span>
       {#if queued !== undefined}
         <span class="qdots" aria-label={`${queued} packs queued`}>
           {#each Array(MAX_DOTS) as _, j (j)}<i class:on={j < queued}></i>{/each}

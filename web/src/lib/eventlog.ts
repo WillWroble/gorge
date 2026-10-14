@@ -4,8 +4,9 @@
  * in order. The server redacts other seats' packs, picks and decks until the
  * event is COMPLETE; before then these readers simply find less.
  *
- * The entries are the server's event.Entry JSON. build.Deck carries no JSON
- * tags, so a DeckSaved's deck arrives as {"Main": [...], "Basics": [...]}.
+ * The entries are the server's event.Entry JSON. A DeckSaved's deck is
+ * build.Deck, {"main": [...], "basics": [W, U, B, R, G]}, with "main"
+ * omitted when the deck has no non-basic cards (or the line is redacted).
  */
 
 import { BASIC_NAMES } from './draftcards';
@@ -27,7 +28,7 @@ interface EntryJSON {
   rev?: number;
   auto?: boolean;
   cards?: CardRefJSON[];
-  deck?: { Main?: string[] | null; Basics?: number[] };
+  deck?: { main?: string[] | null; basics?: number[] };
 }
 
 export interface RevealedDeck {
@@ -68,8 +69,8 @@ export function revealDecks(raw: unknown[]): RevealedDeck[] {
   return [...last.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([seat, e]) => {
-      const main = e.deck?.Main ?? [];
-      const b = e.deck?.Basics ?? [];
+      const main = e.deck?.main ?? [];
+      const b = e.deck?.basics ?? [];
       const basics = BASIC_NAMES.map((name, i) => ({ name, count: b[i] ?? 0 })).filter((x) => x.count > 0);
       return {
         seat,

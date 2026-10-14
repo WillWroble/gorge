@@ -8,9 +8,9 @@ import LobbyView from './LobbyView.svelte';
 import PhaseRail from './PhaseRail.svelte';
 import { EventClient } from '../../lib/draftevent.svelte';
 import { DeckBuilder } from '../../lib/deckbuild.svelte';
-import { CardFactsStore } from '../../lib/cardfacts.svelte';
 import { standingRows } from '../../lib/standings';
-import { draftPack, eventPool, eventState, FACTS } from '../../test/eventfixtures';
+import { card, draftPack, eventPool, eventState } from '../../test/eventfixtures';
+import PodStatus from './PodStatus.svelte';
 import type { EventSeries, Frame } from '../../protocol';
 
 // SSR via svelte/server, the repo's component-test convention: no DOM, no
@@ -23,7 +23,6 @@ vi.mock('../../lib/images', () => ({ images: { url: () => new Promise<string | n
 
 afterEach(() => vi.unstubAllGlobals());
 
-const facts = () => new CardFactsStore(async () => null, FACTS);
 const frame = (t: string, body: unknown): Frame => ({ v: 1, t, seq: 0, body });
 
 function drafting() {
@@ -35,7 +34,7 @@ function drafting() {
 
 describe('DraftView', () => {
   it('renders the pick header, the pack, the pool by mana value and the 17Lands credit', () => {
-    const { body } = render(DraftView, { props: { client: drafting(), facts: facts() } });
+    const { body } = render(DraftView, { props: { client: drafting() } });
     expect(body).toContain('Pack 1 · Pick 3');
     expect(body).toContain('3 cards');
     expect(body).toContain('opened by Seat 3 · Bot 3 (bot)'); // pick 3 of a left pass came two seats round
@@ -51,7 +50,7 @@ describe('DraftView', () => {
   it('a selected card enables Take, names it, and shows in the inspector', () => {
     const c = drafting();
     c.select('c11');
-    const { body } = render(DraftView, { props: { client: c, facts: facts() } });
+    const { body } = render(DraftView, { props: { client: c } });
     expect(body).toContain('Take Shivan Dragon');
     expect(body).not.toMatch(/data-testid="take"[^>]*disabled/);
     expect(body).toMatch(/aria-selected="true"[^>]*data-id="c11"|data-id="c11"[^>]*aria-selected="true"/);
@@ -62,7 +61,7 @@ describe('DraftView', () => {
     const c = new EventClient('e1', { seat: 0, token: 't' });
     c.handleFrame(frame('event_state', eventState()));
     c.handleFrame(frame('draft_pack', draftPack({ round: 2, pick_no: 2 })));
-    const { body } = render(DraftView, { props: { client: c, facts: facts() } });
+    const { body } = render(DraftView, { props: { client: c } });
     expect(body).toContain('passing right →');
     expect(body).toContain('opened by Seat 2');
   });
@@ -70,7 +69,7 @@ describe('DraftView', () => {
   it('shows the stale-pick notice the client set', () => {
     const c = drafting();
     c.notice = 'That pack moved on before your pick landed — here is the pack you hold now.';
-    const { body } = render(DraftView, { props: { client: c, facts: facts() } });
+    const { body } = render(DraftView, { props: { client: c } });
     expect(body).toContain('That pack moved on');
   });
 
@@ -78,10 +77,49 @@ describe('DraftView', () => {
     const c = drafting();
     c.handleFrame(frame('draft_pack', draftPack({ waiting: true, pack: [] })));
     c.handleFrame(frame('pod_progress', { event: 'e1', round: 1, picks: [4, 3, 3, 3], queued: [0, 1, 2, 0] }));
-    const { body } = render(DraftView, { props: { client: c, facts: facts() } });
+    const { body } = render(DraftView, { props: { client: c } });
     expect(body).toContain('Waiting for the next pack');
     expect(body).toContain('picks 3 · queued 2');
     expect(body).toContain('picks 4 · queued 0');
+  });
+  it('lays the pool out by the wire\'s mana value and colours, and asks the network for nothing', () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('no fetch expected')));
+    vi.stubGlobal('fetch', fetch);
+    const c = new EventClient('e1', { seat: 0, token: 't' });
+    c.handleFrame(frame('event_state', eventState()));
+    c.handleFrame(frame('draft_pack', draftPack({ pool: [card('c1', 'Serra Angel'), card('c2', 'Lightning Bolt'), card('c3', 'Evolving Wilds')] })));
+    c.select('c11');
+    const { body } = render(DraftView, { props: { client: c } });
+    // Serra Angel in the 5 column, Bolt in 0–1, Wilds under Land; no "?" column.
+    expect(body).toMatch(/>5<\/span>[\s\S]*?data-id="c1"/);
+    expect(body).toMatch(/>0–1<\/span>[\s\S]*?data-id="c2"/);
+    expect(body).toMatch(/>Land<\/span>[\s\S]*?data-id="c3"/);
+    expect(body).not.toMatch(/>\?<\/span>/);
+    expect(body).toContain('ev-tint-W');
+    expect(body).toContain('Creature Dragon'); // the inspector's type line is the wire's
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('a card the server sent no facts for is the only thing in "?"', () => {
+    const c = new EventClient('e1', { seat: 0, token: 't' });
+    c.handleFrame(frame('event_state', eventState()));
+    c.handleFrame(frame('draft_pack', draftPack({ pool: [card('c1', 'Serra Angel'), card('c9', 'Mystery Card')] })));
+    const { body } = render(DraftView, { props: { client: c } });
+    expect(body).toMatch(/>\?<\/span>[\s\S]*?data-id="c9"/);
+  });
+
+  it('a heuristic-rated set carries no 17Lands credit', () => {
+    const { body } = render(DraftView, { props: { client: drafting(), rated: false } });
+    expect(body).not.toContain('17Lands');
+  });
+});
+
+describe('PodStatus', () => {
+  it('shows picks alone until a seat\'s queue count arrives — no placeholder dash', () => {
+    const { body } = render(PodStatus, { props: { seats: eventState().seats, you: 0, progress: null } });
+    expect(body).toContain('picks 2');
+    expect(body).not.toContain('queued');
+    expect(body).not.toContain('—');
   });
 });
 
@@ -95,7 +133,7 @@ describe('BuildView', () => {
   it('renders the two zones, the chips, the steppers and the server\'s deck check verbatim', () => {
     const b = builder();
     b.check = { valid: false, total: 19, error: 'build: deck has 19 cards, needs at least 40', auto_lands: [0, 0, 0, 10, 11] };
-    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }), facts: facts() } });
+    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }) } });
     expect(body).toContain('data-testid="zone-deck"');
     expect(body).toContain('data-testid="zone-side"');
     expect(body).toContain('Colourless');
@@ -113,7 +151,7 @@ describe('BuildView', () => {
   it('a valid server check enables Ready', () => {
     const b = builder();
     b.check = { valid: true, total: 40, auto_lands: [0, 0, 0, 19, 19] };
-    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }), facts: facts() } });
+    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }) } });
     expect(body).toContain('The server accepts this deck.');
     expect(body).not.toMatch(/data-testid="ready"[^>]*disabled/);
   });
@@ -121,16 +159,29 @@ describe('BuildView', () => {
   it('the colour filter narrows the pool zone only', () => {
     const b = builder();
     b.setFilter('W');
-    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }), facts: facts() } });
+    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }) } });
     expect(body).toContain('Serra Angel'); // white, in the pool
     expect(body).not.toContain('Giant Growth'); // green, in the pool: filtered out
     expect(body).toContain('Lightning Bolt'); // in the deck: never filtered
   });
 
+  it('curve, pips and the spell/land split come from the wire facts', () => {
+    const b = builder();
+    b.move('c1', 'deck'); // Serra Angel joins Bolt and Elves
+    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }) } });
+    expect(body).toContain('3 spells');
+    expect(body).not.toMatch(/>\?<\/span>/);
+  });
+
+  it('a heuristic-rated set carries no 17Lands credit', () => {
+    const { body } = render(BuildView, { props: { builder: builder(), ev: eventState({ phase: 'BUILD' }), rated: false } });
+    expect(body).not.toContain('17Lands');
+  });
+
   it('a save refusal is shown as the server worded it', () => {
     const b = builder();
     b.error = 'eventhost: build: deck has 19 cards, needs at least 40';
-    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }), facts: facts() } });
+    const { body } = render(BuildView, { props: { builder: b, ev: eventState({ phase: 'BUILD' }) } });
     expect(body).toMatch(/data-testid="build-error"[^>]*>eventhost: build: deck has 19 cards/);
   });
 });
@@ -177,9 +228,21 @@ describe('HubView and Standings', () => {
     expect(body).toContain('MTR Appendix C');
   });
 
-  it('standings with no rows say so', () => {
+  it('standings with no rows (the server sends none before the first result) say so, with no table', () => {
     const { body } = render(Standings, { props: { rows: [] } });
     expect(body).toContain('No results yet.');
+    expect(body).toContain('data-testid="standings-empty"');
+    expect(body).not.toContain('<table');
+    expect(body).not.toContain('data-seat=');
+  });
+
+  it('a hub before any result (standings null or []) shows the empty state, not zero rows', () => {
+    for (const standings of [[], null]) {
+      const ev = eventState({ phase: 'ROUND1', round: 1, standings: standings as unknown as [] });
+      const { body } = render(HubView, { props: { ev } });
+      expect(body).toContain('No results yet.');
+      expect(body).not.toContain('data-seat=');
+    }
   });
 
   it('COMPLETE shows final standings and the revealed decks from the log', () => {
@@ -187,7 +250,7 @@ describe('HubView and Standings', () => {
     const log = [
       { kind: 'PackOpened', round: 1, cards: [{ id: 'c1', name: 'Serra Angel' }] },
       { kind: 'Picked', round: 1, pick_no: 1, id: 'c1' },
-      { kind: 'DeckSaved', rev: 1, deck: { Main: ['c1'], Basics: [39, 0, 0, 0, 0] } },
+      { kind: 'DeckSaved', rev: 1, deck: { main: ['c1'], basics: [39, 0, 0, 0, 0] } },
     ];
     const { body } = render(HubView, { props: { ev, log } });
     expect(body).toContain('Event complete');

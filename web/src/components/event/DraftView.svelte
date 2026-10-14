@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { EventClient } from '../../lib/draftevent.svelte';
-  import type { CardFactsStore } from '../../lib/cardfacts.svelte';
-  import { cardView, openedBy, passDirection, rarityLabel, seatLabel, COLOURS, tint } from '../../lib/draftcards';
+  import { cardView, factsOf, openedBy, passDirection, rarityLabel, seatLabel, COLOURS, tint } from '../../lib/draftcards';
   import CardImage from '../CardImage.svelte';
   import MvColumns from './MvColumns.svelte';
   import PodStatus from './PodStatus.svelte';
@@ -13,7 +12,7 @@
    * pick it. The pick is an intent — (round, pick_no, id) — and the screen
    * then shows whatever pack the server says the seat holds.
    */
-  let { client, facts }: { client: EventClient; facts: CardFactsStore } = $props();
+  let { client, rated = true }: { client: EventClient; rated?: boolean } = $props();
 
   const pack = $derived(client.pack);
   const ev = $derived(client.state);
@@ -21,18 +20,14 @@
   const cards = $derived(pack && !pack.waiting ? pack.pack : []);
   const pool = $derived(pack?.pool ?? []);
   const selected = $derived(cards.find((c) => c.id === client.selected) ?? null);
+  const selectedFacts = $derived(selected ? factsOf(selected) : null);
   const round = $derived(pack && !pack.waiting ? pack.round : (client.progress?.round ?? 0));
   const dir = $derived(passDirection(round || 1));
   const opener = $derived(pack && !pack.waiting && you !== null ? openedBy(you, pack.round, pack.pick_no) : null);
 
-  // Resolve display facts for everything on screen.
-  $effect(() => {
-    facts.want([...cards.map((c) => c.name), ...pool.map((c) => c.name)]);
-  });
-
   const colourCounts = $derived.by(() => {
     const out: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-    for (const c of pool) for (const col of facts.of(c.name).colours) out[col]++;
+    for (const c of pool) for (const col of factsOf(c).colours) out[col]++;
     return out;
   });
 
@@ -66,7 +61,7 @@
           <button
             type="button"
             role="option"
-            class="pcard ev-tint-{tint(facts.of(c.name))}"
+            class="pcard ev-tint-{tint(factsOf(c))}"
             class:sel={c.id === client.selected}
             aria-selected={c.id === client.selected}
             aria-label={`${c.name}, ${rarityLabel(c.rarity)}`}
@@ -76,7 +71,7 @@
             ondblclick={() => void client.pick(c.id)}
             onkeydown={(e) => onkey(e, c.id)}
           >
-            <CardImage card={cardView(c, facts.of(c.name))} pt={false} />
+            <CardImage card={cardView(c)} pt={false} />
             <span class="ev-rar {c.rarity}" title={rarityLabel(c.rarity)}></span>
           </button>
         {/each}
@@ -99,9 +94,9 @@
           {/each}
         </span>
       </div>
-      <MvColumns cards={pool} {facts} label="Your picks" />
+      <MvColumns cards={pool} label="Your picks" />
     </div>
-    <Attribution />
+    {#if rated}<Attribution />{/if}
   </section>
 
   <aside class="ev-rail">
@@ -112,10 +107,10 @@
     <div class="block">
       <h3 class="ev-h5">Inspect</h3>
       {#if selected}
-        <div class="big"><CardImage card={cardView(selected, facts.of(selected.name))} size="large" pt={false} /></div>
+        <div class="big"><CardImage card={cardView(selected)} size="large" pt={false} /></div>
         <p class="data dim center">
-          {facts.of(selected.name).types || selected.name}
-          {#if facts.of(selected.name).mv !== null}· MV {facts.of(selected.name).mv}{/if}
+          {selectedFacts?.types || selected.name}
+          {#if selectedFacts && selectedFacts.mv !== null}· MV {selectedFacts.mv}{/if}
           · {rarityLabel(selected.rarity)}
         </p>
       {:else}

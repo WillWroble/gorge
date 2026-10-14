@@ -1,28 +1,43 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../components/event/event.css';
-  import type { BotPolicyInfo } from '../protocol';
+  import type { BotPolicyInfo, EventSetInfo } from '../protocol';
   import { fetchBotPolicies } from '../lib/api';
-  import { createEvent } from '../lib/eventapi';
+  import { createEvent, listEventPersonas, listEventSets } from '../lib/eventapi';
   import { navigateTo } from '../lib/router';
   import { message } from '../lib/draftevent.svelte';
-  import { BOT_SEATS, EVENT_SETS, createRequest, eventPolicies } from '../lib/newevent';
+  import { BOT_SEATS, DEFAULT_PERSONA, RATINGS_17LANDS, createRequest, eventPolicies, setNote } from '../lib/newevent';
+  import Attribution from '../components/event/Attribution.svelte';
 
   /**
    * /events/new (mockup 3a): a 4-player pod, pick one, best of 1. Seat 1 is
-   * you; seats 2–4 are bots whose game policy comes from the server's
-   * offered list — which never includes a policy that reads opponents'
-   * decklists. The drafter and builder are the server's one persona today.
-   * Creating the event sends you to your own invite link.
+   * you; seats 2–4 are bots. Everything offered is the server's: the sets
+   * (GET /api/events/sets), the pickbot personas (GET /api/events/personas)
+   * and the bot game policies (/api/bot-policies, which never lists a policy
+   * that reads opponents' decklists). Creating the event sends you to your
+   * own invite link.
+   *
+   * sets0 and personas0 seed the two catalogues for the SSR test harness,
+   * where onMount never runs; production passes neither and fetches both.
    */
-  let set = $state(EVENT_SETS[0].code);
+  let { sets0 = null, personas0 = null }: { sets0?: EventSetInfo[] | null; personas0?: string[] | null } = $props();
+
+  // svelte-ignore state_referenced_locally
+  let sets = $state<EventSetInfo[] | null>(sets0);
+  // svelte-ignore state_referenced_locally
+  let personas = $state<string[]>(personas0 ?? []);
+  let setsError = $state<string | null>(null);
+  // svelte-ignore state_referenced_locally
+  let set = $state(sets0?.[0]?.code ?? '');
   let policies = $state<BotPolicyInfo[]>([]);
   let defaultPolicy = $state('');
   let botPolicy = $state<string[]>(Array(BOT_SEATS).fill(''));
+  let botDrafter = $state<string[]>(Array(BOT_SEATS).fill(''));
   let busy = $state(false);
   let error = $state<string | null>(null);
 
   const offered = $derived(eventPolicies(policies));
+  const chosen = $derived(sets?.find((s) => s.code === set) ?? null);
   const defaultLabel = $derived(policies.find((p) => p.name === defaultPolicy)?.label ?? defaultPolicy);
 
   onMount(() => {
@@ -32,6 +47,18 @@
         defaultPolicy = l.default;
       })
       .catch(() => (policies = []));
+    listEventSets()
+      .then((l) => {
+        sets = l ?? [];
+        if (!sets.some((s) => s.code === set)) set = sets[0]?.code ?? '';
+      })
+      .catch((e) => {
+        sets = [];
+        setsError = message(e);
+      });
+    listEventPersonas()
+      .then((p) => (personas = p.drafters ?? []))
+      .catch(() => (personas = []));
   });
 
   function policyLabel(p: BotPolicyInfo): string {
@@ -39,10 +66,11 @@
   }
 
   async function open() {
+    if (!set) return;
     busy = true;
     error = null;
     try {
-      const res = await createEvent(createRequest(set, botPolicy));
+      const res = await createEvent(createRequest(set, botPolicy, botDrafter));
       const mine = res.invites?.[0];
       navigateTo(mine ? mine.join : `/e/${encodeURIComponent(res.event)}`);
     } catch (e) {
@@ -80,7 +108,15 @@
             <div class="seatrow">
               <span class="idx data">{i + 2}</span>
               <span class="kind">Bot</span>
-              <span class="data dim persona">Drafter: rating + colour · Builder: best 23</span>
+              <span class="persona">
+                <select aria-label={`Seat ${i + 2} drafts as`} bind:value={botDrafter[i]} data-testid={`seat-${i + 2}-drafter`}>
+                  <option value="">Drafter: server default ({DEFAULT_PERSONA})</option>
+                  {#each personas as name (name)}
+                    <option value={name}>Drafter: {name}</option>
+                  {/each}
+                </select>
+                <span class="data dim">Builder: {botDrafter[i] || DEFAULT_PERSONA}</span>
+              </span>
               <label class="plays">
                 <span class="sr">Seat {i + 2} plays</span>
                 <select aria-label={`Seat ${i + 2} plays`} bind:value={botPolicy[i]} data-testid={`seat-${i + 2}-policy`}>
@@ -106,19 +142,26 @@
     </section>
     <aside class="ev-rail">
       <span class="ev-h5">Set</span>
-      <div class="setlist" role="radiogroup" aria-label="Set">
-        {#each EVENT_SETS as s (s.code)}
-          <label class="setopt" class:on={set === s.code}>
-            <input type="radio" name="event-set" value={s.code} bind:group={set} />
-            <span class="code data">{s.code}</span>
-            <span>{s.name}<small>{s.note}</small></span>
-          </label>
-        {/each}
+      <div class="setlist" role="radiogroup" aria-label="Set" data-testid="set-list">
+        {#if sets === null}
+          <p class="dim small">Loading the sets…</p>
+        {:else}
+          {#each sets as s (s.code)}
+            <label class="setopt" class:on={set === s.code}>
+              <input type="radio" name="event-set" value={s.code} bind:group={set} />
+              <span class="code data">{s.code}</span>
+              <span>{s.name || s.code}<small>{setNote(s)}</small></span>
+            </label>
+          {:else}
+            <p class="dim small" role="status">{setsError ? `Could not load the sets: ${setsError}` : 'This server offers no draftable sets.'}</p>
+          {/each}
+        {/if}
       </div>
       <p class="dim small">Only sets where every booster card is fully supported are offered.</p>
+      {#if chosen?.ratings === RATINGS_17LANDS}<Attribution what="Bot pick ratings" />{/if}
       <span class="sp"></span>
       {#if error}<p class="ev-error" role="alert">{error}</p>{/if}
-      <button type="button" class="ev-btn primary" data-testid="open-pod" disabled={busy} onclick={open}>{busy ? 'Opening…' : 'Open the pod'}</button>
+      <button type="button" class="ev-btn primary" data-testid="open-pod" disabled={busy || !set} onclick={open}>{busy ? 'Opening…' : 'Open the pod'}</button>
     </aside>
   </div>
 </main>
@@ -187,7 +230,14 @@
     grid-template-columns: 1.5rem 3rem minmax(0, 1fr);
   }
   .persona {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
     font-size: var(--t-11);
+  }
+  .persona select {
+    width: 100%;
   }
   .plays select {
     width: 100%;

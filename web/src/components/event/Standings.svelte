@@ -4,11 +4,18 @@
   /**
    * The standings table: the server's rows in the server's order (MTR
    * Appendix C — match points, then OMW%, GW%, OGW%, with the 33% floor).
-   * Nothing here re-ranks or recomputes a percentage.
+   * Nothing here re-ranks or recomputes a percentage. The server sends no
+   * rows until it has logged the first result (results log in pairing
+   * order, so a finished series can wait on its round-mate), and until then
+   * this says so instead of drawing an empty (or all-zero) table.
    */
   let { rows, final = false }: { rows: StandingRow[]; final?: boolean } = $props();
 </script>
 
+{#if rows.length === 0}
+  <h3 class="ev-h5 cap">{final ? 'Final standings' : 'Standings'}</h3>
+  <p class="empty" data-testid="standings-empty">No results yet. Standings appear once the server records the first result.</p>
+{:else}
 <div class="tablebox">
   <table data-testid="standings">
     <caption class="ev-h5">{final ? 'Final standings' : 'Standings'}</caption>
@@ -34,13 +41,12 @@
           <td class="data">{r.gw}</td>
           <td class="data">{r.ogw}</td>
         </tr>
-      {:else}
-        <tr><td colspan="7" class="empty">No results yet.</td></tr>
       {/each}
     </tbody>
   </table>
 </div>
 <p class="note">Order: match points, then OMW%, GW%, OGW% (MTR Appendix C, with the 33% floor).</p>
+{/if}
 
 <style>
   .tablebox {
@@ -82,7 +88,12 @@
   tr.you td:first-child {
     box-shadow: inset 2px 0 0 var(--gilt);
   }
+  .cap {
+    margin: 0 0 var(--sp-2);
+  }
   .empty {
+    margin: 0;
+    font-size: var(--t-12);
     color: var(--ink-dim);
   }
   .note {
