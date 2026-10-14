@@ -111,8 +111,8 @@ type NamedBuilder struct {
 // NamedPlayer is one resolved player policy. New builds a fresh seat for
 // one game from the seat's own seed; it may be called from several
 // goroutines at once (E5-c2's workers). ReadsDecklists marks an Env player
-// — refused by Player unless Options.AllowDecklistBots (and until E5-c5
-// even then).
+// — refused by Player unless Options.AllowDecklistBots (E5-c5 lifted the
+// refusal; the game driver then runs it through the bench Env driver).
 type NamedPlayer struct {
 	Ref AgentRef
 	New func(seed uint64) (seat.Seat, error)
@@ -189,11 +189,14 @@ func (l *Lab) Builder(ref AgentRef) (NamedBuilder, error) {
 // then the limited London mulligan heuristic for a *seat.Bot (the rule
 // cmd/draftsim's game driver applies) — and is safe to call concurrently.
 //
-// An Env policy (bots.ReadsDecklists) is refused with ErrDecklistBot:
-// without Options.AllowDecklistBots always, and with it until the bench Env
-// driver lands (E5-c5), since bench would otherwise drive the hosted
-// wrapper as a plain seat and the policy would silently play without its
-// Env.
+// An Env policy (bots.ReadsDecklists) is refused with ErrDecklistBot unless
+// Options.AllowDecklistBots is set (operator ruling 2026-10-13). With the
+// opt-in it is admitted and its NamedPlayer declares ReadsDecklists: true, so
+// the game driver runs it through the bench Env driver (Hooks.EnvSeats) and
+// manifests can mark the result. E5-c3's NewManifest sets
+// Manifest.AllowDecklistBots when Options.AllowDecklistBots and any game's
+// players include such a ref; the detection is bots.ReadsDecklists over each
+// ref's name (strip the "@version", bots.Normalize).
 func (l *Lab) Player(ref AgentRef) (NamedPlayer, error) {
 	name, err := bots.Normalize(ref.Name)
 	if err != nil {
@@ -203,11 +206,9 @@ func (l *Lab) Player(ref AgentRef) (NamedPlayer, error) {
 	if err != nil {
 		return NamedPlayer{}, err
 	}
-	if bots.ReadsDecklists(name) {
-		if !l.opts.AllowDecklistBots {
-			return NamedPlayer{}, fmt.Errorf("%w: policy %q reads every seat's real decklist (bots.Info.Env); the lab's AllowDecklistBots opt-in (operator ruling 2026-10-13) is off", ErrDecklistBot, name)
-		}
-		return NamedPlayer{}, fmt.Errorf("%w: policy %q: Env players need the bench Env driver (E5-c5)", ErrDecklistBot, name)
+	readsDecklists := bots.ReadsDecklists(name)
+	if readsDecklists && !l.opts.AllowDecklistBots {
+		return NamedPlayer{}, fmt.Errorf("%w: policy %q reads every seat's real decklist (bots.Info.Env); the lab's AllowDecklistBots opt-in (operator ruling 2026-10-13) is off", ErrDecklistBot, name)
 	}
 	return NamedPlayer{
 		Ref: AgentRef{Name: ref.Name, Version: v},
@@ -225,7 +226,7 @@ func (l *Lab) Player(ref AgentRef) (NamedPlayer, error) {
 			}
 			return st, nil
 		},
-		ReadsDecklists: false,
+		ReadsDecklists: readsDecklists,
 	}, nil
 }
 

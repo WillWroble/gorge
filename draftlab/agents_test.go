@@ -99,8 +99,8 @@ func TestAgentResolution(t *testing.T) {
 		t.Errorf("unknown player err = %v, want ErrUnknownAgent", err)
 	}
 
-	// Players: the bot policy resolves; an Env policy is refused unless
-	// opted in, and even then.
+	// Players: the bot policy resolves; an Env policy is refused without the
+	// opt-in and admitted (ReadsDecklists true) with it.
 	bot, err := l.Player(AgentRef{Name: "bot"})
 	if err != nil {
 		t.Fatalf("Player(bot): %v", err)
@@ -111,15 +111,19 @@ func TestAgentResolution(t *testing.T) {
 	if st, err := bot.New(1); err != nil || st == nil {
 		t.Errorf("player New: seat %v err %v", st, err)
 	}
-	for _, opts := range []Options{{}, {AllowDecklistBots: true}} {
-		l2, err := Open(testutil.CorpusDirOrSkip(t), opts)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = l2.Player(AgentRef{Name: "sb-tactical"})
-		if !errors.Is(err, ErrDecklistBot) {
-			t.Errorf("Env policy (AllowDecklistBots=%v) err = %v, want ErrDecklistBot", opts.AllowDecklistBots, err)
-		}
+	if _, err := l.Player(AgentRef{Name: "sb-tactical"}); !errors.Is(err, ErrDecklistBot) {
+		t.Errorf("Env policy without opt-in: err = %v, want ErrDecklistBot", err)
+	}
+	l2, err := Open(testutil.CorpusDirOrSkip(t), Options{AllowDecklistBots: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := l2.Player(AgentRef{Name: "sb-tactical"})
+	if err != nil {
+		t.Fatalf("Env policy with opt-in: %v", err)
+	}
+	if !env.ReadsDecklists {
+		t.Error("Env policy with opt-in: ReadsDecklists = false, want true")
 	}
 }
 

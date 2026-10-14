@@ -173,13 +173,10 @@ func TestPlayRefusals(t *testing.T) {
 	} else if strings.Contains(err.Error(), "E5-c5") {
 		t.Errorf("Env player without opt-in: got the E5-c5 error %q, want the opt-in refusal", err)
 	}
-	// With the opt-in: refused until the bench Env driver lands (E5-c5).
+	// With the opt-in: admitted; the game plays (E5-c5 lifted the refusal).
 	l2 := testLabOpts(t, Options{AllowDecklistBots: true})
-	_, err := l2.PlayGame(env, es[1], 2)
-	if !errors.Is(err, ErrDecklistBot) {
-		t.Errorf("Env player with opt-in: err = %v, want ErrDecklistBot", err)
-	} else if !strings.Contains(err.Error(), "E5-c5") {
-		t.Errorf("Env player with opt-in: err = %q, want the E5-c5 driver error", err)
+	if _, err := l2.PlayGame(env, es[1], 2); err != nil {
+		t.Errorf("Env player with opt-in: err = %v, want a played game", err)
 	}
 }
 

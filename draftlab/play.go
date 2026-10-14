@@ -85,13 +85,14 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 	if err != nil {
 		return GameResult{}, fmt.Errorf("draftlab: seat 1: %w", err)
 	}
-	if err := l.envGate([2]NamedPlayer{a.Player, b.Player}, [2]seat.Seat{s0, s1}); err != nil {
+	env, err := l.envGate([2]NamedPlayer{a.Player, b.Player}, [2]seat.Seat{s0, s1})
+	if err != nil {
 		return GameResult{}, err
 	}
 
 	var mulligans [2]int
 	cfg := l.gameConfig(names, seed, deckA, deckB)
-	oc, eng, err := bench.PlayGame(cfg, []seat.Seat{s0, s1}, l.maxTurns(), l.maxIntents(), bench.Hooks{
+	hooks := bench.Hooks{
 		NewEngine: rules.NewStartingPlayerChoice,
 		Setup:     func(e *rules.Engine) { e.AskStartingPlayer() },
 		Decision: func(seatIdx int, d *decision.Decision, in decision.Intent, _ *botpolicy.Board) error {
@@ -104,7 +105,12 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 			}
 			return nil
 		},
-	})
+	}
+	if env {
+		hooks.EnvSeats = true
+		hooks.HonestRoot = true
+	}
+	oc, eng, err := bench.PlayGame(cfg, []seat.Seat{s0, s1}, l.maxTurns(), l.maxIntents(), hooks)
 	if err != nil {
 		return GameResult{}, fmt.Errorf("draftlab: seed %d: %w", seed, err)
 	}
@@ -145,37 +151,51 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 	return res, nil
 }
 
-// envGate refuses an Env player: a NamedPlayer that declares ReadsDecklists,
-// or whose constructed seat implements bots.EnvSeat (fail closed). Without
-// Options.AllowDecklistBots it is always refused with ErrDecklistBot; even
-// with the opt-in it is refused until the bench Env driver lands (E5-c5),
-// because bench would otherwise drive the hosted wrapper as a plain seat and
-// the policy would silently play without its Env. E5-c5 changes this one
-// function.
-func (l *Lab) envGate(players [2]NamedPlayer, seats [2]seat.Seat) error {
-	return l.envGateList(players[:], seats[:])
+// envGate refuses an Env player unless Options.AllowDecklistBots is set, and
+// reports whether either player reads every seat's real decklist (a
+// NamedPlayer that declares ReadsDecklists, or whose constructed seat
+// implements bots.EnvSeat -- fail closed). With the opt-in such a game runs
+// through the bench Env driver (Hooks.EnvSeats, E5-c5), so the hosted wrapper
+// is driven with its bots.Env instead of silently playing without it; the
+// returned bit is what selects those hooks.
+func (l *Lab) envGate(players [2]NamedPlayer, seats [2]seat.Seat) (bool, error) {
+	return l.envGateResult(players[:], seats[:])
 }
 
 // envGateList is envGate over a player list: the event driver gates every
 // seat's player before any game runs (seats nil then — no seat is
-// constructed yet), while playGame gates the two players it constructed.
+// constructed yet), while playGame gates the two players it constructed. It
+// drops envGate's bit: the event driver only needs the admit-or-refuse
+// verdict.
 func (l *Lab) envGateList(players []NamedPlayer, seats []seat.Seat) error {
+	_, err := l.envGateResult(players, seats)
+	return err
+}
+
+// envGateResult is the one home for the Env gate: it fails closed on a
+// NamedPlayer that declares ReadsDecklists or a constructed seat that
+// implements bots.EnvSeat, refuses the first such player without the
+// AllowDecklistBots opt-in, and reports whether any player reads every seat's
+// real decklist. E5-c5 lifted the refusal: with the opt-in the player is
+// admitted, and the returned bit selects the bench Env driver.
+func (l *Lab) envGateResult(players []NamedPlayer, seats []seat.Seat) (bool, error) {
+	env := false
 	for i := 0; i < len(players); i++ {
-		env := players[i].ReadsDecklists
+		reads := players[i].ReadsDecklists
 		if i < len(seats) {
 			if _, ok := seats[i].(bots.EnvSeat); ok {
-				env = true
+				reads = true
 			}
 		}
-		if !env {
+		if !reads {
 			continue
 		}
+		env = true
 		if !l.opts.AllowDecklistBots {
-			return fmt.Errorf("%w: player %d (%s) reads every seat's real decklist; the lab's AllowDecklistBots opt-in (operator ruling 2026-10-13) is off", ErrDecklistBot, i, players[i].Ref)
+			return false, fmt.Errorf("%w: player %d (%s) reads every seat's real decklist; the lab's AllowDecklistBots opt-in (operator ruling 2026-10-13) is off", ErrDecklistBot, i, players[i].Ref)
 		}
-		return fmt.Errorf("%w: player %d (%s): Env players need the bench Env driver (E5-c5)", ErrDecklistBot, i, players[i].Ref)
 	}
-	return nil
+	return env, nil
 }
 
 // gameConfig is one game's engine config, exactly cmd/draftsim's
