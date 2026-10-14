@@ -5,6 +5,7 @@ import (
 
 	_ "github.com/adams-shaun/gorge/bots/all" // link the built-in policies
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/rules"
 )
 
 // The run defaults, cmd/draftsim's watchdogs and London mulligan round:
@@ -41,6 +42,10 @@ type Options struct {
 	// the game re-drives with no player policy (ReplayTape,
 	// VerifyEventTapes). Off by default.
 	RecordTape bool
+	// OnEngine, when set, is handed each finished game's engine (its event
+	// log included) before the result is built. A spike hook for analysis
+	// tooling (cmd/cardval's note census); it must not mutate the engine.
+	OnEngine func(seed uint64, eng *rules.Engine)
 }
 
 // Lab is one opened composition surface: a read-only card corpus plus the
