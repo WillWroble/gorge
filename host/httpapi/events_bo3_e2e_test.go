@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -660,8 +661,19 @@ func TestDraftEventBo3TwoHumansOverHTTP(t *testing.T) {
 	}
 
 	// The standings table recomputes exactly from the log's results.
+	// Sorted keys: ComputeStandings sums each seat's opponents'
+	// percentages in slice order, so map order would make the floats
+	// 1-ULP-nondeterministic and flake the exact-struct compare.
+	keys := keysOf(seriesEnded)
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i][0] != keys[j][0] {
+			return keys[i][0] < keys[j][0]
+		}
+		return keys[i][1] < keys[j][1]
+	})
 	var results []event.SeriesResult
-	for k, se := range seriesEnded {
+	for _, k := range keys {
+		se := seriesEnded[k]
 		games := make([]event.GameOutcome, 0, len(gameEnded[k]))
 		for _, ge := range gameEnded[k] {
 			switch {
@@ -789,6 +801,9 @@ drain:
 		if !in0[c.ID] && !offered[c.ID] {
 			leak = append(leak, c.ID)
 		}
+	}
+	if len(leak) == 0 {
+		t.Fatal("precondition missing: no seat-3 card was ever hidden from seat 0")
 	}
 	bodies = append(bodies, bodyJSON(t, pool0))
 	for _, cp := range packs0 {
@@ -943,11 +958,18 @@ func scriptedIntent(t *testing.T, a, b, game, slot int, d *decision.Decision) de
 	return decision.Intent{}
 }
 
-// keysOf lists a map's keys in range order, for one failure message.
+// keysOf lists a map's keys in sorted order, for failure messages and any
+// later iteration whose order must not vary run to run.
 func keysOf[V any](m map[[2]int]V) [][2]int {
 	out := make([][2]int, 0, len(m))
 	for k := range m {
 		out = append(out, k)
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
 	return out
 }
