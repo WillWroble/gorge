@@ -50,8 +50,8 @@ func ref(id, name string, rarity limited.Rarity) limited.CardRef {
 func sheetRarities(t *testing.T, spec setdata.Spec) map[string]limited.Rarity {
 	t.Helper()
 	rarity := map[string]limited.Rarity{}
-	for _, cards := range spec.Sheets {
-		for _, c := range cards {
+	for _, sheet := range spec.Config.Sheets {
+		for _, c := range sheet.Cards {
 			rarity[c.Name] = c.Rarity
 		}
 	}
@@ -70,11 +70,11 @@ func fdnMainSetNames(t *testing.T) []string {
 		t.Fatalf("setdata FDN: %v", err)
 	}
 	var names []string
-	for sheet, cards := range spec.Sheets {
-		if len(cards) == 0 {
-			t.Fatalf("FDN sheet %q is empty", sheet)
+	for sheetName, sheet := range spec.Config.Sheets {
+		if len(sheet.Cards) == 0 {
+			t.Fatalf("FDN sheet %q is empty", sheetName)
 		}
-		for _, c := range cards {
+		for _, c := range sheet.Cards {
 			names = append(names, c.Name)
 		}
 	}

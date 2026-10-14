@@ -18,12 +18,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/adams-shaun/gorge/limited/setdata"
 )
 
 func main() {
 	o := options{}
 	fs := flag.NewFlagSet("draftsim", flag.ExitOnError)
 	fs.StringVar(&o.set, "set", "FDN", "set code to draft (an embedded limited/setdata spec)")
+	fs.StringVar(&o.collation, "collation", string(setdata.DefaultCollation), "collation the packs are cut from: "+string(setdata.Play)+", "+string(setdata.Arena))
 	fs.Uint64Var(&o.seed, "seed", 1, "event seed; the first event uses it and each later event adds one")
 	fs.IntVar(&o.events, "events", 1, "number of independent events to run")
 	fs.StringVar(&o.players, "players", "lethal-pressure,bot,cast-profile,lethal-pressure",
@@ -50,16 +53,17 @@ func main() {
 
 // options is one draftsim invocation, gathered from the flags.
 type options struct {
-	set      string
-	seed     uint64
-	events   int
-	players  string
-	drafter  string
-	builder  string
-	verify   bool
-	draftlog string
-	verbose  bool
-	dir      string
+	set       string
+	collation string
+	seed      uint64
+	events    int
+	players   string
+	drafter   string
+	builder   string
+	verify    bool
+	draftlog  string
+	verbose   bool
+	dir       string
 	// gauntlet, gauntletGames, gauntletPlayer and baseline are the
 	// -gauntlet measurement flags (gauntlet.go); gauntletMaxHuman caps the
 	// human deck list for tests and is not a flag.

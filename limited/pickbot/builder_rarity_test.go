@@ -40,12 +40,14 @@ func TestBuilderPoolRarityReachesHeuristic(t *testing.T) {
 		t.Fatalf("setdata FDN: %v", err)
 	}
 	found := false
-	for _, c := range spec.Sheets["mythic"] {
-		if c.Name == ajani.Name && c.Rarity == limited.Mythic {
-			found = true
+	for _, sheet := range spec.Config.Sheets {
+		for _, c := range sheet.Cards {
+			if c.Name == ajani.Name && c.Rarity == limited.Mythic {
+				found = true
+			}
 		}
 	}
 	if !found {
-		t.Fatalf("%q is not a mythic on the FDN mythic sheet", ajani.Name)
+		t.Fatalf("%q is not a mythic on any FDN spec sheet", ajani.Name)
 	}
 }

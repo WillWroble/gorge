@@ -1,7 +1,9 @@
-// Package booster opens seeded Play Booster packs from a limited/setdata
-// Spec (draft-events spec §4.3). It fills the spec's slots in order, never
-// puts the same card name twice in one pack, draws wildcard rarities by the
-// spec's weights, and colour-balances the slots marked balance_colours.
+// Package booster opens seeded packs from a limited/setdata Spec's MTGJSON
+// collation config (draft-events spec §4.3, E5-a1): it picks a pack variant
+// by weight, fills each contents sheet by the cards' collation weights,
+// never puts the same card name twice in one pack, honours a sheet's
+// allow_duplicates and fixed flags, and colour-balances the sheets marked
+// balance_colors.
 //
 // The package is pure: its only randomness is the *rand.Rand the caller
 // seeds, its only inputs besides that are the spec and a colour lookup the
@@ -13,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sort"
 
 	"github.com/adams-shaun/gorge/limited"
 	"github.com/adams-shaun/gorge/limited/setdata"
@@ -49,133 +52,181 @@ func (ids *IDs) Count() int { return ids.next }
 const wubrg = "WUBRG"
 
 // Open fills one pack from spec. rng drives every draw; ids assigns the
-// CardRef IDs in slot-fill order; colourOf backs the colour balance of the
-// slots whose BalanceColours is set (Open refuses to run when such a slot
-// exists and colourOf is nil).
+// CardRef IDs in fill order; colourOf backs the colour balance of the
+// sheets whose BalanceColors is set and whose slot draws at least 5 cards
+// (Open refuses to run when such a sheet exists and colourOf is nil).
 //
-// Every draw resamples a name already in the pack, so a pack never carries
-// the same name twice. A slot that cannot be filled without duplicates
-// fails Open with an error.
+// The variant is picked by weight first, then the variant's contents fill
+// in sorted sheet-name order. A draw resamples any name already in the
+// pack, so a pack never carries the same name twice; a sheet draws without
+// replacement within the pack unless its AllowDuplicates is set. A slot
+// that cannot be filled under those rules fails Open with an error.
 func Open(spec setdata.Spec, rng *rand.Rand, ids IDSource, colourOf ColourOf) ([]limited.CardRef, error) {
+	pack, _, err := openPack(spec, rng, ids, colourOf)
+	return pack, err
+}
+
+// openPack is Open with the picked variant index returned, so the stats
+// tests can measure the variant distribution the public API only implies.
+func openPack(spec setdata.Spec, rng *rand.Rand, ids IDSource, colourOf ColourOf) ([]limited.CardRef, int, error) {
 	if rng == nil {
-		return nil, errors.New("booster: Open needs a seeded *rand.Rand")
+		return nil, -1, errors.New("booster: Open needs a seeded *rand.Rand")
 	}
 	if ids == nil {
-		return nil, errors.New("booster: Open needs a non-nil ID allocator")
+		return nil, -1, errors.New("booster: Open needs a non-nil ID allocator")
 	}
-	for i, slot := range spec.Slots {
-		if slot.BalanceColours && colourOf == nil {
-			return nil, fmt.Errorf("booster: slot %d balances colours but no ColourOf was supplied", i)
+	if colourOf == nil {
+		for name, sheet := range spec.Config.Sheets {
+			if sheet.BalanceColors {
+				return nil, -1, fmt.Errorf("booster: sheet %q balances colours but no ColourOf was supplied", name)
+			}
 		}
 	}
+	v := pickVariant(spec.Config, rng)
+	variant := spec.Config.Variants[v]
 	pack := make([]limited.CardRef, 0, spec.PackSize)
-	inPack := map[string]bool{}
-	for i, slot := range spec.Slots {
+	st := &drawState{inPack: map[string]bool{}, drawn: map[string]bool{}}
+	for _, name := range sortedSheetNames(variant.Contents) {
+		count := variant.Contents[name]
+		sheet, ok := spec.Config.Sheets[name]
+		if !ok {
+			return nil, -1, fmt.Errorf("booster: %s: variant names missing sheet %q (spec is unvalidated?)", spec.Code, name)
+		}
 		start := len(pack)
-		for n := 0; n < slot.Count; n++ {
-			var (
-				card setdata.SheetCard
-				err  error
-			)
-			switch {
-			case slot.Sheet != "":
-				card, err = drawSheetUnique(rng, spec.Sheets[slot.Sheet], inPack)
-			case slot.RareMythic != nil:
-				card, err = drawRareMythic(rng, spec.Sheets, slot.RareMythic, inPack)
-			case slot.Wildcard != nil:
-				card, err = drawWildcard(rng, spec, slot.Wildcard, inPack)
-			default:
-				err = fmt.Errorf("slot %d sets none of sheet/rare_mythic/wildcard", i)
-			}
+		if sheet.Fixed {
+			fixed, err := drawFixed(sheet, count, st)
 			if err != nil {
-				return nil, fmt.Errorf("booster: %s slot %d: %w", spec.Code, i, err)
+				return nil, -1, fmt.Errorf("booster: %s sheet %q: %w", spec.Code, name, err)
 			}
-			pack = append(pack, limited.CardRef{
-				ID:     ids.Next(),
-				Name:   card.Name,
-				Set:    spec.Code,
-				Number: card.Number,
-				Rarity: card.Rarity,
-			})
-			inPack[card.Name] = true
+			for _, sc := range fixed {
+				pack = append(pack, ref(ids, sc))
+				st.take(sc)
+			}
+		} else {
+			for n := 0; n < count; n++ {
+				sc, err := drawWeighted(rng, sheet, st)
+				if err != nil {
+					return nil, -1, fmt.Errorf("booster: %s sheet %q: %w", spec.Code, name, err)
+				}
+				pack = append(pack, ref(ids, sc))
+				st.take(sc)
+			}
 		}
-		if slot.BalanceColours {
-			balanceColours(rng, pack[start:], spec.Sheets[slot.Sheet], colourOf, inPack)
-		}
-	}
-	return pack, nil
-}
-
-// freeIndices returns the sheet positions whose names are not yet in the
-// pack, in sheet order.
-func freeIndices(sheet []setdata.SheetCard, inPack map[string]bool) []int {
-	free := make([]int, 0, len(sheet))
-	for i, sc := range sheet {
-		if !inPack[sc.Name] {
-			free = append(free, i)
+		if sheet.BalanceColors && count >= 5 {
+			balanceColours(rng, pack[start:], sheet.Cards, colourOf, st.inPack)
 		}
 	}
-	return free
+	return pack, v, nil
 }
 
-// drawSheetUnique draws a uniformly random sheet card whose name is not yet
-// in the pack. It fails only when every card on the sheet is already packed.
-func drawSheetUnique(rng *rand.Rand, sheet []setdata.SheetCard, inPack map[string]bool) (setdata.SheetCard, error) {
-	free := freeIndices(sheet, inPack)
-	if len(free) == 0 {
-		return setdata.SheetCard{}, errors.New("every card on the sheet is already in the pack")
+// ref builds the pack entry one sheet card becomes. Set and number are the
+// printing's own (a special-guest card carries its SPG set), while the
+// CardRef's event ID comes from the caller's allocator.
+func ref(ids IDSource, sc setdata.SheetCard) limited.CardRef {
+	return limited.CardRef{
+		ID:     ids.Next(),
+		Name:   sc.Name,
+		Set:    sc.Set,
+		Number: sc.Number,
+		Rarity: sc.Rarity,
 	}
-	return sheet[free[rng.IntN(len(free))]], nil
 }
 
-// rareMythicWeights returns the weights a rare/mythic split draws on: the
-// first RareMythic slot's weights in spec order, or 1:1 when the spec has no
-// such slot to inherit from.
-func rareMythicWeights(spec setdata.Spec) setdata.RareMythic {
-	for _, slot := range spec.Slots {
-		if slot.RareMythic != nil {
-			return *slot.RareMythic
+// drawState tracks what one pack already holds: the card names (never
+// repeated, whatever the sheets say) and the card UUIDs (not repeated
+// unless the sheet allows duplicates).
+type drawState struct {
+	inPack map[string]bool
+	drawn  map[string]bool
+}
+
+// take records one card as packed.
+func (st *drawState) take(sc setdata.SheetCard) {
+	st.inPack[sc.Name] = true
+	st.drawn[sc.UUID] = true
+}
+
+// packed reports whether the card can still be drawn for this pack: its
+// name is not in the pack, and — unless the sheet allows duplicates — its
+// UUID is not either.
+func (st *drawState) packed(sc setdata.SheetCard, allowDuplicates bool) bool {
+	return st.inPack[sc.Name] || (!allowDuplicates && st.drawn[sc.UUID])
+}
+
+// pickVariant picks a pack variant by weight: one IntN over the config's
+// total weight, walked across the variants in their listed order.
+func pickVariant(cfg setdata.Config, rng *rand.Rand) int {
+	n := rng.IntN(cfg.TotalWeight)
+	for i := range cfg.Variants {
+		if n < cfg.Variants[i].Weight {
+			return i
+		}
+		n -= cfg.Variants[i].Weight
+	}
+	// Unreachable for a validated config (the weights sum to TotalWeight);
+	// the last variant keeps the function total anyway.
+	return len(cfg.Variants) - 1
+}
+
+// sortedSheetNames lists a variant's contents keys, sorted: no map
+// iteration order may reach the pack.
+func sortedSheetNames(contents map[string]int) []string {
+	names := make([]string, 0, len(contents))
+	for name := range contents {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// drawFixed takes a fixed sheet's cards as listed, in order, skipping any
+// name already in the pack until the slot's count is met. A fixed sheet
+// with fewer unpacked cards than the slot needs is a spec defect and fails.
+func drawFixed(sheet setdata.Sheet, count int, st *drawState) ([]setdata.SheetCard, error) {
+	out := make([]setdata.SheetCard, 0, count)
+	for _, sc := range sheet.Cards {
+		if len(out) == count {
+			break
+		}
+		if st.inPack[sc.Name] {
+			continue
+		}
+		out = append(out, sc)
+	}
+	if len(out) < count {
+		return nil, errors.New("fixed sheet has fewer unpacked cards than the slot draws")
+	}
+	return out, nil
+}
+
+// drawWeighted draws one card from a sheet by its collation weight, over
+// the cards the pack can still take (drawState.packed). It fails only when
+// no drawable card is left.
+func drawWeighted(rng *rand.Rand, sheet setdata.Sheet, st *drawState) (setdata.SheetCard, error) {
+	total := 0
+	for _, sc := range sheet.Cards {
+		if !st.packed(sc, sheet.AllowDuplicates) {
+			total += sc.Weight
 		}
 	}
-	return setdata.RareMythic{RareWeight: 1, MythicWeight: 1}
+	if total == 0 {
+		return setdata.SheetCard{}, errors.New("no drawable card is left")
+	}
+	n := rng.IntN(total)
+	for _, sc := range sheet.Cards {
+		if st.packed(sc, sheet.AllowDuplicates) {
+			continue
+		}
+		if n < sc.Weight {
+			return sc, nil
+		}
+		n -= sc.Weight
+	}
+	return setdata.SheetCard{}, errors.New("weighted draw fell off the sheet (impossible for a validated sheet)")
 }
 
-// drawRareMythic picks one card across the rare and mythic sheets, each rare
-// carrying RareWeight and each mythic MythicWeight (2:1 per-card weights over
-// 60 R / 20 M give the published one-mythic-in-seven rare slots). The draw
-// excludes names already in the pack and fails when nothing is left.
-func drawRareMythic(rng *rand.Rand, sheets map[string][]setdata.SheetCard, rm *setdata.RareMythic, inPack map[string]bool) (setdata.SheetCard, error) {
-	freeR := freeIndices(sheets["rare"], inPack)
-	freeM := freeIndices(sheets["mythic"], inPack)
-	spanR, spanM := len(freeR)*rm.RareWeight, len(freeM)*rm.MythicWeight
-	if spanR+spanM == 0 {
-		return setdata.SheetCard{}, errors.New("no unpacked rare or mythic card is left")
-	}
-	n := rng.IntN(spanR + spanM)
-	if n < spanR {
-		return sheets["rare"][freeR[n/rm.RareWeight]], nil
-	}
-	return sheets["mythic"][freeM[(n-spanR)/rm.MythicWeight]], nil
-}
-
-// drawWildcard first rolls the slot's rarity by its weights, then draws a
-// card of that rarity: common and uncommon straight off their sheets, the
-// rare_mythic bucket split by the spec's per-card rare/mythic weights.
-func drawWildcard(rng *rand.Rand, spec setdata.Spec, w *setdata.Weights, inPack map[string]bool) (setdata.SheetCard, error) {
-	roll := rng.Float64()
-	switch {
-	case roll < w.Common:
-		return drawSheetUnique(rng, spec.Sheets["common"], inPack)
-	case roll < w.Common+w.Uncommon:
-		return drawSheetUnique(rng, spec.Sheets["uncommon"], inPack)
-	default:
-		rm := rareMythicWeights(spec)
-		return drawRareMythic(rng, spec.Sheets, &rm, inPack)
-	}
-}
-
-// balanceColours tops up the colour coverage of one balance_colours slot's
-// freshly drawn cards (spec §4.3): while some W/U/B/R/G colour has no
+// balanceColours tops up the colour coverage of one balance_colors sheet's
+// freshly drawn slot (spec §4.3): while some W/U/B/R/G colour has no
 // mono-coloured card in the slot, it replaces one card with an unpacked mono
 // card of the missing colour, up to five tries. The replaced card is a
 // colourless or multicoloured one when the slot has any (swapping a mono
@@ -246,7 +297,7 @@ func balanceColours(rng *rand.Rand, slot []limited.CardRef, sheet []setdata.Shee
 		}
 		sc := sheet[cand[rng.IntN(len(cand))]]
 		delete(inPack, slot[pos].Name)
-		slot[pos] = limited.CardRef{ID: slot[pos].ID, Name: sc.Name, Set: slot[pos].Set, Number: sc.Number, Rarity: sc.Rarity}
+		slot[pos] = limited.CardRef{ID: slot[pos].ID, Name: sc.Name, Set: sc.Set, Number: sc.Number, Rarity: sc.Rarity}
 		inPack[sc.Name] = true
 	}
 }
