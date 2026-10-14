@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -201,7 +202,25 @@ func TestBotOnlyBo3EventCompletes(t *testing.T) {
 		seriesRows[[3]int{row.Round, row.A, row.B}] = row
 	}
 	results := make([]event.SeriesResult, 0, len(perSeries))
-	for pair, s := range perSeries {
+	// Walk the series in (round, a, b) order -- the order the event itself
+	// ended them in. Ranging the map directly fed ComputeStandings a random
+	// order, and OMW%/OGW% are float means whose last bit depends on the
+	// summation order, so the DeepEqual below failed at random (postmerge RED
+	// 216758d3e: OGW ...967 vs ...969).
+	pairs := make([][3]int, 0, len(perSeries))
+	for pair := range perSeries {
+		pairs = append(pairs, pair)
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		for k := 0; k < 3; k++ {
+			if pairs[i][k] != pairs[j][k] {
+				return pairs[i][k] < pairs[j][k]
+			}
+		}
+		return false
+	})
+	for _, pair := range pairs {
+		s := perSeries[pair]
 		wins := checkBo3Shape(t, pair, s)
 		games := make([]event.GameOutcome, 0, len(s.ends))
 		for _, en := range s.ends {
