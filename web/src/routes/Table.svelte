@@ -184,8 +184,14 @@
   // mid-game. The seat that is the human is seat 0 in createGame's
   // rotation, but the predicate reads the wire flags, not a hard-coded
   // index, so an inverted assignment still finds it.
+  const eventURL = typeof location !== 'undefined' && new URLSearchParams(location.search).has('event');
   const restartable = $derived.by(() => {
     if (!liveSeated || seatCtx === null || m.match === null || mulligan !== null) return false;
+    // A draft-event table (or any series table) belongs to its event: a
+    // restart there would walk the player out of the event into an unrelated
+    // vs-bot game. The server's flags say so once the table list is loaded;
+    // the event's join URL (?event=…) says so from the first render.
+    if (tableInfo?.event === true || tableInfo?.series === true || eventURL) return false;
     if (m.seats.length !== 2) return false;
     // Exactly ONE human seat, and it is the viewer (a two-human table and a
     // viewer sitting in the bot seat both fail here).

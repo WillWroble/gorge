@@ -90,6 +90,13 @@ export interface TableInfo {
    * field existed.
    */
   series?: boolean;
+  /**
+   * Event marks a table owned by a draft event (TableConfig.Event): its
+   * games are the event's to schedule, so the client offers no restart
+   * (a fresh vs-bot game) from it. omitempty, like Series: a non-event
+   * table is byte-identical to a table before the field existed.
+   */
+  event?: boolean;
 }
 
   /**

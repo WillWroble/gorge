@@ -188,8 +188,15 @@ func TestEventTableExemptFromOnDemandLimit(t *testing.T) {
 	if err := r.AddTable(evt); err != nil {
 		t.Fatalf("event table refused: %v", err)
 	}
-	if got := r.Tables(); len(got) != 2 {
+	got := r.Tables()
+	if len(got) != 2 {
 		t.Fatalf("tables %+v, want g1 and e1t", got)
+	}
+	// TableInfo.Event tells the client the table is the event's (no restart).
+	for _, ti := range got {
+		if want := ti.ID == "e1t"; ti.Event != want {
+			t.Fatalf("table %s Event = %v, want %v", ti.ID, ti.Event, want)
+		}
 	}
 	// Event without OnDemand is refused.
 	noOD := TableConfig{ID: "e2", Seats: 2, Decks: []string{"a", "b"}, Spectator: view.Public, Event: "e1"}

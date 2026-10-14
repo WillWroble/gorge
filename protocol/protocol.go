@@ -144,6 +144,11 @@ type TableInfo struct {
 	// value, so a non-series table is byte-identical to a table before the
 	// field existed.
 	Series bool `json:"series,omitempty"`
+	// Event marks a table owned by a draft event (TableConfig.Event): its
+	// games are the event's to schedule, so the client offers no restart
+	// (a fresh vs-bot game) from it. omitempty, like Series: a non-event
+	// table is byte-identical to a table before the field existed.
+	Event bool `json:"event,omitempty"`
 }
 
 // Widget is the overview cell: enough to draw a 2x2 life grid, a turn
