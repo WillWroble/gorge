@@ -308,6 +308,11 @@
       "status": "EXT",
       "purpose": "Training composition API over the draft stack: open packs, draft, build, play, gauntlet and whole events with named, versioned built-in agents; every call a pure function of inputs and seed; 17Lands-shaped artifacts."
     },
+    "draftlab/extern": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "Out-of-process agents for draftlab: dial an agent over a child's stdio or a Unix socket, batch its requests across concurrent games, and expose it as a Drafter, Builder and Player."
+    },
     "draftlab/extern/refagent": {
       "tier": "bots",
       "status": "TOOL",
