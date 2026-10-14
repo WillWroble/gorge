@@ -53,9 +53,31 @@ func (e *Engine) protectedFrom(target, source state.ObjID) bool {
 	if target == 0 || source == 0 {
 		return false
 	}
-	for _, kw := range e.Keywords(target) {
-		if q, ok := protectionQuality(kw); ok && e.sourceHasQuality(source, q) {
-			return true
+	// The ranged list must be a private copy: sourceHasQuality inside the
+	// loop derives the SOURCE's characteristics, and a Derived build rewrites
+	// the chars scratch in place (chars/derive.go's Compute), so ranging
+	// e.Keywords(target) directly reads whichever list the nested build left
+	// in the buffer -- and whether that build rewrote in place or reallocated
+	// depends on the buffer's growth history, which differs between an
+	// execution and its re-execution (the derived memo serves owned arrays in
+	// one and misses to the shared scratch in the other). That read made the
+	// CR 608.2b recheck diverge from the recorded event stream.
+	//
+	// Census (re-measured for this discipline): the two loops on this file
+	// that call a derive inside the ranged keyword window — protectedFrom and
+	// hexproofBlocksTarget below — each take this private copy. Every other
+	// ranged e.Keywords/Derived body in rules/ is pure-string and never
+	// derives mid-range (shroudBlocksTarget here is pure-string; the
+	// trigger_blocks.go pairMemberMatches site instead hands the alias to a
+	// SpecContext that the same matchesSpec call consumes before any further
+	// derive, so no later build rewrites under it within that window).
+	kws := e.Keywords(target)
+	kws = append([]string(nil), kws...)
+	for _, kw := range kws {
+		if q, ok := protectionQuality(kw); ok {
+			if e.sourceHasQuality(source, q) {
+				return true
+			}
 		}
 	}
 	return false
@@ -149,7 +171,16 @@ func (e *Engine) hexproofBlocksTarget(id state.ObjID, targeting state.PlayerID, 
 			return false
 		}
 	}
-	for _, kw := range e.Keywords(id) {
+	// The same private-copy discipline protectedFrom applies above:
+	// sourceHasQuality inside this loop derives the SOURCE's characteristics
+	// (objColors -> e.Colors -> Derived; matchesSpec -> e.Derived), and a
+	// Derived build rewrites the shared chars scratch in place, so ranging the
+	// aliased list directly can change the remaining window mid-loop — and
+	// differently between an execution and its rewind re-execution, the CV-1
+	// divergence class.
+	kws := e.Keywords(id)
+	kws = append([]string(nil), kws...)
+	for _, kw := range kws {
 		q, ok := hexproofQuality(kw)
 		if !ok {
 			continue
