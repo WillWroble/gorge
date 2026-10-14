@@ -10,7 +10,7 @@ import (
 // TestDrawKnownKeysSorted: the unread lookup binary-searches the table.
 func TestDrawKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(drawKnownKeys[:]) || len(slices.Compact(slices.Clone(drawKnownKeys[:]))) != len(drawKnownKeys) {
-		t.Fatal("drawKnownKeys must be sorted and duplicate-free")
+		t.Fatal("drawKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

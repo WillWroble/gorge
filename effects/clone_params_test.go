@@ -11,7 +11,7 @@ import (
 // TestCloneKnownKeysSorted: the unread lookup binary-searches the table.
 func TestCloneKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(cloneKnownKeys[:]) || len(slices.Compact(slices.Clone(cloneKnownKeys[:]))) != len(cloneKnownKeys) {
-		t.Fatal("cloneKnownKeys must be sorted and duplicate-free")
+		t.Fatal("cloneKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

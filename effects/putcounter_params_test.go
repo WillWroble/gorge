@@ -10,7 +10,7 @@ import (
 // TestPutCounterKnownKeysSorted: the unread lookup binary-searches the table.
 func TestPutCounterKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(putCounterKnownKeys[:]) || len(slices.Compact(slices.Clone(putCounterKnownKeys[:]))) != len(putCounterKnownKeys) {
-		t.Fatal("putCounterKnownKeys must be sorted and duplicate-free")
+		t.Fatal("putCounterKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

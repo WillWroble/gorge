@@ -11,7 +11,7 @@ import (
 // table.
 func TestDelayedTriggerKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(delayedTriggerKnownKeys[:]) || len(slices.Compact(slices.Clone(delayedTriggerKnownKeys[:]))) != len(delayedTriggerKnownKeys) {
-		t.Fatal("delayedTriggerKnownKeys must be sorted and duplicate-free")
+		t.Fatal("delayedTriggerKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

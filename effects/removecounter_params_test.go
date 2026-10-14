@@ -13,7 +13,7 @@ import (
 func TestRemoveCounterKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(removeCounterKnownKeys[:]) ||
 		len(slices.Compact(slices.Clone(removeCounterKnownKeys[:]))) != len(removeCounterKnownKeys) {
-		t.Fatal("removeCounterKnownKeys must be sorted and duplicate-free")
+		t.Fatal("removeCounterKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

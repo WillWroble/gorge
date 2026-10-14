@@ -11,7 +11,7 @@ import (
 // table.
 func TestReplaceEffectKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(replaceEffectKnownKeys[:]) || len(slices.Compact(slices.Clone(replaceEffectKnownKeys[:]))) != len(replaceEffectKnownKeys) {
-		t.Fatal("replaceEffectKnownKeys must be sorted and duplicate-free")
+		t.Fatal("replaceEffectKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

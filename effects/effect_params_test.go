@@ -10,7 +10,7 @@ import (
 // TestEffectKnownKeysSorted: the unread lookup binary-searches the table.
 func TestEffectKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(effectKnownKeys[:]) || len(slices.Compact(slices.Clone(effectKnownKeys[:]))) != len(effectKnownKeys) {
-		t.Fatal("effectKnownKeys must be sorted and duplicate-free")
+		t.Fatal("effectKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

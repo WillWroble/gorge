@@ -11,7 +11,7 @@ import (
 func TestVoteKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(voteKnownKeys[:]) ||
 		len(slices.Compact(slices.Clone(voteKnownKeys[:]))) != len(voteKnownKeys) {
-		t.Fatal("voteKnownKeys must be sorted and duplicate-free")
+		t.Fatal("voteKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 
