@@ -71,10 +71,16 @@ func packages(t *testing.T) map[string]pkg {
 // A package with no directory, or a directory that cannot be opened, is
 // fatal: silently skipping it would reintroduce the stale-cache hole this
 // open closes.
+//
+// The number of directories opened is recorded in openModuleDirsN so
+// TestOpenPackageDirsCoversEveryPackage can assert that packages() actually
+// performed the open — removing the openModulePackageDirs call from
+// packages() leaves the count at zero and fails that test, instead of
+// silently reintroducing the stale-cache hole.
 func openModulePackageDirs(t *testing.T, pkgs map[string]pkg) {
 	t.Helper()
 	openModuleDirsOnce.Do(func() {
-		_, openModuleDirsErr = openPackageDirs(pkgs)
+		openModuleDirsN, openModuleDirsErr = openPackageDirs(pkgs)
 	})
 	if openModuleDirsErr != nil {
 		t.Fatal(openModuleDirsErr)
@@ -84,19 +90,28 @@ func openModulePackageDirs(t *testing.T, pkgs map[string]pkg) {
 var (
 	openModuleDirsOnce sync.Once
 	openModuleDirsErr  error
+	openModuleDirsN    int // directories openModulePackageDirs opened through packages()
 )
 
 // openPackageDirs opens the directory of every package in pkgs and returns
 // how many it opened. It returns an error instead of calling t.Fatal so the
 // guards can be unit tested (TestOpenPackageDirsCoversEveryPackage): a caller
 // that opens fewer directories than there are packages has silently left the
-// stale-cache hole open.
+// stale-cache hole open. The paths are iterated in sorted order so the first
+// failure reported (and the "opened" count in its message) is stable across
+// runs.
 func openPackageDirs(pkgs map[string]pkg) (int, error) {
 	if len(pkgs) == 0 {
 		return 0, fmt.Errorf("no packages to open; the cache-tracking open would run vacuously")
 	}
+	paths := make([]string, 0, len(pkgs))
+	for path := range pkgs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
 	opened := 0
-	for path, p := range pkgs {
+	for _, path := range paths {
+		p := pkgs[path]
 		if p.dir == "" {
 			return opened, fmt.Errorf("go list reported no directory for %s; the cache-tracking open would be skipped", path)
 		}
