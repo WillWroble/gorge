@@ -307,6 +307,7 @@ func botStreams(seed uint64, seats int) ([]*rand.Rand, []*rand.PCG) {
 func (e *engineEnv) matchRoot() (err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("match-root", p)
 			err = fmt.Errorf("%w: matching the root: %v", ErrPanic, p)
 		}
 	}()
@@ -368,6 +369,7 @@ func (e *engineEnv) Turn() int { return int(e.e.G.Turn) }
 func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("play", p)
 			pt, err = nil, fmt.Errorf("%w: %v", ErrPanic, p)
 		}
 	}()
@@ -645,6 +647,7 @@ func cloneObservers(obs []*searchprobe.Collector) []*searchprobe.Collector {
 func (e *engineEnv) submit(d *decision.Decision, in decision.Intent) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("submit", p)
 			err = fmt.Errorf("%w: %v", ErrPanic, p)
 		}
 	}()
@@ -669,6 +672,7 @@ func (e *engineEnv) submit(d *decision.Decision, in decision.Intent) (err error)
 func (e *engineEnv) Leaf() (l Leaf) {
 	defer func() {
 		if p := recover(); p != nil {
+			tracePanic("leaf", p)
 			l = Leaf{Err: fmt.Errorf("%w: leaf: %v", ErrPanic, p)}
 		}
 	}()

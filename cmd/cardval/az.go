@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/rand/v2"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/adams-shaun/gorge/bots"
@@ -111,4 +113,42 @@ func registerAZ(g *gen, netPath string, sims, beliefDecks int, seed uint64) (str
 		New: func(o bots.Options) (seat.Seat, error) { return azredeal.NewWithModel(o, cfg, m) },
 	})
 	return fmt.Sprintf("%s@sims=%d,net=%s", azPolicy, sims, net), nil
+}
+
+// panicLog groups recovered search panics by where they were recovered and
+// their message (digits blanked), printing the first limit distinct stacks.
+var panicLog struct {
+	mu    sync.Mutex
+	limit int
+	n     map[string]int
+	order []string
+}
+
+func tracePanics(limit int) {
+	panicLog.limit, panicLog.n = limit, map[string]int{}
+	azmcts.PanicTrace = func(where string, p any, stack []byte) {
+		key := where + ": " + strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return '#'
+			}
+			return r
+		}, fmt.Sprint(p))
+		panicLog.mu.Lock()
+		defer panicLog.mu.Unlock()
+		if panicLog.n[key] == 0 {
+			panicLog.order = append(panicLog.order, key)
+			if len(panicLog.order) <= panicLog.limit {
+				fmt.Fprintf(os.Stderr, "cardval: az panic %s\n%s\n", key, stack)
+			}
+		}
+		panicLog.n[key]++
+	}
+}
+
+func panicCensus() {
+	panicLog.mu.Lock()
+	defer panicLog.mu.Unlock()
+	for _, k := range panicLog.order {
+		fmt.Fprintf(os.Stderr, "cardval: az panic census %8d  %s\n", panicLog.n[k], k)
+	}
 }

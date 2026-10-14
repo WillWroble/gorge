@@ -112,6 +112,7 @@ func main() {
 		azNet    = flag.String("az-net", "", "with -az: the .dzgw network; empty = no network (knows no card)")
 		azSims   = flag.Int("az-sims", 25, "with -az: simulations per searched decision")
 		azBelief = flag.Int("az-belief", 2000, "with -az: random decks in the closed-list belief")
+		azPanics = flag.Int("az-panics", 0, "with -az: print the stack of the first N distinct recovered search panics to stderr, and a census of all of them at the end")
 		maxObjs  = flag.Int("max-objs", 2000, "board-size cap: a game past it is a stall, not a 20 GB process (0 = off)")
 	)
 	flag.Parse()
@@ -163,6 +164,9 @@ func main() {
 	g := gen{cs: cs, pairs: pairs, creatures: *creature, lab: lab, hands: hl}
 	label := *pilot
 	if *az {
+		if *azPanics > 0 {
+			tracePanics(*azPanics)
+		}
 		if label, err = registerAZ(&g, *azNet, *azSims, *azBelief, *seed); err != nil {
 			fail("%v", err)
 		}
@@ -227,6 +231,9 @@ func main() {
 		writeJSON(*out+"/az.json", &azStats)
 		fmt.Fprintf(os.Stderr, "cardval: az: %d decisions, %d searched, %d feed-stopped, %d refused, %.1f sims/searched\n",
 			azStats.Decisions, azStats.Searched, azStats.FeedStopped, azStats.Refused, float64(azStats.Sims)/max(1, float64(azStats.Searched)))
+		fmt.Fprintf(os.Stderr, "cardval: az: sims %d completed %d panics %d no-world %d all-failed %d\n",
+			azStats.Sims, azStats.Completed, azStats.Panics, azStats.NoWorld, azStats.AllFailed)
+		panicCensus()
 	}
 }
 
