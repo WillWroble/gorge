@@ -64,7 +64,7 @@ func (l *Lab) Gauntlet(hero Entrant, opponents []Entrant, games int, seed uint64
 			a, b = b, a
 		}
 		gs := rand.New(rand.NewPCG(seed, gauntletSaltBase<<32|uint64(j)<<16|uint64(g))).Uint64()
-		res, err := l.playGame(a, b, entrantNames(a, b), gs)
+		res, err := l.playGame(a, b, entrantNames(a, b), gs, false)
 		if err != nil {
 			return GameResult{}, err
 		}

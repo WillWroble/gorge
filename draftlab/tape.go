@@ -29,7 +29,10 @@ type Tape struct {
 // stop the re-drive at the same intent). The two seats of the game share one
 // cursor; a game is serial — one seat answers at a time — so it needs no
 // lock. A nil tape and a tape recorded under a different mulligan round are
-// refused; intents left over after the re-drive are an error.
+// refused; intents left over after the re-drive are an error. The re-drive
+// enforces Ruling P2, as replay.Replay does: every recorded intent is
+// submitted verbatim and ANY engine rejection is a tape divergence error,
+// never a fallback re-answer.
 func (l *Lab) ReplayTape(a, b Deck, seed uint64, t *Tape) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("draftlab: ReplayTape: nil tape (run with Options.RecordTape)")
@@ -42,7 +45,7 @@ func (l *Lab) ReplayTape(a, b Deck, seed uint64, t *Tape) (string, error) {
 		Ref: AgentRef{Name: "tape"},
 		New: func(uint64) (seat.Seat, error) { return &tapeSeat{cur: cur}, nil },
 	}
-	res, err := l.playGame(Entrant{Deck: a, Player: p}, Entrant{Deck: b, Player: p}, t.Names, seed)
+	res, err := l.playGame(Entrant{Deck: a, Player: p}, Entrant{Deck: b, Player: p}, t.Names, seed, true)
 	if err != nil {
 		return "", err
 	}

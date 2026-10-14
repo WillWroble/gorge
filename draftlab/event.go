@@ -253,7 +253,7 @@ func (l *Lab) RunEvent(s EventSpec) (EventResult, error) {
 			res, err := l.playGame(
 				Entrant{Deck: decks[sp.A], Player: playerOf(sp.A)},
 				Entrant{Deck: decks[sp.B], Player: playerOf(sp.B)},
-				[2]string{fmt.Sprintf("p%d", sp.A), fmt.Sprintf("p%d", sp.B)}, gs)
+				[2]string{fmt.Sprintf("p%d", sp.A), fmt.Sprintf("p%d", sp.B)}, gs, false)
 			if err != nil {
 				return GameResult{}, err
 			}
@@ -414,7 +414,7 @@ func (l *Lab) replayGameHead(ev *event.Event, set, mode string, players []NamedP
 	res, err := l.playGame(
 		Entrant{Deck: da, Player: players[a%len(players)]},
 		Entrant{Deck: db, Player: players[b%len(players)]},
-		[2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, gs)
+		[2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, gs, false)
 	if err != nil {
 		return "", err
 	}
