@@ -193,7 +193,10 @@ func set(s string) map[string]bool {
 // docs/superpowers/specs/2026-10-13-draft-events-design.md) uses time only
 // for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
 // event package as a logged auto-pick entry, so replaying an event's log
-// never reads the clock. No game, event, view or
+// never reads the clock. cmd/draftrl (the draft-RL driver) reads it only
+// for rollout's throughput line (stdout, never a record) and for the
+// GORGE_PAUSE_FILE poll's sleep; every pick, deck and game record is a pure
+// function of its seed. No game, event, view or
 // replay reads the clock, and intents reach the engine only through
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
@@ -216,6 +219,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/searchbench":      true,
 		module + "/cmd/enginebench":      true,
 		module + "/cmd/dzgorge":          true,
+		module + "/cmd/draftrl":          true,
 		module + "/internal/gamepool":    true,
 		module + "/internal/inferbroker": true,
 		module + "/host/manabrewhttp":    true,

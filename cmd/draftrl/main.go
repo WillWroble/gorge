@@ -1,8 +1,10 @@
 // Command draftrl is the draft-RL program's driver (spec
-// docs/superpowers/specs/2026-10-14-draft-rl-design.md). Its one
-// subcommand so far is gate (DR-4, §3.0): homogeneous or mixed pods drafted
+// docs/superpowers/specs/2026-10-14-draft-rl-design.md). Its
+// subcommands are gate (DR-4, §3.0): homogeneous or mixed pods drafted
 // from fixed seeds, each seat's built deck measured against the
-// fdn-limited gauntlet under the scripted bot or the closed-list az pilot.
+// fdn-limited gauntlet under the scripted bot or the closed-list az pilot;
+// and rollout (DR-7, §3.3 with the §11 reward ruling): league pods scored
+// by the round robin within the pod, writing the training records.
 //
 // draftrl is a bot-only sim tool: the az pilot is an Env seat, admitted
 // only through draftlab's AllowDecklistBots opt-in, which no event or
@@ -25,13 +27,16 @@ func main() {
 // run dispatches the subcommand; it is main's testable body.
 func run(args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: draftrl gate [flags] (calibrate is not implemented yet)")
+		return fmt.Errorf("usage: draftrl gate|rollout [flags] (calibrate is not implemented yet)")
 	}
 	switch args[0] {
 	case "gate":
 		_, err := gate(args[1:], out)
 		return err
+	case "rollout":
+		_, err := rollout(args[1:], out)
+		return err
 	default:
-		return fmt.Errorf("unknown subcommand %q (want gate)", args[0])
+		return fmt.Errorf("unknown subcommand %q (want gate or rollout)", args[0])
 	}
 }
