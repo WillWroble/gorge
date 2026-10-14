@@ -461,8 +461,12 @@ func (c TableConfig) singleShot() bool {
 
 // setState is the one home for a table's lifecycle state transition: it
 // writes t.state under t.mu and then tells every subscriber the new state
-// (protocol.TTableState), so the wire can never miss a transition. A halt
-// does not go through here — halt writes TableHalted directly and sends
+// (protocol.TTableState), so the wire can never miss a transition. Only a
+// series table emits the frame: an ordinary table's idle/live/cooldown is
+// already carried by match_start/match_end and the overview widget, and
+// emitting it would add an unrequested frame to every non-series stream
+// (E3-fx2 scopes the signal to a series table between games). A halt does
+// not go through here — halt writes TableHalted directly and sends
 // TableHaltedBody instead — so a table_state frame only ever carries idle,
 // live or between_games. The broadcast runs after t.mu is released: it takes
 // the registry lock and each session's, and Subscribe holds t.fanMu then
@@ -471,7 +475,7 @@ func (t *table) setState(s string) {
 	t.mu.Lock()
 	t.state = s
 	t.mu.Unlock()
-	if t.reg != nil {
+	if t.reg != nil && t.cfg.Series {
 		t.reg.broadcastTableState(t, s)
 	}
 }
@@ -488,8 +492,10 @@ func tableStateName(s string) string {
 
 // broadcastTableState pushes one table_state frame to every session watching
 // the table, focus and overview alike — the signal is public table
-// lifecycle, not per-viewer state, so it is not redacted. It never blocks:
-// push drops a slow client (the session overflows and is unregistered).
+// lifecycle, not per-viewer state, so it is not redacted. setState calls it
+// only for a series table (E3-fx2); the frame is not emitted for an ordinary
+// table. It never blocks: push drops a slow client (the session overflows
+// and is unregistered).
 func (r *Registry) broadcastTableState(t *table, s string) {
 	ss, _ := r.sessionsFor(t.cfg.ID)
 	if len(ss) == 0 {

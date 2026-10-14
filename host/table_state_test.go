@@ -157,3 +157,55 @@ func TestSeriesTableEmitsBetweenGamesThenLive(t *testing.T) {
 		t.Fatalf("no live table_state frame after between_games; states=%v", states)
 	}
 }
+
+// TestNonSeriesTableEmitsNoTableState pins E3-fx2's scope: table_state is a
+// series-table signal only. An ordinary table's idle/live/cooldown is already
+// carried by match_start/match_end and the overview widget, so emitting
+// table_state for it injects an unrequested frame into every non-series
+// stream. This is the regression a blanket setState broadcast caused (it made
+// a focus stream begin table_state live before match_start, and an overview
+// subscriber see between_games), so the test runs a plain one-match table and
+// asserts its whole stream carries no table_state at all.
+func TestNonSeriesTableEmitsNoTableState(t *testing.T) {
+	t.Parallel()
+	var s *Session
+	var frames []protocol.Frame
+	o := testOptions(t)
+	o.Sleep = func(time.Duration, <-chan struct{}) { drainNonBlocking(s, &frames) }
+	r, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if err := r.AddTable(fourSeatTable("t1", false)); err != nil {
+		t.Fatal(err)
+	}
+	s = r.OpenSession()
+	if err := r.Subscribe(s, "t1", protocol.ModeFocus); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Start("t1"); err != nil {
+		t.Fatal(err)
+	}
+	r.Wait("t1")
+	drainNonBlocking(s, &frames) // pick up match_end, pushed after the last handshake
+
+	// Precondition: the table really played its one match and the stream
+	// carried frames, so "no table_state" is a statement about a live stream,
+	// not an empty or never-started one.
+	ms, err := r.Matches("t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ms) != 1 {
+		t.Fatalf("table played %d matches, want 1", len(ms))
+	}
+	if len(frames) < 100 {
+		t.Fatalf("only %d frames; the focus stream never ran", len(frames))
+	}
+	for _, f := range frames {
+		if f.T == protocol.TTableState {
+			t.Fatalf("non-series table emitted table_state %q; the frame is series-only", decode[protocol.TableStateBody](t, f).State)
+		}
+	}
+}
