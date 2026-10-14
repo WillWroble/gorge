@@ -1,31 +1,29 @@
 <script lang="ts">
   import type { DraftCard } from '../../protocol';
-  import type { CardFactsStore } from '../../lib/cardfacts.svelte';
-  import { mvColumns, tint } from '../../lib/draftcards';
+  import { factsOf, mvColumns, tint } from '../../lib/draftcards';
   import ManaSymbols from '../ManaSymbols.svelte';
 
   /**
    * A pool or deck laid out in mana-value columns (0–1 … 6+, Land, and "?"
-   * while a card's facts are unresolved). Each card is a one-line strip.
+   * for a card the server sent no facts for), grouped by the facts each
+   * DraftCard carries on the wire. Each card is a one-line strip.
    * With `onactivate` the strips are buttons — click, tap or Enter moves the
    * card — and with `draggable` they also start an HTML5 drag carrying the
    * card's instance id; the drop target is the zone around this grid.
    */
   let {
     cards,
-    facts,
     draggable = false,
     onactivate,
     label,
   }: {
     cards: DraftCard[];
-    facts: CardFactsStore;
     draggable?: boolean;
     onactivate?: (id: string) => void;
     label?: string;
   } = $props();
 
-  const cols = $derived(mvColumns(cards, (c) => facts.of(c.name)));
+  const cols = $derived(mvColumns(cards, factsOf));
   let dragging = $state<string | null>(null);
 
   function dragstart(e: DragEvent, id: string) {
@@ -41,7 +39,7 @@
     <div class="mvcol">
       <div class="h"><span>{col.label}</span><span>{col.cards.length || ''}</span></div>
       {#each col.cards as c (c.id)}
-        {@const f = facts.of(c.name)}
+        {@const f = factsOf(c)}
         {#if onactivate}
           <button
             type="button"

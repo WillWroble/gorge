@@ -2,17 +2,16 @@
  * draftcards.ts holds the draft and deckbuilder screens' DISPLAY helpers:
  * mana-value columns, colour chips, pass direction and who opened a pack.
  *
- * Nothing here decides legality. A DraftCard on the wire carries only its
- * instance id, name, printing and rarity; the cost and type line used to
- * group cards into columns come from the card-text catalog the client
- * already reads for the hover panel (./oracle, gorged's /cards/named). A
- * card whose facts are unknown lands in a "?" column rather than being
- * guessed at, and the server's DeckCheck stays the only word on whether a
- * deck is legal.
+ * Nothing here decides legality. The facts a card is grouped and tinted by
+ * — mana value, colours, printed cost, type line — come from the server on
+ * the wire (protocol.DraftCard, E1-8), read from the same corpus the engine
+ * plays; the client never looks them up or computes them on its own. A card
+ * the server's corpus does not know carries none of them and lands in a "?"
+ * column rather than being guessed at, and the server's DeckCheck stays the
+ * only word on whether a deck is legal.
  */
 
 import type { CardView, DraftCard } from '../protocol';
-import type { OracleCard } from './oracle';
 import type { ManaColour } from './mana';
 
 export const COLOURS: readonly ManaColour[] = ['W', 'U', 'B', 'R', 'G'];
@@ -48,43 +47,30 @@ export function costTokens(cost: string | undefined): string[] {
   return c.split(/\s+/).map((t) => t.toUpperCase());
 }
 
-/** manaValue is the printed mana value of a token list (X counts zero, hybrid and Phyrexian count one, twobrid "2/W" counts two). */
-export function manaValue(tokens: string[]): number {
-  let mv = 0;
-  for (const t of tokens) {
-    if (/^\d+$/.test(t)) mv += Number(t);
-    else if (/^[XYZ]$/.test(t)) continue;
-    else if (/^2\/[WUBRG]$/.test(t)) mv += 2;
-    else mv += 1;
-  }
-  return mv;
-}
-
-/** coloursOf is the set of W/U/B/R/G letters a cost's symbols name, in WUBRG order. */
-export function coloursOf(tokens: string[]): ManaColour[] {
-  const seen = new Set<string>();
-  for (const t of tokens) for (const ch of t) if ('WUBRG'.includes(ch)) seen.add(ch);
-  return COLOURS.filter((c) => seen.has(c));
-}
-
 /** forgeCost renders tokens in the Forge notation ManaSymbols draws. */
 export function forgeCost(tokens: string[]): string {
   return tokens.join(' ');
 }
 
-/** factsFromOracle turns one catalog entry into display facts; null (no catalog, or a miss) is UNKNOWN. */
-export function factsFromOracle(o: OracleCard | null | undefined): CardFacts {
-  if (!o) return UNKNOWN_FACTS;
-  const types = o.type_line ?? '';
+/**
+ * factsOf reads one card's display facts off the wire. The server omits
+ * every fact for a card its corpus does not know (no type line), so that
+ * card's mana value is null — the "?" column. A known card with no
+ * mana_value is a zero (the field is omitempty): a land, or a free spell.
+ * Colours are the server's colour identity, a subset of "WUBRG".
+ */
+export function factsOf(c: DraftCard): CardFacts {
+  const types = c.type_line ?? '';
+  const known = types !== '' || c.mana_cost !== undefined || c.mana_value !== undefined;
+  if (!known) return UNKNOWN_FACTS;
   const front = types.split('//')[0];
-  const land = /\bLand\b/.test(front);
-  const tokens = costTokens(o.mana_cost);
+  const colours = c.colors ?? '';
   return {
-    mv: o.type_line === undefined && o.mana_cost === undefined ? null : manaValue(tokens),
-    colours: coloursOf(tokens),
-    land,
+    mv: c.mana_value ?? 0,
+    colours: COLOURS.filter((col) => colours.includes(col)),
+    land: /\bLand\b/.test(front),
     creature: /\bCreature\b/.test(front),
-    cost: forgeCost(tokens),
+    cost: forgeCost(costTokens(c.mana_cost)),
     types,
   };
 }
@@ -100,7 +86,8 @@ const MV_LABELS = ['0–1', '2', '3', '4', '5', '6+'];
 
 /**
  * mvColumns buckets cards into the mockup's columns: 0–1, 2, 3, 4, 5, 6+,
- * Land, and — only when some card's facts are still unknown — "?". Order
+ * Land, and — only when some card arrived with no facts (the server's
+ * corpus does not know it) — "?". Order
  * inside a column is the input order, so a pool reads in pick order.
  */
 export function mvColumns<T>(cards: T[], factsOf: (c: T) => CardFacts): Column<T>[] {
@@ -159,8 +146,9 @@ export function openedBy(seat: number, round: number, pickNo: number, seats = 4)
   return passDirection(round) === 'left' ? (seat - steps + seats) % seats : (seat + steps) % seats;
 }
 
-/** cardView adapts a DraftCard to the CardView CardImage renders (art by name; the blank face shows the catalog's cost and type line). */
-export function cardView(c: DraftCard, facts: CardFacts = UNKNOWN_FACTS): CardView {
+/** cardView adapts a DraftCard to the CardView CardImage renders (art by name; the blank face shows the wire's cost and type line). */
+export function cardView(c: DraftCard): CardView {
+  const facts = factsOf(c);
   return {
     id: 0,
     name: c.name,

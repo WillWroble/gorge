@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { coloursOf, costTokens, factsFromOracle, manaValue, mvColumns, openedBy, passDirection, passesFilter, seatLabel, tint, UNKNOWN_FACTS } from './draftcards';
-import { FACTS } from '../test/eventfixtures';
+import { cardView, costTokens, factsOf, mvColumns, openedBy, passDirection, passesFilter, seatLabel, tint, UNKNOWN_FACTS } from './draftcards';
+import { card } from '../test/eventfixtures';
+
+const F = (name: string) => factsOf(card('x', name));
 
 describe('cost parsing (display only)', () => {
-  it('reads the catalog brace form and the Forge spaced form alike', () => {
+  it('reads the Forge spaced form the server sends, and the brace form alike', () => {
     expect(costTokens('{2}{W}{W}')).toEqual(['2', 'W', 'W']);
     expect(costTokens('2 W W')).toEqual(['2', 'W', 'W']);
     expect(costTokens('{X}{R}')).toEqual(['X', 'R']);
@@ -12,33 +14,43 @@ describe('cost parsing (display only)', () => {
     expect(costTokens('')).toEqual([]);
     expect(costTokens('no cost')).toEqual([]);
   });
-  it('mana value and colours', () => {
-    expect(manaValue(['2', 'W', 'W'])).toBe(4);
-    expect(manaValue(['X', 'R'])).toBe(1);
-    expect(manaValue(['2/W'])).toBe(2);
-    expect(manaValue(['W/U', 'B/P'])).toBe(2);
-    expect(coloursOf(['1', 'W/U', 'G'])).toEqual(['W', 'U', 'G']);
+});
+
+describe('factsOf reads the wire, never computes', () => {
+  it('takes mana value, colours, cost and type line straight from the DraftCard', () => {
+    expect(F('Serra Angel')).toEqual({ mv: 5, colours: ['W'], land: false, creature: true, cost: '3 W W', types: 'Creature Angel' });
+    expect(F('Fusion Elemental').colours).toEqual(['W', 'U', 'B', 'R', 'G']);
   });
-  it('factsFromOracle: a miss is unknown, a land is a land', () => {
-    expect(factsFromOracle(null)).toBe(UNKNOWN_FACTS);
-    expect(factsFromOracle({ name: 'Evolving Wilds', mana_cost: '', type_line: 'Land' })).toMatchObject({ land: true, mv: 0 });
-    expect(factsFromOracle({ name: 'Serra Angel', mana_cost: '{3}{W}{W}', type_line: 'Creature — Angel' })).toMatchObject({
-      mv: 5, colours: ['W'], creature: true, cost: '3 W W',
-    });
+  it('the mana value is the server\'s even when the cost would say otherwise', () => {
+    // An X spell, a split card: whatever the server says is the column.
+    expect(factsOf({ ...card('x', 'Odd'), mana_cost: 'X R', mana_value: 7, type_line: 'Sorcery' }).mv).toBe(7);
+    // Colours are the server's colour identity, not the cost's symbols.
+    expect(factsOf({ ...card('x', 'Odd'), mana_cost: '2', mana_value: 2, colors: 'G', type_line: 'Artifact' }).colours).toEqual(['G']);
+  });
+  it('a known card with no mana_value (omitempty) is a zero; a land is a land', () => {
+    expect(F('Ornithopter')).toMatchObject({ mv: 0, land: false, creature: true, cost: '' });
+    expect(F('Evolving Wilds')).toMatchObject({ mv: 0, land: true });
+  });
+  it('a card the server sent no facts for is unknown', () => {
+    expect(factsOf(card('x', 'Mystery Card'))).toBe(UNKNOWN_FACTS);
+  });
+  it('cardView shows the wire cost and type line', () => {
+    expect(cardView(card('c1', 'Serra Angel'))).toMatchObject({ name: 'Serra Angel', types: 'Creature Angel', mana_cost: '3 W W' });
   });
 });
 
 describe('mvColumns', () => {
-  const of = (n: string) => FACTS[n] ?? UNKNOWN_FACTS;
-  it('buckets 0–1 … 6+ and Land, and adds "?" only while some card is unknown', () => {
-    const cols = mvColumns(['Serra Angel', 'Lightning Bolt', 'Shivan Dragon', 'Evolving Wilds'], of);
+  it('buckets 0–1 … 6+ and Land from the wire facts, and adds "?" only for a card with none', () => {
+    const cards = ['Serra Angel', 'Lightning Bolt', 'Shivan Dragon', 'Evolving Wilds', 'Ornithopter'].map((n, i) => card(`c${i}`, n));
+    const cols = mvColumns(cards, factsOf);
     expect(cols.map((c) => c.label)).toEqual(['0–1', '2', '3', '4', '5', '6+', 'Land']);
-    expect(cols[0].cards).toEqual(['Lightning Bolt']);
-    expect(cols[4].cards).toEqual(['Serra Angel']);
-    expect(cols[5].cards).toEqual(['Shivan Dragon']);
-    expect(cols[6].cards).toEqual(['Evolving Wilds']);
-    const withUnknown = mvColumns(['Serra Angel', 'Mystery Card'], of);
-    expect(withUnknown.at(-1)).toMatchObject({ label: '?', cards: ['Mystery Card'] });
+    expect(cols[0].cards.map((c) => c.name)).toEqual(['Lightning Bolt', 'Ornithopter']);
+    expect(cols[4].cards.map((c) => c.name)).toEqual(['Serra Angel']);
+    expect(cols[5].cards.map((c) => c.name)).toEqual(['Shivan Dragon']);
+    expect(cols[6].cards.map((c) => c.name)).toEqual(['Evolving Wilds']);
+    const withUnknown = mvColumns([card('c1', 'Serra Angel'), card('c2', 'Mystery Card')], factsOf);
+    expect(withUnknown.at(-1)).toMatchObject({ label: '?' });
+    expect(withUnknown.at(-1)!.cards.map((c) => c.name)).toEqual(['Mystery Card']);
   });
 });
 
@@ -59,12 +71,12 @@ describe('filters and labels', () => {
   it('colour chips', () => {
     const gold = { ...UNKNOWN_FACTS, colours: ['W', 'U'] as const } as unknown as typeof UNKNOWN_FACTS;
     expect(passesFilter('all', UNKNOWN_FACTS)).toBe(true);
-    expect(passesFilter('W', FACTS['Serra Angel'])).toBe(true);
-    expect(passesFilter('R', FACTS['Serra Angel'])).toBe(false);
+    expect(passesFilter('W', F('Serra Angel'))).toBe(true);
+    expect(passesFilter('R', F('Serra Angel'))).toBe(false);
     expect(passesFilter('multi', gold)).toBe(true);
-    expect(passesFilter('colourless', FACTS['Evolving Wilds'])).toBe(true);
+    expect(passesFilter('colourless', F('Evolving Wilds'))).toBe(true);
     expect(tint(gold)).toBe('M');
-    expect(tint(FACTS['Lightning Bolt'])).toBe('R');
+    expect(tint(F('Lightning Bolt'))).toBe('R');
     expect(tint(UNKNOWN_FACTS)).toBe('C');
   });
   it('seat labels', () => {

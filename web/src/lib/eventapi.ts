@@ -16,7 +16,9 @@ import type {
   DraftPack,
   ErrorBody,
   EventLog,
+  EventPersonas,
   EventPool,
+  EventSetInfo,
   EventState,
   PickRequest,
 } from '../protocol';
@@ -84,6 +86,12 @@ export const listEvents = () => call<EventState[]>('GET', eventsListURL(), null)
 
 /** createEvent is POST /api/events; the response carries each human seat's invite once. */
 export const createEvent = (req: CreateEventRequest) => call<CreateEventResponse>('POST', eventsListURL(), null, req);
+
+/** listEventSets is GET /api/events/sets: the server's draftable sets, with each one's pack size and rating source. */
+export const listEventSets = () => call<EventSetInfo[]>('GET', withBase('/api/events/sets'), null);
+
+/** listEventPersonas is GET /api/events/personas: the pickbot persona names a create body's drafter fields accept. */
+export const listEventPersonas = () => call<EventPersonas>('GET', withBase('/api/events/personas'), null);
 
 /** isStale reports a pick the server refused because the pod moved on (or the card left the pack): refetch, do not retry. */
 export function isStale(e: unknown): boolean {
