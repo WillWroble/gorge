@@ -45,6 +45,17 @@ type Info struct {
 	// with TableConfig.AllowDecklistBots (enforced by host's table
 	// validation and gorged's offered-set gate).
 	Env, Search bool
+	// ClosedLists marks an Env policy whose every seat closes its
+	// opponents' deck lists: the seat is a searchseat.ClosedListSeat whose
+	// SearchBelief is never nil, so the host hands it a closed Setup and a
+	// closed honest root (host/botenv.go envData, searchseat.SeatSetup) and
+	// it never reads an opponent's real list or real hidden cards. Such a
+	// policy does not read decklists (ReadsDecklists is false) and may seat
+	// against a human without AllowDecklistBots. The declaration is not
+	// trusted on its own: at a table with a human the host checks every
+	// built seat at match start and refuses an open one, and envData
+	// refuses an open root at every decision (host/closedlist.go).
+	ClosedLists bool
 	Formats     []string
 	MaxSeats    int
 	Caretaker   string
@@ -103,7 +114,7 @@ var entries = map[string]Entry{}
 var validName = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 func Register(e Entry) {
-	if !validName.MatchString(e.Name) || e.New == nil || (e.Tier != Production && e.Tier != Experimental) {
+	if !validName.MatchString(e.Name) || e.New == nil || (e.Tier != Production && e.Tier != Experimental) || (e.ClosedLists && !e.Env) {
 		panic(fmt.Sprintf("bots: invalid entry %q", e.Name))
 	}
 	if _, exists := entries[e.Name]; exists {
@@ -142,14 +153,20 @@ func Names() []string {
 }
 
 // ReadsDecklists reports whether the named policy builds a search engine
-// over every seat's REAL decklist (Info.Env; host/botenv.go's envData).
-// The single discriminator for the operator ruling of 2026-10-13: such a
-// policy seats only on a bot-only table that set TableConfig's
-// AllowDecklistBots, and never against a human. An unknown name is false.
+// over every seat's REAL decklist (Info.Env without Info.ClosedLists;
+// host/botenv.go's envData). The single discriminator for the operator
+// ruling of 2026-10-13: such a policy seats only on a bot-only table that
+// set TableConfig's AllowDecklistBots, and never against a human. A
+// closed-list policy (az-c4) is an Env policy that does NOT read decklists.
+// An unknown name is false.
 func ReadsDecklists(name string) bool {
 	e, ok := Lookup(name)
-	return ok && e.Env
+	return ok && e.ReadsDecklists()
 }
+
+// ReadsDecklists is the Info form of the package function: Env and not
+// ClosedLists.
+func (i Info) ReadsDecklists() bool { return i.Env && !i.ClosedLists }
 
 func Entries() []Entry {
 	out := make([]Entry, 0, len(entries))

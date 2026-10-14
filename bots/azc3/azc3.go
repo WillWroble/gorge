@@ -25,58 +25,29 @@
 package azc3
 
 import (
-	"errors"
-	"fmt"
-	"sync"
-
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azredeal"
 	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/gonet"
-	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // Policy is the registry key.
 const Policy = "az-c3"
 
-var (
-	mu      sync.Mutex
-	enabled bool
-	model   *policynet.Model
-	belief  *searchprobe.Belief
-)
+// c3 is az-c3's hosted registration: open lists unless SetBelief closes them.
+var c3 = NewHosted(HostedSpec{Info: info(), ErrPrefix: "azc3"})
 
 // SetBelief closes the opponents' deck lists for every az-c3 seat built
 // afterwards: the search deals each opponent's unknown cards from lists
 // drawn from b (azmcts.WorldRedealClosed) instead of the opponent's real
 // list. gorged calls it for -az-c3-belief. Nil restores the open lists.
-func SetBelief(b *searchprobe.Belief) {
-	mu.Lock()
-	defer mu.Unlock()
-	belief = b
-}
+func SetBelief(b *searchprobe.Belief) { c3.SetBelief(b) }
 
 // Enable loads the network at path and registers the az-c3 policy. It must run
 // before the server resolves its policy flags, once per process; a path that
 // is not a valid .dzgw network is an error and registers nothing.
-func Enable(path string) error {
-	mu.Lock()
-	defer mu.Unlock()
-	if enabled {
-		return errors.New("azc3: already enabled")
-	}
-	m, err := gonet.Model(path)
-	if err != nil {
-		return fmt.Errorf("azc3: %w", err)
-	}
-	model = m
-	bots.Register(bots.Entry{Info: info(), New: newSeat})
-	enabled = true
-	return nil
-}
+func Enable(path string) error { return c3.Enable(path) }
 
 func info() bots.Info {
 	return bots.Info{
@@ -140,20 +111,4 @@ func ClosedConfig(b *searchprobe.Belief) azmcts.SeatConfig {
 		cfg.World, cfg.Belief = azmcts.WorldRedealClosed, b
 	}
 	return cfg
-}
-
-// newSeat is the registry factory. The seat pays its own mana through the
-// engine's automatic payment plans, as it did in training, so a table built
-// without them is refused here rather than played at a handicap.
-func newSeat(o bots.Options) (seat.Seat, error) {
-	if !o.AutoPayMana {
-		return nil, errors.New("az-c3 needs automatic mana payment (gorged -bot-auto-mana, the default)")
-	}
-	mu.Lock()
-	m, b := model, belief
-	mu.Unlock()
-	if m == nil {
-		return nil, errors.New("az-c3: no network loaded (Enable was not called)")
-	}
-	return azredeal.NewWithModel(o, ClosedConfig(b), m)
 }

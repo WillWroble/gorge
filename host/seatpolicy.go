@@ -33,7 +33,7 @@ func (c TableConfig) validatedSeatPolicies() (TableConfig, error) {
 			}
 			policies[i] = policy
 			if e, ok := bots.Lookup(policy); ok {
-				if e.Env {
+				if e.ReadsDecklists() {
 					return TableConfig{}, fmt.Errorf("host: table %s: seat %d: bot policy %q reads opponents' decklists", c.ID, i, policy)
 				}
 				if e.NeedsAutoPay && !c.autoPayManaEnabled() {

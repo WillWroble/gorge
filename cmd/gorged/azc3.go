@@ -11,17 +11,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/view"
 )
 
@@ -107,14 +102,10 @@ func deckLoaders(reg *cards.Registry, dir, az3Dir string, az3Pool []string) func
 	}
 }
 
-// reservedFor returns the bot policy a deck is reserved for, "" when none.
+// reservedFor returns the bot policy a deck is reserved for, "" when none;
+// a deck shared by az-c3 and az-c4 names both (reservedOwners, azc4.go).
 func (c config) reservedFor(id string) string {
-	for policy, pool := range c.policyPools {
-		if containsDeck(pool, id) {
-			return policy
-		}
-	}
-	return ""
+	return strings.Join(c.reservedOwners(id), ", ")
 }
 
 // azc3Table is the demo's az-c3 bot-versus-bot table: two seats, both az-c3,
@@ -145,42 +136,9 @@ func (c config) azc3Belief(reg *cards.Registry) error {
 	if c.az3Belief == "" {
 		return nil
 	}
-	var names []string
-	if c.az3BeliefPool != "" {
-		raw, err := os.ReadFile(c.az3BeliefPool)
-		if err != nil {
-			return fmt.Errorf("-az-c3-belief-pool: %w", err)
-		}
-		for i, line := range strings.Split(string(raw), "\n") {
-			v := strings.Split(line, "\t")
-			if i == 0 || len(v) < 2 || v[1] != "train" {
-				continue
-			}
-			names = append(names, v[0]+".json")
-		}
-	} else {
-		ents, err := os.ReadDir(c.az3Belief)
-		if err != nil {
-			return fmt.Errorf("-az-c3-belief: %w", err)
-		}
-		for _, e := range ents {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
-				names = append(names, e.Name())
-			}
-		}
-	}
-	sort.Strings(names)
-	var decks [][]*cards.Card
-	for _, n := range names {
-		_, d, err := deck.Load(reg, filepath.Join(c.az3Belief, n))
-		if err != nil {
-			continue // a deck the corpus cannot resolve is no evidence either way
-		}
-		decks = append(decks, d)
-	}
-	b, err := searchprobe.NewBelief(decks)
+	b, err := loadBelief(reg, c.az3Belief, c.az3BeliefPool, "-az-c3-belief", "-az-c3-belief-pool")
 	if err != nil {
-		return fmt.Errorf("-az-c3-belief %s: %w", c.az3Belief, err)
+		return err
 	}
 	azc3.SetBelief(b)
 	return nil

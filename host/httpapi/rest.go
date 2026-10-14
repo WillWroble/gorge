@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/host"
@@ -28,8 +29,31 @@ type DeckInfo struct {
 	Commander string `json:"commander,omitempty"`
 	// Pool names the bot policy this deck is reserved for ("" for an ordinary
 	// deck). A reserved deck is dealt only to games against that policy, and
-	// that policy deals nothing else (cmd/gorged/azc3.go).
+	// that policy deals nothing else (cmd/gorged/azc3.go). A deck reserved
+	// for several policies (az-c3 and az-c4 sharing one deck directory,
+	// cmd/gorged/azc4.go) names them all, comma-separated (JoinPools).
 	Pool string `json:"pool,omitempty"`
+}
+
+// JoinPools adds policy to a DeckInfo.Pool value.
+func JoinPools(pool, policy string) string {
+	if pool == "" {
+		return policy
+	}
+	if PoolHas(pool, policy) {
+		return pool
+	}
+	return pool + "," + policy
+}
+
+// PoolHas reports whether a DeckInfo.Pool value names policy.
+func PoolHas(pool, policy string) bool {
+	for _, p := range strings.Split(pool, ",") {
+		if p == policy && p != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // decks serves GET /api/decks: every deck, so a client that knows nothing of
@@ -49,14 +73,14 @@ func (h *handler) decks(w http.ResponseWriter, r *http.Request) {
 	}
 	reserved := false
 	for _, d := range all {
-		if d.Pool == policy {
+		if PoolHas(d.Pool, policy) {
 			reserved = true
 			break
 		}
 	}
 	decks := []DeckInfo{}
 	for _, d := range all {
-		if (reserved && d.Pool == policy) || (!reserved && d.Pool == "") {
+		if (reserved && PoolHas(d.Pool, policy)) || (!reserved && d.Pool == "") {
 			decks = append(decks, d)
 		}
 	}

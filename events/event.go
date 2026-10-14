@@ -1196,7 +1196,7 @@ const (
 	// world: the closed-decklist redeal (internal/searchprobe) gives an
 	// opponent's unknown hand and library cards identities sampled from a
 	// belief over deck lists instead of permuting the real ones. Obj is the
-	// card (in its owner's hand or library), Player its owner, Amount the new
+	// card (in its owner's hand, library or sideboard), Player its owner, Amount the new
 	// card's ordinal in state.Game.HypotheticalCards and Text that card's
 	// primary-face name; the fold checks the name against the table, so a
 	// stale ordinal changes nothing (and rules.ReidentifyHidden, the only

@@ -97,7 +97,7 @@ func validateBotPolicyFlags(def, offeredRaw string) (string, []string, error) {
 	if !ok {
 		return "", nil, fmt.Errorf("-bot-policy: unknown bot policy %q (known: %s)", def, strings.Join(bots.Names(), ", "))
 	}
-	if entry.Env {
+	if entry.ReadsDecklists() {
 		return "", nil, fmt.Errorf("-bot-policy %q reads opponents' decklists and cannot be the default: a vs-bot request always seats a human", def)
 	}
 	if !containsString(offered, def) {

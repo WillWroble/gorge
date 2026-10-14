@@ -553,7 +553,7 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 		return &parkedData{
 			p:       d.Player,
 			dc:      dc,
-			brd:     botpolicy.BoardFromGameInto(m.e.G, m.e, d.Player, brd),
+			brd:     botpolicy.BoardFromGameInto(m.e.G, m.e, d.Player, brd).Detached(),
 			isBoard: true,
 		}
 	}
@@ -710,6 +710,12 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	// every Observe/Record below is a nil-receiver no-op (§5.2 Create).
 	m.feeds = newMatchFeeds(seats)
 	m.mu.Unlock()
+	// Decklist privacy (host/closedlist.go): at a table with a human, every
+	// search seat must close its opponents' lists, checked on the seats
+	// actually built rather than on the policy's declaration.
+	if err := closedListGuard(t.cfg, seats); err != nil {
+		return r.crash(t, m, err)
+	}
 	// Task M2b-3: arm every human seat with its think budget and its
 	// deterministic caretaker bot — the one defaultSeats would have built
 	// for that slot (seed ^ slot+1), so a timed-out human decision is
@@ -890,6 +896,18 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 				d := m.e.Pending()
 				var drec *decision.Decision
 				if d != nil && m.feeds != nil {
+					// A payment-plan answer (in.Payment / in.Announce) names
+					// one of the decision's PaymentActions, which the engine
+					// builds lazily -- Submit builds them to validate it. A
+					// seat that is not a PaymentPlanConsumer (the az seats,
+					// which plan payments on their own root) leaves them
+					// unbuilt on the live decision, so the copy recorded on
+					// the feed could not translate the answer and the feed
+					// stopped for the rest of the game. Build them first: a
+					// pure derived read, no event, no RNG.
+					if in.Payment != nil || in.Announce != nil {
+						m.e.EnsurePaymentActions()
+					}
 					drec = d.Clone()
 				}
 				if e := m.e.Submit(in); e != nil {

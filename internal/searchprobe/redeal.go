@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/state"
@@ -69,6 +70,11 @@ type redealPlan struct {
 	closed   bool
 	seen     []int32
 	seenMask uint8
+	// side is a closed player's sideboard (a hidden zone the hand and
+	// library deal never touches), in object order: every Deal re-identifies
+	// it from the belief too (Redealer.reidentifySide), after every other
+	// deal, so its draws never shift the hand and library deal.
+	side []state.ObjID
 }
 
 func redealWorlds(setup PublicGame, h History, known KnownCards, base *RedealBase, n int, seed func(int) [2]uint64) ([]World, string) {
@@ -123,6 +129,11 @@ type Redealer struct {
 	// re-identification scratch.
 	belief *Belief
 	ords   []int32
+	// manifests is the base's genesis manifest table closed to the actor's
+	// own list (rules.Engine.ClosedDeckManifests), installed on every world
+	// of a closed setup so no world's OwnDeck names an opponent's real list.
+	// Nil for an open setup: the world keeps the base's table.
+	manifests []deck.Manifest
 }
 
 // NewRedealer prepares the redeal of base.Engine for the seat whose History
@@ -307,6 +318,8 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 			slices.Sort(plan.unknown)
 			plan.closed, plan.seenMask = true, closedMask[p]
 			plan.seen = closedSeen[p]
+			plan.side = append([]state.ObjID(nil), e.G.Zone(state.ZSideboard, p)...)
+			slices.Sort(plan.side)
 			slices.Sort(plan.seen)
 			plan.indexClosed(e)
 			plans = append(plans, plan)
@@ -348,8 +361,12 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 		}
 		plans = append(plans, plan)
 	}
-	return &Redealer{e: e, known: known, obs: base.Observer, probe: probe, nowBoard: nowBoard, nowDecision: nowDec, plans: plans,
-		blind: observationBlind(e, h.Actor, plans), belief: setup.Belief}, ""
+	r := &Redealer{e: e, known: known, obs: base.Observer, probe: probe, nowBoard: nowBoard, nowDecision: nowDec, plans: plans,
+		blind: observationBlind(e, h.Actor, plans), belief: setup.Belief}
+	if setup.Belief != nil {
+		r.manifests = e.ClosedDeckManifests(h.Actor)
+	}
+	return r, ""
 }
 
 // Deal builds one redealt world from seed: a hypothetical clone of the base
@@ -364,6 +381,11 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 func (r *Redealer) Deal(seed [2]uint64, sp *rules.Spare) (*rules.Engine, string) {
 	rng := rand.New(rand.NewPCG(seed[0], seed[1]))
 	w := r.e.CloneHypotheticalInto(seed[1], sp)
+	if r.manifests != nil {
+		if err := w.UseDeckManifests(r.manifests); err != nil {
+			return nil, "closed manifests: " + err.Error()
+		}
+	}
 	blind := r.blind
 	for i := range r.plans {
 		if r.plans[i].closed {
@@ -375,6 +397,15 @@ func (r *Redealer) Deal(seed [2]uint64, sp *rules.Spare) (*rules.Engine, string)
 		}
 		if reason := redealPlayer(w, &r.plans[i], rng, &r.scratch); reason != "" {
 			return nil, reason
+		}
+	}
+	for i := range r.plans {
+		if r.plans[i].closed && len(r.plans[i].side) > 0 {
+			reason, dealtBlind := r.reidentifySide(w, &r.plans[i], rng)
+			if reason != "" {
+				return nil, reason
+			}
+			blind = blind && dealtBlind
 		}
 	}
 	if err := r.known.holds(w, r.obs); err != nil {
@@ -435,6 +466,27 @@ func (r *Redealer) reidentify(w *rules.Engine, plan *redealPlan, rng *rand.Rand)
 	r.ords = r.belief.closedDeal(plan.seenMask, plan.seen, len(plan.unknown), rng, r.ords)
 	if err := rules.ReidentifyHidden(w, r.belief.Cards(), plan.unknown, r.ords); err != nil {
 		return fmt.Sprintf("player %d closed redeal: %v", plan.player, err), false
+	}
+	dealtBlind = true
+	for _, o := range r.ords {
+		if !r.belief.blind[o] {
+			dealtBlind = false
+			break
+		}
+	}
+	return "", dealtBlind
+}
+
+// reidentifySide gives a closed player's sideboard this world's identities:
+// a fresh list drawn from the belief by the player's seen colours, trimmed
+// or padded to the sideboard's size (Belief.closedDeal with nothing
+// accounted for). The real sideboard is as private as the real list, so it
+// never reaches a world either; what it deals is a function of the plan and
+// r alone.
+func (r *Redealer) reidentifySide(w *rules.Engine, plan *redealPlan, rng *rand.Rand) (reason string, dealtBlind bool) {
+	r.ords = r.belief.closedDeal(plan.seenMask, nil, len(plan.side), rng, r.ords)
+	if err := rules.ReidentifyHidden(w, r.belief.Cards(), plan.side, r.ords); err != nil {
+		return fmt.Sprintf("player %d closed sideboard: %v", plan.player, err), false
 	}
 	dealtBlind = true
 	for _, o := range r.ords {

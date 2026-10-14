@@ -12,6 +12,7 @@ import (
 
 	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/internal/searchseat"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/seat"
 	"github.com/adams-shaun/gorge/view"
 )
@@ -42,13 +43,20 @@ func TestUndoRebuildsEnvSeatFeeds(t *testing.T) {
 	o := testOptions(t)
 	rewound := make(chan int, 1)
 	o.OnRewind = func(_ TableID, _ int, n int, _ uint64) error { rewound <- n; return nil }
+	// The spy closes its opponent's list: at a table with a human the host
+	// seats only a closed-list search seat (host/closedlist.go).
+	_, decks := testutil.SampleDecks(t, 4)
+	belief, err := searchprobe.NewBelief(decks[2:])
+	if err != nil {
+		t.Fatal(err)
+	}
 	o.Seats = func(names []string, gotSeed uint64) []seat.Seat {
 		// Slot 0 is replaced by the HumanSeat through TableConfig.Humans
 		// below (the undo requester); slot 1 stays the spy EnvSeat, the only
 		// seat the host builds a feed for.
 		return []seat.Seat{
 			seat.NewBot(gotSeed ^ 1),
-			&spyEnvSeat{Bot: seat.NewBot(gotSeed ^ 2)},
+			&closedSpy{spyEnvSeat: &spyEnvSeat{Bot: seat.NewBot(gotSeed ^ 2)}, belief: belief},
 		}
 	}
 	r, err := New(o)

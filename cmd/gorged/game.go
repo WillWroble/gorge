@@ -46,7 +46,7 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 			// the server's default.
 			name = c.botPolicy
 			for _, id := range []string{req.HumanDeck, req.BotDeck} {
-				if owner := c.reservedFor(id); id != "" && owner != "" {
+				if owner := c.reservedPick(id); id != "" && owner != "" {
 					name = owner
 					break
 				}
@@ -82,9 +82,11 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 		// Operator ruling 2026-10-13: a policy that reads opponents'
 		// decklists (bots.Info.Env) never plays a vs-bot table — this
 		// request always seats a human. It covers both an explicit client
-		// pick and the reserved-pool picker above, whose reservedFor hit
-		// would otherwise name az-c3 here.
-		if entry.Env {
+		// pick and the reserved-pool picker above, whose reservedPick hit
+		// would otherwise name az-c3 here. A closed-list policy (az-c4,
+		// bots.Info.ClosedLists) does not read decklists and passes; the
+		// host checks its seats at match start (host/closedlist.go).
+		if bots.ReadsDecklists(policy) {
 			return httpapi.CreateGameResponse{}, fmt.Errorf("bot policy %q reads opponents' decklists and cannot play at a table with a human", policy)
 		}
 		pool, otherPool := conPool, cmdPool

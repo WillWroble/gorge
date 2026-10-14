@@ -75,9 +75,12 @@ func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registr
 	if gate == nil {
 		return nil, fmt.Errorf("gorged: draft events need a seat gate to mint game tokens")
 	}
+	// A policy with a reserved deck pool (az-c4) plays only those decks, and
+	// an event deals its own, so it is left out too.
+	reserved := c.reservedPolicyNames()
 	policies := make([]string, 0, len(c.botPolicies))
 	for _, p := range c.botPolicies {
-		if !bots.ReadsDecklists(p) {
+		if !bots.ReadsDecklists(p) && !containsString(reserved, p) {
 			policies = append(policies, p)
 		}
 	}
