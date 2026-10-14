@@ -1,0 +1,3394 @@
+{
+ "seed": 5993994771396169689,
+ "names": [
+  "FDN06-RG",
+  "e203-s1"
+ ],
+ "mulligans": 2,
+ "max_objs": 2000,
+ "decks": [
+  [
+   "Abrade",
+   "Affectionate Indrik",
+   "Ashroot Animist",
+   "Battlesong Berserker",
+   "Bite Down",
+   "Bushwhack",
+   "Bushwhack",
+   "Dragon Trainer",
+   "Eager Trufflesnout",
+   "Eager Trufflesnout",
+   "Felling Blow",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Forest",
+   "Gnarlid Colony",
+   "Gnarlid Colony",
+   "Gorehorn Raider",
+   "Heartfire Immolator",
+   "Llanowar Elves",
+   "Loot, Exuberant Explorer",
+   "Mountain",
+   "Mountain",
+   "Mountain",
+   "Mountain",
+   "Mountain",
+   "Mountain",
+   "Mountain",
+   "Nessian Hornbeetle",
+   "Ruby, Daring Tracker",
+   "Rugged Highlands",
+   "Shivan Dragon",
+   "Slagstorm",
+   "Slumbering Cerberus",
+   "Solemn Simulacrum",
+   "Wary Thespian"
+  ],
+  [
+   "Dazzling Angel",
+   "Dazzling Angel",
+   "Faebloom Trick",
+   "Vanguard Seraph",
+   "Inspiring Paladin",
+   "Banishing Light",
+   "Healer's Hawk",
+   "Clinquant Skymage",
+   "Essence Scatter",
+   "Giada, Font of Hope",
+   "Giada, Font of Hope",
+   "Squad Rallier",
+   "Squad Rallier",
+   "Uncharted Voyage",
+   "Imprisoned in the Moon",
+   "Imprisoned in the Moon",
+   "Dauntless Veteran",
+   "Witness Protection",
+   "Extravagant Replication",
+   "Self-Reflection",
+   "Make Your Move",
+   "Cathar Commando",
+   "Rune-Sealed Wall",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Plains",
+   "Island",
+   "Island",
+   "Island",
+   "Island",
+   "Island",
+   "Island",
+   "Island",
+   "Island"
+  ]
+ ],
+ "intents": [
+  {
+   "seq": 18,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 20,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 22,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 29,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 33,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 38,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 44,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 48,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 53,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 57,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 63,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 67,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 71,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 77,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 81,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 86,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 90,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 99,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 103,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 109,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 113,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 118,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 126,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 130,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 137,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 141,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 146,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 150,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 156,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 160,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 164,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 170,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 174,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 179,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 183,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 192,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 196,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 202,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 206,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 211,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 217,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 223,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 229,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 235,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 239,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 245,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 249,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 254,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 258,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 264,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 268,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 272,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 278,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 282,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 287,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 291,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 301,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 305,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 311,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 315,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 320,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 324,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 328,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 334,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 340,
+   "player": 0,
+   "choices": null,
+   "payment": {
+    "action_id": "f4f7d48ba10ef9f79d75caf79b4f51a42e06d39a333bc26f703368e79c50ea3d",
+    "plan": {
+     "version": 1,
+     "id": "d450c651a6847bf6190638d5d372608eb3cef9cb9f6791706311557bc622d85e",
+     "cost": {
+      "generic": 1,
+      "mana": [
+       0,
+       0,
+       0,
+       1,
+       0,
+       0
+      ]
+     },
+     "activations": [],
+     "pool_spend": [
+      0,
+      0,
+      0,
+      1,
+      1,
+      0
+     ],
+     "pool_after": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "seq": 347,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 351,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 357,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 361,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 366,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 370,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 376,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 380,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 384,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 390,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 394,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 399,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 403,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 414,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 418,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 424,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 428,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 433,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 439,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 445,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 451,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 458,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 462,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 469,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 473,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 478,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 482,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 488,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 492,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 496,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 502,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 506,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 511,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 515,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 526,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 530,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 536,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 540,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 545,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 549,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 553,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 559,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 565,
+   "player": 0,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 571,
+   "player": 0,
+   "choices": null,
+   "payment": {
+    "action_id": "b534e62342868fee2e820f75610f6f2ce2dcebecf22ed075933453aa53d237f4",
+    "plan": {
+     "version": 1,
+     "id": "369c05323266a1fba81123fb7fdc4432a4e96168f2497845b4d08e73cfdedee8",
+     "cost": {
+      "generic": 2,
+      "mana": [
+       0,
+       0,
+       0,
+       0,
+       1,
+       0
+      ]
+     },
+     "activations": [],
+     "pool_spend": [
+      0,
+      0,
+      0,
+      2,
+      1,
+      0
+     ],
+     "pool_after": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "seq": 575,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 578,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 586,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 590,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 597,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 601,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 611,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 615,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 620,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 624,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 628,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 633,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 637,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 643,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 647,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 655,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 659,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 665,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 669,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 674,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 678,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 690,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 694,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 700,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 704,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 709,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 715,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 721,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 727,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 733,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 739,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 743,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 749,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 755,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 759,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 765,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 769,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 775,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 779,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 783,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 789,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 793,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 798,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 802,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 815,
+   "player": 0,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 819,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 825,
+   "player": 0,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 829,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 834,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 840,
+   "player": 0,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 846,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 852,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 858,
+   "player": 0,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 862,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 866,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 873,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 877,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 884,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 888,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 893,
+   "player": 0,
+   "choices": null
+  },
+  {
+   "seq": 900,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 904,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 907,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 910,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 917,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 921,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 928,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 932,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 944,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 948,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 954,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 958,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 962,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 967,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 971,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 975,
+   "player": 1,
+   "choices": null
+  },
+  {
+   "seq": 979,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 983,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 991,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 995,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1001,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1005,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1010,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1014,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1027,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1031,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1037,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1041,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1046,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1052,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1058,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1064,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1070,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1076,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1082,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1086,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1092,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1096,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1102,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1106,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1110,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1115,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1119,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1125,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1129,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1138,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1142,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1148,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1152,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1157,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1161,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1175,
+   "player": 0,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1179,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1185,
+   "player": 0,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1189,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1194,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1200,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1206,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1212,
+   "player": 0,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1216,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1220,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1226,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1232,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1239,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1243,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1249,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1253,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1258,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1262,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1266,
+   "player": 0,
+   "choices": [
+    0,
+    1
+   ]
+  },
+  {
+   "seq": 1272,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1276,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1280,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1284,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1288,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1305,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1309,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1314,
+   "player": 0,
+   "choices": null
+  },
+  {
+   "seq": 1321,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1325,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1331,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1335,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1340,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1344,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1358,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 1362,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1368,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 1372,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1377,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 1383,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1389,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1395,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1401,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1405,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 1412,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1416,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1423,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1427,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1432,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1436,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1440,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1445,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1449,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1455,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1459,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1468,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1472,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1478,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1482,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1487,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1491,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1506,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 1510,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1516,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 1520,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1525,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1531,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1537,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1543,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1549,
+   "player": 0,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1553,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1557,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1563,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1569,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1576,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1580,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1586,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1590,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1594,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1597,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1609,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1613,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1618,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1622,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1626,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1631,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1635,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1641,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1645,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1653,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1657,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1663,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1667,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1672,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1676,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1689,
+   "player": 1,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1693,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1699,
+   "player": 1,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1703,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1708,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1714,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1720,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1726,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1732,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1739,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1743,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1749,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1753,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1758,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1762,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1768,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1772,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1776,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1782,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1786,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1791,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1795,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1811,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1815,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1821,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1825,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1830,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1836,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 1840,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1845,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 1849,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1853,
+   "player": 0,
+   "choices": [
+    0,
+    1
+   ]
+  },
+  {
+   "seq": 1859,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 1863,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1867,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1871,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 1875,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1888,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1892,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1898,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1902,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1907,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1911,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1925,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 1929,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1935,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 1939,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1944,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1950,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1956,
+   "player": 1,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1962,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1968,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1974,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1980,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1986,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1993,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1997,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2003,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2007,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2012,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2016,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2020,
+   "player": 1,
+   "choices": null
+  },
+  {
+   "seq": 2024,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2028,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2032,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2038,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2042,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2047,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2051,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2061,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2065,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2071,
+   "player": 0,
+   "choices": null,
+   "payment": {
+    "action_id": "ac0124d456e6a59d7353087decb0fd679074da4fb5081c99e38ca28db292b1b9",
+    "plan": {
+     "version": 1,
+     "id": "742d61f753bc143230b497d64111ccd7640d6381afc7017c7778766952cf0fdb",
+     "cost": {
+      "generic": 1,
+      "mana": [
+       0,
+       0,
+       0,
+       0,
+       1,
+       0
+      ]
+     },
+     "activations": [
+      {
+       "source": 16,
+       "source_zone_seq": 849,
+       "ability": {
+        "kind": "intrinsic",
+        "intrinsic": "basic_land"
+       },
+       "produces": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+       ]
+      },
+      {
+       "source": 30,
+       "source_zone_seq": 1560,
+       "ability": {
+        "kind": "intrinsic",
+        "intrinsic": "basic_land"
+       },
+       "produces": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+       ]
+      }
+     ],
+     "pool_spend": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "pool_after": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "seq": 2075,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2078,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2089,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2093,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2102,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2106,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2111,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2117,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2121,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2126,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2130,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2134,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2139,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2143,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2149,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2153,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2161,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2165,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2171,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2175,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2180,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2184,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2199,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2203,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2207,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2211,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2218,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2222,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2228,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2232,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2237,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 2243,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 2249,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2255,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2261,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2267,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2273,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2279,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2283,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2289,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2293,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2299,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2303,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2307,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2313,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2317,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2322,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2326,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2338,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 2342,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2348,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 2352,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2357,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2363,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2369,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2375,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2382,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2386,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2392,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2396,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2401,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2405,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2409,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2414,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2418,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2424,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2428,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  }
+ ]
+}

@@ -202,7 +202,13 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 	}
 	for _, ref := range referenced {
 		id := base.Observer.object(ref)
-		if o := e.G.Obj(id); o != nil && o.Zone.Hidden() && !pinned[id] {
+		// A token is never a hidden card (CR 111.8: one that would be in a
+		// hidden zone ceases to exist). A token still being created --
+		// staged for an "as it enters" question, such as a token copy of an
+		// Aura choosing what it enchants (CR 303.4f) -- is in no zone yet,
+		// and its Zone field reads the zero value, ZLibrary; it is not a
+		// library card and nothing about it is hidden.
+		if o := e.G.Obj(id); o != nil && o.Zone.Hidden() && !o.IsToken && !pinned[id] {
 			return nil, "observed frame refers to an unpinned hidden card"
 		}
 	}
