@@ -320,6 +320,7 @@ start_one() {
 		-art-dir "$ART_DIR" \
 		-pprof="$PPROF" \
 		-vsbot \
+		-events \
 		"$@" \
 		>"$log" 2>&1 </dev/null 9>&- &
 	say "started $spectator on 127.0.0.1:$port (log $log)"
