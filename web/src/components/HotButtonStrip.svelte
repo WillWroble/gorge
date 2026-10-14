@@ -360,9 +360,14 @@
        preset label, and the hard skip's chip IS the warning banner. Undo's
        machine pause outranks both: this is the only always-visible status in
        the live strip (its nested SeatPanel deliberately hides the autobar),
-       so the chip also becomes the Auto switch that its text says resumes. -->
+       so the chip also becomes the Auto switch that its text says resumes.
+       It is a switch, so it must LOOK like one: lit while Auto is on, dim
+       while off, half-lit while paused. It used to paint on and off alike and
+       the pause lit, so resuming turned it dark and every later press flipped
+       Auto with nothing visible changing ("the button has no effect"). -->
   <button
     class="mode-chip"
+    class:on={logic.auto && !logic.machinePaused}
     class:paused={logic.machinePaused}
     class:run={runLive}
     class:warning={logic.hardSkip}
@@ -605,8 +610,8 @@
   }
   .compact { display: none; }
 
-  /* The status chip is also the always-visible Auto switch. Presets read as
-     labels; a live run takes the run register — the hard skip's warning
+  /* The status chip is also the always-visible Auto switch: lit when Auto is
+     on, dim when off. Presets read as labels; a live run takes the run register — the hard skip's warning
      colour is the danger variable, because passing everything unseen is the
      one state that can lose the game in silence. */
   .mode-chip {
@@ -628,6 +633,7 @@
     white-space: nowrap;
     cursor: pointer;
   }
+  .mode-chip.on,
   .mode-chip.run {
     color: var(--felt-sunk);
     background: var(--offered);
@@ -637,10 +643,13 @@
     background: var(--danger);
     border-color: var(--danger);
   }
+  /* Paused is neither on nor off: half-lit, the look of an armed tab, so the
+     press that resumes it visibly lights the chip fully. */
   .mode-chip.paused {
-    color: var(--felt-sunk);
-    background: var(--offered);
+    color: var(--ink);
+    background: color-mix(in srgb, var(--offered) 22%, var(--instrument-raised));
     border-color: var(--offered);
+    box-shadow: inset 0 0 0 1px var(--offered);
   }
   .mode-chip:hover,
   .mode-chip:focus-visible {
