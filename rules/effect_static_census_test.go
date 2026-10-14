@@ -52,17 +52,38 @@ func effectRegisteredStaticModes(t *testing.T) map[string]bool {
 	return modes
 }
 
-// effectCorpusModes returns, per mode, the set of corpus files whose Effect
-// body (an SVar referenced from a StaticAbilities$ or Triggers$ field) names
-// that mode.
+// splitEffectTokens splits a comma/whitespace separated token list.
+func splitEffectTokens(s string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' })
+}
+
+// effectAbilityField returns the tokens a `Field$` parameter carries on one
+// ability line, or nil when the line has no such parameter. Ability
+// parameters are `|`-separated, so a whole-field match cannot confuse
+// `Triggers$` with `AddTriggers$`.
+func effectAbilityField(line, field string) []string {
+	for _, part := range strings.Split(line, "|") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, field+"$") {
+			return splitEffectTokens(strings.TrimPrefix(part, field+"$"))
+		}
+	}
+	return nil
+}
+
+// effectCorpusModes returns, per mode, the set of corpus files whose EFFECT
+// ability (an `A:AB$`/`A:SP$` or `SVar:NAME:DB$/AB$/SP$` whose API is
+// `Effect`) carries a `StaticAbilities$`/`Triggers$` reference to an SVar
+// whose `Mode$` names that mode. Only Effect-delivered grants are counted: an
+// Animate, a Clone `AddTriggers$` or a printed `T:Mode$` trigger is a
+// different registration path and is not what the AGENTS.md row describes.
 func effectCorpusModes(t *testing.T) (static, trigger map[string]map[string]bool) {
 	t.Helper()
 	root := filepath.Join(testutil.CorpusDirOrSkip(t), "cardsfolder")
 	static = map[string]map[string]bool{}
 	trigger = map[string]map[string]bool{}
-	saRE := regexp.MustCompile(`StaticAbilities\$([^|\n]*)`)
-	trRE := regexp.MustCompile(`Triggers\$([^|\n]*)`)
-	bodyRE := regexp.MustCompile(`(?m)^SVar:([^:]+):Mode\$([^\n|]*)`)
+	abilityRE := regexp.MustCompile(`(?m)^(?:SVar:[^:\n]+:)?(?:A:)?(?:DB|AB|SP)\$([^\n]*)`)
+	modeRE := regexp.MustCompile(`(?m)^SVar:([^:\n]+):Mode\$([^\n|]*)`)
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".txt") {
 			return err
@@ -72,33 +93,26 @@ func effectCorpusModes(t *testing.T) (static, trigger map[string]map[string]bool
 			return nil
 		}
 		txt := string(b)
-		saRefs, trRefs := map[string]bool{}, map[string]bool{}
-		for _, m := range saRE.FindAllStringSubmatch(txt, -1) {
-			for _, tok := range strings.FieldsFunc(m[1], func(r rune) bool { return r == ',' || r == ' ' || r == '\t' }) {
-				saRefs[tok] = true
-			}
+		modeBySVar := map[string][]string{}
+		for _, m := range modeRE.FindAllStringSubmatch(txt, -1) {
+			modeBySVar[strings.TrimSpace(m[1])] = splitEffectTokens(m[2])
 		}
-		for _, m := range trRE.FindAllStringSubmatch(txt, -1) {
-			for _, tok := range strings.FieldsFunc(m[1], func(r rune) bool { return r == ',' || r == ' ' || r == '\t' }) {
-				trRefs[tok] = true
-			}
-		}
-		for _, m := range bodyRE.FindAllStringSubmatch(txt, -1) {
-			name := strings.TrimSpace(m[1])
-			for _, mode := range strings.FieldsFunc(m[2], func(r rune) bool { return r == ',' || r == ' ' || r == '\t' }) {
-				if saRefs[name] {
-					if static[mode] == nil {
-						static[mode] = map[string]bool{}
+		add := func(tbl map[string]map[string]bool, refs []string) {
+			for _, ref := range refs {
+				for _, mode := range modeBySVar[ref] {
+					if tbl[mode] == nil {
+						tbl[mode] = map[string]bool{}
 					}
-					static[mode][path] = true
-				}
-				if trRefs[name] {
-					if trigger[mode] == nil {
-						trigger[mode] = map[string]bool{}
-					}
-					trigger[mode][path] = true
+					tbl[mode][path] = true
 				}
 			}
+		}
+		for _, m := range abilityRE.FindAllStringSubmatch(txt, -1) {
+			if !strings.HasPrefix(strings.TrimSpace(m[1]), "Effect") {
+				continue
+			}
+			add(static, effectAbilityField(m[1], "StaticAbilities"))
+			add(trigger, effectAbilityField(m[1], "Triggers"))
 		}
 		return nil
 	})
