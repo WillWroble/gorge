@@ -226,9 +226,11 @@ func (r *run) idlePick(seat int) bool {
 	return true
 }
 
-// idleBuild saves the builder's suggestion for an idle seat and readies
-// it. A suggestion that will not validate halts the run, exactly as the
-// bot path in advanceBuild does.
+// idleBuild saves the builder's suggestion for an idle seat that has not
+// saved one yet, and readies the seat whenever a deck is saved but not
+// readied — a human who saved a deck and then vanished must not hold the
+// event in BUILD forever. A suggestion that will not validate halts the
+// run, exactly as the bot path in advanceBuild does.
 func (r *run) idleBuild(seat int) bool {
 	acted := false
 	if r.ev.SavedRev(seat) == 0 {
@@ -243,10 +245,11 @@ func (r *run) idleBuild(seat int) bool {
 		}
 		acted = true
 	}
-	if acted && r.ev.ReadyRev(seat) == 0 {
+	if r.ev.ReadyRev(seat) == 0 {
 		if err := r.apply(event.Entry{Kind: event.KindReady, Seat: seat, Rev: r.ev.SavedRev(seat)}); err != nil {
 			return acted
 		}
+		acted = true
 	}
 	return acted
 }

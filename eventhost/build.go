@@ -126,7 +126,10 @@ func (h *Host) CheckDeck(id, token string, req protocol.DeckRequest) (protocol.D
 	if r.ev.Phase() == event.PhaseLobby {
 		return protocol.DeckCheck{}, errConflict("eventhost: the event has not drafted yet (phase %s)", r.ev.Phase())
 	}
-	r.markAct(seat, r.h.opts.Now())
+	// No markAct here: CheckDeck is a read-only check, and a client that
+	// only polls it must not keep an otherwise-idle event live past its
+	// idle window. Only state-changing actions (join, pick, save, ready)
+	// refresh the window.
 	return r.deckCheck(seat, req), nil
 }
 
