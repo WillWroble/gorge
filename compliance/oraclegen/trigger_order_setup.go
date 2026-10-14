@@ -13,7 +13,7 @@ import (
 // scenario keep the pre-retiming behaviour. XAnswers and the direct tests use
 // this form.
 func xanswers(ds []rules.OracleDecision, steps int, modes map[string]int, castSteps map[int]bool) [][]XAnswer {
-	return xanswersSetup(ds, steps, modes, castSteps, nil)
+	return xanswersSetup(ds, steps, modes, castSteps, nil, nil)
 }
 
 // triggerOrderSetupPosed reports whether a trigger-order decision is posed by

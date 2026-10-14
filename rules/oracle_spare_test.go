@@ -20,7 +20,8 @@ func TestOracleSparePoolIsInvisible(t *testing.T) {
 	sc.xmageFixture = true
 	fails, transcript, run := runOracleScenario(reg, sc)
 	want := OracleResult{Fails: fails, Transcript: transcript,
-		Snapshots: append([]OracleSnapshot{}, run.snaps...), Decisions: append([]OracleDecision{}, run.decisions...)}
+		Snapshots: append([]OracleSnapshot{}, run.snaps...), Decisions: append([]OracleDecision{}, run.decisions...),
+		Flips: append([]OracleFlip{}, run.flips...)}
 	for i := 0; i < 3; i++ {
 		if _, err := RunOracleScenarioJSON(reg, []byte(castAbilityIndexScenario)); err != nil {
 			t.Fatal(err)

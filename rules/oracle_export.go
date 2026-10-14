@@ -19,6 +19,12 @@ type OracleResult struct {
 	Transcript []string         `json:"transcript,omitempty"`
 	Snapshots  []OracleSnapshot `json:"snapshots"`
 	Decisions  []OracleDecision `json:"decisions"`
+	// Flips records every canonical coin-flip result Note the run's seeded
+	// RNG produced (rules.OracleFlip), in log order. A generated row's
+	// XMage side scripts each one, so the two engines do not each flip on
+	// their own seed. Omitted when the scenario flips no coin, leaving the
+	// result bytes unchanged for every other scenario.
+	Flips []OracleFlip `json:"flips,omitempty"`
 	// PendingTriggerAsks counts checkpoints taken with a trigger-order or
 	// triggered-cost ask still pending (XMage has answered it by then). A
 	// ratchet at zero; omitted when zero so existing results are unchanged.
@@ -51,6 +57,7 @@ func RunOracleScenarioJSON(reg *cards.Registry, raw []byte) (OracleResult, error
 		Fails: fails, Transcript: transcript,
 		Snapshots:          append([]OracleSnapshot{}, run.snaps...),
 		Decisions:          append([]OracleDecision{}, run.decisions...),
+		Flips:              append([]OracleFlip{}, run.flips...),
 		PendingTriggerAsks: run.askedAtCheckpoint,
 	}
 	// The result holds only strings and fresh slices, never the engine's

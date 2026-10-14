@@ -1,2 +1,0 @@
-{"shape":{"template":"cast-resolve","op":"resolve","field":"p0.graveyard","diff":"gorge+[$CARD] xmage+[]"},"key":"cast-resolve | resolve | p0.graveyard | gorge+[$CARD] xmage+[]","cards":1}
-{"card":"Flesh Duplicate","template":"cast-resolve","status":"diverge","api":"-","detail":"step 1 (resolve) p0.graveyard: gorge \"[Flesh Duplicate]\", xmage \"[]\""}
