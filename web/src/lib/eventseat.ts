@@ -74,3 +74,18 @@ export function rememberName(name: string, storage: Storage | null = safeStorage
     /* best-effort */
   }
 }
+
+/**
+ * tableEventSeat is the table page's event context (E3-9). A series game's
+ * join link is `/t/{table}?seat=&token=&event=<id>`: its token is the GAME
+ * token, so the event seat comes ONLY from the pair the event page
+ * remembered for that event — the URL's seat and token are never read (or
+ * stored) as an event seat. Null without `event=` or without a remembered
+ * seat (a spectator, or a browser that never opened the event page).
+ */
+export function tableEventSeat(search: string, storage: Storage | null = safeStorage()): { event: string; seat: EventSeat } | null {
+  const event = new URLSearchParams(search).get('event');
+  if (!event) return null;
+  const seat = eventSeatFor(event, '', storage);
+  return seat ? { event, seat } : null;
+}

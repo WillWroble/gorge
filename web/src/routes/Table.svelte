@@ -15,6 +15,7 @@
   import DvrBar from '../components/DvrBar.svelte';
   import MatchList from '../components/MatchList.svelte';
   import ConcedeControl from '../components/ConcedeControl.svelte';
+  import TableEventOverlay from '../components/event/TableEventOverlay.svelte';
   import RestartControl from '../components/RestartControl.svelte';
   import SeatPanel from '../components/SeatPanel.svelte';
   import HandFan from '../components/HandFan.svelte';
@@ -112,8 +113,12 @@
 
   // idle: the table has no live match and none imminent, so the match list
   // is the whole page rather than a strip under a "waiting" placeholder.
+  // E3-9: a draft-event series table between two of its games is not idle
+  // (TableEventOverlay reports the series still in play), whatever the
+  // table store guessed from the match_end of a non-perpetual table.
+  let eventInPlay = $state(false);
   const idle = $derived.by(() => {
-    if (finished) return false;
+    if (finished || eventInPlay) return false;
     const state = tables.list.find((t) => t.info.id === table)?.info.state;
     return state === 'idle' || state === 'halted';
   });
@@ -466,6 +471,10 @@
 </script>
 
 <svelte:window onkeydown={closeOptions} onclick={closeOptionsOutside} />
+
+<!-- E3-9: a draft-event series game (join link carries &event=) overlays the
+     between-games panel; it renders nothing for any other table. -->
+{#if liveSeated}<TableEventOverlay {table} onInPlay={(v) => (eventInPlay = v)} />{/if}
 
 {#if idle}
   <main class="matches-page">

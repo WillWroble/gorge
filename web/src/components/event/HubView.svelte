@@ -6,14 +6,33 @@
   import { countNames, pickHistory, revealDecks } from '../../lib/eventlog';
   import { gameDots, inPlay, seriesScore, seriesStatus } from '../../lib/series';
   import Standings from './Standings.svelte';
+  import BetweenGames from './BetweenGames.svelte';
 
   /**
    * The event hub (mockup 3d) for ROUND1..3, and the results page for
    * COMPLETE. Pairings, scores and standings are the server's; the viewer's
    * own live game carries the server's seat-tokenised join path, every
    * other game a spectate link to its table.
+   *
+   * Between two games of the viewer's own Bo3 series the row carries the
+   * between-games panel (E3-9) — the place to sideboard when the table page
+   * is gone (a restart moves the series to a new table). `token` is the
+   * viewer's event seat token; `onstate` adopts a submit's EventState and
+   * `onstale` refetches after a 409.
    */
-  let { ev, log = null }: { ev: EventState; log?: unknown[] | null } = $props();
+  let {
+    ev,
+    log = null,
+    token = null,
+    onstate = null,
+    onstale = null,
+  }: {
+    ev: EventState;
+    log?: unknown[] | null;
+    token?: string | null;
+    onstate?: ((st: EventState) => void) | null;
+    onstale?: (() => void | Promise<void>) | null;
+  } = $props();
 
   const you = $derived(ev.you ?? null);
   const complete = $derived(ev.phase === 'COMPLETE');
@@ -99,6 +118,11 @@
             {/if}
           </div>
         </div>
+        {#if mine && you !== null && token && s.state === 'between' && s.game}
+          {#key `${ev.event}-${s.round}-${s.game}`}
+            <BetweenGames event={ev.event} {token} {you} series={s} seats={ev.seats} {onstate} {onstale} />
+          {/key}
+        {/if}
       {/each}
     {/each}
 

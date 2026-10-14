@@ -288,6 +288,26 @@ describe('HubView and Standings', () => {
     expect(body).toContain('<i class="dot d ');
   });
 
+  it('the viewer\'s own between-games series carries the between-games panel inline (E3-9); others do not', () => {
+    const ev = eventState({
+      phase: 'ROUND1',
+      round: 1,
+      best_of: 3,
+      series: [
+        s({ best_of: 3, state: 'between', table: 'e1-r1-s03-g1-a1', game: 2, games: [3], score: [0, 1], chooser: 0, waiting: [0, 3] }),
+        s({ a: 1, b: 2, best_of: 3, state: 'between', table: 'e1-r1-s12-g1-a1', game: 2, games: [1], score: [1, 0], chooser: 2, waiting: [] }),
+      ],
+    });
+    const { body } = render(HubView, { props: { ev, token: 'evtok0' } });
+    expect(body.match(/data-testid="between-games"/g)).toHaveLength(1);
+    expect(body).toContain('id="between-games"'); // the row's "your deck" link anchors here
+    expect(body).toContain('You will choose play or draw');
+    expect(body).toContain('Game 2 of 3 — you lost game 1');
+    expect(body).not.toContain('evtok0');
+    // A spectator (no seat token) gets no panel.
+    expect(render(HubView, { props: { ev: { ...ev, you: null } } }).body).not.toContain('data-testid="between-games"');
+  });
+
   it('a best-of-1 row has no game dots', () => {
     const ev = eventState({ phase: 'ROUND1', round: 1, series: [s({ state: 'ended', score: [1, 0], winner: 0, games: [0] })] });
     const { body } = render(HubView, { props: { ev } });

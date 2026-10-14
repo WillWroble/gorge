@@ -72,6 +72,19 @@ export class DeckBuilder {
     this.loaded = true;
   }
 
+  /**
+   * adoptPlaying starts the working copy from the deck the seat played last
+   * game (EventPool.playing, the sideboarding start), falling back to the
+   * saved deck, and treats that start as "saved" so `dirty` reads as
+   * "changed since last game".
+   */
+  adoptPlaying(p: EventPool): void {
+    this.adopt(p);
+    const start = p.playing ?? p.deck ?? null;
+    if (start) this.setDeck(start);
+    this.#saved = key(this.deck);
+  }
+
   get deck(): DeckRequest {
     return { main: [...this.main], basics: [...this.basics] as Basics };
   }

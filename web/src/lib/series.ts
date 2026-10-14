@@ -1,4 +1,4 @@
-import type { EventSeries } from '../protocol';
+import type { EventSeries, EventState } from '../protocol';
 
 /**
  * series.ts renders an EventSeries row's facts for the hub. Every value is
@@ -45,3 +45,36 @@ export function seriesStatus(s: EventSeries): string {
 
 /** inPlay reports a series whose games are under way: live, or between two of its games. */
 export const inPlay = (s: EventSeries): boolean => s.state === 'live' || s.state === 'between';
+
+/** opponentOf is the other seat of a series the viewer plays in. */
+export const opponentOf = (s: EventSeries, you: number): number => (s.a === you ? s.b : s.a);
+
+/**
+ * previousResult is how the viewer's last game of the series went — the
+ * game before `s.game` — read from the server's per-game winners, or null
+ * before any game was played.
+ */
+export function previousResult(s: EventSeries, you: number): 'won' | 'lost' | 'drawn' | null {
+  const g = (s.game ?? 0) - 2;
+  const w = g >= 0 ? s.games?.[g] : undefined;
+  if (w === undefined) return null;
+  return w < 0 ? 'drawn' : w === you ? 'won' : 'lost';
+}
+
+/**
+ * viewerSeries is the viewer's series in the current round, optionally the
+ * one played on `table` (the table page's series), or null for a spectator
+ * or a viewer with no series this round.
+ */
+export function viewerSeries(ev: EventState, table?: string): EventSeries | null {
+  const you = ev.you;
+  if (you === null || you === undefined) return null;
+  return (
+    (ev.series ?? []).find(
+      (s) => s.round === ev.round && (s.a === you || s.b === you) && (table === undefined || !s.table || s.table === table),
+    ) ?? null
+  );
+}
+
+/** waitingOn reports whether the server still waits on `seat`'s deck between games. */
+export const waitingOn = (s: EventSeries, seat: number): boolean => s.state === 'between' && (s.waiting ?? []).includes(seat);

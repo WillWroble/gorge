@@ -21,6 +21,7 @@ import type {
   EventSetInfo,
   EventState,
   PickRequest,
+  SideboardRequest,
 } from '../protocol';
 import { ApiError, TIMEOUT_CODE } from './api';
 import { withBase } from './basepath';
@@ -64,6 +65,8 @@ export interface EventApi {
   check(id: string, token: string, deck: DeckRequest): Promise<DeckCheck>;
   save(id: string, token: string, deck: DeckRequest): Promise<DeckCheck>;
   ready(id: string, token: string, rev: number): Promise<EventState>;
+  /** sideboard locks the seat's deck for its series' next game: keep last game's, or a new list (E3-5). */
+  sideboard(id: string, token: string, req: SideboardRequest): Promise<EventState>;
   log(id: string, token: string | null): Promise<EventLog>;
   subscribe(id: string, token: string | null, session: string): Promise<void>;
 }
@@ -77,6 +80,7 @@ export const eventApi: EventApi = {
   check: (id, token, deck) => call<DeckCheck>('POST', eventURL(id, '/deck/check'), token, deck),
   save: (id, token, deck) => call<DeckCheck>('POST', eventURL(id, '/deck'), token, deck),
   ready: (id, token, rev) => call<EventState>('POST', eventURL(id, '/ready'), token, { rev }),
+  sideboard: (id, token, req) => call<EventState>('POST', eventURL(id, '/sideboard'), token, req),
   log: (id, token) => call<EventLog>('GET', eventURL(id, '/log'), token),
   subscribe: (id, token, session) => call<void>('POST', eventURL(id, '/subscribe'), token, { session }),
 };

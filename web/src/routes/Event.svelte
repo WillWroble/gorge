@@ -151,7 +151,7 @@
         </section>
       {/if}
     {:else}
-      <HubView ev={st} {log} />
+      <HubView ev={st} {log} token={client.token} onstate={(s) => (client.state = s)} onstale={() => client.load()} />
     {/if}
   {/if}
 </main>
