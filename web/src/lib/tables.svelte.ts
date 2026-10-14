@@ -23,11 +23,17 @@ function isSeries(info: TableInfo): boolean {
 // tableStateName maps a table_state frame's value onto the client's own state
 // spelling: the server names a series table's between-games cooldown
 // "between_games" (protocol.TableBetweenGames) while TableInfo.State and this
-// store call it "cooldown". A frame for a table this client does not know, or
-// with no state, is left alone.
+// store call it "cooldown". The value set is fail-closed like the rest of the
+// frame handling: only the three states E3-fx2 emits (between_games, live,
+// idle) are accepted, and anything else — including no state — leaves the
+// store alone rather than feeding an unknown string into the idle derivation.
 function tableStateName(state: string | undefined): string | null {
-  if (state === 'between_games') return 'cooldown';
-  return state ?? null;
+  switch (state) {
+    case 'between_games': return 'cooldown';
+    case 'live': return 'live';
+    case 'idle': return 'idle';
+    default: return null;
+  }
 }
 
 class Tables {

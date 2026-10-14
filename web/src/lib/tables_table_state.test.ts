@@ -60,4 +60,19 @@ describe('tables: series table state (E3-fx2 client)', () => {
     tables.apply({ v: 1, t: 'table_state', seq: 1, table: 'ghost', body: { state: 'live' } });
     expect(find('known').info.state).toBe('idle');
   });
+
+  it('a table_state frame with an unrecognised or missing state is ignored (fail closed)', () => {
+    tables.apply({ v: 1, t: 'hello', seq: 0, body: { session: 's1', tables: [info('known')] } });
+    expect(find('known').info.state).toBe('idle'); // precondition: the table starts idle
+    // E3-fx2 emits only between_games|live|idle; anything else — a future
+    // value this client does not know, or a missing state — must not become
+    // the store's state and feed the idle/matches-page derivation.
+    tables.apply({ v: 1, t: 'table_state', seq: 1, table: 'known', body: { state: 'rebooting' } });
+    expect(find('known').info.state).toBe('idle');
+    tables.apply({ v: 1, t: 'table_state', seq: 2, table: 'known', body: {} });
+    expect(find('known').info.state).toBe('idle');
+    // ...while a known value still lands.
+    tables.apply({ v: 1, t: 'table_state', seq: 3, table: 'known', body: { state: 'between_games' } });
+    expect(find('known').info.state).toBe('cooldown');
+  });
 });
