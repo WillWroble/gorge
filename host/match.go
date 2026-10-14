@@ -208,6 +208,14 @@ func (r *Registry) newMatchWith(t *table, k int, plan *SeriesGame) (*match, erro
 	// Config with the host guard at its default keeps the watcher on.
 	if r.opts.MaxDecisionsPerTurn == 0 {
 		cfg.LoopGuard = &rules.LoopGuard{Disabled: true}
+	} else {
+		// The default object cap (CV-8): a hosted table's degenerate token
+		// storm ends as a recorded stalled match (the play recover below
+		// re-classifies it) instead of growing the arena and event log
+		// until the process OOMs. The same volume bound the shared harness
+		// drive loop (internal/bench) arms; an explicit caller guard would
+		// win, and no host path sets one.
+		cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	}
 	// The format the table was configured with is threaded into the engine
 	// once, here, so the match's rules.Config is the single value both the
@@ -655,6 +663,17 @@ func parkSeat(ctx context.Context, seats []seat.Seat, pd *parkedData, undo <-cha
 func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) {
 	defer func() {
 		if p := recover(); p != nil {
+			// A volume LivelockError (the armed object cap, CV-8) is not an
+			// engine bug: the game's board grew past its budget mid-turn,
+			// exactly the shape the per-turn decision guard's own stall
+			// crash records. Record it through the same ordinary MatchCrashed
+			// path with the stall wording -- the table halts with a reason an
+			// operator reads as a stall, never as a "panic:" bug report, and
+			// it cannot wedge: play returns, run() ends the table.
+			if lle, ok := p.(*rules.LivelockError); ok && rules.IsVolumeReason(lle.Reason) {
+				final = r.crash(t, m, fmt.Errorf("stalled: %v", lle))
+				return
+			}
 			final = r.crash(t, m, fmt.Errorf("panic: %v\n%s", p, debug.Stack()))
 		}
 	}()

@@ -181,6 +181,14 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 	if newEng == nil {
 		newEng = rules.New
 	}
+	// The default object cap (CV-8): a caller that set no explicit budget
+	// (cmd/cardfuzz's -max-objects, a search harness's own LoopGuard) plays
+	// under rules.DefaultMaxObjs, so a degenerate token storm ends as a
+	// recorded bigboard stall (the classification below) instead of growing
+	// the arena and event log until the box OOMs. An explicit MaxObjs wins;
+	// a Disabled guard (the host's stall-guard opt-out propagation) is
+	// returned unchanged.
+	cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	e := newEng(cfg)
 	if hooks.Setup != nil {
 		hooks.Setup(e)
@@ -473,10 +481,11 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 		}
 		return o, e, nil
 	}
-	if lle != nil && lle.Reason == rules.RunawayBigBoardReason {
-		// A runaway burst on a board past rules.RunawayBigBoardObjs is
-		// volume, not a loop: a stalled game (the cardfuzz "bigboard"
-		// kind), excluded from rates like any watchdog cap.
+	if lle != nil && rules.IsVolumeReason(lle.Reason) {
+		// A runaway burst on a board past rules.RunawayBigBoardObjs (CV-2)
+		// and the armed object cap (CV-8) are volume, not a loop: a stalled
+		// game (the cardfuzz "bigboard" kind), excluded from rates like any
+		// watchdog cap.
 		return finish(Outcome{StallOn: "bigboard", Turns: e.G.Turn, Intents: n, Livelock: lle.Error()})
 	}
 	if lle != nil {

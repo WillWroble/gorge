@@ -142,6 +142,11 @@ func deckNames(flagVal string, seats int) ([]string, error) {
 // failure: non-termination, a replay error or a chain divergence.
 func playOne(out io.Writer, seed uint64, names []string, decks [][]*cards.Card, tokens map[string]*cards.Card, nameUniverse *cards.Universe, verify bool) (ok bool) {
 	cfg := rules.Config{Seed: seed, Names: append([]string(nil), names...), Decks: decks, Tokens: tokens, NameUniverse: nameUniverse}
+	// The default object cap (CV-8), the same volume bound the shared drive
+	// loop arms: a degenerate token storm here ends as a LIVELOCK failure
+	// line under a bounded arena instead of growing the process until the
+	// box OOMs.
+	cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	spare := sparePool.Get()
 	cfg.Spare = spare
 	e := rules.NewStartingPlayerChoice(cfg)
