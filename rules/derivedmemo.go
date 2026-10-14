@@ -280,12 +280,47 @@ func (e *Engine) derivedMemoRef(id state.ObjID, atStack state.Zone) *Derived {
 	}
 	m := table.slot(id, len(e.G.Objs)+1, cap(e.G.Objs)+1)
 	ep, ver, objs := len(e.L.Events), e.continuousVersion, len(e.G.Objs)
+	if e.derivedMemoServes(m, id, atStack, ep, ver, objs) {
+		return &m.d
+	}
+	if m.gen == e.derivedMemoGen {
+		// Same walk, moved key (unreachable today: the walk emits nothing).
+		// A caller of this walk may still be ranging the old arrays, so
+		// the rebuild gets fresh ones instead of rewriting them in place.
+		m.kw, m.ty = nil, nil
+	}
+	e.active()
+	builds, seq := e.activeBuildSeq, e.derivedSeq
+	d := e.derivedCompute(id, atStack)
+	if e.activeBuildSeq != builds || faceHasCDAStatic(e.G.Obj(id)) {
+		// active() rebuilt mid-derivation, or the object's own CDA amount
+		// reads arbitrary state (derived_transparent.go): never reuse across
+		// walks.
+		seq = 0
+	}
+	// Re-resolve the entry: its storage is the table's append-grown entry
+	// list, so the pointer taken above is not held across the derivation.
+	m = table.slot(id, len(e.G.Objs)+1, cap(e.G.Objs)+1)
+	d.Keywords = memoOwned(&m.kw, d.Keywords)
+	d.Types = memoOwned(&m.ty, d.Types)
+	m.d = d
+	m.gen, m.ep, m.ver, m.objs, m.seq = e.derivedMemoGen, ep, ver, objs, seq
+	return &m.d
+}
+
+// derivedMemoServes reports whether id's memo entry m holds an answer the
+// current scope may serve: a same-scope entry at the current key, or a
+// cross-walk entry still exact (re-stamped into this scope). It is
+// derivedMemoRef's hit test, shared with derivedMemoPeek; ep, ver and objs
+// are the caller's key (log length, continuousVersion, arena length) read
+// before the test.
+func (e *Engine) derivedMemoServes(m *derivedMemoEntry, id state.ObjID, atStack state.Zone, ep, ver, objs int) bool {
 	epOK := m.ep == ep || (m.ep == e.derivedMemoAliasFrom && ep == e.derivedMemoAliasTo)
 	if m.gen == e.derivedMemoGen && epOK && m.ver == ver && m.objs == objs {
 		if derivedMemoVerify {
 			e.verifyDerivedMemo(id, atStack, m.d)
 		}
-		return &m.d
+		return true
 	}
 	// Cross-walk reuse: an entry an EARLIER scope computed is still exact when
 	// active() has not been rebuilt since (activeBuildSeq unchanged after
@@ -316,32 +351,25 @@ func (e *Engine) derivedMemoRef(id state.ObjID, atStack state.Zone) *Derived {
 				e.verifyDerivedMemo(id, atStack, m.d)
 			}
 			m.gen, m.ep = e.derivedMemoGen, ep
-			return &m.d
+			return true
 		}
 	}
-	if m.gen == e.derivedMemoGen {
-		// Same walk, moved key (unreachable today: the walk emits nothing).
-		// A caller of this walk may still be ranging the old arrays, so
-		// the rebuild gets fresh ones instead of rewriting them in place.
-		m.kw, m.ty = nil, nil
+	return false
+}
+
+// derivedMemoPeek is the live-zone memo entry's Derived when the memo would
+// serve it right now, and nil otherwise -- it never computes or creates an
+// entry. A narrower reader (derivedTypesOf) uses it to take an answer the
+// scope already built instead of re-walking the layers, and on a miss does
+// its own narrower walk.
+func (e *Engine) derivedMemoPeek(id state.ObjID) *Derived {
+	if e.derivedMemoDepth == 0 || !e.derivedMemoUsable() || id == 0 || int(id) > len(e.G.Objs) {
+		return nil
 	}
-	e.active()
-	builds, seq := e.activeBuildSeq, e.derivedSeq
-	d := e.derivedCompute(id, atStack)
-	if e.activeBuildSeq != builds || faceHasCDAStatic(e.G.Obj(id)) {
-		// active() rebuilt mid-derivation, or the object's own CDA amount
-		// reads arbitrary state (derived_transparent.go): never reuse across
-		// walks.
-		seq = 0
+	if m := e.derivedMemo.at(id); m != nil && e.derivedMemoServes(m, id, 0, len(e.L.Events), e.continuousVersion, len(e.G.Objs)) {
+		return &m.d
 	}
-	// Re-resolve the entry: its storage is the table's append-grown entry
-	// list, so the pointer taken above is not held across the derivation.
-	m = table.slot(id, len(e.G.Objs)+1, cap(e.G.Objs)+1)
-	d.Keywords = memoOwned(&m.kw, d.Keywords)
-	d.Types = memoOwned(&m.ty, d.Types)
-	m.d = d
-	m.gen, m.ep, m.ver, m.objs, m.seq = e.derivedMemoGen, ep, ver, objs, seq
-	return &m.d
+	return nil
 }
 
 // memoOwned copies src into the entry's reusable backing array *buf and

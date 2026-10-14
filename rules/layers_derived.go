@@ -289,9 +289,19 @@ func (e *Engine) derivedTypesOf(id state.ObjID) []string {
 	if o == nil || o.Face() == nil {
 		return nil
 	}
-	e.charsWalk.Depth++
-	ty := e.typeCharacteristics(id, 0)
-	e.charsWalk.Depth--
+	// A Derived the current memo scope already holds for id answers without
+	// a second layer-4 walk (derivedMemoPeek never computes). The census's
+	// mana-ability gate reads every own permanent's types on every
+	// collection, and an animated all-creature-types manland's walk is the
+	// expensive one; verify mode below still compares the full walk.
+	var ty []string
+	if d := e.derivedMemoPeek(id); d != nil {
+		ty = d.Types
+	} else {
+		e.charsWalk.Depth++
+		ty = e.typeCharacteristics(id, 0)
+		e.charsWalk.Depth--
+	}
 	if derivedMemoVerify {
 		if want := e.derivedCompute(id, 0).Types; !slices.Equal(ty, want) {
 			panic(fmt.Sprintf("rules: derivedTypesOf(%d) = %v, full walk %v", id, ty, want))
