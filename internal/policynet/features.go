@@ -206,27 +206,7 @@ func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag
 // and (b) adds the option card's spell API as a hashed id (pn03's counter
 // vs. other-instant signal).
 func EncodeOptionWith(fs FeatureSet, v view.View, seat state.PlayerID, d decision.Kind, o decision.Option, idx, n int) Option {
-	opt := EncodeOption(v, seat, d, o, idx, n)
-	if fs == FeaturesV1 {
-		return opt
-	}
-	if decKindIndex(d) < 0 {
-		// Remove the colliding v1 "other" bit. EncodeOption emits the
-		// decision-kind slot before the card-type block, so the FIRST slot
-		// at that row is the decision kind's; a real Land's own type bit, set
-		// later, survives.
-		opt.Slots = dropSlot(opt.Slots, uint16(decKindOffset+len(decision.Kinds)))
-		opt.Hashed = append(opt.Hashed, Feature{Row: hashID("mz|deckind|other"), Value: 1})
-	}
-	if o.Obj != 0 {
-		if ref, ok := cardIndex(v, seat)[o.Obj]; ok && ref.cv.SpellAPI != "" {
-			opt.Hashed = append(opt.Hashed, Feature{Row: hashID("mz|api|" + ref.cv.SpellAPI), Value: 1})
-		}
-	}
-	if fs == FeaturesEntity {
-		opt.EntA, opt.EntB = entityOptionRefs(v, seat, o)
-	}
-	return opt
+	return withEncoder(&v, seat, func(x *OptionEncoder) Option { return x.Encode(fs, d, o, idx, n) })
 }
 
 // dropSlot removes the first slot at row r (a v1 "other" slot is set once).

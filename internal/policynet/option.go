@@ -181,66 +181,6 @@ const (
 	odGroup     = 23 // Option.Group != ""
 )
 
-// cardRef is one view-resolved card: its CardView, which zone class it sits
-// in (zoneIndex, or -1 for command/commanders/stack), and whether the zone
-// list is the viewer's own.
-type cardRef struct {
-	cv   view.CardView
-	zone int
-	mine bool
-}
-
-// cardIndex resolves ObjIDs to cards by scanning the view's zone lists in a
-// fixed order (my hand, my battlefield, then each other battlefield in seat
-// order, graveyards, exiles, command, commanders, stack) — first match wins,
-// and the map is only ever read by key afterwards, so no iteration order
-// reaches an output.
-func cardIndex(v view.View, seat state.PlayerID) map[state.ObjID]cardRef {
-	idx := make(map[state.ObjID]cardRef)
-	add := func(cards []view.CardView, zone int, mine bool) {
-		for i := range cards {
-			cv := cards[i]
-			if _, ok := idx[cv.ID]; !ok {
-				idx[cv.ID] = cardRef{cv: cv, zone: zone, mine: mine}
-			}
-		}
-	}
-	for i := range v.Players {
-		pv := &v.Players[i]
-		mine := pv.ID == seat
-		if mine {
-			add(pv.Hand, zoneHand, true)
-			add(pv.Battlefield, zoneBattlefield, true)
-			add(pv.Graveyard, zoneGraveyard, true)
-			add(pv.Exile, zoneExile, true)
-		}
-	}
-	for i := range v.Players {
-		pv := &v.Players[i]
-		if pv.ID == seat {
-			continue
-		}
-		add(pv.Battlefield, zoneBattlefield, false)
-		add(pv.Graveyard, zoneGraveyard, false)
-		add(pv.Exile, zoneExile, false)
-	}
-	for i := range v.Players {
-		pv := &v.Players[i]
-		if pv.ID == seat {
-			add(pv.Command, -1, true)
-			add(pv.Commanders, -1, true)
-		}
-	}
-	for i := range v.Stack {
-		if sv := &v.Stack[i]; sv.Card != nil {
-			if _, ok := idx[sv.Card.ID]; !ok {
-				idx[sv.Card.ID] = cardRef{cv: *sv.Card, zone: -1, mine: sv.Card.Controller == seat}
-			}
-		}
-	}
-	return idx
-}
-
 // EncodeOption encodes one offered option (R1 §1.4). d is the decision kind
 // being answered (the record's view carries no decision), idx the option's
 // index in the offered list and n the list length.
@@ -255,7 +195,13 @@ func cardIndex(v view.View, seat state.PlayerID) map[state.ObjID]cardRef {
 // Dense scalars are documented at their offset constants above; a scalar
 // whose subject the option does not name (no card, not a block option) is 0.
 func EncodeOption(v view.View, seat state.PlayerID, d decision.Kind, o decision.Option, idx, n int) Option {
-	idxCards := cardIndex(v, seat)
+	return withEncoder(&v, seat, func(x *OptionEncoder) Option { return x.encodeV1(d, o, idx, n) })
+}
+
+// encodeV1 is EncodeOption for the encoder's view and seat. Cards resolve
+// through the encoder's card index (Reset's fixed zone order, first match
+// wins), so no iteration order reaches an output.
+func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int) Option {
 
 	var slots []Feature
 	set := func(row int) { slots = append(slots, Feature{Row: uint16(row), Value: 1}) }
@@ -278,8 +224,8 @@ func EncodeOption(v view.View, seat state.PlayerID, d decision.Kind, o decision.
 		if p, ok := o.Obj.PlayerRef(); ok {
 			isPlayer = true
 			_ = p
-		} else if ref, ok := idxCards[o.Obj]; ok {
-			card = &ref
+		} else if ref, ok := x.lookup(o.Obj); ok {
+			card = ref
 		}
 	}
 	if o.Kind == "player" {
@@ -382,7 +328,7 @@ func EncodeOption(v view.View, seat state.PlayerID, d decision.Kind, o decision.
 	}
 	dense[odIsPlayer] = float32(boolInt(isPlayer))
 	if o.Attacker != 0 {
-		if aref, ok := idxCards[o.Attacker]; ok {
+		if aref, ok := x.lookup(o.Attacker); ok {
 			dense[odAtkPower] = float32(aref.cv.Power)
 			dense[odAtkTough] = float32(aref.cv.Toughness)
 			dense[odAtkDamage] = float32(aref.cv.Damage)
@@ -412,7 +358,7 @@ func EncodeOption(v view.View, seat state.PlayerID, d decision.Kind, o decision.
 		costTotal = float32(manaOnlyPips(o.Cost))
 	}
 	if costTotal > 0 {
-		avail := availableTotal(v, seat)
+		avail := x.availableTotal()
 		dense[odCostTotal] = costTotal
 		dense[odCostDelta] = costTotal - avail
 		if costTotal > avail {
@@ -438,7 +384,7 @@ func EncodeOption(v view.View, seat state.PlayerID, d decision.Kind, o decision.
 	if cardID != "" {
 		desc := "none"
 		if o.Attacker != 0 {
-			if aref, ok := idxCards[o.Attacker]; ok {
+			if aref, ok := x.lookup(o.Attacker); ok {
 				desc = "atk|" + aref.cv.Name
 			} else {
 				desc = "atk|unknown"

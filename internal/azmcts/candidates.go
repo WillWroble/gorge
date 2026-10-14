@@ -937,10 +937,7 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 			opts = append(opts, o)
 		}
 	}
-	enc := make([]policynet.Option, len(opts))
-	for i := range opts {
-		enc[i] = policynet.EncodeOptionWith(net.Features, v, d.Player, d.Kind, opts[i], i, len(opts))
-	}
+	enc := policynet.EncodeOptionsWith(net.Features, pv, d.Player, d.Kind, opts, nil)
 	seat.MarkBotPicks(d, enc[:len(d.Options)], bot)
 	if payCasts && bot.Payment != nil {
 		for i, c := range cands {

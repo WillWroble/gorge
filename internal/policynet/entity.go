@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
 )
@@ -285,26 +284,6 @@ func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, av
 		rows = append(rows, Feature{Row: hashID("ent|api|" + cv.SpellAPI), Value: 1})
 	}
 	return EntityCard{Group: group, Raw: raw, Rows: rows}
-}
-
-// entityOptionRefs resolves an option's entity references (Option.EntA/B):
-// its own card and its related card, as 1 + State.Cards index (0 = none).
-func entityOptionRefs(v view.View, seat state.PlayerID, o decision.Option) (int32, int32) {
-	_, idx := entityCards(v, seat)
-	ref := func(id state.ObjID) int32 {
-		if id == 0 {
-			return 0
-		}
-		if i, ok := idx[id]; ok {
-			return int32(i + 1)
-		}
-		return 0
-	}
-	rel := o.Attacker
-	if rel == 0 {
-		rel = o.Battle
-	}
-	return ref(o.Obj), ref(rel)
 }
 
 // ---- model half --------------------------------------------------------
