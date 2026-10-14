@@ -13,6 +13,7 @@ import (
 
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/searchprobe"
@@ -280,5 +281,88 @@ func TestHonestRootRefusesWithoutAFeed(t *testing.T) {
 	// A feed that never observed has no frames: still a refusal.
 	if e, reason := ss.HonestRoot(searchprobe.PublicGame{}, dead, nil, [2]uint64{}); e != nil || reason == "" {
 		t.Fatalf("frame-less feed: got (%v, %q), want (nil, non-empty)", e, reason)
+	}
+}
+
+// newSearchPosition plays a bot-vs-bot game, feeding seat 0 as
+// newRootPosition does, and stops at seat 0's first decision whose options
+// name cards in its own library (a fetch land's or tutor's search).
+func newSearchPosition(t *testing.T, cfg rules.Config) (rootPosition, bool) {
+	t.Helper()
+	e := rules.New(cfg)
+	e.Advance()
+	feed := ss.NewFeed(0)
+	rngs := searchprobe.BotRandoms(cfg.Seed, 2)
+	board := botpolicy.NewBoard(2)
+	setup := searchprobe.PublicGame{Names: cfg.Names, Decks: cfg.Decks, Tokens: cfg.Tokens, StartingLife: cfg.StartingLife}
+	for steps := 0; steps < 20000 && !e.G.Over; steps++ {
+		d := e.Pending()
+		if d == nil {
+			return rootPosition{}, false
+		}
+		if _, ok := feed.Observe(e); !ok {
+			t.Fatalf("feed stopped: %s", feed.StopReason())
+		}
+		in := botpolicy.Decide(botpolicy.BoardFromGameInto(e.G, e, d.Player, &board), d, rngs[d.Player])
+		if d.Player == 0 {
+			for _, o := range d.Options {
+				if ob := e.G.Obj(o.Obj); ob != nil && d.Kind == decision.KChoose && ob.Zone == state.ZLibrary && ob.Owner == 0 {
+					return rootPosition{e: e, feed: feed, setup: setup}, true
+				}
+			}
+			if err := feed.RecordAnswer(d, in); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := e.Submit(in); err != nil {
+			t.Fatalf("step %d submit: %v", steps, err)
+		}
+	}
+	return rootPosition{}, false
+}
+
+// TestHonestRootAtALibrarySearch: a decision that offers the seat cards of
+// its own library (it is searching it) builds an honest root, and a redeal
+// from that root prepares. The seat is looking at those cards, so the
+// redeal pins them where they are; it used to refuse ("observed frame refers
+// to an unpinned hidden card"), which the az seat's driver counted as a
+// stopped feed and played the plain bot.
+func TestHonestRootAtALibrarySearch(t *testing.T) {
+	cfg := rootTestConfig(t, "foundations-tramplesaurus-rex", "foundations-wretched-ranks")
+	var p rootPosition
+	found := false
+	for seed := uint64(1); seed <= 40 && !found; seed++ {
+		cfg.Seed = seed
+		p, found = newSearchPosition(t, cfg)
+	}
+	if !found {
+		t.Fatal("fixture: no seat-0 library search in 40 seeds")
+	}
+	root, reason := ss.HonestRoot(p.setup, p.feed, p.e, [2]uint64{3, 4})
+	if reason != "" {
+		t.Fatalf("HonestRoot refused at a library search: %s", reason)
+	}
+	got, err := p.feed.Collector().Clone().Capture(root, nil)
+	if err != nil {
+		t.Fatalf("capture the root: %v", err)
+	}
+	if last := p.feed.LastFrame(); got.Board.Sum != last.Board.Sum || !reflect.DeepEqual(got.Decision, last.Decision) {
+		t.Fatal("the root's observation differs from the feed's last frame")
+	}
+	known, err := p.feed.Known()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := azmcts.NewRedeal(azmcts.RedealInput{
+		Setup:   p.setup,
+		History: p.feed.History(),
+		Known:   known,
+		Base:    searchprobe.RedealBase{Engine: root, Observer: p.feed.Collector()},
+	}, p.feed.Collector().Clone(), 5, 0)
+	if err != nil {
+		t.Fatalf("NewRedeal: %v", err)
+	}
+	if refused := src.Refused(); refused != "" {
+		t.Fatalf("a redeal from the root refused: %s", refused)
 	}
 }

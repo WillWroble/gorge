@@ -164,6 +164,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 	if sha256.Sum256(nowBoard) != last.Board.Sum || !ObservedDecisionEqual(nowDec, last.Decision) {
 		return nil, "base engine is not at the observed boundary"
 	}
+	known = known.withDecisionCards(h, e, base.Observer)
 	if err := known.holds(e, base.Observer); err != nil {
 		return nil, "projection does not hold in the base engine: " + err.Error()
 	}
@@ -623,4 +624,91 @@ func sortByName(e *rules.Engine, ids []state.ObjID) {
 		}
 		return ids[i] < ids[j]
 	})
+}
+
+// withDecisionCards is k plus every hidden card the seat's own pending
+// decision (h's last frame) offers it by name: a library search's or a
+// look-at-the-top pile split's options, the cards of a looked-at hand. The
+// seat is looking at those cards right now -- the frame introduced their
+// identities -- so a redeal must keep each exactly where it is; re-dealing
+// one would change what the decision offers. Their zone is the decision's
+// own public fact (the library searched, the hand looked at), read from the
+// base engine only for cards whose identity the seat already holds. A card
+// the seat holds no identity for is left out, and NewRedealer's
+// unpinned-reference check still refuses it.
+func (k KnownCards) withDecisionCards(h History, e *rules.Engine, c *Collector) KnownCards {
+	d := h.Frames[len(h.Frames)-1].Decision
+	if d == nil || d.Player != h.Actor {
+		return k
+	}
+	names := make(map[uint32]Identity)
+	for _, frame := range h.Frames {
+		for _, identity := range frame.Identities {
+			names[identity.ID] = identity
+		}
+	}
+	known := make(map[uint32]bool, k.Count())
+	for _, hand := range k.Hands {
+		for _, card := range hand.Cards {
+			known[card.ID] = true
+		}
+	}
+	for _, lib := range k.Libraries {
+		for _, card := range lib.Members {
+			known[card.ID] = true
+		}
+	}
+	var add []Identity
+	for _, o := range d.Options {
+		ref := o.Action.Obj
+		if ref == 0 || known[ref] {
+			continue
+		}
+		identity, ok := names[ref]
+		obj := e.G.Obj(c.object(ref))
+		if !ok || obj == nil || obj.Owner != identity.Owner || (obj.Zone != state.ZHand && obj.Zone != state.ZLibrary) {
+			continue
+		}
+		known[ref] = true
+		add = append(add, identity)
+	}
+	if len(add) == 0 {
+		return k
+	}
+	out := KnownCards{Actor: k.Actor, Hands: slices.Clone(k.Hands), Libraries: slices.Clone(k.Libraries)}
+	for _, identity := range add {
+		if e.G.Obj(c.object(identity.ID)).Zone == state.ZHand {
+			i := slices.IndexFunc(out.Hands, func(x KnownHand) bool { return x.Player == identity.Owner })
+			if i < 0 {
+				out.Hands = append(out.Hands, KnownHand{Player: identity.Owner})
+				i = len(out.Hands) - 1
+			}
+			out.Hands[i].Cards = insertIdentity(out.Hands[i].Cards, identity)
+			continue
+		}
+		i := slices.IndexFunc(out.Libraries, func(x KnownLibrary) bool { return x.Player == identity.Owner })
+		if i < 0 {
+			out.Libraries = append(out.Libraries, KnownLibrary{Player: identity.Owner})
+			i = len(out.Libraries) - 1
+		}
+		out.Libraries[i].Members = insertIdentity(out.Libraries[i].Members, identity)
+	}
+	sort.Slice(out.Hands, func(i, j int) bool { return out.Hands[i].Player < out.Hands[j].Player })
+	sort.Slice(out.Libraries, func(i, j int) bool { return out.Libraries[i].Player < out.Libraries[j].Player })
+	return out
+}
+
+// insertIdentity is list (sorted by reference, never written) with identity
+// added in reference order.
+func insertIdentity(list []Identity, identity Identity) []Identity {
+	i, _ := slices.BinarySearchFunc(list, identity.ID, func(x Identity, id uint32) int {
+		switch {
+		case x.ID < id:
+			return -1
+		case x.ID > id:
+			return 1
+		}
+		return 0
+	})
+	return slices.Insert(slices.Clone(list), i, identity)
 }
