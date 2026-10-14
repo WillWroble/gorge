@@ -30,7 +30,7 @@ type Options struct {
 	Cards          *cards.Registry
 	Policies       []string // bot game policies offered; empty = every non-Env policy
 	DefaultPolicy  string   // "" = bots.Default
-	MaxHumans      int      // 0 = 1
+	MaxHumans      int      // 0 = 4 (E3-5)
 	MaxLiveEvents  int      // 0 = 4
 	MaxAttempts    int      // 0 = 3 (E1-5 uses this)
 	Mulligans      int
@@ -44,7 +44,9 @@ type Options struct {
 	// field). nil = crypto/rand.
 	Seed func() uint64
 	// LobbyTimeout is how long an event may sit in LOBBY with an unjoined
-	// human seat before the sweep cancels it: 0 = 15 minutes, negative =
+	// human seat before the sweep acts: at least one human joined fills
+	// every unjoined seat with a bot and starts the event, zero joined
+	// cancels it (E3-5 operator decision 3). 0 = 15 minutes, negative =
 	// disabled. IdleTimeout is how long a human seat may owe a decision
 	// without acting before the sweep acts for it (auto-pick, auto-submit
 	// or concede): 0 = 2 hours, negative = disabled.
@@ -74,7 +76,9 @@ type run struct {
 	lastPack [4]string    // last draft_pack key sent per seat
 	halted   string       // persistence/replay failure: read-only, 503 on writes
 	blocked  string       // E1-5: why a game could not start
-	tokens   map[host.TableID]string
+	// E3-5: each live game table's per-slot game tokens — index 0 is event
+	// seat a (table slot 0), 1 event seat b. Empty string = not minted.
+	tokens map[host.TableID][2]string
 	// E1-5: finished matches awaiting their pairing-order log slot, and
 	// each series' last published public JSON. Both guarded by mu.
 	outcomes   map[[2]int]outcome
@@ -155,7 +159,7 @@ func New(o Options) (*Host, error) {
 	for _, id := range ids {
 		r := &run{
 			h:           h,
-			tokens:      map[host.TableID]string{},
+			tokens:      map[host.TableID][2]string{},
 			outcomes:    map[[2]int]outcome{},
 			lastSeries:  map[[3]int]string{},
 			seriesTable: map[[2]int]host.TableID{},
@@ -411,7 +415,7 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		h:           h,
 		meta:        m,
 		ev:          event.New(),
-		tokens:      map[host.TableID]string{},
+		tokens:      map[host.TableID][2]string{},
 		outcomes:    map[[2]int]outcome{},
 		lastSeries:  map[[3]int]string{},
 		seriesTable: map[[2]int]host.TableID{},
@@ -465,7 +469,7 @@ func (h *Host) maxHumans() int {
 	if h.opts.MaxHumans > 0 {
 		return h.opts.MaxHumans
 	}
-	return 1
+	return 4
 }
 
 func (h *Host) maxLive() int {

@@ -96,7 +96,11 @@ func (r *run) startGame(sp event.SeriesSpec, game int) error {
 		if err != nil {
 			return fail(err)
 		}
-		r.tokens[id] = tok
+		// E3-5: each human slot gets its own game token, so both humans of
+		// a series join their own side.
+		toks := r.tokens[id]
+		toks[slot] = tok
+		r.tokens[id] = toks
 	}
 	ref := gameRef{run: r, round: sp.Round, a: a, b: b, game: game, attempt: attempt}
 	if series {

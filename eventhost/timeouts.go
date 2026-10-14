@@ -61,19 +61,28 @@ func (h *Host) checkTimeouts(now time.Time) {
 	}
 }
 
-// expire is one sweep pass for one run. It cancels an abandoned lobby and
-// acts for human seats whose idle window closed with a decision owed. The
-// sweep clock only ever APPENDS entries (LobbyTimeout / IdleTimeout
-// markers, then the ordinary entries the actions take); replay never
-// reads the clock. It is called under run.mu.
+// expire is one sweep pass for one run. It closes an abandoned lobby —
+// cancelled outright when no human ever joined, filled with bot seats when
+// at least one did (E3-5 operator decision 3) — and acts for human seats
+// whose idle window closed with a decision owed. The sweep clock only ever
+// APPENDS entries (LobbyTimeout / IdleTimeout markers, then the ordinary
+// entries the actions take); replay never reads the clock. It is called
+// under run.mu.
 func (r *run) expire(now time.Time) {
 	if r.halted != "" {
 		return
 	}
 	if r.ev.Phase() == event.PhaseLobby {
 		if r.lobbyAbandoned(now) {
-			if err := r.apply(event.Entry{Kind: event.KindLobbyTimeout}); err != nil {
-				return
+			if r.joinedHumans() == 0 {
+				if err := r.apply(event.Entry{Kind: event.KindLobbyTimeout}); err != nil {
+					return
+				}
+			} else {
+				if !r.fillLobbyWithBots() {
+					return
+				}
+				r.advance()
 			}
 			r.broadcast()
 		}
@@ -115,6 +124,69 @@ func (r *run) lobbyAbandoned(now time.Time) bool {
 	return unjoined && now.Sub(r.createdAt) > d
 }
 
+// joinedHumans counts the human seats that have joined the lobby. The
+// caller holds run.mu.
+func (r *run) joinedHumans() int {
+	n := 0
+	for _, ms := range r.meta.Seats {
+		if ms.Kind == "human" && ms.Name != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// fillLobbyWithBots converts every unjoined human seat of an abandoned
+// lobby into a bot seat (E3-5 operator decision 3): the default drafter
+// persona and the host's default game policy, named like a created bot.
+// The seat's invite token dies with its humanity — the stored sha256 is
+// cleared, so a stale join link can no longer act for the seat. The
+// converted seats are logged as bots by the EventCreated the next advance
+// applies. It saves the meta first and reports whether the event may go on;
+// a persistence failure halts the run read-only instead. The caller holds
+// run.mu.
+func (r *run) fillLobbyWithBots() bool {
+	policy, perr := r.h.botPolicy(r.h.opts.DefaultPolicy)
+	if perr != nil {
+		for _, cand := range r.h.opts.Policies {
+			if p2, e2 := r.h.botPolicy(cand); e2 == nil {
+				policy = p2
+				break
+			}
+		}
+	}
+	if policy == "" {
+		if r.halted == "" {
+			r.halted = fmt.Sprintf("event %s: lobby fill found no bot policy", r.meta.ID)
+		}
+		return false
+	}
+	changed := false
+	for s := range r.meta.Seats {
+		ms := r.meta.Seats[s]
+		if ms.Kind != "human" || ms.Name != "" {
+			continue
+		}
+		ms.Kind = "bot"
+		ms.Policy = policy
+		ms.Drafter = "rating-colour"
+		ms.Name = fmt.Sprintf("Bot %d (%s)", s+1, policy)
+		ms.TokenSHA256 = ""
+		r.meta.Seats[s] = ms
+		changed = true
+	}
+	if !changed {
+		return true
+	}
+	if err := r.h.opts.Store.saveMeta(r.meta); err != nil {
+		if r.halted == "" {
+			r.halted = fmt.Sprintf("event %s: persistence failed: %v", r.meta.ID, err)
+		}
+		return false
+	}
+	return true
+}
+
 // idleOwed lists the human seats whose idle window closed while a decision
 // was owed, in seat order. IdleTimeout disabled (or non-positive) means no
 // seat is ever owed.
@@ -152,6 +224,17 @@ func (r *run) owesDecision(seat int) bool {
 			}
 			if !r.ev.Started(sp.A, sp.B) || r.inFlight(sp.A, sp.B) != nil {
 				return true
+			}
+			// E3-5: between games, a side still to submit its deck owes
+			// one sideboarding submission.
+			if v, ok := r.ev.SeriesState(sp.A, sp.B); ok && v.Between {
+				side := 0
+				if seat == sp.B {
+					side = 1
+				}
+				if v.Locked[side] == 0 {
+					return true
+				}
 			}
 		}
 		return false
@@ -193,6 +276,12 @@ func (r *run) idleActions(now time.Time) bool {
 				}
 			}
 		case event.RoundPhase(1), event.RoundPhase(2), event.RoundPhase(3):
+			// E3-5: an idle human in its series' between window keeps the
+			// deck it played last game (one auto-keep per window) before
+			// the concession path can end the series.
+			if r.idleSideboard(now) {
+				progressed, acted = true, true
+			}
 			if r.concedeIdle(now) {
 				progressed, acted = true, true
 			}
@@ -286,20 +375,23 @@ func (r *run) concedeIdle(now time.Time) bool {
 	return acted
 }
 
-// concedeSeries closes one series by concession: the absent human's
-// remaining game is logged as a GameEnded with head "conceded" and the
-// series is ended. Two absent humans draw. A game attempt still in flight
-// has its table deregistered first-class, so a late result from the
-// stalled match is dropped by OnMatchEnd's table lookup.
+// concedeSeries closes one series by concession (E1-8). Every game the
+// series still owes is logged as a GameEnded with head "conceded": the
+// in-flight game under its own attempt number, a never-started one under
+// attempt 0. The absent human's side loses every remaining game; two
+// absent humans draw every remaining game. A Bo3 series' SeriesEnded
+// score is the wins its played games produced (E3-4), so a forfeited
+// series keeps the games its humans actually finished. A game attempt
+// still in flight has its table deregistered first-class, so a late
+// result from the stalled match is dropped by OnMatchEnd's table lookup.
 func (r *run) concedeSeries(sp event.SeriesSpec, idle map[int]bool) error {
 	if !r.ev.Started(sp.A, sp.B) {
 		if err := r.apply(event.Entry{
-			Kind: event.KindSeriesStarted, Round: sp.Round, A: sp.A, B: sp.B, BestOf: 1,
+			Kind: event.KindSeriesStarted, Round: sp.Round, A: sp.A, B: sp.B, BestOf: r.bestOf(),
 		}); err != nil {
 			return err
 		}
 	}
-	att := r.inFlight(sp.A, sp.B)
 	var winner *int
 	switch {
 	case idle[sp.A] && idle[sp.B]:
@@ -310,35 +402,84 @@ func (r *run) concedeSeries(sp event.SeriesSpec, idle map[int]bool) error {
 		w := sp.A
 		winner = &w
 	}
-	game, attempt := 1, 0
-	if att != nil {
-		game, attempt = att.Game, att.Attempt
-	}
-	if err := r.apply(event.Entry{
-		Kind: event.KindGameEnded, Round: sp.Round, A: sp.A, B: sp.B,
-		Game: game, Attempt: attempt, Winner: winner, Head: "conceded",
-	}); err != nil {
-		return err
-	}
-	score := [2]int{0, 0}
-	if winner != nil {
-		if *winner == sp.A {
-			score = [2]int{1, 0}
-		} else {
-			score = [2]int{0, 1}
+	// One GameEnded per pass, bounded by the series length: an in-flight
+	// attempt is logged first, then the between window's never-started
+	// remainder.
+	for i := 0; i < r.bestOf(); i++ {
+		v, ok := r.ev.SeriesState(sp.A, sp.B)
+		if !ok || !v.Started || v.Ended || v.NextGame == 0 {
+			break
+		}
+		if att := v.InFlight; att != nil {
+			if err := r.apply(event.Entry{
+				Kind: event.KindGameEnded, Round: sp.Round, A: sp.A, B: sp.B,
+				Game: att.Game, Attempt: att.Attempt, Winner: winner, Head: "conceded",
+			}); err != nil {
+				return err
+			}
+			id := host.TableID(att.Table)
+			r.h.mu.Lock()
+			delete(r.h.tables, id)
+			r.h.mu.Unlock()
+			delete(r.tokens, id)
+			continue
+		}
+		if err := r.apply(event.Entry{
+			Kind: event.KindGameEnded, Round: sp.Round, A: sp.A, B: sp.B,
+			Game: v.NextGame, Winner: winner, Head: "conceded",
+		}); err != nil {
+			return err
 		}
 	}
+	v, ok := r.ev.SeriesState(sp.A, sp.B)
+	if !ok {
+		return nil
+	}
 	if err := r.apply(event.Entry{
-		Kind: event.KindSeriesEnded, Round: sp.Round, A: sp.A, B: sp.B, Score: score,
+		Kind: event.KindSeriesEnded, Round: sp.Round, A: sp.A, B: sp.B, Score: v.Wins,
 	}); err != nil {
 		return err
 	}
-	if att != nil {
-		id := host.TableID(att.Table)
-		r.h.mu.Lock()
-		delete(r.h.tables, id)
-		r.h.mu.Unlock()
-		delete(r.tokens, id)
-	}
 	return nil
+}
+
+// idleSideboard locks the deck an idle human seat played last game for its
+// series' next game (E3-5: one auto-keep per between window, the host's
+// action, Auto on the entry). When the next game then goes live and the
+// seat still owes its game decisions, the sweep's concession path ends
+// the series. It reports whether anything was applied. The caller holds
+// run.mu.
+func (r *run) idleSideboard(now time.Time) bool {
+	acted := false
+	for s := 0; s < draft.Seats; s++ {
+		if r.meta.Seats[s].Kind != "human" || now.Sub(r.lastAct[s]) <= r.h.opts.IdleTimeout {
+			continue
+		}
+		a, b, ok := r.ev.SeriesOf(s)
+		if !ok {
+			continue
+		}
+		v, ok := r.ev.SeriesState(a, b)
+		if !ok || !v.Between || v.NextGame == 0 {
+			continue
+		}
+		side := 0
+		if s == b {
+			side = 1
+		}
+		if v.Locked[side] != 0 {
+			continue
+		}
+		if err := r.apply(event.Entry{
+			Kind: event.KindSideboarded, Round: v.Round, A: a, B: b,
+			Game: v.NextGame, Seat: s, Rev: v.PlayRevs[side], Auto: true,
+		}); err != nil {
+			if r.halted == "" {
+				r.halted = fmt.Sprintf("event %s: idle seat %d sideboard failed: %v", r.meta.ID, s, err)
+			}
+			return acted
+		}
+		acted = true
+	}
+	return acted
 }

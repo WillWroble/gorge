@@ -275,7 +275,7 @@ func TestHumanGameGetsJoinLink(t *testing.T) {
 	if !mintedOK {
 		t.Fatalf("MintSeat never called for %s: %v", table, minted)
 	}
-	wantJoin := fmt.Sprintf("/t/%s?seat=0&token=tok-%s-0", table, table)
+	wantJoin := fmt.Sprintf("/t/%s?seat=0&token=tok-%s-0&event=%s", table, table, id)
 	st := stateOf(t, p.h, id, tok)
 	ser := -1
 	for i := range st.Series {
