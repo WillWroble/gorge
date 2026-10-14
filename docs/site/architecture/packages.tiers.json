@@ -549,6 +549,10 @@
       "tier": "bots",
       "status": "EXT"
     },
+    "limited/draftnet": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "limited/pickbot": {
       "tier": "core",
       "status": "CORE"
