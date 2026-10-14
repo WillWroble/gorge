@@ -3,6 +3,7 @@ package extern
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -13,19 +14,67 @@ import (
 )
 
 // TestMain re-executes this test binary as the external agent child when
-// GORGE_EXTAGENT_HELPER is set (no helper binary is ever built):
-// "refagent" serves the reference agent over stdio; "silent" handshakes
-// and then never answers (a child the Dial ctx must kill).
+// GORGE_EXTAGENT_HELPER is set (no helper binary is ever built). The value
+// is either a bare mode name — "refagent" serves the reference agent over
+// stdio, "silent" handshakes and then never answers (a child the Dial ctx
+// must kill) — or a JSON object configuring the refagent helper with a
+// refagent.Config subset: mode, policy, model_version, view_omit,
+// die_after, skip_forced, payment_actions, target_hints, kinds, max_batch,
+// agent.
 func TestMain(m *testing.M) {
-	switch os.Getenv("GORGE_EXTAGENT_HELPER") {
+	v := os.Getenv("GORGE_EXTAGENT_HELPER")
+	switch v {
 	case "":
 		os.Exit(m.Run())
 	case "refagent":
 		_ = refagent.Serve(os.Stdin, os.Stdout, refagent.Config{})
 	case "silent":
 		silentServe(os.Stdin, os.Stdout)
+	default:
+		var c helperConfig
+		if err := json.Unmarshal([]byte(v), &c); err != nil {
+			fmt.Fprintf(os.Stderr, "GORGE_EXTAGENT_HELPER: not a mode or JSON config: %v\n", err)
+			os.Exit(1)
+		}
+		if c.Mode == "silent" {
+			silentServe(os.Stdin, os.Stdout)
+			os.Exit(0)
+		}
+		_ = refagent.Serve(os.Stdin, os.Stdout, c.refagentConfig())
 	}
 	os.Exit(0)
+}
+
+// helperConfig is the JSON shape GORGE_EXTAGENT_HELPER accepts, a subset
+// of refagent.Config.
+type helperConfig struct {
+	Mode           string   `json:"mode"` // "" = refagent; "silent" supported
+	Policy         string   `json:"policy"`
+	ModelVersion   string   `json:"model_version"`
+	Agent          string   `json:"agent"`
+	Kinds          []string `json:"kinds"`
+	MaxBatch       int      `json:"max_batch"`
+	ViewOmit       []string `json:"view_omit"`
+	SkipForced     bool     `json:"skip_forced"`
+	PaymentActions bool     `json:"payment_actions"`
+	TargetHints    bool     `json:"target_hints"`
+	DieAfter       int      `json:"die_after"`
+}
+
+// refagentConfig maps the helper config onto a served refagent.Config.
+func (c helperConfig) refagentConfig() refagent.Config {
+	return refagent.Config{
+		Agent:          c.Agent,
+		ModelVersion:   c.ModelVersion,
+		Policy:         c.Policy,
+		Kinds:          c.Kinds,
+		MaxBatch:       c.MaxBatch,
+		ViewOmit:       c.ViewOmit,
+		SkipForced:     c.SkipForced,
+		PaymentActions: c.PaymentActions,
+		TargetHints:    c.TargetHints,
+		DieAfter:       c.DieAfter,
+	}
 }
 
 // silentServe handshakes like an agent and then reads and never answers:
@@ -103,7 +152,11 @@ func dialRefagent(t *testing.T, h *hub, cfg refagent.Config, o Options) *Agent {
 		_ = fromAgentW.Close()
 		served <- err
 	}()
-	t.Cleanup(func() { <-served })
+	t.Cleanup(func() {
+		if err := <-served; err != nil && err != io.EOF {
+			t.Logf("refagent serve: %v", err)
+		}
+	})
 	a, err := dial(context.Background(), pipeConn{Reader: fromAgentR, WriteCloser: toAgentW}, o, h, nil)
 	if err != nil {
 		t.Fatalf("dial refagent: %v", err)

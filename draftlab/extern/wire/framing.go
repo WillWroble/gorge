@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -19,7 +20,7 @@ func NewReader(r io.Reader, maxLine int) *Reader {
 	if maxLine <= 0 {
 		maxLine = MaxLine
 	}
-	return &Reader{br: bufio.NewReader(r), maxLine: maxLine}
+	return &Reader{br: bufio.NewReaderSize(r, 64<<10), maxLine: maxLine}
 }
 
 // Read decodes the next message. It does NOT validate; callers validate
@@ -43,7 +44,9 @@ func (r *Reader) Read() (Message, error) {
 }
 
 // readLine returns the next non-blank line (without its newline), whether
-// it overflowed the cap, and the read result. Blank lines are skipped.
+// it overflowed the cap, and the read result. Blank lines are skipped. A
+// line longer than the bufio buffer accumulates across ReadSlice chunks
+// (ErrBufferFull is not an error here, only the cap is).
 func (r *Reader) readLine() (line []byte, tooLong bool, err error) {
 	for {
 		line = line[:0]
@@ -51,6 +54,21 @@ func (r *Reader) readLine() (line []byte, tooLong bool, err error) {
 		var chunk []byte
 		for {
 			chunk, err = r.br.ReadSlice('\n')
+			if errors.Is(err, bufio.ErrBufferFull) {
+				// The buffer filled before the newline: keep the
+				// chunk (unless the cap already tripped, in which
+				// case discard it) and read on.
+				if !tooLong {
+					if len(line)+len(chunk) > r.maxLine+1 {
+						tooLong = true
+						line = line[:0]
+					} else {
+						line = append(line, chunk...)
+					}
+				}
+				err = nil
+				continue
+			}
 			if !tooLong {
 				if len(line)+len(chunk) > r.maxLine+1 {
 					// One byte of headroom keeps an exactly-maxLine

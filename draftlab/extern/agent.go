@@ -94,6 +94,8 @@ type Agent struct {
 
 	statsPicks, statsBuilds, statsDecides atomic.Int64
 	statsBatches, statsMaxBatch           atomic.Int64
+	statsForced, statsRefused             atomic.Int64
+	statsFallbacks                        atomic.Int64
 
 	closeOnce sync.Once
 	closeErr  error
@@ -112,12 +114,15 @@ func (a *Agent) Ref() draftlab.AgentRef {
 // Stats reads the agent's counters.
 func (a *Agent) Stats() Stats {
 	return Stats{
-		Picks:    a.statsPicks.Load(),
-		Builds:   a.statsBuilds.Load(),
-		Decides:  a.statsDecides.Load(),
-		Batches:  a.statsBatches.Load(),
-		MaxBatch: int(a.statsMaxBatch.Load()),
-		Dead:     a.sess.deadFlag.Load(),
+		Picks:     a.statsPicks.Load(),
+		Builds:    a.statsBuilds.Load(),
+		Decides:   a.statsDecides.Load(),
+		Batches:   a.statsBatches.Load(),
+		MaxBatch:  int(a.statsMaxBatch.Load()),
+		Dead:      a.sess.deadFlag.Load(),
+		Forced:    a.statsForced.Load(),
+		Refused:   a.statsRefused.Load(),
+		Fallbacks: a.statsFallbacks.Load(),
 	}
 }
 
