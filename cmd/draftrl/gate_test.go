@@ -2,11 +2,19 @@ package main
 
 import (
 	"bytes"
+	"runtime/debug"
 	"strings"
 	"testing"
 
 	"github.com/adams-shaun/gorge/internal/testutil"
 )
+
+// withSoftLimit pins the runtime soft memory limit for one test, so the az
+// memory guard sees a known GOMEMLIMIT whatever the test was launched with.
+func withSoftLimit(t *testing.T, b int64) {
+	prev := debug.SetMemoryLimit(b)
+	t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+}
 
 // TestGateSmokeBot is DR-4's bot smoke: 1 event, 1 human deck, 1 game per
 // pairing, the scripted bot pilot. Every seat's built and random deck
@@ -33,6 +41,10 @@ func TestGateSmokeBot(t *testing.T) {
 // per-seat builders (random on seat 1) and no baseline.
 func TestGateSmokeAZNoNet(t *testing.T) {
 	dir := testutil.CorpusDirOrSkip(t)
+	// 1 GiB soft holds 4 workers at sims 2 and fits the capped test scope's
+	// hard limit at the guard's 1.4x headroom (a 3 GiB GOMEMLIMIT under a
+	// 4G MemoryMax does not).
+	withSoftLimit(t, 1<<30)
 	var out bytes.Buffer
 	r, err := gate([]string{"-corpus", dir, "-events", "1", "-games", "1", "-max-human", "1",
 		"-pilot", "az", "-az-sims", "2", "-az-belief", "4", "-baseline", "none",
@@ -57,5 +69,22 @@ func TestParseSeatAgents(t *testing.T) {
 		if _, err := parseSeatAgents(bad, false); err == nil {
 			t.Errorf("%q parsed", bad)
 		}
+	}
+}
+
+// TestGateRefusesAZUnderMemory is the az memory guard's wiring: an az gate
+// whose GOMEMLIMIT cannot hold its workers is refused before the corpus
+// loads (the corpus path does not exist, so reaching draftlab.Open would
+// fail differently), and the bot pilot never consults the guard.
+func TestGateRefusesAZUnderMemory(t *testing.T) {
+	withSoftLimit(t, 512<<20)
+	missing := t.TempDir() + "/no-corpus"
+	_, err := gate([]string{"-corpus", missing, "-pilot", "az", "-workers", "4", "-az-sims", "25"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "GOMEMLIMIT") || !strings.Contains(err.Error(), "-workers") {
+		t.Fatalf("az under 512 MiB: err %v, want the memcap refusal", err)
+	}
+	_, err = gate([]string{"-corpus", missing, "-pilot", "bot", "-workers", "4"}, &bytes.Buffer{})
+	if err == nil || strings.Contains(err.Error(), "GOMEMLIMIT") {
+		t.Fatalf("bot under 512 MiB: err %v, want the corpus error, not the az refusal", err)
 	}
 }
