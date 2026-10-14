@@ -443,6 +443,27 @@ func foldClonePermanent(g *state.Game, e *Event) {
 	// (effects/cloneETBShapeOK) admits only heads cards can expand, so the
 	// false return is a defensive skip.
 	if kw, ok := strings.CutPrefix(e.Counter, "ifnew "); ok {
+		// sf is a SHALLOW value copy: for a plain battlefield creature its
+		// Face backing fields -- SVars, Keywords, Triggers, Repls -- alias
+		// the copied template's face, which for a printed card is the
+		// SHARED corpus face (state/object.go returns o.Card.Faces[i]).
+		// ApplyKeywordExpansion appends to Keywords/Triggers/Repls and
+		// setSVar writes the SVars map it binds from, so without a copy
+		// the expansion would mutate the process-global corpus face --
+		// cross-match contamination on a live server, and a latent
+		// concurrent-map race on the shared cards.SharedCorpus. Deep-copy
+		// the mutable fields before expanding (the gain-this-ability arm
+		// above already does this for SVars).
+		if len(sf.SVars) > 0 {
+			svars := make(map[string]string, len(sf.SVars))
+			for k, v := range sf.SVars {
+				svars[k] = v
+			}
+			sf.SVars = svars
+		}
+		sf.Keywords = append([]string(nil), sf.Keywords...)
+		sf.Triggers = append([]cards.Trigger(nil), sf.Triggers...)
+		sf.Repls = append([]cards.Repl(nil), sf.Repls...)
 		for line := range strings.SplitSeq(kw, ";") {
 			if line != "" {
 				sf.ApplyKeywordExpansion(line)
