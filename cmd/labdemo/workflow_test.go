@@ -201,6 +201,10 @@ func TestLabdemoOptionValidation(t *testing.T) {
 		{"gauntlet-heroes", func(o *options) { o.gauntletHeroes = -1 }, "-gauntlet-heroes"},
 		{"games", func(o *options) { o.games = 0 }, "-games"},
 		{"workers", func(o *options) { o.workers = -1 }, "-workers"},
+		{"ext-flush", func(o *options) { o.extFlush = "eager" }, "-ext-flush"},
+		{"ext-fail", func(o *options) { o.extFail = "ignore" }, "-ext-fail"},
+		{"ext-max-batch", func(o *options) { o.extMaxBatch = -1 }, "-ext-max-batch"},
+		{"ext-spec", func(o *options) { o.player = "ext:exec:" }, "bad agent spec"},
 	} {
 		o := options{seed: 1, podSeats: 8, games: 1}
 		tc.mut(&o)
