@@ -9,40 +9,36 @@ import (
 )
 
 // TestGenerateReproducesCommittedSets regenerates every set that has a
-// hand-authored header, in memory, and asserts the committed file under
-// sets/ is byte-identical — so a manifest change (a new printing, a rarity
-// correction at the XMage pin) shows up as a diff instead of silently
-// drifting from the committed spec.
+// trimmed MTGJSON input, in memory, and asserts the committed file under
+// sets/ is byte-identical — so an MTGJSON pin move (a new printing, a
+// collation correction) shows up as a diff instead of silently drifting
+// from the committed spec.
 func TestGenerateReproducesCommittedSets(t *testing.T) {
 	// The generator runs from limited/setdata; the test runs from this
-	// package's directory three levels deeper.
+	// package's directory two levels deeper.
 	root := "../.."
-	manifests := "../../../../compliance/manifests"
+	mtgjson := filepath.Join(root, "mtgjson")
 
-	headerEntries, err := os.ReadDir(filepath.Join(root, "headers"))
+	entries, err := os.ReadDir(mtgjson)
 	if err != nil {
-		t.Fatalf("read headers: %v", err)
+		t.Fatalf("read mtgjson inputs: %v", err)
 	}
 	var codes []string
-	for _, e := range headerEntries {
+	for _, e := range entries {
 		if name := e.Name(); strings.HasSuffix(name, ".json") {
 			codes = append(codes, strings.TrimSuffix(name, ".json"))
 		}
 	}
 	if len(codes) != 2 {
-		t.Fatalf("expected the two committed headers (FDN, BLB), found %d: %v", len(codes), codes)
+		t.Fatalf("expected the two committed MTGJSON inputs (FDN, BLB), found %d: %v", len(codes), codes)
 	}
 	for _, code := range codes {
 		t.Run(code, func(t *testing.T) {
-			headerJSON, err := os.ReadFile(filepath.Join(root, "headers", code+".json"))
+			raw, err := os.ReadFile(filepath.Join(mtgjson, code+".json"))
 			if err != nil {
-				t.Fatalf("read header: %v", err)
+				t.Fatalf("read MTGJSON input: %v", err)
 			}
-			manifestJSON, err := os.ReadFile(filepath.Join(manifests, code+".json"))
-			if err != nil {
-				t.Fatalf("read manifest: %v", err)
-			}
-			got, err := Generate(headerJSON, manifestJSON)
+			got, err := Generate(raw)
 			if err != nil {
 				t.Fatalf("generate: %v", err)
 			}
@@ -75,14 +71,50 @@ func TestGenerateReproducesCommittedSets(t *testing.T) {
 	}
 }
 
-// TestGenerateRejectsMismatchedManifest proves the generator fails loudly
-// when the header and manifest disagree about the set.
-func TestGenerateRejectsMismatchedManifest(t *testing.T) {
-	h := []byte(`{"code":"FDN","name":"Foundations","main_max":271,"pack_size":14,
-		"land_sheet":{"names":["Plains"]},
-		"slots":[{"sheet":"land","count":1}]}`)
-	m := []byte(`{"code":"BLB","cards":[]}`)
-	if _, err := Generate(h, m); err == nil {
-		t.Fatal("Generate accepted a header and manifest for different sets")
+// TestGenerateIsDeterministic compiles one input twice and asserts the
+// outputs are byte-identical, so a regenerate run can never churn the
+// committed file.
+func TestGenerateIsDeterministic(t *testing.T) {
+	raw, err := os.ReadFile("../../mtgjson/FDN.json")
+	if err != nil {
+		t.Fatalf("read MTGJSON input: %v", err)
+	}
+	first, err := Generate(raw)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	second, err := Generate(raw)
+	if err != nil {
+		t.Fatalf("generate again: %v", err)
+	}
+	if !bytes.Equal(first, second) {
+		t.Fatal("two Generate runs over the same input produced different bytes")
+	}
+}
+
+// TestGenerateRejectsBrokenInputs proves the compile step fails loudly on
+// the malformed shapes a trimmed MTGJSON file could carry: an unknown
+// rarity word, a config naming a missing sheet, and a variant recipe that
+// disagrees with its siblings about the pack size.
+func TestGenerateRejectsBrokenInputs(t *testing.T) {
+	raw, err := os.ReadFile("../../mtgjson/FDN.json")
+	if err != nil {
+		t.Fatalf("read MTGJSON input: %v", err)
+	}
+	cases := map[string]func(string) string{
+		"unknown rarity word": func(s string) string {
+			return strings.Replace(s, `"rarity": "common"`, `"rarity": "commonish"`, 1)
+		},
+		"variant names a missing sheet": func(s string) string {
+			return strings.Replace(s, `"land": 1,`, `"unreal": 1,`, 1)
+		},
+		"zero card weight": func(s string) string {
+			return strings.Replace(s, "\"weight\": 1\n", "\"weight\": 0\n", 1)
+		},
+	}
+	for name, breakIt := range cases {
+		if _, err := Generate([]byte(breakIt(string(raw)))); err == nil {
+			t.Errorf("Generate accepted an input with a %s", name)
+		}
 	}
 }

@@ -108,6 +108,49 @@ func firstKind(entries []event.Entry) event.Kind {
 	return entries[0].Kind
 }
 
+// TestDraftsimCollationIsSelectableAndValidated pins E5-a1's flag contract:
+// an unknown -collation is refused before anything runs, naming the
+// collations the set carries, and -collation play runs a real event — its
+// line names the collation and its packs come off the play config.
+func TestDraftsimCollationIsSelectableAndValidated(t *testing.T) {
+	dir := corpusReady(t)
+	// Precondition: the two collations the flag may name are the set's own.
+	names := setdata.Collations("FDN")
+	if len(names) != 2 || names[0] != setdata.Play || names[1] != setdata.Arena {
+		t.Fatalf("precondition: FDN carries collations %v, want [play play-arena]", names)
+	}
+	o := options{
+		set: "FDN", collation: "paper", seed: 1, events: 1,
+		players: "bot,bot,bot,bot", drafter: "rating-colour", builder: "best23", dir: dir,
+	}
+	if _, err := run(o, &strings.Builder{}); err == nil {
+		t.Fatal("run accepted an unknown -collation")
+	} else if !strings.Contains(err.Error(), `no "paper" collation`) || !strings.Contains(err.Error(), "play, play-arena") {
+		t.Errorf("unknown-collation error = %q, want it to name the collation and list the set's", err)
+	}
+
+	// The default (unset) is play-arena; the printed event line says so.
+	var out strings.Builder
+	o.collation = ""
+	if _, err := run(o, &out); err != nil {
+		t.Fatalf("run at the default collation: %v", err)
+	}
+	if !strings.Contains(out.String(), "set FDN (play-arena)") {
+		t.Errorf("default-collation event line misses `set FDN (play-arena)`; got:\n%s", out.String())
+	}
+
+	// -collation play runs a full event too, named on its line.
+	out.Reset()
+	o.collation = "play"
+	o.verify = true
+	if _, err := run(o, &out); err != nil {
+		t.Fatalf("run at -collation play: %v", err)
+	}
+	if !strings.Contains(out.String(), "set FDN (play)") {
+		t.Errorf("play-collation event line misses `set FDN (play)`; got:\n%s", out.String())
+	}
+}
+
 // TestDraftsimRefusesEnvPolicy pins the operator ruling: a -players entry
 // whose bots.Info.Env is true (it searches over every seat's REAL
 // decklist) refuses to seat, naming the rule, before anything runs.

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all" // link the built-in policies
@@ -88,9 +89,19 @@ func run(o options, out io.Writer) (*result, error) {
 	if err != nil {
 		return nil, err
 	}
-	spec, err := setdata.Load(o.set)
+	// An unset collation (options built in tests, not via the flag set)
+	// means the default; a name the set does not carry is the error below.
+	if o.collation == "" {
+		o.collation = string(setdata.DefaultCollation)
+	}
+	spec, err := setdata.LoadCollation(o.set, setdata.Collation(o.collation))
 	if err != nil {
-		return nil, err
+		if colls := specCollations(o.set); len(colls) > 0 {
+			return nil, fmt.Errorf("%w (collations: %s)", err, strings.Join(colls, ", "))
+		}
+		// An unknown set carries no collations to list; say so distinctly
+		// instead of an empty list.
+		return nil, fmt.Errorf("unknown set %q (known: %s)", o.set, strings.Join(setdata.Codes(), ", "))
 	}
 
 	reg, err := testutil.OpenCorpusRegistry(o.dir)
@@ -132,7 +143,7 @@ func run(o options, out io.Writer) (*result, error) {
 	res := &result{}
 	for n := 0; n < o.events; n++ {
 		seed := o.seed + uint64(n)
-		fmt.Fprintf(out, "event %d: seed %d, set %s, drafter %s, builder %s\n", n+1, seed, spec.Code, o.drafter, o.builder)
+		fmt.Fprintf(out, "event %d: seed %d, set %s (%s), drafter %s, builder %s\n", n+1, seed, spec.Code, spec.Collation, o.drafter, o.builder)
 		if o.verbose {
 			for i, p := range players {
 				fmt.Fprintf(out, "  seat %d: %s (persona %s/%s/%s)\n", i, p, o.drafter, o.builder, p)
@@ -215,6 +226,17 @@ func personaPair(drafter, builder string, lookup pickbot.CardLookup) (pickbot.Dr
 	return d, b, nil
 }
 
+// specCollations names the set's collations for the -collation error
+// message, so a typo lists what exists.
+func specCollations(set string) []string {
+	names := setdata.Collations(set)
+	out := make([]string, len(names))
+	for i, c := range names {
+		out[i] = string(c)
+	}
+	return out
+}
+
 // sheetNames is the set's sheet-card universe, sorted: the pack_card_ and
 // pool_ columns the -draftlog export writes. No map iteration reaches the
 // output: the names are collected per sheet in slice order and the sort
@@ -222,8 +244,8 @@ func personaPair(drafter, builder string, lookup pickbot.CardLookup) (pickbot.Dr
 func sheetNames(spec setdata.Spec) []string {
 	seen := map[string]bool{}
 	var names []string
-	for _, sheet := range spec.Sheets {
-		for _, sc := range sheet {
+	for _, sheet := range spec.Config.Sheets {
+		for _, sc := range sheet.Cards {
 			if !seen[sc.Name] {
 				seen[sc.Name] = true
 				names = append(names, sc.Name)

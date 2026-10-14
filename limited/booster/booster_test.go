@@ -11,31 +11,58 @@ import (
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
 
-// sheetCard builds one SheetCard.
-func sheetCard(name, number string, r limited.Rarity) setdata.SheetCard {
-	return setdata.SheetCard{Name: name, Number: number, Rarity: r}
+// sheetCard builds one SheetCard with a distinct UUID and the given weight.
+func sheetCard(name, number string, r limited.Rarity, weight int) setdata.SheetCard {
+	return setdata.SheetCard{
+		UUID:   "u" + number,
+		Name:   name,
+		Set:    "TST",
+		Number: number,
+		Rarity: r,
+		Weight: weight,
+	}
 }
+
+// v2spec assembles a valid v2 Spec from variants and sheets: the config's
+// total weight is the variants' sum. The precondition assert makes a
+// hand-built spec that fails Validate fail the test loudly, not silently.
+func v2spec(packSize int, variants []setdata.Variant, sheets map[string]setdata.Sheet) setdata.Spec {
+	total := 0
+	for _, v := range variants {
+		total += v.Weight
+	}
+	spec := setdata.Spec{
+		Code: "TST", Name: "Test", PackSize: packSize,
+		Source: "hand-built test spec",
+		Config: setdata.Config{TotalWeight: total, Variants: variants, Sheets: sheets},
+	}
+	if err := spec.Validate(); err != nil {
+		// Callers build specs that must validate; a broken one is a test bug.
+		panic("v2spec: hand-built spec is invalid: " + err.Error())
+	}
+	return spec
+}
+
+func itoa(i int) string { return strconv.Itoa(i) }
 
 // fiveColourSheet returns 20 W, 6 U, 6 B, 6 R and 2 G mono commons, named
 // W1..W20, U1..U6, B1..B6, R1..R6, G1..G2, so a 7-common draw usually misses
 // green and the colour balance has to trade a white for it.
-func fiveColourSheet() []setdata.SheetCard {
-	var sheet []setdata.SheetCard
+func fiveColourSheet() setdata.Sheet {
+	var cards []setdata.SheetCard
 	for i := 1; i <= 20; i++ {
-		sheet = append(sheet, sheetCard("W"+itoa(i), itoa(i), limited.Common))
+		cards = append(cards, sheetCard("W"+itoa(i), itoa(i), limited.Common, 1))
 	}
 	for _, col := range []byte{'U', 'B', 'R'} {
 		for i := 1; i <= 6; i++ {
-			sheet = append(sheet, sheetCard(string(col)+itoa(i), itoa(i), limited.Common))
+			cards = append(cards, sheetCard(string(col)+itoa(i), "1"+string(col)+itoa(i), limited.Common, 1))
 		}
 	}
 	for i := 1; i <= 2; i++ {
-		sheet = append(sheet, sheetCard("G"+itoa(i), itoa(i), limited.Common))
+		cards = append(cards, sheetCard("G"+itoa(i), "2G"+itoa(i), limited.Common, 1))
 	}
-	return sheet
+	return setdata.Sheet{TotalWeight: len(cards), BalanceColors: true, Cards: cards}
 }
-
-func itoa(i int) string { return strconv.Itoa(i) }
 
 // monoCount counts the slot cards that are mono-coloured of each WUBRG
 // colour, using the test's own colourOf table.
@@ -61,29 +88,37 @@ func monoCount(colourOf booster.ColourOf, cards []limited.CardRef) [5]int {
 	return out
 }
 
-// TestBoosterPackFillsSlotsInOrderAndIDs opens a hand spec whose slots are
-// recognisable by rarity and checks the pack fills in spec order with
-// sequential IDs from the caller's allocator.
-func TestBoosterPackFillsSlotsInOrderAndIDs(t *testing.T) {
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 5, MainMax: 100,
-		Sheets: map[string][]setdata.SheetCard{
-			"common":   {sheetCard("C1", "1", limited.Common), sheetCard("C2", "2", limited.Common), sheetCard("C3", "3", limited.Common)},
-			"uncommon": {sheetCard("U1", "10", limited.Uncommon)},
-			"rare":     {sheetCard("R1", "20", limited.Rare)},
-			"mythic":   {sheetCard("M1", "30", limited.Mythic)},
-			"land":     {sheetCard("L1", "90", limited.Land)},
-		},
-		Slots: []setdata.Slot{
-			{Sheet: "common", Count: 2},
-			{RareMythic: &setdata.RareMythic{RareWeight: 2, MythicWeight: 1}, Count: 1},
-			{Sheet: "uncommon", Count: 1},
-			{Sheet: "land", Count: 1},
-		},
+// colourOfInitial maps a card name's first letter to its mono colour, the
+// convention the five-colour test sheets use.
+func colourOfInitial(name string) []byte {
+	if len(name) == 0 {
+		return nil
 	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
+	switch name[0] {
+	case 'W', 'U', 'B', 'R', 'G':
+		return []byte{name[0]}
 	}
+	return nil
+}
+
+// TestBoosterPackFillsContentsAndIDs opens a hand spec whose sheets are
+// recognisable by rarity and checks the pack fills in sorted sheet order
+// with sequential IDs from the caller's allocator.
+func TestBoosterPackFillsContentsAndIDs(t *testing.T) {
+	spec := v2spec(5,
+		[]setdata.Variant{{Weight: 1, Contents: map[string]int{
+			"common": 2, "land": 1, "rareMythic": 1, "uncommon": 1,
+		}}},
+		map[string]setdata.Sheet{
+			"common": {TotalWeight: 3, Cards: []setdata.SheetCard{
+				sheetCard("C1", "1", limited.Common, 1), sheetCard("C2", "2", limited.Common, 1), sheetCard("C3", "3", limited.Common, 1),
+			}},
+			"uncommon": {TotalWeight: 1, Cards: []setdata.SheetCard{sheetCard("U1", "10", limited.Uncommon, 1)}},
+			"rareMythic": {TotalWeight: 5, Cards: []setdata.SheetCard{
+				sheetCard("R1", "20", limited.Rare, 2), sheetCard("R2", "21", limited.Rare, 2), sheetCard("M1", "30", limited.Mythic, 1),
+			}},
+			"land": {TotalWeight: 1, Cards: []setdata.SheetCard{sheetCard("L1", "90", limited.Land, 1)}},
+		})
 	pack, err := booster.Open(spec, rand.New(rand.NewPCG(1, 2)), &booster.IDs{}, nil)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -91,69 +126,59 @@ func TestBoosterPackFillsSlotsInOrderAndIDs(t *testing.T) {
 	if len(pack) != 5 {
 		t.Fatalf("pack has %d cards, want 5", len(pack))
 	}
-	wantRarity := []limited.Rarity{limited.Common, limited.Common, limited.Rare, limited.Uncommon, limited.Land}
+	// Sorted sheet order: common, common, land, rareMythic (R or M),
+	// uncommon.
+	wantRarity := []limited.Rarity{limited.Common, limited.Common, limited.Land, limited.Rare, limited.Uncommon}
 	for i, r := range wantRarity {
-		if i == 2 && (pack[i].Rarity == limited.Mythic) {
-			r = limited.Mythic // the rare/mythic slot may draw either side of the split
+		if i == 3 && pack[i].Rarity == limited.Mythic {
+			r = limited.Mythic // the weighted rare/mythic draw may land either side
 		}
 		if pack[i].Rarity != r {
-			t.Errorf("pack[%d] rarity = %c, want %c (slots must fill in spec order)", i, pack[i].Rarity, r)
+			t.Errorf("pack[%d] rarity = %c, want %c (sheets fill in sorted name order)", i, pack[i].Rarity, r)
 		}
 		if pack[i].Set != "TST" {
-			t.Errorf("pack[%d].Set = %q, want TST", i, pack[i].Set)
+			t.Errorf("pack[%d].Set = %q, want the printing's set TST", i, pack[i].Set)
 		}
-		wantID := "c" + itoa(i+1)
-		if pack[i].ID != wantID {
-			t.Errorf("pack[%d].ID = %q, want %q (IDs assigned in slot-fill order)", i, pack[i].ID, wantID)
+		if wantID := "c" + itoa(i+1); pack[i].ID != wantID {
+			t.Errorf("pack[%d].ID = %q, want %q (IDs assigned in fill order)", i, pack[i].ID, wantID)
 		}
 	}
 }
 
 // TestBoosterPackNeverRepeatsNames drives the resample rule from both
-// directions: two draws from a two-card sheet come out distinct, and a third
-// draw from the same two-card sheet is an error, not a duplicate.
+// directions: two draws from a two-card sheet come out distinct, and a
+// third draw from the same two-card sheet is an error, not a duplicate.
 func TestBoosterPackNeverRepeatsNames(t *testing.T) {
-	twoCards := []setdata.SheetCard{sheetCard("Only1", "1", limited.Common), sheetCard("Only2", "2", limited.Common)}
-	packOf := func(counts ...int) setdata.Spec {
-		spec := setdata.Spec{
-			Code: "TST", Name: "Test", MainMax: 10,
-			Sheets: map[string][]setdata.SheetCard{"common": twoCards},
-		}
-		total := 0
-		for _, c := range counts {
-			spec.Slots = append(spec.Slots, setdata.Slot{Sheet: "common", Count: c})
-			total += c
-		}
-		spec.PackSize = total
-		return spec
+	sheets := map[string]setdata.Sheet{
+		"common": {TotalWeight: 2, Cards: []setdata.SheetCard{
+			sheetCard("Only1", "1", limited.Common, 1), sheetCard("Only2", "2", limited.Common, 1),
+		}},
 	}
-	pack, err := booster.Open(packOf(2), rand.New(rand.NewPCG(3, 4)), &booster.IDs{}, nil)
+	pack, err := booster.Open(v2spec(2, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 2}}}, sheets),
+		rand.New(rand.NewPCG(3, 4)), &booster.IDs{}, nil)
 	if err != nil {
 		t.Fatalf("Open two draws from a two-card sheet: %v", err)
 	}
 	if len(pack) != 2 || pack[0].Name == pack[1].Name {
 		t.Fatalf("two draws gave %v: a pack must never repeat a name", pack)
 	}
-	if _, err := booster.Open(packOf(3), rand.New(rand.NewPCG(3, 4)), &booster.IDs{}, nil); err == nil {
+	if _, err := booster.Open(v2spec(3, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 3}}}, sheets),
+		rand.New(rand.NewPCG(3, 4)), &booster.IDs{}, nil); err == nil {
 		t.Error("three draws from a two-card sheet succeeded: duplicates must fail Open, not pass silently")
 	}
 }
 
-// TestBoosterRareMythicSplitFollowsPerCardWeights pins the 2:1 per-card
-// split: with two rares at weight 2 and one mythic at weight 1, the mythic
-// takes the rare/mythic slot one time in five.
-func TestBoosterRareMythicSplitFollowsPerCardWeights(t *testing.T) {
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 1, MainMax: 10,
-		Sheets: map[string][]setdata.SheetCard{
-			"rare":   {sheetCard("R1", "1", limited.Rare), sheetCard("R2", "2", limited.Rare)},
-			"mythic": {sheetCard("M1", "3", limited.Mythic)},
-		},
-		Slots: []setdata.Slot{{RareMythic: &setdata.RareMythic{RareWeight: 2, MythicWeight: 1}, Count: 1}},
-	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
-	}
+// TestBoosterDrawFollowsPerCardWeights pins the weighted draw: with two
+// rares at weight 2 and one mythic at weight 1, the mythic takes the slot
+// one time in five.
+func TestBoosterDrawFollowsPerCardWeights(t *testing.T) {
+	spec := v2spec(1,
+		[]setdata.Variant{{Weight: 1, Contents: map[string]int{"rareMythic": 1}}},
+		map[string]setdata.Sheet{
+			"rareMythic": {TotalWeight: 5, Cards: []setdata.SheetCard{
+				sheetCard("R1", "1", limited.Rare, 2), sheetCard("R2", "2", limited.Rare, 2), sheetCard("M1", "3", limited.Mythic, 1),
+			}},
+		})
 	const packs = 20000
 	mythics := 0
 	for i := 0; i < packs; i++ {
@@ -167,58 +192,48 @@ func TestBoosterRareMythicSplitFollowsPerCardWeights(t *testing.T) {
 	}
 	share := float64(mythics) / packs // want 1*1 / (2*2 + 1*1) = 0.2
 	if share < 0.18 || share > 0.22 {
-		t.Errorf("mythic share of the rare/mythic slot = %.4f over %d packs, want 0.2 ± 0.02", share, packs)
+		t.Errorf("mythic share of the weighted draw = %.4f over %d packs, want 0.2 ± 0.02", share, packs)
 	}
 }
 
-// TestBoosterWildcardRarityFollowsWeights pins a wildcard slot's rarity
-// distribution on its weights and the rare_mythic bucket's internal 2:1
-// per-card split (two rares at weight 2 vs one mythic at weight 1 → one
-// mythic in five of the bucket's draws).
-func TestBoosterWildcardRarityFollowsWeights(t *testing.T) {
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 2, MainMax: 10,
-		Sheets: map[string][]setdata.SheetCard{
-			"common":   {sheetCard("C1", "1", limited.Common), sheetCard("C2", "2", limited.Common), sheetCard("C3", "3", limited.Common), sheetCard("C4", "4", limited.Common)},
-			"uncommon": {sheetCard("U1", "5", limited.Uncommon), sheetCard("U2", "6", limited.Uncommon), sheetCard("U3", "7", limited.Uncommon), sheetCard("U4", "8", limited.Uncommon)},
-			"rare":     {sheetCard("R1", "9", limited.Rare), sheetCard("R2", "10", limited.Rare)},
-			"mythic":   {sheetCard("M1", "11", limited.Mythic)},
-		},
-		Slots: []setdata.Slot{
-			{RareMythic: &setdata.RareMythic{RareWeight: 2, MythicWeight: 1}, Count: 1},
-			{Wildcard: &setdata.Weights{Common: 0.5, Uncommon: 0.4, RareMythic: 0.1}, Count: 1},
-		},
+// TestBoosterVariantWeightsPickTheRecipe pins the variant pick: a pack from
+// the dominant variant's recipe has an extra common, the minority one an
+// extra land; the shares follow the variant weights.
+func TestBoosterVariantWeightsPickTheRecipe(t *testing.T) {
+	sheets := map[string]setdata.Sheet{
+		"common": {TotalWeight: 6, Cards: []setdata.SheetCard{
+			sheetCard("C1", "1", limited.Common, 1), sheetCard("C2", "2", limited.Common, 1), sheetCard("C3", "3", limited.Common, 1),
+			sheetCard("C4", "4", limited.Common, 1), sheetCard("C5", "5", limited.Common, 1), sheetCard("C6", "6", limited.Common, 1),
+		}},
+		"land": {TotalWeight: 2, Cards: []setdata.SheetCard{
+			sheetCard("L1", "9", limited.Land, 1), sheetCard("L2", "10", limited.Land, 1),
+		}},
 	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
-	}
+	spec := v2spec(4,
+		[]setdata.Variant{
+			{Weight: 3, Contents: map[string]int{"common": 3, "land": 1}},
+			{Weight: 1, Contents: map[string]int{"common": 2, "land": 2}},
+		}, sheets)
 	const packs = 20000
-	var got [4]int // C U R M
+	small := 0
 	for i := 0; i < packs; i++ {
-		pack, err := booster.Open(spec, rand.New(rand.NewPCG(uint64(i), 9)), &booster.IDs{}, nil)
-		if err != nil || len(pack) != 2 {
+		pack, err := booster.Open(spec, rand.New(rand.NewPCG(uint64(i), 13)), &booster.IDs{}, nil)
+		if err != nil || len(pack) != 4 {
 			t.Fatalf("Open pack %d: %v", i, err)
 		}
-		switch pack[1].Rarity { // the wildcard draw sits after the rare/mythic slot
-
-		case limited.Common:
-			got[0]++
-		case limited.Uncommon:
-			got[1]++
-		case limited.Rare:
-			got[2]++
-		case limited.Mythic:
-			got[3]++
-		default:
-			t.Fatalf("wildcard drew rarity %c outside C/U/R/M", pack[0].Rarity)
+		commons := 0
+		for _, c := range pack {
+			if c.Rarity == limited.Common {
+				commons++
+			}
+		}
+		if commons == 2 {
+			small++
 		}
 	}
-	want := [4]float64{0.5, 0.4, 0.08, 0.02} // rare_mythic 0.1 splits 2:1 per card
-	for i, w := range want {
-		share := float64(got[i]) / packs
-		if share < w-0.01 || share > w+0.01 {
-			t.Errorf("wildcard rarity %c share = %.4f, want %.4f ± 0.01", "CURM"[i], share, w)
-		}
+	share := float64(small) / packs // the weight-1 variant's recipe
+	if share < 0.22 || share > 0.28 {
+		t.Errorf("minority variant share = %.4f over %d packs, want 0.25 ± 0.03", share, packs)
 	}
 }
 
@@ -228,28 +243,12 @@ func TestBoosterWildcardRarityFollowsWeights(t *testing.T) {
 // every one of them, without ever emptying white or duplicating a name.
 func TestBoosterColourBalanceFillsMissingColours(t *testing.T) {
 	sheet := fiveColourSheet()
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 7, MainMax: 40,
-		Sheets: map[string][]setdata.SheetCard{"common": sheet},
-		Slots:  []setdata.Slot{{Sheet: "common", Count: 7, BalanceColours: true}},
-	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
-	}
-	colourOf := func(name string) []byte {
-		if len(name) == 0 {
-			return nil
-		}
-		switch name[0] {
-		case 'W', 'U', 'B', 'R', 'G':
-			return []byte{name[0]}
-		}
-		return nil
-	}
+	spec := v2spec(7, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 7}}}, map[string]setdata.Sheet{"common": sheet})
+	colourOf := colourOfInitial
 	// Precondition: green is genuinely scarce on the sheet, so an unbalanced
 	// draw would miss it most of the time and the assertion below is live.
 	var greenOnSheet int
-	for _, sc := range sheet {
+	for _, sc := range sheet.Cards {
 		if colourOf(sc.Name)[0] == 'G' {
 			greenOnSheet++
 		}
@@ -303,36 +302,73 @@ func TestBoosterColourBalanceFillsMissingColours(t *testing.T) {
 	}
 }
 
+// TestBoosterColourBalanceOnlyFromFiveCards pins the brief's threshold: a
+// balance_colors sheet whose slot draws fewer than 5 cards is NOT balanced.
+// The sheet is white-plentiful/blue-scarce and the slot draws 4: balanced,
+// every all-white draw would trade a white for a blue and no pack would
+// stay blueless; unbalanced, all-white packs occur and blue may stay
+// missing. (At count 5 the same threshold forces every missing colour in —
+// that direction is TestBoosterColourBalanceFillsMissingColours.)
+func TestBoosterColourBalanceOnlyFromFiveCards(t *testing.T) {
+	var cards []setdata.SheetCard
+	for i := 1; i <= 20; i++ {
+		cards = append(cards, sheetCard("W"+itoa(i), itoa(i), limited.Common, 1))
+	}
+	for i := 1; i <= 6; i++ {
+		cards = append(cards, sheetCard("U"+itoa(i), "1U"+itoa(i), limited.Common, 1))
+	}
+	sheet := setdata.Sheet{TotalWeight: len(cards), BalanceColors: true, Cards: cards}
+	spec := v2spec(4, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 4}}}, map[string]setdata.Sheet{"common": sheet})
+	missed := 0
+	const packs = 200
+	for i := 0; i < packs; i++ {
+		pack, err := booster.Open(spec, rand.New(rand.NewPCG(uint64(i), 17)), &booster.IDs{}, colourOfInitial)
+		if err != nil {
+			t.Fatalf("Open pack %d: %v", i, err)
+		}
+		if monoCount(colourOfInitial, pack)[1] == 0 {
+			missed++
+		}
+	}
+	if missed == 0 {
+		t.Fatal("every 4-card draw from the white/blue sheet hit blue: the precondition cannot show the threshold")
+	}
+	t.Logf("sub-five balance_colors slot left blue missing in %d of %d packs (allowed)", missed, packs)
+}
+
 // TestBoosterPodIsDeterministicAndSaltStable pins OpenPod: the same seed
 // replays byte-identically, and growing the pod never shifts a pack another
 // seat already holds.
 func TestBoosterPodIsDeterministicAndSaltStable(t *testing.T) {
-	sheet := fiveColourSheet()
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 7, MainMax: 40,
-		Sheets: map[string][]setdata.SheetCard{
-			"common":   sheet,
-			"uncommon": {sheetCard("UncA", "1", limited.Uncommon)},
-			"rare":     {sheetCard("RareA", "2", limited.Rare)},
-			"mythic":   {sheetCard("MythA", "3", limited.Mythic)},
-			"land":     {sheetCard("LandA", "9", limited.Land)},
-		},
-		Slots: []setdata.Slot{
-			{Sheet: "common", Count: 4, BalanceColours: true},
-			{RareMythic: &setdata.RareMythic{RareWeight: 2, MythicWeight: 1}, Count: 1},
-			{Sheet: "uncommon", Count: 1},
-			{Sheet: "land", Count: 1},
-		},
+	// The pod needs enough distinct cards per sheet that 6 packs (3 seats ×
+	// 2) can all draw pod-wide-unique names from each of its slots.
+	sheets := map[string]setdata.Sheet{
+		"common": fiveColourSheet(),
+		"uncommon": {TotalWeight: 6, Cards: []setdata.SheetCard{
+			sheetCard("UncA", "1", limited.Uncommon, 1), sheetCard("UncB", "2", limited.Uncommon, 1),
+			sheetCard("UncC", "3", limited.Uncommon, 1), sheetCard("UncD", "4", limited.Uncommon, 1),
+			sheetCard("UncE", "5", limited.Uncommon, 1), sheetCard("UncF", "6", limited.Uncommon, 1),
+		}},
+		"rareMythic": {TotalWeight: 7, Cards: []setdata.SheetCard{
+			sheetCard("RareA", "7", limited.Rare, 2), sheetCard("RareB", "8", limited.Rare, 2),
+			sheetCard("RareC", "9", limited.Rare, 1), sheetCard("RareD", "10", limited.Rare, 1),
+			sheetCard("MythA", "11", limited.Mythic, 1),
+		}},
+		"land": {TotalWeight: 6, Cards: []setdata.SheetCard{
+			sheetCard("LandA", "90", limited.Land, 1), sheetCard("LandB", "91", limited.Land, 1),
+			sheetCard("LandC", "92", limited.Land, 1), sheetCard("LandD", "93", limited.Land, 1),
+			sheetCard("LandE", "94", limited.Land, 1), sheetCard("LandF", "95", limited.Land, 1),
+		}},
 	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
+	spec := v2spec(7, []setdata.Variant{{Weight: 1, Contents: map[string]int{
+		"common": 4, "land": 1, "rareMythic": 1, "uncommon": 1,
+	}}}, sheets)
+	// Precondition: the common sheet balances colours, so the colour lookup
+	// matters and the pod exercise covers it.
+	if !sheets["common"].BalanceColors {
+		t.Fatal("precondition: the pod spec's common sheet does not balance colours")
 	}
-	colourOf := func(name string) []byte {
-		if len(name) > 0 && name[0] != 'L' {
-			return []byte{name[0]}
-		}
-		return nil
-	}
+	colourOf := colourOfInitial
 	openPod := func(seats, packs int) [][][]limited.CardRef {
 		t.Helper()
 		pod, err := booster.OpenPod(spec, 42, seats, packs, &booster.IDs{}, colourOf)
@@ -385,16 +421,12 @@ func TestBoosterPodIsDeterministicAndSaltStable(t *testing.T) {
 }
 
 // TestBoosterRefusesMissingInputs checks the guard rails: no allocator, no
-// seeded rng, or a balancing slot without a ColourOf all fail Open.
+// seeded rng, or a balancing sheet without a ColourOf all fail Open.
 func TestBoosterRefusesMissingInputs(t *testing.T) {
-	spec := setdata.Spec{
-		Code: "TST", Name: "Test", PackSize: 1, MainMax: 10,
-		Sheets: map[string][]setdata.SheetCard{"common": {sheetCard("C1", "1", limited.Common)}},
-		Slots:  []setdata.Slot{{Sheet: "common", Count: 1, BalanceColours: true}},
+	sheets := map[string]setdata.Sheet{
+		"common": {TotalWeight: 1, BalanceColors: true, Cards: []setdata.SheetCard{sheetCard("C1", "1", limited.Common, 1)}},
 	}
-	if err := spec.Validate(); err != nil {
-		t.Fatalf("precondition: hand spec is invalid: %v", err)
-	}
+	spec := v2spec(1, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 1}}}, sheets)
 	rng := rand.New(rand.NewPCG(1, 1))
 	if _, err := booster.Open(spec, rng, nil, nil); err == nil {
 		t.Error("Open accepted a nil ID allocator")
@@ -403,7 +435,7 @@ func TestBoosterRefusesMissingInputs(t *testing.T) {
 		t.Error("Open accepted a nil rng")
 	}
 	if _, err := booster.Open(spec, rng, &booster.IDs{}, nil); err == nil {
-		t.Error("Open accepted a balancing slot without a ColourOf")
+		t.Error("Open accepted a balancing sheet without a ColourOf")
 	}
 	if _, err := booster.OpenPod(spec, 1, 0, 1, &booster.IDs{}, nil); err == nil {
 		t.Error("OpenPod accepted zero seats")

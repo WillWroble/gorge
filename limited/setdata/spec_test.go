@@ -1,41 +1,25 @@
 package setdata_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/adams-shaun/gorge/limited"
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
 
-func mustLoad(t *testing.T, code string) setdata.Spec {
+// mustLoadCollation loads and validates one embedded spec, failing the test
+// on either.
+func mustLoadCollation(t *testing.T, code string, c setdata.Collation) setdata.Spec {
 	t.Helper()
-	spec, err := setdata.Load(code)
+	spec, err := setdata.LoadCollation(code, c)
 	if err != nil {
-		t.Fatalf("Load(%s): %v", code, err)
+		t.Fatalf("LoadCollation(%s, %s): %v", code, c, err)
 	}
 	if err := spec.Validate(); err != nil {
-		t.Fatalf("Load(%s): embedded spec fails its own validator: %v", code, err)
+		t.Fatalf("LoadCollation(%s, %s): embedded spec fails its own validator: %v", code, c, err)
 	}
 	return spec
-}
-
-// sheetCounts returns each sheet's size.
-func sheetCounts(spec setdata.Spec) map[string]int {
-	out := map[string]int{}
-	for name, cards := range spec.Sheets {
-		out[name] = len(cards)
-	}
-	return out
-}
-
-func assertCounts(t *testing.T, spec setdata.Spec, want map[string]int) {
-	t.Helper()
-	got := sheetCounts(spec)
-	for _, sheet := range []string{"common", "uncommon", "rare", "mythic", "land"} {
-		if got[sheet] != want[sheet] {
-			t.Errorf("%s sheet %s has %d cards, want %d", spec.Code, sheet, got[sheet], want[sheet])
-		}
-	}
 }
 
 // TestSetdataCodesAreExactlyFDNAndBLB pins the loader's universe: exactly
@@ -51,93 +35,202 @@ func TestSetdataCodesAreExactlyFDNAndBLB(t *testing.T) {
 	if _, err := setdata.Load(""); err == nil {
 		t.Error("Load(\"\") succeeded")
 	}
-	if _, err := setdata.Load("../headers/FDN"); err == nil {
+	if _, err := setdata.Load("../mtgjson/FDN"); err == nil {
 		t.Error("Load accepted a path-traversal code")
 	}
 }
 
-// TestSetdataFDNSpec matches the measured Foundations booster: 80
-// pack-relevant commons after the ten gain lands move to the land sheet
-// (Evolving Wilds stays a common), 101 uncommons, 60 rares, 20 mythics, and
-// a 14-card slot recipe.
-func TestSetdataFDNSpec(t *testing.T) {
-	spec := mustLoad(t, "FDN")
-	if spec.Name != "Foundations" || spec.PackSize != 14 || spec.MainMax != 271 {
-		t.Errorf("FDN header fields = %q pack %d main_max %d", spec.Name, spec.PackSize, spec.MainMax)
-	}
-	assertCounts(t, spec, map[string]int{"common": 80, "uncommon": 101, "rare": 60, "mythic": 20, "land": 10})
-	if got := findCard(t, spec, "common", "Evolving Wilds"); got == nil {
-		t.Error("Evolving Wilds should stay on the common sheet")
-	}
-	if got := findCard(t, spec, "common", "Bloodfell Caves"); got != nil {
-		t.Error("Bloodfell Caves should have moved off the common sheet to the land sheet")
-	}
-	if got := findCard(t, spec, "land", "Tranquil Cove"); got == nil {
-		t.Error("Tranquil Cove missing from the land sheet")
-	} else if got.Rarity != limited.Land || got.Number != "270" {
-		t.Errorf("land-sheet Tranquil Cove = %+v, want rarity L number 270", *got)
-	}
-}
-
-// TestSetdataBLBSpec matches the measured Bloomburrow booster: 81
-// commons, 99 uncommons, 60 rares, 20 mythics, and the five basics on the
-// land sheet carrying their lowest collector number (262-278, outside the
-// main runs).
-func TestSetdataBLBSpec(t *testing.T) {
-	spec := mustLoad(t, "BLB")
-	if spec.Name != "Bloomburrow" || spec.PackSize != 14 || spec.MainMax != 261 {
-		t.Errorf("BLB header fields = %q pack %d main_max %d", spec.Name, spec.PackSize, spec.MainMax)
-	}
-	assertCounts(t, spec, map[string]int{"common": 81, "uncommon": 99, "rare": 60, "mythic": 20, "land": 5})
-	if got := findCard(t, spec, "land", "Plains"); got == nil {
-		t.Error("Plains missing from the land sheet")
-	} else if got.Rarity != limited.Land || got.Number != "262" {
-		t.Errorf("land-sheet Plains = %+v, want rarity L number 262", *got)
-	}
-	if got := findCard(t, spec, "common", "Blossoming Sands"); got != nil {
-		t.Error("Blossoming Sands is a bonus-sheet gain land and must not be pack material")
-	}
-}
-
-// findCard returns the sheet card with the given name, or nil.
-func findCard(t *testing.T, spec setdata.Spec, sheet, name string) *setdata.SheetCard {
-	t.Helper()
-	for _, c := range spec.Sheets[sheet] {
-		if c.Name == name {
-			return &c
+// TestSetdataCollationsArePlayAndArena pins the collation surface of both
+// embedded sets and refuses an unknown collation with the carried ones in
+// the message.
+func TestSetdataCollationsArePlayAndArena(t *testing.T) {
+	for _, code := range setdata.Codes() {
+		got := setdata.Collations(code)
+		if len(got) != 2 || got[0] != setdata.Play || got[1] != setdata.Arena {
+			t.Errorf("Collations(%s) = %v, want [play play-arena]", code, got)
 		}
 	}
-	return nil
+	if got := setdata.Collations("NOPE"); got != nil {
+		t.Errorf("Collations(NOP) = %v, want nil", got)
+	}
+	if _, err := setdata.LoadCollation("FDN", "vintage"); err == nil {
+		t.Fatal("LoadCollation(FDN, vintage) succeeded for an unembedded collation")
+	} else if want := `no "vintage" collation`; !strings.Contains(err.Error(), want) {
+		t.Errorf("unknown-collation error %q lacks %q", err.Error(), want)
+	}
+}
+
+// TestSetdataDefaultCollationIsArena pins the default: Load serves the
+// play-arena collation, the one the 17Lands ratings are measured on. FDN
+// arena carries the arena-only rareMythic sheet and neither foil sheet; BLB
+// arena packs are 13 cards — nothing may assume 14.
+func TestSetdataDefaultCollationIsArena(t *testing.T) {
+	if setdata.DefaultCollation != setdata.Arena {
+		t.Fatalf("DefaultCollation = %q, want play-arena", setdata.DefaultCollation)
+	}
+	fdn := mustLoadCollation(t, "FDN", setdata.Arena)
+	def, err := setdata.Load("FDN")
+	if err != nil {
+		t.Fatalf("Load(FDN): %v", err)
+	}
+	if def.PackSize != fdn.PackSize || def.Name != fdn.Name || len(def.Config.Variants) != len(fdn.Config.Variants) {
+		t.Fatalf("Load(FDN) does not serve the play-arena spec: %+v vs %+v", def, fdn)
+	}
+	if _, ok := fdn.Config.Sheets["rareMythic"]; !ok {
+		t.Error("FDN arena lacks the rareMythic sheet")
+	}
+	for _, arenaOnlyAbsence := range []string{"foil", "foilLand", "rareMythicWithShowcase"} {
+		if _, ok := fdn.Config.Sheets[arenaOnlyAbsence]; ok {
+			t.Errorf("FDN arena carries the paper-only %q sheet", arenaOnlyAbsence)
+		}
+	}
+	if fdn.PackSize != 14 {
+		t.Errorf("FDN arena pack size = %d, want 14", fdn.PackSize)
+	}
+	blb := mustLoadCollation(t, "BLB", setdata.Arena)
+	if blb.PackSize != 13 {
+		t.Errorf("BLB arena pack size = %d, want 13 (no land slot)", blb.PackSize)
+	}
+}
+
+// TestSetdataPlayCollation pins the paper Play Booster shape of both sets:
+// two foil-bearing variants of the 788+12+197+3 recipe, a specialGuest
+// sheet, and FDN's foilReplacement-free paper sheet set.
+func TestSetdataPlayCollation(t *testing.T) {
+	fdn := mustLoadCollation(t, "FDN", setdata.Play)
+	if fdn.PackSize != 14 {
+		t.Errorf("FDN play pack size = %d, want 14", fdn.PackSize)
+	}
+	if len(fdn.Config.Variants) != 4 {
+		t.Fatalf("FDN play has %d variants, want 4", len(fdn.Config.Variants))
+	}
+	weights := map[int]bool{}
+	total := 0
+	for _, v := range fdn.Config.Variants {
+		weights[v.Weight] = true
+		total += v.Weight
+	}
+	for _, w := range []int{788, 12, 197, 3} {
+		if !weights[w] {
+			t.Errorf("FDN play lacks a variant of weight %d (has %v)", w, weights)
+		}
+	}
+	if total != fdn.Config.TotalWeight {
+		t.Errorf("FDN play variant weights sum to %d, want total_weight %d", total, fdn.Config.TotalWeight)
+	}
+	for _, sheet := range []string{"common", "uncommon", "rareMythicWithShowcase", "specialGuest", "foil", "foilLand", "land", "wildcard"} {
+		if _, ok := fdn.Config.Sheets[sheet]; !ok {
+			t.Errorf("FDN play lacks sheet %q", sheet)
+		}
+	}
+	if got := len(fdn.Config.Sheets["specialGuest"].Cards); got != 10 {
+		t.Errorf("FDN play specialGuest sheet has %d cards, want 10", got)
+	}
+	for _, sc := range fdn.Config.Sheets["specialGuest"].Cards {
+		if sc.Set != "SPG" {
+			t.Errorf("special-guest card %q carries set %q, want SPG", sc.Name, sc.Set)
+		}
+	}
+	blb := mustLoadCollation(t, "BLB", setdata.Play)
+	if blb.PackSize != 14 || len(blb.Config.Variants) != 4 {
+		t.Errorf("BLB play = pack %d with %d variants, want 14 and 4", blb.PackSize, len(blb.Config.Variants))
+	}
+}
+
+// TestSetdataSheetWeightsAreCardSums spot-checks the derived numbers the
+// sampler draws on: each sheet's total weight is the sum of its cards'
+// weights, and the arena rareMythic sheet splits 120 rare : 20 mythic in
+// card weights (the 1-mythic-in-7 arena rare slot).
+func TestSetdataSheetWeightsAreCardSums(t *testing.T) {
+	for _, code := range setdata.Codes() {
+		for _, c := range setdata.Collations(code) {
+			spec := mustLoadCollation(t, code, c)
+			for name, sheet := range spec.Config.Sheets {
+				total := 0
+				for _, sc := range sheet.Cards {
+					total += sc.Weight
+				}
+				if total != sheet.TotalWeight {
+					t.Errorf("%s %s sheet %q weights sum to %d, want %d", code, c, name, total, sheet.TotalWeight)
+				}
+			}
+		}
+	}
+	arena := mustLoadCollation(t, "FDN", setdata.Arena)
+	rare, mythic := 0, 0
+	for _, sc := range arena.Config.Sheets["rareMythic"].Cards {
+		switch sc.Rarity {
+		case limited.Rare:
+			rare += sc.Weight
+		case limited.Mythic:
+			mythic += sc.Weight
+		}
+	}
+	if rare != 120 || mythic != 20 {
+		t.Errorf("FDN arena rareMythic weights = rare %d / mythic %d, want 120 / 20", rare, mythic)
+	}
+}
+
+// goodSpec is a minimal valid v2 spec the validator cases break in one
+// place each.
+func goodSpec() setdata.Spec {
+	card := func(name, number string, r limited.Rarity, w int) setdata.SheetCard {
+		return setdata.SheetCard{UUID: "u" + number, Name: name, Set: "TST", Number: number, Rarity: r, Weight: w}
+	}
+	return setdata.Spec{
+		Code: "TST", Name: "Test", PackSize: 3,
+		Source: "hand-built test spec",
+		Config: setdata.Config{
+			SourceSetCodes: []string{"TST"},
+			TotalWeight:    10,
+			Variants: []setdata.Variant{
+				{Weight: 9, Contents: map[string]int{"common": 2, "rareMythic": 1}},
+				{Weight: 1, Contents: map[string]int{"common": 1, "rareMythic": 1, "land": 1}},
+			},
+			Sheets: map[string]setdata.Sheet{
+				"common": {TotalWeight: 3, Cards: []setdata.SheetCard{card("C1", "1", limited.Common, 1), card("C2", "2", limited.Common, 1), card("C3", "3", limited.Common, 1)}},
+				"rareMythic": {TotalWeight: 6, Cards: []setdata.SheetCard{
+					card("R1", "10", limited.Rare, 2), card("R2", "11", limited.Rare, 2), card("M1", "12", limited.Mythic, 2),
+				}},
+				"land": {TotalWeight: 1, Cards: []setdata.SheetCard{card("L1", "90", limited.Common, 1)}},
+			},
+		},
+	}
 }
 
 // TestSetdataValidateAcceptsAndRejects exercises the validator's rules on
 // broken copies of a known-good spec; the loaded spec passing Validate
 // first is what makes the rejections meaningful.
 func TestSetdataValidateAcceptsAndRejects(t *testing.T) {
-	good := mustLoad(t, "BLB")
-	cases := map[string]func(s *setdata.Spec){
-		"slot counts overfill the pack": func(s *setdata.Spec) { s.Slots[0].Count++ },
-		"empty sheet":                   func(s *setdata.Spec) { s.Sheets["land"] = nil },
-		"wildcard weights sum to 0.9": func(s *setdata.Spec) {
-			for i := range s.Slots {
-				if w := s.Slots[i].Wildcard; w != nil {
-					w.Common = 0.571 - 0.1
-				}
-			}
-		},
-		"card on two sheets": func(s *setdata.Spec) {
-			s.Sheets["land"] = append(s.Sheets["land"], s.Sheets["common"][0])
-		},
-		"name twice on one sheet": func(s *setdata.Spec) {
-			dup := s.Sheets["common"][0]
-			s.Sheets["common"] = append(s.Sheets["common"], dup)
-		},
-		"slot names a missing sheet": func(s *setdata.Spec) { s.Slots[0].Sheet = "unreal" },
-		"slot sets two kinds":        func(s *setdata.Spec) { s.Slots[0].RareMythic = &setdata.RareMythic{RareWeight: 1, MythicWeight: 1} },
-		"zero-count slot":            func(s *setdata.Spec) { s.Slots[1].Count = 0 },
+	good := goodSpec()
+	if err := good.Validate(); err != nil {
+		t.Fatalf("precondition: hand-built spec is invalid: %v", err)
 	}
+	cases := map[string]func(s *setdata.Spec){
+		"variant names a missing sheet":  func(s *setdata.Spec) { s.Config.Variants[0].Contents["unreal"] = 1 },
+		"variant weights miss the total": func(s *setdata.Spec) { s.Config.Variants[0].Weight-- },
+		"variant contents miss the pack": func(s *setdata.Spec) { s.Config.Variants[0].Contents["common"]-- },
+		"variants disagree on pack size": func(s *setdata.Spec) { s.Config.Variants[1].Contents["common"]++; s.PackSize = 4 },
+		"zero variant weight":            func(s *setdata.Spec) { s.Config.Variants[0].Weight = 0 },
+		"empty sheet":                    func(s *setdata.Spec) { s.Config.Sheets["land"] = setdata.Sheet{} },
+		"card weight not the sheet sum":  func(s *setdata.Spec) { sh := s.Config.Sheets["land"]; sh.TotalWeight = 5; s.Config.Sheets["land"] = sh },
+		"zero card weight": func(s *setdata.Spec) {
+			sh := s.Config.Sheets["land"]
+			sh.Cards[0].Weight = 0
+			s.Config.Sheets["land"] = sh
+		},
+		"invalid rarity letter": func(s *setdata.Spec) {
+			sh := s.Config.Sheets["land"]
+			sh.Cards[0].Rarity = 'X'
+			s.Config.Sheets["land"] = sh
+		},
+		"zero pack size":   func(s *setdata.Spec) { s.PackSize = 0 },
+		"missing set name": func(s *setdata.Spec) { s.Name = "" },
+	}
+	// Each case mutates a FRESH spec: goodSpec builds new maps and slices
+	// per call, so no case corrupts another through shared headers.
 	for name, breakIt := range cases {
-		s := good
+		s := goodSpec()
 		breakIt(&s)
 		if err := s.Validate(); err == nil {
 			t.Errorf("Validate accepted a spec with %s", name)
