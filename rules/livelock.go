@@ -69,6 +69,26 @@ const (
 	// RunawayBigBoardReason is LivelockError.Reason for that trip; the
 	// harness records it as a "bigboard" stall, never an engine abort.
 	RunawayBigBoardReason = "runaway resolution on a large board"
+	// ObjectCapReason is LivelockError.Reason for the armed object cap
+	// (LoopGuard.MaxObjs). The harnesses re-classify a game that tripped it
+	// through IsVolumeReason, so the string lives here and nowhere else.
+	ObjectCapReason = "object cap"
+	// DefaultMaxObjs is the object-arena population the shared harness and
+	// host paths arm LoopGuard.MaxObjs with when the caller set no explicit
+	// budget (rules.WithDefaultObjectCap). It is a VOLUME bound, not a
+	// bug detector: measured over 2100 ordinary games (1200 FDN-Limited
+	// pairs, 600 constructed repo-deck pairs, 300 4-seat Commander repo-deck
+	// games, CV-8 probe) the arena's end-of-game high-water (it is monotone,
+	// so end-of-game length IS the high-water) was 554 objects (Commander,
+	// 4 seats); the widest legitimate token board on record is cardfuzz
+	// batch8's 1790 Goblins. 10000 sits ~18x above the measured ordinary
+	// maximum, equals RunawayBigBoardObjs (the same "this is volume, not a
+	// stuck resolution" population CV-2 fixed the runaway reason at), and
+	// bounds a Krenko, Mob Boss storm well under the GB-scale RSS an
+	// unbounded one reaches (CV-8's measured 7.2 GB and climbing at 25127
+	// objects) while an ordinary game never comes within an order of
+	// magnitude of it.
+	DefaultMaxObjs = RunawayBigBoardObjs
 )
 
 // progressKinds are the events that prove the game is still moving: a
@@ -121,6 +141,39 @@ type LoopGuard struct {
 	RunawayEvents int
 	MaxObjs       int
 	Disabled      bool
+}
+
+// WithDefaultObjectCap arms a harness or host config's object cap at
+// DefaultMaxObjs: the caller's own guard is copied and its MaxObjs filled
+// when it set none, a nil guard gets the default, an EXPLICIT MaxObjs (a
+// caller's own budget, cmd/cardfuzz's -max-objects) wins unchanged, and a
+// Disabled guard -- the embedder's supervised-infinite-loop opt-out the
+// host propagates from MaxDecisionsPerTurn == 0 -- is returned unchanged
+// (an opted-out game is supervised by whoever disabled the watcher, and a
+// default volume bound must not resurrect a protection the embedder
+// explicitly turned off).
+func WithDefaultObjectCap(g *LoopGuard) *LoopGuard {
+	if g == nil {
+		return &LoopGuard{MaxObjs: DefaultMaxObjs}
+	}
+	if g.Disabled || g.MaxObjs > 0 {
+		return g
+	}
+	out := *g
+	out.MaxObjs = DefaultMaxObjs
+	return &out
+}
+
+// IsVolumeReason reports whether a LivelockError's Reason is degenerate
+// VOLUME -- a game whose board (or creation plan) grew past a deliberate
+// budget -- rather than a stuck resolution. The harnesses (internal/bench's
+// drive loop, the host's play recover) record a game that tripped a volume
+// reason as a stalled game under the cardfuzz "bigboard" vocabulary, never
+// as an engine-bug abort (Ruling CV-2). "token plan" is deliberately NOT
+// volume here: it predates the classification and its callers classify it
+// themselves.
+func IsVolumeReason(reason string) bool {
+	return reason == ObjectCapReason || reason == RunawayBigBoardReason
 }
 
 func (g *LoopGuard) filled() LoopGuard {
@@ -359,7 +412,7 @@ func (w *livelockWatcher) observeFrom(ev *events.Event, damageSource state.ObjID
 	// hundreds of thousands of expensive events later.
 	if w.guard.MaxObjs > 0 && nObjs > w.guard.MaxObjs {
 		panic(&LivelockError{
-			Reason: "object cap",
+			Reason: ObjectCapReason,
 			Kind:   ev.Kind,
 			Object: ev.Obj,
 			Count:  nObjs,
