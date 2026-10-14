@@ -91,6 +91,10 @@ const (
 var entityTypes = [...]string{"Creature", "Land", "Artifact", "Enchantment", "Planeswalker",
 	"Instant", "Sorcery", "Battle", "Legendary", "Basic"}
 
+// entityTypeMasks is entityTypes as cardTypeBits masks (typeMasks).
+var entityTypeMasks = [len(entityTypes)]uint16{tbCreature, tbLand, tbArtifact, tbEnchantment, tbPlaneswalker,
+	tbInstant, tbSorcery, tbBattle, tbLegendary, tbBasic}
+
 // entityHashSuffix is the entity contract's part of EncoderHashFor.
 func entityHashSuffix() string {
 	return fmt.Sprintf("\x1fentity-format=1\x1fgroups=%d\x1fraw=%d\x1fsum=%g\x1ftypes=%s\x1fpins=%d",
@@ -172,16 +176,14 @@ func entityCards(v view.View, seat state.PlayerID) ([]EntityCard, map[state.ObjI
 func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, avail int32, blocking bool, hosts int, ctrl map[state.ObjID]state.PlayerID) EntityCard {
 	raw := make([]float32, EntityRawWidth)
 	set := func(i int, v float32) { raw[i] = v }
-	types := strings.Fields(cv.Types)
-	for i, t := range entityTypes {
-		for _, w := range types {
-			if w == t {
-				set(entTypeOff+i, 1)
-			}
+	fold, exact := typeMasks(cv.Types)
+	for i, m := range entityTypeMasks {
+		if exact&m != 0 {
+			set(entTypeOff+i, 1)
 		}
 	}
-	creature := hasTypeWord(cv.Types, "Creature")
-	if creature || hasTypeWord(cv.Types, "Planeswalker") || zone == entZoneHand {
+	creature := fold&tbCreature != 0
+	if creature || fold&tbPlaneswalker != 0 || zone == entZoneHand {
 		set(entPower, float32(cv.Power)/4)
 		set(entToughness, float32(cv.Toughness-cv.Damage)/4)
 	}
@@ -266,10 +268,10 @@ func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, av
 	}
 	mv := int32(mvOf(cv.ManaCost))
 	set(entManaValue, float32(mv)/5)
-	if hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash") {
+	if fold&tbInstant != 0 || hasKeyword(cv, "Flash") {
 		set(entInstant, 1)
 	}
-	if zone == entZoneHand && !hasTypeWord(cv.Types, "Land") && mv <= avail {
+	if zone == entZoneHand && fold&tbLand == 0 && mv <= avail {
 		set(entCastable, 1)
 	}
 	if cv.FaceDown {

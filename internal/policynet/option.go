@@ -240,8 +240,9 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 		token = card.cv.Token != ""
 	}
 	any := false
-	for i, w := range cardTypeBits {
-		if hasTypeWord(types, w) {
+	fold, _ := typeMasks(types)
+	for i := range cardTypeBits {
+		if fold&(1<<i) != 0 {
 			set(typeOffset + i)
 			any = true
 		}
@@ -414,12 +415,24 @@ func decKindIndex(d decision.Kind) int {
 // hasTypeWord reports whether the space-separated Types string carries the
 // word (case-insensitive).
 func hasTypeWord(types, word string) bool {
-	for _, t := range strings.Fields(types) {
+	if !isASCII(types) {
+		for _, t := range strings.Fields(types) {
+			if strings.EqualFold(t, word) {
+				return true
+			}
+		}
+		return false
+	}
+	for i := 0; ; {
+		t, next := nextField(types, i)
+		if t == "" {
+			return false
+		}
 		if strings.EqualFold(t, word) {
 			return true
 		}
+		i = next
 	}
-	return false
 }
 
 // manaBraceForm normalises a brace-form mana cost ("{2}{U}{U}") to the

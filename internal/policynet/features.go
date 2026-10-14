@@ -275,9 +275,7 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 	}
 	type agg struct{ canAttack, canAttackPower, canBlock, canBlockTough, flyers int32 }
 	perm := func(z string, cv view.CardView, a *agg) {
-		for _, t := range strings.Fields(cv.Types) {
-			push("mz|"+z+"|type|"+t, 1)
-		}
+		eachField(cv.Types, func(t string) { push("mz|"+z+"|type|"+t, 1) })
 		creature := hasTypeWord(cv.Types, "Creature")
 		if cv.Tapped {
 			push("mz|"+z+"|tapped", 1)
@@ -372,9 +370,7 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 		if sv.Card.SpellAPI != "" {
 			push("mz|stack|"+side+"|api|"+sv.Card.SpellAPI, 1)
 		}
-		for _, t := range strings.Fields(sv.Card.Types) {
-			push("mz|stack|"+side+"|type|"+t, 1)
-		}
+		eachField(sv.Card.Types, func(t string) { push("mz|stack|"+side+"|type|"+t, 1) })
 	}
 	// Seat aggregates: numeric-valued rows (the embedding row times the count)
 	// plus a bucketed one-hot, so both a linear and a threshold read exist.
@@ -418,9 +414,7 @@ func mzState(v view.View, seat state.PlayerID, push func(string, float32)) {
 // colours are not checked).
 func handCard(z string, cv view.CardView, avail int32, push func(string, float32)) {
 	mv := int32(mvOf(cv.ManaCost))
-	for _, t := range strings.Fields(cv.Types) {
-		push("mz|"+z+"|type|"+t, 1)
-	}
+	eachField(cv.Types, func(t string) { push("mz|"+z+"|type|"+t, 1) })
 	push("mz|"+z+"|mv"+mzBucket(mv, 8), 1)
 	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash")
 	if instant {
@@ -429,9 +423,7 @@ func handCard(z string, cv view.CardView, avail int32, push func(string, float32
 	land := hasTypeWord(cv.Types, "Land")
 	if !land && mv <= avail {
 		push("mz|"+z+"|castable", 1)
-		for _, t := range strings.Fields(cv.Types) {
-			push("mz|"+z+"|castable|type|"+t, 1)
-		}
+		eachField(cv.Types, func(t string) { push("mz|"+z+"|castable|type|"+t, 1) })
 		if instant {
 			push("mz|"+z+"|castable|instant-speed", 1)
 		}
