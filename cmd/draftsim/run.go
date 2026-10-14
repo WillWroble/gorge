@@ -133,6 +133,9 @@ func run(o options, out io.Writer) (*result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := applyRatingsOverride(o, r, out); err != nil {
+		return nil, err
+	}
 
 	var csvOut *os.File
 	csvHeader := true

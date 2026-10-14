@@ -42,6 +42,9 @@ type Best23 struct {
 	// tell lands and creatures apart.
 	Lookup CardLookup
 	Tuning Tuning
+	// Ratings, when non-nil, replaces the embedded rating file (see
+	// RatingColour.Ratings).
+	Ratings *RatingsOverride
 }
 
 // tuning returns the builder's knob set, filling the zero value with the
@@ -82,7 +85,9 @@ func (b *Best23) candidates(set string, pool []limited.CardRef) []candidate {
 			c.creature = f.IsCreature()
 			c.mv = int(f.Cmc())
 		}
-		if e, ok := RawRating(set, ref.Name); ok {
+		if b.Ratings != nil {
+			c.rating = (b.Ratings.Value(ref.Name) - t.RatingCentre) * t.RatingScale
+		} else if e, ok := RawRating(set, ref.Name); ok {
 			c.rating = (e.GihWr - t.RatingCentre) * t.RatingScale
 		} else {
 			c.rating = (Heuristic(b.card(ref.Name), ref.Rarity) - t.HeuristicCentre) * t.HeuristicScale

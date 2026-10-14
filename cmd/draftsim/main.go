@@ -42,6 +42,8 @@ func main() {
 		"comma-separated bot policy per seat: one name seats it everywhere, otherwise exactly -seats names (a policy that reads decklists, bots.Info.Env, is refused)")
 	fs.StringVar(&o.drafter, "drafter", "rating-colour", "pickbot drafter name")
 	fs.StringVar(&o.builder, "builder", "best23", "pickbot builder name")
+	fs.StringVar(&o.ratingsFile, "ratings-file", "", "training only: JSON {card: {field: value}} (cmd/cardval values.json) replacing the embedded 17Lands ratings for drafter and builder, rescaled to the 17Lands gih_wr mean/std")
+	fs.StringVar(&o.ratingsField, "ratings-field", "gih", "which field of -ratings-file to rate by")
 	fs.BoolVar(&o.verify, "verify", false, "replay each event from its own log and every game from its chain, exiting non-zero on the first mismatch")
 	fs.StringVar(&o.draftlog, "draftlog", "", "path to append the events' picks to as 17Lands draft_data CSV")
 	fs.StringVar(&o.gauntlet, "gauntlet", "", "deck-quality gauntlet after each event: play the built (and random baseline) decks against a spellbench catalog; only fdn-limited, and requires -set FDN")
@@ -97,6 +99,8 @@ type options struct {
 	gauntletPlayer   string
 	baseline         string
 	gauntletMaxHuman int
+	ratingsFile      string
+	ratingsField     string
 }
 
 // playerList splits the -players flag into its per-seat policies: one name
