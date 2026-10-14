@@ -46,6 +46,10 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		MaxDecisionsPerTurn:   host.DefaultMaxDecisionsPerTurn,
 		Dir:                   dir,
 		OnMatchEnd:            relay.OnMatchEnd,
+		// A Series table asks the relay; the target is installed below,
+		// once the Host exists. Harmless for Bo1: only a Series table
+		// consults it.
+		Series: relay.Series,
 	}
 	eo := Options{Store: store, Cards: corpus, Seed: func() uint64 { return 11 }}
 	if mut != nil {
@@ -62,6 +66,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		t.Fatal(err)
 	}
 	relay.Set(h.OnMatchEnd)
+	relay.SetSeries(h.Series)
 	p := &gamePair{h: h, reg: reg, store: store}
 	t.Cleanup(func() { h.Close(); reg.Close() })
 	return p

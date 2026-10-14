@@ -6,6 +6,27 @@
 // games (E1-5) slot into the two stubs this package carries
 // (advanceBuild/advanceRounds and Options.MintSeat).
 //
+// # Series (E3-4)
+//
+// An event is best-of-one (the default) or best-of-three (create's
+// best_of: 3). A Bo3 event's series run on one host series table each:
+// advanceSeriesBo3 logs the series' entries (SeriesStarted, each game's
+// GameStarted with its play/draw chooser — game 1 the table's toss winner,
+// later games MTR 2.2's loser-chooses rule, bots' Sideboarded between
+// games, the series' SeriesEnded), and the table's hook — Host.Series,
+// reached through gorged's Relay — plans each match from the event's own
+// state: the in-flight game's decks and chooser, a stop once the series
+// has ended or moved to a new table, or a park on the run (answered by
+// wakeWaiters when the log moves) until the next GameStarted is logged.
+// A crashed series match aborts its attempt and restarts the game on a
+// fresh table; past MaxAttempts the game logs as a draw and the series
+// goes on. A human seat's sideboarding submission is E3-5: until then a
+// Bo3 series with a human side waits between games with the bot side
+// already locked. The lock order extends the host's rule: Host.Series
+// takes Host.mu alone to find the run, then run.mu alone; a parked call
+// waits holding nothing, and advance answers the waiters (in sorted
+// table-id order) under run.mu.
+//
 // The package never imports net/http: handlers read an Error's HTTP status
 // and code through the Status/Code methods.
 //

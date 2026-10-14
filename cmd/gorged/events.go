@@ -50,6 +50,11 @@ func (w eventsWiring) hook(o *host.Options) {
 	}
 	w.relay.Next = o.OnMatchEnd
 	o.OnMatchEnd = w.relay.OnMatchEnd
+	// E3-4: the series hook chains the same way; a Bo1-only relay target
+	// never sees a Series table.
+	if o.Series == nil {
+		o.Series = w.relay.Series
+	}
 }
 
 // startEvents builds the eventhost — which resumes every stored event —
@@ -94,5 +99,6 @@ func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registr
 		return nil, err
 	}
 	w.relay.Set(evh.OnMatchEnd)
+	w.relay.SetSeries(evh.Series)
 	return evh, nil
 }

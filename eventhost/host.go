@@ -79,7 +79,12 @@ type run struct {
 	// each series' last published public JSON. Both guarded by mu.
 	outcomes   map[[2]int]outcome
 	lastSeries map[[3]int]string
-	live       atomic.Bool // phase not COMPLETE or CANCELLED; read under Host.mu for the capacity bound
+	// E3-4: each Bo3 series' live table id, and the parked Series-hook
+	// calls per live series table. Both guarded by mu; the waiters map is
+	// answered in sorted table-id order, never map order.
+	seriesTable map[[2]int]host.TableID
+	waiters     map[host.TableID]waiter
+	live        atomic.Bool // phase not COMPLETE or CANCELLED; read under Host.mu for the capacity bound
 	justDraft  bool        // the draft ended since the last broadcast: one last pod_progress
 	// E1-8: when the event was created, and when each human seat last
 	// acted successfully. The sweep reads them under mu; replay never does.
@@ -149,10 +154,12 @@ func New(o Options) (*Host, error) {
 	}
 	for _, id := range ids {
 		r := &run{
-			h:          h,
-			tokens:     map[host.TableID]string{},
-			outcomes:   map[[2]int]outcome{},
-			lastSeries: map[[3]int]string{},
+			h:           h,
+			tokens:      map[host.TableID]string{},
+			outcomes:    map[[2]int]outcome{},
+			lastSeries:  map[[3]int]string{},
+			seriesTable: map[[2]int]host.TableID{},
+			waiters:     map[host.TableID]waiter{},
 		}
 		m, merr := o.Store.loadMeta(id)
 		if merr != nil {
@@ -244,12 +251,19 @@ func (h *Host) lookup() pickbotCardLookup {
 	return func(name string) *cards.Card { c, _ := reg.Lookup(name); return c }
 }
 
-// Close stops the host. Afterwards every method answers unavailable.
+// Close stops the host. Afterwards every method answers unavailable. It
+// releases the parked series-hook calls first (each answers stop, ending
+// its table's goroutine), so wg.Wait cannot wait on them.
 func (h *Host) Close() error {
 	h.stopOnce.Do(func() { close(h.stop) })
 	h.mu.Lock()
 	h.closed = true
 	h.mu.Unlock()
+	for _, r := range h.events {
+		r.mu.Lock()
+		r.releaseWaiters()
+		r.mu.Unlock()
+	}
 	h.wg.Wait()
 	return nil
 }
@@ -328,12 +342,16 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errBadRequest("eventhost: %v", err)
 	}
+	if req.BestOf != 0 && req.BestOf != 1 && req.BestOf != 3 {
+		h.mu.Unlock()
+		return protocol.CreateEventResponse{}, errBadRequest("eventhost: best_of must be 1 or 3, got %d", req.BestOf)
+	}
 	seed, serr := h.mintSeed()
 	if serr != nil {
 		h.mu.Unlock()
 		return protocol.CreateEventResponse{}, errUnavailable("eventhost: minting seed: %v", serr)
 	}
-	m := meta{Set: req.Set, Seed: seed, CreatedAt: h.opts.Now()}
+	m := meta{Set: req.Set, Seed: seed, BestOf: req.BestOf, CreatedAt: h.opts.Now()}
 	humans := 0
 	var invites []protocol.EventInvite
 	for s, cs := range req.Seats {
@@ -390,13 +408,15 @@ func (h *Host) CreateEvent(req protocol.CreateEventRequest) (protocol.CreateEven
 		return protocol.CreateEventResponse{}, errUnavailable("eventhost: %v", err)
 	}
 	r := &run{
-		h:          h,
-		meta:       m,
-		ev:         event.New(),
-		tokens:     map[host.TableID]string{},
-		outcomes:   map[[2]int]outcome{},
-		lastSeries: map[[3]int]string{},
-		justDraft:  false,
+		h:           h,
+		meta:        m,
+		ev:          event.New(),
+		tokens:      map[host.TableID]string{},
+		outcomes:    map[[2]int]outcome{},
+		lastSeries:  map[[3]int]string{},
+		seriesTable: map[[2]int]host.TableID{},
+		waiters:     map[host.TableID]waiter{},
+		justDraft:   false,
 	}
 	r.createdAt = m.CreatedAt
 	r.lastAct = [draft.Seats]time.Time{m.CreatedAt, m.CreatedAt, m.CreatedAt, m.CreatedAt}

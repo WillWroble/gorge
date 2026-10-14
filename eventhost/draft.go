@@ -43,6 +43,10 @@ func (r *run) advance() {
 	if sawDraft && r.ev.Phase() == event.PhaseBuild {
 		r.justDraft = true
 	}
+	// E3-4: the log just moved — answer every parked series-hook call
+	// whose plan changed, so a between-games table resumes the moment the
+	// next GameStarted is on the log and an ended series' table stops.
+	r.wakeWaiters()
 }
 
 // advanceLobby creates the event once every human seat has a name, then
