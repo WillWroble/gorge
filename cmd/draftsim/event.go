@@ -48,22 +48,43 @@ type gameRecord struct {
 	verified bool   // -verify replayed this game's chain against its log
 }
 
-// runOneEvent plays one full event: the packs, the draft, the build, the
-// three round-robin rounds as Bo1 series and the event end. With verify
-// set, every game is additionally replayed from its own chain the way
+// runOneEvent plays one full event: the packs, the draft (draft mode only),
+// the build, then the structure's rounds as Bo1 series (the driver loop:
+// a Swiss event pairs each round through a logged RoundPaired entry, a
+// round-robin event's rounds are paired by the event itself, and a none
+// event plays no series so EventEnded lands in BUILD). With verify set,
+// every game is additionally replayed from its own chain the way
 // cmd/mtgsim's -verify does. It returns the finished event and the per-
 // game records.
 func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResult, error) {
+	sh := r.podShapeOr()
+	n := sh.seats
 	e := event.New()
-	seats := [4]event.SeatSpec{}
+	persona := drafterLabel(r)
+	if sh.mode == event.ModeSealed {
+		persona = "sealed"
+	}
+	seats := make([]event.SeatSpec, n)
 	for i, p := range r.players {
 		seats[i] = event.SeatSpec{
 			Kind:    "bot",
 			Name:    p,
-			Persona: fmt.Sprintf("%s/%s/%s", r.spec.Code, drafterLabel(r), p),
+			Persona: fmt.Sprintf("%s/%s/%s", r.spec.Code, persona, p),
 		}
 	}
-	if err := e.Apply(event.Entry{Kind: event.KindEventCreated, Seed: seed, Set: r.spec.Code, Seats: seats[:]}); err != nil {
+	en := event.Entry{Kind: event.KindEventCreated, Seed: seed, Set: r.spec.Code, Seats: seats, Collation: sh.collation}
+	// The shape fields are logged only when non-default, so the
+	// default-flag logs stay byte-identical to the pre-shape-flag ones.
+	if sh.mode != event.ModeDraft {
+		en.Mode = sh.mode
+	}
+	if sh.structure != event.StructureRoundRobin {
+		en.Structure = sh.structure
+	}
+	if sh.structure != event.StructureNone && sh.rounds != defaultRounds(sh.structure, n) {
+		en.Rounds = sh.rounds
+	}
+	if err := e.Apply(en); err != nil {
 		return nil, nil, err
 	}
 
@@ -71,35 +92,38 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 	if err != nil {
 		return nil, nil, err
 	}
-	for s := 0; s < draft.Seats; s++ {
-		for rd := 0; rd < draft.Rounds; rd++ {
-			if err := e.Apply(event.Entry{Kind: event.KindPackOpened, Round: rd + 1, Seat: s, Cards: packs[s][rd]}); err != nil {
-				return nil, nil, fmt.Errorf("pack round %d seat %d: %w", rd+1, s, err)
+	for s := 0; s < n; s++ {
+		for p := 0; p < sh.packs; p++ {
+			if err := e.Apply(event.Entry{Kind: event.KindPackOpened, Round: p + 1, Seat: s, Cards: packs[s][p]}); err != nil {
+				return nil, nil, fmt.Errorf("pack %d seat %d: %w", p+1, s, err)
 			}
 		}
 	}
 
 	// The draft: every seat picks whenever its queue head has a pack; the
-	// pod's own turn order keeps the pools identical to any legal order.
-	rngs := make([]*rand.Rand, draft.Seats)
-	for s := range rngs {
-		rngs[s] = pickRNG(seed, s)
-	}
-	for e.Phase() == event.PhaseDraft {
-		progressed := false
-		for s := 0; s < draft.Seats; s++ {
-			v, ok := e.Next(s)
-			if !ok {
-				continue
-			}
-			id := r.drafter.Pick(v, rngs[s])
-			if err := e.Apply(event.Entry{Kind: event.KindPicked, Round: v.Round, PickNo: v.PickNo, Seat: s, ID: id}); err != nil {
-				return nil, nil, fmt.Errorf("pick seat %d round %d pick %d: %w", s, v.Round, v.PickNo, err)
-			}
-			progressed = true
+	// pod's own turn order keeps the pools identical to any legal order. A
+	// sealed event has no draft — its packs went straight into the pools.
+	if sh.mode == event.ModeDraft {
+		rngs := make([]*rand.Rand, n)
+		for s := range rngs {
+			rngs[s] = pickRNG(seed, s)
 		}
-		if !progressed {
-			return nil, nil, fmt.Errorf("draft stuck in phase %s with no legal pick", e.Phase())
+		for e.Phase() == event.PhaseDraft {
+			progressed := false
+			for s := 0; s < n; s++ {
+				v, ok := e.Next(s)
+				if !ok {
+					continue
+				}
+				id := r.drafter.Pick(v, rngs[s])
+				if err := e.Apply(event.Entry{Kind: event.KindPicked, Round: v.Round, PickNo: v.PickNo, Seat: s, ID: id}); err != nil {
+					return nil, nil, fmt.Errorf("pick seat %d round %d pick %d: %w", s, v.Round, v.PickNo, err)
+				}
+				progressed = true
+			}
+			if !progressed {
+				return nil, nil, fmt.Errorf("draft stuck in phase %s with no legal pick", e.Phase())
+			}
 		}
 	}
 
@@ -116,6 +140,16 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 		return e, er, nil
 	}
 	for {
+		if round, ok := e.AwaitingPairing(); ok {
+			pairs, err := e.SuggestedPairings()
+			if err != nil {
+				return nil, nil, err
+			}
+			if err := e.Apply(event.Entry{Kind: event.KindRoundPaired, Round: round, Pairs: pairs}); err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
 		pending := e.PendingSeries()
 		if len(pending) == 0 {
 			break
@@ -135,6 +169,34 @@ func runOneEvent(r *runner, seed uint64, verify bool) (*event.Event, *eventResul
 	return e, er, nil
 }
 
+// podShapeOr returns the runner's resolved pod shape, filling the zero
+// shape an options-literal runner carries (the tests build those directly)
+// with the legacy defaults: the players list's length (or 4), draft mode,
+// round robin, 3 packs per seat.
+func (r *runner) podShapeOr() podShape {
+	sh := r.shape
+	if sh.seats == 0 {
+		n := len(r.players)
+		if n == 0 {
+			n = draft.Seats
+		}
+		sh.seats = n
+	}
+	if sh.mode == "" {
+		sh.mode = event.ModeDraft
+	}
+	if sh.structure == "" {
+		sh.structure = event.StructureRoundRobin
+	}
+	if sh.packs == 0 {
+		sh.packs = event.DraftPacks
+	}
+	if sh.rounds == 0 {
+		sh.rounds = defaultRounds(sh.structure, sh.seats)
+	}
+	return sh
+}
+
 // drafterLabel names the drafter in the event log's Persona strings; the
 // concrete v1 persona types are the only drafter the tool builds, so the
 // label is fixed.
@@ -149,8 +211,9 @@ func drafterLabel(r *runner) string {
 // that seat's copy of that pack, IDs assigned once across the whole event
 // in seat-major, pack-second order.
 func openPacks(r *runner, seed uint64) ([][][]limited.CardRef, error) {
+	sh := r.podShapeOr()
 	ids := &booster.IDs{}
-	return booster.OpenPod(r.spec, seed, draft.Seats, draft.Rounds, ids, colourOfRegistry(r.reg))
+	return booster.OpenPod(r.spec, seed, sh.seats, sh.packs, ids, colourOfRegistry(r.reg))
 }
 
 // colourOfRegistry adapts the card corpus to booster's ColourOf: the
@@ -180,8 +243,9 @@ func colourOfRegistry(reg *cards.Registry) booster.ColourOf {
 // deck in the event, resolving each deck file into the engine's card
 // pointers on the way.
 func buildDecks(r *runner, e *event.Event) ([][]*cards.Card, error) {
-	decks := make([][]*cards.Card, draft.Seats)
-	for s := 0; s < draft.Seats; s++ {
+	n := r.podShapeOr().seats
+	decks := make([][]*cards.Card, n)
+	for s := 0; s < n; s++ {
 		pool := e.Pool(s)
 		d := r.builder.Build(r.spec.Code, pool)
 		f := build.ToDeckFile(pool, d, fmt.Sprintf("p%d %s draft", s, r.spec.Code))
