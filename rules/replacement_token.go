@@ -56,6 +56,33 @@ func (e *Engine) continueCreateTokenReplacements(ev events.Event, matches []repl
 	return last, true
 }
 
+// tokenPlanMintCap aborts a CreateToken replacement plan whose honest
+// answer exceeds this many mints. The plan grows exponentially in the
+// applicable matches (each "twice that many" doubler doubles it), and a
+// game that stacks enough of them under one creation asks for a creation
+// that cannot be represented at all: the mints alone would be hundreds of
+// millions of events. Measured (cli-20261014T150338Z-47872e76): one FDN
+// sweep game stacked ~27 Amount matches onto one token-copy proposal and
+// grew the plan to 2^27 mints (~5 GB live) inside one resolution --
+// before the first mint was even emitted, so the livelock watcher's
+// emission-side runaway backstop never saw it -- and OOM-killed the
+// 24 GB training box. The cap is checked on the PREDICTED size before the
+// larger slice is allocated, so the abort costs no growth; anything above
+// it is also far past the watcher's 50k-event emission backstop, so no
+// game above the cap was completable anyway. 1<<20 bounds one plan's
+// transient size at ~40 MB and is orders of magnitude above every plan
+// the acceptance corpus builds.
+const tokenPlanMintCap = 1 << 20
+
+// tokenPlanAbort raises the token-plan livelock abort (rules/livelock.go's
+// contract): the game is unrepresentable, the harness recovers, records
+// the diagnostic and moves on. obj is the source the diagnostic names: the
+// offending replacement's object, or the copied object for a proposal
+// whose caller-side Amount alone is past the cap.
+func tokenPlanAbort(ev events.Event, obj state.ObjID, n int) {
+	panic(&LivelockError{Reason: "token plan", Kind: ev.Kind, Object: obj, Count: n, Cap: tokenPlanMintCap})
+}
+
 // tokenPlanMint is one planned mint of a CreateToken replacement plan: an
 // ordinary scripted token (script) or a copy of a battlefield permanent
 // (copyOf -- the chosen-copy body's TokenScript$ Chosen shape).
@@ -541,6 +568,9 @@ func (e *Engine) applyTokenReplacementToPlan(ev events.Event, plan []tokenPlanMi
 		if len(scripts) == 0 {
 			return plan
 		}
+		if bound := len(plan) * len(scripts); bound > tokenPlanMintCap {
+			tokenPlanAbort(ev, m.id, bound)
+		}
 		out := make([]tokenPlanMint, 0, len(plan)*len(scripts))
 		for _, mint := range plan {
 			if e.tokenReplacementMatchesMint(ev, m, mint) {
@@ -573,7 +603,21 @@ func (e *Engine) applyTokenReplacementToPlan(ev events.Event, plan []tokenPlanMi
 		if len(extra) == 0 {
 			return plan
 		}
-		out := make([]tokenPlanMint, 0, len(plan)+int(n)*len(extra))
+		// Upper bound on the grown plan: every mint matching adds n*extra
+		// mints ("that many"), so at most every mint of the plan does; a
+		// fixed Amount$ appends one n*extra block at the end. The bound is
+		// what the cap check aborts on -- the growth is never allocated
+		// when the plan's honest answer is past the cap.
+		bound := len(plan)
+		if fixed {
+			bound += int(n) * len(extra)
+		} else {
+			bound += len(plan) * int(n) * len(extra)
+		}
+		if bound > tokenPlanMintCap {
+			tokenPlanAbort(ev, m.id, bound)
+		}
+		out := make([]tokenPlanMint, 0, bound)
 		var fixedController tokenPlanMint
 		matched := false
 		for _, mint := range plan {
@@ -636,6 +680,9 @@ func (e *Engine) applyTokenReplacementToPlan(ev events.Event, plan []tokenPlanMi
 			e.emit(events.Event{Kind: events.Note, Obj: m.id, Player: ev.Player,
 				Text: "ReplaceToken Amount$ " + raw + " is not implemented; the token is created unchanged"})
 			return plan
+		}
+		if bound := len(plan) * int(n); bound > tokenPlanMintCap {
+			tokenPlanAbort(ev, m.id, bound)
 		}
 		out := make([]tokenPlanMint, 0, len(plan)*int(n)+1)
 		for _, mint := range plan {
