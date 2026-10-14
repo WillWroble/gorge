@@ -303,12 +303,21 @@ func TestBoosterColourBalanceFillsMissingColours(t *testing.T) {
 }
 
 // TestBoosterColourBalanceOnlyFromFiveCards pins the brief's threshold: a
-// balance_colors sheet whose slot draws fewer than 5 cards is NOT balanced,
-// so a scarce colour may stay missing. (At count 5 the same sheet forces
-// green into every pack — that direction is
-// TestBoosterColourBalanceFillsMissingColours.)
+// balance_colors sheet whose slot draws fewer than 5 cards is NOT balanced.
+// The sheet is white-plentiful/blue-scarce and the slot draws 4: balanced,
+// every all-white draw would trade a white for a blue and no pack would
+// stay blueless; unbalanced, all-white packs occur and blue may stay
+// missing. (At count 5 the same threshold forces every missing colour in —
+// that direction is TestBoosterColourBalanceFillsMissingColours.)
 func TestBoosterColourBalanceOnlyFromFiveCards(t *testing.T) {
-	sheet := fiveColourSheet()
+	var cards []setdata.SheetCard
+	for i := 1; i <= 20; i++ {
+		cards = append(cards, sheetCard("W"+itoa(i), itoa(i), limited.Common, 1))
+	}
+	for i := 1; i <= 6; i++ {
+		cards = append(cards, sheetCard("U"+itoa(i), "1U"+itoa(i), limited.Common, 1))
+	}
+	sheet := setdata.Sheet{TotalWeight: len(cards), BalanceColors: true, Cards: cards}
 	spec := v2spec(4, []setdata.Variant{{Weight: 1, Contents: map[string]int{"common": 4}}}, map[string]setdata.Sheet{"common": sheet})
 	missed := 0
 	const packs = 200
@@ -317,14 +326,14 @@ func TestBoosterColourBalanceOnlyFromFiveCards(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open pack %d: %v", i, err)
 		}
-		if monoCount(colourOfInitial, pack)[4] == 0 {
+		if monoCount(colourOfInitial, pack)[1] == 0 {
 			missed++
 		}
 	}
 	if missed == 0 {
-		t.Fatal("every 4-card draw from the five-colour sheet hit green: the precondition cannot show the threshold")
+		t.Fatal("every 4-card draw from the white/blue sheet hit blue: the precondition cannot show the threshold")
 	}
-	t.Logf("sub-five balance_colors slot left green missing in %d of %d packs (allowed)", missed, packs)
+	t.Logf("sub-five balance_colors slot left blue missing in %d of %d packs (allowed)", missed, packs)
 }
 
 // TestBoosterPodIsDeterministicAndSaltStable pins OpenPod: the same seed
