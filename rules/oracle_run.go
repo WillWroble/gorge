@@ -844,6 +844,12 @@ func (r *oracleRun) build(sc oracleScenario) error {
 		}
 		if d.Kind == decision.KPriority && e.G.Step == state.StepMain1 && e.G.Turn == targetTurn &&
 			(len(e.G.Stack) == 0 || sc.xmageFixture) {
+			// The drive window's flip attribution point. A drive flip that
+			// fired here is attributed to step < 0; if the drive ever stopped
+			// short of this exact state, the next call (after the first
+			// gameplay step) would misattribute it as a step-0 gameplay flip
+			// -- unreachable, because a generated scenario must replay clean
+			// and build() fails loudly ("setup never reached") otherwise.
 			r.recordFlips(-1)
 			r.logf("setup done: turn %d %s, stack %d", e.G.Turn, e.G.Step, len(e.G.Stack))
 			// A parked placement's drop is setup-only (placeSetupCard).

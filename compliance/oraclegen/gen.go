@@ -1557,13 +1557,17 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	}
 	// Gameplay flips lead their steps: prepend in log order, which the
 	// per-step slices accumulated, ahead of every decision answer the loop
-	// appended.
+	// appended. AFTER demoteTriggerOrderSpans, whose span start/count were
+	// recorded against the loop's pre-prepend indices (gen.go above): a
+	// prepend first would shift them onto the step's other answers and splice
+	// the inert text over them (dropping the scripted answers). Demoting on
+	// the unshifted list keeps the flips leading either way.
+	demoteTriggerOrderSpans(out, trigSpans)
 	for st, fs := range stepFlips {
 		if len(fs) > 0 {
 			out[st] = append(fs, out[st]...)
 		}
 	}
-	demoteTriggerOrderSpans(out, trigSpans)
 	if len(setupAnswers) > 0 || len(setupTrigAnswers) > 0 || len(setupAsks) > 0 || len(setupFlips) > 0 {
 		// Setup answers are read from xmage_answers[0] before build(), even
 		// when the scenario has no gameplay steps.
