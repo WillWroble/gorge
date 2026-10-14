@@ -1,4 +1,4 @@
-package rules_test
+package templates_test
 
 import (
 	"strings"
