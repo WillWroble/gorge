@@ -112,7 +112,7 @@ type EntityCard struct {
 // Order: my battlefield, every other battlefield (seat order), my hand, the
 // stack (top first, as the view lists it).
 func entityCards(v view.View, seat state.PlayerID) ([]EntityCard, map[state.ObjID]int) {
-	out := entityCardList(&v, seat)
+	out := entityCardList(nil, &v, seat)
 	idx := make(map[state.ObjID]int, len(out))
 	n := 0
 	walkEntityOrder(&v, seat, func(cv *view.CardView, _ uint8, _ int) {
@@ -212,7 +212,7 @@ func (b *entityBoard) controller(id state.ObjID) (state.PlayerID, bool) {
 // entityCardList is entityCards' card list. Every card's Raw and Rows are
 // carved out of one slab each (capacity-capped, so an append never reaches
 // a neighbour).
-func entityCardList(v *view.View, seat state.PlayerID) []EntityCard {
+func entityCardList(buf *StateBuf, v *view.View, seat state.PlayerID) []EntityCard {
 	var me *view.PlayerView
 	for i := range v.Players {
 		if v.Players[i].ID == seat {
@@ -247,9 +247,7 @@ func entityCardList(v *view.View, seat state.PlayerID) []EntityCard {
 		clear(sc.seen)
 		sc.gen = 1
 	}
-	out := make([]EntityCard, 0, total)
-	raw := make([]float32, total*EntityRawWidth)
-	rows := make([]Feature, 0, 2*total)
+	out, raw, rows := buf.entitySlabs(total)
 	walkEntityOrder(v, seat, func(cv *view.CardView, group uint8, zone int) {
 		if !sc.markNew(cv.ID) {
 			return
@@ -265,6 +263,10 @@ func entityCardList(v *view.View, seat state.PlayerID) []EntityCard {
 		out = append(out, EntityCard{Group: group, Raw: r, Rows: cr})
 	})
 	entityScratches.Put(sc)
+	buf.keepEntity(out, rows)
+	if len(out) == 0 {
+		return nil // as the append-built list was
+	}
 	return out
 }
 

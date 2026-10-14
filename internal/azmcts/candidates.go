@@ -914,8 +914,10 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 	}
 	// Only the parts the network's encoders read are projected.
 	view.ProjectLeanInto(pv, e.G, e, d.Player, d, net.Features.ViewOmit())
-	v := *pv
-	st := policynet.EncodeStateWith(net.Features, v, d.Player, nil)
+	// The state is encoded into pooled storage: it is read only by Score.
+	sb := policynet.AcquireStateBuf()
+	defer policynet.ReleaseStateBuf(sb)
+	st := policynet.EncodeStateWithInto(sb, net.Features, pv, d.Player, nil)
 	opts := d.Options
 	// synth[i] is the index in opts of candidate i's synthetic cast option,
 	// -1 for none; nil when no candidate has one.

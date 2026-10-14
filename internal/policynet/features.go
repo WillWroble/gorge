@@ -173,27 +173,34 @@ func (sc *Scorer) Features() FeatureSet { return sc.m.Features }
 // EncodeStateWith is EncodeState under feature set fs. FeaturesV1 is exactly
 // EncodeState. diag is read only by the diagnostic sets (nil = none known).
 func EncodeStateWith(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag) State {
-	st := EncodeState(v, seat)
+	return encodeStateWith(nil, fs, &v, seat, diag)
+}
+
+// encodeStateWith is EncodeStateWith into buf's storage (fresh storage for
+// a nil buf).
+func encodeStateWith(buf *StateBuf, fs FeatureSet, v *view.View, seat state.PlayerID, diag *Diag) State {
+	st := encodeState(buf, v, seat)
 	if fs == FeaturesV1 {
 		return st
 	}
 	// The mz rows are appended straight after the v1 bag, then the whole
 	// bag is stably sorted by row.
 	sk := &sink{fs: st.Sparse}
-	mzState(v, seat, sk)
+	mzState(*v, seat, sk)
 	if fs == FeaturesMZOwnLib {
-		ownLibState(v, seat, sk.str)
+		ownLibState(*v, seat, sk.str)
 	}
 	if fs == FeaturesMZGrave {
-		graveyardState(v, seat, sk.str)
+		graveyardState(*v, seat, sk.str)
 	}
 	if fs.Diagnostic() && diag != nil {
-		mzDiag(v, seat, fs, diag, sk)
+		mzDiag(*v, seat, fs, diag, sk)
 	}
 	st.Sparse = sk.fs
 	stableSortByRow(st.Sparse)
+	buf.keepSparse(st.Sparse)
 	if fs == FeaturesEntity {
-		st.Cards = entityCardList(&v, seat)
+		st.Cards = entityCardList(buf, v, seat)
 	}
 	return st
 }

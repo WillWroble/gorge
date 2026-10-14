@@ -154,8 +154,13 @@ const (
 // "Name|t0|a0|s0|c<counters>" (t=tapped, a=attacking, s=summon-sick,
 // counters sorted "Kind=v" joined by ",", "-" when empty), so the model can
 // distinguish a tapped Thalia from an untapped one.
-func EncodeState(v view.View, seat state.PlayerID) State {
-	dense := make([]float32, DenseWidth)
+func EncodeState(v view.View, seat state.PlayerID) State { return encodeState(nil, &v, seat) }
+
+// encodeState is EncodeState into buf's storage (fresh storage for a nil
+// buf).
+func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
+	v := vp
+	dense := buf.denseBuf(DenseWidth)
 	dense[denseTurn] = float32(v.Turn)
 	b := float32(v.Turn)
 	if b > 40 {
@@ -176,7 +181,7 @@ func EncodeState(v view.View, seat state.PlayerID) State {
 	}
 	dense[denseStackDepth] = float32(len(v.Stack))
 
-	var sparse []Feature
+	sparse := buf.sparseBuf()
 	push := func(s string) { sparse = append(sparse, Feature{Row: hashID(s), Value: 1}) }
 	decorated := func(cv view.CardView) string {
 		return cv.Name + "|t" + bit(cv.Tapped) + "|a" + bit(cv.Attacking) +
@@ -203,7 +208,8 @@ func EncodeState(v view.View, seat state.PlayerID) State {
 			everyOther = append(everyOther, pv)
 		}
 	}
-	seats := make([]*view.PlayerView, maxSeatBlocks)
+	var seatsBuf [maxSeatBlocks]*view.PlayerView
+	seats := seatsBuf[:]
 	seats[0] = me
 	for i := 0; i < len(everyOther) && i < maxSeatBlocks-1; i++ {
 		seats[1+i] = everyOther[i]
@@ -267,6 +273,7 @@ func EncodeState(v view.View, seat state.PlayerID) State {
 	}
 
 	stableSortByRow(sparse)
+	buf.keepSparse(sparse)
 	return State{Dense: dense, Sparse: sparse}
 }
 

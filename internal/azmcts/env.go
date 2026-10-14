@@ -693,7 +693,9 @@ func leafValue(net *policynet.Model, e *rules.Engine, actor state.PlayerID, sc *
 	}
 	v := &sc.leaf
 	view.ProjectLeanInto(v, e.G, e, actor, e.Pending(), net.Features.ViewOmit())
-	x := float64(net.Value(policynet.EncodeStateWith(net.Features, *v, actor, nil)))
+	sb := policynet.AcquireStateBuf()
+	x := float64(net.Value(policynet.EncodeStateWithInto(sb, net.Features, v, actor, nil)))
+	policynet.ReleaseStateBuf(sb)
 	switch {
 	case math.IsNaN(x):
 		return 0.5
