@@ -230,6 +230,12 @@ type projector struct {
 		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	}
 	noTokens bool
+	// hideHand is the CR 103.5 blind: true while the CR 103.1 play/draw
+	// choice is unresolved, when no player may see any hand. It is probed
+	// once from ch's optional StartingChoicePending capability
+	// (rules.Engine); a Chars without it (a hand-built snapshot, a test
+	// stand-in) never blinds, matching the R-9 no-ask host.
+	hideHand bool
 	// noDerived leaves every CardView's Chars-derived facts (layer-3 name,
 	// keywords, P/T) unasked: a lean projection's OmitDerivedChars.
 	noDerived bool
@@ -250,6 +256,9 @@ func newProjector(g *state.Game, ch Chars, viewer state.PlayerID, sc *projScratc
 	})
 	if s, ok := ch.(tokenSuppressor); ok && s.SuppressCardTokens() {
 		p.noTokens = true
+	}
+	if s, ok := ch.(interface{ StartingChoicePending() bool }); ok && s.StartingChoicePending() {
+		p.hideHand = true
 	}
 	return p
 }

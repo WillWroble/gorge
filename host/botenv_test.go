@@ -421,7 +421,13 @@ func swapOpponentHidden(t *testing.T, e *rules.Engine, feed *searchseat.Feed) in
 // boundary at least once, which is what proves a REDEAL happened (a plain
 // clone of the live engine would pass every pointer check and still leak).
 // The deciding seat's own hand, which the seat is entitled to, must match the
-// live hand at every boundary: the redeal keeps what the seat knows.
+// live hand at every boundary: the redeal keeps what the seat knows. The one
+// exception is the boundary where the CR 103.1 winner-chooses choice is still
+// pending (E3-fx1): CR 103.5 hides every hand from every player there -- the
+// deciding seat's own included -- so the seat's own frame shows no hand and
+// its honest root deals its hand from the derivable pool like any other
+// hidden card. A root that held the LIVE hand at that boundary would be the
+// leak, not the redeal, so the pending boundary asserts the opposite.
 func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 	t.Parallel()
 	var spy *spyEnvSeat
@@ -497,19 +503,24 @@ func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 	}
 
 	// The live opponent hand at every slot-0 decision boundary, rebuilt by
-	// deterministic replay of the finished log.
+	// deterministic replay of the finished log, plus which of those
+	// boundaries still hold the pending CR 103.1 winner-chooses choice
+	// (E3-fx1: CR 103.5 hides the deciding seat's own hand there, so the
+	// honest root redeals it -- see the test's doc comment).
 	liveOpp, liveActor := map[uint64][]string{}, map[uint64][]string{}
+	choicePending := map[uint64]bool{}
 	if _, err := replay.Walk(engine.L, m.cfg, len(engine.L.Intents), func(e *rules.Engine, i int) error {
 		if d := e.Pending(); d != nil && d.Player == 0 {
 			liveOpp[d.Seq] = zoneNames(e.G.Zone(state.ZHand, 1), e)
 			liveActor[d.Seq] = zoneNames(e.G.Zone(state.ZHand, 0), e)
+			choicePending[d.Seq] = e.StartingChoicePending()
 		}
 		return nil
 	}); err != nil {
 		t.Fatalf("replay walk: %v", err)
 	}
 
-	same, diff := 0, 0
+	same, diff, blind := 0, 0, 0
 	for _, rec := range spy.envs {
 		live, ok := liveOpp[rec.seq]
 		if !ok {
@@ -520,10 +531,27 @@ func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 		} else {
 			diff++
 		}
+		if choicePending[rec.seq] {
+			// CR 103.5: while the CR 103.1 choice is pending the seat may
+			// not see its own hand either, so its root must NOT hold the
+			// live hand -- the redeal is the honest world. (A uniform redeal
+			// from the derivable pool could theoretically deal the live hand
+			// by chance; the probability is ~1/C(60,7), the same order of
+			// exposure the opponent-hand redeal check below already carries.)
+			if sortedEqual(rec.actorHand, liveActor[rec.seq]) {
+				t.Fatalf("env decision seq %d: the root held the deciding seat's own hand while the starting-player choice was pending (%v); the CR 103.5 blind did not reach the root",
+					rec.seq, rec.actorHand)
+			}
+			blind++
+			continue
+		}
 		if !sortedEqual(rec.actorHand, liveActor[rec.seq]) {
 			t.Fatalf("env decision seq %d: the root redealt the deciding seat's OWN hand (%v, live %v)",
 				rec.seq, rec.actorHand, liveActor[rec.seq])
 		}
+	}
+	if blind == 0 {
+		t.Fatalf("no Env decision fell in the pending starting-player window; the blind-boundary branch never ran")
 	}
 	if diff == 0 {
 		t.Fatalf("the root's opponent hand equalled the live opponent hand at all %d Env decisions; no redeal happened", len(spy.envs))

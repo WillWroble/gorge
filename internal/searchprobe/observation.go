@@ -127,6 +127,19 @@ func (c noPotentialChars) PotentialActions(p state.PlayerID) []decision.Potentia
 
 func (noPotentialChars) OwnDeck(state.PlayerID) *deck.Manifest { return nil }
 
+// StartingChoicePending forwards the engine's CR 103.5 pending-answer
+// capability (rules.Engine.StartingChoicePending) through the wrapper: it
+// embeds the view.Chars INTERFACE, so the projector's and
+// botpolicy.BoardFromGameInto's capability assertions would silently see
+// "not pending" and leave the hand visible without it (the same hazard the
+// ViewCharacteristics and BeginDerivedReads forwardings cover).
+func (c noPotentialChars) StartingChoicePending() bool {
+	if s, ok := c.Chars.(interface{ StartingChoicePending() bool }); ok {
+		return s.StartingChoicePending()
+	}
+	return false
+}
+
 // BeginDerivedReads/EndDerivedReads pass the engine's pure-read memo scope
 // through the wrapper (view.projectInto opens it), which the embedded
 // view.Chars interface would otherwise hide.
