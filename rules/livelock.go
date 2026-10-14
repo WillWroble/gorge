@@ -58,6 +58,17 @@ const (
 	// never-false-positive, not tight: the runaway diagnostic still names
 	// the span and the last event, which is where a debugger looks.
 	defaultRunawayEvents = 50000
+	// RunawayBigBoardObjs is the arena population at which a runaway
+	// trip is a board too large to finish, not a stuck resolution: one
+	// combat damage step or token storm over a Krenko, Mob Boss board
+	// (a player who cannot lose, Herald of Eternal Dawn, keeps it going)
+	// legitimately emits more events than defaultRunawayEvents with no
+	// decision. A real repeating cycle never reaches this branch: the
+	// exact-period detector fires first and reports "repeating cycle".
+	RunawayBigBoardObjs = 10000
+	// RunawayBigBoardReason is LivelockError.Reason for that trip; the
+	// harness records it as a "bigboard" stall, never an engine abort.
+	RunawayBigBoardReason = "runaway resolution on a large board"
 )
 
 // progressKinds are the events that prove the game is still moving: a
@@ -138,12 +149,15 @@ func (g *LoopGuard) filled() LoopGuard {
 // a string) so a harness can record the pieces (object, kind, repeat
 // count, cycle length) structurally as well as render the text.
 type LivelockError struct {
-	// Reason is "repeating cycle", "runaway resolution", "object cap" or
-	// "token plan" -- which trigger fired. The first three are the
-	// watcher's; "token plan" is raised by the CreateToken replacement
-	// plan driver when a creation's honest answer exceeds
-	// tokenPlanMintCap mints (a doubler stack whose exponential plan
-	// cannot be represented), under the same abort contract.
+	// Reason is "repeating cycle", "runaway resolution", "object cap",
+	// "token plan" or "runaway resolution on a large board" -- which
+	// trigger fired. The first four are the watcher's and the CreateToken
+	// replacement plan driver's: "token plan" is raised when a creation's
+	// honest answer exceeds tokenPlanMintCap mints (a doubler stack whose
+	// exponential plan cannot be represented), under the same abort
+	// contract; "runaway resolution on a large board" is a runaway trip
+	// on a board past RunawayBigBoardObjs, recorded as a bigboard stall
+	// rather than an engine abort.
 	Reason string
 	// Kind and Object identify the repeating event shape: for a cycle, the
 	// first event of one period; for a runaway, the last event emitted.
@@ -177,6 +191,8 @@ func (e *LivelockError) Error() string {
 		fmt.Fprintf(&b, "the object arena holds %d object(s), cap %d", e.Count, e.Cap)
 	case livelockReasonTokenPlan:
 		fmt.Fprintf(&b, "the token-creation plan would hold %d mint(s), cap %d", e.Count, e.Cap)
+	case livelockReasonBigBoard:
+		fmt.Fprintf(&b, "%d event(s) with no decision, step or turn change, events %d-%d, the object arena holds %d object(s)", e.QuietEvents, e.FirstSeq, e.LastSeq, e.Count)
 	default:
 		fmt.Fprintf(&b, "%d event(s) with no decision, step or turn change, events %d-%d", e.QuietEvents, e.FirstSeq, e.LastSeq)
 	}
@@ -366,8 +382,13 @@ func (w *livelockWatcher) observeFrom(ev *events.Event, damageSource state.ObjID
 		w.quiet++
 	}
 	if w.quiet > w.guard.RunawayEvents {
+		reason := "runaway resolution"
+		if nObjs >= RunawayBigBoardObjs {
+			reason = RunawayBigBoardReason
+		}
 		panic(&LivelockError{
-			Reason:      "runaway resolution",
+			Reason:      reason,
+			Count:       nObjs,
 			Kind:        ev.Kind,
 			Object:      ev.Obj,
 			FirstSeq:    w.quietSince,
@@ -810,10 +831,12 @@ const (
 	livelockReasonRepeatingCycle livelockReasonCode = iota + 1
 	livelockReasonObjectCap
 	livelockReasonTokenPlan
+	livelockReasonBigBoard
 )
 
 var livelockReasonCodes = state.NewStrCodes(
 	state.StrEntry[livelockReasonCode]{Key: "repeating cycle", Val: livelockReasonRepeatingCycle},
 	state.StrEntry[livelockReasonCode]{Key: "object cap", Val: livelockReasonObjectCap},
 	state.StrEntry[livelockReasonCode]{Key: "token plan", Val: livelockReasonTokenPlan},
+	state.StrEntry[livelockReasonCode]{Key: RunawayBigBoardReason, Val: livelockReasonBigBoard},
 )
