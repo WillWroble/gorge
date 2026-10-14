@@ -82,7 +82,7 @@ func humanDriveUntilBetween(t *testing.T, reg *host.Registry, r *run, a, b int) 
 			if time.Now().After(deadline) {
 				t.Fatalf("series (%d,%d): no game table within deadline", a, b)
 			}
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(pollEvery)
 			continue
 		}
 		acted := false
@@ -101,7 +101,7 @@ func humanDriveUntilBetween(t *testing.T, reg *host.Registry, r *run, a, b int) 
 			t.Fatalf("series (%d,%d) never reached between within deadline", a, b)
 		}
 		if !acted {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(pollEvery)
 		}
 	}
 }
@@ -125,7 +125,7 @@ func waitSeriesInFlight(t *testing.T, r *run, a, b, game int, d time.Duration) (
 			}
 			t.Fatalf("series (%d,%d) game %d never started: %+v", a, b, game, v)
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(pollEvery)
 	}
 }
 
@@ -191,7 +191,7 @@ func driveSeriesToEnd(t *testing.T, h *Host, reg *host.Registry, r *run, id, tok
 			}
 		}
 		if !acted {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(pollEvery)
 		}
 	}
 }
@@ -453,7 +453,7 @@ func TestTwoHumanBo3SeriesSideboardAndKeep(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatalf("match 2 never appeared on %s: %d matches, %v", table, len(mi), merr)
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(pollEvery)
 	}
 	if m2.Seats[0].DeckID != DeckID(id, 0, 2) || m2.Seats[1].DeckID != DeckID(id, 3, 1) {
 		t.Fatalf("match 2 decks = %q/%q, want %q/%q", m2.Seats[0].DeckID, m2.Seats[1].DeckID, DeckID(id, 0, 2), DeckID(id, 3, 1))
