@@ -151,6 +151,16 @@ func writePicksBin(w io.Writer, tableHash string, drafters []string, picks []pic
 	for _, d := range drafters {
 		b.str(d)
 	}
+	if err := b.flush(); err != nil {
+		return err
+	}
+	if err := b.writeRecords(picks); err != nil {
+		return err
+	}
+	return b.w.Flush()
+}
+
+func (b *binWriter) writeRecords(picks []pickRec) error {
 	for i := range picks {
 		p := &picks[i]
 		if len(p.Pack) > 254 || len(p.Features.Cands) != len(p.Pack) {
@@ -180,7 +190,7 @@ func writePicksBin(w io.Writer, tableHash string, drafters []string, picks []pic
 			return err
 		}
 	}
-	return b.w.Flush()
+	return nil
 }
 
 // defaultSetTable builds the rollout's feature table when no -table is
@@ -305,4 +315,14 @@ func writeFile(path string, fn func(w io.Writer) error) error {
 		return err
 	}
 	return f.Close()
+}
+
+// writePickRecords appends pick records (no header) in the picks.bin
+// record format, for a writer that streams pods after the header.
+func writePickRecords(w io.Writer, picks []pickRec) error {
+	b := &binWriter{w: bufio.NewWriter(w)}
+	if err := b.writeRecords(picks); err != nil {
+		return err
+	}
+	return b.w.Flush()
 }

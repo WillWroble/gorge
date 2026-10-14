@@ -35,6 +35,7 @@ type NetDrafter struct {
 // pick to the next that changes a result.
 type netScratch struct {
 	ex draftfeat.Extractor
+	f  draftfeat.Features
 	in draftnet.Inputs
 	r  draftnet.Runner
 }
@@ -53,8 +54,9 @@ func (d *NetDrafter) Pick(v PickView, r *rand.Rand) string {
 	}
 	s := netScratchPool.Get().(*netScratch)
 	defer netScratchPool.Put(s)
-	f := s.ex.Extract(v, d.Table)
-	s.in.Fill(&f, v, d.Table)
+	s.ex.ExtractInto(&s.f, v, d.Table)
+	f := &s.f
+	s.in.Fill(f, v, d.Table)
 	logits, err := s.r.Forward(d.Net, &s.in)
 	if err != nil {
 		return v.Pack[0].ID
@@ -66,7 +68,7 @@ func (d *NetDrafter) Pick(v PickView, r *rand.Rand) string {
 		chosen = argmaxLogits(logits, r)
 	}
 	if d.Recorder != nil {
-		d.Recorder.Record(v, &f, &s.in, logits, chosen)
+		d.Recorder.Record(v, f, &s.in, logits, chosen)
 	}
 	return v.Pack[chosen].ID
 }
