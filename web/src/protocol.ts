@@ -4,7 +4,7 @@
 
 export type BotTier = "production" | "experimental";
 
-export type FrameType = "hello" | "widget" | "match_start" | "snapshot" | "event" | "decision" | "match_end" | "table_halted" | "overflow" | "error" | "rewind" | "event_state" | "draft_pack" | "pod_progress" | "series_update";
+export type FrameType = "hello" | "widget" | "match_start" | "snapshot" | "event" | "decision" | "match_end" | "table_halted" | "table_state" | "overflow" | "error" | "rewind" | "event_state" | "draft_pack" | "pod_progress" | "series_update";
 
 export type MatchState = "live" | "finished" | "aborted" | "crashed";
 
@@ -81,6 +81,15 @@ export interface TableInfo {
    * AutoMana enables the human payment-plan UI for this table.
    */
   auto_mana: boolean;
+  /**
+   * Series marks a series table (TableConfig.Series, E3-2): it plays match
+   * after match, its end decided by the series hook rather than a match
+   * count, and between games it sits in the "between_games" table_state
+   * while players sideboard. omitempty: false is the default and the zero
+   * value, so a non-series table is byte-identical to a table before the
+   * field existed.
+   */
+  series?: boolean;
 }
 
   /**
@@ -1607,6 +1616,23 @@ export interface MatchEnd {
    */
 export interface TableHaltedBody {
   reason: string;
+}
+
+  /**
+   * TableStateBody is the table_state frame: a table's coarse lifecycle state
+   * as it changes, so a client need not infer it from match_end. State is
+   * TableBetweenGames while a series table sideboards between two games,
+   * TableLive while a match is on the table, and TableIdle otherwise. The
+   * envelope's Table names the table.
+   *
+   * E3-fx2 chose a new frame over reusing an existing one: the widget frame
+   * carries a State field but is only built from a live match (host/widgetFrame
+   * reads the engine), and a series table between games has no match at all
+   * (host/registry.go retires it before the hook plans the next), so no widget
+   * can be built in exactly the state this signal must report.
+   */
+export interface TableStateBody {
+  state: string;
 }
 
   /**

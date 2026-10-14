@@ -91,7 +91,7 @@ func (r *Registry) load() error {
 			return err
 		}
 		rec.Config = cfg
-		t := newTable(cfg)
+		t := newTable(r, cfg)
 		t.k = rec.Match
 		scs, err := readSidecars(r.opts.Dir, cfg.ID)
 		if err != nil {

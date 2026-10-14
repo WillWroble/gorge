@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "t": "table_state",
+  "id": 4182,
+  "table": "t1",
+  "match": 7,
+  "seq": 9500,
+  "body": {
+    "state": "between_games"
+  }
+}

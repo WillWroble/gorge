@@ -364,6 +364,12 @@ const memoryHistoryLimit = 8
 type table struct {
 	cfg TableConfig
 
+	// reg is the registry this table belongs to. setState uses it to tell
+	// subscribers a lifecycle state changed (protocol.TTableState), so the
+	// one home for a table's state transition is also the one home for the
+	// wire signal. nil only for a table built before it is registered.
+	reg *Registry
+
 	// started is guarded by Registry.mu, not mu below. See the struct doc.
 	started bool
 
@@ -412,8 +418,8 @@ type table struct {
 	lastLine string
 }
 
-func newTable(cfg TableConfig) *table {
-	return &table{cfg: cfg, state: protocol.TableIdle, stop: make(chan struct{}), done: make(chan struct{})}
+func newTable(r *Registry, cfg TableConfig) *table {
+	return &table{reg: r, cfg: cfg, state: protocol.TableIdle, stop: make(chan struct{}), done: make(chan struct{})}
 }
 
 func (t *table) info() protocol.TableInfo {
@@ -421,7 +427,8 @@ func (t *table) info() protocol.TableInfo {
 	defer t.mu.RUnlock()
 	info := protocol.TableInfo{ID: string(t.cfg.ID), Name: t.cfg.Name, Seats: t.cfg.Seats,
 		Spectator: t.cfg.Spectator.String(), State: t.state, Match: t.k, Perpetual: t.cfg.Perpetual,
-		Format: t.cfg.Format.String(), BotPolicy: t.cfg.BotPolicy, Mulligans: t.cfg.Mulligans, AutoMana: t.cfg.AutoMana}
+		Format: t.cfg.Format.String(), BotPolicy: t.cfg.BotPolicy, Mulligans: t.cfg.Mulligans, AutoMana: t.cfg.AutoMana,
+		Series: t.cfg.Series}
 	// SeatNames come from the live match's own seat list — the same
 	// []protocol.SeatInfo that MatchStart carries — so the two can never
 	// drift. cur is guarded by t.mu, which we already hold; reading its
@@ -452,8 +459,48 @@ func (c TableConfig) singleShot() bool {
 	return !c.Perpetual || len(c.Humans) > 0
 }
 
+// setState is the one home for a table's lifecycle state transition: it
+// writes t.state under t.mu and then tells every subscriber the new state
+// (protocol.TTableState), so the wire can never miss a transition. A halt
+// does not go through here — halt writes TableHalted directly and sends
+// TableHaltedBody instead — so a table_state frame only ever carries idle,
+// live or between_games. The broadcast runs after t.mu is released: it takes
+// the registry lock and each session's, and Subscribe holds t.fanMu then
+// t.mu, so emitting while still holding t.mu would invert that order.
 func (t *table) setState(s string) {
 	t.mu.Lock()
 	t.state = s
 	t.mu.Unlock()
+	if t.reg != nil {
+		t.reg.broadcastTableState(t, s)
+	}
+}
+
+// tableStateName maps an internal table state to the table_state frame's
+// value. Only the between-games cooldown is renamed (TableBetweenGames); idle
+// and live are already the wire spellings. Halted never reaches here.
+func tableStateName(s string) string {
+	if s == protocol.TableCooldown {
+		return protocol.TableBetweenGames
+	}
+	return s
+}
+
+// broadcastTableState pushes one table_state frame to every session watching
+// the table, focus and overview alike — the signal is public table
+// lifecycle, not per-viewer state, so it is not redacted. It never blocks:
+// push drops a slow client (the session overflows and is unregistered).
+func (r *Registry) broadcastTableState(t *table, s string) {
+	ss, _ := r.sessionsFor(t.cfg.ID)
+	if len(ss) == 0 {
+		return
+	}
+	t.mu.RLock()
+	k := t.k
+	t.mu.RUnlock()
+	f := frame(protocol.TTableState, t, k, 0, protocol.TableStateBody{State: tableStateName(s)})
+	for _, sub := range ss {
+		sub.push(f)
+	}
+	r.dropOverflowed(ss)
 }
