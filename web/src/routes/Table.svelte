@@ -112,13 +112,12 @@
   }
 
   // idle: the table has no live match and none imminent, so the match list
-  // is the whole page rather than a strip under a "waiting" placeholder.
-  // E3-9: a draft-event series table between two of its games is not idle
-  // (TableEventOverlay reports the series still in play), whatever the
-  // table store guessed from the match_end of a non-perpetual table.
-  let eventInPlay = $state(false);
+  // is the whole page rather than a strip under a "waiting" placeholder. A
+  // series table between two of its games is not idle: the table store reads
+  // it as cooldown from TableInfo.series and the server's table_state frame
+  // (E3-fx2), so the finished board stays up until the next game starts.
   const idle = $derived.by(() => {
-    if (finished || eventInPlay) return false;
+    if (finished) return false;
     const state = tables.list.find((t) => t.info.id === table)?.info.state;
     return state === 'idle' || state === 'halted';
   });
@@ -474,7 +473,7 @@
 
 <!-- E3-9: a draft-event series game (join link carries &event=) overlays the
      between-games panel; it renders nothing for any other table. -->
-{#if liveSeated}<TableEventOverlay {table} onInPlay={(v) => (eventInPlay = v)} />{/if}
+{#if liveSeated}<TableEventOverlay {table} />{/if}
 
 {#if idle}
   <main class="matches-page">

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TableInfo } from '../protocol';
+import type { Frame, TableInfo } from '../protocol';
 import type { TableState } from './tables.svelte';
 
 // tables.svelte.ts wires its constructor to session.stream.onFrame, and the
@@ -16,10 +16,7 @@ vi.mock('./api', () => ({ fetchTables: fetchTablesMock }));
 
 const { tables } = await import('./tables.svelte');
 
-// TableInfo.series is E3-fx2's field; the local alias lets a test build one
-// before the pinned protocol.ts carries it.
-type TableInfoWithSeries = TableInfo & { series?: boolean };
-const info = (id: string, overrides: Partial<TableInfoWithSeries> = {}): TableInfoWithSeries =>
+const info = (id: string, overrides: Partial<TableInfo> = {}): TableInfo =>
   ({ id, name: id, seats: 2, spectator: '', state: 'idle', match: 0, perpetual: false, format: 'constructed', bot_policy: 'bot', mulligans: 6, auto_mana: false, ...overrides });
 
 function find(id: string): TableState {
@@ -45,14 +42,42 @@ describe('tables: series table state (E3-fx2 client)', () => {
 
   it("a series table's match_end is between games, not idle; a plain table's is idle", () => {
     tables.apply({ v: 1, t: 'hello', seq: 0, body: { session: 's1', tables: [info('ser', { series: true }), info('plain')] } });
-    expect((find('ser').info as TableInfoWithSeries).series).toBe(true); // precondition: the store kept the series flag
-    expect((find('plain').info as TableInfoWithSeries).series).toBeFalsy();
+    expect(find('ser').info.series).toBe(true); // precondition: the store kept the series flag
+    expect(find('plain').info.series).toBeFalsy();
 
     tables.apply({ v: 1, t: 'match_end', seq: 1, table: 'ser', body: { result: 'win', winner: 0, head: 'h' } });
     expect(find('ser').info.state).toBe('cooldown');
 
     tables.apply({ v: 1, t: 'match_end', seq: 2, table: 'plain', body: { result: 'win', winner: 0, head: 'h' } });
     expect(find('plain').info.state).toBe('idle');
+  });
+
+  it('a series follows the server across games: finished board, between games, live again, then idle', () => {
+    // The frame order host/registry.go emits for a Bo3 table: table_state live
+    // ahead of each match_start; after a match_end the loop head sets
+    // between_games while the series hook plans the next game, and idle once
+    // the hook ends the series.
+    tables.apply({ v: 1, t: 'hello', seq: 0, body: { session: 's1', tables: [info('bo3', { series: true, state: 'live', match: 1 })] } });
+    const states: string[] = [];
+    const step = (f: Pick<Frame, 't' | 'match' | 'body'>) => {
+      tables.apply({ v: 1, seq: states.length + 1, table: 'bo3', ...f });
+      states.push(find('bo3').info.state);
+    };
+    step({ t: 'match_end', match: 1, body: { result: 'win', winner: 1, head: 'h1' } });
+    step({ t: 'table_state', match: 1, body: { state: 'between_games' } });
+    step({ t: 'table_state', match: 2, body: { state: 'live' } });
+    step({ t: 'match_start', match: 2, body: { seats: [] } });
+    step({ t: 'match_end', match: 2, body: { result: 'win', winner: 1, head: 'h2' } });
+    step({ t: 'table_state', match: 2, body: { state: 'between_games' } });
+    step({ t: 'table_state', match: 2, body: { state: 'idle' } });
+    expect(states).toEqual(['cooldown', 'cooldown', 'live', 'live', 'cooldown', 'cooldown', 'idle']);
+    expect(find('bo3').match).toBe(2); // the store followed the second game
+  });
+
+  it('a series table that is between games on (re)connect is not idle', () => {
+    // TableInfo.State reports the server's internal cooldown between games.
+    tables.apply({ v: 1, t: 'hello', seq: 0, body: { session: 's1', tables: [info('bo3', { series: true, state: 'cooldown', match: 1 })] } });
+    expect(find('bo3').info.state).toBe('cooldown');
   });
 
   it('a table_state frame for an unknown table is ignored', () => {
