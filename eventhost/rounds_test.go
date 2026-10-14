@@ -2,6 +2,7 @@ package eventhost
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -131,6 +132,21 @@ func TestRelayChains(t *testing.T) {
 	relay.Next = func(host.TableID, int, protocol.MatchInfo) error { return errors.New("next failed") }
 	if err := relay.OnMatchEnd("t", 1, protocol.MatchInfo{}); err == nil || err.Error() != "next failed" {
 		t.Fatalf("chained error = %v", err)
+	}
+
+	// Series before SetSeries answers no; after it, the target receives
+	// the call with its context, table and match number.
+	if g, ok, err := relay.Series(context.Background(), "t", 1); ok || err != nil || g.Chooser != 0 {
+		t.Fatalf("Series before SetSeries = %+v ok=%v err=%v", g, ok, err)
+	}
+	got := ""
+	relay.SetSeries(func(_ context.Context, t host.TableID, k int) (host.SeriesGame, bool, error) {
+		got = fmt.Sprintf("%s/%d", t, k)
+		return host.SeriesGame{Chooser: 2}, true, nil
+	})
+	if g, ok, err := relay.Series(context.Background(), "tt", 2); err != nil || !ok ||
+		g.Chooser != 2 || got != "tt/2" {
+		t.Fatalf("Series after SetSeries = %+v ok=%v err=%v got=%q", g, ok, err, got)
 	}
 }
 

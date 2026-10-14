@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/event"
 	"github.com/adams-shaun/gorge/host"
+	"github.com/adams-shaun/gorge/protocol"
 )
 
 // bo3Series is one pairing's Bo3 entries in log order, grouped by kind.
@@ -163,20 +166,24 @@ func checkBo3Shape(t *testing.T, pair [3]int, s *bo3Series) [2]int {
 	return wins
 }
 
-// TestBotOnlyBo3 drives a bot-only best-of-three event to COMPLETE and
-// checks every series' log: SeriesStarted 3, one series table per series
-// (games 2/3 continue on it, chooser per MTR 2.2), bots sideboarding
-// between games, SeriesEnded with the games' score.
-func TestBotOnlyBo3(t *testing.T) {
+// TestBotOnlyBo3EventCompletes drives a bot-only best-of-three event to
+// COMPLETE and checks every series' log: SeriesStarted 3, one series table
+// per series (games 2/3 continue on it, chooser per MTR 2.2), bots
+// sideboarding between games, SeriesEnded with the games' score; the
+// series' table played exactly the series' games with the readied decks;
+// the event state's series rows carry best_of 3 and the scores; and the
+// standings equal event.ComputeStandings over the logged results.
+func TestBotOnlyBo3EventCompletes(t *testing.T) {
 	p := startGamePair(t, "", nil)
 	req := botEventReq("bot", "lethal-pressure", "cast-profile", "bot")
 	req.BestOf = 3
 	resp := createOK(t, p.h, req)
-	waitPhase(t, p.h, resp.Event, "COMPLETE", 50*time.Second)
+	id := resp.Event
+	waitPhase(t, p.h, id, "COMPLETE", 50*time.Second)
 
-	r := runOf(t, p.h, resp.Event)
+	r := runOf(t, p.h, id)
 	r.mu.Lock()
-	log, st := r.ev.Log(), r.stateFor(-1)
+	log, st, standings := r.ev.Log(), r.stateFor(-1), r.ev.Standings()
 	r.mu.Unlock()
 
 	if st.BestOf != 3 {
@@ -189,28 +196,74 @@ func TestBotOnlyBo3(t *testing.T) {
 	if len(perSeries) != 6 {
 		t.Fatalf("%d series logged, want 6", len(perSeries))
 	}
-	points := [4]int{}
+	seriesRows := map[[3]int]protocol.EventSeries{}
+	for _, row := range st.Series {
+		seriesRows[[3]int{row.Round, row.A, row.B}] = row
+	}
+	results := make([]event.SeriesResult, 0, len(perSeries))
 	for pair, s := range perSeries {
 		wins := checkBo3Shape(t, pair, s)
-		switch {
-		case wins[0] == 2:
-			points[pair[1]] += 3
-		case wins[1] == 2:
-			points[pair[2]] += 3
-		default:
-			points[pair[1]], points[pair[2]] = points[pair[1]]+1, points[pair[2]]+1
+		games := make([]event.GameOutcome, 0, len(s.ends))
+		for _, en := range s.ends {
+			switch {
+			case en.Winner == nil:
+				games = append(games, event.Draw)
+			case *en.Winner == pair[1]:
+				games = append(games, event.AWon)
+			default:
+				games = append(games, event.BWon)
+			}
+		}
+		results = append(results, event.SeriesResult{
+			Round: pair[0], A: pair[1], B: pair[2], Score: wins, Games: games,
+		})
+		row, ok := seriesRows[pair]
+		if !ok || row.BestOf != 3 || row.State != "ended" || row.Score != wins {
+			t.Fatalf("state series row %v = %+v, want ended best_of 3 score %v", pair, row, wins)
+		}
+		// The series table played exactly the series' games, match k with
+		// the seats' readied decks (bots keep rev 1; slot 0 plays a's).
+		mi, err := p.reg.Matches(host.TableID(s.starts[0].Table))
+		if err != nil || len(mi) != len(s.ends) {
+			t.Fatalf("Matches(%s) = %d matches (%v), want %d", s.starts[0].Table, len(mi), err, len(s.ends))
+		}
+		wantA, wantB := DeckID(id, pair[1], 1), DeckID(id, pair[2], 1)
+		for _, m := range mi {
+			if len(m.Seats) != 2 || m.Seats[0].DeckID != wantA || m.Seats[1].DeckID != wantB {
+				t.Fatalf("series %v match decks = %s/%s, want %s/%s", pair,
+					m.Seats[0].DeckID, m.Seats[1].DeckID, wantA, wantB)
+			}
 		}
 	}
-	r.mu.Lock()
-	standings := r.ev.Standings()
-	r.mu.Unlock()
 	if len(standings) != 4 {
 		t.Fatalf("%d standings rows, want 4", len(standings))
 	}
-	for _, row := range standings {
-		if row.Points != points[row.Seat] {
-			t.Fatalf("seat %d points %d, want %d", row.Seat, row.Points, points[row.Seat])
+	if want := event.ComputeStandings(results); !reflect.DeepEqual(standings, want) {
+		t.Fatalf("standings %+v, want ComputeStandings %+v", standings, want)
+	}
+}
+
+// TestBotOnlyBo3EventIsDeterministic replays the same seed into two
+// independent bot-only Bo3 events: their logs are byte-identical.
+func TestBotOnlyBo3EventIsDeterministic(t *testing.T) {
+	mk := func() []byte {
+		p := startGamePair(t, "", nil)
+		req := botEventReq("bot", "lethal-pressure", "cast-profile", "bot")
+		req.BestOf = 3
+		resp := createOK(t, p.h, req)
+		waitPhase(t, p.h, resp.Event, "COMPLETE", 50*time.Second)
+		r := runOf(t, p.h, resp.Event)
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		b, err := event.MarshalLog(r.ev.Log())
+		if err != nil {
+			t.Fatal(err)
 		}
+		return b
+	}
+	first, second := mk(), mk()
+	if !bytes.Equal(first, second) {
+		t.Fatal("two bot-only Bo3 events with the same seed diverged")
 	}
 }
 
@@ -484,64 +537,143 @@ func TestSeriesHookWaitsAndCloseReleases(t *testing.T) {
 	}
 }
 
-// TestResumeBetweenGamesContinuesOnANewTable restarts a bot-only Bo3 event
-// mid-round from its store: the in-flight attempts are aborted, the series
-// resume on fresh tables (a between-games series continues with its locked
-// decks, a mid-game one replays on a new one), and the event plays out to
-// COMPLETE with every series' log shape intact.
-func TestResumeBetweenGamesContinuesOnANewTable(t *testing.T) {
-	dir := t.TempDir()
+// cutResumeDir builds a fresh disk store that holds the source event's
+// meta and deck files plus a LOG PREFIX of a played-out event: the first n
+// entries of log. A new pair opened on the result resumes the event from
+// the prefix, exactly as a restart that crashed after that entry would.
+func cutResumeDir(t *testing.T, srcDir, id string, log []event.Entry, n int) string {
+	t.Helper()
+	dst := t.TempDir()
+	ev := filepath.Join(dst, id)
+	if err := os.MkdirAll(ev, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mb, err := os.ReadFile(filepath.Join(srcDir, id, "event.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ev, "event.json"), mb, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(ev, "decks"), os.DirFS(filepath.Join(srcDir, id, "decks"))); err != nil {
+		t.Fatal(err)
+	}
+	lb, err := event.MarshalLog(log[:n])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ev, "log.jsonl"), lb, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dst
+}
+
+// playBotBo3 runs a bot-only Bo3 event to COMPLETE on a disk store and
+// returns the pair, the event id and the full log.
+func playBotBo3(t *testing.T, dir string) (*gamePair, string, []event.Entry) {
+	t.Helper()
 	p := startGamePair(t, dir, nil)
 	req := botEventReq("bot", "lethal-pressure", "cast-profile", "bot")
 	req.BestOf = 3
 	resp := createOK(t, p.h, req)
 	id := resp.Event
-	waitPhase(t, p.h, id, "ROUND1", 50*time.Second)
+	waitPhase(t, p.h, id, "COMPLETE", 50*time.Second)
 	r := runOf(t, p.h, id)
 	r.mu.Lock()
-	log1 := r.ev.Log()
+	log := r.ev.Log()
 	r.mu.Unlock()
-	oldTables := map[string]bool{}
-	for _, en := range log1 {
-		if en.Kind == event.KindGameStarted {
-			oldTables[en.Table] = true
+	return p, id, log
+}
+
+// assertPrefixReplayed asserts the resumed log carries the prefix entries
+// verbatim before anything new.
+func assertPrefixReplayed(t *testing.T, prefix, log2 []event.Entry, n int) {
+	t.Helper()
+	if len(log2) <= n {
+		t.Fatalf("resumed log %d entries, want more than the %d-entry prefix", len(log2), n)
+	}
+	for i := 0; i < n; i++ {
+		if !reflect.DeepEqual(prefix[i], log2[i]) {
+			t.Fatalf("resumed log diverges at %d: %+v vs %+v", i, prefix[i], log2[i])
 		}
 	}
-	if len(oldTables) == 0 {
-		t.Fatal("no games started before the restart")
-	}
+}
 
+// TestResumeBetweenGamesContinuesOnANewTable restarts a bot-only Bo3 event
+// from a store whose log ends at round-1 series (0,3)'s first Sideboarded
+// pair: the series resumes on a NEW table (the first host's series table
+// died with it), plays its game 2 there, and the event reaches COMPLETE
+// with every series' log shape intact.
+func TestResumeBetweenGamesContinuesOnANewTable(t *testing.T) {
+	dir := t.TempDir()
+	p, id, log := playBotBo3(t, dir)
+
+	// Cut after (0,3)'s first Sideboarded pair (game 2's two sides).
+	cut := -1
+	seen := 0
+	for i, en := range log {
+		if en.Kind == event.KindSideboarded && en.Round == 1 && en.A == 0 && en.B == 3 {
+			seen++
+			cut = i
+			if seen == 2 {
+				break
+			}
+		}
+	}
+	if seen != 2 {
+		t.Fatalf("round-1 (0,3) Sideboarded pair not on the log (saw %d)", seen)
+	}
+	for _, en := range log[cut-1 : cut+1] {
+		if en.Game != 2 || en.Rev != 1 || (en.Seat != 0 && en.Seat != 3) {
+			t.Fatalf("cut entries are not (0,3) game 2 rev-1 sideboards: %+v", en)
+		}
+	}
+	prefixTables := map[string]bool{}
+	for _, en := range log[:cut+1] {
+		if en.Kind == event.KindGameStarted {
+			prefixTables[en.Table] = true
+		}
+	}
+	dst := cutResumeDir(t, dir, id, log, cut+1)
 	p.h.Close()
 	p.reg.Close()
 
-	p2 := startGamePair(t, dir, nil)
+	p2 := startGamePair(t, dst, nil)
 	waitPhase(t, p2.h, id, "COMPLETE", 50*time.Second)
 	r2 := runOf(t, p2.h, id)
 	r2.mu.Lock()
 	log2 := r2.ev.Log()
 	r2.mu.Unlock()
-	if log2[len(log2)-1].Kind != event.KindEventEnded {
-		t.Fatalf("resumed event did not end: last entry %+v", log2[len(log2)-1])
-	}
-	// The store's log is append-only: the resumed replay is the old log
-	// plus what the resumed run added.
-	if len(log2) < len(log1) {
-		t.Fatalf("resumed log shrank: %d < %d entries", len(log2), len(log1))
-	}
-	for i, en := range log1 {
-		if !reflect.DeepEqual(en, log2[i]) {
-			t.Fatalf("resumed log diverges at %d: %+v vs %+v", i, en, log2[i])
+	assertPrefixReplayed(t, log, log2, cut+1)
+
+	// The first new GameStarted is (0,3) game 2's attempt 1, on a fresh
+	// table that hosts game 2 (not the dead game-1 table).
+	var first event.Entry
+	for _, en := range log2[cut+1:] {
+		if en.Kind == event.KindGameStarted {
+			first = en
+			break
 		}
 	}
-	// Every GameStarted the resumed run logged is on a table the first
-	// host never used: an aborted attempt replays on a fresh table, and a
-	// between-games series continues on a fresh one (the first host's
-	// series tables died with it).
-	for _, en := range log2[len(log1):] {
-		if en.Kind == event.KindGameStarted && oldTables[en.Table] {
-			t.Fatalf("resumed run reused first host's table %s: %+v", en.Table, en)
+	if first.Kind != event.KindGameStarted || first.Round != 1 || first.A != 0 || first.B != 3 ||
+		first.Game != 2 || first.Attempt != 1 {
+		t.Fatalf("first resumed GameStarted = %+v, want (0,3) game 2 attempt 1", first)
+	}
+	if want := fmt.Sprintf("%s-r1-s03-g2-a1", id); first.Table != want {
+		t.Fatalf("first resumed GameStarted table %s, want %s", first.Table, want)
+	}
+	if prefixTables[first.Table] {
+		t.Fatalf("resumed run reused dead table %s", first.Table)
+	}
+	for _, en := range log2[cut+1:] {
+		if en.Kind == event.KindGameStarted && prefixTables[en.Table] {
+			t.Fatalf("resumed run reused dead table %s: %+v", en.Table, en)
 		}
 	}
+
+	// Every series still plays out in shape: 2 or 3 ended games, decided
+	// or full, SeriesEnded with the games' score, and each start's chooser
+	// per MTR 2.2 (across the table change for (0,3)).
 	perSeries := groupSeries(log2)
 	if len(perSeries) != 6 {
 		t.Fatalf("%d series logged, want 6", len(perSeries))
@@ -550,8 +682,8 @@ func TestResumeBetweenGamesContinuesOnANewTable(t *testing.T) {
 		if s.started.Kind != event.KindSeriesStarted || s.started.BestOf != 3 {
 			t.Fatalf("series %v SeriesStarted = %+v", pair, s.started)
 		}
-		if len(s.ends) < 2 || len(s.ends) > 3 {
-			t.Fatalf("series %v played %d games", pair, len(s.ends))
+		if len(s.aborts) != 0 || len(s.ends) < 2 || len(s.ends) > 3 {
+			t.Fatalf("series %v aborts=%d ends=%d", pair, len(s.aborts), len(s.ends))
 		}
 		wins := [2]int{}
 		for _, en := range s.ends {
@@ -569,10 +701,6 @@ func TestResumeBetweenGamesContinuesOnANewTable(t *testing.T) {
 		if s.finished.Kind != event.KindSeriesEnded || s.finished.Score != wins {
 			t.Fatalf("series %v SeriesEnded = %+v, wins %v", pair, s.finished, wins)
 		}
-		// Per game: every attempt's chooser follows the rules across the
-		// restart (game 1 the attempt's toss winner, later games MTR 2.2
-		// over the previous ended game). A between-games series may keep
-		// playing games 2 and 3 on its own table when no restart intervened.
 		startsByGame := map[int][]event.Entry{}
 		endByGame := map[int]*event.Entry{}
 		for _, en := range s.ends {
@@ -584,20 +712,88 @@ func TestResumeBetweenGamesContinuesOnANewTable(t *testing.T) {
 		}
 		for g := 1; g <= len(s.ends); g++ {
 			sts := startsByGame[g]
-			if len(sts) == 0 {
-				t.Fatalf("series %v game %d never started", pair, g)
+			if len(sts) != 1 {
+				t.Fatalf("series %v game %d has %d starts", pair, g, len(sts))
 			}
-			for i, en := range sts {
-				if en.Attempt != i+1 {
-					t.Fatalf("series %v game %d start %d has attempt %d", pair, g, i, en.Attempt)
-				}
-				var prevStart, prevEnd *event.Entry
-				if g > 1 {
-					prevStart, prevEnd = &startsByGame[g-1][len(startsByGame[g-1])-1], endByGame[g-1]
-				}
-				checkChooserPlan(t, pair, en, prevStart, prevEnd)
+			en := sts[0]
+			if en.Attempt != 1 {
+				t.Fatalf("series %v game %d start attempt %d", pair, g, en.Attempt)
 			}
+			var prevStart, prevEnd *event.Entry
+			if g > 1 {
+				prevStart, prevEnd = &startsByGame[g-1][0], endByGame[g-1]
+			}
+			checkChooserPlan(t, pair, en, prevStart, prevEnd)
 		}
+	}
+}
+
+// TestResumeMidGameAbortsAndRetries restarts a bot-only Bo3 event from a
+// store whose log ends at round-1 series (0,3) game 2 attempt 1's
+// GameStarted: the resumed run aborts the caught-in-flight attempt
+// ("server restart") and retries game 2 as attempt 2 on a fresh table with
+// a different game seed.
+func TestResumeMidGameAbortsAndRetries(t *testing.T) {
+	dir := t.TempDir()
+	p, id, log := playBotBo3(t, dir)
+
+	cut := -1
+	for i, en := range log {
+		if en.Kind == event.KindGameStarted && en.Round == 1 && en.A == 0 && en.B == 3 &&
+			en.Game == 2 && en.Attempt == 1 {
+			cut = i
+			break
+		}
+	}
+	if cut < 0 {
+		t.Fatal("round-1 (0,3) game 2 attempt 1 never started")
+	}
+	seed1 := log[cut].GameSeed
+	dst := cutResumeDir(t, dir, id, log, cut+1)
+	p.h.Close()
+	p.reg.Close()
+
+	p2 := startGamePair(t, dst, nil)
+	waitPhase(t, p2.h, id, "COMPLETE", 50*time.Second)
+	r2 := runOf(t, p2.h, id)
+	r2.mu.Lock()
+	log2 := r2.ev.Log()
+	r2.mu.Unlock()
+	assertPrefixReplayed(t, log, log2, cut+1)
+
+	// The resumed tail: the caught-in-flight attempt aborted with the
+	// restart reason, then game 2 retried as attempt 2 on a new table
+	// (…-g2-a2) with a different seed.
+	aborted, retried := false, false
+	for _, en := range log2[cut+1:] {
+		if !aborted {
+			if en.Kind != event.KindGameAborted {
+				t.Fatalf("first resumed entry = %+v, want the in-flight game aborted", en)
+			}
+			if en.Round != 1 || en.A != 0 || en.B != 3 || en.Game != 2 ||
+				en.Attempt != 1 || en.Reason != "server restart" {
+				t.Fatalf("restart abort = %+v", en)
+			}
+			aborted = true
+			continue
+		}
+		if en.Kind != event.KindGameStarted {
+			continue
+		}
+		if en.Round != 1 || en.A != 0 || en.B != 3 || en.Game != 2 || en.Attempt != 2 {
+			t.Fatalf("retried GameStarted = %+v, want (0,3) game 2 attempt 2", en)
+		}
+		if want := fmt.Sprintf("%s-r1-s03-g2-a2", id); en.Table != want {
+			t.Fatalf("retried game 2 table %s, want %s", en.Table, want)
+		}
+		if en.GameSeed == seed1 {
+			t.Fatal("retried game 2 reused attempt 1's game seed")
+		}
+		retried = true
+		break
+	}
+	if !aborted || !retried {
+		t.Fatal("resumed log never aborted and retried the caught-in-flight game")
 	}
 }
 
