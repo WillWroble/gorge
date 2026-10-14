@@ -7,7 +7,6 @@ import (
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules/chars"
-	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -369,8 +368,9 @@ func (e *Engine) genesisDeal(cfg Config, tossAsk bool) *Engine {
 	// renders this one Note through player(), so a seated human still reads
 	// their own name.
 	if toss >= 0 {
-		e.emit(events.Event{Kind: events.Note, Player: state.PlayerID(toss),
-			Text: pay.SeatName(e.G, state.PlayerID(toss)) + " won the toss"})
+		seat, note, _ := e.tossOutcome(cfg, toss)
+		e.emit(events.Event{Kind: events.Note, Player: state.PlayerID(seat), Text: note})
+		toss = seat
 	}
 	// Match-wide dense commander indexing for Player.CmdDamage (assigned at
 	// genesis): a commander's dense index is the sum of (valid commanders in
@@ -530,7 +530,8 @@ func (e *Engine) genesisDeal(cfg Config, tossAsk bool) *Engine {
 	choicePending := tossAsk && !e.G.Over && len(alive) > 1 && toss >= 0 && toss < len(e.G.Players) &&
 		!e.G.Players[toss].Lost
 	if choicePending {
-		e.tossChoice = tossChoice{active: true, winner: start}
+		_, _, configured := e.tossOutcome(cfg, toss)
+		e.tossChoice = tossChoice{active: true, winner: start, configured: configured}
 	}
 	// The resolved toss is authoritative genesis state, not merely a Note or
 	// the later TurnChange: opening-hand effects and Count$StartingPlayer run
