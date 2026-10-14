@@ -537,6 +537,10 @@
       "tier": "core",
       "status": "CORE"
     },
+    "limited/draftfeat": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "limited/pickbot": {
       "tier": "core",
       "status": "CORE"
