@@ -143,6 +143,10 @@
       "tier": "cmd",
       "status": "TOOL"
     },
+    "cmd/extagent": {
+      "tier": "cmd",
+      "status": "TOOL"
+    },
     "cmd/exitloop": {
       "tier": "cmd",
       "status": "SUSP"
@@ -303,6 +307,16 @@
       "tier": "bots",
       "status": "EXT",
       "purpose": "Training composition API over the draft stack: open packs, draft, build, play, gauntlet and whole events with named, versioned built-in agents; every call a pure function of inputs and seed; 17Lands-shaped artifacts."
+    },
+    "draftlab/extern/refagent": {
+      "tier": "bots",
+      "status": "TOOL",
+      "purpose": "Reference gorge-agent/1 agent (uniform random, first legal) for tests, benchmarks and as a worked example."
+    },
+    "draftlab/extern/wire": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "The gorge-agent/1 wire: JSON-lines messages an out-of-process drafter, builder or player speaks, carrying view.View, decision.Intent and protocol.DraftCard."
     },
     "effects": {
       "tier": "core",
