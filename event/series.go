@@ -1,7 +1,5 @@
 package event
 
-import "github.com/adams-shaun/gorge/limited/draft"
-
 // The series rules shared by the Apply mutators and the read accessors: a
 // best-of-N series is decided when a side has need wins, full when every
 // game of its length has been played, and (Bo3 only) between games while
@@ -101,7 +99,7 @@ func (e *Event) SeriesState(a, b int) (SeriesView, bool) {
 
 // SeriesOf reports the current-round pairing that contains seat.
 func (e *Event) SeriesOf(seat int) (a, b int, ok bool) {
-	if e.round < 1 || seat < 0 || seat >= draft.Seats {
+	if e.round < 1 || seat < 0 || seat >= e.NumSeats() {
 		return 0, 0, false
 	}
 	for _, p := range e.pairings {

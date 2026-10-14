@@ -1,6 +1,10 @@
 package event
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/adams-shaun/gorge/limited/draft"
+)
 
 // GameOutcome is one played game's result relative to the series' seats:
 // AWon means seat A won, BWon means seat B won, Draw means neither.
@@ -40,21 +44,27 @@ type Standing struct {
 // and GW% (and, through the opponents' floored values, to OMW% and OGW%).
 const floorPercent = 0.33
 
-// ComputeStandings builds the standings table from completed series
+// ComputeStandings builds the standings table for the hosted 4-seat pod
+// from completed series results; see ComputeStandingsN.
+func ComputeStandings(results []SeriesResult) []Standing {
+	return ComputeStandingsN(draft.Seats, results)
+}
+
+// ComputeStandingsN builds an n-row standings table from completed series
 // results: match points 3/1/0 per MTR Appendix C, MW% = points/(3×series)
 // and GW% = game points/(3×games) each floored at 0.33, OMW% and OGW% the
 // means of the opponents' floored values, ordered by points, OMW%, GW%,
 // OGW%, then seat index. It accepts any subset of a round robin's series,
 // so mid-event tables compute the same way. Results naming seats outside
-// the four-seat pod are ignored.
-func ComputeStandings(results []SeriesResult) []Standing {
-	var aggs [4]seatAgg
+// 0..n-1 are ignored.
+func ComputeStandingsN(n int, results []SeriesResult) []Standing {
+	aggs := make([]seatAgg, n)
 	for _, r := range results {
 		lo, hi := r.A, r.B
 		if lo > hi {
 			lo, hi = hi, lo
 		}
-		if lo < 0 || hi >= len(aggs) || lo == hi {
+		if lo < 0 || hi >= n || lo == hi {
 			continue
 		}
 		switch {
@@ -163,5 +173,5 @@ func (e *Event) Standings() []Standing {
 		}
 		rs = append(rs, SeriesResult{Round: f.round, A: f.a, B: f.b, Score: f.score, Games: games})
 	}
-	return ComputeStandings(rs)
+	return ComputeStandingsN(e.NumSeats(), rs)
 }
