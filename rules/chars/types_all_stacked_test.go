@@ -96,7 +96,7 @@ func TestStackedAllCreatureTypesGrantsStayCheap(t *testing.T) {
 	// finds it already there. Measured 7. The pre-fix walk allocated a
 	// vocabulary-sized match list per probe: 151 allocations and ~4 ms per
 	// walk (105 and ~3.5 ms with only the quadratic dedup restored), against
-	// ~57 us now (BenchmarkStackedAllCreatureTypesWalk).
+	// ~4 us now (BenchmarkStackedAllCreatureTypesWalk).
 	allocs := testing.AllocsPerRun(20, func() {
 		TypesAndAllCreatureTypes(board, board.active, id, 0)
 	})
