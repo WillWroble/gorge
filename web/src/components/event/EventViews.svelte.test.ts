@@ -114,6 +114,47 @@ describe('DraftView', () => {
   });
 });
 
+describe('DraftView pick timer', () => {
+  afterEach(() => vi.useRealTimers());
+
+  function timed(remaining: number) {
+    const c = new EventClient('e1', { seat: 0, token: 'tok0' });
+    c.handleFrame(frame('event_state', eventState({ pick_timer: 'standard' })));
+    c.handleFrame(frame('draft_pack', draftPack({ time_limit_ms: 70_000, remaining_ms: remaining })));
+    return c;
+  }
+
+  it('without a timer the header says "no pick timer"', () => {
+    const { body } = render(DraftView, { props: { client: drafting() } });
+    expect(body).toContain('no pick timer');
+    expect(body).not.toContain('data-testid="pick-clock"');
+  });
+
+  it('counts down from remaining_ms as of the pack\'s arrival, warns under 10 s and shows "auto-picking…" at 0', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'));
+    const c = timed(42_500);
+    let { body } = render(DraftView, { props: { client: c } });
+    expect(body).toMatch(/data-testid="pick-clock"[^>]*>\s*43s/);
+    expect(body).not.toMatch(/class="clock[^"]*warn/);
+    expect(body).not.toContain('no pick timer');
+
+    vi.advanceTimersByTime(34_000); // 8.5 s left
+    ({ body } = render(DraftView, { props: { client: c } }));
+    expect(body).toMatch(/data-testid="pick-clock"[^>]*>\s*9s/);
+    expect(body).toMatch(/class="clock[^"]*warn/);
+
+    vi.advanceTimersByTime(9_000);
+    ({ body } = render(DraftView, { props: { client: c } }));
+    expect(body).toContain('auto-picking…');
+
+    // The server's next pack restarts the count from its own remaining_ms.
+    c.handleFrame(frame('draft_pack', draftPack({ pick_no: 4, time_limit_ms: 65_000, remaining_ms: 65_000 })));
+    ({ body } = render(DraftView, { props: { client: c } }));
+    expect(body).toMatch(/data-testid="pick-clock"[^>]*>\s*65s/);
+  });
+});
+
 describe('PodStatus', () => {
   it('shows picks alone until a seat\'s queue count arrives — no placeholder dash', () => {
     const { body } = render(PodStatus, { props: { seats: eventState().seats, you: 0, progress: null } });
@@ -208,6 +249,51 @@ describe('HubView and Standings', () => {
     expect(body.match(/data-testid="join-game"/g)).toHaveLength(1);
   });
 
+  it('a best-of-3 row shows the series score, one dot per played game and the live game number', () => {
+    const ev = eventState({
+      phase: 'ROUND1',
+      round: 1,
+      best_of: 3,
+      series: [
+        s({ best_of: 3, state: 'live', table: 'e1-r1-s03-g1-a1', attempt: 1, game: 3, games: [3, 0], score: [1, 1], join: '/t/e1-r1-s03-g1-a1?seat=0&token=gt&event=e1' }),
+        s({ a: 1, b: 2, best_of: 3, state: 'ended', table: 'e1-r1-s12-g1-a1', games: [1, 1], score: [2, 0], winner: 1 }),
+      ],
+    });
+    const { body } = render(HubView, { props: { ev } });
+    expect(body).toContain('1 – 1');
+    expect(body).toContain('2 – 0');
+    expect(body).toContain('live · game 3');
+    const dots = [...body.matchAll(/<i class="dot (\w) /g)].map((m) => m[1]);
+    // the viewer's row from the viewer's side (lost game 1, won game 2), the other row from its left seat's
+    expect(dots).toEqual(['l', 'w', 'w', 'w']);
+    expect(body.match(/data-testid="game-dots"/g)).toHaveLength(2);
+  });
+
+  it('a between-games series says so, counts as playing, and offers the viewer its deck for the next game', () => {
+    const ev = eventState({
+      phase: 'ROUND1',
+      round: 1,
+      best_of: 3,
+      series: [
+        s({ best_of: 3, state: 'between', table: 'e1-r1-s03-g1-a1', game: 2, games: [3], score: [0, 1], chooser: 0, waiting: [0] }),
+        s({ a: 1, b: 2, best_of: 3, state: 'between', table: 'e1-r1-s12-g1-a1', game: 2, games: [-1], score: [0, 0], waiting: [] }),
+      ],
+    });
+    const { body } = render(HubView, { props: { ev } });
+    expect(body.match(/between games/g)).toHaveLength(2);
+    expect(body).toContain('Round 1 · playing');
+    expect(body).toMatch(/href="#between-games"[^>]*data-testid="your-deck"[^>]*>your deck for game 2/);
+    expect(body.match(/data-testid="your-deck"/g)).toHaveLength(1);
+    expect(body).toContain('href="/t/e1-r1-s12-g1-a1"'); // the other series stays watchable
+    expect(body).toContain('<i class="dot d ');
+  });
+
+  it('a best-of-1 row has no game dots', () => {
+    const ev = eventState({ phase: 'ROUND1', round: 1, series: [s({ state: 'ended', score: [1, 0], winner: 0, games: [0] })] });
+    const { body } = render(HubView, { props: { ev } });
+    expect(body).not.toContain('data-testid="game-dots"');
+  });
+
   it('standings render the server rows in order with the MTR tiebreak columns', () => {
     const ev = eventState({
       phase: 'ROUND2',
@@ -269,6 +355,13 @@ describe('LobbyView and PhaseRail', () => {
     expect(body).toContain('data-testid="join-form"');
     expect(body).toContain('Join the pod');
     expect(body).toContain('bot · plays lethal-pressure');
+    expect(body).toContain('best of 1 · no pick timer');
+  });
+
+  it('the lobby summary names best of 3 and the timer mode', () => {
+    const ev = eventState({ phase: 'LOBBY', best_of: 3, pick_timer: 'relaxed' });
+    const { body } = render(LobbyView, { props: { ev, canJoin: false, onjoin: () => {} } });
+    expect(body).toContain('best of 3 · relaxed pick timer');
   });
 
   it('marks the current phase', () => {

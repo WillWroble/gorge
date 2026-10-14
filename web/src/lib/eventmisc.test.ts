@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eventSeatFor, forgetEventSeat } from './eventseat';
 import { cardNames, countNames, pickHistory, revealDecks } from './eventlog';
 import { pct, record, standingRows } from './standings';
-import { createRequest, eventPolicies, ratedBy17Lands, setNote } from './newevent';
+import { createRequest, defaultSeats, eventPolicies, inviteURL, maskToken, ratedBy17Lands, setNote, timerLabel, timerOffered, type SeatChoice } from './newevent';
+import { gameDots, inPlay, seriesScore, seriesStatus } from './series';
+import { pickSecondsLeft } from './pickclock';
 import { createEvent, listEventPersonas, listEventSets } from './eventapi';
 import { eventState, fakeFetch } from '../test/eventfixtures';
 import type { BotPolicyInfo, EventSeries, EventSetInfo } from '../protocol';
@@ -102,6 +104,11 @@ describe('standings rows', () => {
   });
 });
 
+const bots = (policies: string[], drafters: string[] = []): SeatChoice[] => [
+  { kind: 'human', policy: '', drafter: '' },
+  ...policies.map((policy, i): SeatChoice => ({ kind: 'bot', policy, drafter: drafters[i] ?? '' })),
+];
+
 describe('create request', () => {
   const p = (name: string, formats: string[]): BotPolicyInfo => ({
     name, label: name, description: '', tier: 'production', strength: [], mean_ms: 0, p95_ms: 0, cost_scope: '', cost_note: '', search: false, formats,
@@ -110,23 +117,80 @@ describe('create request', () => {
     expect(eventPolicies([p('a', ['constructed', 'commander']), p('b', ['commander'])]).map((x) => x.name)).toEqual(['a']);
   });
   it('seat 1 is the human; an empty policy keeps the server default', () => {
-    expect(createRequest('FDN', ['lethal-pressure', '', 'bot'])).toEqual({
+    expect(createRequest('FDN', bots(['lethal-pressure', '', 'bot']))).toEqual({
       set: 'FDN',
       seats: [{ kind: 'human' }, { kind: 'bot', policy: 'lethal-pressure' }, { kind: 'bot' }, { kind: 'bot', policy: 'bot' }],
     });
   });
 });
 
+describe('create request: seat kinds, best of, pick timer', () => {
+  const pod = (...kinds: ('human' | 'bot')[]): SeatChoice[] => kinds.map((kind) => ({ kind, policy: kind === 'human' ? 'ignored' : '', drafter: '' }));
+  it('the default pod is you plus three bots', () => {
+    expect(defaultSeats().map((s) => s.kind)).toEqual(['human', 'bot', 'bot', 'bot']);
+  });
+  it('a human seat carries only its kind; best_of is sent only for 3', () => {
+    expect(createRequest('FDN', pod('human', 'bot', 'human', 'bot'), { bestOf: 3 })).toEqual({
+      set: 'FDN', best_of: 3, seats: [{ kind: 'human' }, { kind: 'bot' }, { kind: 'human' }, { kind: 'bot' }],
+    });
+    expect(createRequest('FDN', pod('human', 'bot', 'bot', 'bot'), { bestOf: 1 })).not.toHaveProperty('best_of');
+  });
+  it('pick_timer is sent only when chosen, and only for two or more humans', () => {
+    expect(timerOffered(pod('human', 'bot', 'bot', 'bot'))).toBe(false);
+    expect(timerOffered(pod('human', 'human', 'bot', 'bot'))).toBe(true);
+    expect(createRequest('FDN', pod('human', 'human', 'bot', 'bot'))).not.toHaveProperty('pick_timer');
+    expect(createRequest('FDN', pod('human', 'human', 'bot', 'bot'), { pickTimer: 'relaxed' }).pick_timer).toBe('relaxed');
+    expect(createRequest('FDN', pod('human', 'bot', 'bot', 'bot'), { pickTimer: 'relaxed' })).not.toHaveProperty('pick_timer');
+  });
+  it('labels the stored timer mode; an invite link is origin + base + join, shown with its token masked', () => {
+    expect(timerLabel('standard')).toBe('standard pick timer');
+    expect(timerLabel('relaxed')).toBe('relaxed pick timer');
+    expect(timerLabel('off')).toBe('no pick timer');
+    expect(timerLabel(undefined)).toBe('no pick timer');
+    const url = inviteURL('https://x.test', '/e/ev1?seat=1&token=abcDEF');
+    expect(url).toBe('https://x.test/e/ev1?seat=1&token=abcDEF');
+    expect(maskToken(url)).toBe('https://x.test/e/ev1?seat=1&token=••••••');
+  });
+});
+
+describe('series rows and the pick clock', () => {
+  const row = (over: Partial<EventSeries>): EventSeries => ({ round: 1, a: 0, b: 3, best_of: 3, state: 'live', score: [0, 0], winner: null, ...over });
+  it('game dots read the per-game winners from one side (-1 is a draw)', () => {
+    const s = row({ games: [3, 0, -1], score: [1, 1] });
+    expect(gameDots(s, 0)).toEqual(['l', 'w', 'd']);
+    expect(gameDots(s, 3)).toEqual(['w', 'l', 'd']);
+    expect(gameDots(row({}), 0)).toEqual([]);
+  });
+  it('the status line names the live game, the between state and the outcome', () => {
+    expect(seriesScore(row({ score: [2, 1] }))).toBe('2 – 1');
+    expect(seriesScore(row({ state: 'pending' }))).toBe('vs');
+    expect(seriesStatus(row({ game: 2 }))).toBe('live · game 2');
+    expect(seriesStatus(row({ best_of: 1, attempt: 2 }))).toBe('live · attempt 2');
+    expect(seriesStatus(row({ state: 'between', game: 3 }))).toBe('between games');
+    expect(seriesStatus(row({ state: 'ended', winner: 0 }))).toBe('final');
+    expect(seriesStatus(row({ state: 'ended', winner: null }))).toBe('draw');
+    expect(inPlay(row({ state: 'between' }))).toBe(true);
+    expect(inPlay(row({ state: 'ended' }))).toBe(false);
+  });
+  it('the pick clock counts the server\'s remaining_ms down from arrival, never below zero', () => {
+    expect(pickSecondsLeft(70_000, 1000, 1000)).toBe(70);
+    expect(pickSecondsLeft(70_000, 1000, 1500)).toBe(70);
+    expect(pickSecondsLeft(70_000, 1000, 62_000)).toBe(9);
+    expect(pickSecondsLeft(70_000, 1000, 71_000)).toBe(0);
+    expect(pickSecondsLeft(70_000, 1000, 99_000)).toBe(0);
+  });
+});
+
 describe('create request: personas, no seed', () => {
   it('names a bot\'s pickbot persona only when one was chosen', () => {
-    expect(createRequest('BLB', ['', 'bot', ''], ['best23', '', 'rating-colour'])).toEqual({
+    expect(createRequest('BLB', bots(['', 'bot', ''], ['best23', '', 'rating-colour']))).toEqual({
       set: 'BLB',
       seats: [{ kind: 'human' }, { kind: 'bot', drafter: 'best23' }, { kind: 'bot', policy: 'bot' }, { kind: 'bot', drafter: 'rating-colour' }],
     });
   });
   it('never sends a seed (the server mints it; an unknown field is a 400)', async () => {
     const { calls } = fakeFetch({ 'POST /api/events': { body: { event: 'e9', invites: [], state: eventState() } } });
-    await createEvent(createRequest('FDN', ['', '', ''], ['', '', '']));
+    await createEvent(createRequest('FDN', defaultSeats()));
     expect(calls).toHaveLength(1);
     const body = calls[0].body as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(['seats', 'set']);
