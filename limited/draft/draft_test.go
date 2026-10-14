@@ -386,3 +386,33 @@ func TestPodPickViewCopiesAreDefensive(t *testing.T) {
 		t.Fatalf("view picks = %v, want the one picked card", v2.Picks)
 	}
 }
+
+// TestPickViewSeatsIsPodSize: every view a 4- and an 8-seat pod hands out
+// carries the pod size, from the first pick to the last.
+func TestPickViewSeatsIsPodSize(t *testing.T) {
+	for _, n := range []int{4, 8} {
+		p, err := NewPod(1, mkPacksN(n, 3, n+2))
+		if err != nil {
+			t.Fatal(err)
+		}
+		views := 0
+		for !p.Done() {
+			for s := 0; s < n; s++ {
+				v, ok := p.Next(s)
+				if !ok {
+					continue
+				}
+				if v.Seats != n {
+					t.Fatalf("n=%d seat %d round %d pick %d: Seats = %d", n, s, v.Round, v.PickNo, v.Seats)
+				}
+				views++
+				if err := p.Pick(s, v.PickNo, v.Pack[0].ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if views != n*3*(n+2) {
+			t.Fatalf("n=%d: checked %d views", n, views)
+		}
+	}
+}

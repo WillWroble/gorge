@@ -252,7 +252,7 @@ func TestPickTimerAutoPicksOnExpiry(t *testing.T) {
 		r.mu.Unlock()
 		t.Fatal("seat 3 has no pack")
 	}
-	cp := draft.PickView{Set: v3.Set, Round: v3.Round, PickNo: v3.PickNo,
+	cp := draft.PickView{Set: v3.Set, Round: v3.Round, PickNo: v3.PickNo, Seats: v3.Seats,
 		Pack: slices.Clone(v3.Pack), Picks: slices.Clone(v3.Picks)}
 	for _, seen := range v3.Seen {
 		cp.Seen = append(cp.Seen, slices.Clone(seen))
