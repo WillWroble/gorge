@@ -87,8 +87,12 @@ func effTwoPiles(h Host, c *Ctx, sa *cards.SA) {
 		return v
 	}
 
-	// The card set, in the deterministic Remembered/Targets order.
-	set := objectsOf(c.Remembered)
+	// The card set, in the deterministic Remembered/Targets order. Defined$
+	// Remembered is Forge's host remembered list, which never contains the
+	// event object the trigger fired on (rememberedExcludingCapture): a
+	// Curator of Destinies ETB captures the entering Sphinx in its Ctx, and
+	// reading the raw list offered the source itself as a pile card.
+	set := objectsOf(rememberedExcludingCapture(h, c))
 	if spec == "Targeted" {
 		set = objectsOf(c.Targets)
 	}

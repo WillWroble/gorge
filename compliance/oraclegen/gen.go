@@ -1271,6 +1271,17 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 				as = damageSplitAnswers(d)
 				break
 			}
+			if d.Resume == "twopiles_pick" && len(d.Picks) == 1 {
+				// The pile pick (Curator of Destinies, Fact or Fiction) is
+				// XMage's opponent.chooseUse("Face-down", "Face-up"), a
+				// boolean choice, never gorge's "First pile"/"Second pile"
+				// label (measured 2026-10-14: the label is "Found wrong
+				// choice command"). Taking pile A -- the separator's pile,
+				// the face-down pile XMage's TargetCard selected -- is the
+				// boolean true.
+				as = append(as, XAnswer{d.Seat, "choice", twoPilesPileAnswer(d)})
+				break
+			}
 			if d.Resume == "mana_color" && len(d.ManaColours) > 1 {
 				// A Produced$ "Combo <colours>" ask whose offered span
 				// exceeds one colour is XMage's AddManaInAnyCombinationEffect
@@ -2754,6 +2765,16 @@ func openingHandAnswers(f *cards.Face) []Answer {
 		return []Answer{{Kind: "choose", Pick: []string{"no"}}}
 	}
 	return nil
+}
+
+// twoPilesPileAnswer maps gorge's pile pick to XMage's boolean chooseUse
+// answer: pile A ("First pile", the separator's face-down pile) is "yes",
+// pile B ("Second pile", the face-up pile) is "no".
+func twoPilesPileAnswer(d rules.OracleDecision) string {
+	if len(d.PickKinds) == 1 && d.PickKinds[0] == "pile-b" {
+		return "no"
+	}
+	return "yes"
 }
 
 // pickQueue is xmQueue for the k-th pick, except that a search of ANOTHER

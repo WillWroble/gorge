@@ -233,6 +233,21 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Options: 5, Max: 5, Min: 0, Picks: []string{"Jace Beleren"}, PickRefs: []string{"p0:Jace Beleren"}, PickIdx: []int{0}, PickKinds: []string{"twopiles"}},
 			want: []XAnswer{{0, "choice", "Jace Beleren"}, {0, "choice", "[choice_skip]"}},
 		},
+		{
+			// The pile pick (Curator of Destinies, Fact or Fiction) is
+			// XMage's opponent.chooseUse("Face-down", "Face-up"), a boolean
+			// choice. Taking pile A -- the separator's face-down pile -- is
+			// the boolean true, scripted "yes".
+			name: "two-piles pick pile A: chooseUse yes",
+			d:    rules.OracleDecision{Step: 0, Seat: 1, Kind: "choose_n", GorgeKind: "choose", Resume: "twopiles_pick", Options: 2, Max: 1, Picks: []string{"First pile"}, PickRefs: []string{"First pile"}, PickIdx: []int{0}, PickKinds: []string{"pile-a"}},
+			want: []XAnswer{{1, "choice", "yes"}},
+		},
+		{
+			// Pile B (the face-up pile) is the boolean false, "no".
+			name: "two-piles pick pile B: chooseUse no",
+			d:    rules.OracleDecision{Step: 0, Seat: 1, Kind: "choose_n", GorgeKind: "choose", Resume: "twopiles_pick", Options: 2, Max: 1, Picks: []string{"Second pile"}, PickRefs: []string{"Second pile"}, PickIdx: []int{1}, PickKinds: []string{"pile-b"}},
+			want: []XAnswer{{1, "choice", "no"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
