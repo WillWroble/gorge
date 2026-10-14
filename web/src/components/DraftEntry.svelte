@@ -28,6 +28,9 @@
     border-radius: var(--radius);
     background: var(--instrument);
     color: var(--ink-inst);
+    /* Same column as PlayVsBot and DeckLeaderboard, so the strips line up. */
+    max-width: 32rem;
+    flex: none;
   }
   .text {
     flex: 1 1 16rem;
