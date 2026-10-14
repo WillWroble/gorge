@@ -2,6 +2,9 @@
   import type { DraftCard } from '../../protocol';
   import { factsOf, mvColumns, tint } from '../../lib/draftcards';
   import ManaSymbols from '../ManaSymbols.svelte';
+  import CardDetail from '../CardDetail.svelte';
+  import { cardView } from '../../lib/draftcards';
+  import { DraftHover } from '../../lib/drafthover.svelte';
 
   /**
    * A pool or deck laid out in mana-value columns (0–1 … 6+, Land, and "?"
@@ -26,6 +29,12 @@
   const cols = $derived(mvColumns(cards, factsOf));
   let dragging = $state<string | null>(null);
 
+  // Hovering a strip opens the zoomed CardDetail panel (the one-line strip
+  // only names the card). A strip that moves to the other zone leaves this
+  // grid under the pointer, so supervise closes a panel whose card is gone.
+  const detail = new DraftHover();
+  $effect(() => detail.supervise(cards));
+
   function dragstart(e: DragEvent, id: string) {
     if (!e.dataTransfer) return;
     e.dataTransfer.setData('text/plain', id);
@@ -46,17 +55,27 @@
             class="strip ev-tint-{tint(f)}"
             class:dragging={dragging === c.id}
             data-id={c.id}
-            title={c.name}
             {draggable}
             ondragstart={(e) => dragstart(e, c.id)}
             ondragend={() => (dragging = null)}
             onclick={() => onactivate(c.id)}
+            onpointerenter={(e) => detail.enter(c, e.currentTarget)}
+            onpointerleave={() => detail.leave()}
+            onfocus={(e) => detail.focus(c, e.currentTarget)}
+            onblur={() => detail.leave()}
+            onkeydown={(e) => detail.keydown(e)}
           >
             <span class="nm">{c.name}</span>
             {#if f.cost}<ManaSymbols cost={f.cost} />{/if}
           </button>
         {:else}
-          <div class="strip ev-tint-{tint(f)}" data-id={c.id} title={c.name}>
+          <div
+            class="strip ev-tint-{tint(f)}"
+            data-id={c.id}
+            role="listitem"
+            onpointerenter={(e) => detail.enter(c, e.currentTarget)}
+            onpointerleave={() => detail.leave()}
+          >
             <span class="nm">{c.name}</span>
             {#if f.cost}<ManaSymbols cost={f.cost} />{/if}
           </div>
@@ -65,6 +84,10 @@
     </div>
   {/each}
 </div>
+
+{#if detail.show && detail.card && detail.anchor}
+  <CardDetail card={cardView(detail.card)} anchor={detail.anchor} />
+{/if}
 
 <style>
   /* Seven columns on a wide screen; they wrap rather than shrink to nothing

@@ -6,6 +6,8 @@
   import PodStatus from './PodStatus.svelte';
   import PickClock from './PickClock.svelte';
   import Attribution from './Attribution.svelte';
+  import CardDetail from '../CardDetail.svelte';
+  import { DraftHover } from '../../lib/drafthover.svelte';
 
   /**
    * The pick screen (mockup 3b). Click or tap a card to inspect it;
@@ -32,7 +34,14 @@
     return out;
   });
 
+  // Hovering a pack card opens the same zoomed CardDetail panel the table
+  // uses; a picked card leaves the pack under the pointer, so supervise
+  // closes a panel whose card is gone.
+  const detail = new DraftHover();
+  $effect(() => detail.supervise(cards));
+
   function onkey(e: KeyboardEvent, id: string) {
+    detail.keydown(e);
     if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
     if (client.selected === id) void client.pick(id);
@@ -76,13 +85,20 @@
             onclick={() => client.select(c.id)}
             ondblclick={() => void client.pick(c.id)}
             onkeydown={(e) => onkey(e, c.id)}
+            onpointerenter={(e) => detail.enter(c, e.currentTarget)}
+            onpointerleave={() => detail.leave()}
+            onfocus={(e) => detail.focus(c, e.currentTarget)}
+            onblur={() => detail.leave()}
           >
             <CardImage card={cardView(c)} pt={false} />
             <span class="ev-rar {c.rarity}" title={rarityLabel(c.rarity)}></span>
           </button>
         {/each}
       </div>
-      <p class="hint">Tap a card to inspect it · double-click, or Enter twice, to take it.</p>
+      <p class="hint">Hover a card to zoom it · tap to select · double-click, or Enter twice, to take it.</p>
+      {#if detail.show && detail.card && detail.anchor}
+        <CardDetail card={cardView(detail.card)} anchor={detail.anchor} />
+      {/if}
     {:else}
       <div class="waiting" role="status">
         <h2>Waiting for the next pack</h2>

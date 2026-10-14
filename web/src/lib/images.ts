@@ -24,6 +24,19 @@ const OFFLINE_FOR = 60_000;
 // rest (nothing is stored, so the name re-resolves later) while the
 // server's prewarm warms the cache meanwhile.
 const REQUEST_TIMEOUT = 10_000;
+// A 503 from /art/named is the server's "pending": its wait budget expired
+// while the Scryfall fetch is still running detached, and the entry will be a
+// plain disk hit shortly (cmd/gorged/art.go errArtPending). That is not an
+// outage, so it must NOT take the 60s offline rest: a cold cache answers
+// 503 for a burst of names (a fresh draft pack of a set the server never
+// prewarmed), and the offline rest then answered null to every later name
+// and left whole packs blank. A pending name is retried on its own after
+// PENDING_RETRY_MS, up to PENDING_RETRIES times, without marking anything
+// offline or storing anything.
+const PENDING_RETRY_MS = 3_000;
+const PENDING_RETRIES = 8;
+
+class ArtPending extends Error {}
 // Version the browser cache independently of the server's art blobs. Existing
 // browsers may hold a valid immutable URL whose bytes were selected by older
 // face-matching logic; changing this namespace makes them resolve the name
@@ -98,6 +111,7 @@ export function createImages(src: Partial<ImageSource> = {}) {
     try {
       const res = await env.fetch(withBase(`/art/named?exact=${encodeURIComponent(name)}`), { headers: { Accept: 'application/json' }, signal: abort.signal });
       if (res.status === 404) return null;
+      if (res.status === 503) throw new ArtPending(name);
       if (!res.ok) throw new Error(`art ${res.status}`);
       const j = (await res.json()) as Scryfall;
       // A multi-faced card (Delver of Secrets / Insectile Aberration) puts no
@@ -129,13 +143,25 @@ export function createImages(src: Partial<ImageSource> = {}) {
 
     const idle = queue.length === 0 && pending.size === 0;
     const p = new Promise<string | null>((resolve) => {
+      let tries = 0;
       const run = () => {
         // A queued lookup can sit for a while before its turn; re-check here
         // too, so a source that went offline after this was queued doesn't
         // still fire the request once its slot comes up.
         if (offline()) { resolve(null); return; }
         lookup(name).then((u) => { memo.set(name, u); toStorage(name, u); resolve(u); })
-          .catch(() => { offlineUntil = env.now() + OFFLINE_FOR; resolve(null); });
+          .catch((e) => {
+            if (e instanceof ArtPending) {
+              // The server is still fetching this name: ask again later,
+              // this name only. Out of retries, resolve null unstored, so a
+              // later mount asks again.
+              if (++tries <= PENDING_RETRIES) env.setTimeout(run, PENDING_RETRY_MS);
+              else resolve(null);
+              return;
+            }
+            offlineUntil = env.now() + OFFLINE_FOR;
+            resolve(null);
+          });
       };
       if (idle) run();
       else { queue.push(run); if (queue.length === 1) env.setTimeout(drain, SPACING); }
