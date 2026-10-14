@@ -86,7 +86,7 @@ func (l *Lab) Play(entrants []Entrant, o PlayOptions, seed uint64) (Tournament, 
 		roundGames, err := l.runGames(len(pairs), func(i int) (GameResult, error) {
 			a, b := pairs[i][0], pairs[i][1]
 			gs := gameSeed(seed, r, a, b, 1)
-			res, err := l.playGame(entrants[a], entrants[b], [2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, gs)
+			res, err := l.playGame(entrants[a], entrants[b], [2]string{fmt.Sprintf("p%d", a), fmt.Sprintf("p%d", b)}, gs, false)
 			if err != nil {
 				return GameResult{}, err
 			}

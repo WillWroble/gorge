@@ -80,22 +80,62 @@ func TestReplayTapeRejectsTamper(t *testing.T) {
 	}
 	base := *res.Tape
 
-	// Flip one recorded MID-GAME choice to its complement: the pregame asks
-	// (starting player, mulligan) accept an out-of-range answer inertly, so
-	// flip past them — from the tape's midpoint on, the asks are in-game
-	// priority choices — and toggle the first choice to the other option.
-	// The replay either errors (a rejected or diverged answer) or reaches a
-	// different head — never the same head.
+	// P2 contract: every recorded intent is submitted verbatim and any
+	// engine rejection refuses the tape — there is no fallback re-answer, so
+	// the flip may target the FIRST intent, not only post-pregame ones. Flip
+	// the pregame asks (a starting_player ask at intent 0, a mulligan ask at
+	// intent 1) to a choice index no ask offers: each must error naming the
+	// engine's out-of-range rejection, never replay to the recorded head.
+	for i, want := range []string{"kind starting_player", "kind mulligan"} {
+		flipped := base
+		flipped.Intents = append([]decision.Intent(nil), base.Intents...)
+		if i >= len(flipped.Intents) {
+			t.Fatalf("the tape has %d intents, want one to flip for %s", len(flipped.Intents), want)
+		}
+		if len(flipped.Intents[i].Choices) == 0 {
+			t.Fatalf("intent %d recorded no choices; the flip would be vacuous", i)
+		}
+		flipped.Intents[i].Choices = append([]int(nil), flipped.Intents[i].Choices...)
+		flipped.Intents[i].Choices[0] = 1048576
+		_, err := l.ReplayTape(decks[0], decks[1], 404, &flipped)
+		if err == nil {
+			t.Errorf("intent %d flipped to 1048576 replayed cleanly, want a %s rejection", i, want)
+			continue
+		}
+		if !strings.Contains(err.Error(), "out of range") || !strings.Contains(err.Error(), want) {
+			t.Errorf("intent %d flipped to 1048576: error %v, want an out-of-range %s rejection", i, err, want)
+		}
+	}
+
+	// A flipped post-pregame choice refuses the same way (the triage case
+	// that already failed before P2 only by luck — its fallback happened to
+	// diverge): flip the first intent after the pregame asks.
 	flipped := base
 	flipped.Intents = append([]decision.Intent(nil), base.Intents...)
-	for i := len(flipped.Intents) / 2; i < len(flipped.Intents); i++ {
+	for i := 2; i < len(flipped.Intents); i++ {
 		if len(flipped.Intents[i].Choices) > 0 {
 			flipped.Intents[i].Choices = append([]int(nil), flipped.Intents[i].Choices...)
-			flipped.Intents[i].Choices[0] ^= 1
+			flipped.Intents[i].Choices[0] = 1048576
 			break
 		}
 	}
-	head, err := l.ReplayTape(decks[0], decks[1], 404, &flipped)
+	if _, err := l.ReplayTape(decks[0], decks[1], 404, &flipped); err == nil || !strings.Contains(err.Error(), "out of range") {
+		t.Errorf("a post-pregame intent flipped to 1048576: error %v, want an out-of-range rejection", err)
+	}
+
+	// Flip one recorded MID-GAME choice to its complement: the replay either
+	// errors (a rejected or diverged answer) or reaches a different head —
+	// never the same head.
+	flippedMid := base
+	flippedMid.Intents = append([]decision.Intent(nil), base.Intents...)
+	for i := len(flippedMid.Intents) / 2; i < len(flippedMid.Intents); i++ {
+		if len(flippedMid.Intents[i].Choices) > 0 {
+			flippedMid.Intents[i].Choices = append([]int(nil), flippedMid.Intents[i].Choices...)
+			flippedMid.Intents[i].Choices[0] ^= 1
+			break
+		}
+	}
+	head, err := l.ReplayTape(decks[0], decks[1], 404, &flippedMid)
 	if err == nil && head == res.Head {
 		t.Fatal("a flipped choice replayed to the recorded head")
 	}

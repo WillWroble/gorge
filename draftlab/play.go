@@ -66,13 +66,17 @@ func (l *Lab) PlayGame(a, b Entrant, seed uint64) (GameResult, error) {
 			names[i] = fmt.Sprintf("p%d", i)
 		}
 	}
-	return l.playGame(a, b, names, seed)
+	return l.playGame(a, b, names, seed, false)
 }
 
 // playGame is the shared game body: PlayGame (deck-name labels) and Play
 // (seat labels) both funnel through it. names is the engine config's deck
-// identity for each player, not the GameResult.Decks display name.
-func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, error) {
+// identity for each player, not the GameResult.Decks display name. verbatim
+// selects Ruling P2 (ReplayTape's contract): every seat answer is submitted
+// verbatim and any Submit rejection is a fatal error, not the refusal
+// ladder's fallback re-answer — it rides a parameter, never a Lab field,
+// because games run concurrently through runGames pools.
+func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64, verbatim bool) (GameResult, error) {
 	deckA, namesA, err := l.resolveDeck(a.Deck)
 	if err != nil {
 		return GameResult{}, err
@@ -120,6 +124,14 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 	if env {
 		hooks.EnvSeats = true
 		hooks.HonestRoot = true
+	}
+	if verbatim {
+		hooks.Submit = func(e *rules.Engine, _ int, d *decision.Decision, in decision.Intent) (bool, error) {
+			if err := e.Submit(in); err != nil {
+				return false, fmt.Errorf("tape replay, decision seq %d kind %s: %w", d.Seq, d.Kind, err)
+			}
+			return true, nil
+		}
 	}
 	oc, eng, err := bench.PlayGame(cfg, []seat.Seat{s0, s1}, l.maxTurns(), l.maxIntents(), hooks)
 	if err != nil {
