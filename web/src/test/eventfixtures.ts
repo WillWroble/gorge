@@ -16,6 +16,7 @@ export function eventState(over: Partial<EventState> = {}): EventState {
     set: 'FDN',
     phase: 'DRAFT',
     round: 0,
+    best_of: 1,
     you: 0,
     seats: [
       { seat: 0, kind: 'human', name: 'Ada', joined: true, picks: 2, ready: false },
