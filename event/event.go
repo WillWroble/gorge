@@ -47,7 +47,8 @@ type SeriesSpec struct {
 	BestOf int `json:"best_of"`
 }
 
-// bestOfOnly is the one series length the event accepts for now.
+// bestOfOnly is the series length PendingSeries reports for a series not
+// yet started: the caller passes its own best-of in its SeriesStarted.
 const bestOfOnly = 1
 
 // Event is one draft event's state machine. Every field change goes through
@@ -90,6 +91,17 @@ type seriesState struct {
 	ended   bool
 	bestOf  int
 	games   []int8 // winner seat, or -1 for a draw
+	// choosers is the play/draw chooser per played game, -1 unknown; kept
+	// parallel with games.
+	choosers []int8
+	// playRevs is the deck revision each side played in the in-flight (or
+	// last) game: game 1 plays the readied BUILD decks, later games the
+	// sideboarded locks.
+	playRevs [2]int
+	// locked is the deck revision each side has Sideboarded for the series'
+	// next game; 0 = not yet. A GameEnded clears it; a GameAborted keeps it,
+	// so a replayed attempt plays the same decks.
+	locked [2]int
 	// inFlight is the started-but-not-yet-resulted game attempt, or nil.
 	inFlight *GameAttempt
 	// attempts is the highest attempt logged for the series' NEXT game; it
@@ -263,6 +275,8 @@ func (e *Event) apply(en *Entry) error {
 		return e.applyGameStarted(en)
 	case KindGameAborted:
 		return e.applyGameAborted(en)
+	case KindSideboarded:
+		return e.applySideboarded(en)
 	case KindLobbyTimeout:
 		return e.applyLobbyTimeout(en)
 	case KindIdleTimeout:
@@ -412,15 +426,43 @@ func (e *Event) applyPicked(en *Entry) error {
 	return nil
 }
 
+// applyDeckSaved saves one seat's deck revision. It is a BUILD-phase entry,
+// and (E3-3) also legal in a round phase for a seat whose current series is
+// between games with its side not yet sideboarded — a mid-series deck change
+// only takes effect when the seat Sideboards the new revision, so a round
+// phase DeckSaved does not touch the seat's readiness.
 func (e *Event) applyDeckSaved(en *Entry) error {
 	if !e.cooked {
 		return fmt.Errorf("event: DeckSaved: event not created")
 	}
-	if e.phase != PhaseBuild {
+	inRound := false
+	switch e.phase {
+	case PhaseBuild:
+		// the ordinary BUILD-phase save
+	case RoundPhase(1), RoundPhase(2), RoundPhase(3):
+		inRound = true
+	default:
 		return fmt.Errorf("event: DeckSaved: illegal in phase %s", e.phase)
 	}
 	if en.Seat < 0 || en.Seat >= draft.Seats {
 		return fmt.Errorf("event: DeckSaved: seat %d out of range", en.Seat)
+	}
+	if inRound {
+		a, b, ok := e.SeriesOf(en.Seat)
+		if !ok {
+			return fmt.Errorf("event: DeckSaved: seat %d has no series in round %d", en.Seat, e.round)
+		}
+		st := e.series[[2]int{a, b}]
+		if st == nil || !between(st, a, b) {
+			return fmt.Errorf("event: DeckSaved: seat %d's series is not between games", en.Seat)
+		}
+		side := 0
+		if en.Seat == b {
+			side = 1
+		}
+		if st.locked[side] != 0 {
+			return fmt.Errorf("event: DeckSaved: seat %d's side is already sideboarded for game %d", en.Seat, len(st.games)+1)
+		}
 	}
 	if en.Rev != len(e.decks[en.Seat])+1 {
 		return fmt.Errorf("event: DeckSaved: seat %d revision %d is not the next revision", en.Seat, en.Rev)
@@ -434,7 +476,9 @@ func (e *Event) applyDeckSaved(en *Entry) error {
 	d := *en.Deck
 	d.Main = append([]string(nil), d.Main...)
 	e.decks[en.Seat] = append(e.decks[en.Seat], savedDeck{rev: en.Rev, deck: d})
-	e.ready[en.Seat] = 0 // a new revision must be readied again
+	if !inRound {
+		e.ready[en.Seat] = 0 // a new revision must be readied again
+	}
 	return nil
 }
 
@@ -506,8 +550,8 @@ func (e *Event) applySeriesStarted(en *Entry) error {
 	if err := e.seriesEntryOK(en); err != nil {
 		return err
 	}
-	if en.BestOf != bestOfOnly {
-		return fmt.Errorf("event: SeriesStarted: best of %d unsupported (only Bo1 for now)", en.BestOf)
+	if en.BestOf != 1 && en.BestOf != 3 {
+		return fmt.Errorf("event: SeriesStarted: best of %d unsupported (only Bo1 and Bo3)", en.BestOf)
 	}
 	st := e.seriesFor(en.A, en.B)
 	if st.started {
@@ -529,6 +573,9 @@ func (e *Event) applyGameEnded(en *Entry) error {
 	if st.ended {
 		return fmt.Errorf("event: GameEnded: series seats %d–%d already ended", en.A, en.B)
 	}
+	if decided(st, en.A, en.B) || full(st) {
+		return fmt.Errorf("event: GameEnded: series seats %d–%d is already decided or full", en.A, en.B)
+	}
 	if en.Game != len(st.games)+1 {
 		return fmt.Errorf("event: GameEnded: game %d is not the series' next game (%d)", en.Game, len(st.games)+1)
 	}
@@ -538,6 +585,7 @@ func (e *Event) applyGameEnded(en *Entry) error {
 	if en.Head == "" {
 		return fmt.Errorf("event: GameEnded: game has no chain head")
 	}
+	ch := int8(-1)
 	if st.inFlight != nil {
 		if en.Game != st.inFlight.Game {
 			return fmt.Errorf("event: GameEnded: game %d does not match the in-flight attempt's game %d", en.Game, st.inFlight.Game)
@@ -545,6 +593,7 @@ func (e *Event) applyGameEnded(en *Entry) error {
 		if en.Attempt != 0 && en.Attempt != st.inFlight.Attempt {
 			return fmt.Errorf("event: GameEnded: attempt %d does not match the in-flight attempt %d", en.Attempt, st.inFlight.Attempt)
 		}
+		ch = int8(st.inFlight.Chooser)
 		st.inFlight = nil
 	}
 	st.attempts = 0
@@ -553,12 +602,17 @@ func (e *Event) applyGameEnded(en *Entry) error {
 		g = int8(*en.Winner)
 	}
 	st.games = append(st.games, g)
+	st.choosers = append(st.choosers, ch)
+	st.locked = [2]int{} // the locks served the game just ended
 	return nil
 }
 
 // applyGameStarted records a game attempt: the host table an attempt of the
 // series' next game is being played on. A crash or restart aborts the
-// attempt with GameAborted and the retry logs the next attempt.
+// attempt with GameAborted and the retry logs the next attempt. A
+// best-of-three GameStarted also carries the play/draw chooser: game 1 the
+// CR 103.1 toss winner, later games MTR 2.2's loser of the previous game
+// (or that game's chooser after a draw).
 func (e *Event) applyGameStarted(en *Entry) error {
 	if err := e.seriesEntryOK(en); err != nil {
 		return err
@@ -569,6 +623,9 @@ func (e *Event) applyGameStarted(en *Entry) error {
 	}
 	if st.ended {
 		return fmt.Errorf("event: GameStarted: series seats %d–%d already ended", en.A, en.B)
+	}
+	if decided(st, en.A, en.B) || full(st) {
+		return fmt.Errorf("event: GameStarted: series seats %d–%d is already decided or full", en.A, en.B)
 	}
 	if st.inFlight != nil {
 		return fmt.Errorf("event: GameStarted: series seats %d–%d already has a game attempt in flight (game %d attempt %d)",
@@ -583,9 +640,35 @@ func (e *Event) applyGameStarted(en *Entry) error {
 	if en.Table == "" {
 		return fmt.Errorf("event: GameStarted: attempt has no table")
 	}
+	chooser := -1
+	switch {
+	case st.bestOf == 1:
+		if en.Chooser != nil {
+			return fmt.Errorf("event: GameStarted: a best-of-one game carries no play/draw chooser")
+		}
+	case en.Chooser == nil:
+		return fmt.Errorf("event: GameStarted: a best-of-three game needs a play/draw chooser")
+	case *en.Chooser != en.A && *en.Chooser != en.B:
+		return fmt.Errorf("event: GameStarted: chooser seat %d is not a series seat", *en.Chooser)
+	case len(st.games) >= 1:
+		if st.locked[0] == 0 || st.locked[1] == 0 {
+			return fmt.Errorf("event: GameStarted: game %d needs both sides sideboarded first", en.Game)
+		}
+		if exp := expectedChooser(st, en.A, en.B); exp >= 0 && *en.Chooser != exp {
+			return fmt.Errorf("event: GameStarted: chooser seat %d, want seat %d (MTR 2.2)", *en.Chooser, exp)
+		}
+	}
+	if en.Chooser != nil {
+		chooser = *en.Chooser
+	}
+	if en.Game == 1 {
+		st.playRevs = [2]int{e.ready[en.A], e.ready[en.B]}
+	} else {
+		st.playRevs = st.locked
+	}
 	st.inFlight = &GameAttempt{
 		Round: en.Round, A: en.A, B: en.B, Game: en.Game, Attempt: en.Attempt,
-		Table: en.Table, Seed: en.GameSeed,
+		Table: en.Table, Seed: en.GameSeed, Chooser: chooser,
 	}
 	st.attempts = en.Attempt
 	return nil
@@ -612,6 +695,43 @@ func (e *Event) applyGameAborted(en *Entry) error {
 	return nil
 }
 
+// applySideboarded locks one side's deck revision for its series' next
+// game: the seat (or the server for an absent human, Auto) keeps the deck
+// it played last game or plays a revision it saved between games. Both
+// sides must be locked before the next GameStarted of a best-of-three
+// series is legal.
+func (e *Event) applySideboarded(en *Entry) error {
+	if err := e.seriesEntryOK(en); err != nil {
+		return err
+	}
+	st := e.seriesFor(en.A, en.B)
+	if !between(st, en.A, en.B) {
+		return fmt.Errorf("event: Sideboarded: series seats %d–%d is not between games", en.A, en.B)
+	}
+	if en.Game != len(st.games)+1 {
+		return fmt.Errorf("event: Sideboarded: game %d is not the series' next game (%d)", en.Game, len(st.games)+1)
+	}
+	if en.Seat < 0 || en.Seat >= draft.Seats {
+		return fmt.Errorf("event: Sideboarded: seat %d out of range", en.Seat)
+	}
+	if en.Seat != en.A && en.Seat != en.B {
+		return fmt.Errorf("event: Sideboarded: seat %d is not a series seat", en.Seat)
+	}
+	side := 0
+	if en.Seat == en.B {
+		side = 1
+	}
+	if st.locked[side] != 0 {
+		return fmt.Errorf("event: Sideboarded: seat %d already sideboarded for game %d", en.Seat, en.Game)
+	}
+	if en.Rev < 1 || en.Rev > e.SavedRev(en.Seat) {
+		return fmt.Errorf("event: Sideboarded: seat %d revision %d is not a saved revision (1..%d)",
+			en.Seat, en.Rev, e.SavedRev(en.Seat))
+	}
+	st.locked[side] = en.Rev
+	return nil
+}
+
 func (e *Event) applySeriesEnded(en *Entry) error {
 	if err := e.seriesEntryOK(en); err != nil {
 		return err
@@ -627,7 +747,7 @@ func (e *Event) applySeriesEnded(en *Entry) error {
 		return fmt.Errorf("event: SeriesEnded: series seats %d–%d has a game attempt in flight (game %d attempt %d)",
 			en.A, en.B, st.inFlight.Game, st.inFlight.Attempt)
 	}
-	if len(st.games) != st.bestOf {
+	if len(st.games) != st.bestOf && !decided(st, en.A, en.B) {
 		return fmt.Errorf("event: SeriesEnded: %d of %d games played", len(st.games), st.bestOf)
 	}
 	winsA, winsB := 0, 0

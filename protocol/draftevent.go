@@ -40,20 +40,29 @@ type EventSeat struct {
 	Ready   bool   `json:"ready"`
 }
 
-// EventSeries is one pairing of an event round. State is "pending", "live"
-// or "ended". Table names the live (or last) game's host table, so a
-// spectator can watch at /t/{table}; Attempt is the game attempt in flight.
-// Winner is nil while the series is not ended and for a drawn series. Join
-// appears only in the viewer's own state: the seat-tokenised spectate URL
-// for that seat's side of the live game.
+// EventSeries is one pairing of an event round. State is "pending", "live",
+// "between" or "ended" — "between" names the sideboarding step between two
+// games of a series (E3-3). Table names the live (or last) game's host
+// table, so a spectator can watch at /t/{table}; Attempt is the game
+// attempt in flight. Game is the live game, or the next one while between.
+// Games is the winner seat per played game (-1 for a draw); Chooser names
+// the event seat choosing play/draw for Game; Waiting lists the seats
+// still to submit their deck while between. Winner is nil while the series
+// is not ended and for a drawn series. Join appears only in the viewer's
+// own state: the seat-tokenised spectate URL for that seat's side of the
+// live game.
 type EventSeries struct {
 	Round   int    `json:"round"`
 	A       int    `json:"a"`
 	B       int    `json:"b"`
 	BestOf  int    `json:"best_of"`
-	State   string `json:"state"`             // "pending" | "live" | "ended"
+	State   string `json:"state"`             // "pending" | "live" | "between" | "ended"
 	Table   string `json:"table,omitempty"`   // the live (or last) game's table: spectate at /t/{table}
 	Attempt int    `json:"attempt,omitempty"` // the live game's attempt number
+	Game    int    `json:"game,omitempty"`    // the live game, or the next one while between
+	Games   []int  `json:"games,omitempty"`   // winner seat per played game (-1 draw)
+	Chooser *int   `json:"chooser,omitempty"` // the event seat choosing play/draw for Game
+	Waiting []int  `json:"waiting,omitempty"` // seats still to submit their deck while between
 	Score   [2]int `json:"score"`
 	Winner  *int   `json:"winner"`         // nil while not ended, and for a drawn series
 	Join    string `json:"join,omitempty"` // only in the viewer's own state: /t/{table}?seat=N&token=T
@@ -81,6 +90,8 @@ type EventState struct {
 	Set       string          `json:"set"`
 	Phase     string          `json:"phase"` // LOBBY DRAFT BUILD ROUND1 ROUND2 ROUND3 COMPLETE
 	Round     int             `json:"round"`
+	BestOf    int             `json:"best_of"` // the event's series format (1 or 3)
+	PickTimer string          `json:"pick_timer,omitempty"`
 	Seats     []EventSeat     `json:"seats"`
 	You       *int            `json:"you"`    // the viewer's seat when a valid seat token was presented
 	Series    []EventSeries   `json:"series"` // every pairing of rounds 1..3, round then pairing order
@@ -93,13 +104,15 @@ type EventState struct {
 // this seat right now, so Pack and Pool carry their last-known (or empty)
 // contents.
 type DraftPack struct {
-	Event   string      `json:"event"`
-	Seat    int         `json:"seat"`
-	Waiting bool        `json:"waiting"` // no pack queued for this seat right now
-	Round   int         `json:"round"`
-	PickNo  int         `json:"pick_no"`
-	Pack    []DraftCard `json:"pack"`
-	Pool    []DraftCard `json:"pool"`
+	Event       string      `json:"event"`
+	Seat        int         `json:"seat"`
+	Waiting     bool        `json:"waiting"` // no pack queued for this seat right now
+	Round       int         `json:"round"`
+	PickNo      int         `json:"pick_no"`
+	TimeLimitMS int64       `json:"time_limit_ms,omitempty"` // 0 = no pick timer
+	RemainingMS int64       `json:"remaining_ms,omitempty"`
+	Pack        []DraftCard `json:"pack"`
+	Pool        []DraftCard `json:"pool"`
 }
 
 // PodProgress is the pod_progress body: how far every seat is through the
@@ -126,12 +139,26 @@ type CreateEventSeat struct {
 	Drafter string `json:"drafter,omitempty"` // pickbot name; "" = "rating-colour"
 }
 
-// CreateEventRequest is the POST /api/events body: the drafted set and the
-// four seats. The seed is always minted by the server; no client field may
-// choose it.
+// CreateEventRequest is the POST /api/events body: the drafted set, the
+// series format and the four seats. BestOf is 1 or 3 (0 = 1). PickTimer is
+// "", "off", "standard" or "relaxed". The seed is always minted by the
+// server; no client field may choose it.
 type CreateEventRequest struct {
-	Set   string            `json:"set"`
-	Seats []CreateEventSeat `json:"seats"` // exactly 4
+	Set       string            `json:"set"`
+	BestOf    int               `json:"best_of,omitempty"`    // 0 = 1; 1 or 3
+	PickTimer string            `json:"pick_timer,omitempty"` // "", "off", "standard", "relaxed"
+	Seats     []CreateEventSeat `json:"seats"`                // exactly 4
+}
+
+// SideboardRequest is the POST /api/events/{id}/sideboard body: the seat's
+// deck for game Game of its current series. Keep re-submits the deck it
+// played last game; otherwise Deck is the new list (pool CardRef ids plus
+// basics), saved as a new revision. Exactly one of Keep and Deck is set.
+// Game is compared with the server's next game; a stale one is a 409.
+type SideboardRequest struct {
+	Game int          `json:"game"`
+	Keep bool         `json:"keep,omitempty"`
+	Deck *DeckRequest `json:"deck,omitempty"`
 }
 
 // EventInvite is one seat's join token in a CreateEventResponse. Join is the
@@ -204,6 +231,8 @@ type DeckCheck struct {
 // EventPool is the GET /api/events/{id}/pool body: the seat's drafted cards,
 // its latest saved deck revision (nil before the first save), whether the
 // seat has readied, and the bot builder's suggested deck for this pool.
+// Playing is, in a round, the deck the seat plays or last played in its
+// series, with PlayingRev naming its revision.
 type EventPool struct {
 	Event      string       `json:"event"`
 	Seat       int          `json:"seat"`
@@ -211,6 +240,8 @@ type EventPool struct {
 	Deck       *DeckRequest `json:"deck"` // latest saved revision, nil before the first save
 	Rev        int          `json:"rev"`
 	Ready      bool         `json:"ready"`
+	Playing    *DeckRequest `json:"playing,omitempty"` // the deck the seat plays or last played in its series
+	PlayingRev int          `json:"playing_rev,omitempty"`
 	Suggestion DeckRequest  `json:"suggestion"` // the bot builder's deck for this pool
 }
 

@@ -43,6 +43,10 @@ const (
 	// timer appends entries only; replay never reads the clock.
 	KindLobbyTimeout Kind = "LobbyTimeout"
 	KindIdleTimeout  Kind = "IdleTimeout"
+	// Sideboarded (E3-3) is appended after every earlier kind: it locks one
+	// side's deck revision for its series' next game. Auto marks the server
+	// keeping the deck for an absent human.
+	KindSideboarded Kind = "Sideboarded"
 )
 
 // Entry is one log entry: a Kind discriminator plus the fields of that
@@ -72,7 +76,7 @@ type Entry struct {
 	A int `json:"a,omitempty"`
 	// B is the higher seat of a series.
 	B int `json:"b,omitempty"`
-	// BestOf is the series length; only Bo1 is accepted for now.
+	// BestOf is the series length: 1 (Bo1) or 3 (Bo3).
 	BestOf int `json:"best_of,omitempty"`
 	// Auto marks a pick the drafter made without asking its controller.
 	Auto bool `json:"auto,omitempty"`
@@ -105,6 +109,11 @@ type Entry struct {
 	GameSeed uint64 `json:"game_seed,omitempty"`
 	// Reason says why a GameAborted attempt produced no result.
 	Reason string `json:"reason,omitempty"`
+	// Chooser is a best-of-three GameStarted's play/draw chooser: the event
+	// seat posed the starting_player decision (game 1: the CR 103.1 toss
+	// winner; later games: MTR 2.2's loser of the previous game, or that
+	// game's chooser after a draw). nil in every Bo1 log.
+	Chooser *int `json:"chooser,omitempty"`
 }
 
 // cloneEntry deep-copies an entry's slice and pointer fields so the log
@@ -127,6 +136,10 @@ func cloneEntry(en Entry) Entry {
 	}
 	if en.Standings != nil {
 		en.Standings = append([]Standing(nil), en.Standings...)
+	}
+	if en.Chooser != nil {
+		c := *en.Chooser
+		en.Chooser = &c
 	}
 	return en
 }
@@ -164,7 +177,7 @@ func ParseLog(data []byte) ([]Entry, error) {
 		case KindEventCreated, KindPackOpened, KindPicked, KindDeckSaved,
 			KindReady, KindSeriesStarted, KindGameEnded, KindSeriesEnded,
 			KindEventEnded, KindGameStarted, KindGameAborted,
-			KindLobbyTimeout, KindIdleTimeout:
+			KindLobbyTimeout, KindIdleTimeout, KindSideboarded:
 		default:
 			return nil, fmt.Errorf("event: parse log line %d: unknown kind %q", i+1, en.Kind)
 		}

@@ -14,6 +14,9 @@ type GameAttempt struct {
 	Attempt int
 	Table   string
 	Seed    uint64
+	// Chooser is the game's play/draw chooser seat, or -1 when the
+	// GameStarted entry carried none (every Bo1 game).
+	Chooser int
 }
 
 // SeriesOutcome is one ended series: the round, the two seats, the final
@@ -23,6 +26,8 @@ type SeriesOutcome struct {
 	A, B   int
 	Score  [2]int
 	Winner int // -1 for a drawn series
+	// Games is the winner seat per played game, -1 for a draw.
+	Games []int
 }
 
 // InFlight returns the current round's in-flight game attempts in pairing
@@ -85,8 +90,13 @@ func (e *Event) Started(a, b int) bool {
 func (e *Event) Results() []SeriesOutcome {
 	out := make([]SeriesOutcome, 0, len(e.results))
 	for _, f := range e.results {
+		games := make([]int, len(f.games))
+		for i, g := range f.games {
+			games[i] = int(g)
+		}
 		out = append(out, SeriesOutcome{
 			Round: f.round, A: f.a, B: f.b, Score: f.score, Winner: f.winner,
+			Games: games,
 		})
 	}
 	return out

@@ -37,6 +37,7 @@ func Render() (string, error) {
 		{protoPkg, "SeriesUpdate"}, {protoPkg, "CreateEventRequest"}, {protoPkg, "CreateEventResponse"},
 		{protoPkg, "JoinEventRequest"}, {protoPkg, "PickRequest"}, {protoPkg, "DeckRequest"},
 		{protoPkg, "DeckCheck"}, {protoPkg, "EventPool"}, {protoPkg, "ReadyRequest"},
+		{protoPkg, "SideboardRequest"},
 		{protoPkg, "EventLog"}, {protoPkg, "EventSubscribe"},
 		{protoPkg, "EventSetInfo"}, {protoPkg, "EventPersonas"},
 		// decision.Intent is the client's ANSWER — the one wire type a human

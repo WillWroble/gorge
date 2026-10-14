@@ -335,8 +335,8 @@ func TestApplyRejectsIllegalEntries(t *testing.T) {
 	if err := r1.Apply(event.Entry{Kind: event.KindSeriesStarted, Round: 1, A: 3, B: 0, BestOf: 1}); err == nil {
 		t.Errorf("SeriesStarted with A above B: want error")
 	}
-	if err := r1.Apply(event.Entry{Kind: event.KindSeriesStarted, Round: 1, A: 0, B: 3, BestOf: 3}); err == nil {
-		t.Errorf("SeriesStarted BestOf 3: want error")
+	if err := r1.Apply(event.Entry{Kind: event.KindSeriesStarted, Round: 1, A: 0, B: 3, BestOf: 2}); err == nil {
+		t.Errorf("SeriesStarted BestOf 2: want error (only Bo1 and Bo3)")
 	}
 	if err := r1.Apply(event.Entry{Kind: event.KindGameEnded, Round: 1, A: 0, B: 3, Game: 1, Head: "h"}); err == nil {
 		t.Errorf("GameEnded for an unstarted series: want error")

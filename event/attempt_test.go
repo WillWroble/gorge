@@ -36,7 +36,7 @@ func TestGameAttemptLifecycle(t *testing.T) {
 
 	attemptStart(t, e, 1, 0, 3, 1, "t-abc", 99)
 	in := e.InFlight()
-	if len(in) != 1 || in[0] != (event.GameAttempt{Round: 1, A: 0, B: 3, Game: 1, Attempt: 1, Table: "t-abc", Seed: 99}) {
+	if len(in) != 1 || in[0] != (event.GameAttempt{Round: 1, A: 0, B: 3, Game: 1, Attempt: 1, Table: "t-abc", Seed: 99, Chooser: -1}) {
 		t.Fatalf("InFlight after GameStarted = %+v", in)
 	}
 	if got := e.NextAttempt(0, 3); got != 2 {

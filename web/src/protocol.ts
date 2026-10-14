@@ -1717,12 +1717,17 @@ export interface EventSeat {
 }
 
   /**
-   * EventSeries is one pairing of an event round. State is "pending", "live"
-   * or "ended". Table names the live (or last) game's host table, so a
-   * spectator can watch at /t/{table}; Attempt is the game attempt in flight.
-   * Winner is nil while the series is not ended and for a drawn series. Join
-   * appears only in the viewer's own state: the seat-tokenised spectate URL
-   * for that seat's side of the live game.
+   * EventSeries is one pairing of an event round. State is "pending", "live",
+   * "between" or "ended" — "between" names the sideboarding step between two
+   * games of a series (E3-3). Table names the live (or last) game's host
+   * table, so a spectator can watch at /t/{table}; Attempt is the game
+   * attempt in flight. Game is the live game, or the next one while between.
+   * Games is the winner seat per played game (-1 for a draw); Chooser names
+   * the event seat choosing play/draw for Game; Waiting lists the seats
+   * still to submit their deck while between. Winner is nil while the series
+   * is not ended and for a drawn series. Join appears only in the viewer's
+   * own state: the seat-tokenised spectate URL for that seat's side of the
+   * live game.
    */
 export interface EventSeries {
   round: number;
@@ -1732,6 +1737,10 @@ export interface EventSeries {
   state: string;
   table?: string;
   attempt?: number;
+  game?: number;
+  games?: number[];
+  chooser?: number | null;
+  waiting?: number[];
   score: [number, number];
   winner: number | null;
   join?: string;
@@ -1763,6 +1772,8 @@ export interface EventState {
   set: string;
   phase: string;
   round: number;
+  best_of: number;
+  pick_timer?: string;
   seats: EventSeat[];
   you: number | null;
   series: EventSeries[];
@@ -1799,6 +1810,8 @@ export interface DraftPack {
   waiting: boolean;
   round: number;
   pick_no: number;
+  time_limit_ms?: number;
+  remaining_ms?: number;
   pack: DraftCard[];
   pool: DraftCard[];
 }
@@ -1834,12 +1847,15 @@ export interface CreateEventSeat {
 }
 
   /**
-   * CreateEventRequest is the POST /api/events body: the drafted set and the
-   * four seats. The seed is always minted by the server; no client field may
-   * choose it.
+   * CreateEventRequest is the POST /api/events body: the drafted set, the
+   * series format and the four seats. BestOf is 1 or 3 (0 = 1). PickTimer is
+   * "", "off", "standard" or "relaxed". The seed is always minted by the
+   * server; no client field may choose it.
    */
 export interface CreateEventRequest {
   set: string;
+  best_of?: number;
+  pick_timer?: string;
   seats: CreateEventSeat[];
 }
 
@@ -1909,6 +1925,8 @@ export interface DeckCheck {
    * EventPool is the GET /api/events/{id}/pool body: the seat's drafted cards,
    * its latest saved deck revision (nil before the first save), whether the
    * seat has readied, and the bot builder's suggested deck for this pool.
+   * Playing is, in a round, the deck the seat plays or last played in its
+   * series, with PlayingRev naming its revision.
    */
 export interface EventPool {
   event: string;
@@ -1917,6 +1935,8 @@ export interface EventPool {
   deck: DeckRequest | null;
   rev: number;
   ready: boolean;
+  playing?: DeckRequest | null;
+  playing_rev?: number;
   suggestion: DeckRequest;
 }
 
@@ -1926,6 +1946,19 @@ export interface EventPool {
    */
 export interface ReadyRequest {
   rev: number;
+}
+
+  /**
+   * SideboardRequest is the POST /api/events/{id}/sideboard body: the seat's
+   * deck for game Game of its current series. Keep re-submits the deck it
+   * played last game; otherwise Deck is the new list (pool CardRef ids plus
+   * basics), saved as a new revision. Exactly one of Keep and Deck is set.
+   * Game is compared with the server's next game; a stale one is a 409.
+   */
+export interface SideboardRequest {
+  game: number;
+  keep?: boolean;
+  deck?: DeckRequest | null;
 }
 
   /**
