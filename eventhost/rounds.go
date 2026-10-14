@@ -286,6 +286,10 @@ func (r *run) advanceSeriesBo3(sp event.SeriesSpec) (bool, error) {
 		return false, nil
 	}
 	if v.Started && v.NextGame == 0 {
+		// §3 step 4: the series is over — its table is done, so the live
+		// series table row goes too (the hook's stop answer drops the
+		// table's ref; this drops the run's row).
+		delete(r.seriesTable, [2]int{sp.A, sp.B})
 		if err := r.apply(event.Entry{
 			Kind: event.KindSeriesEnded, Round: sp.Round, A: sp.A, B: sp.B, Score: v.Wins,
 		}); err != nil {

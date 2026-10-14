@@ -39,6 +39,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		t.Fatal(err)
 	}
 	relay := &Relay{}
+	seriesHook := NewLazySeries()
 	ho := host.Options{
 		LoadDeck:              store.DeckLoader(corpus, nil),
 		Tokens:                corpus.Tokens,
@@ -47,10 +48,12 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		MaxDecisionsPerTurn:   host.DefaultMaxDecisionsPerTurn,
 		Dir:                   dir,
 		OnMatchEnd:            relay.OnMatchEnd,
-		// A Series table asks the relay; the target is installed below,
-		// once the Host exists. Harmless for Bo1: only a Series table
-		// consults it.
-		Series: relay.Series,
+		// A Series table asks the lazy hook; the Host's Series is
+		// installed below, once the Host exists. New's resume advance can
+		// start series tables before that, and a call landing in the
+		// window parks on the lazy hook instead of reading no plan — a
+		// "no plan" answer would end the table and wedge the event.
+		Series: seriesHook.Series,
 	}
 	eo := Options{Store: store, Cards: corpus, Seed: func() uint64 { return 11 }}
 	if mut != nil {
@@ -67,7 +70,7 @@ func startGamePair(t *testing.T, dir string, mut func(*Options, *host.Options)) 
 		t.Fatal(err)
 	}
 	relay.Set(h.OnMatchEnd)
-	relay.SetSeries(h.Series)
+	seriesHook.Set(h.Series)
 	p := &gamePair{h: h, reg: reg, store: store}
 	t.Cleanup(func() { h.Close(); reg.Close() })
 	return p

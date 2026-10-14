@@ -91,7 +91,9 @@ func TestEventsBotOnlyBo3PodCompletesOverHTTP(t *testing.T) {
 		t.Fatalf("state series = %+v", lastState.Series)
 	}
 
-	// The store: the event's log.jsonl exists and ends with EventEnded.
+	// The store: the event's log.jsonl exists, carries Sideboarded lines
+	// (bots keep their decks between games; a Bo3 event never completes
+	// without them) and ends with EventEnded.
 	f, err := os.Open(filepath.Join(dir, "events", "e1", "log.jsonl"))
 	if err != nil {
 		t.Fatalf("event log file: %v", err)
@@ -99,11 +101,24 @@ func TestEventsBotOnlyBo3PodCompletesOverHTTP(t *testing.T) {
 	defer f.Close()
 	sc := bufio.NewScanner(f)
 	last := ""
+	sawSideboard := false
 	for sc.Scan() {
 		last = sc.Text()
+		var en struct {
+			Kind string `json:"kind"`
+		}
+		if err := json.Unmarshal([]byte(last), &en); err != nil {
+			t.Fatalf("log line %q: %v", last, err)
+		}
+		if en.Kind == "Sideboarded" {
+			sawSideboard = true
+		}
 	}
 	if err := sc.Err(); err != nil {
 		t.Fatal(err)
+	}
+	if !sawSideboard {
+		t.Fatal("no Sideboarded line on the event log")
 	}
 	var en struct {
 		Kind string `json:"kind"`

@@ -61,6 +61,21 @@ func (h *Host) Series(ctx context.Context, t host.TableID, k int) (host.SeriesGa
 	}
 	ch := make(chan seriesAnswer, 1)
 	r.waiters[t] = waiter{k: k, ch: ch}
+	// A Close between the entry check and this registration ran its
+	// releaseWaiters loop without a waiter of ours to release: re-check
+	// closed under h.mu and answer stop, so the call never parks under a
+	// closed host.
+	h.mu.Lock()
+	closed := h.closed
+	h.mu.Unlock()
+	if closed {
+		delete(r.waiters, t)
+		r.mu.Unlock()
+		h.mu.Lock()
+		delete(h.tables, t)
+		h.mu.Unlock()
+		return host.SeriesGame{}, false, nil
+	}
 	r.mu.Unlock()
 	select {
 	case a := <-ch:
@@ -147,9 +162,10 @@ func (r *run) wakeWaiters() {
 	}
 }
 
-// tableSeed is one live series table's game seed, read back from the log's
-// GameStarted entries (a series table plays exactly one match, so exactly
-// one entry names it). ok=false means the table has none — a game 1/2
+// tableSeed is one live series table's game seed, read back from the
+// log's GameStarted entries naming it — every entry that names it carries
+// the table's seed, since a game continuing on it logs GameStarted again
+// with the same seed. ok=false means the table has none — a game 1/2
 // whose GameStarted logged but whose table row the caller lost track of.
 func (r *run) tableSeed(id host.TableID) (uint64, bool) {
 	for _, en := range r.ev.Log() {

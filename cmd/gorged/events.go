@@ -17,11 +17,12 @@ import (
 var _ httpapi.EventService = (*eventhost.Host)(nil)
 
 // eventsWiring is what serve builds before host.New (the store whose deck
-// loader the registry needs, and the OnMatchEnd relay) for startEvents.
-// The zero value means -events is off.
+// loader the registry needs, the OnMatchEnd relay and the lazy series
+// hook) for startEvents. The zero value means -events is off.
 type eventsWiring struct {
-	store *eventhost.Store
-	relay *eventhost.Relay
+	store  *eventhost.Store
+	relay  *eventhost.Relay
+	series *eventhost.LazySeries
 }
 
 // prepareEvents opens the event store under <dir>/events (memory when dir
@@ -38,7 +39,8 @@ func (c config) prepareEvents(reg *cards.Registry, load func(string) (host.Deck,
 	if err != nil {
 		return eventsWiring{}, load, err
 	}
-	return eventsWiring{store: st, relay: &eventhost.Relay{}}, st.DeckLoader(reg, load), nil
+	return eventsWiring{store: st, relay: &eventhost.Relay{}, series: eventhost.NewLazySeries()},
+		st.DeckLoader(reg, load), nil
 }
 
 // hook routes host.Options.OnMatchEnd through the wiring's relay, keeping
@@ -50,10 +52,13 @@ func (w eventsWiring) hook(o *host.Options) {
 	}
 	w.relay.Next = o.OnMatchEnd
 	o.OnMatchEnd = w.relay.OnMatchEnd
-	// E3-4: the series hook chains the same way; a Bo1-only relay target
-	// never sees a Series table.
+	// E3-4: the series hook is the wiring's LazySeries. New resumes
+	// synchronously and can start series tables, so the target cannot be
+	// installed here; a call landing before startEvents' Set parks on the
+	// lazy hook instead of reading no plan (which would end the table and
+	// wedge the event with its GameStarted unresolved).
 	if o.Series == nil {
-		o.Series = w.relay.Series
+		o.Series = w.series.Series
 	}
 }
 
@@ -99,6 +104,6 @@ func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registr
 		return nil, err
 	}
 	w.relay.Set(evh.OnMatchEnd)
-	w.relay.SetSeries(evh.Series)
+	w.series.Set(evh.Series)
 	return evh, nil
 }
