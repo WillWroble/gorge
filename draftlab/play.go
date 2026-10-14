@@ -153,10 +153,19 @@ func (l *Lab) playGame(a, b Entrant, names [2]string, seed uint64) (GameResult, 
 // the policy would silently play without its Env. E5-c5 changes this one
 // function.
 func (l *Lab) envGate(players [2]NamedPlayer, seats [2]seat.Seat) error {
-	for i := 0; i < 2; i++ {
+	return l.envGateList(players[:], seats[:])
+}
+
+// envGateList is envGate over a player list: the event driver gates every
+// seat's player before any game runs (seats nil then — no seat is
+// constructed yet), while playGame gates the two players it constructed.
+func (l *Lab) envGateList(players []NamedPlayer, seats []seat.Seat) error {
+	for i := 0; i < len(players); i++ {
 		env := players[i].ReadsDecklists
-		if _, ok := seats[i].(bots.EnvSeat); ok {
-			env = true
+		if i < len(seats) {
+			if _, ok := seats[i].(bots.EnvSeat); ok {
+				env = true
+			}
 		}
 		if !env {
 			continue
