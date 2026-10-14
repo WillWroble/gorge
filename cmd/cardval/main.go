@@ -39,6 +39,7 @@ import (
 	"github.com/adams-shaun/gorge/draftlab"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/state"
 )
 
 const wubrg = "WUBRG"
@@ -98,6 +99,7 @@ func main() {
 		creature = flag.Int("creatures", 15, "creatures among the 23 nonland cards")
 		notes    = flag.Bool("notes", false, "census every engine Note by its source card into notes.json")
 		line     = flag.String("line", "", "replay: a games.jsonl row to replay; writes the two deck files and the result")
+		dumplog  = flag.Bool("dumplog", false, "replay: also dump the replayed game's event log to replay-events.json")
 	)
 	flag.Parse()
 	if *out == "" {
@@ -109,8 +111,20 @@ func main() {
 	var nc *noteCensus
 	opts := draftlab.Options{}
 	if *notes {
-		nc = &noteCensus{by: map[string]map[string]int{}}
+		nc = &noteCensus{by: map[string]map[string]int{}, attributed: map[string]map[string]int{},
+			playMiss: map[string][]playMissSet{}, seeds: map[string][]uint64{},
+			abortAttr: map[string]map[string]int{}}
 		opts.OnEngine = nc.add
+	}
+	if *dumplog {
+		if nc != nil {
+			fail("-dumplog and -notes are separate modes")
+		}
+		opts.OnEngine = func(_ uint64, eng *rules.Engine) {
+			writeJSON(*out+"/replay-events.json", eng.L.Events)
+			writeJSON(*out+"/replay-tallies.json", map[string]any{
+				"abort": eng.AbortTally, "legacy_ask": eng.LegacyAskTally})
+		}
 	}
 	lab, err := draftlab.Open(*corpus, opts)
 	if err != nil {
@@ -168,43 +182,156 @@ func main() {
 	run(jobs, *workers, *out+"/games.jsonl")
 	if nc != nil {
 		writeJSON(*out+"/notes.json", nc.by)
+		writeJSON(*out+"/notes-attributed.json", nc.attributed)
+		writeJSON(*out+"/notes-aborts.json", nc.abortAttr)
+		writeJSON(*out+"/notes-playmiss.json", nc.playMiss)
+		writeJSON(*out+"/notes-seeds.json", nc.seeds)
 	}
 }
 
 // noteCensus counts every engine Note by the name of its source object's
-// card and its text (digits blanked so object ids group together).
+// card and its text (digits blanked so object ids group together). CV-6
+// adds three attributions the raw log cannot give:
+//   - attributed: rules.Engine's AbortTally / LegacyAskTally, which name the
+//     card or ability behind the notes whose event carries no source object
+//     (the aborted cast/activation Notes and the default-answered ask),
+//   - playMiss: for every "Play found no card to play" firing, the cards
+//     exiled from libraries since the previous firing, so a miss whose
+//     exiles were all lands reads benign and a missed castable spell shows
+//     its name.
 type noteCensus struct {
-	mu sync.Mutex
-	by map[string]map[string]int
+	mu         sync.Mutex
+	by         map[string]map[string]int
+	attributed map[string]map[string]int
+	playMiss   map[string][]playMissSet
+	// seeds records the game seeds of the diagnosable notes (the aborted
+	// cast/activation Notes, the default-answered asks and the Play misses),
+	// bounded so one pathological text cannot balloon the file.
+	seeds map[string][]uint64
+	// abortAttr attributes every "aborted" Note in the surviving log to the
+	// proposal it reversed (the log scan described above).
+	abortAttr map[string]map[string]int
 }
 
-func (n *noteCensus) add(_ uint64, eng *rules.Engine) {
+// playMissSet is one "Play found no card to play" firing and the cards that
+// had been exiled from libraries since the previous firing.
+type playMissSet struct {
+	Exiles []string `json:"exiles"`
+}
+
+// blankNoteText is the census's text key: digits blanked so object ids
+// group together, truncated to 160 bytes.
+func blankNoteText(s string) string {
+	t := []byte(s)
+	for i, c := range t {
+		if c >= '0' && c <= '9' {
+			t[i] = '#'
+		}
+	}
+	if len(t) > 160 {
+		t = t[:160]
+	}
+	return string(t)
+}
+
+func (n *noteCensus) add(seed uint64, eng *rules.Engine) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	var libExiles []string
+	// lastProposal is the most recent spell/ability proposal event: the
+	// nearest PutOnStack (a spell cast's own push, Obj = the card) or
+	// AbilityPush (an activated ability's mint, Obj = the source permanent)
+	// before an abort Note names the proposal the abort reversed. A log scan
+	// rather than the engine's scratch: the tape kernel's checkpoint Restore
+	// rewinds the log over an aborted resolution and re-runs it, so scratch
+	// tallies can disagree with the surviving log while the log is always
+	// the truth.
+	proposal := ""
 	for _, e := range eng.L.Events {
+		if e.Kind == events.DeclareAttackers {
+			// An attacks trigger's dig belongs to its own declaration: a
+			// miss's window must not span into earlier triggers whose play
+			// ask was posed (and so fired no Note).
+			libExiles = nil
+			continue
+		}
+		if e.Kind == events.MoveZone && e.From == state.ZLibrary && e.To == state.ZExile {
+			if o := eng.G.Obj(e.Obj); o != nil && o.Face() != nil {
+				libExiles = append(libExiles, o.Face().Name)
+			} else {
+				libExiles = append(libExiles, fmt.Sprintf("obj#%d", e.Obj))
+			}
+			continue
+		}
+		if e.Kind == events.PutOnStack || e.Kind == events.AbilityPush {
+			proposal = "obj#" + fmt.Sprint(e.Obj)
+			if o := eng.G.Obj(e.Obj); o != nil && o.Face() != nil {
+				proposal = o.Face().Name
+			}
+			if e.Kind == events.AbilityPush {
+				proposal += " (activation)"
+			}
+			continue
+		}
 		if e.Kind != events.Note {
 			continue
 		}
+		text := blankNoteText(e.Text)
 		name := "<none>"
 		if o := eng.G.Obj(e.Obj); o != nil && o.Card != nil && len(o.Card.Faces) > 0 {
 			name = o.Card.Faces[0].Name
 		}
-		t := []byte(e.Text)
-		for i, c := range t {
-			if c >= '0' && c <= '9' {
-				t[i] = '#'
+		if strings.Contains(e.Text, "Play found no card to play") {
+			m := n.playMiss[name]
+			if m == nil {
+				m = []playMissSet{}
+				n.playMiss[name] = m
 			}
+			n.playMiss[name] = append(m, playMissSet{Exiles: libExiles})
+			libExiles = nil
 		}
-		if len(t) > 160 {
-			t = t[:160]
+		if strings.Contains(e.Text, "aborted") {
+			m := n.abortAttr[text]
+			if m == nil {
+				m = map[string]int{}
+				n.abortAttr[text] = m
+			}
+			m[proposal]++
+		}
+		if strings.Contains(e.Text, "aborted") ||
+			strings.Contains(e.Text, "ask answered with its default") ||
+			strings.Contains(e.Text, "Play found no card to play") {
+			key := text + "|" + name
+			if strings.Contains(e.Text, "aborted") {
+				key = text + "|" + proposal
+			}
+			if len(n.seeds[key]) < 40 {
+				n.seeds[key] = append(n.seeds[key], seed)
+			}
 		}
 		m := n.by[name]
 		if m == nil {
 			m = map[string]int{}
 			n.by[name] = m
 		}
-		m[string(t)]++
+		m[text]++
 	}
+	mergeTally := func(t map[string]int) {
+		for key, count := range t {
+			text, label, found := strings.Cut(key, "\x1f")
+			if !found {
+				label = "<unknown>"
+			}
+			m := n.attributed[label]
+			if m == nil {
+				m = map[string]int{}
+				n.attributed[label] = m
+			}
+			m[blankNoteText(text)] += count
+		}
+	}
+	mergeTally(eng.AbortTally)
+	mergeTally(eng.LegacyAskTally)
 }
 
 // eligible is the set's nonland, non-basic cards the corpus carries, in name

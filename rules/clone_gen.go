@@ -644,6 +644,18 @@ func cloneFieldsEngineContinuation(c, e *Engine, sp *Spare, remap *cloneRemap) {
 			c.tpCtlChooser[k0] = v0
 		}
 	}
+	if e.AbortTally != nil {
+		c.AbortTally = make(map[string]int, len(e.AbortTally))
+		for k0, v0 := range e.AbortTally {
+			c.AbortTally[k0] = v0
+		}
+	}
+	if e.LegacyAskTally != nil {
+		c.LegacyAskTally = make(map[string]int, len(e.LegacyAskTally))
+		for k0, v0 := range e.LegacyAskTally {
+			c.LegacyAskTally[k0] = v0
+		}
+	}
 	if e.cast != nil {
 		p0 := *e.cast
 		if e.cast.CastPayment.Payment != nil {
