@@ -23,10 +23,11 @@
 //
 // Env rule: a Player policy whose bots.Info.Env is true reads every seat's
 // REAL decklist, so it is refused unless Options.AllowDecklistBots was set
-// (the bot-only opt-in of the operator ruling of 2026-10-13) — and even
-// then refused until the bench Env driver lands (E5-c5), because bench
-// would otherwise drive the hosted wrapper as a plain seat and the policy
-// would silently play without its Env.
+// (the bot-only opt-in of the operator ruling of 2026-10-13). With the
+// opt-in such a game runs through the bench Env driver
+// (bench.Hooks{EnvSeats: true, HonestRoot: true}), so the hosted wrapper is
+// driven with its bots.Env — the honest root, never the live engine — and
+// its result is marked for the manifest (E5-c3's AllowDecklistBots).
 //
 // The E5-d seam (out-of-process agents) is designed, not implemented: an
 // external drafter/builder plugs in as a pickbot.Drafter / pickbot.Builder
