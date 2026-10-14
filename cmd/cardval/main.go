@@ -43,6 +43,7 @@ import (
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/draftlab"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/memcap"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/state"
 )
@@ -123,8 +124,8 @@ func main() {
 		// working set: a kernel memcg OOM kill is exactly what the reward
 		// loop's stability veto counts, and 2026-10-14's seven-kill retry
 		// burst came from a run launched far under its need. Checked before
-		// the corpus loads, so the refusal costs nothing. See memguard.go.
-		if err := checkAZCaps(*workers, *azSims); err != nil {
+		// the corpus loads, so the refusal costs nothing. See internal/memcap.
+		if err := memcap.CheckAzCaps(*workers, *azSims); err != nil {
 			fail("%v", err)
 		}
 	}
