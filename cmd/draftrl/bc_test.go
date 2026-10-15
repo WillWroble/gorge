@@ -20,6 +20,8 @@ import (
 type binPick struct {
 	pod, seat, drafter, chosen int
 	logits                     []float32
+	behaviour                  bool
+	temp, logp                 float32
 }
 
 func readPicksBin(t *testing.T, path string) ([]string, []binPick) {
@@ -30,6 +32,9 @@ func readPicksBin(t *testing.T, path string) ([]string, []binPick) {
 	}
 	if string(b[:4]) != "DRPB" {
 		t.Fatalf("magic %q", b[:4])
+	}
+	if v := binary.LittleEndian.Uint32(b[4:]); v != 1 && v != 2 {
+		t.Fatalf("picks.bin version %d", v)
 	}
 	G, C, nd := int(binary.LittleEndian.Uint32(b[8:])), int(binary.LittleEndian.Uint32(b[12:])), int(binary.LittleEndian.Uint32(b[16:]))
 	o := 20
@@ -47,7 +52,7 @@ func readPicksBin(t *testing.T, path string) ([]string, []binPick) {
 	var out []binPick
 	for o < len(b) {
 		p := binPick{pod: int(binary.LittleEndian.Uint32(b[o:])), seat: int(b[o+4])}
-		size, chosen, has := int(b[o+7]), int(b[o+8]), b[o+10]
+		size, chosen, has, flags := int(b[o+7]), int(b[o+8]), b[o+10], b[o+11]
 		p.drafter, p.chosen = int(b[o+9]), chosen
 		o += 12 + 4*G + size*(4+4*C)
 		if has == 1 {
@@ -55,6 +60,12 @@ func readPicksBin(t *testing.T, path string) ([]string, []binPick) {
 				p.logits = append(p.logits, math.Float32frombits(binary.LittleEndian.Uint32(b[o:])))
 				o += 4
 			}
+		}
+		if flags&1 != 0 {
+			p.behaviour = true
+			p.temp = math.Float32frombits(binary.LittleEndian.Uint32(b[o:]))
+			p.logp = math.Float32frombits(binary.LittleEndian.Uint32(b[o+4:]))
+			o += 8
 		}
 		out = append(out, p)
 	}

@@ -36,6 +36,15 @@ type LogitSource interface {
 	LastLogits() []float32
 }
 
+// BehaviourSource is the optional sampling side of a LogitSource drafter:
+// for a stochastic pick it returns the temperature and the chosen card's
+// log-prob under softmax(logits/temp) (ok false for a deterministic pick).
+// The rollout writes it into picks.bin's behaviour block (version 2) so
+// PPO has the behaviour log-prob.
+type BehaviourSource interface {
+	LastBehaviour() (temp float32, logp float32, ok bool)
+}
+
 var drafterKinds = struct {
 	sync.Mutex
 	m map[string]DrafterKind
@@ -174,18 +183,23 @@ func newLeagueDrafter(lab *draftlab.Lab, sp leagueSpec, set string, rc *ratingsC
 
 // pickRec is one recorded pick.
 type pickRec struct {
-	Pod       int                `json:"pod"`
-	PodSeed   uint64             `json:"pod_seed"`
-	Seat      int                `json:"seat"`
-	Round     int                `json:"round"`
-	PickNo    int                `json:"pick_no"`
-	Pick      int                `json:"pick"` // the seat's 0-based pick ordinal over the draft
-	Drafter   string             `json:"drafter"`
-	Pack      []string           `json:"pack"` // card names in pack order
-	Chosen    string             `json:"chosen"`
-	ChosenIdx int                `json:"chosen_idx"`
-	Logits    []float32          `json:"logits,omitempty"`
-	Features  draftfeat.Features `json:"features"`
+	Pod       int       `json:"pod"`
+	PodSeed   uint64    `json:"pod_seed"`
+	Seat      int       `json:"seat"`
+	Round     int       `json:"round"`
+	PickNo    int       `json:"pick_no"`
+	Pick      int       `json:"pick"` // the seat's 0-based pick ordinal over the draft
+	Drafter   string    `json:"drafter"`
+	Pack      []string  `json:"pack"` // card names in pack order
+	Chosen    string    `json:"chosen"`
+	ChosenIdx int       `json:"chosen_idx"`
+	Logits    []float32 `json:"logits,omitempty"`
+	// Temp and LogProb are the behaviour policy of a sampled pick
+	// (BehaviourSource); HasBehaviour is false for a deterministic one.
+	HasBehaviour bool               `json:"has_behaviour,omitempty"`
+	Temp         float32            `json:"temp,omitempty"`
+	LogProb      float32            `json:"logp,omitempty"`
+	Features     draftfeat.Features `json:"features"`
 
 	drafterIdx int
 	packIdx    []int32 // table index per pack card, -1 when absent
@@ -245,6 +259,9 @@ func (d *recordingDrafter) pick(v pickbot.PickView, r *rand.Rand, fallible bool)
 	if ls, ok := d.inner.(LogitSource); ok {
 		if l := ls.LastLogits(); l != nil {
 			rec.Logits = append([]float32(nil), l...)
+			if bs, ok := d.inner.(BehaviourSource); ok {
+				rec.Temp, rec.LogProb, rec.HasBehaviour = bs.LastBehaviour()
+			}
 		}
 	}
 	*d.out = append(*d.out, rec)

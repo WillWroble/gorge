@@ -120,3 +120,18 @@ func sampleLogits(l []float32, temp float64, r *rand.Rand) int {
 	}
 	return len(l) - 1
 }
+
+// SoftmaxLogProb is log softmax(l/temp)[i], computed in float64 in index
+// order exactly as sampleLogits weighs the candidates: the behaviour
+// log-prob of a sampled pick (PPO's importance ratio denominator).
+func SoftmaxLogProb(l []float32, temp float64, i int) float64 {
+	mx := float64(l[0])
+	for _, x := range l[1:] {
+		mx = math.Max(mx, float64(x))
+	}
+	var sum float64
+	for _, x := range l {
+		sum += math.Exp((float64(x) - mx) / temp)
+	}
+	return (float64(l[i])-mx)/temp - math.Log(sum)
+}

@@ -380,6 +380,20 @@ The omniscient critic is a separate Python MLP and is never exported (constraint
 **Hosted play.** Argmax with seeded tie-break, like `RatingColour`. Training samples at
 temperature 1 using the seat rng.
 
+**Drafter spec.** `cmd/draftrl`'s `-league`/`-drafters` take
+`net:WEIGHTS.dpkw[@TABLE.json][~T]`. With no `~T` the seat is argmax; `~T` (a decimal
+T >= 0, e.g. `net:s1.dpkw~1`) samples softmax(logits/T) from the seat's pick rng, which
+`draftlab.Draft` derives from (pod seed, seat) only, so picks are identical at any
+`-workers`. The temperature is the text after the last `~` only when it parses as a
+number; a `~` inside a path is left alone. A sampling seat's drafter ref is
+`net@<hash>~T`. `NetDrafter.Pick` stays allocation-free at T > 0.
+
+**Behaviour log-prob in `picks.bin` (version 2).** The record's former zero pad byte is
+`flags`; bit 0 means a behaviour block follows the logits: `f32 T, f32 log
+softmax(logits/T)[chosenIdx]`. Only a sampling net seat sets it. Version 1 files have the
+byte 0 and read unchanged under a v2 reader; a v1 reader must skip the 8 bytes when bit 0
+is set. `picks.jsonl` carries the same as `has_behaviour`/`temp`/`logp`.
+
 ## 6. Compute budget
 
 | Item | Cost | Source |

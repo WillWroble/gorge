@@ -49,7 +49,7 @@ func parseRollout(args []string) (rolloutOpts, error) {
 	fs.IntVar(&o.pods, "pods", 1, "4-seat pods this iteration")
 	fs.IntVar(&o.k, "k", 4, "games per pair of seats in each pod's round robin (sides alternate)")
 	fs.IntVar(&o.iter, "iter", 0, "iteration number, recorded in the manifest")
-	fs.StringVar(&league, "league", "17l", "league drafter specs, comma-separated: 17l | ovr:PATH#FIELD | KIND:ARG (a registered DrafterKind, e.g. net:); each pod seat draws one uniformly from -seed")
+	fs.StringVar(&league, "league", "17l", "league drafter specs, comma-separated: 17l | ovr:PATH#FIELD | KIND:ARG (a registered DrafterKind, e.g. net:WEIGHTS.dpkw[@TABLE.json][~T]: argmax, or ~T samples softmax(logits/T) from the seat rng); each pod seat draws one uniformly from -seed")
 	fs.BoolVar(&o.leagueFixed, "league-fixed", false, "seat s takes league entry s mod len instead of a random draw")
 	fs.StringVar(&builder, "builder", "17l", "best23 ratings for every seat: 17l | ovr:PATH#FIELD (the value table)")
 	fs.StringVar(&o.table, "table", "", "draftfeat SetTable JSON for the pick features; empty = facts + z-scored builder ratings")

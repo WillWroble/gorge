@@ -2,6 +2,7 @@ package pickbot
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"os"
 	"slices"
@@ -135,5 +136,47 @@ func TestNetDrafterArgmaxMatchesLogits(t *testing.T) {
 	// Temperature sampling at a tiny T is argmax.
 	if got := sampleLogits([]float32{0, 5, 1}, 1e-3, r); got != 1 {
 		t.Errorf("cold sample %d", got)
+	}
+}
+
+// TestSampleLogitsMatchesSoftmax: over many draws the empirical pick
+// frequencies match softmax(l/T), and SoftmaxLogProb is that softmax.
+func TestSampleLogitsMatchesSoftmax(t *testing.T) {
+	l := []float32{0.3, 1.2, -0.5, 1.0, 0.0}
+	r := rand.New(rand.NewPCG(11, 3))
+	for _, temp := range []float64{0.5, 1, 2} {
+		const n = 200000
+		var counts [5]int
+		for i := 0; i < n; i++ {
+			counts[sampleLogits(l, temp, r)]++
+		}
+		var psum float64
+		for i := range l {
+			p := math.Exp(SoftmaxLogProb(l, temp, i))
+			psum += p
+			got := float64(counts[i]) / n
+			// 5 sigma of a binomial proportion.
+			if tol := 5 * math.Sqrt(p*(1-p)/n); math.Abs(got-p) > tol {
+				t.Errorf("T=%v card %d: frequency %.4f, softmax %.4f (tol %.4f)", temp, i, got, p, tol)
+			}
+		}
+		if math.Abs(psum-1) > 1e-9 {
+			t.Errorf("T=%v: probabilities sum to %v", temp, psum)
+		}
+	}
+}
+
+// TestNetDrafterColdTemperatureIsArgmax: as T -> 0 a sampling NetDrafter
+// drafts exactly the argmax pod.
+func TestNetDrafterColdTemperatureIsArgmax(t *testing.T) {
+	net, tab := netFixture(t)
+	a := runNetPod(t, &NetDrafter{Net: net, Table: tab}, tab, 7)
+	b := runNetPod(t, &NetDrafter{Net: net, Table: tab, Temperature: 1e-6}, tab, 7)
+	if !slices.Equal(a, b) {
+		t.Fatal("T=1e-6 drafted differently from argmax")
+	}
+	c := runNetPod(t, &NetDrafter{Net: net, Table: tab, Temperature: 1}, tab, 7)
+	if slices.Equal(a, c) {
+		t.Log("T=1 happened to match argmax on this pod")
 	}
 }
