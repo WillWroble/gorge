@@ -13,9 +13,12 @@ import (
 
 // tokenArtFixture is artFixture for the token path: an httptest server standing
 // in for Scryfall's cards/search endpoint, keyed by the base name the query
-// carries, plus ac wired to it via searchBaseURL. Each entry's image URL is
-// served from the fixture itself, so a hit's blob bytes identify the card
-// that was picked.
+// carries, plus ac wired to it via searchBaseURL — and via namedBaseURL too,
+// because a token test that also calls named() (e.g. the key-collision test)
+// must hit the fixture's 404 for /cards/named, never the real api.scryfall.com
+// (art.go:55-58: this package's tests never touch the real network). Each
+// entry's image URL is served from the fixture itself, so a hit's blob bytes
+// identify the card that was picked.
 func tokenArtFixture(t *testing.T, tokens map[string]string) (*artCache, *atomic.Int32) {
 	t.Helper()
 	var searchHits atomic.Int32
@@ -71,6 +74,7 @@ func tokenArtFixture(t *testing.T, tokens map[string]string) (*artCache, *atomic
 		t.Fatal(err)
 	}
 	ac.client = srv.Client()
+	ac.namedBaseURL = srv.URL + "/cards/named?exact="
 	ac.searchBaseURL = srv.URL + "/cards/search?q="
 	return ac, &searchHits
 }
