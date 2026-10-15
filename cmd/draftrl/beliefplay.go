@@ -184,6 +184,14 @@ func beliefPlay(args []string, out io.Writer) error {
 				if t == s {
 					continue
 				}
+				if o.treat == "oracle" {
+					b, err := searchprobe.NewBelief([][]*cards.Card{deckCards(lab, pp.decks[t])})
+					if err != nil {
+						return err
+					}
+					pp.treat[s][t] = player(b)
+					continue
+				}
 				off := (t - s + 4) % 4
 				r := rand.New(rand.NewPCG(podSeed, beliefPlaySalt<<32|uint64(s)<<8|uint64(t)))
 				lists := smp.decks(fl.SampleSMC(off, o.k, nil, o.smc, r), nil)

@@ -64,6 +64,7 @@ type beliefOpts struct {
 	azNet                      string
 	azSims, azPanics           int
 	controlSealed, allowFaults bool
+	treat                      string
 	pool                       draftbelief.PoolModel
 	smc                        draftbelief.SMCOptions
 	noRej                      bool
@@ -110,6 +111,7 @@ func parseBelief(args []string) (beliefOpts, error) {
 	fs.StringVar(&o.values, "belief-values", "", "the card values the opponent pick model assumes: empty = 17Lands, or ovr:PATH#FIELD")
 	fs.StringVar(&o.types, "belief-types", "", "smc: drafter value types, |-separated (17l | ovr:PATH#FIELD); empty = the table's values only")
 	fs.IntVar(&o.games, "games", 2, "beliefplay: games per pod pair (sides alternate); each played twice, beliefs swapped")
+	fs.StringVar(&o.treat, "treat", "draft", "beliefplay: treatment belief: draft | oracle (the opponent's real list: an upper bound, never legal)")
 	fs.StringVar(&o.azNet, "az-net", "", "beliefplay: the .dzgw network")
 	fs.IntVar(&o.azSims, "az-sims", 25, "beliefplay: simulations per searched decision")
 	fs.BoolVar(&o.controlSealed, "control-sealed", false, "beliefplay: control belief = draftrl's random sealed-pool decks instead of the 17Lands corpus")
