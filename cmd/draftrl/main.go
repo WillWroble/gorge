@@ -41,7 +41,11 @@ func run(args []string, out io.Writer) error {
 	case "bc":
 		_, err := bc(args[1:], out)
 		return err
+	case "belief":
+		return belief(args[1:], out)
+	case "beliefplay":
+		return beliefPlay(args[1:], out)
 	default:
-		return fmt.Errorf("unknown subcommand %q (want gate, rollout or bc)", args[0])
+		return fmt.Errorf("unknown subcommand %q (want gate, rollout, bc, belief or beliefplay)", args[0])
 	}
 }
