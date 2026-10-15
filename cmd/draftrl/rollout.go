@@ -29,6 +29,10 @@ type rolloutOpts struct {
 	pods, k, iter          int
 	league                 []leagueSpec
 	leagueFixed            bool
+	weights                []float64 // -league-weights, one per -league entry (nil = uniform)
+	learner                int       // index of -learner in league (appended last), -1 = none
+	learners               int       // learner seats per pod
+	picksJSONL             bool
 	builder                seatAgent
 	table                  string
 	pilot                  string
@@ -40,7 +44,7 @@ type rolloutOpts struct {
 
 func parseRollout(args []string) (rolloutOpts, error) {
 	var o rolloutOpts
-	var league, builder string
+	var league, builder, weights, learner string
 	fs := flag.NewFlagSet("draftrl rollout", flag.ContinueOnError)
 	fs.StringVar(&o.corpus, "corpus", ".cards", "card corpus directory")
 	fs.StringVar(&o.set, "set", "FDN", "set code")
@@ -51,6 +55,10 @@ func parseRollout(args []string) (rolloutOpts, error) {
 	fs.IntVar(&o.iter, "iter", 0, "iteration number, recorded in the manifest")
 	fs.StringVar(&league, "league", "17l", "league drafter specs, comma-separated: 17l | ovr:PATH#FIELD | KIND:ARG (a registered DrafterKind, e.g. net:WEIGHTS.dpkw[@TABLE.json][~T]: argmax, or ~T samples softmax(logits/T) from the seat rng); each pod seat draws one uniformly from -seed")
 	fs.BoolVar(&o.leagueFixed, "league-fixed", false, "seat s takes league entry s mod len instead of a random draw")
+	fs.StringVar(&weights, "league-weights", "", "comma-separated draw weights, one per -league entry (empty = uniform)")
+	fs.StringVar(&learner, "learner", "", "S2 learner drafter spec (e.g. net:cur.dpkw~1): -learners seats of every pod take it at random positions, the rest draw from -league; recorded as the last drafter")
+	fs.IntVar(&o.learners, "learners", 2, "learner seats per pod when -learner is set (1-4)")
+	fs.BoolVar(&o.picksJSONL, "picks-jsonl", true, "also write picks.jsonl (the JSON twin of picks.bin; large)")
 	fs.StringVar(&builder, "builder", "17l", "best23 ratings for every seat: 17l | ovr:PATH#FIELD (the value table)")
 	fs.StringVar(&o.table, "table", "", "draftfeat SetTable JSON for the pick features; empty = facts + z-scored builder ratings")
 	fs.StringVar(&o.pilot, "pilot", "bot", "round-robin pilot on both seats: a bot policy name, or az (closed-list az search)")
@@ -70,6 +78,32 @@ func parseRollout(args []string) (rolloutOpts, error) {
 	var err error
 	if o.league, err = parseLeague(league); err != nil {
 		return o, fmt.Errorf("-league: %w", err)
+	}
+	if o.weights, err = parseWeights(weights, len(o.league)); err != nil {
+		return o, fmt.Errorf("-league-weights: %w", err)
+	}
+	o.learner = -1
+	if learner != "" {
+		if o.learners < 1 || o.learners > 4 {
+			return o, fmt.Errorf("-learners must be 1-4")
+		}
+		if o.leagueFixed {
+			return o, fmt.Errorf("-learner and -league-fixed are exclusive")
+		}
+		ls, err := parseLeague(learner)
+		if err != nil || len(ls) != 1 {
+			return o, fmt.Errorf("-learner: want one spec (%v)", err)
+		}
+		for _, l := range o.league {
+			if l.text == ls[0].text {
+				return o, fmt.Errorf("-learner %s is also a -league entry: records name the learner by its spec, so it must be unique", l.text)
+			}
+		}
+		o.learner = len(o.league)
+		o.league = append(o.league, ls[0])
+		if o.weights != nil {
+			o.weights = append(o.weights, 0)
+		}
 	}
 	b, err := parseSeatAgents(builder, false)
 	if err != nil {
@@ -148,6 +182,10 @@ type rolloutManifest struct {
 	K           int            `json:"k"`
 	League      []string       `json:"league"`
 	LeagueFixed bool           `json:"league_fixed,omitempty"`
+	Weights     []float64      `json:"league_weights,omitempty"`
+	Learner     string         `json:"learner,omitempty"`  // the -learner spec (also the last league entry)
+	LearnerIdx  int            `json:"learner_idx"`        // its drafter index in picks.bin, -1 = none
+	Learners    int            `json:"learners,omitempty"` // learner seats per pod
 	Builder     string         `json:"builder"`
 	Pilot       string         `json:"pilot"`
 	TableHash   string         `json:"table_hash"`
@@ -251,7 +289,7 @@ func rollout(args []string, out io.Writer) (*rolloutResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("pod seed %d: %w", podSeed, err)
 		}
-		seats := seatLeague(o.league, podSeed, o.leagueFixed)
+		seats := seatPod(len(o.league), podSeed, o.leagueFixed, o.weights, o.learner, o.learners)
 		drafters := make([]draftlab.NamedDrafter, 4)
 		var podPicks [4][]pickRec
 		for s := range drafters {
@@ -486,8 +524,12 @@ func writeRollout(lab *draftlab.Lab, o rolloutOpts, table *draftfeat.SetTable, l
 			return nil
 		})
 	}
-	if err := jsonl("picks.jsonl", len(res.Picks), func(i int) any { return &res.Picks[i] }); err != nil {
-		return err
+	files := []string{"picks.bin", "seats.jsonl", "games.jsonl", "game_data.csv", "table.json", "manifest.json"}
+	if o.picksJSONL {
+		if err := jsonl("picks.jsonl", len(res.Picks), func(i int) any { return &res.Picks[i] }); err != nil {
+			return err
+		}
+		files = append([]string{"picks.jsonl"}, files...)
 	}
 	if err := writeFile(filepath.Join(o.out, "picks.bin"), func(w io.Writer) error {
 		return writePicksBin(w, table.Hash(), league, res.Picks)
@@ -533,12 +575,16 @@ func writeRollout(lab *draftlab.Lab, o rolloutOpts, table *draftfeat.SetTable, l
 	m := rolloutManifest{
 		Manifest: lab.NewManifest("rollout", o.seed, agents, res.Games),
 		Iter:     o.iter, Pods: o.pods, K: o.k, League: league, LeagueFixed: o.leagueFixed,
+		Weights: o.weights, LearnerIdx: o.learner,
 		Builder: "best23/" + o.builder.String(), Pilot: pilot, TableHash: table.Hash(), MaxObjs: o.maxObjs,
 		GateDecks: gateDecks, AZ: res.AZ,
-		Files:    []string{"picks.jsonl", "picks.bin", "seats.jsonl", "games.jsonl", "game_data.csv", "table.json", "manifest.json"},
+		Files:    files,
 		PicksBin: map[string]any{"version": picksBinVersion, "global": globalLayout, "cand": candLayout, "drafters": league},
 	}
 	m.Set, m.Collation, m.Mode, m.Seats = o.set, o.collation, "draft", 4
+	if o.learner >= 0 {
+		m.Learner, m.Learners = league[o.learner], o.learners
+	}
 	b, err := json.MarshalIndent(m, "", " ")
 	if err != nil {
 		return err
