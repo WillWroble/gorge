@@ -59,6 +59,25 @@ type Scryfall = {
   card_faces?: { name?: string; image_uris?: { normal?: string } }[];
 };
 
+/**
+ * ImageFacts are the token facts a CardView carries that disambiguate a
+ * token's art on the server: an in-game token's display name ("Goblin
+ * Token") is never a card Scryfall's named endpoint knows, so the token
+ * path resolves the art by SEARCH over the stripped base name, and the
+ * type line + P/T feed the deterministic pick. Only read when isToken is
+ * set — every ordinary card name goes to /art/named as before.
+ */
+export interface ImageFacts {
+  isToken?: boolean;
+  types?: string;
+  pt?: string;
+}
+
+/** tokenCacheKey namespaces a token's storage/memo entries away from any same-named real card's entries: the names collide, the facts don't. */
+function tokenCacheKey(name: string, facts: ImageFacts): string {
+  return `token\u001f${name}\u001f${facts.types ?? ''}\u001f${facts.pt ?? ''}`;
+}
+
 /** createImages resolves exact card names to card art served from this app's own origin (art.go proxies and caches Scryfall server-side) with memory + localStorage caches, request spacing and an offline backoff. */
 export function createImages(src: Partial<ImageSource> = {}) {
   const env: ImageSource = {
@@ -93,14 +112,15 @@ export function createImages(src: Partial<ImageSource> = {}) {
     if (queue.length) env.setTimeout(drain, SPACING);
   }
 
-  async function lookup(name: string): Promise<string | null> {
-    // Same-origin, not Scryfall directly: cmd/gorged's /art/named proxies and
-    // caches Scryfall on the server (art.go), so every viewer's browser only
-    // ever talks to this app's own origin, and a card fetched once by any
-    // viewer is served from disk for every viewer after. The response shape
-    // mirrors Scryfall's own /cards/named (name + image_uris.normal) on
-    // purpose, so this parsing needs no change from when it read Scryfall
-    // directly — only the request's base URL moved.
+  async function lookup(name: string, endpoint: string): Promise<string | null> {
+    // Same-origin, not Scryfall directly: cmd/gorged's /art/named (and, for
+    // tokens, /art/token) proxies and caches Scryfall on the server
+    // (art.go / art_token.go), so every viewer's browser only ever talks to
+    // this app's own origin, and a card fetched once by any viewer is
+    // served from disk for every viewer after. The response shape mirrors
+    // Scryfall's own /cards/named (name + image_uris.normal) on purpose, so
+    // this parsing needs no change from when it read Scryfall directly —
+    // only the request's base URL moved.
     // REQUEST_TIMEOUT (see the constant's comment) bounds the whole lookup —
     // body read included — because every millisecond of it holds a browser
     // connection. The abort is armed through env.setTimeout so the fake-clock
@@ -109,7 +129,7 @@ export function createImages(src: Partial<ImageSource> = {}) {
     let settled = false;
     env.setTimeout(() => { if (!settled) abort.abort(); }, REQUEST_TIMEOUT);
     try {
-      const res = await env.fetch(withBase(`/art/named?exact=${encodeURIComponent(name)}`), { headers: { Accept: 'application/json' }, signal: abort.signal });
+      const res = await env.fetch(withBase(endpoint), { headers: { Accept: 'application/json' }, signal: abort.signal });
       if (res.status === 404) return null;
       if (res.status === 503) throw new ArtPending(name);
       if (!res.ok) throw new Error(`art ${res.status}`);
@@ -133,13 +153,22 @@ export function createImages(src: Partial<ImageSource> = {}) {
     }
   }
 
-  function url(name: string): Promise<string | null> {
-    if (memo.has(name)) return Promise.resolve(memo.get(name)!);
-    const stored = fromStorage(name);
-    if (stored !== undefined) { memo.set(name, stored); return Promise.resolve(stored); }
+  function url(name: string, facts?: ImageFacts): Promise<string | null> {
+    // A token resolves through /art/token against namespaced cache keys: its
+    // display name is NOT a card name, so sharing the plain-name key with a
+    // same-named real card would let one entry poison the other.
+    const isToken = facts?.isToken === true;
+    const ck = isToken && facts ? tokenCacheKey(name, facts) : name;
+    if (memo.has(ck)) return Promise.resolve(memo.get(ck)!);
+    const stored = fromStorage(ck);
+    if (stored !== undefined) { memo.set(ck, stored); return Promise.resolve(stored); }
     if (offline()) return Promise.resolve(null);
-    const inflight = pending.get(name);
+    const inflight = pending.get(ck);
     if (inflight) return inflight;
+
+    const endpoint = isToken && facts
+      ? `/art/token?exact=${encodeURIComponent(name)}&types=${encodeURIComponent(facts.types ?? '')}&pt=${encodeURIComponent(facts.pt ?? '')}`
+      : `/art/named?exact=${encodeURIComponent(name)}`;
 
     const idle = queue.length === 0 && pending.size === 0;
     const p = new Promise<string | null>((resolve) => {
@@ -149,7 +178,7 @@ export function createImages(src: Partial<ImageSource> = {}) {
         // too, so a source that went offline after this was queued doesn't
         // still fire the request once its slot comes up.
         if (offline()) { resolve(null); return; }
-        lookup(name).then((u) => { memo.set(name, u); toStorage(name, u); resolve(u); })
+        lookup(name, endpoint).then((u) => { memo.set(ck, u); toStorage(ck, u); resolve(u); })
           .catch((e) => {
             if (e instanceof ArtPending) {
               // The server is still fetching this name: ask again later,
@@ -165,8 +194,8 @@ export function createImages(src: Partial<ImageSource> = {}) {
       };
       if (idle) run();
       else { queue.push(run); if (queue.length === 1) env.setTimeout(drain, SPACING); }
-    }).finally(() => pending.delete(name));
-    pending.set(name, p);
+    }).finally(() => pending.delete(ck));
+    pending.set(ck, p);
     return p;
   }
 

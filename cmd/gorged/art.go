@@ -54,8 +54,10 @@ type artCache struct {
 	sem chan struct{}
 	// namedBaseURL is "https://api.scryfall.com/cards/named?exact=" in
 	// production; tests point it at an httptest server instead so this
-	// package's tests never touch the real network.
-	namedBaseURL string
+	// package's tests never touch the real network. searchBaseURL is the
+	// token path's cards/search equivalent (art_token.go), same seam.
+	namedBaseURL  string
+	searchBaseURL string
 	// pace is the minimum spacing between two outbound Scryfall request
 	// starts — the <=10 req/s courtesy Scryfall asks for (50-100ms between
 	// requests). It is enforced by paceWait as a LIMITER over the request
@@ -127,16 +129,17 @@ func newArtCache(dir string) (*artCache, error) {
 		return nil, fmt.Errorf("art cache dir: %w", err)
 	}
 	return &artCache{
-		dir:          dir,
-		client:       &http.Client{Timeout: 15 * time.Second},
-		sem:          make(chan struct{}, 1),
-		namedBaseURL: scryfallNamedURL,
-		pace:         100 * time.Millisecond,
-		now:          time.Now,
-		sleep:        sleepCtx,
-		afterFunc:    func(d time.Duration, f func()) func() bool { return time.AfterFunc(d, f).Stop },
-		waitBudget:   artWaitBudget,
-		inflight:     map[string]chan struct{}{},
+		dir:           dir,
+		client:        &http.Client{Timeout: 15 * time.Second},
+		sem:           make(chan struct{}, 1),
+		namedBaseURL:  scryfallNamedURL,
+		searchBaseURL: scryfallSearchURL,
+		pace:          100 * time.Millisecond,
+		now:           time.Now,
+		sleep:         sleepCtx,
+		afterFunc:     func(d time.Duration, f func()) func() bool { return time.AfterFunc(d, f).Stop },
+		waitBudget:    artWaitBudget,
+		inflight:      map[string]chan struct{}{},
 	}, nil
 }
 

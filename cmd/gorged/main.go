@@ -610,6 +610,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	// is unavailable fails at startup rather than at the first submission.
 	topMux := http.NewServeMux()
 	topMux.HandleFunc("GET /art/named", ac.named)
+	topMux.HandleFunc("GET /art/token", ac.token)
 	topMux.HandleFunc("GET /art/blob/{key}", ac.blob)
 	topMux.HandleFunc("GET /cards/named", ac.text)
 	// net/http/pprof's init registers its handlers on http.DefaultServeMux,
