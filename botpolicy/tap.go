@@ -1,6 +1,7 @@
 package botpolicy
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -86,10 +87,13 @@ func hasFlash(kws []string) bool {
 // non-mana reason (no legal targets, a timing restriction) still triggers
 // taps: the policy cannot read those facts, and its old behaviour did
 // worse (it tapped regardless of the hand at all).
-func (b Board) tapWants() bool {
+func (b Board) tapWants(d *decision.Decision) bool {
 	keys, cs := b.Cards.Keys(), b.Cards.Values()
 	for i := range cs {
 		if c := &cs[i]; !c.Castable || c.CMC <= 0 {
+			continue
+		}
+		if !tapTarget(d, keys[i]) {
 			continue
 		}
 		if !b.poolPays(keys[i], cs[i]) {
@@ -230,7 +234,7 @@ func (b Board) cardScore(c Card) int32 {
 // Fail-closed errs toward passing: the gate never taps a source it cannot
 // price, the window falls through to the land drop and the cast, and the
 // game advances.
-func (b Board) bestUnpayable(offered [5]bool) (state.ObjID, Card, bool) {
+func (b Board) bestUnpayable(d *decision.Decision, offered [5]bool) (state.ObjID, Card, bool) {
 	bestID := state.ObjID(0)
 	var best Card
 	var bestScore int32 = -1
@@ -241,6 +245,9 @@ func (b Board) bestUnpayable(offered [5]bool) (state.ObjID, Card, bool) {
 			continue
 		}
 		id, c := keys[i], cs[i]
+		if !tapTarget(d, id) {
+			continue
+		}
 		if b.poolPays(id, c) {
 			continue
 		}
@@ -256,6 +263,34 @@ func (b Board) bestUnpayable(offered [5]bool) (state.ObjID, Card, bool) {
 		}
 	}
 	return bestID, best, found
+}
+
+// tapTarget reports whether the tap gate may aim at castable card id in
+// decision d. Without the engine's cast census (d nil, or
+// decision.PotentialCastsKnown false: a manual-pay seat, whose decision never
+// builds the payment extension, or a pool the planner declines) every card
+// qualifies, exactly the gate's original reading. With it, two engine facts
+// the Board cannot derive exclude a card:
+//
+//   - it is absent from decision.PotentialCasts: the engine's own offer walk,
+//     priced against every untapped source, offers no cast of it in this
+//     window -- no legal target, a timing or casting restriction, a non-mana
+//     cost it cannot pay, or a cost beyond even that over-bound;
+//   - its plain cast is in decision.PotentialUnpayableCasts: the payment
+//     planner PROVED no assignment of the seat's sources pays it (a colour
+//     the mana base cannot make, a restricted source).
+//
+// Either way no amount of manual tapping can make the card castable, so a
+// tap toward it only floats mana that empties at step end. Measured over a
+// 435-game auto-pay mirror of the repo decks (2026-10-14), such cards were
+// the tap gate's intent in roughly two of every three manual tap runs the
+// auto-pay bot made while it held payment plans or none. A linear scan over
+// the census (one hand's casts) keeps the hot path map-free.
+func tapTarget(d *decision.Decision, id state.ObjID) bool {
+	if d == nil || !d.PotentialCastsKnown {
+		return true
+	}
+	return slices.Contains(d.PotentialCasts, id) && !slices.Contains(d.PotentialUnpayableCasts, id)
 }
 
 // offeredClosesPips is the satisfiability filter bestUnpayable and
@@ -328,10 +363,10 @@ func (b Board) neededColours(c Card) [5]bool {
 // It consumes no rng: the pick is a pure function of the offered options and
 // the board facts.
 func (b Board) chooseTap(d *decision.Decision) int {
-	if !b.tapWants() {
+	if !b.tapWants(d) {
 		return -1
 	}
-	_, c, ok := b.bestUnpayable(b.offeredColours(d))
+	_, c, ok := b.bestUnpayable(d, b.offeredColours(d))
 	if !ok {
 		return -1
 	}
@@ -424,10 +459,10 @@ func (b Board) offeredColours(d *decision.Decision) [5]bool {
 // a cast the V1 planner can offer no plan for, and answers with the manual
 // policy instead so the card can still be paid.
 func (b Board) TapIntent(d *decision.Decision) (state.ObjID, bool) {
-	if !b.tapWants() {
+	if !b.tapWants(d) {
 		return 0, false
 	}
-	id, _, ok := b.bestUnpayable(b.offeredColours(d))
+	id, _, ok := b.bestUnpayable(d, b.offeredColours(d))
 	return id, ok
 }
 
@@ -487,7 +522,7 @@ func (b Board) CastableNow(player state.PlayerID, d *decision.Decision) (state.O
 func (b Board) AnyCastableNow(player state.PlayerID, d *decision.Decision) bool {
 	offered := b.offeredColours(d)
 	for id, c := range b.Cards.All() {
-		if !c.Castable || c.CMC <= 0 {
+		if !c.Castable || c.CMC <= 0 || !tapTarget(d, id) {
 			continue
 		}
 		if b.poolPays(id, c) {

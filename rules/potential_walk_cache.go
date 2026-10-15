@@ -296,8 +296,13 @@ func (e *Engine) planCastPaymentAtDecision(p state.PlayerID, cast decision.Plann
 		}
 	}
 	if e.potentialWalkUsable() && e.potentialWalkHit(p, false) {
+		flashback := cast.Origin == decision.OriginFlashback
 		for _, o := range e.potentialWalk.opts {
-			if o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0 && o.Obj == cast.Object {
+			listed := o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0
+			if flashback {
+				listed = planCastFlashbackOption(o)
+			}
+			if listed && o.Obj == cast.Object {
 				statics := costStaticSource{e: e}
 				candidates := paymentCastCandidates{e: e, p: p, priced: true}
 				return e.planCastPaymentMemo(p, cast, &statics, &candidates)

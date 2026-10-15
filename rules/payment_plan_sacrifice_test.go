@@ -169,7 +169,8 @@ func TestPaymentPlanOffersCorpusBoneSplinters(t *testing.T) {
 // TestPaymentPlanSacrificeShapeStillDeclines pins the boundary the gate
 // change must not cross: variable-count sacrifice (Sac<X/...>), sacrifice-all
 // (Sac<All/...>, which parses as Unknown) and a fixed sacrifice combined with
-// any OTHER non-mana part stay withheld. This is the "class, not the
+// any other non-mana part (a fixed discard excepted: botmanual admits it)
+// stay withheld. This is the "class, not the
 // instance" companion to the sacrifice offer above.
 func TestPaymentPlanSacrificeShapeStillDeclines(t *testing.T) {
 	t.Parallel()
@@ -178,7 +179,6 @@ func TestPaymentPlanSacrificeShapeStillDeclines(t *testing.T) {
 	}{
 		{"sacX", "A:SP$ Draw | Cost$ B Sac<X/Creature> | NumCards$ 1"},
 		{"sacAll", "A:SP$ Draw | Cost$ B Sac<All/Creature> | NumCards$ 1"},
-		{"sacPlusDiscard", "A:SP$ Draw | Cost$ B Sac<1/Creature> Discard<1/Card> | NumCards$ 1"},
 		{"sacPlusLife", "A:SP$ Draw | Cost$ B Sac<1/Creature> PayLife<1> | NumCards$ 1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

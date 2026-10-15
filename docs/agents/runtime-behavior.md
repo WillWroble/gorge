@@ -83,6 +83,17 @@ bot candidate (`Root.NoBot`) and counts `Stats.BotTapRerooted`
 (botbench's `tap-rerooted` line). Human seats are unchanged: the host builds
 their plans under `TableConfig.AutoMana` and the client only picks.
 
+The same build also leaves an engine-side cast census on the decision
+(`Decision.PotentialCasts`, `PotentialCastsKnown`, beside
+`PotentialUnpayableCasts`): every object the offer builder's PotentialMana
+walk offers a cast of. The bot's tap gate (`botpolicy.tapTarget`) never aims
+a manual tap at a card absent from it or proved unpayable, which was two of
+every three manual tap runs the auto-pay bot made (botmanual, 2026-10-14). A
+seat that never builds plans has no census, so the manual-mana bot and every
+golden game are unchanged. The manual taps that remain are planner gaps the
+V1 witness withholds by design ({X}, hybrid, convoke/delve/improvise,
+target-dependent and optional costs, restricted or last-resort sources).
+
 ## Seat-privacy boundary
 
 A seat credential names **both its table and seat**. Every current

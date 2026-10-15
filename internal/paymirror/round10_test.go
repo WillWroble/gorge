@@ -44,11 +44,16 @@ import (
 //     earlier; the lifePaymentConsequences harness gap is fixed in
 //     paymirror.go, so the witness no longer trips on it. The paid-cost census
 //     default-on flip (cli-20261012T170859Z) then moved this cast from
-//     seq 2298 to 2291.
+//     seq 2298 to 2291, and botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) to
+//     seq 2250, verdict still equivalent.
 //   - 10877 seq 2873 (Infernal Plunge), commander4-r9 a_witness:wrong_production:
 //     the plan's Ogre paid life for R and was then the creature sacrificed
 //     for the spell's additional cost (CR 601.2h); the witness read that
 //     sacrifice as its activation (harness gap, activationProduction).
+//     botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moves the cast to seq 4900,
+//     where run A's witness is clean and the float route is the expected
+//     cast_blocked_by_float_trigger (floating at priority puts a mana
+//     trigger on the stack first).
 //
 // fb-20260927T163321Z-69285807 moved the commander seeds here (12468, 11828,
 // 12603, 10877) with the command-zone payment-plan fix: a commander in the
@@ -72,8 +77,8 @@ import (
 var roundTenWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
 	12468: {},
 	11828: {},
-	12603: {2291: ""},
-	10877: {2834: ""},
+	12603: {2250: ""},
+	10877: {4900: "expected:float_then_cast:cast_blocked_by_float_trigger"},
 }
 
 const (

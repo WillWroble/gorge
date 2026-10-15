@@ -59,7 +59,15 @@ import (
 // option list and intent stream moves. Attributed: reverting only
 // rules/genesis.go's `paidManaCensus: !cfg.DisablePaidManaCensus` to `false`
 // reproduces the pre-flip golden dc4be0b6 byte for byte.
-const smokeDigestGolden = "9a58cae449938b0e9e9d64484a66fdf797b359110b2ba762afefd70db77bd497"
+//
+// Re-pinned for botmanual (2026-10-14): the payment planner now offers a plan
+// for a graveyard card's flashback cast (decision.OriginFlashback; Burn's Lava
+// Dart) and for a fixed-count discard additional cost, and the sb seats cast
+// through those plans. Attributed: disabling either half alone still moves
+// the digest (flashback off: dd82184d, discard off: 3ae6d37d), while the
+// auto-pay bot's tap-gate cast census does not reach this run (disabling it
+// alone reproduces the new digest below).
+const smokeDigestGolden = "1a9c15a3d4fb3344b582580b86bb7f4a73641310064b713e8fe5345539b48e76"
 
 // TestSpellbenchSmokeDigestIsStable plays the smoke run and compares its
 // games.jsonl digest against the golden above.

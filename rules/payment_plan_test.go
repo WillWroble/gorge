@@ -634,10 +634,14 @@ func TestPaymentPlanAdditionalCostCastGetsNoPlan(t *testing.T) {
 		e, _, spell := newFixtureDeck(t, 9403, "Name:Planned Thrill Shape\nManaCost:1 R\nTypes:Instant\nA:SP$ Draw | Cost$ 1 R Discard<1/Card> | NumCards$ 2\nOracle:x\n")
 		onBoard(t, e, 0, paymentPlanMountain)
 		onBoard(t, e, 0, paymentPlanMountain)
-		if e.paymentPlanCastShapeDetail(0, spell) != "shape:additional_cost" {
-			t.Fatalf("discard cast detail = %q, want shape:additional_cost", e.paymentPlanCastShapeDetail(0, spell))
+		// botmanual admits the fixed-count discard on the sacrifice's terms
+		// (pay.PlanNonManaAdmissible; TestPaymentPlanSeeksDiscardOffer).
+		if detail := e.paymentPlanCastShapeDetail(0, spell); detail != "" {
+			t.Fatalf("discard cast detail = %q, want the fixed-count discard admitted", detail)
 		}
-		assertWithheld(t, e, spell, map[int]int32{state.ManaIndex('R'): 2})
+		if got := e.PlanCastPayment(0, paymentCast(spell)); got.Plan == nil {
+			t.Fatalf("discard cast outcome = %+v, want a mana-only plan", got)
+		}
 	})
 
 	delveSetup := func(t *testing.T, seed uint64) (*Engine, state.ObjID, []state.ObjID) {
@@ -699,7 +703,10 @@ func TestPaymentPlanAdditionalCostCastGetsNoPlan(t *testing.T) {
 		onBoard(t, e, 0, paymentPlanMountain)
 		onBoard(t, e, 0, paymentPlanMountain)
 		spell := putInHand(t, e, 0, corpusCard(t, "Thrill of Possibility"))
-		assertWithheld(t, e, spell, map[int]int32{state.ManaIndex('R'): 2})
+		// Its `Discard<1/Card>` is the fixed-count discard botmanual admits.
+		if got := e.PlanCastPayment(0, paymentCast(spell)); got.Plan == nil {
+			t.Fatalf("Thrill of Possibility outcome = %+v, want a mana-only plan", got)
+		}
 	})
 
 	t.Run("corpus Gurmag Angler", func(t *testing.T) {
