@@ -17,8 +17,12 @@ package host
 //   - TestClosedListGuard*: the host checks the seats it built, not the
 //     declaration.
 //
-// az-c4 registers only on Enable, once per binary (enableAZC4); every test
-// here that walks bots.Entries skips it by name.
+// az-c5 (hosted_azc5_test.go) is az-c4 with another network; the gate, guard
+// and determinism rows here cover it too.
+//
+// az-c4 and az-c5 register only on Enable, once per binary
+// (enableClosedPolicy); every test here that walks bots.Entries skips them by
+// name.
 
 import (
 	"context"
@@ -34,6 +38,7 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/bots/azc4"
+	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
@@ -55,16 +60,27 @@ var azc4BeliefDecks = []string{
 	"foundations-tramplesaurus-rex", "foundations-wretched-ranks",
 }
 
+// closedPolicies is every closed-list hosted az policy's Enable: each takes
+// a network and a belief, and they differ only in the network.
+var closedPolicies = map[string]func(string, *searchprobe.Belief) error{azc4.Policy: azc4.Enable, azc5.Policy: azc5.Enable}
+
 var (
-	azc4Once   sync.Once
-	azc4Belief *searchprobe.Belief
+	closedMu     sync.Mutex
+	closedBelief *searchprobe.Belief // the test belief, built once
+	closedOn     = map[string]bool{}
 )
 
-// enableAZC4 registers az-c4 over a synthetic network and the test belief,
-// once per test binary.
-func enableAZC4(t *testing.T) *searchprobe.Belief {
+// enableAZC4 registers az-c4 (enableClosedPolicy).
+func enableAZC4(t *testing.T) *searchprobe.Belief { return enableClosedPolicy(t, azc4.Policy) }
+
+// enableClosedPolicy registers the named closed-list policy over a synthetic
+// network and the test belief (one belief, shared by every closed-list
+// policy), once per test binary.
+func enableClosedPolicy(t *testing.T, policy string) *searchprobe.Belief {
 	t.Helper()
-	azc4Once.Do(func() {
+	closedMu.Lock()
+	defer closedMu.Unlock()
+	if closedBelief == nil {
 		reg := testutil.CorpusRegistry(t)
 		var decks [][]*cards.Card
 		for _, n := range azc4BeliefDecks {
@@ -74,7 +90,10 @@ func enableAZC4(t *testing.T) *searchprobe.Belief {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dir, err := os.MkdirTemp("", "azc4-host-")
+		closedBelief = b
+	}
+	if !closedOn[policy] {
+		dir, err := os.MkdirTemp("", policy+"-host-")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,15 +102,15 @@ func enableAZC4(t *testing.T) *searchprobe.Belief {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := azc4.Enable(path, b); err != nil {
+		if err := closedPolicies[policy](path, closedBelief); err != nil {
 			t.Fatal(err)
 		}
-		azc4Belief = b
-	})
-	if _, ok := bots.Lookup(azc4.Policy); !ok || azc4Belief == nil {
-		t.Fatal("az-c4 is not registered")
+		closedOn[policy] = true
 	}
-	return azc4Belief
+	if _, ok := bots.Lookup(policy); !ok {
+		t.Fatalf("%s is not registered", policy)
+	}
+	return closedBelief
 }
 
 func TestHostedEnvSeatsIgnoreTheRealHiddenCardsAZC4(t *testing.T) {
@@ -168,8 +187,12 @@ func publicZone(z state.Zone) bool {
 // non-searched paths get -- are a subset of revealed. The root engine is
 // walked whole, through unexported fields, except the fields named in
 // skipFields (each is a residual the report's leak audit names).
-func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) {
-	belief := enableAZC4(t)
+func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) { closedPrivacyGames(t, azc4.Policy) }
+
+// closedPrivacyGames is TestAZC4NeverSeesTheHumansHiddenCards for the named
+// closed-list policy.
+func closedPrivacyGames(t *testing.T, policy string) {
+	belief := enableClosedPolicy(t, policy)
 	reg := testutil.CorpusRegistry(t)
 	botDeck := testutil.RepoDeck(t, reg, "mono-white-equipment")
 	humanDeck := testutil.RepoDeck(t, reg, "mono-red-goblins")
@@ -333,7 +356,7 @@ func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) {
 		walkTime += time.Since(start)
 	}
 	opts.Seats = func(names []string, seed uint64) []seat.Seat {
-		inner, err := bots.New(azc4.Policy, bots.Options{Seed: seed ^ 1, AutoPayMana: true, SearchParallelism: 4})
+		inner, err := bots.New(policy, bots.Options{Seed: seed ^ 1, AutoPayMana: true, SearchParallelism: 4})
 		if err != nil {
 			panic(err)
 		}
@@ -352,12 +375,12 @@ func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) {
 		mu.Lock()
 		tid, revealed, evDone = TableID("g"+itoa(g+1)), map[string]bool{}, 0
 		mu.Unlock()
-		cfg := TableConfig{ID: tid, Name: "az-c4 vs a human", Seats: 2,
+		cfg := TableConfig{ID: tid, Name: policy + " vs a human", Seats: 2,
 			Decks: []string{"human", "bot"}, // match 1 deals seat i Decks[(i+1)%2]
-			Seed:  seed, Spectator: view.Public, Humans: []int{1}, BotPolicy: azc4.Policy,
+			Seed:  seed, Spectator: view.Public, Humans: []int{1}, BotPolicy: policy,
 			AutoMana: true, BotAutoPayMana: true, Mulligans: 2}
 		if err := r.AddTable(cfg); err != nil {
-			t.Fatalf("AddTable refused az-c4 at a human table without the decklist opt-in: %v", err)
+			t.Fatalf("AddTable refused %s at a human table without the decklist opt-in: %v", policy, err)
 		}
 		if err := r.Start(tid); err != nil {
 			t.Fatal(err)
@@ -368,7 +391,7 @@ func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) {
 			t.Fatalf("matches %v, %v", ms, err)
 		}
 		if got := []string{ms[0].Seats[0].Deck, ms[0].Seats[1].Deck}; got[0] != "bot" || got[1] != "human" {
-			t.Fatalf("seat decks %v, want the bot deck at the az-c4 seat and the human deck at the human's", got)
+			t.Fatalf("seat decks %v, want the bot deck at the %s seat and the human deck at the human's", got, policy)
 		}
 		if ms[0].State == protocol.MatchCrashed {
 			t.Fatalf("game %d crashed", g+1)
@@ -407,17 +430,18 @@ func TestAZC4NeverSeesTheHumansHiddenCards(t *testing.T) {
 		if len(leaks) > 40 {
 			leaks = leaks[:40]
 		}
-		t.Fatalf("%d leak(s) of the human's unrevealed cards into az-c4's inputs:\n%s", len(leaks), strings.Join(leaks, "\n"))
+		t.Fatalf("%d leak(s) of the human's unrevealed cards into %s's inputs:\n%s", len(leaks), policy, strings.Join(leaks, "\n"))
 	}
 }
 
 // Open-list Env policies -- az-c3 (enabled here without a belief, as gorged
 // serves it), az-redeal and sb-tactical -- are refused at a table with a
-// human, with or without the opt-in; az-c4 is accepted there without it, and
-// on a bot-only table without it too.
+// human, with or without the opt-in; az-c4 and az-c5 are accepted there
+// without it, and on a bot-only table without it too.
 func TestDecklistGateAtHumanTables(t *testing.T) {
 	enableAZC3(t)
 	enableAZC4(t)
+	enableClosedPolicy(t, azc5.Policy)
 	table := func(policy string, humans []int, optIn bool) TableConfig {
 		return TableConfig{ID: "t1", Seats: 2, Decks: []string{"a", "b"}, Seed: 1, Spectator: view.Public,
 			Humans: humans, BotPolicy: policy, AutoMana: true, BotAutoPayMana: true, AllowDecklistBots: optIn}
@@ -438,27 +462,36 @@ func TestDecklistGateAtHumanTables(t *testing.T) {
 			r.Close()
 		}
 	}
-	if bots.ReadsDecklists(azc4.Policy) {
-		t.Fatal("az-c4 reads decklists")
-	}
-	for _, humans := range [][]int{{0}, nil} {
-		r, err := New(testOptions(t))
-		if err != nil {
-			t.Fatal(err)
+	for _, policy := range []string{azc4.Policy, azc5.Policy} {
+		if bots.ReadsDecklists(policy) {
+			t.Fatalf("%s reads decklists", policy)
 		}
-		if err := r.AddTable(table(azc4.Policy, humans, false)); err != nil {
-			t.Errorf("az-c4 (humans %v) without the opt-in: %v", humans, err)
+		for _, humans := range [][]int{{0}, nil} {
+			r, err := New(testOptions(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := r.AddTable(table(policy, humans, false)); err != nil {
+				t.Errorf("%s (humans %v) without the opt-in: %v", policy, humans, err)
+			}
+			r.Close()
 		}
-		r.Close()
 	}
 }
 
-// The host does not trust the declaration: an az-c4 table whose bot seat is
-// an open-list search seat (here az-c3 without a belief, swapped in through
-// Options.Seats) crashes at match start, before the seat is asked anything.
+// The host does not trust the declaration: an az-c4 (or az-c5) table whose
+// bot seat is an open-list search seat (here az-c3 without a belief, swapped
+// in through Options.Seats) crashes at match start, before the seat is asked
+// anything.
 func TestClosedListGuardRefusesAnOpenSeatAtAHumanTable(t *testing.T) {
+	for _, policy := range []string{azc4.Policy, azc5.Policy} {
+		t.Run(policy, func(t *testing.T) { openSeatGuardRow(t, policy) })
+	}
+}
+
+func openSeatGuardRow(t *testing.T, policy string) {
 	enableAZC3(t)
-	enableAZC4(t)
+	enableClosedPolicy(t, policy)
 	opts := testOptions(t)
 	asked := false
 	opts.Seats = func(names []string, seed uint64) []seat.Seat {
@@ -477,7 +510,7 @@ func TestClosedListGuardRefusesAnOpenSeatAtAHumanTable(t *testing.T) {
 	}
 	defer r.Close()
 	if err := r.AddTable(TableConfig{ID: "t1", Seats: 2, Decks: []string{"a", "b"}, Seed: 1, Spectator: view.Public,
-		Humans: []int{1}, BotPolicy: azc4.Policy, AutoMana: true, BotAutoPayMana: true}); err != nil {
+		Humans: []int{1}, BotPolicy: policy, AutoMana: true, BotAutoPayMana: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Start("t1"); err != nil {
@@ -532,11 +565,14 @@ func TestClosedSetupCutsAnOpenSetupAtAHumanTable(t *testing.T) {
 // Two bot-only az-c4 tables from one seed (without the decklist opt-in, which
 // az-c4 does not need) play the same intents byte for byte, and each replays
 // to its recorded head. They are bot-only because a human answered by the
-// timeout caretaker is not reproducible run to run.
+// timeout caretaker is not reproducible run to run. A third table, az-c5 over
+// the SAME synthetic network, plays them too: az-c5 differs from az-c4 in its
+// network and nothing else.
 func TestHostedAZC4IsDeterministic(t *testing.T) {
 	enableAZC4(t)
+	enableClosedPolicy(t, azc5.Policy)
 	const seed = uint64(20261014)
-	run := func(tag string) (protocol.MatchInfo, *events.Log) {
+	run := func(policy, tag string) (protocol.MatchInfo, *events.Log) {
 		opts := testOptions(t)
 		opts.MaxIntents = detSearchIntentsCap
 		opts.BotUnboundedDecisions = true
@@ -546,8 +582,8 @@ func TestHostedAZC4IsDeterministic(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer r.Close()
-		cfg := TableConfig{ID: "t1", Name: "azc4" + tag, Seats: 2, Decks: []string{"a", "b"},
-			Seed: seed, Spectator: view.Public, BotPolicy: azc4.Policy, BotAutoPayMana: true, AutoMana: true}
+		cfg := TableConfig{ID: "t1", Name: policy + tag, Seats: 2, Decks: []string{"a", "b"},
+			Seed: seed, Spectator: view.Public, BotPolicy: policy, BotAutoPayMana: true, AutoMana: true}
 		if err := r.AddTable(cfg); err != nil {
 			t.Fatalf("AddTable: %v", err)
 		}
@@ -564,7 +600,7 @@ func TestHostedAZC4IsDeterministic(t *testing.T) {
 		m.mu.RLock()
 		info, log, rulesCfg, rootRefusals := m.info(), m.e.L.Clone(), m.cfg, m.rootRefusals
 		m.mu.RUnlock()
-		t.Logf("%s: %s turn %d intents %d, root refusals %d", tag, info.State, info.Turns, len(log.Intents), rootRefusals)
+		t.Logf("%s %s: %s turn %d intents %d, root refusals %d", policy, tag, info.State, info.Turns, len(log.Intents), rootRefusals)
 		replayed, err := replay.Replay(log, rulesCfg)
 		if err != nil {
 			t.Fatalf("replay: %v", err)
@@ -574,12 +610,16 @@ func TestHostedAZC4IsDeterministic(t *testing.T) {
 		}
 		return info, log
 	}
-	aInfo, aLog := run("a")
-	bInfo, bLog := run("b")
+	aInfo, aLog := run(azc4.Policy, "a")
+	bInfo, bLog := run(azc4.Policy, "b")
 	if n := len(aLog.Intents); n != detSearchIntentsCap {
 		t.Fatalf("run a logged %d intents, want the cap %d", n, detSearchIntentsCap)
 	}
 	if !reflect.DeepEqual(aLog.Intents, bLog.Intents) || aInfo.Head != bInfo.Head {
 		t.Fatalf("two az-c4 runs differ (intents %d/%d, heads %s/%s)", len(aLog.Intents), len(bLog.Intents), aInfo.Head, bInfo.Head)
+	}
+	cInfo, cLog := run(azc5.Policy, "c")
+	if !reflect.DeepEqual(aLog.Intents, cLog.Intents) || aInfo.Head != cInfo.Head {
+		t.Fatalf("az-c5 over az-c4's network plays a different game (intents %d/%d, heads %s/%s)", len(aLog.Intents), len(cLog.Intents), aInfo.Head, cInfo.Head)
 	}
 }

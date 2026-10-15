@@ -31,6 +31,7 @@ import (
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/bots/azc4"
+	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/bots/sbtactical"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
@@ -98,9 +99,9 @@ func TestEveryHostedPolicyIsDeterministic(t *testing.T) {
 			// TestHostedAZC3IsDeterministic (hosted_azc3_test.go).
 			continue
 		}
-		if e.Name == azc4.Policy {
-			// az-c4 likewise; its row is TestHostedAZC4IsDeterministic
-			// (hosted_azc4_test.go).
+		if e.Name == azc4.Policy || e.Name == azc5.Policy {
+			// az-c4 and az-c5 likewise; their row is
+			// TestHostedAZC4IsDeterministic (hosted_azc4_test.go).
 			continue
 		}
 		played = true

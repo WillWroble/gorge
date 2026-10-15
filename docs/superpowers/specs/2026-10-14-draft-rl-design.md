@@ -546,3 +546,52 @@ Run order: DR-1, DR-2, DR-11 → DR-3 → DR-4 (G0 re-baseline) → DR-5 → DR-
   - az panics are tracked, not blocking: DR-7 logs panics per card.
   - Weights load by flag from /mnt/sata.
   - DR-6 hosting waits for the operator.
+
+## 12. Results (2026-10-15)
+
+### S1: behaviour clone
+
+- Top-1 agreement with the S0 teacher: **98.3%** on held-out pods (gate ≥ 85%: passes).
+- Gauntlet, S1 against its teacher:
+
+  | Pilot | S1 | S0 teacher |
+  |---|---|---|
+  | `bot` | 50.1% | 50.5% |
+  | az-c4 | 46.3% | 47.1% |
+
+  S1 is within 1 pp of the teacher under both pilots, which is what the non-inferiority bar asks.
+
+### S2: PPO on drafted-deck win rate
+
+- Pilot: the C5 net (az-c5, `docs/superpowers/reports/2026-10-15-az-c5.md`), as §3.0 planned.
+- 40 iterations. Stopped on a plateau, against the planned 100.
+- Gates, 1024 games each:
+
+  | Checkpoint | s1 | i10 | i20 | i30 | i40 |
+  |---|---|---|---|---|---|
+  | Score | .450 | .465 | .445 | .467 | .452 |
+
+- Paired check, 32 pods and 4096 games per side (seeds 201-232):
+
+  | Checkpoint | Score | vs S1 |
+  |---|---|---|
+  | S1 | .439 | n/a |
+  | iter-0029 | .458 | +1.9 pp, z 1.76 |
+  | iter-0039 | .457 | +1.8 pp, z 1.67 |
+
+  The S2 bar is +3 pp with a lower 95% bound above 0, so **S2 does not pass**.
+- League reward rose from .49 to .54 and then stayed flat from about iteration 30.
+- KL to S1 was still rising at the stop (.33).
+- Per seat: S1 falls from .460 to .410 in the last seat, while S2 stays flat at .45-.47.
+- Best checkpoint: `/mnt/sata/gorge-training/draftrl/s2/run/iter-0029/ppo/net.dpkw`. It is as
+  strong as iter-0039 and has drifted less from S1.
+- Run notes: `/mnt/sata/gorge-training/draftrl/s2/run/NOTES.md`. The run can be resumed with
+  `s2loop.sh` and the same environment.
+
+**Diagnosis.** A league-only reward saturates. Once the learner beats its own league, the pod
+round robin (§11) has little left to teach it. The open options:
+
+- add 17Lands opponents to the reward (this reverses the §11 ruling for FDN only);
+- turn on η in-hand credit (S2b);
+- reweight the league;
+- go to S3 and recompute values from the S2 games.

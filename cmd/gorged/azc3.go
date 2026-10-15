@@ -103,7 +103,7 @@ func deckLoaders(reg *cards.Registry, dir, az3Dir string, az3Pool []string) func
 }
 
 // reservedFor returns the bot policy a deck is reserved for, "" when none;
-// a deck shared by az-c3 and az-c4 names both (reservedOwners, azc4.go).
+// a deck shared by az-c3 and a closed-list policy names both (reservedOwners, azclosed.go).
 func (c config) reservedFor(id string) string {
 	return strings.Join(c.reservedOwners(id), ", ")
 }

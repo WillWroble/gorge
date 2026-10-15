@@ -18,7 +18,7 @@ The import direction is one-way. `internal/archtest`'s
 | `decision` | `Decision` / `Option` / `Intent`, and the closed set of `decision.Kind`s (`decision.Kinds`). The whole engine↔seat contract. |
 | `deck` | `{name, count}` deck-list JSON resolved against a `cards.Registry`. |
 | `botpolicy` | The one heuristic bot policy (`botpolicy.Decide`), in one copy, shared by `seat` and rules' own fuzz driver. Reads a `Board`, never a view or an engine. Cast profiles in `botpolicy/profiles/`. |
-| `bots` | Registry of hosted bot policies (`bots/registry.go`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. |
+| `bots` | Registry of hosted bot policies (`bots/registry.go`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. The hosted az policies `bots/azc3`, `bots/azc4` and `bots/azc5` register only when gorged's `-az-c*-net` flags enable them (`cmd/gorged/azc3.go`, `cmd/gorged/azclosed.go`). |
 | `events` | The event union, `events.Apply` (the only state mutator), the log, the sha256 hash chain. `events.Kind` is append-only. |
 | `effects` | `api:` primitive implementations, filter/count/value evaluators. Talks to the engine only through the small `effects.Host` interface; never imports `rules`. |
 | `rules` | The engine: turn structure, priority, stack, combat, SBAs, layers, casting and payment, and the `kw:`/`trig:`/`stat:`/`repl:` primitives. `rules.New`, `Pending`, `Submit`, `Advance`, `Clone`. `rules.NewStaged` (`staging.go`) builds a hypothetical engine at a described position. Also holds the coverage ratchets (`rules/*_test.go`) and the golden heads (`rules/testdata/heads/`, pinned by `TestHeads`). |
