@@ -47,6 +47,10 @@
       "tier": "bots",
       "status": "EXT"
     },
+    "bots/azc5": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "bots/azredeal": {
       "tier": "bots",
       "status": "EXT"

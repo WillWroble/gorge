@@ -31,7 +31,7 @@ type DeckInfo struct {
 	// deck). A reserved deck is dealt only to games against that policy, and
 	// that policy deals nothing else (cmd/gorged/azc3.go). A deck reserved
 	// for several policies (az-c3 and az-c4 sharing one deck directory,
-	// cmd/gorged/azc4.go) names them all, comma-separated (JoinPools).
+	// cmd/gorged/azclosed.go) names them all, comma-separated (JoinPools).
 	Pool string `json:"pool,omitempty"`
 }
 
