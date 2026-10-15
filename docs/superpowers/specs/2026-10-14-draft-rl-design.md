@@ -29,7 +29,7 @@ never gates anything.
 | D1 | The policy's only input is `draft.PickView` plus a static per-set table. Features are a pure function of the view, recomputed from `Seen` at every pick, with no drafter state. | This is the legality guarantee: the pod hands a seat copies of its own history and nothing else (`limited/draft/draft.go:121-143`). Being stateless also survives the event-restart rule (draft-events Q9), which rebuilds drafters from the log. |
 | D2 | Omniscient information appears only in a training-time critic and in auxiliary labels, both in the Python trainer. Neither is ever exported into the weights file the Go drafter loads. | Operator rules: never trust the client, and no bot in an event reads decklists. |
 | D3 | Rollout and hosted inference are Go-native (new pure `limited/draftnet`). Python trains and exports weights. Go computes the features and Python consumes them, never recomputing them. | Hosted bots must be in-process `pickbot` drafters (`eventhost/draft.go:141`). One feature implementation means no train/serve skew. This is the same split as `internal/gonet` (`internal/gonet/gonet.go:15-33`). |
-| D4 | The training reward is the win rate of each seat's built deck against decks sampled from the 17Lands FDN **train** split, excluding the 16 gate decks. Intra-pod round-robin games are an ablation only. | Gating on the training opponents would overfit the gate. Intra-pod games are zero-sum, which invites co-adaptation with the league (§9 R1). |
+| D4 | (Revised by the §11 ruling.) The training reward is each seat's score in the **round robin within its pod**: its built deck against the other three seats' decks. No 17Lands deck enters a rollout; the fdn-limited gauntlet decks are evaluation only, and a card-list-hash guard refuses them. | The reward needs no human data, so it works on a cold set. Intra-pod games are zero-sum, which invites co-adaptation with the league (§9 R1); the past-checkpoint league, the fixed gauntlet gate and the mixed-pod check push back. |
 | D5 | The builder is fixed for the whole program: `best23` with the same value table as the policy's prior. | This isolates drafting. Builder learning is a separate program. |
 | D6 | Pods hold 2 learners and 2 frozen league seats. The baseline is the leave-one-out mean over all 4 seats' rewards. | The 4 seats share packs, so the pod mean cancels pack quality. Frozen seats keep the table's behaviour non-stationary only slowly. |
 | D7 | Persona identity is never a feature. | Prevents learning to exploit a named bot. The policy must read behaviour, not labels. |
@@ -143,7 +143,8 @@ never gates anything.
 - Seeds 201–248 never appear in training. Training seeds start at 1,000,000.
 
 **Pilot.** The authority pilot is the az-c4 closed-list search at sims=25 on both seats, with
-the C4 net and the belief built from the train split. That is the training pilot (D4).
+the C4 net and the belief built from the train split. The training pilot is the same az search
+(the S2 loop takes the net as config: C5 once it exists).
 
 A secondary pilot, the scripted `bot`, runs at every gate as a pilot-exploit guard (§9 R2).
 A final S2 confirmation runs at sims=100, the hosted config.
@@ -202,9 +203,19 @@ distribution and seat tokens already shaped by the auxiliary loss.
 2. League draw: S0 20%, B17 20%, S1 20%, past checkpoints 40% (uniform over the last 10,
    added every 5 iterations).
 3. Every seat builds with `best23` and the current value table.
-4. Every seat plays K = 8 games against train-split opponent decks, seat-alternated, under the
-   az pilot. Draws and stalls score 0.5.
-5. R_i = mean score.
+4. The pod plays a round robin (§11): every pair of seats plays K games (K = 4 default),
+   sides alternated, under the az pilot, so each seat plays 3K games. Draws and stalls score
+   0.5. No 17Lands deck is an opponent.
+5. R_i = seat i's mean score over its round-robin games (`seats.jsonl` `score`).
+
+**Implementation (DR-9).** `cmd/draftrl rollout -learner net:W~1 -learners 2` seats the learner
+at 2 random positions per pod and draws the other seats from `-league` with `-league-weights`
+(the league draw never returns the learner). The manifest records `learner`/`learner_idx`;
+PPO trains only on that drafter's picks, using the picks.bin v2 behaviour log-prob as the old
+log-prob. The trainer (`py/ppo.py`) and the resumable loop (`s2/s2loop.sh`) live out of repo
+under `/mnt/sata/gorge-training/draftrl/`. Because the round robin is zero-sum with equal games
+per seat, the pod mean is exactly 0.5 and the leave-one-out advantage is (4R_i − 2)/3; the
+baseline still matters once seats have unequal game counts and for the ablations.
 
 **Advantage** for a pick at step t taking card c:
 
@@ -244,8 +255,7 @@ bias the baseline.
 
 ### 3.4 S3: values from drafted-deck games
 
-1. Feed every S2 rollout game (both sides: drafted decks and 17Lands opponents, tagged by
-   source) through cardval's offline estimators (`gih`, `deck`, `hlogit`) via `GameDataCSV`.
+1. Feed every S2 rollout game (both sides are drafted pod decks, tagged by drafter) through cardval's offline estimators (`gih`, `deck`, `hlogit`) via `GameDataCSV`.
    Archetype-conditional values and a pair-lift table come from the same data.
 2. **S0′** = S0 with the S3 values. Gate S0′ − S0 ≥ +1 pp paired, which tests the random-deck
    bias claim directly and cheaply.
@@ -380,13 +390,27 @@ The omniscient critic is a separate Python MLP and is never exported (constraint
 **Hosted play.** Argmax with seeded tie-break, like `RatingColour`. Training samples at
 temperature 1 using the seat rng.
 
+**Drafter spec.** `cmd/draftrl`'s `-league`/`-drafters` take
+`net:WEIGHTS.dpkw[@TABLE.json][~T]`. With no `~T` the seat is argmax; `~T` (a decimal
+T >= 0, e.g. `net:s1.dpkw~1`) samples softmax(logits/T) from the seat's pick rng, which
+`draftlab.Draft` derives from (pod seed, seat) only, so picks are identical at any
+`-workers`. The temperature is the text after the last `~` only when it parses as a
+number; a `~` inside a path is left alone. A sampling seat's drafter ref is
+`net@<hash>~T`. `NetDrafter.Pick` stays allocation-free at T > 0.
+
+**Behaviour log-prob in `picks.bin` (version 2).** The record's former zero pad byte is
+`flags`; bit 0 means a behaviour block follows the logits: `f32 T, f32 log
+softmax(logits/T)[chosenIdx]`. Only a sampling net seat sets it. Version 1 files have the
+byte 0 and read unchanged under a v2 reader; a v1 reader must skip the 8 bytes when bit 0
+is set. `picks.jsonl` carries the same as `has_behaviour`/`temp`/`logp`.
+
 ## 6. Compute budget
 
 | Item | Cost | Source |
 |---|---|---|
 | az pilot, sims=25, both seats | ≈ 8.5 games/s on 16 workers (≈ 30k/h) | cardval az-c4-s25 |
 | scripted bot pilot | 160–200 games/s on 16 workers | cardval runs.log |
-| S2 iteration: 256 pods × 4 seats × 8 games | 8,192 games ≈ 16 min | derived |
+| S2 iteration: 256 pods × 6 pairs × K = 4 games (round robin, 12 games/seat) | 6,144 games ≈ 10–12 min at ~10 games/s | rollout-smoke (az-c4, 16 workers) |
 | Drafting + Go inference per iteration | 256 × 168 picks × ≲ 2 ms ≈ 86 CPU-s ≈ 6 s wall | **INFERRED** |
 | PPO update (21.5k learner picks × 4 epochs, CPU torch) | < 1 min | **INFERRED** |
 | S2, 100 iterations | ≈ 28 h, ≈ 820k games | derived |
@@ -431,7 +455,7 @@ The verdict uses seeds 201–248 (§3.0). Order follows the operator's hypothesi
 5. **P3** (S3 only).
 6. **Credit and baseline:** η ∈ {0, 0.5}, the critic baseline (S2c), and K ∈ {4, 8, 16} at
    fixed games per iteration.
-7. **Reward:** gauntlet vs intra-pod round robin.
+7. **Reward:** withdrawn by §11 (17Lands decks never enter rollouts; the round robin is the reward).
 
 A group is kept unless its removal *improves* the gauntlet with a 95% CI excluding 0.
 
@@ -450,7 +474,7 @@ case) touch existing hot paths. `docs/agents/repo-map*.md` rows land in DR-10 al
 | DR-4 | New `cmd/draftrl`. `gate` subcommand: pods from seeds, per-seat drafters/builders as `NamedDrafter`s, `Lab.Gauntlet` vs `CatalogDecks("fdn-limited")`. Pilot `bot` or the closed-list az (registered like `cmd/cardval/az.go:66-114`, belief via DR-2). Prints draftsim's `built:`/`random:` contract. `calibrate` subcommand fits the opponent-model constants into `SetTable`. | Smoke: 1 event, `maxHuman` 1, 1 game, `bot` pilot; and the no-net az at sims 2. **Operator-run acceptance (not a test):** the `bot` pilot reproduces 48.1% / 31.5% within CI. | DR-2, DR-3 |
 | DR-5 | New pure `limited/draftnet`: `.dpkw` format (header + named float32 tensors), `Load([]byte)` (refuses unknown tensors), `Forward`. `NetDrafter` in `limited/pickbot/netdrafter.go` (argmax or temperature, optional `Recorder` hook for logits and features). | Parity: committed fixture (tiny random weights + inputs + expected logits from the Python trainer) within 1e-4. `critic.*` tensor refused. imports test. | DR-3 |
 | DR-6 | Hosting: `eventhost/persona.go` accepts a registered `NetDrafter` persona; gorged `-draft-net`/`-draft-table` flags register it (mirrors `azc4.Enable`). | `eventhost` persona test with a fixture net. A privacy test asserts the persona is constructed from the `PickView` path only. | DR-5, operator ruling Q4 |
-| DR-7 | `cmd/draftrl rollout`: league pods, `best23` with value-table ratings (`RatingsOverride`), K games/seat vs train-split decks (gate decks excluded by card-list hash), az pilot. Writes per-iteration `picks.bin` + `picks.jsonl` + `seats.jsonl` + `GameDataCSV` + event logs + manifest. Honours `GORGE_PAUSE_FILE`. | Smoke: 1 pod, `bot` pilot, 2 games/seat; records reproduce from the seed. Gate-deck exclusion test. | DR-4, DR-5, S0 merged |
+| DR-7 | `cmd/draftrl rollout`: league pods, `best23` with value-table ratings (`RatingsOverride`), the round robin within the pod, K games per seat pair (§11; gate decks excluded by card-list hash), az pilot. Writes per-iteration `picks.bin` + `picks.jsonl` + `seats.jsonl` + `GameDataCSV` + event logs + manifest. Honours `GORGE_PAUSE_FILE`. | Smoke: 1 pod, `bot` pilot, 2 games/seat; records reproduce from the seed. Gate-deck exclusion test. | DR-4, DR-5, S0 merged |
 | DR-8 | `cmd/draftrl bc`: draft-only S0/variant pods writing teacher scores + seat labels. | Smoke: 2 pods; the label equals the built deck's top pair. | DR-7 |
 | DR-9 | Trainer (out of repo, `/mnt/sata/.../draftrl/py`): BC, PPO, critic, `.dpkw` export, parity-fixture generator; loop script alternating rollout and train under heavy.sh. | Operator-run S1 and S2 gates. | DR-5, DR-7, DR-8 |
 | DR-10 | `cmd/draftrl values`: rollout `GameDataCSV` → split-half `se`, pair-conditional values, pair-lift table → new `SetTable`. Repo-map rows. | Fixed 50-game CSV → golden table. | DR-7 |
@@ -470,7 +494,7 @@ Run order: DR-1, DR-2, DR-11 → DR-3 → DR-4 (G0 re-baseline) → DR-5 → DR-
 - **R2 Pilot exploit.** The policy can learn decks az-c4 pilots well rather than good decks
   (for example, avoiding cards the search misplays). The `bot`-pilot guard at every gate
   reports the divergence.
-- **R3 Credit noise.** At K = 8, R has SE ≈ 0.18 per seat. The in-hand term is noisier still
+- **R3 Credit noise.** At 12 round-robin games per seat (K = 4), R has SE ≈ 0.14 per seat. The in-hand term is noisier still
   and biased toward late-game cards (GIH's known bias). Mitigations: the pod baseline, batch
   normalisation, η starting at 0, and the K ablation.
 - **R4 az-c4 is FDN-specific.**

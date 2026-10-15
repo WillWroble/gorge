@@ -112,7 +112,7 @@ func parseGate(args []string) (gateOpts, error) {
 	fs.Uint64Var(&o.seed, "seed", 201, "first event seed; event n uses seed+n")
 	fs.IntVar(&o.events, "events", 24, "events (4-seat pods)")
 	fs.IntVar(&o.games, "games", 4, "games per gauntlet pairing (sides alternate)")
-	fs.StringVar(&drafters, "drafters", "17l", "per-seat drafter specs, 1 or 4, comma-separated: 17l | ovr:PATH#FIELD (rating-colour) | KIND:ARG (a registered DrafterKind, e.g. net:WEIGHTS.dpkw)")
+	fs.StringVar(&drafters, "drafters", "17l", "per-seat drafter specs, 1 or 4, comma-separated: 17l | ovr:PATH#FIELD (rating-colour) | KIND:ARG (a registered DrafterKind, e.g. net:WEIGHTS.dpkw[@TABLE.json][~T], ~T sampling at temperature T)")
 	fs.StringVar(&builders, "builders", "", "per-seat builder specs, 1 or 4: 17l | ovr:PATH#FIELD (best23) | random; empty = follow each seat's drafter ratings")
 	fs.StringVar(&o.baseline, "baseline", "random", "also measure a random deck from each seat's pool: random | none")
 	fs.StringVar(&o.pilot, "pilot", "bot", "gauntlet pilot on both seats: a bot policy name, or az (closed-list az search)")

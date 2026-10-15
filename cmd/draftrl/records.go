@@ -20,19 +20,25 @@ import (
 	"github.com/adams-shaun/gorge/limited/setdata"
 )
 
-// picks.bin (little-endian), version 1:
+// picks.bin (little-endian), version 2:
 //
 //	header: "DRPB" u32 version u32 G u32 C u32 nDrafters,
 //	        str tableHash, nDrafters × str drafter id   (str = u16 len + bytes)
 //	record: u32 pod u8 seat u8 round u8 pickNo u8 packSize
-//	        u8 chosenIdx (255 = none) u8 drafterIdx u8 hasLogits u8 0
+//	        u8 chosenIdx (255 = none) u8 drafterIdx u8 hasLogits u8 flags
 //	        G × f32 global features (globalLayout order)
 //	        packSize × (i32 table index (-1 = not in table), C × f32 candidate features)
 //	        if hasLogits: packSize × f32
+//	        if flags&1 (behaviour; only with hasLogits): f32 temperature T,
+//	          f32 log softmax(logits/T)[chosenIdx]  (the sampled pick's
+//	          behaviour log-prob; probabilities are softmax(logits/T))
 //
+// Version 1 is the same layout with the flags byte always 0, so a v2
+// reader reads v1 files unchanged; a v1 reader reads a v2 file correctly
+// only when no record sets flags (no sampling net seat).
 // Static card features are not repeated: a reader joins the table index
 // against the SetTable named by tableHash (written as table.json).
-const picksBinVersion = 1
+const picksBinVersion = 2
 
 // globalLayout names the G global features, in order.
 var globalLayout = func() []string {
@@ -175,7 +181,11 @@ func (b *binWriter) writeRecords(picks []pickRec) error {
 		if len(p.Logits) == len(p.Pack) && len(p.Logits) > 0 {
 			hasLogits = 1
 		}
-		b.buf = append(b.buf, byte(p.Seat), byte(p.Round), byte(p.PickNo), byte(len(p.Pack)), chosen, byte(p.drafterIdx), hasLogits, 0)
+		flags := byte(0)
+		if hasLogits == 1 && p.HasBehaviour {
+			flags = 1
+		}
+		b.buf = append(b.buf, byte(p.Seat), byte(p.Round), byte(p.PickNo), byte(len(p.Pack)), chosen, byte(p.drafterIdx), hasLogits, flags)
 		b.vec = globalVec(&p.Features, b.vec[:0])
 		b.f32s(b.vec)
 		for ci := range p.Features.Cands {
@@ -185,6 +195,9 @@ func (b *binWriter) writeRecords(picks []pickRec) error {
 		}
 		if hasLogits == 1 {
 			b.f32s(p.Logits)
+		}
+		if flags&1 != 0 {
+			b.f32s([]float32{p.Temp, p.LogProb})
 		}
 		if err := b.flush(); err != nil {
 			return err

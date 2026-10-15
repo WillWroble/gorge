@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -34,6 +36,15 @@ type DrafterKind func(lab *draftlab.Lab, arg, set string) (d pickbot.Drafter, re
 // NetDrafter Recorder adapts to it with a few lines.
 type LogitSource interface {
 	LastLogits() []float32
+}
+
+// BehaviourSource is the optional sampling side of a LogitSource drafter:
+// for a stochastic pick it returns the temperature and the chosen card's
+// log-prob under softmax(logits/temp) (ok false for a deterministic pick).
+// The rollout writes it into picks.bin's behaviour block (version 2) so
+// PPO has the behaviour log-prob.
+type BehaviourSource interface {
+	LastBehaviour() (temp float32, logp float32, ok bool)
 }
 
 var drafterKinds = struct {
@@ -104,18 +115,96 @@ const leagueSalt = 0xD4A7E6
 // from rand.NewPCG(podSeed, leagueSalt). With a 4-entry league and
 // -league-fixed the seats take the entries in order instead.
 func seatLeague(league []leagueSpec, podSeed uint64, fixed bool) [4]int {
+	return seatPod(len(league), podSeed, fixed, nil, -1, 0)
+}
+
+// seatPod is seatLeague with the S2 learner options (spec §3.3). n is the
+// number of league entries. With learner >= 0 (the learner's index, which
+// is never drawn by the league draw) the pod first places `learners` seats
+// at random positions on the learner, then draws every other seat from the
+// remaining entries. weights (one per entry, nil = uniform; the learner's
+// own weight is ignored) make the league draw weighted. With learner < 0
+// and nil weights it is exactly seatLeague's draw, so existing rollouts
+// reproduce byte for byte.
+func seatPod(n int, podSeed uint64, fixed bool, weights []float64, learner, learners int) [4]int {
 	var out [4]int
 	if fixed {
 		for s := range out {
-			out[s] = s % len(league)
+			out[s] = s % n
 		}
 		return out
 	}
 	r := rand.New(rand.NewPCG(podSeed, leagueSalt))
+	if learner < 0 && weights == nil {
+		for s := range out {
+			out[s] = r.IntN(n)
+		}
+		return out
+	}
+	var isLearner [4]bool
+	if learner >= 0 {
+		for _, s := range r.Perm(4)[:learners] {
+			isLearner[s] = true
+		}
+	}
+	// The league draw: weighted over every entry but the learner.
+	w := make([]float64, n)
+	sum := 0.0
+	for i := range w {
+		if i == learner {
+			continue
+		}
+		w[i] = 1
+		if weights != nil {
+			w[i] = weights[i]
+		}
+		sum += w[i]
+	}
 	for s := range out {
-		out[s] = r.IntN(len(league))
+		if isLearner[s] {
+			out[s] = learner
+			continue
+		}
+		x := r.Float64() * sum
+		out[s] = -1
+		for i, wi := range w {
+			if wi <= 0 {
+				continue
+			}
+			out[s] = i
+			if x < wi {
+				break
+			}
+			x -= wi
+		}
 	}
 	return out
+}
+
+// parseWeights parses -league-weights: n comma-separated finite weights >= 0
+// with a positive sum, or nil for an empty string.
+func parseWeights(s string, n int) ([]float64, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	toks := strings.Split(s, ",")
+	if len(toks) != n {
+		return nil, fmt.Errorf("%d weights for %d league entries", len(toks), n)
+	}
+	out := make([]float64, n)
+	sum := 0.0
+	for i, t := range toks {
+		w, err := strconv.ParseFloat(strings.TrimSpace(t), 64)
+		if err != nil || w < 0 || math.IsNaN(w) || math.IsInf(w, 0) {
+			return nil, fmt.Errorf("weight %q: want a finite number >= 0", t)
+		}
+		out[i] = w
+		sum += w
+	}
+	if sum <= 0 {
+		return nil, fmt.Errorf("weights sum to 0")
+	}
+	return out, nil
 }
 
 // ratingsCache loads each ratings override file once.
@@ -174,18 +263,23 @@ func newLeagueDrafter(lab *draftlab.Lab, sp leagueSpec, set string, rc *ratingsC
 
 // pickRec is one recorded pick.
 type pickRec struct {
-	Pod       int                `json:"pod"`
-	PodSeed   uint64             `json:"pod_seed"`
-	Seat      int                `json:"seat"`
-	Round     int                `json:"round"`
-	PickNo    int                `json:"pick_no"`
-	Pick      int                `json:"pick"` // the seat's 0-based pick ordinal over the draft
-	Drafter   string             `json:"drafter"`
-	Pack      []string           `json:"pack"` // card names in pack order
-	Chosen    string             `json:"chosen"`
-	ChosenIdx int                `json:"chosen_idx"`
-	Logits    []float32          `json:"logits,omitempty"`
-	Features  draftfeat.Features `json:"features"`
+	Pod       int       `json:"pod"`
+	PodSeed   uint64    `json:"pod_seed"`
+	Seat      int       `json:"seat"`
+	Round     int       `json:"round"`
+	PickNo    int       `json:"pick_no"`
+	Pick      int       `json:"pick"` // the seat's 0-based pick ordinal over the draft
+	Drafter   string    `json:"drafter"`
+	Pack      []string  `json:"pack"` // card names in pack order
+	Chosen    string    `json:"chosen"`
+	ChosenIdx int       `json:"chosen_idx"`
+	Logits    []float32 `json:"logits,omitempty"`
+	// Temp and LogProb are the behaviour policy of a sampled pick
+	// (BehaviourSource); HasBehaviour is false for a deterministic one.
+	HasBehaviour bool               `json:"has_behaviour,omitempty"`
+	Temp         float32            `json:"temp,omitempty"`
+	LogProb      float32            `json:"logp,omitempty"`
+	Features     draftfeat.Features `json:"features"`
 
 	drafterIdx int
 	packIdx    []int32 // table index per pack card, -1 when absent
@@ -245,6 +339,9 @@ func (d *recordingDrafter) pick(v pickbot.PickView, r *rand.Rand, fallible bool)
 	if ls, ok := d.inner.(LogitSource); ok {
 		if l := ls.LastLogits(); l != nil {
 			rec.Logits = append([]float32(nil), l...)
+			if bs, ok := d.inner.(BehaviourSource); ok {
+				rec.Temp, rec.LogProb, rec.HasBehaviour = bs.LastBehaviour()
+			}
 		}
 	}
 	*d.out = append(*d.out, rec)

@@ -64,11 +64,13 @@ func TestNetDrafterPickAllocatesNothing(t *testing.T) {
 	if cv.view.Pack == nil {
 		t.Fatal("no view captured")
 	}
-	d := &NetDrafter{Net: net, Table: tab}
-	rng := rand.New(rand.NewPCG(1, 1))
-	d.Pick(cv.view, rng)
-	if a := testing.AllocsPerRun(50, func() { d.Pick(cv.view, rng) }); a != 0 {
-		t.Fatalf("NetDrafter.Pick allocates %.1f times per pick, want 0", a)
+	for _, temp := range []float64{0, 1} {
+		d := &NetDrafter{Net: net, Table: tab, Temperature: temp}
+		rng := rand.New(rand.NewPCG(1, 1))
+		d.Pick(cv.view, rng)
+		if a := testing.AllocsPerRun(50, func() { d.Pick(cv.view, rng) }); a != 0 {
+			t.Fatalf("T=%v: NetDrafter.Pick allocates %.1f times per pick, want 0", temp, a)
+		}
 	}
 }
 

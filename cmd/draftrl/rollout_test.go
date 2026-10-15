@@ -131,13 +131,15 @@ func (f *fakeNet) Pick(v pickbot.PickView, _ *rand.Rand) string {
 }
 func (f *fakeNet) LastLogits() []float32 { return f.last }
 
+func fakeKind(_ *draftlab.Lab, arg, _ string) (pickbot.Drafter, draftlab.AgentRef, error) {
+	return &fakeNet{}, draftlab.AgentRef{Name: "fake", Version: arg}, nil
+}
+
 // TestRolloutDrafterKindHook drafts with a registered kind and checks its
 // logits ride the pick records.
 func TestRolloutDrafterKindHook(t *testing.T) {
 	dir := testutil.CorpusDirOrSkip(t)
-	RegisterDrafterKind("fake", func(_ *draftlab.Lab, arg, _ string) (pickbot.Drafter, draftlab.AgentRef, error) {
-		return &fakeNet{}, draftlab.AgentRef{Name: "fake", Version: arg}, nil
-	})
+	RegisterDrafterKind("fake", fakeKind)
 	if _, err := parseLeague("nokind:x"); err == nil {
 		t.Fatal("unregistered kind parsed")
 	}
