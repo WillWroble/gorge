@@ -66,6 +66,7 @@ func (e *Engine) planCastPaymentChecked(p state.PlayerID, cast decision.PlannedC
 	// would compose a cost (and, from ZCommand, a commander tax) that
 	// beginCast would never charge.
 	originZone := state.ZHand
+	flashback := false
 	switch planCastPaymentCheckedCodes.Code(string(cast.Origin)) {
 	case planCastPaymentCheckedHand:
 	case planCastPaymentCheckedCommandZone:
@@ -74,10 +75,15 @@ func (e *Engine) planCastPaymentChecked(p state.PlayerID, cast decision.PlannedC
 		originZone = state.ZExile
 	case planCastPaymentCheckedGraveyard:
 		originZone = state.ZGraveyard
+	case planCastPaymentCheckedFlashback:
+		// The CR 702.34a flashback cast of a graveyard card for its primary
+		// flashback cost (decision.OriginFlashback): the owner's own card,
+		// cast in Mode "flashback", never a may-play grant.
+		originZone, flashback = state.ZGraveyard, true
 	default:
 		return PaymentPlanOutcome{Reason: "unsupported"}
 	}
-	mayPlay := plannedMayPlayZone(originZone)
+	mayPlay := plannedMayPlayZone(originZone) && !flashback
 	o := e.G.Obj(cast.Object)
 	// A may-play permission can grant an opponent's card (Intellect
 	// Devourer), so the owner check is relaxed for those origins only; the
@@ -85,21 +91,30 @@ func (e *Engine) planCastPaymentChecked(p state.PlayerID, cast decision.PlannedC
 	if o == nil || o.Zone != originZone || (!mayPlay && o.Owner != p) || o.Face() == nil || int(o.FaceIdx) != cast.Face {
 		return PaymentPlanOutcome{Reason: "unsupported"}
 	}
-	if detail := e.paymentPlanCastShapeDetailUsing(statics.get(), p, cast.Object); detail != "" {
+	if detail := e.paymentPlanCastShapeDetailScoped(statics.get(), p, cast.Object, plannedCastScope(o.Zone, flashback)); detail != "" {
 		return PaymentPlanOutcome{Reason: "unsupported", Detail: detail}
 	}
-	if mayPlay {
+	switch {
+	case flashback:
+		if !candidates.hasFlashback(cast.Object) {
+			return PaymentPlanOutcome{Reason: "unsupported"}
+		}
+	case mayPlay:
 		if !candidates.has(cast.Object, true) {
 			return PaymentPlanOutcome{Reason: "unsupported"}
 		}
-	} else if !candidates.has(cast.Object) {
-		return PaymentPlanOutcome{Reason: "unsupported"}
+	default:
+		if !candidates.has(cast.Object) {
+			return PaymentPlanOutcome{Reason: "unsupported"}
+		}
 	}
 	// V1 has no way to carry a target-dependent reprice or a choice made at
 	// announcement. Candidate discovery below owns timing, targets and
 	// prohibitions; this method owns the exact cost/witness subset.
 	var cost Cost
-	if mayPlay {
+	if flashback {
+		cost = e.plannedFlashbackCost(statics.get(), p, cast.Object)
+	} else if mayPlay {
 		// The untyped may-play cast's price, composed exactly as the offer
 		// walk (legal_walk_alt.go) prices it and beginCast's "mayplay" case
 		// charges it: the free grant empties the mana part, the granting
@@ -173,6 +188,9 @@ type paymentCastCandidates struct {
 	// mayIDs are the untyped may-play casts (Mode "mayplay", no
 	// MayPlayPerm) the same walk listed, for the exile/graveyard origins.
 	mayIDs []state.ObjID
+	// fbIDs are the primary-instance flashback casts (Mode "flashback", no
+	// Option.Cost) the same walk listed, for decision.OriginFlashback.
+	fbIDs []state.ObjID
 }
 
 // pricedCandidatesVerify: see derivedMemoVerify. Set by the rules test binary.
@@ -182,25 +200,7 @@ func (c *paymentCastCandidates) has(id state.ObjID, mayPlay ...bool) bool {
 	if c.priced && !pricedCandidatesVerify {
 		return true
 	}
-	if !c.ready {
-		hyp := state.Mana{1 << 28, 1 << 28, 1 << 28, 1 << 28, 1 << 28, 1 << 28}
-		// Only casts are read, so the walk skips the non-cast sections
-		// (legalActionsWalk's castsOnly).
-		opts := c.e.legalActionsWalkTemp(c.p, &hyp, true)
-		for _, opt := range opts {
-			if opt.Kind != "cast" || opt.AltCostIndex != 0 {
-				continue
-			}
-			switch {
-			case opt.Mode == "":
-				c.ids = append(c.ids, opt.Obj)
-			case planCastPaymentCheckedCodes.Code(opt.Mode) == planCastPaymentCheckedMayPlayMode && opt.MayPlayPerm == "":
-				c.mayIDs = append(c.mayIDs, opt.Obj)
-			}
-		}
-		c.e.optRelease(opts)
-		c.ready = true
-	}
+	c.fill()
 	wantMayPlay := len(mayPlay) > 0 && mayPlay[0]
 	found := false
 	if wantMayPlay {
@@ -218,6 +218,55 @@ func (c *paymentCastCandidates) has(id state.ObjID, mayPlay ...bool) bool {
 	return found
 }
 
+// fill runs the set's one huge-pool walk on first use.
+func (c *paymentCastCandidates) fill() {
+	if c.ready {
+		return
+	}
+	hyp := state.Mana{1 << 28, 1 << 28, 1 << 28, 1 << 28, 1 << 28, 1 << 28}
+	// Only casts are read, so the walk skips the non-cast sections
+	// (legalActionsWalk's castsOnly).
+	opts := c.e.legalActionsWalkTemp(c.p, &hyp, true)
+	for _, opt := range opts {
+		if opt.Kind != "cast" || opt.AltCostIndex != 0 {
+			continue
+		}
+		switch {
+		case opt.Mode == "":
+			c.ids = append(c.ids, opt.Obj)
+		case planCastPaymentCheckedCodes.Code(opt.Mode) == planCastPaymentCheckedMayPlayMode && opt.MayPlayPerm == "":
+			c.mayIDs = append(c.mayIDs, opt.Obj)
+		case planCastFlashbackOption(opt):
+			c.fbIDs = append(c.fbIDs, opt.Obj)
+		}
+	}
+	c.e.optRelease(opts)
+	c.ready = true
+}
+
+// hasFlashback is has for a planned flashback cast: membership of the
+// primary-instance flashback casts the same walk listed (fbIDs). A priced
+// set answers true, exactly as has does, and verify mode checks it.
+func (c *paymentCastCandidates) hasFlashback(id state.ObjID) bool {
+	if c.priced && !pricedCandidatesVerify {
+		return true
+	}
+	c.fill()
+	found := slices.Contains(c.fbIDs, id)
+	if c.priced && !found {
+		panic(fmt.Sprintf("payment plan: priced-walk flashback cast %d missing from the huge-pool walk", id))
+	}
+	return found
+}
+
+// planCastFlashbackOption reports whether opt is the cast option a planned
+// flashback cast (decision.OriginFlashback) stands for: the primary flashback
+// instance (no Option.Cost, which names a further instance), no alternative
+// additional cost, no may-play permission.
+func planCastFlashbackOption(opt decision.Option) bool {
+	return opt.Kind == optCast && opt.Mode == "flashback" && opt.Cost == "" && opt.AltCostIndex == 0 && opt.MayPlayPerm == ""
+}
+
 // paymentPlanCastShapeOK excludes plain casts whose announced cost or result
 // depends on a choice V1 cannot bind into its witness.  The ordinary priority
 // option remains available; this only withholds the additive automatic offer.
@@ -233,6 +282,17 @@ func (e *Engine) paymentPlanCastShapeDetail(p state.PlayerID, id state.ObjID) st
 // already-collected cost-static set (the offer builder's, shared by every
 // candidate of one decision).
 func (e *Engine) paymentPlanCastShapeDetailUsing(statics costStaticViews, p state.PlayerID, id state.ObjID) string {
+	scope := spellScope("")
+	if o := e.G.Obj(id); o != nil && plannedMayPlayZone(o.Zone) {
+		scope = spellScope("mayplay")
+	}
+	return e.paymentPlanCastShapeDetailScoped(statics, p, id, scope)
+}
+
+// paymentPlanCastShapeDetailScoped is paymentPlanCastShapeDetailUsing for a
+// cast priced in scope: the may-play origins' "mayplay", a planned
+// flashback's "flashback" (plannedCastScope), the plain casts' "".
+func (e *Engine) paymentPlanCastShapeDetailScoped(statics costStaticViews, p state.PlayerID, id state.ObjID, scope costScope) string {
 	o := e.G.Obj(id)
 	if o == nil || o.Face() == nil {
 		return "shape:additional_cost"
@@ -243,10 +303,6 @@ func (e *Engine) paymentPlanCastShapeDetailUsing(statics costStaticViews, p stat
 	}
 	// Cost$ on the spell ability and the supported cost-static extra are both
 	// additional costs; neither is represented by a mana-only plan witness.
-	scope := spellScope("")
-	if plannedMayPlayZone(o.Zone) {
-		scope = spellScope("mayplay")
-	}
 	mods := e.costModifiersWithTargetsUsing(statics, p, id, scope, nil, false)
 	spellCost := Cost{}
 	if sa := f.SpellAbility(); sa != nil {
@@ -257,12 +313,12 @@ func (e *Engine) paymentPlanCastShapeDetailUsing(statics costStaticViews, p stat
 	if pay.PlanCostDetail(mods.Extra) != "" {
 		return "shape:additional_cost"
 	}
-	// The spell ability's own Cost$ admits exactly one non-mana shape: a
-	// fixed-count mandatory sacrifice. The mana half of that same cost still
-	// has to be V1-clean, which paymentPlanNonManaAdmissible checks after
-	// removing the Sac parts. Every other non-mana part (Discard, PayLife,
-	// Exile, tapXType, RevealOrChoose, Exert, ...) and every variable-count
-	// Sac<X/...>/Sac<All/...> still declines.
+	// The spell ability's own Cost$ admits exactly two non-mana shapes: a
+	// fixed-count mandatory sacrifice or discard. The mana half of that same
+	// cost still has to be V1-clean, which pay.PlanNonManaAdmissible checks
+	// after removing the Sac and Discard parts. Every other non-mana part
+	// (PayLife, Exile, tapXType, RevealOrChoose, Exert, ...) and every
+	// variable-count Sac<X/...>/Sac<All/...> or Discard<X/...> still declines.
 	if pay.PlanNonManaAdmissible(spellCost) != "" || pay.PlanNonManaAdmissible(pay.WithSpellAbilityExtras(f, Cost{})) != "" {
 		return "shape:additional_cost"
 	}
@@ -422,7 +478,7 @@ func (e *Engine) PaymentActionsForPriority(p state.PlayerID, seq uint64) []decis
 	// The builder's plans may be shared with the decision's cast-plan memo
 	// (planCastPaymentMemo); hand the caller its own copy, as
 	// EnsurePaymentActions does.
-	Out, _ := e.paymentActionsForPriority(p, p, seq, nil)
+	Out, _, _, _ := e.paymentActionsForPriority(p, p, seq, nil, nil)
 	if Out == nil {
 		return nil
 	}
@@ -449,16 +505,21 @@ func (e *Engine) PaymentActionsForPriority(p state.PlayerID, seq uint64) []decis
 // sources cannot afford, which the huge-pool walk admits, so the planner
 // only ever sees the candidates it saw before. Cost statics are collected
 // once and shared by every candidate.
-func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64, options []decision.Option) ([]decision.PaymentAction, []state.ObjID) {
+//
+// potential is the caller's buffer for the build's cast census
+// (decision.PotentialCasts): it is truncated and refilled with every object
+// the walk offers a cast of, and known reports that the walk ran.
+func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64, options []decision.Option, potential []state.ObjID) (out []decision.PaymentAction, unpayable []state.ObjID, potentialCasts []state.ObjID, known bool) {
+	potential = potential[:0]
 	if e.G.Over {
-		return nil, nil
+		return nil, nil, potential, false
 	}
 	// Every candidate's plan is declined on a pool the planner cannot
 	// account for (planCastPaymentChecked), and that verdict reads only the
 	// player, so no walk can change the empty result.
 	if !pay.PlanPoolOK(&e.G.Players[p]) {
 		e.PaymentStats.RecordBuild(true)
-		return nil, nil
+		return nil, nil, potential, false
 	}
 	e.PaymentStats.RecordBuild(false)
 	// The builder's potential walk is what the priority walk's block record
@@ -483,10 +544,13 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 	// The walk is shared with the decision's other potential readers
 	// (potential_walk_cache.go), which may hand back the full walk.
 	hyp, candidates := e.potentialWalkOf(p, false)
+	for i := range candidates {
+		if candidates[i].Kind == optCast && !slices.Contains(potential, candidates[i].Obj) {
+			potential = append(potential, candidates[i].Obj)
+		}
+	}
 	statics := costStaticSource{e: e}
 	legal := paymentCastCandidates{e: e, p: p, priced: true}
-	var out []decision.PaymentAction
-	var unpayable []state.ObjID
 	// The planner's "insufficient" is a PROOF only when the source census
 	// prices every mana ability p could activate, or when a relaxation of the
 	// abilities it misses (paymentPlanRelaxProof) still cannot pay. The cast
@@ -527,7 +591,8 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 		// exile/graveyard card (Mode "mayplay"): a typed MayPlayText$
 		// permission carries a MayPlayPerm and stays withheld.
 		mayPlay := planCastPaymentCheckedCodes.Code(opt.Mode) == planCastPaymentCheckedMayPlayMode && opt.MayPlayPerm == ""
-		if opt.Kind != "cast" || (opt.Mode != "" && !mayPlay) || opt.AltCostIndex != 0 {
+		flashback := planCastFlashbackOption(opt)
+		if opt.Kind != "cast" || (opt.Mode != "" && !mayPlay && !flashback) || opt.AltCostIndex != 0 {
 			continue
 		}
 		// Derive the origin from the object's actual zone.  Only the hand and
@@ -540,6 +605,10 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 		}
 		var origin string
 		switch {
+		case flashback && originObj.Zone == state.ZGraveyard:
+			origin = decision.OriginFlashback
+		case flashback:
+			continue
 		case mayPlay && plannedMayPlayZone(originObj.Zone):
 			origin = plannedMayPlayOrigin(originObj.Zone)
 		case mayPlay:
@@ -555,7 +624,10 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 		got := e.planCastPaymentMemo(p, cast, &statics, &legal)
 		e.PaymentStats.RecordOutcome(got)
 		if got.Plan == nil {
-			if got.Reason == pay.ReasonInsufficient && provesUnpayable(cast) {
+			// The unpayable census names plain casts only
+			// (decision.PotentialUnpayableCasts); a flashback proof is not
+			// recorded there.
+			if !flashback && got.Reason == pay.ReasonInsufficient && provesUnpayable(cast) {
 				unpayable = append(unpayable, opt.Obj)
 			}
 			continue
@@ -590,7 +662,7 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 			options = e.legalActions(p)
 		}
 		for i := range options {
-			if options[i].Kind == "cast" && options[i].Obj == opt.Obj && options[i].Mode == opt.Mode && options[i].MayPlayPerm == "" && options[i].AltCostIndex == 0 {
+			if options[i].Kind == "cast" && options[i].Obj == opt.Obj && options[i].Mode == opt.Mode && options[i].MayPlayPerm == "" && options[i].AltCostIndex == 0 && options[i].Cost == "" {
 				idx := options[i].Index
 				a.BaseOptionIndex = &idx
 				break
@@ -599,7 +671,7 @@ func (e *Engine) paymentActionsForPriority(p, idSeat state.PlayerID, seq uint64,
 		out = append(out, a)
 		e.PaymentStats.RecordOffered(len(a.Plans))
 	}
-	return out, unpayable
+	return out, unpayable, potential, true
 }
 
 // ValidateCastPayment independently re-derives the eligible sources and cost
@@ -621,13 +693,9 @@ func (e *Engine) ValidateCastPayment(p state.PlayerID, cast decision.PlannedCast
 	// submit; the seat then falls back to the manual window instead of
 	// committing a cast whose additional cost can no longer be paid.
 	if o := e.G.Obj(cast.Object); o != nil && o.Face() != nil {
-		scope := spellScope("")
-		if plannedMayPlayZone(o.Zone) {
-			scope = spellScope("mayplay")
-		}
-		composed := e.offerCostFor(p, cast.Object, pay.WithSpellAbilityExtras(o.Face(), pay.RawBaseCost(asPayer(e), p, cast.Object)), scope)
-		if len(composed.Sac) != 0 && !pay.NonManaCastable(asPayer(e), p, cast.Object, composed, false, "") {
-			return fmt.Errorf("payment plan sacrifice cost no longer payable")
+		composed := e.plannedCastComposedCost(p, cast, o)
+		if (len(composed.Sac) != 0 || len(composed.Discard) != 0) && !pay.NonManaCastable(asPayer(e), p, cast.Object, composed, false, "") {
+			return fmt.Errorf("payment plan sacrifice or discard cost no longer payable")
 		}
 	}
 	if got.Reason == "unsupported" {
@@ -684,7 +752,11 @@ func (e *Engine) ValidateCastPayment(p state.PlayerID, cast decision.PlannedCast
 	// witness the planner just built.
 	settleBase := pay.RawBaseCost(asPayer(e), p, cast.Object)
 	settleScope := spellScope("")
-	if o := e.G.Obj(cast.Object); o != nil && plannedMayPlayZone(o.Zone) {
+	if cast.Origin == decision.OriginFlashback {
+		// A planned flashback settles at its primary flashback cost in
+		// "flashback" scope (plannedFlashbackCost: extras, then statics).
+		settleBase, settleScope = e.flashbackCost(cast.Object), spellScope("flashback")
+	} else if o := e.G.Obj(cast.Object); o != nil && plannedMayPlayZone(o.Zone) {
 		settleScope = spellScope("mayplay")
 		if free, granted := e.mayPlayGrant(p, cast.Object); granted && free {
 			settleBase = Cost{}
@@ -975,6 +1047,7 @@ const (
 	planCastPaymentCheckedExile
 	planCastPaymentCheckedGraveyard
 	planCastPaymentCheckedMayPlayMode
+	planCastPaymentCheckedFlashback
 )
 
 var planCastPaymentCheckedCodes = state.NewStrCodes(
@@ -983,7 +1056,45 @@ var planCastPaymentCheckedCodes = state.NewStrCodes(
 	state.StrEntry[planCastPaymentCheckedCode]{Key: "exile", Val: planCastPaymentCheckedExile},
 	state.StrEntry[planCastPaymentCheckedCode]{Key: "graveyard", Val: planCastPaymentCheckedGraveyard},
 	state.StrEntry[planCastPaymentCheckedCode]{Key: "mayplay", Val: planCastPaymentCheckedMayPlayMode},
+	state.StrEntry[planCastPaymentCheckedCode]{Key: decision.OriginFlashback, Val: planCastPaymentCheckedFlashback},
 )
+
+// plannedCastScope is the cost-static scope a planned cast from zone z is
+// priced in: "flashback" for a planned flashback cast, "mayplay" for a
+// may-play origin (exile, graveyard), "" for the hand and command zone --
+// the scope beginCast charges each one's option Mode in.
+func plannedCastScope(z state.Zone, flashback bool) costScope {
+	switch {
+	case flashback:
+		return spellScope("flashback")
+	case plannedMayPlayZone(z):
+		return spellScope("mayplay")
+	}
+	return spellScope("")
+}
+
+// plannedFlashbackCost is the cost a planned flashback cast of id locks in
+// (CR 601.2f), composed exactly as the offer walk (legal_walk_alt.go's
+// flashback arm) and beginCast's "flashback" mode charge it: the primary
+// flashback cost (flashbackCost: the printed parameter, or the card's mana
+// cost for a parameterless grant) with the spell ability's own additional
+// costs folded in (CR 702.34a replaces only the mana cost), then re-priced by
+// every live cost static in "flashback" scope.
+func (e *Engine) plannedFlashbackCost(statics costStaticViews, p state.PlayerID, id state.ObjID) Cost {
+	f := e.G.Obj(id).Face()
+	return e.offerCostForUsing(statics, p, id, pay.WithSpellAbilityExtras(f, e.flashbackCost(id)), spellScope("flashback"))
+}
+
+// plannedCastComposedCost is the cost a planned cast locks in, read for the
+// submit-time checks (ValidateCastPayment's sacrifice feasibility): the
+// primary flashback cost in "flashback" scope for decision.OriginFlashback,
+// else the printed cost with its extras in the origin zone's scope.
+func (e *Engine) plannedCastComposedCost(p state.PlayerID, cast decision.PlannedCast, o *state.Object) Cost {
+	if cast.Origin == decision.OriginFlashback {
+		return e.plannedFlashbackCost(e.collectCostStatics(), p, cast.Object)
+	}
+	return e.offerCostFor(p, cast.Object, pay.WithSpellAbilityExtras(o.Face(), pay.RawBaseCost(asPayer(e), p, cast.Object)), plannedCastScope(o.Zone, false))
+}
 
 // plannedMayPlayZone reports whether z is an origin whose planned cast is an
 // untyped may-play cast (the "mayplay" mode): exile and the graveyard.
@@ -1002,13 +1113,10 @@ func plannedMayPlayOrigin(z state.Zone) string {
 // plannedCastOption is the priority option an announced or planned cast of
 // cast begins as. A may-play origin (exile, graveyard) begins as Mode
 // "mayplay" so beginCast prices the permission's cost and records the hosts
-// while the card is still in the granted zone; the hand and command-zone
-// plain casts carry no Mode, exactly as before.
+// while the card is still in the granted zone; a planned flashback
+// (decision.OriginFlashback) begins as Mode "flashback", the primary
+// instance (no Option.Cost); the hand and command-zone plain casts carry no
+// Mode, exactly as before (decision.PlannedCast.CastMode).
 func plannedCastOption(cast decision.PlannedCast) decision.Option {
-	opt := decision.Option{Kind: "cast", Obj: cast.Object}
-	switch planCastPaymentCheckedCodes.Code(cast.Origin) {
-	case planCastPaymentCheckedExile, planCastPaymentCheckedGraveyard:
-		opt.Mode = "mayplay"
-	}
-	return opt
+	return decision.Option{Kind: "cast", Obj: cast.Object, Mode: cast.CastMode()}
 }

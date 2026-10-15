@@ -196,11 +196,32 @@ type PaymentPlan struct {
 //
 // Origin is the zone the cast begins from: "hand", "command_zone" (the plain
 // taxed commander cast), or "exile" / "graveyard" (the plain cast an untyped
-// may-play permission grants a card there).
+// may-play permission grants a card there) -- or "flashback" (OriginFlashback),
+// the CR 702.34a flashback cast of a graveyard card for its primary flashback
+// cost, the one alternative-cost cast a V1 witness pays.
 type PlannedCast struct {
 	Object state.ObjID `json:"object"`
 	Face   int         `json:"face"`
 	Origin string      `json:"origin"`
+}
+
+// OriginFlashback is the PlannedCast.Origin of a planned flashback cast: the
+// card begins in its owner's graveyard and is cast in Mode "flashback" for
+// its primary (printed, or CR 702.32a-granted mana-cost) flashback cost. A
+// further flashback instance (Option.Cost set) is never planned.
+const OriginFlashback = "flashback"
+
+// CastMode is the priority-option Mode a planned cast of this origin begins
+// as: "flashback" for OriginFlashback, "mayplay" for the exile and graveyard
+// may-play origins, "" for the hand and command-zone plain casts.
+func (c PlannedCast) CastMode() string {
+	switch c.Origin {
+	case OriginFlashback:
+		return "flashback"
+	case "exile", "graveyard":
+		return "mayplay"
+	}
+	return ""
 }
 
 // PaymentAction is an additive priority-decision action. BaseOptionIndex is
@@ -310,6 +331,7 @@ func (d *Decision) CloneValue() Decision {
 func (d *Decision) CloneInto(dst *Decision) {
 	opts, reasons, pays := dst.Options[:0], dst.WindowReasons[:0], dst.PaymentActions[:0]
 	unpayable := dst.PotentialUnpayableCasts[:0]
+	potential := dst.PotentialCasts[:0]
 	fb, mp := dst.PaymentFallback, dst.ManaPayment
 	*dst = *d
 	dst.Options, dst.WindowReasons = nil, nil
@@ -327,6 +349,7 @@ func (d *Decision) CloneInto(dst *Decision) {
 	}
 	dst.PaymentActions = pays
 	dst.PotentialUnpayableCasts = append(unpayable, d.PotentialUnpayableCasts...)
+	dst.PotentialCasts = append(potential, d.PotentialCasts...)
 	if d.PaymentFallback != nil {
 		if fb == nil {
 			fb = new(PaymentFallback)

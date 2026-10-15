@@ -39,7 +39,10 @@ func paymentActionsReference(e *Engine, p state.PlayerID, seq uint64) []decision
 		// exile/graveyard card (Mode "mayplay", no MayPlayPerm), which the
 		// production builder admits with its zone's origin.
 		mayPlay := planCastPaymentCheckedCodes.Code(opt.Mode) == planCastPaymentCheckedMayPlayMode && opt.MayPlayPerm == ""
-		if opt.Kind != "cast" || (opt.Mode != "" && !mayPlay) || opt.AltCostIndex != 0 {
+		// So is a graveyard card's primary-instance flashback cast (Mode
+		// "flashback", no Option.Cost), offered with decision.OriginFlashback.
+		flashback := opt.Kind == "cast" && opt.Mode == "flashback" && opt.Cost == "" && opt.AltCostIndex == 0 && opt.MayPlayPerm == ""
+		if opt.Kind != "cast" || (opt.Mode != "" && !mayPlay && !flashback) || opt.AltCostIndex != 0 {
 			continue
 		}
 		// The origin comes from the object's actual zone, mirroring the
@@ -52,6 +55,10 @@ func paymentActionsReference(e *Engine, p state.PlayerID, seq uint64) []decision
 		}
 		var origin string
 		switch {
+		case flashback && originObj.Zone == state.ZGraveyard:
+			origin = decision.OriginFlashback
+		case flashback:
+			continue
 		case mayPlay && plannedMayPlayZone(originObj.Zone):
 			origin = plannedMayPlayOrigin(originObj.Zone)
 		case mayPlay:
@@ -80,7 +87,7 @@ func paymentActionsReference(e *Engine, p state.PlayerID, seq uint64) []decision
 		}
 		a := decision.PaymentAction{ID: aid, Cast: cast, Label: opt.Label, Plans: []decision.PaymentPlan{plan}}
 		for i := range legacy {
-			if legacy[i].Kind == "cast" && legacy[i].Obj == opt.Obj && legacy[i].Mode == opt.Mode && legacy[i].MayPlayPerm == "" && legacy[i].AltCostIndex == 0 {
+			if legacy[i].Kind == "cast" && legacy[i].Obj == opt.Obj && legacy[i].Mode == opt.Mode && legacy[i].MayPlayPerm == "" && legacy[i].AltCostIndex == 0 && legacy[i].Cost == "" {
 				idx := legacy[i].Index
 				a.BaseOptionIndex = &idx
 				break

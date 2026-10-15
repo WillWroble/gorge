@@ -1099,7 +1099,9 @@ export interface WindowReason {
    *
    * Origin is the zone the cast begins from: "hand", "command_zone" (the plain
    * taxed commander cast), or "exile" / "graveyard" (the plain cast an untyped
-   * may-play permission grants a card there).
+   * may-play permission grants a card there) -- or "flashback" (OriginFlashback),
+   * the CR 702.34a flashback cast of a graveyard card for its primary flashback
+   * cost, the one alternative-cost cast a V1 witness pays.
    */
 export interface PlannedCast {
   object: number;

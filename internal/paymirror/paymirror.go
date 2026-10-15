@@ -575,12 +575,11 @@ func floatTriggerPrecedesCast(res *RouteResult) {
 }
 
 // castOptionMode is the option Mode a planned cast's origin begins with: a
-// card in exile or the graveyard is cast through its untyped may-play offer.
+// card in exile or the graveyard is cast through its untyped may-play offer,
+// a flashback-origin plan through its primary flashback offer
+// (decision.PlannedCast.CastMode).
 func castOptionMode(origin string) string {
-	if origin == "exile" || origin == "graveyard" {
-		return "mayplay"
-	}
-	return ""
+	return decision.PlannedCast{Origin: origin}.CastMode()
 }
 
 // mirrorFloat is RouteFloat: activate each planned source at priority with
@@ -645,7 +644,7 @@ func mirrorFloat(b *rules.Engine, rep *Report, res *RouteResult, aEvents []event
 	}
 	d := b.Pending()
 	idx := findOption(d, func(o decision.Option) bool {
-		return o.Kind == "cast" && o.Obj == rep.Object && o.Mode == rep.castMode && o.AltCostIndex == 0
+		return o.Kind == "cast" && o.Obj == rep.Object && o.Mode == rep.castMode && o.AltCostIndex == 0 && o.Cost == ""
 	})
 	if idx < 0 {
 		why := fmt.Sprintf("pool %v", b.G.Players[p].Pool)
@@ -760,7 +759,7 @@ func mirrorBase(b *rules.Engine, rep *Report, action *decision.PaymentAction, re
 		return
 	}
 	o := d.Options[i]
-	if o.Kind != "cast" || o.Obj != action.Cast.Object || o.Mode != castOptionMode(action.Cast.Origin) || o.AltCostIndex != 0 {
+	if o.Kind != "cast" || o.Obj != action.Cast.Object || o.Mode != castOptionMode(action.Cast.Origin) || o.AltCostIndex != 0 || o.Cost != "" {
 		setMismatch(res, "base_option_names_other_action", fmt.Sprintf("%+v", o))
 		return
 	}

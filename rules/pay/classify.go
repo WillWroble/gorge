@@ -38,7 +38,8 @@ func FaceReadsManaSpent(f *cards.Face) bool {
 
 // PlanNonManaAdmissible reports whether c is a cost a mana-only V1
 // witness can describe: its mana half must classify cleanly and its only
-// permitted non-mana part is a fixed-count mandatory Sac<N/Spec>. A
+// permitted non-mana parts are a fixed-count mandatory Sac<N/Spec> and
+// Discard<N/Spec>. A
 // variable-count Sac<X/Spec> (cost.CostPart.Announced, the announced count binds
 // the cast's X) and Sac<All/...> (which never reaches Cost.Sac -- it parses as
 // Unknown) are not admissible, and every other non-mana field declines. The
@@ -46,14 +47,28 @@ func FaceReadsManaSpent(f *cards.Face) bool {
 // classifier the gate has always used, so X/hybrid/snow and the other
 // unsupported mana-class shapes still decline here. Returns the decline detail, or
 // "" when the cost is admissible.
+//
+// A fixed-count mandatory Discard<N/Spec> (Thrill of Possibility's "discard a
+// card") is admitted on the same terms as the sacrifice: the discard is the
+// cast's own CR 601.2h cost ask, answered from the hand after the card has
+// moved to the stack, and it never touches a mana source the witness spends,
+// so the witness's mana half is unchanged by it. paymentPlanCheck re-reads
+// the cast's cost after its announcements (discards included) before the
+// first activation, and ValidateCastPayment re-runs the offer gate's
+// feasibility check at submit, exactly as for a sacrifice.
 func PlanNonManaAdmissible(c Cost) string {
 	for _, part := range c.Sac {
 		if part.Announced || part.N <= 0 {
 			return "cost:sacrifice"
 		}
 	}
+	for _, part := range c.Discard {
+		if part.Announced || part.Dyn != "" || part.N <= 0 {
+			return "cost:discard"
+		}
+	}
 	rest := c
-	rest.Sac = nil
+	rest.Sac, rest.Discard = nil, nil
 	return PlanCostDetail(rest)
 }
 

@@ -31,14 +31,15 @@ import (
 //     casting, changing the bot game's path before the Urza's Incubator
 //     finding. The seed remains pinned as a clean, control-equivalent game;
 //     the old cast-specific finding is no longer reached after the rules fix.
-//   - 4129 seq 5755: Demonic Tutor, equivalent (the Ogre pay-life-only
+//   - 4129 seq 3318: Demonic Tutor, equivalent (the Ogre pay-life-only
 //     witness stays pinned by TestWitnessReadsPayLifeOnlySources). Ticket
 //     agent-20261012T222541Z-ceca6383: pro-shaper's Exotic Orchard is now a
 //     planned source (an opponent-reflecting ManaReflected colour choice), so
 //     the bot's auto-pay casts earlier through it and the same cast moves from
 //     seq 5797 to 5740 (confirmed by reverting the planner hunk: 5797 returns);
 //     the paid-cost census default-on flip (cli-20261012T170859Z) then moved it
-//     to seq 5755.
+//     to seq 5755, and botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans)
+//     to seq 3318, verdict still equivalent.
 func TestRoundSixFindingsMirrorKernel(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -56,7 +57,7 @@ func TestRoundSixFindingsMirrorKernel(t *testing.T) {
 		{2138, []string{"vivi-ornitier-cedh", "hearthhull-worldseed-landfall", "pro-shaper", "foundations-keen-engineering"}, 0, ""},
 		{25, []string{"foundations-reign-of-dragons", "hearthhull-worldseed-landfall", "avengers-assemble", "rakdos-muscle-scam-exe"}, 269, ""},
 		{4139, []string{"foundations-wretched-ranks", "deadly-disguise", "foundations-reign-of-dragons", "ulalek-eldrazi"}, 0, ""},
-		{4129, []string{"rakdos-muscle-scam-exe", "pro-shaper", "foundations-reign-of-dragons", "foundations-wretched-ranks"}, 5755, ""},
+		{4129, []string{"rakdos-muscle-scam-exe", "pro-shaper", "foundations-reign-of-dragons", "foundations-wretched-ranks"}, 3318, ""},
 	} {
 		reports := round6Game(t, d, GameSpec{Seed: tc.seed, Decks: tc.decks, Commander: true, Policy: "bot"})
 		if len(reports) == 0 {

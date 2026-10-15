@@ -10,24 +10,28 @@ import "testing"
 // gets its root-caused verdict (the history of every pin is in the deleted
 // TestRoundNineFindingsMirror's doc, round9_test.go at 19fa2a40d):
 //
-//   - 10860 seq 3246: Worldly Tutor (the Command Tower production fix),
+//   - 10860 seq 4637: Worldly Tutor (the Command Tower production fix),
 //     equivalent (was seq 3239 until eng-turnwatch: an aborted cast now
 //     logs a SpellCastReversed event, shifting every later seq by +7 here;
-//     the card list and verdicts of the game are otherwise identical);
+//     the card list and verdicts of the game are otherwise identical; then
+//     3246 until botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moved the
+//     bots' trajectory, same card and verdict);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
-//   - 10056 seq 6750: Lagomos, Hand of Hatred, equivalent (the paid-cost
-//     census default-on flip, cli-20261012T170859Z, moved this cast from
-//     seq 6128);
+//   - 10056: Lagomos, Hand of Hatred was equivalent at seq 6750 (the
+//     paid-cost census default-on flip, cli-20261012T170859Z, had moved it
+//     from seq 6128); botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moves the
+//     game so the cast is no longer reached; a clean, control-equivalent
+//     game;
 //   - 8175: the Hideaway ETB timing correction changes this game before the
 //     former Songs of the Damned finding, so that planned cast is no longer
 //     reached (verified against the pre-fix keyword expansion).
 //
 // roundNineWant holds those pins.
 var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-	10860: {3246: ""},
+	10860: {4637: ""},
 	11056: {},
-	10056: {6750: ""},
+	10056: {},
 	8175:  {},
 }
 

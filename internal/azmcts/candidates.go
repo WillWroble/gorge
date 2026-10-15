@@ -405,6 +405,11 @@ func paymentActs(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decisi
 	one := *d
 	one.Min, one.Max = 1, 1
 	one.Options = []decision.Option{{Index: 0, Kind: "cast", Obj: a.Cast.Object, Player: d.Player, Label: a.Label}}
+	if a.Cast.Origin == decision.OriginFlashback {
+		// A planned flashback is the flashback cast, not a plain one: name
+		// its mode so its key differs from any other cast of the card.
+		one.Options[0].Mode = "flashback"
+	}
 	one.PaymentActions = nil
 	// The cast's object is a hand card no legacy option may name yet (no
 	// mana floats): introduce it, as ObserveDecision does for d's own.
@@ -564,6 +569,7 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 	havePass := false
 	covered := make(map[state.ObjID]bool, len(payments)) // membership only -- never ranged.
 	payAt := make(map[state.ObjID]int, len(payments))    // lookup only -- never ranged.
+	var coveredMode map[state.ObjID]string               // lookup only -- never ranged; nil until a flashback plan.
 	for _, a := range payments {
 		if len(a.Plans) == 0 || covered[a.Cast.Object] {
 			continue
@@ -578,6 +584,14 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 			c.score = []int{*a.BaseOptionIndex}
 		}
 		covered[a.Cast.Object] = true
+		if a.Cast.Origin == decision.OriginFlashback {
+			// The legacy flashback cast this plan stands for is skipped
+			// below, as the ordinary cast is for a hand plan.
+			if coveredMode == nil {
+				coveredMode = make(map[state.ObjID]string, 1)
+			}
+			coveredMode[a.Cast.Object] = "flashback"
+		}
 		payAt[a.Cast.Object] = len(pays)
 		pays = append(pays, c)
 	}
@@ -598,7 +612,7 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 				continue
 			}
 		}
-		if o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0 && covered[o.Obj] {
+		if o.Kind == "cast" && o.AltCostIndex == 0 && o.Cost == "" && covered[o.Obj] && o.Mode == coveredMode[o.Obj] {
 			continue
 		}
 		in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{i}}
