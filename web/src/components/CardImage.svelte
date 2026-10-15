@@ -45,7 +45,17 @@
     let cancelled = false;
     url = null;
     onresolved?.(false);
-    images.url(name).then((u) => {
+    images
+      .url(
+        name,
+        // A token's display name is not a card name (its art resolves by
+        // search over the stripped base name, lib/images.ts): send the wire
+        // facts the server's deterministic pick reads.
+        card.is_token
+          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}` }
+          : undefined,
+      )
+      .then((u) => {
       if (!cancelled) {
         url = u;
         onresolved?.(u !== null);
