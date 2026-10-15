@@ -713,6 +713,35 @@ def vmstat(key: str) -> int:
     return 0
 
 
+def _cgroup_oom_kill(root: Path | None = None) -> int | None:
+    """The `oom_kill` count of THIS user's cgroup slice, or None when the
+    reading is unavailable.
+
+    The box is shared, and `/proc/vmstat`'s `oom_kill` is a BOX-WIDE total: a
+    foreign container in `system.slice` that hits its OWN memory limit is
+    OOM-killed inside its own memcg, and counting it here vetoes the reward
+    score for instability this repo did not cause (2026-10-15: a k8s pod's
+    `vegad` container was `oom.group`-killed, 4 kills, at head 290c023bf).
+    Every job this repo runs -- gates, probes, heavy jobs, the agent seats and
+    the table servers -- lives in the operator's user slice, and cgroup v2's
+    `memory.events` is hierarchical, so `user.slice/user-<uid>.slice` is the
+    honest boundary: it carries this repo's OOMs and never a system container.
+
+    `root` defaults to `$GORGE_CGROUP_ROOT` or `/sys/fs/cgroup`, so a test can
+    point it at a fake tree instead of the real box's counters (the same
+    override `gorged_processes` gives through `GORGE_PROC_DIR`)."""
+    root = root or Path(os.environ.get("GORGE_CGROUP_ROOT", "/sys/fs/cgroup"))
+    events = root / "user.slice" / f"user-{os.getuid()}.slice" / "memory.events"
+    try:
+        for line in events.read_text().splitlines():
+            k, v = line.split()
+            if k == "oom_kill":
+                return int(v)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def _proc_ppid(pid_dir: Path) -> int:
     """The parent pid from /proc/<pid>/stat's `comm` field, robust to a comm
     containing spaces or parens: split on the LAST `)`, which is the closing
@@ -982,6 +1011,11 @@ def collect_stability(repo: Path, state: Path | None = None) -> list[str]:
     The kernel counters are cumulative since boot, so the level says nothing
     about this window; the delta is the only honest reading, and a missing
     state file means the first probe reports zero rather than the boot total.
+
+    OOM kills are scoped to this user's cgroup slice (`_cgroup_oom_kill`), not
+    the box-wide `/proc/vmstat` counter: a foreign `system.slice` container's
+    own-limit kill is not this repo's instability. The box-wide counter is the
+    fallback only when the cgroup reading is unavailable (no cgroup v2).
     """
     rows = []
     prev = {}
@@ -990,10 +1024,16 @@ def collect_stability(repo: Path, state: Path | None = None) -> list[str]:
             prev = json.loads(state.read_text())
         except ValueError:
             prev = {}
-    cur = {"oom_kill": vmstat("oom_kill"), "pswpin": vmstat("pswpin")}
+    oom = _cgroup_oom_kill()
+    scoped = oom is not None
+    if oom is None:
+        oom = vmstat("oom_kill")
+    cur = {"oom_kill": oom, "pswpin": vmstat("pswpin")}
     oom_delta = max(0, cur["oom_kill"] - prev.get("oom_kill", cur["oom_kill"]))
     swap_delta = max(0, cur["pswpin"] - prev.get("pswpin", cur["pswpin"]))
-    rows.append(row(repo, "stability", "oom_kills", oom_delta))
+    rows.append(row(repo, "stability", "oom_kills", oom_delta,
+                    note="this user's cgroup slice" if scoped
+                    else "box-wide /proc/vmstat (no cgroup reading)"))
     rows.append(row(repo, "stability", "swap_in_pages", swap_delta))
 
     j = journal_rows(repo, days=1)
@@ -1335,16 +1375,42 @@ def selftest() -> int:
         check("a malformed journal ts is skipped, not fatal", True)
 
         st = repo / ".ds4" / "reward" / "stability.json"
-        first = [json.loads(r) for r in collect_stability(repo, st)]
-        oom = next(r for r in first if r["metric"] == "oom_kills")
-        check("first stability probe reports no OOM delta", oom["value"] == 0, oom)
-        check("stability probe records gate timeouts",
-              next(r for r in first if r["metric"] == "gate_timeouts")["value"] == 1)
-        # Pretend the counter moved since the last probe.
-        st.write_text(json.dumps({"oom_kill": vmstat("oom_kill") - 2, "pswpin": 0}))
-        second = [json.loads(r) for r in collect_stability(repo, st)]
-        check("a rising OOM counter is reported as a delta",
-              next(r for r in second if r["metric"] == "oom_kills")["value"] == 2)
+        # The OOM reading is scoped to THIS user's cgroup slice (see
+        # _cgroup_oom_kill): a foreign container in system.slice that hits its
+        # OWN memory limit is OOM-killed in its own memcg and must not veto the
+        # score. A fake cgroup tree with a system.slice sibling proves the
+        # scope; the box-wide /proc/vmstat counter would read the sibling.
+        cg = Path(td) / "cgroup"
+        uslice = cg / "user.slice" / f"user-{os.getuid()}.slice"
+        uslice.mkdir(parents=True)
+        (cg / "system.slice").mkdir()
+
+        def _events(p, kills):
+            p.write_text(f"low 0\nhigh 0\nmax 0\noom {kills}\n"
+                         f"oom_kill {kills}\noom_group_kill 0\n")
+
+        _events(uslice / "memory.events", 3)
+        _events(cg / "system.slice" / "memory.events", 4)
+        _old_cg = os.environ.get("GORGE_CGROUP_ROOT")
+        os.environ["GORGE_CGROUP_ROOT"] = str(cg)
+        try:
+            first = [json.loads(r) for r in collect_stability(repo, st)]
+            oom = next(r for r in first if r["metric"] == "oom_kills")
+            check("first stability probe reports no OOM delta", oom["value"] == 0, oom)
+            check("the OOM reading ignores a foreign system.slice container",
+                  _cgroup_oom_kill() == 3, _cgroup_oom_kill())
+            check("stability probe records gate timeouts",
+                  next(r for r in first if r["metric"] == "gate_timeouts")["value"] == 1)
+            # This user's slice moves by 2; the foreign sibling stays put.
+            _events(uslice / "memory.events", 5)
+            second = [json.loads(r) for r in collect_stability(repo, st)]
+            check("a rising OOM counter is reported as a delta",
+                  next(r for r in second if r["metric"] == "oom_kills")["value"] == 2)
+        finally:
+            if _old_cg is None:
+                os.environ.pop("GORGE_CGROUP_ROOT", None)
+            else:
+                os.environ["GORGE_CGROUP_ROOT"] = _old_cg
 
         g = Path(td) / "gauntlet"
         g.mkdir()
@@ -1401,7 +1467,6 @@ def selftest() -> int:
         # steward: gate wall time from log mtimes, context bytes, code shape.
         gd = repo / ".ds4" / "orchestrator" / "gates" / "issue-1" / "t0"
         gd.mkdir(parents=True)
-        import os
 
         # One of the logs is the test gate's, so this is a COMPLETE run and
         # survives the complete-run filter.
@@ -1497,8 +1562,6 @@ def selftest() -> int:
 
         # idle_branches over a real git repo with a real worktree: an unmerged
         # idle branch is listed, and one already contained in main is not.
-        import os
-
         gr = Path(td) / "gitrepo"
         gr.mkdir()
         run = lambda *a: subprocess.run(  # noqa: E731
