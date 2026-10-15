@@ -122,17 +122,24 @@ var (
 
 // Extract computes v's features against t.
 func (e *Extractor) Extract(v draft.PickView, t *SetTable) Features {
+	var f Features
+	e.ExtractInto(&f, v, t)
+	return f
+}
+
+// ExtractInto is Extract writing into f, reusing f.Cands' capacity, so a
+// caller that keeps one Features per seat allocates nothing once warm.
+func (e *Extractor) ExtractInto(f *Features, v draft.PickView, t *SetTable) {
 	e.t = t
 	n := v.Seats
 	if n < 2 || n > MaxSeats {
 		n = draft.Seats
 	}
-	f := Features{Seats: n, Round: v.Round, PickNo: v.PickNo, PackSize: len(v.Pack)}
+	*f = Features{Seats: n, Round: v.Round, PickNo: v.PickNo, PackSize: len(v.Pack), Cands: f.Cands[:0]}
 	e.resolve(v)
-	e.pool(&f, v)
-	e.table(&f, v, n)
-	e.cands(&f, v, n)
-	return f
+	e.pool(f, v)
+	e.table(f, v, n)
+	e.cands(f, v, n)
 }
 
 // resolve maps every visible card to its table row and reconstructs each
@@ -298,7 +305,13 @@ func (e *Extractor) sortedPool() []int32 {
 func (e *Extractor) cands(f *Features, v draft.PickView, n int) {
 	cur := len(v.Seen)
 	idx := e.packIdx(cur)
-	f.Cands = make([]Cand, len(idx))
+	if f.Cands == nil || cap(f.Cands) < len(idx) {
+		f.Cands = make([]Cand, len(idx))
+	}
+	f.Cands = f.Cands[:len(idx)]
+	for i := range f.Cands {
+		f.Cands[i] = Cand{}
+	}
 	d := direction(int(e.round[cur]))
 	k := int(e.pick[cur])
 	for i, ci := range idx {

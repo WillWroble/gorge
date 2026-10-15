@@ -128,14 +128,14 @@ func (d *RatingColour) ratingWeight(set string, ref limited.CardRef) float64 {
 	return Heuristic(d.Lookup(ref.Name), ref.Rarity)
 }
 
-// Pick scores every card in the pack and returns the best one's ID: score
-// is the centred rating plus k times the colour fit, where k ramps
-// linearly from 0 at pack 1 pick 1 to its full value by pack 1 pick 10 and
-// holds after. Ties within a small epsilon are broken with r.
-func (d *RatingColour) Pick(v PickView, r *rand.Rand) string {
-	if len(v.Pack) == 0 {
-		return ""
-	}
+// Scores writes the drafter's score for every pack card, in v.Pack order,
+// into dst (grown as needed) and returns it: the centred rating plus k
+// times the colour fit, where k ramps linearly from 0 at pack 1 pick 1 to
+// its full value by pack 1 pick 10 and holds after. Pick takes the best of
+// exactly these scores; behaviour cloning (draft-RL DR-8) records them as
+// the teacher's soft targets.
+func (d *RatingColour) Scores(v PickView, dst []float64) []float64 {
+	dst = dst[:0]
 	t := d.tuning()
 	k := t.ColourFitMax
 	if v.Round == 1 {
@@ -144,16 +144,35 @@ func (d *RatingColour) Pick(v PickView, r *rand.Rand) string {
 			k *= frac
 		}
 	}
-	best, bestScore := "", math.Inf(-1)
-	var tied []string
 	for _, ref := range v.Pack {
-		score := d.centred(v.Set, ref) + k*d.colourFit(factsOf(d.Lookup, ref.Name).mask, v.Picks, v.Set)
+		dst = append(dst, d.centred(v.Set, ref)+k*d.colourFit(factsOf(d.Lookup, ref.Name).mask, v.Picks, v.Set))
+	}
+	return dst
+}
+
+// Pick scores every card in the pack (Scores) and returns the best one's
+// ID. Ties within a small epsilon are broken with r.
+func (d *RatingColour) Pick(v PickView, r *rand.Rand) string {
+	if len(v.Pack) == 0 {
+		return ""
+	}
+	return v.Pack[BestScore(d.Scores(v, nil), r)].ID
+}
+
+// BestScore is RatingColour's choice over scores: the highest, with every
+// score within 1e-9 of the running best counted as tied and the tie broken
+// uniformly with r (one r.IntN draw, only on a tie). It returns -1 for no
+// scores.
+func BestScore(scores []float64, r *rand.Rand) int {
+	best, bestScore := -1, math.Inf(-1)
+	var tied []int
+	for i, score := range scores {
 		switch {
 		case score > bestScore+1e-9:
-			best, bestScore, tied = ref.ID, score, []string{ref.ID}
+			best, bestScore, tied = i, score, append(tied[:0], i)
 		case score > bestScore-1e-9:
 			bestScore = math.Max(bestScore, score)
-			tied = append(tied, ref.ID)
+			tied = append(tied, i)
 		}
 	}
 	if len(tied) > 1 {

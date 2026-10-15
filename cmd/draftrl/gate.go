@@ -63,6 +63,9 @@ func (a seatAgent) String() string {
 	switch a.kind {
 	case "ovr":
 		return "ovr:" + filepath.Base(a.path) + "#" + a.field
+	case "17l", "random":
+	default:
+		return a.kind + ":" + filepath.Base(a.path)
 	}
 	return a.kind
 }
@@ -82,6 +85,13 @@ func parseSeatAgents(s string, builder bool) ([]seatAgent, error) {
 				return nil, fmt.Errorf("seat agent %q: want ovr:PATH#FIELD", tok)
 			}
 			out = append(out, seatAgent{kind: "ovr", path: path, field: field})
+		case !builder && strings.Contains(tok, ":"):
+			// A registered league DrafterKind, e.g. net:WEIGHTS.dpkw.
+			kind, arg, _ := strings.Cut(tok, ":")
+			if _, ok := lookupDrafterKind(kind); !ok {
+				return nil, fmt.Errorf("seat agent %q: no drafter kind %q is linked into this build", tok, kind)
+			}
+			out = append(out, seatAgent{kind: kind, path: arg})
 		default:
 			return nil, fmt.Errorf("unknown seat agent %q (want 17l, ovr:PATH#FIELD%s)", tok, map[bool]string{true: " or random", false: ""}[builder])
 		}
@@ -102,7 +112,7 @@ func parseGate(args []string) (gateOpts, error) {
 	fs.Uint64Var(&o.seed, "seed", 201, "first event seed; event n uses seed+n")
 	fs.IntVar(&o.events, "events", 24, "events (4-seat pods)")
 	fs.IntVar(&o.games, "games", 4, "games per gauntlet pairing (sides alternate)")
-	fs.StringVar(&drafters, "drafters", "17l", "per-seat drafter specs, 1 or 4, comma-separated: 17l | ovr:PATH#FIELD (rating-colour)")
+	fs.StringVar(&drafters, "drafters", "17l", "per-seat drafter specs, 1 or 4, comma-separated: 17l | ovr:PATH#FIELD (rating-colour) | KIND:ARG (a registered DrafterKind, e.g. net:WEIGHTS.dpkw)")
 	fs.StringVar(&builders, "builders", "", "per-seat builder specs, 1 or 4: 17l | ovr:PATH#FIELD (best23) | random; empty = follow each seat's drafter ratings")
 	fs.StringVar(&o.baseline, "baseline", "random", "also measure a random deck from each seat's pool: random | none")
 	fs.StringVar(&o.pilot, "pilot", "bot", "gauntlet pilot on both seats: a bot policy name, or az (closed-list az search)")
@@ -127,6 +137,11 @@ func parseGate(args []string) (gateOpts, error) {
 	}
 	if builders == "" {
 		o.builders = o.drafters
+		for _, d := range o.drafters {
+			if d.kind != "17l" && d.kind != "ovr" {
+				return o, fmt.Errorf("-drafters %s has no ratings to build with: give -builders", d)
+			}
+		}
 	} else if o.builders, err = parseSeatAgents(builders, true); err != nil {
 		return o, fmt.Errorf("-builders: %w", err)
 	}
@@ -254,6 +269,14 @@ func gate(args []string, out io.Writer) (*gateResult, error) {
 		drafters := make([]draftlab.NamedDrafter, 4)
 		for s := range drafters {
 			a := at(o.drafters, s)
+			if k, ok := lookupDrafterKind(a.kind); ok && a.kind != "17l" && a.kind != "ovr" {
+				kd, kref, err := k(lab, a.path, o.set)
+				if err != nil {
+					return nil, fmt.Errorf("-drafters %s: %w", a, err)
+				}
+				drafters[s] = draftlab.NamedDrafter{Ref: kref, Drafter: kd}
+				continue
+			}
 			d, err := lab.Drafter(draftlab.AgentRef{Name: "rating-colour"})
 			if err != nil {
 				return nil, err
