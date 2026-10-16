@@ -165,13 +165,13 @@ check "rules test-only edit: no rdep closure, no engine triggers" $? "$P"
 P=$(printf 'engine/cards/open.go\n' | plan)
 has "$P" ./internal/corpusheap && has "$P" ./engine/cards && flag "$P" botbench_subset 1 && flag "$P" tplrest 1 && flag "$P" traj 0
 check "corpus loader edit: corpusheap + botbench subset + templates remainder" $? "$P"
-P=$(printf 'engine/cards/open.go\ncmd/botbench/main.go\n' | plan)
+P=$(printf 'engine/cards/open.go\nlab/cmd/botbench/main.go\n' | plan)
 has "$P" ./lab/cmd/botbench && flag "$P" botbench_subset 0
 check "touched lab/cmd/botbench runs whole, not the subset test" $? "$P"
 P=$(printf 'lab/oracle/compliance/oraclegen/templates/trigger.go\n' | plan)
 flag "$P" tpl 1 && flag "$P" tplrest 0 && ! has "$P" ./lab/oracle/compliance/oraclegen/templates
 check "touched templates: four shards, not in the batch, no extra remainder" $? "$P"
-P=$(printf 'compliance/oraclegen/generate.go\n' | plan)
+P=$(printf 'lab/oracle/compliance/oraclegen/generate.go\n' | plan)
 flag "$P" tpl 0 && flag "$P" tplrest 1
 check "generator edit runs the templates remainder shard" $? "$P"
 # The fast allowlist must not rot: every member is a real directory.

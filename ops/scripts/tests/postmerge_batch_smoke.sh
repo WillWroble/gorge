@@ -70,7 +70,7 @@ run_scenario() {
 	mkdir -p "$d/state"
 	git init -q --bare "$d/origin.git"
 	git init -q -b main "$r"
-	mkdir -p "$r/scripts" "$r/.ds4/orchestrator"
+	mkdir -p "$r/ops/scripts" "$r/.ds4/orchestrator"
 	cp "$SCRIPT" "$r/ops/scripts/postmerge_batch.sh"
 	cat >"$r/ops/scripts/heavy_lock.sh" <<'EOF'
 GORGE_HEAVY_LOCK=${GORGE_HEAVY_LOCK:-/nonexistent/heavy.lock}
@@ -89,7 +89,7 @@ if { [ "$n" = 1 ] && [ "${PMB_FIRST:-red}" = red ]; } || { [ "$n" != 1 ] && [ "$
 fi
 echo ok
 EOF
-	chmod +x "$r/scripts/"*.sh
+	chmod +x "$r/ops/scripts/"*.sh
 	printf '.ds4/\n.worktrees/\n' >"$r/.gitignore"
 	git -C "$r" add -A && git -C "$r" commit -q -m base
 	git -C "$r" remote add origin "$d/origin.git"

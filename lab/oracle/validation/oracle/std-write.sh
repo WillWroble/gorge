@@ -2,7 +2,7 @@
 # std-write.sh WORKTREE OLDRUN NEWRUN SET... -- regenerate scenarios on
 # WORKTREE's gorge, rerun XMage only where a set's scenario file changed since
 # OLDRUN (always for sets named in FORCE_XMAGE="A B"), then diff -write into
-# WORKTREE/compliance/verdicts.
+# WORKTREE/lab/oracle/compliance/verdicts.
 set -uo pipefail
 . "$(dirname "$0")/common.sh"
 W=${1:?worktree} old=${2:?oldrun} new=${3:?newrun}; shift 3

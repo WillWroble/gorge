@@ -499,7 +499,7 @@ build_batch() {
   # The replay leaves verdict/triage edits in the tree: drop them, or a rebuilt
   # batch would carry the dropped branch's results.
   git -C "$wt" switch -q --discard-changes -C "$bbranch" "$MAIN" || return 1
-  git -C "$wt" clean -fdq -- compliance
+  git -C "$wt" clean -fdq -- lab/oracle/compliance
   local id
   for id in "$@"; do
     if git -C "$wt" merge -q --no-ff --no-edit "${BR[$id]}" >/dev/null 2>&1; then

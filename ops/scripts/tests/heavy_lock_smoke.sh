@@ -28,7 +28,7 @@
 set -uo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
-S=$ROOT/scripts
+S=$ROOT/ops/scripts
 TMP=$(mktemp -d /tmp/heavy-lock.XXXXXX)
 fails=0
 check() {

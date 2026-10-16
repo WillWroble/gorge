@@ -264,14 +264,14 @@ mkrepo() {
 	git -C "$R" init -q -b main
 	printf '.ds4\n.worktrees\n' >"$R/.git/info/exclude"
 	printf 'XMAGE_REF ?= abc123\n' >"$R/Makefile"
-	: >"$R/compliance/triage/.keep"
+	: >"$R/lab/oracle/compliance/triage/.keep"
 	echo '{}' >"$R/lab/oracle/compliance/ratchet.json"
 	echo base >"$R/lab/oracle/xmageoracle/base.txt"
 	# every path gen_key and GEN_PATHS name must exist, or a key test cannot see it
 	mkdir -p "$R/lab/oracle/compliance/oraclegen" "$R/lab/cmd/oraclediff" "$R/lab/oracle/compliance/manifests"
-	echo base >"$R/compliance/oraclegen/base.txt"
-	echo base >"$R/cmd/oraclediff/base.txt"
-	echo base >"$R/compliance/manifests/base.txt"
+	echo base >"$R/lab/oracle/compliance/oraclegen/base.txt"
+	echo base >"$R/lab/cmd/oraclediff/base.txt"
+	echo base >"$R/lab/oracle/compliance/manifests/base.txt"
 	{
 		echo '{"id":"Alpha/cast-resolve/v1","card":"Alpha","status":"agree"}'
 		echo '{"id":"Beta/cast-resolve/v1","card":"Beta","scenario_sha":"original-scenario-sha","status":"agree"}'
@@ -579,7 +579,7 @@ mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
 printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/lab/oracle/xmageoracle/t3.flaky"
 # The changed branch scenario hash must prevent restoring main's stale verdict row.
-python3 - "$R/.worktrees/t3/compliance/verdicts/a.jsonl" <<'PY'
+python3 - "$R/.worktrees/t3/lab/oracle/compliance/verdicts/a.jsonl" <<'PY'
 import json, sys
 p=sys.argv[1]
 rows=[json.loads(line) for line in open(p) if line.strip()]
@@ -704,7 +704,7 @@ check "H4 loop completed two passes and stopped at the test sleep hook" $?
 # ---- I: a generator-caused regression is attributed by regenerating the row ---------
 mkrepo I
 mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z compliance/oraclegen/x.genregress 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/compliance/oraclegen/x.genregress 'Beta/cast-resolve/v1'
 mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 mkdir -p "$R/.cards"
 export STUB_REQUIRE_CARDS=1 DRB_SCENARIO_TRACE=$R/scenario.trace
@@ -783,7 +783,7 @@ unset DRB_GO_TRACE
 
 # ---- I5: generator failures report stderr, not progress written to stdout --------
 mkrepo I5
-mkticket t3 2026-10-06T04:00:00Z compliance/oraclegen/x.genregress 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/compliance/oraclegen/x.genregress 'Beta/cast-resolve/v1'
 STUB_GEN_FAIL=1 runpass
 has "$L" 'ATTRIBUTE generator failed for Beta/cast-resolve/v1: missing corpus fixture'
 check "I5 regeneration failure logs the first stderr line" $?
@@ -852,7 +852,7 @@ check "J a recorded last-main is not replayed again" $?
 # ---- K: nothing the generator reads changed: no pass ---------------------------------
 mkdrift K
 echo driver >"$R/lab/oracle/xmageoracle/driver.txt"
-echo '{}' >"$R/compliance/ratchet.json.new"
+echo '{}' >"$R/lab/oracle/compliance/ratchet.json.new"
 git -C "$R" add -A && git -C "$R" commit -q -m "feat(driver): a driver-only change"
 main0=$(git -C "$R" rev-parse main)
 runpass
@@ -934,7 +934,7 @@ check "M2 two tickets with a main-drift row land (fresh main-alone replay)" $?
 
 # ---- N: a manifests-only change drifts, and its commit is a candidate ------------------
 mkdrift N
-echo changed >"$R/compliance/manifests/m.txt"
+echo changed >"$R/lab/oracle/compliance/manifests/m.txt"
 git -C "$R" add -A && git -C "$R" commit -q -m "feat(manifests): m"
 mc=$(git -C "$R" rev-parse --short HEAD)
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
@@ -1014,10 +1014,10 @@ check "P2 the drift the batch covered is not replayed again by a DRIFT pass" $?
 mkrepo O
 mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 o_main0=$(git -C "$R" rev-parse main)
-STUB_MOVE_MAIN=$R STUB_MOVE_FILE=compliance/oraclegen/late.txt runpass
+STUB_MOVE_MAIN=$R STUB_MOVE_FILE=lab/oracle/compliance/oraclegen/late.txt runpass
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1$' "$L" && [ "$(git -C "$R" rev-parse main~1 | head -c 9)" != "" ]
 check "O the batch lands despite a non-conflicting generator move on main" $?
-[ -e "$R/compliance/oraclegen/late.txt" ] && [ "$(cat "$R/.ds4/driver-replay-last-main")" != "$(git -C "$R" rev-parse main)" ]
+[ -e "$R/lab/oracle/compliance/oraclegen/late.txt" ] && [ "$(cat "$R/.ds4/driver-replay-last-main")" != "$(git -C "$R" rev-parse main)" ]
 check "O last-main is not advanced past the unreplayed generator commit" $?
 [ "$(cat "$R/.ds4/driver-replay-last-main")" = "$o_main0" ]
 check "O last-main stays at the replayed main M0" $?

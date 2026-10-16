@@ -918,7 +918,7 @@ def selftest() -> int:
               and any(i == "eff-profile" for i in ids)
               and any(i == "flow-mergefix-rate" for i in ids), ids)
         check("the longest function makes a seam candidate",
-              any(i.startswith("steward-seam-effects-misc-go-effeffect") for i in ids), ids)
+              any(i.startswith("steward-seam-engine-effects-misc-go-effeffect") for i in ids), ids)
         check("no file-size split candidate is minted any more",
               not any(i.startswith("steward-split-") for i in ids), ids)
         seam = next((c for c in cands if c["id"].startswith("steward-seam-")), None)

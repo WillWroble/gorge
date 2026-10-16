@@ -52,7 +52,7 @@ fake_pid() { # <pid> <ppid> <arg>...
 # is in section 1, before any of this is read, but a target and a stub keep the
 # run honest rather than half-configured.
 TARGET=$TMP/target
-mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/rules" "$TARGET/internal/testutil/decks"
+mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/engine/rules" "$TARGET/internal/testutil/decks"
 git -C "$TARGET" init -q 2>/dev/null
 printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1

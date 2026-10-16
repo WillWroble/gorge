@@ -33,7 +33,7 @@
 # once, among the references alone, and cached under
 # /mnt/sata/gorge-training/spellbench-work/gauntlet/ref/<key>/ where <key>
 # is the SHA-256 of the `git rev-parse HEAD:<path>` tree hashes of
-# rules effects cards decision botpolicy lab/training/spellbench lab/cmd/botbench
+# engine/rules engine/effects engine/cards engine/decision bots/botpolicy lab/training/spellbench lab/cmd/botbench
 # plus the pairs and decks values -- so any engine or policy change
 # invalidates the cache and replays the references.
 #
@@ -167,7 +167,7 @@ REFLIST=$(IFS=,; echo "${REFS[*]}")
 # the key too: with a ref cache already on disk, a new champion line must
 # get its own ref-vs-ref games, not ride a cache built without it.
 keysrc=""
-for p in rules effects cards decision botpolicy lab/training/spellbench lab/cmd/botbench; do
+for p in engine/rules engine/effects engine/cards engine/decision bots/botpolicy lab/training/spellbench lab/cmd/botbench; do
 	keysrc+="$(git -C "$ROOT" rev-parse "HEAD:$p")
 "
 done

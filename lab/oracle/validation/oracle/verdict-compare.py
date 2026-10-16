@@ -10,7 +10,7 @@ import sys
 
 def load(tree):
     rows = {}
-    for f in glob.glob(tree + "/compliance/verdicts/*.jsonl"):
+    for f in glob.glob(tree + "/lab/oracle/compliance/verdicts/*.jsonl"):
         for line in open(f):
             if line.strip():
                 r = json.loads(line)

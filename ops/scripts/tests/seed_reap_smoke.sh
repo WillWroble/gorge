@@ -60,7 +60,7 @@ trap cleanup EXIT
 
 # --- a throwaway target repo + stubbed agentctl (seed_smoke.sh's harness)
 TARGET=$TMP/target
-mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/rules" "$TARGET/internal/testutil/decks"
+mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/engine/rules" "$TARGET/internal/testutil/decks"
 git -C "$TARGET" init -q 2>/dev/null
 printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1
@@ -216,7 +216,7 @@ check "a real demo-port neighbour is running" $?
 standing_note=$(python3 - "$ROOT" <<'PY'
 import sys
 from pathlib import Path
-sys.path.insert(0, sys.argv[1] + "/scripts")
+sys.path.insert(0, sys.argv[1] + "/ops/scripts")
 import reward_collect as rc
 print(rc.collect_gorged_hygiene(Path("/proc"))[2])
 PY

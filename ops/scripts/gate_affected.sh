@@ -226,7 +226,7 @@ gate_fast_rdep_pkgs() {
     ./lab/cmd/compliance ./cmd/paymirror ./lab/training/corpuscov ./lab/cmd/exitloop \
     ./cmd/forgec ./lab/cmd/searchbench ./lab/training/spellbench/registry \
     ./bots/azmcts/clairvoyant ./cmd/ledger ./cmd/gcgate ./lab/cmd/traindash \
-    ./server/protocol/manabrew/internal/schemagen ./cmd/autopayaudit \
+    ./server/protocol/manabrew/internal/schemagen \
     ./lab/training/searchbench/statespec ./lab/training/inferbroker ./lab/training/gamepool
 }
 
@@ -301,7 +301,7 @@ gate_affected_plan() {
   # Mechanism 1: the always-run structural set.
   others=$(printf '%s\n' $others $(gate_structural_pkgs) | sort -u)
   # Mechanism 3, corpus loader trigger: corpusheap runs whole (it is one test).
-  if printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(cards|internal/testutil)/([^/]+/)*[^/]+\.go$'; then
+  if printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/cards|internal/testutil)/([^/]+/)*[^/]+\.go$'; then
     corpus=1
     others=$(printf '%s\n' $others ./internal/corpusheap | sort -u)
   fi
@@ -311,7 +311,7 @@ gate_affected_plan() {
   if printf '%s\n' $others | /usr/bin/grep -qx './lab/oracle/compliance/oraclegen/templates'; then
     others=$(printf '%s\n' $others | /usr/bin/grep -vx './lab/oracle/compliance/oraclegen/templates')
     tpl=1
-  elif printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(rules|effects|events|state|cards)/([^/]+/)*[^/]+\.go$' \
+  elif printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/rules|engine/effects|engine/events|engine/state|engine/cards)/([^/]+/)*[^/]+\.go$' \
     || printf '%s\n' "$files" | /usr/bin/grep -q -E '^lab/oracle/compliance/oraclegen/'; then
     tplrest=1
   fi
@@ -324,7 +324,7 @@ gate_affected_plan() {
   # chain head or touches engine code (rules/effects/events/state, non-test Go).
   # The cardfuzz half is only its two seed-pinned finding tests.
   if printf '%s\n' "$files" | /usr/bin/grep -v -E '_test\.go$' | /usr/bin/grep -q -E \
-    '^engine/rules/testdata/heads/|^(rules|effects|events|state)/([^/]+/)*[^/]+\.go$'; then
+    '^engine/rules/testdata/heads/|^(engine/rules|engine/effects|engine/events|engine/state)/([^/]+/)*[^/]+\.go$'; then
     traj=1
     others=$(printf '%s\n' $others ./internal/paymirror ./cmd/repro | sort -u)
   fi

@@ -29,7 +29,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # --- a throwaway target repo whose journal carries a live provider storm
 TARGET=$TMP/target
-mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/rules" "$TARGET/internal/testutil/decks"
+mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/engine/rules" "$TARGET/internal/testutil/decks"
 git -C "$TARGET" init -q 2>/dev/null
 printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1
