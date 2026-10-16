@@ -1,0 +1,135 @@
+# CI gate for pull requests (from this repo's branches and from forks) and for
+# pushes to main and dev.
+#
+# Affected packages only, by Go's own cache: GOCACHE holds both the build cache
+# and the test-result cache, and it is restored from the newest run on the base
+# branch. `go test` then re-runs only the packages whose inputs changed (sources,
+# dependencies, env, files a test opened) and reports the rest as "(cached)".
+# The nightly schedule runs with the cache bypassed (-count=1) so a stale cached
+# result cannot hide indefinitely.
+#
+# The Forge corpus (GPL-3.0, never committed) is fetched at the Makefile's
+# FORGE_REF into the gitignored .cards/ and cached by that pin. A run with no
+# corpus would SKIP every corpus test and read green, so the job fails instead.
+#
+# Fork PRs get a read-only token and no secrets; nothing here needs either.
+# Caches are SAVED only on pushes to main/dev and the schedule, so a PR can read
+# the base branch's cache but never write one.
+name: ci
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  schedule:
+    - cron: '41 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SHARDS: 6
+  GOFLAGS: -p=4
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Restore the Go cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/go-build
+          key: gocache-lint-${{ github.sha }}
+          restore-keys: gocache-lint-
+      - name: gofmt
+        run: |
+          out=$(gofmt -l $(find . \( -name node_modules -o -name .worktrees -o -name .ds4 -o -name .superpowers \) -prune -o -type f -name '*.go' -print))
+          if [ -n "$out" ]; then echo "gofmt: files need formatting:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: generated types are current
+        run: go run ./cmd/gentypes -check
+      - name: Save the Go cache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/go-build
+          key: gocache-lint-${{ github.sha }}
+
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Read the corpus pin
+        id: pin
+        run: echo "forge_ref=$(awk '/^FORGE_REF/ {print $3}' Makefile)" >> "$GITHUB_OUTPUT"
+      - name: Restore the corpus
+        id: corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: .cards
+          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('cards/**/*.go') }}
+          restore-keys: cards-${{ steps.pin.outputs.forge_ref }}-
+      - name: Fetch and compile the corpus
+        if: steps.corpus.outputs.cache-hit != 'true'
+        run: make fetch-cards compile-cards
+      - name: Refuse to run without the corpus
+        run: |
+          test -s .cards/cards.lock || { echo "no .cards corpus: every corpus test would skip"; exit 1; }
+          grep -q "${{ steps.pin.outputs.forge_ref }}" .cards/cards.lock || { echo ".cards is not at FORGE_REF"; cat .cards/cards.lock; exit 1; }
+      - name: Save the corpus
+        if: github.event_name != 'pull_request' && steps.corpus.outputs.cache-hit != 'true' && matrix.shard == 0
+        uses: actions/cache/save@v4
+        with:
+          path: .cards
+          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('cards/**/*.go') }}
+      - name: Restore the Go cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/go-build
+          key: gocache-test${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: gocache-test${{ matrix.shard }}-
+      - name: Test shard ${{ matrix.shard }} of ${{ env.SHARDS }}
+        run: |
+          pkgs=$(bash scripts/ci_shard.sh ${{ matrix.shard }} "$SHARDS")
+          echo "$pkgs" | wc -l | xargs echo "packages:"
+          count=
+          if [ "${{ github.event_name }}" = schedule ]; then count=-count=1; fi
+          go test $count -timeout 20m -skip '^(TestHeads)$' $pkgs
+      - name: Golden chain heads
+        if: matrix.shard == 0
+        run: go test -timeout 10m -run '^TestHeads$' ./rules
+      - name: Save the Go cache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/go-build
+          key: gocache-test${{ matrix.shard }}-${{ github.sha }}
+
+  # One required check to name in branch protection, whatever the shard count.
+  ci-ok:
+    if: always()
+    needs: [lint, test]
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.test.result }}" = success ] || { echo "lint=${{ needs.lint.result }} test=${{ needs.test.result }}"; exit 1; }
