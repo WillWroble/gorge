@@ -80,7 +80,7 @@ help:
 	@echo "  make compliance-manifests — regenerate lab/oracle/compliance/manifests from XMage set classes at XMAGE_REF"
 	@echo "  make xmage-oracle-setup — build XMage at XMAGE_REF out of tree (heavy; run alone)"
 	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
-	@echo "  make compliance-status — generated per-set/per-format compliance status (compliance/status.md, never committed) + ratchet check"
+	@echo "  make compliance-status — generated per-set/per-format compliance status (lab/oracle/compliance/status.md, never committed) + ratchet check"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
 	@echo "  make draftsim       — build draftsim and play 2 verified draft events (SET/SEED override)"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
@@ -255,11 +255,11 @@ compliance-pass:
 	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) scripts/compliance-pass.sh $(SETS)
 
 # compliance-status writes the generated per-set / per-format status page
-# (compliance/status.md, gitignored: never committed) and checks the
+# (lab/oracle/compliance/status.md, gitignored: never committed) and checks the
 # certification ratchet (lab/oracle/compliance/ratchet.json). Spec 2026-10-03 11.3 C8.
 .PHONY: compliance-status
 compliance-status:
-	go run ./lab/cmd/oraclediff status -all -out compliance/status.md
+	go run ./lab/cmd/oraclediff status -all -out lab/oracle/compliance/status.md
 
 # compliance-sets runs the compliance gate at BOTH levels over every
 # committed printed set and writes the per-set table to

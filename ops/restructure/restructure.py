@@ -6,7 +6,8 @@ branch that still has the flat layout and it applies the same moves and
 rewrites, so a stale branch is "rebased" by re-running it rather than by
 resolving rename conflicts by hand.
 
-    python3 ops/restructure/restructure.py [--dry-run]
+    python3 ops/restructure/restructure.py [--dry-run]      # Go layout
+    python3 ops/restructure/restructure.py --stage=ops      # then ops/ + lab/scripts
 
 Passes, in order:
   0. the seat split: seat/ keeps only the Seat contract; the bot
@@ -87,6 +88,38 @@ for c in LAB_CMDS:
     MOVES["cmd/" + c] = "lab/cmd/" + c
 
 DELETE = ["cmd/autopayaudit", "cmd/manamodelstats", "deck.list"]
+
+# Stage "ops": agent-pipeline operations under ops/, research scripts under
+# lab/scripts/; scripts/ keeps what a contributor or CI runs.
+DEV_SCRIPTS = {"agent-worktree.sh", "smoke.sh", "smoke-perf.sh", "ci_shard.sh",
+               "docs_sets.py", "enginebench-build.sh", "enginebench-lib.sh",
+               "enginebench-pair.sh", "enginebench-profile.sh",
+               "enginebench-summarize.py", "enginebench-verify.sh"}
+LAB_SCRIPTS = {"compliance-pass.sh", "compliance-summary.py", "forge-oracle-run.sh",
+               "forge-oracle-setup.sh", "forge-pass.sh", "sb-gauntlet.sh",
+               "spellbench-rate.py", "spellbench-fdn-catalog.py", "m1b-distill.sh",
+               "m1b-winrate.py", "mtgjson_trim.py", "searchbench", "encablate",
+               "playlines", "spellbench-arena"}
+OPS_DELETE = """compliance-printed.py forge-oracle-test-cast.sh forge-oracle-test-setup.sh
+xmage-oracle-test-driver-contract.sh xmage-oracle-test-forge-chunks.sh az-stage0.sh
+m1b-paired.py manamodel_ab.sh manamodel_ab_report.py manamodel_report.py
+encablate/summarize_keep.py searchbench/plot.py searchbench/report_tables.py
+tests/test_perf_record.py spellbench-arena/agent_bridge_v1.rs spellbench-arena/h2h.py
+spellbench-arena/mkcfg.py spellbench-arena/remix_decks.py spellbench-arena/replay.py
+spellbench-arena/view.sh spellbench-arena/wl.py""".split()
+
+
+def ops_moves():
+    m = {"orchestrator": "ops/orchestrator", "deploy": "ops/deploy"}
+    for name in sorted(os.listdir("scripts")):
+        if name in DEV_SCRIPTS:
+            continue
+        if name in LAB_SCRIPTS or name.startswith("xmage-oracle-"):
+            m["scripts/" + name] = "lab/scripts/" + name
+        else:
+            m["scripts/" + name] = "ops/scripts/" + name
+    return m
+
 
 # Exported identifiers that leave package seat for bots/heuristic.
 SEAT_IMPL = """Bot NewBot BotSource NewBotOn NewLethalPressureBot NewCombinedLethalBot
@@ -376,12 +409,51 @@ def rewrite_all(new_to_old):
     return report, touched_go
 
 
+def deepen_roots(path):
+    """A script that moved one directory deeper finds the root one level up."""
+    src = open(path).read()
+    new = re.sub(r'(dirname "(?:\$0|\$\{BASH_SOURCE\[0\]\})"\)/\.\.)(?=["/)])', r"\1/..", src)
+    new = re.sub(r'(\$here/\.\./\.\.)(?=["/)])', r"\1/..", new)
+    new = re.sub(r"(\$\(dirname \"\$0\"\)/\.\./\.\.)(?=[\"/)])", r"\1/..", new)
+    new = new.replace("os.path.dirname(os.path.dirname(os.path.abspath(__file__)))",
+                      "os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))")
+    if new != src:
+        open(path, "w").write(new)
+        return True
+    return False
+
+
+def main_ops():
+    if os.path.isdir("ops/orchestrator"):
+        print("ops stage already applied; nothing to do")
+        return
+    for d in OPS_DELETE:
+        if os.path.exists("scripts/" + d):
+            subprocess.run(["git", "rm", "-rqf", "scripts/" + d], check=True)
+    MOVES.clear()
+    MOVES.update(ops_moves())
+    global FIRST, TOKEN_RE
+    FIRST = {p.split("/")[0] for p in MOVES}
+    TOKEN_RE = re.compile(r"(?<![\w.@/$-])((?:\./)?(?:" + "|".join(sorted(FIRST, key=len, reverse=True)) + r")(?:/[\w.*-]+)*/?(?:\.\.\.)?)")
+    new_to_old = {map_path(f): f for f in git_files()}
+    do_moves()
+    report, touched = rewrite_all(new_to_old)
+    deepened = [f for f, o in new_to_old.items()
+                if os.path.isfile(f) and f.count("/") > o.count("/") and f.endswith((".sh", ".py")) and deepen_roots(f)]
+    os.makedirs(".ds4", exist_ok=True)
+    with open(".ds4/restructure-ops-report.txt", "w") as fh:
+        fh.write("\n".join(report) + "\n" + "\n".join("deepened " + d for d in deepened) + "\n")
+    print(f"ops rewrites: {len(report)}, root-depth fixes: {len(deepened)} (.ds4/restructure-ops-report.txt)")
+
+
 def main():
+    if sh("git", "status", "--porcelain", "--untracked-files=no").strip():
+        sys.exit("refusing: tracked files are modified; commit first")
+    if "--stage=ops" in sys.argv:
+        return main_ops()
     if already_moved():
         print("tree already has the new layout; nothing to do")
         return
-    if sh("git", "status", "--porcelain", "--untracked-files=no").strip():
-        sys.exit("refusing: tracked files are modified; commit first")
     # Record each surviving file's pre-move path before anything moves.
     seat_split()
     pre = git_files() if not DRY else sorted(OLD_FILES)

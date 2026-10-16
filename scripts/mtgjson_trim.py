@@ -6,7 +6,7 @@ Usage (operator; needs network, writes nothing but the output file):
     D=$(mktemp -d)   # an empty directory for the downloads
     for f in Meta.json SET.json.gz SPG.json.gz; do curl -sSLo "$D/$f" https://mtgjson.com/api/v5/$f; done
     gunzip "$D"/*.gz
-    python3 -I scripts/mtgjson_trim.py "$D" SET limited/setdata/mtgjson/SET.json
+    python3 -I scripts/mtgjson_trim.py "$D" SET lab/draft/limited/setdata/mtgjson/SET.json
 
 It keeps each set's "play" and "play-arena" booster configs and the cards
 they reference (the set's own cards plus SPG special guests), with the

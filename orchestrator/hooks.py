@@ -43,7 +43,7 @@ def apply_head_move(wt: Path, seat_count: int, new_hash: str, reason: str) -> bo
     merge conflict by construction; its history is frozen in
     docs/agents/heads-history.md) -- testheads_policy puts it in the commit
     message instead; `reason` stays in the signature for its callers."""
-    path = Path(wt) / "rules" / "testdata" / "heads" / f"{seat_count}.txt"
+    path = Path(wt) / "engine" / "rules" / "testdata" / "heads" / f"{seat_count}.txt"
     if not path.exists():
         return False
     path.write_text(f"{new_hash}\n")

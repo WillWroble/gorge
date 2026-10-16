@@ -742,7 +742,7 @@ def selftest() -> int:
 
     with tempfile.TemporaryDirectory() as td:
         repo = Path(td) / "repo"
-        (repo / "rules").mkdir(parents=True)
+        (repo / "engine" / "rules").mkdir(parents=True)
         state = Path(td) / "state"
         state.mkdir()
         ledger = state / "scoreboard.jsonl"
@@ -970,7 +970,7 @@ def selftest() -> int:
 
         # An empty repo and an empty ledger must produce no candidates and no crash.
         empty = Path(td) / "empty"
-        (empty / "rules").mkdir(parents=True)
+        (empty / "engine" / "rules").mkdir(parents=True)
         el = state / "empty.jsonl"
         el.write_text("")
         check("an empty ledger yields no candidates", generate(empty, state / "nope", el) == []

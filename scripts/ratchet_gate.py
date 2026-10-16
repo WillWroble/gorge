@@ -70,7 +70,7 @@ def watched(path: str) -> bool:
 #     internal/archtest/arch_test.go       forbidden := []struct{ from, to string }{ {module + "/effects", module + "/rules"}, ... }
 #                                          forbiddenManaBrewDirect := []struct{ from, to string }{ ... }
 #     internal/archtest/layering_pay_test.go var payForbiddenStd = []string{"time", ...}
-#     internal/codeshape/codeshape.go      var ScannedDirs = []string{"rules", "effects"}
+#     internal/codeshape/codeshape.go      var ScannedDirs = []string{"engine/rules", "engine/effects"}
 #                                          var <API>OnlyKeys = []string{...}  (keys only that compiler may read)
 #
 #   ceilings: internal/codeshape/ratchet_test.go var longFuncCeilings = map[string]int{ "rules (*Engine).x": 412, ... }
@@ -461,7 +461,7 @@ func TestLongFunctionsOnlyShrink(t *testing.T) {
 
 const LongFuncLines = 300
 
-var ScannedDirs = []string{"rules", "effects"}
+var ScannedDirs = []string{"engine/rules", "engine/effects"}
 
 var CtxConstructorFiles = []string{"engine/effects/ctx_new.go", "engine/rules/ctx_new.go"}
 
@@ -492,7 +492,7 @@ const (
 	standInCellLimit       = 600
 )
 """,
-    "rules/testdata/known-unsupported/incinerate.txt": "Incinerate\n",
+    "engine/rules/testdata/known-unsupported/incinerate.txt": "Incinerate\n",
     GATE_PATH: "# gate\n",
 }
 
@@ -526,30 +526,30 @@ CASES = [
     ("(b) a constant moved to another watched file is kept", lambda t: (
         _sub("internal/archtest/filename_test.go", "const charsBoardMethods = 8\n", "")(t),
         _sub("internal/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 600\n\tcharsBoardMethods = 8")(t)), None),
-    ("(c) add to a package-level allow-list", _sub("internal/archtest/filename_test.go", '"engine/effects/misc.go": true,', '"engine/effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
+    ("(c) add to a package-level allow-list", _sub("internal/archtest/filename_test.go", '"engine/effects/misc.go": true,', '"engine/effects/misc.go": true,\n\t"engine/rules/more.go": true,'), "(c)"),
     ("(c) remove from a package-level allow-list", _sub("internal/archtest/filename_test.go", '\t"engine/effects/misc.go": true,\n', ""), None),
     ("(c) add to a local allow-list", _sub("internal/archtest/filename_test.go", 'module + "/host": true,', 'module + "/host": true,\n\t\tmodule + "/rules": true,'), "(c)"),
     ("(c) remove from a local allow-list", _sub("internal/archtest/filename_test.go", '\t\tmodule + "/host": true,\n', ""), None),
     ("(c) add a codeshape exemption file", _sub("internal/codeshape/codeshape.go", '"engine/rules/ctx_new.go"}', '"engine/rules/ctx_new.go", "rules/more.go"}'), "(c)"),
     ("(c) drop a codeshape exemption file", _sub("internal/codeshape/codeshape.go", ', "engine/rules/ctx_new.go"}', "}"), None),
-    ("(c) drop a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"rules", "effects"}', '{"rules"}'), "(c)"),
-    ("(c) add a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"rules", "effects"}', '{"rules", "effects", "cards"}'), None),
+    ("(c) drop a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"engine/rules", "engine/effects"}', '{"engine/rules"}'), "(c)"),
+    ("(c) add a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"engine/rules", "engine/effects"}', '{"engine/rules", "engine/effects", "engine/cards"}'), None),
     ("(c) drop a forbidden edge", _sub("internal/archtest/filename_test.go", '\t\t{module + "/effects", module + "/rules"},\n', ""), "(c)"),
     ("(c) add a forbidden edge", _sub("internal/archtest/filename_test.go", '{module + "/effects", module + "/rules"},', '{module + "/effects", module + "/rules"},\n\t\t{module + "/view", module + "/rules"},'), None),
     ("(c) rename an allow-list to launder an entry", _sub("internal/archtest/filename_test.go",
         'var sizeOnlyFileNamesAllowed = map[string]bool{\n\t"engine/effects/misc.go": true,',
-        'var sizeOnlyNamesAllowed = map[string]bool{\n\t"engine/effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
+        'var sizeOnlyNamesAllowed = map[string]bool{\n\t"engine/effects/misc.go": true,\n\t"engine/rules/more.go": true,'), "(c)"),
     ("(c) a brand-new allow-list in a new file is fine", _add("internal/archtest/layering_new_test.go",
         'package archtest\n\nvar newImports = map[string]bool{\n\tmodule + "/cards": true,\n}\n'), None),
-    ("(c) an API's own Files list may move", _sub("internal/codeshape/codeshape.go", '"engine/effects/draw.go"', '"effects/draw_resolve.go"'), None),
+    ("(c) an API's own Files list may move", _sub("internal/codeshape/codeshape.go", '"engine/effects/draw.go"', '"engine/effects/draw_resolve.go"'), None),
     ("(d) remove a ratchet row", _sub(RATCHET_TEST, '\t\t{"engineMethodCount", m.EngineMethods, engineMethodCount, "advice"},\n', ""), "(d)"),
     ("(d) rewire a ratchet row's limit", _sub(RATCHET_TEST, "m.EngineMethods, engineMethodCount,", "m.EngineMethods, engineMethodCount + 50,"), "(d)"),
     ("(d) add a ratchet row", _sub(RATCHET_TEST, '"engineMethodCount", m.EngineMethods, engineMethodCount, "advice"},',
         '"engineMethodCount", m.EngineMethods, engineMethodCount, "advice"},\n\t\t{"newRatchet", m.New, newRatchet, "advice"},'), None),
     ("(d) edit a row's advice", _sub(RATCHET_TEST, '"advice"},\n\t\t{"engineMethodCount"', '"better advice"},\n\t\t{"engineMethodCount"'), None),
     ("(d) neuter the comparison", _sub(RATCHET_TEST, "case r.got > r.limit:", "case r.got > r.limit+100:"), "(d)"),
-    ("(e) add a known-unsupported file", _add("rules/testdata/known-unsupported/shock.txt", "Shock\n"), "(e)"),
-    ("(e) delete a known-unsupported file", lambda t: t.pop("rules/testdata/known-unsupported/incinerate.txt"), None),
+    ("(e) add a known-unsupported file", _add("engine/rules/testdata/known-unsupported/shock.txt", "Shock\n"), "(e)"),
+    ("(e) delete a known-unsupported file", lambda t: t.pop("engine/rules/testdata/known-unsupported/incinerate.txt"), None),
     ("(f) edit the gate", _sub(GATE_PATH, "# gate", "# gate, weakened"), "(f)"),
     ("(g) raise a long-function ceiling", _sub(RATCHET_TEST, '"effects effBig":      350', '"effects effBig":      351'), "(g)"),
     ("(g) lower a long-function ceiling", _sub(RATCHET_TEST, '"effects effBig":      350', '"effects effBig":      349'), None),

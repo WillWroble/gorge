@@ -49,7 +49,7 @@ rdir=$1; mkdir -p "$rdir/S"
 printf '%s\n' "$PWD" >"$DRB_REPO/.ds4/stub-batch-tree"
 [ -z "${STUB_REPLAY_RC:-}" ] || exit "$STUB_REPLAY_RC"
 if [ -n "${STUB_MOVE_MAIN:-}" ]; then
-	mf=${STUB_MOVE_FILE:-tools/xmageoracle/shared.txt}
+	mf=${STUB_MOVE_FILE:-lab/oracle/xmageoracle/shared.txt}
 	echo moved >"$STUB_MOVE_MAIN/$mf"
 	git -C "$STUB_MOVE_MAIN" add "$mf"
 	git -C "$STUB_MOVE_MAIN" commit -q -m "main moved during the replay"
@@ -217,7 +217,7 @@ cat >"$S/check.sh" <<'EOF'
 [ "$1" = pre ] || exit 0
 ls lab/oracle/xmageoracle/*.badtest >/dev/null 2>&1 && { echo "stub test red"; exit 1; }
 ls lab/oracle/xmageoracle/*.redalone >/dev/null 2>&1 && { echo "stub branch red alone"; exit 1; }
-[ -e tools/xmageoracle/t1.combo ] && [ -e tools/xmageoracle/t3.combo ] && { echo "stub combination red"; exit 1; }
+[ -e lab/oracle/xmageoracle/t1.combo ] && [ -e lab/oracle/xmageoracle/t3.combo ] && { echo "stub combination red"; exit 1; }
 exit 0
 EOF
 cat >"$S/issue.sh" <<'EOF'
@@ -266,7 +266,7 @@ mkrepo() {
 	printf 'XMAGE_REF ?= abc123\n' >"$R/Makefile"
 	: >"$R/compliance/triage/.keep"
 	echo '{}' >"$R/lab/oracle/compliance/ratchet.json"
-	echo base >"$R/tools/xmageoracle/base.txt"
+	echo base >"$R/lab/oracle/xmageoracle/base.txt"
 	# every path gen_key and GEN_PATHS name must exist, or a key test cannot see it
 	mkdir -p "$R/lab/oracle/compliance/oraclegen" "$R/lab/cmd/oraclediff" "$R/lab/oracle/compliance/manifests"
 	echo base >"$R/compliance/oraclegen/base.txt"
@@ -372,16 +372,16 @@ runpass() {
 
 # ---- A: selection, oldest-first order, skip-on-conflict, landing -------------
 mkrepo A
-echo base2 >"$R/tools/xmageoracle/shared.txt"
+echo base2 >"$R/lab/oracle/xmageoracle/shared.txt"
 git -C "$R" add -A && git -C "$R" commit -q -m "shared file"
-mkticket t3 2026-10-06T01:00:00Z tools/xmageoracle/t3.txt three
-mkticket t7 2026-10-06T02:00:00Z tools/xmageoracle/t7.txt seven human_needed "driver_replay_batch: HELD old reason main=- branch=000000000000"
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/shared.txt one
-mkticket t2 2026-10-06T04:00:00Z tools/xmageoracle/shared.txt two
-mkticket t4 2026-10-06T05:00:00Z tools/xmageoracle/t4.txt four
+mkticket t3 2026-10-06T01:00:00Z lab/oracle/xmageoracle/t3.txt three
+mkticket t7 2026-10-06T02:00:00Z lab/oracle/xmageoracle/t7.txt seven human_needed "driver_replay_batch: HELD old reason main=- branch=000000000000"
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/shared.txt one
+mkticket t2 2026-10-06T04:00:00Z lab/oracle/xmageoracle/shared.txt two
+mkticket t4 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t4.txt four
 sed -i 's/xmage driver needs host replay failed/some other gate failed/' "$R/.ds4/issues/t4.md"
-mkticket t5 2026-10-06T05:30:00Z tools/xmageoracle/t5.txt five merged
-mkticket t6 2026-10-06T06:00:00Z tools/xmageoracle/t6.txt six
+mkticket t5 2026-10-06T05:30:00Z lab/oracle/xmageoracle/t5.txt five merged
+mkticket t6 2026-10-06T06:00:00Z lab/oracle/xmageoracle/t6.txt six
 t6head=$(git -C "$R" rev-parse --short=12 wt/t6)
 printf -- '- 2026-10-06T07:00:00Z driver_replay_batch: HELD CULPRIT earlier main=- branch=%s\n' "$t6head" >>"$R/.ds4/issues/t6.md"
 main0=$(git -C "$R" rev-parse main)
@@ -409,9 +409,9 @@ for t in t3 t7 t1; do
 	[ ! -e "$R/.worktrees/$t" ]
 	check "A $t worktree removed" $?
 done
-git -C "$R" cat-file -e main:tools/xmageoracle/t3.txt && git -C "$R" cat-file -e main:tools/xmageoracle/t7.txt
+git -C "$R" cat-file -e main:lab/oracle/xmageoracle/t3.txt && git -C "$R" cat-file -e main:lab/oracle/xmageoracle/t7.txt
 check "A main has the landed branches' files" $?
-git -C "$R" cat-file -e main:tools/xmageoracle/t6.txt 2>/dev/null
+git -C "$R" cat-file -e main:lab/oracle/xmageoracle/t6.txt 2>/dev/null
 [ $? != 0 ]
 check "A main lacks the held ticket's file" $?
 [ "$(status_of t2)" = human_needed ] && has "$R/.ds4/issues/t2.md" 'driver_replay_batch: HELD merge conflict on the batch main='
@@ -425,8 +425,8 @@ check "A the integration worktree is removed" $r
 
 # ---- B: a flaky regressed row keeps main's row --------------------------------
 mkrepo B
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/x.flaky 'Alpha/cast-resolve/v1'
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.txt three
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/x.flaky 'Alpha/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.txt three
 runpass
 has "$L" 'FLAKY Alpha/cast-resolve/v1'
 check "B the varying row is classified FLAKY" $?
@@ -443,9 +443,9 @@ check "B both tickets marked merged" $?
 
 # ---- C: a stable regression re-parks only the culprit --------------------------
 mkrepo C
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 runpass
 has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
 check "C the branch whose removal clears the row is the CULPRIT" $?
@@ -457,7 +457,7 @@ has "$R/.ds4/issues/t3.md" ' main=- branch='
 check "C the culprit's HELD line is main-independent" $?
 [ "$(status_of t1)" = merged ] && [ "$(status_of t8)" = merged ] && hasnt "$R/.ds4/issues/t1.md" 'HELD'
 check "C the others are marked merged" $?
-git -C "$R" cat-file -e main:tools/xmageoracle/t1.txt && ! git -C "$R" cat-file -e main:tools/xmageoracle/x.regress 2>/dev/null
+git -C "$R" cat-file -e main:lab/oracle/xmageoracle/t1.txt && ! git -C "$R" cat-file -e main:lab/oracle/xmageoracle/x.regress 2>/dev/null
 check "C main has the others and not the culprit" $?
 [ "$(/usr/bin/grep -c 'REPLAY rc=' "$L")" = 2 ]
 check "C a fresh full replay ran without the culprit" $?
@@ -468,8 +468,8 @@ check "C only the non-culprits landed" $?
 # (brief case b) each branch alone breaks the row, so removing either leaves it
 # broken; main alone is clean, so it is the batch's regression, not main drift.
 mkrepo D
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.regress 'Beta/cast-resolve/v1'
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.regress 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
 main0=$(git -C "$R" rev-parse main)
 runpass
 has "$L" 'UNATTRIBUTED row Beta/cast-resolve/v1'
@@ -491,8 +491,8 @@ check "D a HELD set is not replayed again until a branch changes" $?
 
 # ---- E: red pre-check drops the newest branch ------------------------------------
 mkrepo E
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.badtest broken
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.badtest broken
 runpass
 has "$L" 'CHECKS-RED-ALONE t3'
 check "E the red branch is identified by an alone pre-check" $?
@@ -503,20 +503,20 @@ check "E the dropped ticket stays parked, HELD" $?
 
 # ---- E2: the first merged branch is red alone; the second lands -------------------
 mkrepo E2
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.redalone red
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.txt green
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.redalone red
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.txt green
 runpass
 has "$L" 'CHECKS-RED-ALONE t1'
 check "E2 the first-merged red branch is isolated and held" $?
 [ "$(status_of t1)" = human_needed ] && has "$R/.ds4/issues/t1.md" 'driver_replay_batch: HELD build/tests red alone'
 check "E2 only the red branch is held" $?
-[ "$(status_of t3)" = merged ] && git -C "$R" cat-file -e main:tools/xmageoracle/t3.txt
+[ "$(status_of t3)" = merged ] && git -C "$R" cat-file -e main:lab/oracle/xmageoracle/t3.txt
 check "E2 the green branch lands" $?
 
 # ---- E3: green singles with a red combination hold only the later branch ----------
 mkrepo E3
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.combo first
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.combo second
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.combo first
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.combo second
 runpass
 has "$L" 'CHECKS-RED-COMBINATION t1 t3'
 check "E3 a red pair is reported as a combination" $?
@@ -525,13 +525,13 @@ check "E3 only the later combination branch is held" $?
 
 # ---- F: when not to act ------------------------------------------------------------
 mkrepo F1
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkdir -p "$R/.ds4/orchestrator" && echo "operator pause" >"$R/.ds4/orchestrator/pause"
 runpass
 hasnt "$L" 'START' && has "$L" 'IDLE pipeline paused'
 check "F1 a pause file stops the pass" $?
 mkrepo F2
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 echo "2026-10-06 00:00:00 GREEN abcdef012 pushed (3s)" >"$R/.ds4/postmerge-batch.log"
 echo "2026-10-06 01:00:00 RED fedcba987 (30s): --- FAIL" >>"$R/.ds4/postmerge-batch.log"
 runpass
@@ -542,7 +542,7 @@ runpass
 hasnt "$L" 'START'
 check "F3 no parked ticket: nothing happens" $?
 mkrepo F4
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 main0=$(git -C "$R" rev-parse main)
 STUB_REPLAY_RC=3 runpass
 has "$L" 'REPLAY rc=3' && has "$L" 'ABORT full replay failed' && hasnt "$L" 'LANDED'
@@ -554,9 +554,9 @@ check "F4 the integration worktree is cleaned up" $?
 
 # ---- G: main moves and conflicts during the replay: redo, land nothing -------------
 mkrepo G
-echo base2 >"$R/tools/xmageoracle/shared.txt"
+echo base2 >"$R/lab/oracle/xmageoracle/shared.txt"
 git -C "$R" add -A && git -C "$R" commit -q -m "shared file"
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/shared.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/shared.txt one
 STUB_MOVE_MAIN=$R runpass
 has "$L" 'REDO main moved' && hasnt "$L" 'LANDED'
 check "G a conflicting main move redoes the pass without landing" $?
@@ -565,8 +565,8 @@ check "G the ticket is untouched, so the redo selects it again" $?
 
 # ---- H0: changing XMage object identifiers do not turn a stable failure flaky -----
 mkrepo H0
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
 STUB_VOLATILE_IDS=Beta/cast-resolve/v1 runpass
 has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
 check "H0 UUID and three-hex XMage IDs normalize so stable failures are attributed" $?
@@ -575,9 +575,9 @@ check "H0 volatile object identifiers do not log a false flake" $?
 
 # ---- H1: a genuinely varying replay with a changed scenario is attributed, not restored -----
 mkrepo H1
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
-printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/tools/xmageoracle/t3.flaky"
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.regress 'Beta/cast-resolve/v1'
+printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/lab/oracle/xmageoracle/t3.flaky"
 # The changed branch scenario hash must prevent restoring main's stale verdict row.
 python3 - "$R/.worktrees/t3/compliance/verdicts/a.jsonl" <<'PY'
 import json, sys
@@ -589,7 +589,7 @@ for row in rows:
 with open(p,"w") as f:
     f.write("\n".join(json.dumps(row) for row in rows)+"\n")
 PY
-git -C "$R/.worktrees/t3" add lab/oracle/compliance/verdicts/a.jsonl tools/xmageoracle/t3.flaky && git -C "$R/.worktrees/t3" commit -q -m "change scenario hash"
+git -C "$R/.worktrees/t3" add lab/oracle/compliance/verdicts/a.jsonl lab/oracle/xmageoracle/t3.flaky && git -C "$R/.worktrees/t3" commit -q -m "change scenario hash"
 runpass
 has "$L" 'STABLE Beta/cast-resolve/v1 (' && has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
 check "H1 variable output with a changed scenario is promoted to stable attribution" $?
@@ -598,8 +598,8 @@ check "H1 stale main verdict is not kept for the changed scenario" $?
 
 # ---- H: a row already in driver-flakes.log is never a CULPRIT -----------------------
 mkrepo H
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
 driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 driver-batch-20261006T100503Z Beta Beta/cast-resolve/v1 driver=$driver_sha varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
@@ -614,8 +614,8 @@ check "H the branch that only looked guilty lands with the rest" $?
 
 # ---- H2: an expired flake is re-tested and a stable verdict is refreshed ----------
 mkrepo H2
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
 driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=000000000000 varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
@@ -628,10 +628,10 @@ check "H2 stable row is not re-listed for the current driver" $?
 
 # ---- H3: an expired flake that still varies is recorded against the new driver ------
 mkrepo H3
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
-printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/tools/xmageoracle/x.flaky"
-git -C "$R/.worktrees/t3" add tools/xmageoracle/x.flaky && git -C "$R/.worktrees/t3" commit -q -m 'make row vary'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/lab/oracle/xmageoracle/x.flaky"
+git -C "$R/.worktrees/t3" add lab/oracle/xmageoracle/x.flaky && git -C "$R/.worktrees/t3" commit -q -m 'make row vary'
 driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=000000000000 varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
@@ -644,8 +644,8 @@ check "H3 a varying row is never a CULPRIT" $?
 
 # ---- H4: a long-lived process refreshes the driver identity between passes --------
 mkrepo H4
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
 driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=$driver_sha varies: /state" >"$R/.ds4/driver-flakes.log"
 mkdir -p "$TMP/loopbin"
@@ -655,13 +655,13 @@ count_file=$DRB_REPO/.ds4/sleep-count
 n=0; [ ! -e "$count_file" ] || n=$(cat "$count_file")
 n=$((n + 1)); echo "$n" >"$count_file"
 if [ "$n" = 1 ]; then
-  echo driver-v2 >"$DRB_REPO/tools/xmageoracle/driver-v2"
-  git -C "$DRB_REPO" add tools/xmageoracle/driver-v2
-  git -C "$DRB_REPO" rm -q tools/xmageoracle/x.regress
+  echo driver-v2 >"$DRB_REPO/lab/oracle/xmageoracle/driver-v2"
+  git -C "$DRB_REPO" add lab/oracle/xmageoracle/driver-v2
+  git -C "$DRB_REPO" rm -q lab/oracle/xmageoracle/x.regress
   git -C "$DRB_REPO" commit -q -m 'change xmage driver between passes and fix row'
   git -C "$DRB_REPO" worktree add -q -b wt/t4 "$DRB_REPO/.worktrees/t4" main
-  echo 'Beta/cast-resolve/v1' >"$DRB_REPO/.worktrees/t4/tools/xmageoracle/t4.regress"
-  git -C "$DRB_REPO/.worktrees/t4" add tools/xmageoracle/t4.regress
+  echo 'Beta/cast-resolve/v1' >"$DRB_REPO/.worktrees/t4/lab/oracle/xmageoracle/t4.regress"
+  git -C "$DRB_REPO/.worktrees/t4" add lab/oracle/xmageoracle/t4.regress
   git -C "$DRB_REPO/.worktrees/t4" commit -q -m 'reintroduce regression'
   cat >"$DRB_REPO/.ds4/issues/t4.md" <<ISSUE
 ---
@@ -703,9 +703,9 @@ check "H4 loop completed two passes and stopped at the test sleep hook" $?
 
 # ---- I: a generator-caused regression is attributed by regenerating the row ---------
 mkrepo I
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z compliance/oraclegen/x.genregress 'Beta/cast-resolve/v1'
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 mkdir -p "$R/.cards"
 export STUB_REQUIRE_CARDS=1 DRB_SCENARIO_TRACE=$R/scenario.trace
 DRB_REPO=$R "$S/gen.sh" S "$R/without-cards.jsonl" >"$R/no-cards.log" 2>&1
@@ -726,9 +726,9 @@ check "I the others land" $?
 
 # ---- I2: a rules-side runner change with identical scenarios and XMage output
 mkrepo I2
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 export DRB_DIFF_TRACE=$R/diff.trace
 runpass
 unset DRB_DIFF_TRACE
@@ -749,9 +749,9 @@ check "I2 the non-culprit branches land" $?
 
 # ---- I3: a runner change that alters the GENERATED scenario (generation runs the engine) ----
 mkrepo I3
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 export STUB_RUNNER_SCEN=1 DRB_SCENARIO_TRACE=$R/scenario.trace
 runpass
 unset STUB_RUNNER_SCEN DRB_SCENARIO_TRACE
@@ -766,9 +766,9 @@ check "I3 only the runner culprit stays parked; innocent branches land" $?
 
 # ---- I4: the production `go run ./lab/cmd/oraclediff gen|diff` branches (no DRB_GEN_CMD/DRB_DIFF_CMD) ----
 mkrepo I4
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 mkdir -p "$R/.cards"
 export STUB_PROD_GO=1 STUB_REQUIRE_CARDS=1 STUB_RUNNER_SCEN=1 DRB_GO_TRACE=$R/go.trace
 : >"$DRB_GO_TRACE"
@@ -798,12 +798,12 @@ check "I5 failed regeneration cannot clear a row" $?
 # for attribution must remove its DRIVER half too, not just re-run the
 # generator, or the row can never clear and every ticket is held.
 mkrepo X
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/x.regress 'Beta/cast-resolve/v1'
 mkdir -p "$R/.worktrees/t3/rules"
 echo harmless >"$R/.worktrees/t3/rules/harmless.go"
 git -C "$R/.worktrees/t3" add -A && git -C "$R/.worktrees/t3" commit -q -m "feat: harmless gorge change"
-mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
+mkticket t8 2026-10-06T05:00:00Z lab/oracle/xmageoracle/t8.txt eight
 runpass
 has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
 check "X a mixed driver+rules culprit is attributed" $?
@@ -851,7 +851,7 @@ check "J a recorded last-main is not replayed again" $?
 
 # ---- K: nothing the generator reads changed: no pass ---------------------------------
 mkdrift K
-echo driver >"$R/tools/xmageoracle/driver.txt"
+echo driver >"$R/lab/oracle/xmageoracle/driver.txt"
 echo '{}' >"$R/compliance/ratchet.json.new"
 git -C "$R" add -A && git -C "$R" commit -q -m "feat(driver): a driver-only change"
 main0=$(git -C "$R" rev-parse main)
@@ -875,7 +875,7 @@ hasnt "$L" 'DRIFT-START'
 check "K a paused pipeline does not run a DRIFT pass" $?
 mkdrift K4
 gencommit gen.txt changed
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 runpass
 hasnt "$L" 'DRIFT-START' && has "$L" 'MERGED-INTO-BATCH t1'
 check "K a parked ticket runs the normal batch, not a DRIFT pass" $?
@@ -909,8 +909,8 @@ check "L the same drift is neither replayed nor ticketed twice" $?
 
 # ---- M: a batch does not blame a branch for a row the DRIFT replay already regressed --
 mkrepo M
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.txt three
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.txt three
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
 key=$(git -C "$R" ls-tree -d main -- lab/oracle/xmageoracle lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests | sha1sum | cut -c1-12)
 echo "2026-10-06 09:00:00 $key Beta/cast-resolve/v1 | diverge" >"$R/.ds4/driver-drift.log"
@@ -922,8 +922,8 @@ check "M it is excluded from attribution" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1 t3$' "$L" && [ "$(status_of t1)" = merged ] && [ "$(status_of t3)" = merged ]
 check "M the batch lands" $?
 mkrepo M2
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.txt three
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
+mkticket t3 2026-10-06T04:00:00Z lab/oracle/xmageoracle/t3.txt three
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
 echo "2026-10-06 09:00:00 0123456789ab Beta/cast-resolve/v1 | diverge" >"$R/.ds4/driver-drift.log"
 runpass
@@ -946,7 +946,7 @@ check "N the ticket's candidate commits include the manifests commit" $?
 
 # ---- P: (brief case a) a row that diverges on main alone is main drift, not the batch's ----
 mkrepo P
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
 export DRB_SCENARIO_TRACE=$R/scen.trace
 runpass
@@ -970,7 +970,7 @@ check "P the batch landing records last-main" $?
 # ---- P3: case P on the production `go run ./lab/cmd/oraclediff diff` branch: the main-alone
 # verdict's detail comes from the -write compliance row, not the detail-less -out file ----
 mkrepo P3
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
 export DRB_GO_TRACE=$R/go.trace DRB_WRITE_TRACE=$R/write.trace
 STUB_PROD_GO=1 runpass
@@ -985,7 +985,7 @@ check "P3 the ticket lands" $?
 # ---- M3: main alone diverges on the row too, but with a DIFFERENT detail (the
 # ticket's driver changed XMage's result): not main drift; the batch HOLDs ----
 mkrepo M3
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.otherdet 'Beta/cast-resolve/v1'
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.otherdet 'Beta/cast-resolve/v1'
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
 runpass
 has "$L" "MAIN-ALONE Beta/cast-resolve/v1: main alone says 'diverge setup graveyard: gorge \"[Wastes x5]\", xmage \"[]\"'" && hasnt "$L" 'DRIFT-MAIN'
@@ -998,7 +998,7 @@ check "M3 the row is UNATTRIBUTED, the batch HOLDs and no drift line is written"
 mkdrift P2
 gencommit x.genregress 'Beta/cast-resolve/v1'
 gc=$(git -C "$R" rev-parse --short HEAD)
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 runpass
 hasnt "$L" 'DRIFT-START' && has "$L" 'DRIFT-MAIN Beta/cast-resolve/v1 diverge' && hasnt "$L" 'HOLD'
 check "P2 no DRIFT pass first; the batch proves the row is main drift" $?
@@ -1012,7 +1012,7 @@ check "P2 the drift the batch covered is not replayed again by a DRIFT pass" $?
 
 # ---- O: a generator change that reaches main during a batch replay is not marked replayed
 mkrepo O
-mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
+mkticket t1 2026-10-06T03:00:00Z lab/oracle/xmageoracle/t1.txt one
 o_main0=$(git -C "$R" rev-parse main)
 STUB_MOVE_MAIN=$R STUB_MOVE_FILE=compliance/oraclegen/late.txt runpass
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1$' "$L" && [ "$(git -C "$R" rev-parse main~1 | head -c 9)" != "" ]
@@ -1060,7 +1060,7 @@ check "Q4 the LAST gate log rules: a newer dry log overrides an older stale-only
 
 mkrepo Q5
 mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1' 76 note
-mkrequeue t8 2026-10-14T21:00:00Z tools/xmageoracle/t8.txt eight 76 note
+mkrequeue t8 2026-10-14T21:00:00Z lab/oracle/xmageoracle/t8.txt eight 76 note
 runpass
 has "$L" 'CULPRIT t1 row Beta/cast-resolve/v1'
 check "Q5 a stale-only ticket whose change REALLY regresses a row is the CULPRIT" $?
@@ -1071,7 +1071,7 @@ check "Q5 the innocent stale-only ticket lands" $?
 
 mkrepo Q6
 mkrequeue t1 2026-10-14T19:00:00Z engine/rules/oracle_run.go 'gorge: fix thing' 76 note
-mkticket t2 2026-10-14T20:00:00Z tools/xmageoracle/t2.txt two
+mkticket t2 2026-10-14T20:00:00Z lab/oracle/xmageoracle/t2.txt two
 runpass
 [ "$(/usr/bin/grep -c 'MERGED-INTO-BATCH' "$L")" = 2 ] && has "$L" 'SELECT-STALE76 t1' &&
 	/usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1 t2$' "$L"

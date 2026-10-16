@@ -1120,8 +1120,8 @@ def validated_set(repo: Path) -> tuple[int, int, int]:
                         if n:
                             names.add(str(n))
     # Both ratchets are one file per card since W2 (engine/rules/testdata/...).
-    gaps = _ratchet_files(repo / "rules" / "testdata" / "known-unsupported")
-    pgaps = _ratchet_files(repo / "rules" / "testdata" / "paramcensus")
+    gaps = _ratchet_files(repo / "engine" / "rules" / "testdata" / "known-unsupported")
+    pgaps = _ratchet_files(repo / "engine" / "rules" / "testdata" / "paramcensus")
     return len(names), gaps, pgaps
 
 
@@ -1306,7 +1306,7 @@ def collect_steward(repo: Path, context_file: Path | None = None, shape: dict | 
 
 
 def collect_audit(repo: Path) -> list[str]:
-    oracle = repo / "rules" / "testdata" / "oracle"
+    oracle = repo / "engine" / "rules" / "testdata" / "oracle"
     scenarios = len(list(oracle.rglob("*.json"))) if oracle.exists() else 0
     return [row(repo, "audit", "cards_with_oracle_verdict", scenarios, note=str(oracle))]
 
@@ -1349,7 +1349,7 @@ def selftest() -> int:
     with tempfile.TemporaryDirectory() as td:
         repo = Path(td) / "repo"
         (repo / ".ds4" / "orchestrator").mkdir(parents=True)
-        (repo / "rules").mkdir(parents=True)
+        (repo / "engine" / "rules").mkdir(parents=True)
         # A journal with two merge_fix transitions and four merges.
         j = repo / ".ds4" / "orchestrator" / "journal.jsonl"
         lines = []
@@ -1434,13 +1434,13 @@ def selftest() -> int:
             json.dumps({"cards": [{"name": "Mountain"}, {"name": "Vines of Vastwood"}, {"name": "Foo"}]})
         )
         # Each ratchet is one file per card; a non-JSON file is not an entry.
-        ku = repo / "rules" / "testdata" / "known-unsupported"
+        ku = repo / "engine" / "rules" / "testdata" / "known-unsupported"
         ku.mkdir(parents=True)
         (ku / "incinerate.json").write_text(json.dumps({"card": "Incinerate", "labels": ["stat:CantRegenerate"]}))
         (ku / "vines-of-vastwood.json").write_text(json.dumps({"card": "Vines of Vastwood", "labels": ["stat:CantTarget"]}))
         (ku / "README.txt").write_text("not an entry")
-        (repo / "rules" / "testdata" / "paramcensus").mkdir(parents=True)
-        (repo / "rules" / "testdata" / "paramcensus" / "foo.json").write_text(
+        (repo / "engine" / "rules" / "testdata" / "paramcensus").mkdir(parents=True)
+        (repo / "engine" / "rules" / "testdata" / "paramcensus" / "foo.json").write_text(
             json.dumps({"card": "Foo", "labels": ["param:Whatever"]})
         )
         total, gaps, pgaps = validated_set(repo)
