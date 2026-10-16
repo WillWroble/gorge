@@ -267,7 +267,8 @@ def rewrite_go_rel(src, old_dir, new_dir, path, report):
             new = None
             if i == 0 and parts and parts[0] == "..":
                 new = relocate(old_dir, new_dir, parts)
-            elif parts and parts[0] in FIRST and old_exists("/".join(parts)):
+            elif (parts and parts[0] in FIRST and old_exists("/".join(parts))
+                  and (len(parts) > 1 or (i > 0 and re.search(r"(?i)root|repo", args[i - 1])))):
                 m = map_path("/".join(parts))
                 if m != "/".join(parts):
                     new = m.split("/")
