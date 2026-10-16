@@ -37,6 +37,10 @@ import (
 //	   :worlds=K                 K deals per decision instead of one per simulation
 //	   :explore[:nonoise]        generation: sample moves by visits on turns 1-4 (+ root noise)
 //	   :cpuct=1.5 :fpu=0.1 :cands=N
+//	   :exploreturns=N           with :explore, sample moves on turns <= N (default 4)
+//	   :temp=T                   (PL-3) sample the move on EVERY searched decision by visits^(1/T), T>0
+//	   :second=P                 (PL-3) with probability P play the second most-visited root move
+//	   :aseed=N                  (PL-3) salt for the root noise / move randomness only (replays)
 //	   :autopay                  mana paid automatically: every cast (and pass) at a priority stop is a
 //	                             candidate, so the search decides what to cast and when (the seat's own
 //	                             bot is gorge's auto-pay bot; azmcts Options.AutoPayment). bot:autopay is
@@ -94,28 +98,32 @@ import (
 //	                             dzg.export: the same network as remote= without the socket (also
 //	                             prior:gonet=...; the path must not contain a colon)
 type policySpec struct {
-	Raw, Kind string
-	Sims      int
-	Net       string
-	Remote    string
-	GoNet     string
-	model     *policynet.Model
-	HeurLeaf  bool
-	UniPrior  bool
-	Worlds    int
-	Explore   bool
-	NoNoise   bool
-	CPUCT     float64
-	FPU       float64
-	Cands     int
-	AutoPay   bool
-	Mull      botpolicy.MulliganRule // :mull / :keep7; zero is gorge's 1/3 coin
-	TopK      int
-	OppNodes  bool
-	SkipPass  int
-	OppFull   bool         // :oppfull
-	Closed    bool         // :closedlist (the belief is set by play, setBelief)
-	Kinds     azmcts.Kinds // :kinds= / :morekinds; zero is azmcts.AllKinds
+	Raw, Kind    string
+	Sims         int
+	Net          string
+	Remote       string
+	GoNet        string
+	model        *policynet.Model
+	HeurLeaf     bool
+	UniPrior     bool
+	Worlds       int
+	Explore      bool
+	NoNoise      bool
+	ExploreTurns int     // :exploreturns=; 0 keeps the seat default
+	Temp         float64 // :temp=; 0 off
+	Second       float64 // :second=; 0 off
+	ASeed        uint64  // :aseed=
+	CPUCT        float64
+	FPU          float64
+	Cands        int
+	AutoPay      bool
+	Mull         botpolicy.MulliganRule // :mull / :keep7; zero is gorge's 1/3 coin
+	TopK         int
+	OppNodes     bool
+	SkipPass     int
+	OppFull      bool         // :oppfull
+	Closed       bool         // :closedlist (the belief is set by play, setBelief)
+	Kinds        azmcts.Kinds // :kinds= / :morekinds; zero is azmcts.AllKinds
 	// lookup resolves card names for sbtactical (setLookup); nil reads View facts only.
 	lookup builtins.CardLookup
 	// belief is :closedlist's opponent-list belief (setBelief).
@@ -176,6 +184,23 @@ func parsePolicy(s string) (*policySpec, error) {
 			p.Explore = true
 		case "nonoise":
 			p.NoNoise = true
+		case "exploreturns":
+			p.ExploreTurns, err = strconv.Atoi(v)
+			if err == nil && p.ExploreTurns < 0 {
+				err = fmt.Errorf("want >= 0")
+			}
+		case "temp":
+			p.Temp, err = strconv.ParseFloat(v, 64)
+			if err == nil && !(p.Temp > 0) {
+				err = fmt.Errorf("want > 0")
+			}
+		case "second":
+			p.Second, err = strconv.ParseFloat(v, 64)
+			if err == nil && !(p.Second > 0 && p.Second <= 1) {
+				err = fmt.Errorf("want in (0,1]")
+			}
+		case "aseed":
+			p.ASeed, err = strconv.ParseUint(v, 10, 64)
 		case "cpuct":
 			p.CPUCT, err = strconv.ParseFloat(v, 64)
 		case "fpu":
@@ -242,6 +267,9 @@ func parsePolicy(s string) (*policySpec, error) {
 		}
 		p.model = m
 	}
+	if (p.ExploreTurns != 0 || p.Temp != 0 || p.Second != 0 || p.ASeed != 0) && p.Kind != "az" {
+		return nil, fmt.Errorf("policy %q: exploreturns, temp, second and aseed are az keys", s)
+	}
 	if p.Closed && p.Kind != "az" {
 		return nil, fmt.Errorf("policy %q: closedlist is an az key", s)
 	}
@@ -296,6 +324,10 @@ func (p *policySpec) azConfig() azmcts.SeatConfig {
 	}
 	cfg.Worlds = p.Worlds
 	cfg.Explore, cfg.NoNoise = p.Explore, p.NoNoise
+	if p.ExploreTurns > 0 {
+		cfg.ExploreTurns = int32(p.ExploreTurns)
+	}
+	cfg.Search.Temp, cfg.Search.Second, cfg.Search.ChoiceSalt = p.Temp, p.Second, p.ASeed
 	cfg.PriorOnly = p.Kind == "prior"
 	cfg.RecordFeatures = recordFeatures
 	return cfg

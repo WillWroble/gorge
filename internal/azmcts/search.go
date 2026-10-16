@@ -254,7 +254,7 @@ func Search(ctx context.Context, root Root, src WorldSource, net *policynet.Mode
 	}
 	res.Stats.Searched = 1
 	countSearched(&res.Stats, kind)
-	rng := rand.New(rand.NewPCG(opts.Seed, opts.Seed^0x9e3779b97f4a7c15))
+	rng := rand.New(rand.NewPCG(opts.Seed^opts.ChoiceSalt, opts.Seed^0x9e3779b97f4a7c15))
 	treePrior := prior
 	if opts.Noise {
 		treePrior = noisyPrior(prior, rng, opts.DirichletAlpha, opts.DirichletEps)
@@ -305,7 +305,7 @@ func Search(ctx context.Context, root Root, src WorldSource, net *policynet.Mode
 		res.Stats.AllFailed = 1
 		return res, nil
 	}
-	res.Choice = choose(res.Visits, opts.Sample, rng)
+	res.Choice = chooseMove(res.Visits, opts, rng)
 	if res.Choice != 0 || !botFound {
 		res.Intent = cands[res.Choice].in
 	}

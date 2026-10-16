@@ -119,6 +119,15 @@ type Options struct {
 	// visits (tau = 1) instead of the argmax. Generation only, turns 1-4
 	// (the seat decides); eval leaves it false.
 	Sample bool
+	// Temp > 0 samples the move on EVERY searched decision with probability
+	// proportional to visits^(1/Temp) (overrides Sample). 0 is off.
+	Temp float64
+	// Second in (0,1] is the probability of playing the second most-visited
+	// root move instead of the best (when it has any visits). 0 is off.
+	Second float64
+	// ChoiceSalt is mixed into the seed of the root-noise/choice randomness
+	// only (never the world or environment streams). 0 reproduces Seed alone.
+	ChoiceSalt uint64
 	// HeuristicLeaf keeps the frozen heuristic leaf (searchprobe.LeafValue)
 	// even when a network supplies the prior: the network's value head is
 	// then unused (M1b's prior-only ablation).
