@@ -27,10 +27,13 @@ platform from the research, and the docs are written for agent seats.
    bots (MCTS search, net forward pass, belief, sb builtins, searchseat)
    moves into `bots/`. Trainers, corpus builders and calibration benches go to
    `lab/training/`. `policynet` and `searchprobe` are split along that line.
-5. **Draft in gorged: seam + lab composition.** `cmd/gorged` exposes a
-   mode/route registration hook and links no draft code. The draft runtime
-   registers from `lab/`; the demo runs a lab-composed binary.
-   `protocol/draftevent.go` moves with it.
+5. **Draft in gorged: seam + lab composition.** The seam is the `lab` build
+   tag: `cmd/gorged/events.go` and `art_sets.go` (the draft runtime and set
+   art prewarm) build only with `-tags lab`; the untagged binary links no
+   `lab/` package and refuses `-events` (`TestEventsNeedLabBuild`).
+   `make deploy-demo`, the per-ticket gate, the full suite and CI build with
+   `-tags lab`. `server/protocol/draftevent.go` stays: it is wire types the
+   web client generates from and imports nothing from `lab/`.
 6. **`seat` is a contract, bots are injected.** `seat` keeps only `Seat`,
    `PaymentPlanConsumer`, `TargetHintConsumer` and imports only `decision` +
    `view`; it lives at `engine/seat`. `BoardSeat` (names `botpolicy.Board`)
@@ -38,6 +41,11 @@ platform from the research, and the docs are written for agent seats.
    `bots/policynet`. `host` receives a `seat.Factory` (the `bots` registry)
    injected by its command instead of importing concrete bots. This also
    breaks today's `seat → botpolicy`, `bots → seat` cycle.
+   *As built:* the contract is `engine/seat` (`Seat`, `PaymentPlanConsumer`,
+   `TargetHintConsumer`); `Bot`, `PolicyNetBot` and `BoardSeat` live in
+   `bots/heuristic` (botpolicy may not import view, so it cannot own an
+   interface that embeds `seat.Seat`). `server/host` already resolves bots
+   through the `bots` registry; a narrower factory interface is follow-up.
 7. **Engine prefix now.** The core moves under `engine/` in the same window as
    the other Go moves, before any external consumer pins import paths.
 8. **Dead material is deleted**, not archived; git history keeps it.
@@ -61,7 +69,18 @@ ops/       orchestrator deploy scripts docs     (.agentctl stays at root)
 docs/      contributing/ architecture/ decisions/ site/
 ```
 
-## Phases
+## As built (2026-10-16)
+
+All phases landed in one sitting on branch `wt/restructure`, driven by
+`ops/restructure/restructure.py` (stage `go`, then `--stage=ops`) plus hand
+fixes for what a path rewrite cannot see: archtest/codeshape short package
+names, gate trigger regexes, smoke fixtures, Python path joins. The fence is
+`internal/archtest/lab_fence_test.go`. `packages(t)`-style checks that build
+`module + "/" + name` from short names would have gone silently inert; they
+were found by reading archtest, not by a failing test -- re-check that class
+when moving packages again.
+
+## Phases (as planned)
 
 Every move phase ships a committed, idempotent move script (`git mv`, import
 rewrite, `goimports`, path rewrite in docs / AGENTS.md / seat prompt files),
@@ -105,5 +124,5 @@ rebased by re-running the script on it.
 
 ## Not in scope
 
-Splitting the flat `rules/` directory (the lasagna work owns it). Moving
+Splitting the flat `engine/rules/` directory (the lasagna work owns it). Moving
 `lab/` to its own repository.
