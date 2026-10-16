@@ -40,7 +40,7 @@ func TestNameUniverseReadersAreKnown(t *testing.T) {
 	}
 	re := regexp.MustCompile(`\bNameUniverse\b|\blandTypeWords\b|NameUniverseNames`)
 	var got []string
-	for _, pkg := range []string{"rules", "engine/rules/chars", "effects", "events", "state", "decision", "botpolicy", "view"} {
+	for _, pkg := range []string{"engine/rules", "engine/rules/chars", "engine/effects", "engine/events", "engine/state", "engine/decision", "bots/botpolicy", "engine/view"} {
 		paths, err := filepath.Glob(filepath.Join("..", "..", pkg, "*.go"))
 		if err != nil {
 			t.Fatal(err)
