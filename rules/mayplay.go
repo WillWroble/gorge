@@ -105,6 +105,8 @@ func (e *Engine) mayPlayGrantScoped(p state.PlayerID, id state.ObjID, board bool
 	// (a) Self-grants: the card's own statics, read off its face wherever
 	// the card currently sits (an S: line is part of the face, so a card in
 	// the graveyard carries it exactly as it would on the battlefield).
+	// mayPlayStatic applies one off the battlefield only when it names its
+	// EffectZone$ (CR 113.6).
 	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
@@ -504,6 +506,18 @@ func (e *Engine) mayPlayStatic(params map[string]string, id state.ObjID, you sta
 		// implements the plain permission, nothing else.
 		return false, false, false, Cost{}, false, false
 	}
+	// An own-face read (source == id: the self-grant passes read a card's face
+	// statics wherever the card sits). A static without EffectZone$ functions
+	// only on the battlefield (CR 113.6; Forge's StaticAbility default), where
+	// activeStatics already reads it, so off the battlefield it grants nothing:
+	// Future Sight on top of its library does not grant itself. Every corpus
+	// self-grant meant to work elsewhere (Affected$ Card.Self) names its
+	// EffectZone$.
+	if source == id && strings.TrimSpace(params["EffectZone"]) == "" {
+		if o := e.G.Obj(id); o == nil || o.Zone != state.ZBattlefield {
+			return false, false, false, Cost{}, false, false
+		}
+	}
 	// Fail closed on gates this build cannot evaluate: the
 	// mayPlayUnreadGates family plus MayPlayPlayer$ (see
 	// mayPlayGateRejected's doc -- a recognition, not a consumption).
@@ -777,6 +791,12 @@ func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []mayPlayAltV
 		if i < len(bf) {
 			sv = bf[i]
 		} else if st := face[i-len(bf)]; st.Mode == "Continuous" {
+			// The card's own static functions off the battlefield only when it
+			// names its EffectZone$ (CR 113.6, as in mayPlayStatic); without this,
+			// Omniscience in hand offered a free cast of itself.
+			if strings.TrimSpace(st.Params["EffectZone"]) == "" && o.Zone != state.ZBattlefield {
+				continue
+			}
 			sv = staticView{Params: st.Params, PS: st.ParamSetOf(), Source: id, Controller: o.Controller}
 		} else {
 			continue
