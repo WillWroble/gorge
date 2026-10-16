@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # reward-probe.sh — measure the reward axes and append them to the scoreboard.
 #
-# Design: docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md §2.
+# Design: docs/design/2026-09-29-reward-loop-and-seed-agent-design.md §2.
 #
 #   ops/scripts/reward-probe.sh free    the free axes (under a second, no lease)
 #   ops/scripts/reward-probe.sh eff     engine throughput (needs a probe lease)

@@ -1,6 +1,6 @@
 // Package shape gives every XMage disagreement a reusable signature, so a
 // triage ruling is made once per root cause instead of once per card
-// (docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md section
+// (docs/design/2026-10-03-rules-engine-lasagna-design.md section
 // 11.3 C2; the oracle is 2026-10-02-xmage-compliance-oracle-design.md
 // section 8).
 //

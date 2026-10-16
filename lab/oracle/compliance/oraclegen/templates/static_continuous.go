@@ -1,5 +1,5 @@
 // Level-B continuous-static template (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2.3; ticket
+// docs/design/2026-10-05-compliance-level-b.md section 2.3; ticket
 // L11). The scenario is the card's level-A one (cast and resolve, or play the
 // land) with a probe permanent, Grizzly Bears, on both seats: p1 already holds
 // one through Baseline, p0 gets one here. The static arrives after setup, so a

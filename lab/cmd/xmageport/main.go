@@ -1,6 +1,6 @@
 // Command xmageport translates XMage Mage.Tests @Test methods into the
 // oracle-scenario JSON that rules.TestXMagePortScenarios runs (design:
-// docs/superpowers/specs/2026-10-10-xmage-scenario-port-design.md).
+// docs/design/2026-10-10-xmage-scenario-port-design.md).
 //
 //	xmageport -mage <Mage.Tests/src/test/java/org/mage/test> -out <dir> \
 //	    [-family name=relative/dir ...] [-commit engine/rules/testdata/xmageport]

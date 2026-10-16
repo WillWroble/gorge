@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # xmage-oracle-setup.sh -- build XMage out of tree for the compliance oracle
-# (docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md §4-§5).
+# (docs/design/2026-10-02-xmage-compliance-oracle-design.md §4-§5).
 #
 # Idempotent. Re-run after an XMAGE_REF bump. Everything lands under
 # $XMAGE_ORACLE_DIR (default /mnt/sata/gorge-training/xmageoracle); nothing in

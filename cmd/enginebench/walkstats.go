@@ -1,5 +1,5 @@
 // walkstats.go implements enginebench's -walkstats observer: the reuse oracle
-// for the priority legal-action walk (docs/superpowers/specs/2026-10-06-legal-walk-design.md
+// for the priority legal-action walk (archived 2026-10-06-legal-walk-design.md (docs/design/ARCHIVE.md)
 // §1.5, step S0).
 //
 // At every posed priority decision it compares the offered option list with the

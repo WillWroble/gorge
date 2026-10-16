@@ -1,5 +1,5 @@
 // Level-B trigger template (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2.2; ticket
+// docs/design/2026-10-05-compliance-level-b.md section 2.2; ticket
 // L7). The card sits on p0's battlefield with the recipe's probe; the steps
 // are the recipe's cause and then resolve. A candidate is served only when
 // gorge shows the card's trigger on the stack (or, for combat damage, in the

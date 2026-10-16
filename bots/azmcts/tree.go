@@ -1,5 +1,5 @@
 // Package azmcts is the AlphaZero-style tree search of
-// docs/superpowers/specs/2026-09-27-alphazero-mcts-design.md: a PUCT tree
+// docs/design/2026-09-27-alphazero-mcts-design.md: a PUCT tree
 // over ONE seat's searched decisions (single perspective: every value is
 // that seat's win probability, no sign flips), whose leaf is a value -- the
 // policynet value head, or the frozen heuristic searchprobe.LeafValue for

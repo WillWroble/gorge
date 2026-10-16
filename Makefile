@@ -59,7 +59,7 @@ FORGE_REPO ?= https://github.com/adams-shaun/forge.git
 FORGE_REF  ?= 098b055313459c4b36c9e1f1d4e81a2c8aef815e
 # The XMage commit the compliance oracle (manifests, out-of-tree driver)
 # is pinned to. XMage is MIT; nothing from it is a build dependency.
-# docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md
+# docs/design/2026-10-02-xmage-compliance-oracle-design.md
 XMAGE_REF  ?= 6b602a1c85e8ed738a4b40b1ef44c54845b57f68
 XMAGE_ORACLE_DIR ?= /mnt/sata/gorge-training/xmageoracle
 # Forge oracle driver commit (fork, branch oracle-harness): a descendant of FORGE_REF with identical script trees.
@@ -318,7 +318,7 @@ conformance:
 
 # oracle-audit runs the Oracle-text card audit: scenarios whose expected
 # outcomes were written from printed card text and the CR, never the Forge
-# script (docs/superpowers/specs/2026-09-27-oracle-text-card-audit.md). It is
+# script (docs/design/2026-09-27-oracle-text-card-audit.md). It is
 # also part of the ordinary rules suite; this lane is for a focused run and a
 # per-card filter, e.g. `make oracle-audit ORACLE_RUN='Fatal_Push'`.
 ORACLE_RUN ?=
@@ -511,7 +511,7 @@ clean-worktrees:
 # Re-register an orphaned worktree whose branch still exists: recreate its
 # .git/worktrees/<name> metadata so a seat can commit again. Dry run unless
 # APPLY=1. NAME=<worktree-name> (the branch is wt/<name>). See
-# scripts/readopt-worktree.sh.
+# ops/scripts/readopt-worktree.sh.
 readopt-worktree:
 	@[ -n "$(NAME)" ] || { echo "usage: make readopt-worktree NAME=<worktree-name> [APPLY=1]" >&2; exit 2; }
 	@APPLY=$(APPLY) ops/scripts/readopt-worktree.sh "$(NAME)"
@@ -522,7 +522,7 @@ readopt-worktree:
 # approximations table, and the orchestrator's tracked issue files (.ds4/issues/*,
 # top level only — inbox/ is the un-triaged drop zone). Writes .ds4/ledger.json
 # (git-excluded). The lane runs cached (no -count=1), capped and under its own
-# lock: see scripts/ledger-lane.sh.
+# lock: see ops/scripts/ledger-lane.sh.
 ledger:
 	ops/scripts/ledger-lane.sh .ds4/lane-rules.txt
 	go run ./cmd/ledger -lane .ds4/lane-rules.txt -out .ds4/ledger.json

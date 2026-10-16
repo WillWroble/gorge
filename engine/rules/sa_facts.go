@@ -8,7 +8,7 @@ import (
 )
 
 // saFacts is the one per-ability facts record (W4 steps 1 and 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8): effects.SAFacts, defined in effects because resolution reads its typed
 // parameter halves (ChangeZone's today) and effects sits below rules. An
 // ability has exactly one downstream slot (cards.ExtSlot) and a second claim

@@ -10,18 +10,25 @@ is the only backstop.
 ### 1. Dependency direction
 
 ```
-cards → state → decision → events → effects → botpolicy → rules → view → seat → replay → protocol → host → server/host/httpapi → cmd/*
+engine/: cards → state → decision → events → effects → rules → replay
+                                  events → view → seat
+bots/:   botpolicy (→ effects) → heuristic (→ seat) → searchprobe/searchseat/azmcts (→ rules) → bots registry
+server/: protocol (→ view) → host (→ rules, bots registry) → server/host/httpapi
+cmd/*, then lab/** (fenced: nothing outside lab/ imports it)
 ```
 
-A package imports only packages to its left. `deck` sits beside the chain: it
-imports `cards` only and is imported by `rules`, `host` and the test fixtures.
-`seat` also imports `bots/policynet`. That is the measured import graph
-(`go list`, 2026-09-28). The enforced contract is the set of edges that must
-never appear: `effects` never imports `rules` (effects reaches the engine only
-through `effects.Host`). `view`, `protocol` and `deck` never import `rules`.
-`botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
+A package imports only packages to its left or in an earlier group. `deck`
+sits beside the engine chain: it imports `cards` only and is imported by
+`rules`, `view`, `host` and the test fixtures. `engine/seat` is the contract
+only and imports just `decision` and `view`. That is the measured import graph
+(`go list`, 2026-10-16, after the ADR 0001 restructure); the one exception is
+`cmd/gorged` linking `lab/draft/eventhost` and `lab/draft/limited/setdata`,
+which the registration seam removes. The enforced contract is the set of
+edges that must never appear: `effects` never imports `rules` (effects reaches
+the engine only through `effects.Host`). `view`, `protocol` and `deck` never
+import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host`, `internal/testutil` or `bots/azmcts/clairvoyant`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
 and `cmd/gorged` never import `internal/testutil`. Inside the engine, the
-lasagna packages (spec `2026-10-03-rules-engine-lasagna-design.md` §3) are
+lasagna packages (spec [`docs/design/2026-10-03-rules-engine-lasagna-design.md`](../design/2026-10-03-rules-engine-lasagna-design.md) §3) are
 pinned as they land: `engine/rules/cost`, the cost vocabulary leaf, imports only
 `state` (`TestCostVocabularyIsALeaf`) and never `rules`, `effects` or a rules
 subsystem package. `engine/rules/combat`, attack/block legality, imports only
@@ -247,7 +254,7 @@ ticket cannot close goes in the **commit message** and the ticket report.
 ### 11. Contracts are written down
 
 Deliberate behaviour that is not debt is recorded in
-`docs/superpowers/specs/2026-09-22-engine-contracts.md`: the R-9 no-ask host
+[`docs/design/2026-09-22-engine-contracts.md`](../design/2026-09-22-engine-contracts.md): the R-9 no-ask host
 degradation, regeneration, the board-clock round, and similar. Change that
 file in the same commit as the code.
 
@@ -332,8 +339,11 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
 
 ### Docs
 
-- New designs go in `docs/superpowers/specs/`, plans in `plans/`, and measured
-  results in `reports/`. All are date-prefixed.
+- Living designs, plans and the reports a live programme still consults go in
+  `docs/design/`, date-prefixed and flat. A finished record is parked, not
+  kept: copy it to the operator's `.superpowers/archive/`, remove it, and add
+  a row to [`docs/design/ARCHIVE.md`](../design/ARCHIVE.md). Architecture
+  decisions go in `docs/decisions/`.
 - `AGENTS.md` is loaded into every agent turn. Keep additions to it to
   pointers, and put detail here.
 - When code moves, fix the [repo map](repo-map.md) in the same commit.

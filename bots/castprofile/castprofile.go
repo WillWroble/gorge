@@ -9,8 +9,8 @@ import (
 func init() {
 	bots.Register(bots.Entry{Info: bots.Info{
 		Name: "cast-profile", Label: "Cast Profile", Description: "Plays the production bot with a cast profile; the embedded default profile is intent-identical to the manual bot.", Tier: bots.Experimental,
-		Strength: []bots.Measurement{{Claim: "Intent-identical to the manual bot with the embedded default profile; fitted L4 profile failed its gate at 50.92% [49.38, 52.47]", Versus: "manual bot", Setting: "embedded default profile; fitted L4 evaluated in the TS mono suite", Source: "lab/cmd/botbench/main.go:188-192; docs/superpowers/reports/2026-09-19-bot-policy-decision-trace-and-ar7.md §2"}},
-		Cost:     bots.Cost{Scope: "per decision", Note: "as bot; fitted profile is not embedded", Source: "docs/superpowers/specs/2026-09-28-hosted-bot-packages.md §3.1"},
+		Strength: []bots.Measurement{{Claim: "Intent-identical to the manual bot with the embedded default profile; fitted L4 profile failed its gate at 50.92% [49.38, 52.47]", Versus: "manual bot", Setting: "embedded default profile; fitted L4 evaluated in the TS mono suite", Source: "lab/cmd/botbench/main.go:188-192; archived 2026-09-19-bot-policy-decision-trace-and-ar7.md (docs/design/ARCHIVE.md) §2"}},
+		Cost:     bots.Cost{Scope: "per decision", Note: "as bot; fitted profile is not embedded", Source: "docs/design/2026-09-28-hosted-bot-packages.md §3.1"},
 		Formats:  []string{"constructed", "commander"}, Caretaker: "bot",
 	}, New: newCastProfile})
 }

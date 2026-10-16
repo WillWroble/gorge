@@ -294,7 +294,7 @@ def live_branch_files(repo: Path) -> dict[str, list[str]]:
     main, or the same blob as another live branch, cannot conflict with
     either. Counting those produced briefs to split a file no second branch
     was actually editing (measured 2026-09-29: two of three \"editors\" of
-    docs/superpowers/specs/2026-09-28-scam-exe-combo-lines.md held main's
+    archived 2026-09-28-scam-exe-combo-lines.md (docs/design/ARCHIVE.md) held main's
     exact blob; only one differed). So each branch is kept only for paths
     where its blob differs from main's, and identical blobs are deduped.
 

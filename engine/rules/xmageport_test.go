@@ -1,7 +1,7 @@
 package rules
 
 // XMage interaction-scenario port (spec
-// docs/superpowers/specs/2026-10-10-xmage-scenario-port-design.md).
+// docs/design/2026-10-10-xmage-scenario-port-design.md).
 //
 // Every file under testdata/xmageport/<family>/*.json is a translation of one
 // or more XMage Mage.Tests @Test methods (XMage is MIT-licensed; each file's

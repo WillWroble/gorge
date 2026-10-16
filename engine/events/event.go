@@ -1030,7 +1030,7 @@ const (
 	ChaosEnsues
 	// ManaUndo reverses one mana activation made in an announced CR 601.2g
 	// payment window (the "Undo last tap" / "Cancel cast" answers,
-	// docs/superpowers/specs/2026-09-27-announce-then-pay.md §5, CR 733.1).
+	// docs/design/2026-09-27-announce-then-pay.md §5, CR 733.1).
 	// Player is the payer; Counter/Amount name exactly one ManaAdd the
 	// activation made (Amount > 0 is the number of units removed from that
 	// counter's pool slot and its snow/typed tally); a non-zero Obj also

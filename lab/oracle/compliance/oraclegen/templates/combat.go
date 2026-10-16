@@ -1,5 +1,5 @@
 // Level-B combat templates (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2.4).
+// docs/design/2026-10-05-compliance-level-b.md section 2.4).
 package templates
 
 import (

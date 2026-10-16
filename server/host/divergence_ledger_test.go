@@ -1,7 +1,7 @@
 package host
 
 // HD-2's provenance ledger acceptance tests
-// (docs/superpowers/specs/2026-10-10-human-divergence-design.md §5.2, §12):
+// (docs/design/2026-10-10-human-divergence-design.md §5.2, §12):
 // the caretaker bit follows HumanSeat.caretakerFires, the auto bit follows
 // SubmitIntentFrom's flag and the ?auto=1 query form, an undo truncates the
 // ledger beside the log, and the ledger never reaches replay input (two

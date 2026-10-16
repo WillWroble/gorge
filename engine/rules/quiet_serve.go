@@ -10,7 +10,7 @@ import (
 )
 
 // The quiet serve (quiet-seat design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md, §3.2/§3.3,
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md, §3.2/§3.3,
 // step Q2): priorityOptions serves a proved window's options without running
 // the legal-action walk. The proof (engine/rules/quiet_proof.go, seatQuiet) is an
 // over-approximation: when it says quiet, the walk would offer nothing beyond

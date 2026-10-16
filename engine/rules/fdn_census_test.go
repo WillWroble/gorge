@@ -16,7 +16,7 @@ import (
 // cards whose registered primitives leave a parameter unread or whose cost
 // carries an unmodelled token, weighted by 17lands wr60 deck copies. A
 // report only -- it never fails on a finding; the FDN backlog tickets
-// (docs/superpowers/reports/2026-09-28-spellbench-fdn-limited.md) own the
+// (archived 2026-09-28-spellbench-fdn-limited.md (docs/design/ARCHIVE.md)) own the
 // rows.
 func TestFDNParamCensusReport(t *testing.T) {
 	_, d := measureParamCensus(t, nil)

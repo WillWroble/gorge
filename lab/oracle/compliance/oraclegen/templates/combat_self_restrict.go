@@ -10,7 +10,7 @@ import (
 )
 
 // Self-restriction combat observations (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 7): a
+// docs/design/2026-10-05-compliance-level-b.md section 7): a
 // creature whose own "CARDNAME can't attack/block unless ..." static makes
 // gorge refuse the action has no scripted declaration to compare, so the item
 // stops AT the declare decision and asserts, through Step.Expect, that the

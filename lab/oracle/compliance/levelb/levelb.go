@@ -1,5 +1,5 @@
 // Package levelb turns a card's IR into its list of level-B requirements
-// (spec docs/superpowers/specs/2026-10-05-compliance-level-b.md section 1).
+// (spec docs/design/2026-10-05-compliance-level-b.md section 1).
 //
 // A requirement is one thing a level-B scenario must exercise: an activated
 // ability, a trigger, a static, or an attack/block. The classifier is a pure

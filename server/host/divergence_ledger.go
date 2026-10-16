@@ -3,7 +3,7 @@ package host
 import "fmt"
 
 // The provenance ledger is HD-2 of the human-divergence design
-// (docs/superpowers/specs/2026-10-10-human-divergence-design.md §5.2): one
+// (docs/design/2026-10-10-human-divergence-design.md §5.2): one
 // byte per accepted intent, saying whether the answer was a deliberate human
 // choice. The match log alone cannot tell — a caretaker substitution logs
 // byte-identically to a human answer (D3), and the client's autopilot submits

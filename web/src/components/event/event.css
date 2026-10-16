@@ -1,8 +1,8 @@
 /*
  * Shared chrome for the draft-event screens (E2): /events/new and /e/{id}.
  * Every rule is namespaced under .ev so nothing leaks into the table pages.
- * The registers are the client's own (docs/superpowers/specs/2026-09-06-
- * client-design-system.md): FELT for the cards the player handles — the
+ * The registers are the client's own (archived 2026-09-06-
+ * client-design-system.md, docs/design/ARCHIVE.md): FELT for the cards the player handles — the
  * pack, the pool, the deck — and INSTRUMENT for the rails that report the
  * pod, the counts and the server's verdicts. Gilt is "you / the primary
  * action", verdigris a legal or ready state, ember a loss or an error.

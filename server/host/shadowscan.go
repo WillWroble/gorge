@@ -16,7 +16,7 @@ import (
 )
 
 // ShadowScan is HD-3 of the human-divergence design
-// (docs/superpowers/specs/2026-10-10-human-divergence-design.md §5.3-§5.5):
+// (docs/design/2026-10-10-human-divergence-design.md §5.3-§5.5):
 // it replays match k of table id once and, at every decision the seat
 // answered deliberately, asks a fresh shadow instance of policy what it would
 // have answered (shadow.Answer). Every material difference (divergence.Material)

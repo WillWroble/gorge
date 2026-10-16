@@ -15,7 +15,7 @@ import (
 
 // manaSection is the walk's mana-activation section, extracted verbatim from
 // battlefieldWalk (quiet-seat Q2, design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md §3.3) so
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md §3.3) so
 // the quiet serve (engine/rules/quiet_serve.go) can run exactly this block without
 // the walk's other sections, and the walk itself goes through the one copy.
 // It returns the board-wide facts it derives, because the battlefieldWalk

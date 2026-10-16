@@ -11,7 +11,7 @@ import (
 )
 
 // The quiet serve's tests (quiet-seat design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md §6 Q2
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md §6 Q2
 // "Done means"): a proved window's priorityOptions is the walk's list,
 // byte-identically. Every test asserts the serve path RAN (quietServed
 // moved) and the precondition its comparison rests on (the proof says

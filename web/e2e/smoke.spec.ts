@@ -294,7 +294,7 @@ async function settleStartingPlayer(
  * API (the exact option the seated panel's keep button posts), before the
  * test mounts a client. Since c7655f7c0 the Table passes the pending mulligan
  * into the Board and the Board draws NO hand row during the round (ui26
- * ruling, docs/superpowers/plans/2026-09-28-ui-layout.md): the opening hand
+ * ruling, archived 2026-09-28-ui-layout.md (docs/design/ARCHIVE.md)): the opening hand
  * lives in the seat panel instead. A layout test that mounts into the
  * mulligan round therefore never sees `.handtrack .handfan`; keeping here
  * leaves the game on the live board the layout assertions describe, and lets

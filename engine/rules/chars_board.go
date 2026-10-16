@@ -8,7 +8,7 @@ import (
 )
 
 // chars_board.go is package rules' side of the engine/rules/chars seam (spec
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §9, W5
+// docs/design/2026-10-03-rules-engine-lasagna-design.md §9, W5
 // step E4): charsBoard implements chars.Board over the Engine, so the layer
 // walk reads the game without holding the engine. Every method is a pure
 // read that forwards to the engine reader the walk called before it moved,

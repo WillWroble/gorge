@@ -5,7 +5,7 @@
 // corpus (lab/cmd/searchteacher -labels).
 //
 // The design contract comes from R1 §1.4 and §2.2
-// (docs/superpowers/specs/2026-09-06-gorge-learned-policy-research.md):
+// (archived 2026-09-06-gorge-learned-policy-research.md (docs/design/ARCHIVE.md)):
 //
 //   - Everything is read from the view only — never the record's
 //     traceboard board snapshot, never the card corpus registry (R1 §2.3

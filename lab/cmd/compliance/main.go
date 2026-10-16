@@ -1,5 +1,5 @@
 // Command compliance maintains gorge's declared-set compliance data
-// (docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md).
+// (docs/design/2026-10-02-xmage-compliance-oracle-design.md).
 //
 //	compliance manifest -xmage <XMage checkout> -ref <sha> [-out lab/oracle/compliance/manifests]
 //	compliance resolve  [-cards .cards] [-v] <manifest.json>...

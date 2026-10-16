@@ -8,7 +8,7 @@ This file is the rubric's source of truth. Changing the seed's judgement means
 changing this file in the same commit as the script, so a decision the seed made
 last week can be read against the rules it had at the time.
 
-Design: [`docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md`](../superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md).
+Design: [`docs/design/2026-09-29-reward-loop-and-seed-agent-design.md`](../design/2026-09-29-reward-loop-and-seed-agent-design.md).
 
 ## What it is not
 

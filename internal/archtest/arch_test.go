@@ -190,7 +190,7 @@ func set(s string) map[string]bool {
 // timers only to decide WHEN a ready batch is flushed and to report queue and
 // serve nanoseconds; which decisions are answered, and every answer, is a
 // pure function of the games' seeds. eventhost (the draft-event runtime,
-// docs/superpowers/specs/2026-10-13-draft-events-design.md) uses time only
+// docs/design/2026-10-13-draft-events-design.md) uses time only
 // for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
 // event package as a logged auto-pick entry, so replaying an event's log
 // never reads the clock. lab/cmd/draftrl (the draft-RL driver) reads it only
@@ -483,7 +483,7 @@ func TestNoExportLeaksAnEngineGame(t *testing.T) {
 }
 
 // TestNoLegacyMathRand: math/rand/v2 with an explicit seeded source is the
-// only randomness (engine/rules/rng.go, engine/seat/bot.go). The v1 package's global
+// only randomness (engine/rules/rng.go, bots/heuristic/bot.go). The v1 package's global
 // functions are exactly the ambient randomness the engine spec forbids.
 func TestNoLegacyMathRand(t *testing.T) {
 	for path, p := range packages(t) {

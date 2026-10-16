@@ -1,7 +1,7 @@
 // Command encablate is a RESEARCH tool (2026-10-10 encoding ablation): it
 // turns searchteacher label corpora into a family-tagged sparse token dump
 // for the Python ablation harness (scripts in
-// docs/superpowers/reports/2026-10-10-encoding-ablation.md).
+// archived 2026-10-10-encoding-ablation.md (docs/design/ARCHIVE.md)).
 //
 // Every record's redacted view is walked by the mzenc port with
 // Encoder.Hook set, so each emitted feature is attributed to the walker

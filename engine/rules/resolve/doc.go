@@ -1,5 +1,5 @@
 // Package resolve is the L6 resolution kernel of the rules engine (lasagna
-// spec docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §7,
+// spec docs/design/2026-10-03-rules-engine-lasagna-design.md §7,
 // W3; spike results 2026-10-03-s3-spike-results.md): checkpoint at the intent
 // boundary that begins a resolution, and answer every decision posed while
 // that resolution is in progress by re-executing it from the checkpoint with

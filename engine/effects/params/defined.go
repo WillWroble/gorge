@@ -8,7 +8,7 @@ import (
 )
 
 // This file is the generic DEFINED-REFERENCE tier's parameter compiler (W4
-// step 4, docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md
+// step 4, docs/design/2026-10-03-rules-engine-lasagna-design.md
 // section 8: "start with APIs whose params are read on more than one path
 // (costs, targets, Defined$)"). Defined$ names the objects or players an
 // ability acts on whatever its API, and it was read on the offer, payment,

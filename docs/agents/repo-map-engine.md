@@ -1,54 +1,68 @@
-# Repo map — the engine chain
+# Repo map — the platform chain: `engine/`, `bots/`, `server/`
 
 Part of the [repo map](repo-map.md) index. See also:
 [invariants.md](invariants.md) (the rules every change must keep) and
 [do-not.md](do-not.md) (the mistakes that have actually happened here).
 
-## The engine chain
+The import direction is one-way: `engine/` imports nothing outside itself,
+`bots/` imports only `engine/`, and `server/` imports both.
+`internal/archtest`'s `TestDependencyOrderHolds` pins the arrows that must
+never appear (see [invariants.md](invariants.md#1-dependency-direction)).
 
-The import direction is one-way. `internal/archtest`'s
-`TestDependencyOrderHolds` pins the arrows that must never appear (see
-[invariants.md](invariants.md#1-dependency-direction)).
+## `engine/`
 
 | Package | What it owns |
 |---|---|
-| `cards` | Compiles Forge card scripts into the card IR; keyword expanders (`engine/cards/kw_*.go`); `cards.Registry`, coverage. `cards.OpenCorpusFor` (`engine/cards/subset.go`) opens only a known card pool's cards from the per-card segment file, falling back to the whole corpus when the pool reads the name universe; botbench's deck and `-spellbench` modes use it. `cards.CompilerFingerprint` hashes every non-test `.go` file here, so **any edit in `engine/cards/` invalidates every IR cache** and forces a recompile. |
+| `engine/cards` | Compiles Forge card scripts into the card IR; keyword expanders (`engine/cards/kw_*.go`); `cards.Registry`, coverage. `cards.OpenCorpusFor` (`engine/cards/subset.go`) opens only a known card pool's cards from the per-card segment file, falling back to the whole corpus when the pool reads the name universe; botbench's deck and `-spellbench` modes use it. `cards.CompilerFingerprint` hashes every non-test `.go` file here, so **any edit in `engine/cards/` invalidates every IR cache** and forces a recompile. |
 | `engine/cards/oracletext` | Printed-card (Oracle) view for the Oracle audit. A subpackage on purpose so it does not move the fingerprint. |
-| `state` | Objects, zones, players, `state.Game`, the `ContinuousEffect` vocabulary. Plain data; mutated only by `events.Apply`. |
-| `decision` | `Decision` / `Option` / `Intent`, and the closed set of `decision.Kind`s (`decision.Kinds`). The whole engine↔seat contract. |
-| `deck` | `{name, count}` deck-list JSON resolved against a `cards.Registry`. |
-| `botpolicy` | The one heuristic bot policy (`botpolicy.Decide`), in one copy, shared by `seat` and rules' own fuzz driver. Reads a `Board`, never a view or an engine. Cast profiles in `bots/botpolicy/profiles/`. |
-| `bots` | Registry of hosted bot policies (`bots/registry.go`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. The hosted az policies `bots/azc3`, `bots/azc4` and `bots/azc5` register only when gorged's `-az-c*-net` flags enable them (`cmd/gorged/azc3.go`, `cmd/gorged/azclosed.go`). |
-| `events` | The event union, `events.Apply` (the only state mutator), the log, the sha256 hash chain. `events.Kind` is append-only. |
-| `effects` | `api:` primitive implementations, filter/count/value evaluators. Talks to the engine only through the small `effects.Host` interface; never imports `rules`. |
-| `rules` | The engine: turn structure, priority, stack, combat, SBAs, layers, casting and payment, and the `kw:`/`trig:`/`stat:`/`repl:` primitives. `rules.New`, `Pending`, `Submit`, `Advance`, `Clone`. `rules.NewStaged` (`staging.go`) builds a hypothetical engine at a described position. Also holds the coverage ratchets (`engine/rules/*_test.go`) and the golden heads (`engine/rules/testdata/heads/`, pinned by `TestHeads`). |
-| `engine/rules/chars` | The read-only CR 613 layer walk (W5 step E4): `Types` (layer 4), `Compute` (layers 3/5/6 with CR 613.6 dependency order, then 7), `PT` (layer 7), `Name`, `BaseKeywords`, the type vocabulary and layer-4 transforms, and the layer-7a CDA evaluators (`CDASetPT`, `CDAPTStatic`). Reads the game only through `chars.Board`, which `engine/rules/chars_board.go` implements, and keeps its buffers in a `chars.Scratch` the Engine embeds (`charsWalk`); never imports `rules`. The effect lifecycle, the static scan, the Derived memo, the printed fast paths, the incremental layer tables and the Affected$ match (`matchesWithCharsPT`) stay in `rules`. A new characteristic rule goes here; a new Board method fails `TestCharsBoardOnlyShrinks`. |
-| `engine/rules/combat` | Attack/block legality (W5 step E5): `CanAttack`/`CanAttackPair`/`CanBlock`, the CR 508.1d requirement set (`AttackRequirements`), goad, the CantAttack/CantBlock/CantBlockBy/CanAttackDefender restriction walks, hidden-keyword grants, AttackRestrict and MinMaxBlocker bounds, MustBlock duties. Reads the game only through `combat.Board`, which `engine/rules/combat_board.go` implements; never imports `rules`. The declaration flow (asks, validators, attack/block charges, events) stays in `engine/rules/combat.go` and `engine/rules/attack_cost.go`. A new legality rule goes here; a new Board method fails `TestCombatBoardOnlyShrinks`. |
-| `engine/rules/trigmatch` | The trigger-mode matchers (L5, W5 E3): the `Mode$` registry (`Lookup`, `Match`) and one matcher per mode, reading the engine only through the read-only `trigmatch.Board` (implemented by `engine/rules/trigmatch_board.go`). Queueing, latches and Notes stay in `rules` (`checkTriggers`, `checkFaceTriggers`). A new trigger mode registers here. |
-| `view` | Projects one seat's redacted `view.View` (`Project`, `ProjectFor`, `RedactEvents`). The only way a client reads state. `engine/view/view.go` is the orchestration (`Project`/`project`, `View`, the shared text helpers); the card/battlefield projection family lives in `engine/view/card.go` (`CardView`, `cardViews`, `cardView`) and the stack family in `engine/view/stack.go` (`StackView`, `stackViews`). A projection change goes in the family file for its seam, not in `engine/view/view.go` — the two families were interleaved in one file and two projection tickets collided on it (split out in `97655ff0b`). |
-| `seat` | Who answers decisions: `seat.Seat` (+ `BoardSeat`, `PaymentPlanConsumer`), `NewBot`, `NewAttackSimBot`, `NewPolicyNetBot`, explore bot. Handed a view, never an engine. |
-| `replay` | Re-executes `(Config, Log)` and names the first divergent event (`Replay`, `ReplayTo`). |
-| `protocol` | Versioned wire types for host↔client. Types only; never imports `rules`. |
-| `host` | Tables (one goroutine each), sessions, snapshots, persistence, undo, the hosted bot-policy vocabulary (`server/host/bot_policy.go`). Its only clock is an injected sleep. |
-| `server/host/httpapi` | `net/http` JSON + SSE + the embedded web client. Every seat route goes through `claimForTable`. |
-| `eventhost` | Hosted draft events inside gorged: event store (`event.json` + `log.jsonl`), lobby/join, draft with synchronous bots, per-event SSE frames; build and games in later E1 tickets. |
+| `engine/state` | Objects, zones, players, `state.Game`, the `ContinuousEffect` vocabulary. Plain data; mutated only by `events.Apply`. |
+| `engine/decision` | `Decision` / `Option` / `Intent`, and the closed set of `decision.Kind`s (`decision.Kinds`). The whole engine↔seat contract. |
+| `engine/deck` | `{name, count}` deck-list JSON resolved against a `cards.Registry`. |
+| `engine/events` | The event union, `events.Apply` (the only state mutator), the log, the sha256 hash chain. `events.Kind` is append-only. |
+| `engine/effects` | `api:` primitive implementations, filter/count/value evaluators. Talks to the engine only through the small `effects.Host` interface; never imports `rules`. |
+| `engine/effects/params` | Leaf home of the compiled ability-parameter records shared by `effects` and the payment layer. |
+| `engine/rules` | The engine: turn structure, priority, stack, combat, SBAs, layers, casting and payment, and the `kw:`/`trig:`/`stat:`/`repl:` primitives. `rules.New`, `Pending`, `Submit`, `Advance`, `Clone`. `rules.NewStaged` (`engine/rules/staging.go`) builds a hypothetical engine at a described position. Also holds the coverage ratchets (`engine/rules/*_test.go`) and the golden heads (`engine/rules/testdata/heads/`, pinned by `TestHeads`). |
+| `engine/rules/chars` | The read-only CR 613 layer walk: `Types` (layer 4), `Compute` (layers 3/5/6 with CR 613.6 dependency order, then 7), `PT` (layer 7), `Name`, `BaseKeywords`, the layer-7a CDA evaluators. Reads the game only through `chars.Board`, which `engine/rules/chars_board.go` implements; never imports `rules`. A new characteristic rule goes here; a new Board method fails `TestCharsBoardOnlyShrinks`. |
+| `engine/rules/combat` | Attack/block legality: `CanAttack`/`CanAttackPair`/`CanBlock`, the CR 508.1d requirement set (`AttackRequirements`), goad, restriction walks, MustBlock duties. Reads the game only through `combat.Board` (`engine/rules/combat_board.go`). The declaration flow stays in `engine/rules/combat.go` and `engine/rules/attack_cost.go`. A new Board method fails `TestCombatBoardOnlyShrinks`. |
+| `engine/rules/cost` | The shared cost vocabulary: `Cost`, `CostPart`, the Forge cost-string parsers. A leaf (`TestCostVocabularyIsALeaf`). |
+| `engine/rules/pay` | The L5 payment-planning layer (lasagna spec §9). |
+| `engine/rules/resolve` | The L6 resolution kernel (lasagna spec §7); sole owner of the mid-resolution ask state, `Engine.tape` (`TestTapeStateOwnedOnlyByTheResolutionKernel`). |
+| `engine/rules/scriptfacts` | Pure facts a card's printed text and compiled script imply, derived without game state. |
+| `engine/rules/trigmatch` | The trigger-mode matchers: the `Mode$` registry (`Lookup`, `Match`), one matcher per mode, reading the engine through `trigmatch.Board` (`engine/rules/trigmatch_board.go`). Queueing and latches stay in `rules`. A new trigger mode registers here. |
+| `engine/view` | Projects one seat's redacted `view.View` (`Project`, `ProjectFor`, `RedactEvents`). The only way a client reads state. `engine/view/view.go` is the orchestration; the card/battlefield family lives in `engine/view/card.go` and the stack family in `engine/view/stack.go`. A projection change goes in the family file for its seam. |
+| `engine/seat` | The seat contract only: `seat.Seat`, `PaymentPlanConsumer`, `TargetHintConsumer`. Imports only `decision` and `view`. Concrete bots live in `bots/`. |
+| `engine/replay` | Re-executes `(Config, Log)` and names the first divergent event (`Replay`, `ReplayTo`). |
 
-## The draft stack
+The layering design for `engine/rules` is
+[`docs/design/2026-10-03-rules-engine-lasagna-design.md`](../design/2026-10-03-rules-engine-lasagna-design.md).
 
-E0's headless limited lab: a draft pod's own event stream, below (not
-inside) the engine chain. Everything here is pure or nearly so — the only
-package that touches the engine is `lab/cmd/draftsim` (see
-[repo-map-paths.md](repo-map-paths.md#cmd)). Design:
-`docs/superpowers/specs/2026-10-13-draft-events-design.md`.
+## `bots/`
 
 | Package | What it owns |
 |---|---|
-| `limited` | The draft stack's shared vocabulary: `CardRef`, `Rarity`, the pool/receipt types every `lab/draft/limited/` package speaks. No behaviour; embeddable in logs and wire payloads. |
-| `lab/draft/limited/setdata` | The embedded set specs (`FDN`, `BLB` as go:generate-refreshed JSON) and `Load`/`Codes`/`Support` over them. |
-| `lab/draft/limited/booster` | Seeded Play-Booster opening: slot-ordered fills, weighted wildcards, colour balance; `OpenPod` opens a whole pod's packs from one seed. |
-| `lab/draft/limited/draft` | The pure N-seat (2..8; hosted 4) booster-draft state machine (left/right pack flow, FIFO pack queues); interleaving-independent. |
-| `lab/draft/limited/build` | Pool → engine-loadable 40-card deck: validation, coloured-pip land split, `deck.File` output (`ToDeckFile`). |
-| `lab/draft/limited/pickbot` | The pick decision and pool→deck build policies a drafting bot is made of: `RatingColour` (Drafter), `Best23` (Builder), the shared registry with `Lookup`/`Names`. Registry entries are shared pointers — construct fresh instances with a `CardLookup` injected. |
-| `event` | The draft event: a LOBBY→DRAFT→BUILD→ROUNDn→COMPLETE state machine over an append-only, hash-chained log (`Apply`, `ReplayLog`, `MarshalLog`), the per-seat draft view (`Next`/`Pool`/`SavedDeck`), round-robin pairings, sealed supply, Swiss pairings (logged `RoundPaired`), standings and the CSV draft log. Owns the replay-from-log contract `lab/cmd/draftsim -verify` asserts. |
-| `draftlab` | The headless limited lab over the corpus: sealed pools, deck builders and player policies resolved by ref, games and gauntlets as pure functions of (entrants, seed), whole draft/sealed events (`RunEvent`) with per-seat draft ids, manifests, and the 17Lands-shaped `draft_data`/`game_data`/`decks.json` exports (`csv.go`, E5-c4). |
-| `lab/draft/draftlab/extern` | Out-of-process agents for draftlab (E5-d): the adapters (`Drafter`/`Builder`/`Player`), the process-wide batching hub, the `gorge-agent/1` wire (`lab/draft/draftlab/extern/wire`) and the reference agent (`refagent`, plus `lab/cmd/extagent`). Dials one agent over a child's stdio or a Unix socket and exposes it where a built-in agent would sit. The protocol of record is the E5-d plan §4. |
+| `bots/botpolicy` | The one heuristic bot policy (`botpolicy.Decide`), in one copy, shared by `bots/heuristic` and rules' own fuzz driver. Reads a `Board`, never a view or an engine (archtest forbids `view`, `rules`, `seat`). Cast profiles in `bots/botpolicy/profiles/`. |
+| `bots/heuristic` | The default bot: `heuristic.Bot` (`NewBot`, `NewLethalPressureBot`, `NewAttackSimBot`, `NewExploreBot`, `NewCastProfileBot`, …), `heuristic.BoardSeat` (a seat that reads a `botpolicy.Board`), and `PolicyNetBot` (`NewPolicyNetBot`). |
+| `bots` | The closed registry of hosted policies (`bots/registry.go`, `bots.Factory`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. The hosted az policies `bots/azc3`, `bots/azc4` and `bots/azc5` register only when gorged's `-az-c*-net` flags enable them (`cmd/gorged/azc3.go`, `cmd/gorged/azclosed.go`). |
+| `bots/sanity` | Opt-in common-sense guard decorator over engine target hints (default off). |
+| `bots/search`, `bots/azredeal`, `bots/sbbuiltin`, `bots/sbtactical`, `bots/sbsearch` | Hosted adapters (BP-11..BP-14 of the hosted-bot-packages design) over the inference runtime below. |
+| `bots/azc3`, `bots/azc4`, `bots/azc5` | Hosted az networks; each package's doc names its operating report in `docs/design/`. |
+| `bots/azmcts` (+`clairvoyant`) | AlphaZero-style PUCT search ([`docs/design/2026-09-27-alphazero-mcts-design.md`](../design/2026-09-27-alphazero-mcts-design.md)). |
+| `bots/gonet` (+`gonettest`) | The `.dzgw` network forward pass the az bots evaluate. |
+| `bots/policynet` | Feature layer of the learned per-option policy: deterministic encoder from a seat's view, MLP, `.gpol` checkpoints. |
+| `bots/searchprobe` | Hidden-information world sampler (`Collector`, `Sample`, `Redealer`, known-card tracking). |
+| `bots/searchseat` | The PIMC search decision function (`Choose`) shared by the teacher corpus generator and `SearchBot`. |
+| `bots/spellbench/builtins`, `payexec`, `sbsearch` | Runtime halves of the SpellBench bots: the builtin and tactical policies, the payment-plan lowering, determinized search. |
+| `bots/traceboard` | The redacted, map-free decision-trace board schema (`lab/cmd/botbench -decision-trace`). |
+
+## `server/`
+
+| Package | What it owns |
+|---|---|
+| `server/host` | Tables (one goroutine each), sessions, snapshots, persistence, undo, the hosted bot-policy vocabulary (`server/host/bot_policy.go`). Its only clock is an injected sleep. |
+| `server/host/httpapi` | `net/http` JSON + SSE + the embedded web client. Every seat route goes through `claimForTable`. |
+| `server/host/manabrewhttp` | The ManaBrew HTTP surface. |
+| `server/protocol` | Versioned wire types for host↔client. Types only; never imports `rules`. `server/protocol/manabrew` holds the ManaBrew wire types and codecs. |
+| `server/manabrew` (+`mbtest`) | The ManaBrew translator: projects a seat's `view.View` into ManaBrew state, plus a mock client for tests. |
+| `server/divergence` (+`shadow`) | Human-divergence capture records (`divergence-v1`, `triage-v1` JSONL), the materiality predicate, the shadow seed and the shadow answer. Design: [`docs/design/2026-10-10-human-divergence-design.md`](../design/2026-10-10-human-divergence-design.md). |
+
+The draft stack (`lab/draft/…`) is in [repo-map-research.md](repo-map-research.md#labdraft).

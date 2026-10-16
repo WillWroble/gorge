@@ -7,7 +7,7 @@ import (
 )
 
 // Pins for the "unexplained" rows of the 2026-10-10 corpus coverage census
-// (docs/superpowers/reports/2026-10-10-corpus-coverage-census.md): Walking
+// (archived 2026-10-10-corpus-coverage-census.md (docs/design/ARCHIVE.md)): Walking
 // Ballista {4}, Mount Doom #2 and Mirrorpool #1 are payable-after-tapping
 // (PotentialActions) exactly when their printed gates hold, so the census's
 // "never potential" came from the bot's board, not from the offer walk.

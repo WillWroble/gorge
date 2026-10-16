@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M1b: clairvoyant vs honest search teacher, distilled into a seat-visible
-# student (docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §15).
+# student (docs/design/2026-09-28-spellbench-agent-design.md §15).
 #
 # Every heavy step runs under the shared lock in a MemoryMax scope; each
 # generation chunk is one lock hold (~25 min at 8 workers), so other jobs get

@@ -10,7 +10,7 @@ import (
 )
 
 // This file is api:Clone's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on CopyPermanent's pattern (copypermanent_params.go). compileClone is
 // the ONLY reader of a Clone ability's own parameters: the resolution
 // (clone.go) and rules' as-enters copy election (cast_etbchoice.go) read the

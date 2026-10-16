@@ -1,5 +1,5 @@
 // exitloop is the L10 expert-iteration loop
-// (docs/superpowers/plans/2026-09-19-learned-cast-profile.md, "L10"): a
+// (archived 2026-09-19-learned-cast-profile.md (docs/design/ARCHIVE.md), "L10"): a
 // deterministic multi-generation run that orchestrates the three separate
 // stage commands (lab/cmd/searchteacher, lab/cmd/policytrain, lab/cmd/botbench) as built
 // binaries.

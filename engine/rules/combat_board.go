@@ -8,7 +8,7 @@ import (
 )
 
 // combat_board.go is package rules' side of the engine/rules/combat seam (spec
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §9, W5
+// docs/design/2026-10-03-rules-engine-lasagna-design.md §9, W5
 // step E5): combatBoard implements combat.Board over the Engine, so the
 // attack/block legality predicates read the game without holding the
 // engine. Every method is a pure read that forwards to the engine reader the

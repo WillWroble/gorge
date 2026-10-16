@@ -1,13 +1,14 @@
 # Architecture overview
 
-*Measured on `main` @ `f1ac002c4`, 2026-10-12, from `go list ./...` and the
-import graph.*
+*Measured on `main` @ `6d95c6a54`, 2026-10-16, after the repository
+restructure ([ADR 0001](https://github.com/adams-shaun/gorge/blob/main/docs/decisions/0001-repo-layout.md)),
+from `go list ./...` and the import graph.*
 
 ## The core idea
 
 Card behaviour is not hand-written per card. Forge's card scripts (fetched,
-never committed) are compiled by the `cards` package into an IR. The rules
-core (`state`, `decision`, `events`, `effects`, `rules`) implements the
+never committed) are compiled by the `engine/cards` package into an IR. The rules
+core (`engine/state`, `decision`, `events`, `effects`, `rules`) implements the
 primitives the IR references: `api:` effects, `trig:` trigger modes, `kw:`
 keywords, `stat:` static abilities, `count:` value expressions and so on. A
 card is *playable* when every primitive it uses is implemented.
@@ -24,103 +25,94 @@ Players never see the engine. Each seat receives a redacted `view.View` and
 answers a `decision.Decision` drawn from a closed set of kinds (priority,
 targets, attackers, blockers, trigger order, modes, mulligan, and so on).
 
-## Tiers
+## Groups
 
-| Tier | Contents | Role |
+The repository is grouped by audience. Each group imports only the groups
+above it in this table, with one exception noted below.
+
+| Group | Contents | Role |
 |---|---|---|
-| T0 card pipeline | `cards`, `deck`, `engine/cards/oracletext` | Forge script → IR compiler, keyword expanders, card registry, coverage |
-| T1 rules core | `state`, `decision`, `events`, `effects`, `rules` and its sub-packages, `replay`, `botpolicy` | the engine itself, plus the default heuristic bot (which search code uses as its environment model) |
-| T2 projection / host / wire | `view`, `seat`, `protocol`, `host`, `server/host/httpapi`, the ManaBrew adapter stack, `cmd/gorged` | per-seat projections, decision answerers, tables, persistence, HTTP + SSE + the embedded Svelte client (`web/`) |
-| T3 bots / ML / search | `bots/*`, `bots/policynet`, `bots/searchprobe`, `bots/searchseat`, `bots/azmcts`, `lab/training/spellbench/*` | hosted bot policies, learned policy plumbing, search harnesses |
-| T4 tooling | `lab/oracle/compliance/*`, `lab/oracle/xmageoracle`, `internal/archtest`, `internal/codeshape`, `internal/testbudget`, `internal/testutil`, ~40 `cmd/` binaries | the XMage compliance oracle, architecture ratchets, benchmarks |
+| `engine/` | `cards` (+`oracletext`), `deck`, `state`, `decision`, `events`, `effects` (+`params`), `rules` and its sub-packages, `replay`, `view`, `seat` | T0 card pipeline (Forge script → IR) and T1 rules core, the per-seat projection, and the `Seat` contract (`seat` imports only `decision` and `view`) |
+| `bots/` | `botpolicy`, `heuristic` (the default `Bot`, `BoardSeat`, `PolicyNetBot`), the registry (`bots`, `bots/all`), hosted bots (`azc3`/`azc4`/`azc5`, `sbtactical`, ...) and their inference runtime (`azmcts`, `gonet`, `policynet`, `searchprobe`, `searchseat`, `traceboard`, `spellbench/{builtins,payexec,sbsearch}`) | every bot a table can seat |
+| `server/` | `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence` | tables, persistence, HTTP + SSE, the wire protocols |
+| `internal/` | `archtest`, `testutil`, `corpusheap`, `bench`, `paymirror`, `codeshape`, `testbudget`, `tsgen`, `botobs` | architecture ratchets, test support, generators |
+| `cmd/` | `gorged`, `forgec`, `repro`, `mtgsim`, `pkgmap`, `codeshape`, `testbudget`, ... | product and developer binaries; nothing imports a command |
+| `lab/` | `draft/`, `oracle/`, `training/`, `contracts`, `cmd/`, `scripts/` | fenced extensions: draft events, compliance oracles, training research; slated for their own repository |
+| `web/` | the Svelte+Vite client | embedded into `cmd/gorged` |
 
 ```mermaid
 flowchart TB
-  subgraph T0["T0 Card pipeline"]
-    cards["cards"]
-    deck["deck"]
-    oracletext["engine/cards/oracletext"]
-  end
-  subgraph T1["T1 Rules core"]
+  subgraph E["engine/"]
+    cards["cards, deck"]
     state["state"] --> cards
     decision["decision"] --> state
     events["events (Apply, log, hash chain)"] --> decision
-    params["engine/effects/params"] --> decision
-    cost["engine/rules/cost"] --> state
-    effects["effects"] --> events
-    effects --> cost
-    effects --> params
-    sub["engine/rules/chars, combat, trigmatch, pay, resolve, scriptfacts"] --> effects
+    effects["effects (+params, rules/cost)"] --> events
+    sub["rules/chars, combat, trigmatch, pay, resolve, scriptfacts"] --> effects
     rules["rules (Engine)"] --> sub
-    rules --> deck
     replay["replay"] --> rules
-    botpolicy["botpolicy"] --> effects
-  end
-  subgraph T2["T2 Projection / host / wire"]
     view["view"] --> events
-    seat["seat"] --> view
-    seat --> botpolicy
+    seat["seat (contract)"] --> view
+  end
+  subgraph B["bots/"]
+    botpolicy["botpolicy"] --> effects
+    heuristic["heuristic"] --> botpolicy
+    heuristic --> seat
+    searchseat["searchseat, searchprobe, azmcts"] --> rules
+    searchseat --> heuristic
+    registry["bots registry, bots/all, hosted bots"] --> searchseat
+  end
+  subgraph S["server/"]
     protocol["protocol"] --> view
     host["host"] --> rules
-    host --> seat
-    host --> replay
+    host --> registry
     host --> protocol
-    httpapi["server/host/httpapi"] --> host
-    mb["manabrew stack"] --> httpapi
+    httpapi["host/httpapi, manabrew"] --> host
+  end
+  subgraph C["cmd/"]
     gorged["cmd/gorged"] --> httpapi
-    gorged --> mb
   end
-  subgraph T3["T3 Bots / ML / search"]
-    policynet["bots/policynet"]
-    searchprobe["bots/searchprobe"] --> rules
-    searchseat["bots/searchseat"] --> searchprobe
-    azmcts["bots/azmcts"] --> searchseat
-    sbx["lab/training/spellbench/*"]
-    bots["bots/*"] --> searchseat
-    bots --> sbx
-    bots --> azmcts
+  subgraph L["lab/"]
+    draft["draft/eventhost, limited"]
+    oracle["oracle/compliance, training/*"] --> rules
   end
-  subgraph T4["T4 Tooling"]
-    compliance["lab/oracle/compliance/*"] --> rules
-    archtest["archtest, codeshape, testbudget, testutil"]
-    cmds["cmd/*"]
-  end
-  seat -. back-edge .-> policynet
-  host -. back-edge .-> searchseat
-  host -. back-edge .-> searchprobe
-  gorged -. links .-> bots
+  gorged -. back-edge .-> draft
 ```
 
-Arrows point from an importer to the package it imports. Dashed edges are
-*back-edges*: places where a lower tier imports research code from T3.
+Arrows point from an importer to the package it imports. The dashed edge is
+the one remaining *back-edge*: `cmd/gorged` still links
+`lab/draft/eventhost` and `lab/draft/limited/setdata`. ADR 0001 decision 5
+replaces it with a registration seam so that nothing outside `lab/` imports
+`lab/`. The generated tier graph on the [Packages](packages.md) page is the
+authority.
 
 ## Size
 
-About 464k lines of non-test Go and 672k lines of tests. The rules core is
-roughly 249k / 494k of that; the `rules` package alone is 124.5k non-test and
-417.7k test lines across 379 and 2,148 files.
+About 517k lines of non-test Go and 733k lines of tests. `engine/` is 281k /
+533k of that; the `engine/rules` directory alone is 130k non-test lines.
+`lab/` holds 145k / 99k, `bots/` 47k / 43k, `server/` 21k / 35k.
 
 ## Observations
 
-1. **The rules core is clean.** `go list -deps ./engine/rules` reaches 15 in-repo
-   packages, all in T0/T1. The dependency direction is enforced by
-   `internal/archtest` (see [Invariants](invariants.md)).
-2. **`botpolicy` is effectively core.** 28 packages import it, and an
-   architecture test forbids it from importing `view`, `rules` or `seat`. Every
-   search seat uses it as the opponent and environment model.
-3. **The production server links research code.** `cmd/gorged` links 41
-   in-repo packages, including the MCTS, PIMC, learned-policy and SpellBench
-   stacks, through two back-edges: `engine/seat/policynet.go` → `bots/policynet`,
-   and `server/host/botenv.go` → `bots/searchseat`. Decoupling these is on the
-   [cleanup roadmap](cleanup.md). (The former `bots/policynet` →
-   `lab/training/spellbench/v2agent` edge is cut: front end V moved to
-   `lab/training/v2front`, and the SpellBench v1/v2 bridge builds only
-   with `-tags spellbench_bridge`.)
+1. **The rules core is clean.** `go list -deps ./engine/rules` reaches 15
+   in-repo packages, all under `engine/`. The dependency direction is enforced
+   by `internal/archtest` (see [Invariants](invariants.md)).
+2. **`botpolicy` is the shared board model.** It lives in `bots/` and imports
+   only `engine/`; an architecture test forbids it from importing `view`,
+   `rules` or `seat`. Every search seat uses it as the opponent and
+   environment model.
+3. **The engine no longer links bots.** The old `seat → policynet` and
+   `seat → botpolicy` edges are gone: `engine/seat` is the contract only, and
+   the concrete bots live in `bots/heuristic` and the hosted packages. The
+   server reaches bots through the `bots` registry (`bots.Factory`).
+4. **`cmd/gorged` links the draft extension.** It is the only import from
+   outside `lab/` into `lab/` (see the dashed edge above).
 
 ## Further reading
 
 - [Packages](packages.md): every package with its purpose, size and status.
 - [Invariants](invariants.md): the rules the engine relies on, and what
   enforces each.
-- The original design spec:
-  [`docs/superpowers/specs/2026-09-03-mtgcore-go-engine-design.md`](https://github.com/adams-shaun/gorge/blob/main/docs/superpowers/specs/2026-09-03-mtgcore-go-engine-design.md).
+- [ADR 0001: repository layout](https://github.com/adams-shaun/gorge/blob/main/docs/decisions/0001-repo-layout.md).
+- The original M0 design spec (2026-09-03) is archived; see
+  [`docs/design/ARCHIVE.md`](https://github.com/adams-shaun/gorge/blob/main/docs/design/ARCHIVE.md).

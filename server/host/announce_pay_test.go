@@ -35,7 +35,7 @@ func liveEngineCardZone(t *testing.T, r *Registry, id state.ObjID) state.Zone {
 }
 
 // TestAnnouncePayHumanSeatThroughHost is the announce-then-pay host lane
-// (docs/superpowers/specs/2026-09-27-announce-then-pay.md): a human seat on
+// (docs/design/2026-09-27-announce-then-pay.md): a human seat on
 // an Auto Mana table sees only published decisions, announces plan-payable
 // casts through Registry.SubmitIntent, cancels the first (the card returns
 // to hand), undoes a tap when one is offered, pays the rest in the select

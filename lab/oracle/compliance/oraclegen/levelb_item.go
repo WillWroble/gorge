@@ -1,7 +1,7 @@
 // Level-B item identity. A level-B scenario is named by its requirement key
 // ("activate#0.2") rather than a template id, so a card can hold one verdict
 // row per requirement with the row key still `card -> template`
-// (docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2).
+// (docs/design/2026-10-05-compliance-level-b.md section 2).
 //
 // NewItem (gen.go) is deliberately NOT touched: it hard-codes CR 601.2 and
 // the level-A Why, and the verdict's ScenarioSHA is the sha of the whole

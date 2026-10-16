@@ -1,6 +1,6 @@
 package rules
 
-// Oracle-text card audit (docs/superpowers/specs/2026-09-27-oracle-text-card-audit.md).
+// Oracle-text card audit (docs/design/2026-09-27-oracle-text-card-audit.md).
 //
 // Every scenario under testdata/oracle/<family>/<card>.json states what a
 // card does according to its PRINTED (Oracle) text and the Comprehensive

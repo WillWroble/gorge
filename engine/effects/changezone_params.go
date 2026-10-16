@@ -13,7 +13,7 @@ import (
 )
 
 // This file is api:ChangeZone's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8). compileChangeZone is the ONLY reader of a ChangeZone ability's
 // parameters: the resolution (zone_change.go, zone_hand.go, zone_hidden.go,
 // zone_search.go, zone_library.go), the rules-side offer and target paths

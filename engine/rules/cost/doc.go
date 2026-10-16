@@ -6,7 +6,7 @@
 // helpers).
 //
 // It is layer L2 of the rules-engine lasagna (spec
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §3, W5
+// docs/design/2026-10-03-rules-engine-lasagna-design.md §3, W5
 // step E1): a leaf that imports only state, holds no *rules.Engine and reads
 // no game state. internal/archtest TestCostVocabularyIsALeaf pins its import
 // set. Payment -- pip expansion, the resolveMana search, the cast-flow

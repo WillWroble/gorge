@@ -1,6 +1,6 @@
 // Package divergence holds the record types and comparison predicates of
 // the human-divergence capture (design:
-// docs/superpowers/specs/2026-10-10-human-divergence-design.md).
+// docs/design/2026-10-10-human-divergence-design.md).
 //
 // A divergence records one place where a human's answer A and a shadow
 // policy's answer B to the same decision differ materially; the triage

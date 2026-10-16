@@ -75,10 +75,10 @@ so most of these hurt someone other than you.
   `internal/testutil.CorpusRegistry`), don't pass `-count=1`, don't run
   `go test ./...`, `./lab/oracle/compliance/...` or a whole package uncapped, and don't
   run a known-heavy test whole "for a baseline": measure one chunk under the
-  2 GB cap. Split a heavy test into chunk tests sharing fixtures; never
+  4 GB cap. Split a heavy test into chunk tests sharing fixtures; never
   delete assertions or shrink a census to make it fit.
 - **Don't grow `AGENTS.md` with detail.** It is loaded on every agent turn.
-  Put the detail in `docs/agents/` or `docs/superpowers/` and link to it.
+  Put the detail in `docs/agents/`, `docs/design/` or `ops/` and link to it.
 - **Don't quote an unmeasured number as fact.** Name the command or report,
   or label it a hypothesis.
 

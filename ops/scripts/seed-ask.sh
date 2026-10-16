@@ -70,7 +70,7 @@ trap 'rm -f "$BRIEF"' EXIT
 	printf 'to `main` outside a reproducible measurement/plan and its written report, unless\n'
 	printf 'the ask itself names a concrete artifact (e.g. a dashboard) to build.\n\n'
 	printf '## Done means\n\n'
-	printf 'A written report (docs/superpowers/reports/ or the ticket report) that:\n\n'
+	printf 'A written report (docs/design/ or the ticket report) that:\n\n'
 	printf '1. States what exists today precisely, with file:line citations.\n'
 	printf '2. Proposes something concrete and nameable -- a rule, a plan, a dashboard\n'
 	printf '   layout -- specific enough that a reviewer could implement or verify it from\n'

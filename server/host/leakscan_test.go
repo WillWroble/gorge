@@ -20,7 +20,7 @@ import (
 //
 // skip names struct fields the walk does not enter, by "Type.Field"; each
 // one is a documented residual of the leak audit
-// (docs/superpowers/reports/2026-10-14-az-c4-hosted.md), and the scan still
+// (docs/design/2026-10-14-az-c4-hosted.md), and the scan still
 // counts how often it met each so a test can say what it did not look at.
 type leakScan struct {
 	names   []string

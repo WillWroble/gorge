@@ -5,7 +5,7 @@
 // It never receives another seat's picks, pool or deck, nor any pod or
 // server state: Obs is the whole input, and an Obs can be rebuilt from the
 // seat's own PickViews (Obs.Add), which is what the draft already shows the
-// seat (docs/superpowers/reports/2026-10-15-draft-belief.md, "information
+// seat (archived 2026-10-15-draft-belief.md (docs/design/ARCHIVE.md), "information
 // boundary").
 //
 // The model is card flow. A card in a pack the seat passed was taken by the

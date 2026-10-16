@@ -11,7 +11,7 @@ import (
 // mmStats is the paid-cost mana census A/B probe (play -mm-stats, with or
 // without -no-paid-mana-census): per seat, counters over its posed priority
 // windows. They are written into each game's record and summed by the report
-// script (docs/superpowers/reports/2026-10-12-mana-model-ab.md).
+// script (archived 2026-10-12-mana-model-ab.md (docs/design/ARCHIVE.md)).
 //
 // A "new" option is one the census adds: present in the priority walk with
 // the paid-cost census on, absent with it off, at the same state. The other

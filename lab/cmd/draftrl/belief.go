@@ -26,8 +26,8 @@ import (
 )
 
 // The belief subcommand measures how well a seat can guess a pod mate's
-// deck from what it legally saw (docs/superpowers/reports/
-// 2026-10-15-draft-belief.md). Every pod is drafted with an obsDrafter on
+// deck from what it legally saw (archived
+// 2026-10-15-draft-belief.md, docs/design/ARCHIVE.md). Every pod is drafted with an obsDrafter on
 // each seat, which records the seat's own PickViews and nothing else; the
 // draft-informed belief (lab/draft/limited/draftbelief) reads only that log, the
 // public set table and the revealed cards. The true decks are read only to

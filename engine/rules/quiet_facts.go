@@ -10,7 +10,7 @@ import (
 )
 
 // The quiet-seat proof's per-face facts (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md, §2.4,
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md, §2.4,
 // §2.5, §3.1). They are compiled once per face, in the same constructor as
 // the other walkFaceFacts, under the same currentFor guards, so a face whose
 // ability or keyword list was replaced after the table was built reads as a

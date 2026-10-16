@@ -8,7 +8,7 @@
 // evaluators (CDASetPT, CDAPTStatic).
 //
 // It is an L4 package of the rules-engine lasagna (spec
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §3, W5
+// docs/design/2026-10-03-rules-engine-lasagna-design.md §3, W5
 // step E4). It never holds a *rules.Engine: the walk reads the game through
 // Board, a narrow read-only interface package rules implements
 // (engine/rules/chars_board.go), and keeps its per-call buffers in a Scratch the

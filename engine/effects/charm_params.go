@@ -9,7 +9,7 @@ import (
 )
 
 // This file is the modal family's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8). compileCharm is the ONLY reader of a modal ability's own parameters --
 // api:Charm and api:GenericChoice (both resolve through effCharm) and the
 // Choices$ list of the other modal carriers (VillainousChoice, and a Vote or

@@ -11,7 +11,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
-// Announce then pay (docs/superpowers/specs/2026-09-27-announce-then-pay.md).
+// Announce then pay (docs/design/2026-09-27-announce-then-pay.md).
 //
 // A seat that receives PaymentActions may submit Intent.Announce naming an
 // action that carries a plan: the engine begins that ordinary cast with no

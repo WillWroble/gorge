@@ -2,7 +2,7 @@ package main
 
 // -spellbench-az-c3-net and -spellbench-decks-dir: a SpellBench run of the
 // az-c3 policy (bots/azc3) over a directory of decks, the deployment's pool
-// (docs/superpowers/reports/2026-10-09-az-c3-hosted.md). Like az-redeal, the
+// (docs/design/2026-10-09-az-c3-hosted.md). Like az-redeal, the
 // bench builds the az seat itself from the hosted config, so it reaches the
 // concrete *azmcts.Seat; the hosted EnvSeat wrapper is the server's entry.
 

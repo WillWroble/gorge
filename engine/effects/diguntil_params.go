@@ -11,7 +11,7 @@ import (
 )
 
 // This file is api:DigUntil's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on CopyPermanent's pattern (copypermanent_params.go). compileDigUntil
 // is the ONLY reader of a DigUntil ability's own parameters: the resolution
 // (diguntil.go) reads the compiled DigUntilParams, including the parsed

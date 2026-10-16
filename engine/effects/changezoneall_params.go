@@ -11,7 +11,7 @@ import (
 )
 
 // This file is api:ChangeZoneAll's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on ChangeZone's pattern (changezone_params.go). compileChangeZoneAll is
 // the ONLY reader of a ChangeZoneAll ability's parameters: the sweep
 // (zone_changeall.go) and the rules-side removal classifier (targetRemoval)

@@ -1,5 +1,5 @@
 // Package paymirror is an A/B differential check for cast payment plans
-// (docs/superpowers/specs/2026-09-24-cast-payment-plans.md §10: "compare a
+// (docs/design/2026-09-24-cast-payment-plans.md §10: "compare a
 // manual execution of the same selected payment with planned execution for
 // state equivalence").
 //

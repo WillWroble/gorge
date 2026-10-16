@@ -1,5 +1,5 @@
 // Package azc5 hosts the az-c5 policy: az-c4's closed-list search seat with
-// the C5 network (docs/superpowers/reports/2026-10-15-az-c5.md), the net
+// the C5 network (docs/design/2026-10-15-az-c5.md), the net
 // az-c4's closed-list, census-on loop produced when it was continued for four
 // generations on the build carrying the payment-plan fixes (trigpay, bots
 // consuming payment plans, the botmanual tap gate):
@@ -29,7 +29,7 @@ import (
 const Policy = "az-c5"
 
 // report is the source every claim below cites.
-const report = "docs/superpowers/reports/2026-10-15-az-c5.md"
+const report = "docs/design/2026-10-15-az-c5.md"
 
 var c5 = azc3.NewHosted(azc3.HostedSpec{Info: info(), ErrPrefix: "azc5", Closed: true})
 

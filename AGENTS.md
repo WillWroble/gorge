@@ -7,7 +7,20 @@ Pure-Go Magic rules engine.
 The rules engine that will replace `mtgplay`'s XMage bridge. Card behaviour is
 compiled from Forge card scripts into an IR; the engine implements the
 primitives that IR references. See
-`docs/superpowers/specs/2026-09-03-mtgcore-go-engine-design.md`.
+[`docs/site/architecture/overview.md`](docs/site/architecture/overview.md).
+
+## Repository layout
+
+[ADR 0001](docs/decisions/0001-repo-layout.md) (2026-10-16) groups the tree:
+
+- `engine/`: the rules core (`cards state decision events effects rules view
+  replay deck`, and `seat`, the `Seat` contract only). Imports nothing outside.
+- `server/`: `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`.
+- `bots/`: `botpolicy`, `heuristic` (the default bot), the registry, hosted bots and their inference runtime.
+- `cmd/`: product and developer tools. `internal/`: ratchets, test support, generators.
+- `lab/`: fenced extensions (draft, oracles, training; their `cmd/` and `scripts/`). Nothing outside imports it.
+- `ops/`: agentctl hooks, systemd units, pipeline scripts ([`ops/README.md`](ops/README.md)). `scripts/`: contributor/CI only.
+- `docs/design/`: living designs; parked history is indexed in `docs/design/ARCHIVE.md`.
 
 ## Agent guide
 
@@ -236,12 +249,12 @@ So:
 
 Behaviour that is a deliberate contract rather than debt — the R-9 no-ask
 host degradation contract, regeneration, the exact round number — is in
-[`docs/superpowers/specs/2026-09-22-engine-contracts.md`](docs/superpowers/specs/2026-09-22-engine-contracts.md),
+[`docs/design/2026-09-22-engine-contracts.md`](docs/design/2026-09-22-engine-contracts.md),
 not here.
 
 | Stand-in | Where | Removed by |
 |---|---|---|
-| `RestrictValid$` is carried into the mana pool; only dotted `Spell.<filter>`/`Activated.<filter>` alternatives supported by the matcher are enforced. Unsupported alternatives fail closed, including bare `Spell`/`Activated` (13 raw lines), `CostContainsX`, `CumulativeUpkeep`, `CantCast*`, `Static.*` and `nonSpell`; 41 raw `RestrictValid$` lines across 39 corpus files contain at least one such term, so mixed alternatives can lose only the unsupported branch. | `engine/effects/mana_effect.go` (`effMana`), `rules/mana_payment.go` (`restrictValidMatches`) | M4 (the remaining restriction grammar) |
+| `RestrictValid$` is carried into the mana pool; only dotted `Spell.<filter>`/`Activated.<filter>` alternatives supported by the matcher are enforced. Unsupported alternatives fail closed, including bare `Spell`/`Activated` (13 raw lines), `CostContainsX`, `CumulativeUpkeep`, `CantCast*`, `Static.*` and `nonSpell`; 41 raw `RestrictValid$` lines across 39 corpus files contain at least one such term, so mixed alternatives can lose only the unsupported branch. | `engine/effects/mana_effect.go` (`effMana`), `engine/rules/pay/payment.go` (`RestrictValidMatches`) | M4 (the remaining restriction grammar) |
 | `Effect` registers a `StaticAbilities$`/`Triggers$` mode for real via `engine/effects/effect.go`'s switch and `trigmatch.Lookup`; these still Note: statics `AssignCombatDamageAsUnblocked`, `AssignNoCombatDamage`, `AttackVigilance`, `BlockRestrict`, `CanAdapt`, `CantBeActivated`, `CantBeCast`, `CantBecomeMonarch`, `CantBlock`, `CantChangeLife`, `CantLoseLife`, `CantPhaseIn`, `CantPhaseOut`, `IgnoreLegendRule`, `IgnoreShroud`, `MinMaxBlocker`, `UntapOtherPlayer`; triggers `Abandoned`, `Adapt`, `AttackerBlocked`, `AttackerBlockedByCreature`, `AttackerUnblocked`, `Blocks`, `Shuffled`, `VisitAttraction`. | `engine/effects/effect.go` (`effEffect`), `engine/effects/effect_ignorehexproof.go`, `engine/rules/trigmatch` (`Lookup`), `engine/rules/layers_restrict.go`, `engine/state/continuous.go` | M4 (the named modes) |
 | An explicit multi-zone `ChangeZone Origin$` including `Hand` has no origin-aware chooser: the exact-hand and exact-library walkers cannot build one private option list across hand, graveyard, library and battlefield, so a source-default picker emits one replay-visible Note and moves nothing loudly. | `engine/effects/zone.go` (`mixedOriginIncludesHand`), `engine/effects/zone_change.go` (`effChangeZone`) | M4 (origin-aware mixed hidden-zone chooser) |
 | (cloak1) Turn-face-up (CR 708.6) is not implemented: a manifested or cloaked card stays face down forever. Loud-unimplemented: `ManifestDread` (a different API), `RememberManifested$`, `Defined$`-object manifests, the `Choices$` asking forms; for Cloak, the from-hand chooser. Ordinary filters read the printed face, missing a manifested Elf. | `engine/effects/zone_manifest.go` (`effManifest`, `effCloak`), `engine/rules/layers_types.go` (`typeCharacteristics`, `faceDownPrintedHides`), `engine/effects/filter_word.go` (`faceDown`) | M4 (turn-face-up CR 708.6 for both -- the Morph/Megamorph/Disguise ticket owns the shared path; ManifestDread; RememberManifested$) |
@@ -329,7 +342,7 @@ the gate while having executed almost nothing. If you find yourself in a worktre
 with no `.cards`, stop and say so rather than reporting a green suite.
 
 Which agent seats exist, what they cost and when to escalate between them is
-recorded in `docs/superpowers/agent-seats.md`.
+the `[[tiers]]` table in `.agentctl/config.toml`.
 
 ## Hot files: a branch that touches one of these is sequenced, not parallel
 

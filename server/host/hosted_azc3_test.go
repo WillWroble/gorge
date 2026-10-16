@@ -1,6 +1,6 @@
 package host
 
-// az-c3 (docs/superpowers/reports/2026-10-09-az-c3-hosted.md) through the host:
+// az-c3 (docs/design/2026-10-09-az-c3-hosted.md) through the host:
 // the two gates every hosted search entry owes (spec 2026-09-28-hosted-bot-
 // packages §5.3 and §8), run on the real adapter with a synthetic network.
 //
