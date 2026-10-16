@@ -60,6 +60,8 @@ type gameRec struct {
 	MM     [2]mmStats `json:"mm,omitempty"`
 	Visits int        `json:"visits,omitempty"` // visit records this game added to -corpus
 	Err    string     `json:"error,omitempty"`
+	// Lines is the -lines probe (lines.go): each seat's early action sequence and instant timing.
+	Lines *lineRec `json:"lines,omitempty"`
 }
 
 type job struct {
@@ -157,6 +159,7 @@ func runPlay(args []string) int {
 	fs.IntVar(&gonet.CacheSize, "gonet-cache", gonet.CacheSize, "cached gonet= evaluations (states; 0 = none)")
 	fs.IntVar(&gonet.CardCacheSize, "gonet-card-cache", gonet.CardCacheSize, "cached gonet= card vectors (0 = none)")
 	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (rules/paid_mana_census.go)")
+	fs.BoolVar(&linesOn, "lines", false, "record each seat's first-turns action sequence and instant timing counters (game record field lines; PL-3)")
 	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
 	beliefDecks := fs.String("belief-decks", "", "a :closedlist seat's belief corpus: deck directory (default -decks)")
 	beliefPool := fs.String("belief-pool", "", "a :closedlist seat's belief corpus: pool.tsv (default -pool)")
@@ -565,6 +568,9 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 		spare = new(rules.Spare)
 	}
 	cfg.Spare = spare
+	if linesOn {
+		rec.Lines = &lineRec{}
+	}
 	var eng *rules.Engine
 	var auto [2]bool
 	for s := 0; s < 2; s++ {
@@ -586,6 +592,9 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 			}
 		},
 		Decision: func(seatIdx int, d *decision.Decision, in decision.Intent, _ *botpolicy.Board) error {
+			if rec.Lines != nil {
+				rec.Lines.observe(eng, seatIdx, d, in)
+			}
 			if mmStatsOn && eng != nil {
 				if rec.MM[seatIdx] == nil {
 					rec.MM[seatIdx] = mmStats{}
