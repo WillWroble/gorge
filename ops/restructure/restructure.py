@@ -212,7 +212,7 @@ def do_moves():
             run_mv(old, MOVES[old])
     for d in DELETE:
         if os.path.exists(d) and not DRY:
-            subprocess.run(["git", "rm", "-rq", d], check=True)
+            subprocess.run(["git", "rm", "-rqf", d], check=True)
     # tools/ is empty once xmageoracle leaves.
 
 
