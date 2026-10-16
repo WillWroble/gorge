@@ -1,3 +1,0 @@
-# branch appends one of, so parallel census merges all conflicted on it and
-# each needed a merge-resolver seat (7 at once on 2026-09-19). Sections are
-# independent and order-free, so a union merge keeps both sides correctly.
