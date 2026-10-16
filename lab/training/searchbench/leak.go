@@ -6,7 +6,7 @@ package searchbench
 // decides the same in both members of a pair.
 //
 // The pairs and the fair arms' belief worlds are upstream's own
-// (scripts/searchbench/leak_prep.py imports leak.py's probes() and
+// (lab/scripts/searchbench/leak_prep.py imports leak.py's probes() and
 // public_worlds()); everything that touches an engine is here. Seeds pair
 // across the two members exactly as upstream's request() does: seed s
 // searches with 1000+s, the clairvoyant arm's real world is built with

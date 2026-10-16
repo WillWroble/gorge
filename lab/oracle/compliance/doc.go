@@ -5,7 +5,7 @@
 // for how it scales to every set, section 11 of
 // docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md:
 //
-//   - make compliance-pass SETS=... runs a pass (scripts/compliance-pass.sh)
+//   - make compliance-pass SETS=... runs a pass (lab/scripts/compliance-pass.sh)
 //     and recomputes only stale verdicts;
 //   - lab/oracle/compliance/rulings/<id>.json are shape rulings (package shape) and
 //     lab/oracle/compliance/triage/<shape>.jsonl the clusters no ruling covers yet,

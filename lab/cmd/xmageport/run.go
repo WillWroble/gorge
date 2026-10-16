@@ -424,7 +424,7 @@ func runAll(reg *cards.Registry, results []*result) {
 }
 
 // driverLine renders r's scenario as an input line for the XMage oracle
-// driver (scripts/xmage-oracle-run.sh): gorge-only `pass` steps and gorge
+// driver (lab/scripts/xmage-oracle-run.sh): gorge-only `pass` steps and gorge
 // answer placements are removed, and XMage gets the test's ORIGINAL choices
 // (xmage_answers) and activateAbility texts (xmage_ability) instead.
 func driverLine(r *result) ([]byte, error) {

@@ -1,7 +1,7 @@
 package searchbench
 
 // The gorge half of an sb-v1 item (upstream items.py make_item, after its
-// bridge.request): a prep payload (scripts/searchbench/prep.py, the Python
+// bridge.request): a prep payload (lab/scripts/searchbench/prep.py, the Python
 // half) is materialised, advanced to the item decision, checked, and
 // canonicalised; the stored item is what `searchbench run` rebuilds its
 // engines from.

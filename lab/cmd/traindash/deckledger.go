@@ -4,7 +4,7 @@
 // schema spellbench-match-ledger/v1) into its -spellbench-out directory. Every
 // row carries the deck both seats played and the name of the policy in each
 // seat, so the same file that feeds the pooled Bradley-Terry rating also holds
-// a per-deck win rate for any policy that played in it. scripts/sb-gauntlet.sh
+// a per-deck win rate for any policy that played in it. lab/scripts/sb-gauntlet.sh
 // keeps one such ledger per reference cache (gauntlet/ref/<key>/) and throws
 // the per-candidate ledgers away, but the reference ledgers are exactly the
 // per-deck material a deck-scoped dashboard needs -- at zero new game cost.

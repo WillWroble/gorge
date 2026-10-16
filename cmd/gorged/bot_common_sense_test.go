@@ -95,7 +95,7 @@ func TestDeployScriptPassesBotCommonSense(t *testing.T) {
 	if got, want := deployScriptDefault(t, "COMMON_SENSE"), "false"; got != want {
 		t.Fatalf("deploy-demo.sh COMMON_SENSE default %q, want %q", got, want)
 	}
-	script, err := os.ReadFile(filepath.Join("..", "..", "scripts", "deploy-demo.sh"))
+	script, err := os.ReadFile(filepath.Join("..", "..", "ops", "scripts", "deploy-demo.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}

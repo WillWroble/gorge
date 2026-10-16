@@ -96,7 +96,7 @@ help:
 	@echo "  make smoke          — headless-browser smoke gate vs two real gorged servers (public+omniscient); fails on any browser error or a hung loading state"
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
-	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; scripts/nightly.sh)"
+	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; ops/scripts/nightly.sh)"
 	@echo "  make oracle-audit   — run the Oracle-text card audit (engine/rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
 	@echo "  make clean-seats    — delete finished pi-agent seat dirs (~/.cache/pi-agent); dry run unless APPLY=1"
 	@echo "  make clean-worktrees — remove merged, clean .worktrees/* and their branches; dry run unless APPLY=1"
@@ -182,9 +182,9 @@ traindash:
 # bot-only tables spectate omniscient (play-vs-bot tables stay public), four
 # 2-seat constructed tables at a 50ms pace, bots playing az-redeal (2026-09-29:
 # the strongest measured hosted policy, +20.5pp vs the production bot --
-# scripts/deploy-demo.sh has the full rationale and the override to restore
+# ops/scripts/deploy-demo.sh has the full rationale and the override to restore
 # the previous 4-seat two-Commander-two-constructed/lethal-pressure shape)
-# (scripts/deploy-demo.sh; the :8081 omniscient server retired 2026-09-28). Run BY HAND, by the operator, when the demo should pick up
+# (ops/scripts/deploy-demo.sh; the :8081 omniscient server retired 2026-09-28). Run BY HAND, by the operator, when the demo should pick up
 # main: it stops the running servers, which aborts every in-flight vs-bot
 # game, so nothing runs it automatically any more (the post-merge hook and
 # the daemon's landing.deploy_cmd were removed on 2026-09-22).
@@ -197,10 +197,10 @@ traindash:
 deploy-demo: web
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -o $(BIN_DIR)/gorged ./cmd/gorged
-	scripts/deploy-demo.sh
+	ops/scripts/deploy-demo.sh
 
 # The durable card-art cache deploy-demo fills before it starts any server
-# (gorged -prewarm-art-only, called from scripts/deploy-demo.sh).
+# (gorged -prewarm-art-only, called from ops/scripts/deploy-demo.sh).
 ART_DIR ?= /mnt/sata/gorge-data/art
 
 # prewarm-art fills the durable card-art cache from the repo's deck files and
@@ -216,7 +216,7 @@ prewarm-art:
 # stop-demo takes the demo down without starting it again. Same socket
 # lookup as the deploy: never `pkill -f`.
 stop-demo:
-	scripts/deploy-demo.sh --stop-only
+	ops/scripts/deploy-demo.sh --stop-only
 
 .PHONY: sim
 sim: $(BIN_DIR)/mtgsim
@@ -241,10 +241,10 @@ compliance-manifests:
 
 .PHONY: xmage-oracle-setup
 xmage-oracle-setup:
-	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) scripts/xmage-oracle-setup.sh
+	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) lab/scripts/xmage-oracle-setup.sh
 .PHONY: forge-oracle-setup
 forge-oracle-setup:
-	FORGE_REPO='$(FORGE_REPO)' FORGE_REF='$(FORGE_REF)' FORGE_ORACLE_REF='$(FORGE_ORACLE_REF)' FORGE_ORACLE_DIR='$(FORGE_ORACLE_DIR)' scripts/forge-oracle-setup.sh
+	FORGE_REPO='$(FORGE_REPO)' FORGE_REF='$(FORGE_REF)' FORGE_ORACLE_REF='$(FORGE_ORACLE_REF)' FORGE_ORACLE_DIR='$(FORGE_ORACLE_DIR)' lab/scripts/forge-oracle-setup.sh
 
 # compliance-pass runs the XMage compliance pass (gen, plan, XMage replay of
 # the stale scenarios only, diff -write into lab/oracle/compliance/verdicts, summary)
@@ -252,7 +252,7 @@ forge-oracle-setup:
 SETS ?=
 .PHONY: compliance-pass
 compliance-pass:
-	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) scripts/compliance-pass.sh $(SETS)
+	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) lab/scripts/compliance-pass.sh $(SETS)
 
 # compliance-status writes the generated per-set / per-format status page
 # (lab/oracle/compliance/status.md, gitignored: never committed) and checks the
@@ -283,15 +283,15 @@ gentypes:
 
 # seed-ask queues a one-off research/planning ask through the same agentctl
 # pipeline the reward-loop seed agent and the operator both use -- see
-# scripts/seed-ask.sh for what the brief wraps around the raw prompt. The seed
-# agent itself (scripts/seed-agent.sh, the 20-minute timer) is deterministic
+# ops/scripts/seed-ask.sh for what the brief wraps around the raw prompt. The seed
+# agent itself (ops/scripts/seed-agent.sh, the 20-minute timer) is deterministic
 # and takes no prompt; this is the door for an ad-hoc ask.
 PRIORITY ?= 2
 KIND     ?= research
 .PHONY: seed-ask
 seed-ask:
 	@test -n "$(PROMPT)" || { echo 'usage: make seed-ask PROMPT="<your question>" [PRIORITY=2] [KIND=research]' >&2; exit 1; }
-	scripts/seed-ask.sh "$(PROMPT)" --priority "$(PRIORITY)" --kind "$(KIND)"
+	ops/scripts/seed-ask.sh "$(PROMPT)" --priority "$(PRIORITY)" --kind "$(KIND)"
 
 .PHONY: test
 # GOGC=200: rules.test measured 104 s vs 112 s CPU (28.3 s vs 30.4 s wall) for 1.2-1.4 GB vs 0.9 GB RSS.
@@ -407,10 +407,10 @@ smoke-perf: $(BIN_DIR)/botbench
 # fuzz, conformance, test-manabrew, test-spellbench-bridge, a -race pass and
 # an opt-in perf record (PERF_NIGHTLY=1), each in its own capped scope holding
 # a heavy lane, against a fresh detached worktree of origin/main. Heavy: the
-# deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.
+# ops/deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.
 .PHONY: nightly
 nightly:
-	scripts/nightly.sh
+	ops/scripts/nightly.sh
 
 COVER_OUT  ?= coverage.out
 COVER_HTML ?= coverage.html
@@ -502,19 +502,19 @@ clean-cards:
 
 # clean-seats / clean-worktrees reclaim disk from finished agent work. Both
 # are dry runs that only list what they would delete; pass APPLY=1 to delete.
-# See scripts/cleanup.sh for exactly what is kept.
+# See ops/scripts/cleanup.sh for exactly what is kept.
 .PHONY: clean-seats clean-worktrees readopt-worktree
 clean-seats:
-	@APPLY=$(APPLY) scripts/cleanup.sh seat-cache
+	@APPLY=$(APPLY) ops/scripts/cleanup.sh seat-cache
 clean-worktrees:
-	@APPLY=$(APPLY) scripts/cleanup.sh worktrees
+	@APPLY=$(APPLY) ops/scripts/cleanup.sh worktrees
 # Re-register an orphaned worktree whose branch still exists: recreate its
 # .git/worktrees/<name> metadata so a seat can commit again. Dry run unless
 # APPLY=1. NAME=<worktree-name> (the branch is wt/<name>). See
 # scripts/readopt-worktree.sh.
 readopt-worktree:
 	@[ -n "$(NAME)" ] || { echo "usage: make readopt-worktree NAME=<worktree-name> [APPLY=1]" >&2; exit 2; }
-	@APPLY=$(APPLY) scripts/readopt-worktree.sh "$(NAME)"
+	@APPLY=$(APPLY) ops/scripts/readopt-worktree.sh "$(NAME)"
 
 .PHONY: ledger
 ## ledger: rebuild the judge-lane issue ledger the agent dashboard renders
@@ -524,7 +524,7 @@ readopt-worktree:
 # (git-excluded). The lane runs cached (no -count=1), capped and under its own
 # lock: see scripts/ledger-lane.sh.
 ledger:
-	scripts/ledger-lane.sh .ds4/lane-rules.txt
+	ops/scripts/ledger-lane.sh .ds4/lane-rules.txt
 	go run ./cmd/ledger -lane .ds4/lane-rules.txt -out .ds4/ledger.json
 
 # coverage writes the card-support tables -- .coverage/summary.md and

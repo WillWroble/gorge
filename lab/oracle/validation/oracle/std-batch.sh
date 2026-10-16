@@ -12,7 +12,7 @@ for s in "$@"; do
   d=$out/$s; mkdir -p "$d"
   echo "== $s $(date -u +%T)"
   "$out/oraclediff" gen -manifest lab/oracle/compliance/manifests/$s.json -out "$d/scen.jsonl" >"$d/gen.log" 2>&1 || { echo "$s gen FAILED"; tail -3 "$d/gen.log"; continue; }
-  scripts/xmage-oracle-run.sh "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; tail -5 "$d/xmage.jsonl.log"; continue; }
+  lab/scripts/xmage-oracle-run.sh "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; tail -5 "$d/xmage.jsonl.log"; continue; }
   "$out/oraclediff" diff -scenarios "$d/scen.jsonl" -xmage "$d/xmage.jsonl" -out "$d/verdicts.jsonl" >"$d/diff.log" 2>&1 || { echo "$s diff FAILED"; tail -3 "$d/diff.log"; }
   echo "$s scen=$(wc -l <"$d/scen.jsonl") skips=$(wc -l <"$d/scen.jsonl.skips.jsonl") $(tail -1 "$d/diff.log")"
 done

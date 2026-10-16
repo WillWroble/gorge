@@ -123,7 +123,7 @@ func runDeclaredChunk(t *testing.T, i int) {
 		}
 	}
 	// The per-ticket gate's stale-only classifier reads this line (see
-	// CertVerdict and scripts/gate_affected.sh): a chunk whose every problem is
+	// CertVerdict and ops/scripts/gate_affected.sh): a chunk whose every problem is
 	// a stale verdict is a host XMage replay's to clear, not a defect to fix, so
 	// the gate requeues it instead of charging a fix round. Emitted on every
 	// run (go test prints it only for a failing test), so a non-stale problem,

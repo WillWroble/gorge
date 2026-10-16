@@ -34,11 +34,11 @@ staging worktree (an agentctl change plus a daemon restart). Land it by hand:
        flock -o <heavy.lock> systemd-run --user --scope --quiet -p MemoryMax=24G \
          --slice=gorge-heavy.slice env COMPLIANCE_PASS_LOCK=none \
          COMPLIANCE_PASS_OUT=/mnt/sata/gorge-training/xmageoracle/runs/<ticket> \
-         ./scripts/compliance-pass.sh
+         ./lab/scripts/compliance-pass.sh
 
    Only stale scenarios replay (the XMage result cache is keyed by
    XMAGE_REF + driver sha), so a pass is minutes. Do not wrap
-   scripts/xmage-oracle-run.sh itself in an outer systemd-run scope: it
+   lab/scripts/xmage-oracle-run.sh itself in an outer systemd-run scope: it
    starts its own and the nested one fails ("Unit ... already loaded").
 3. Compare every verdict row (`lab/oracle/validation/oracle/verdict-compare.py <main> <worktree>`)'s status against main's before trusting the
    result (a regression is AGREE on main, not AGREE on the branch). A fix
@@ -57,7 +57,7 @@ staging worktree (an agentctl change plus a daemon restart). Land it by hand:
    -write-ratchet` (it only lowers). Never raise a value.
 6. Lean gate: touched packages, `go test ./lab/oracle/compliance/...
    ./internal/codeshape/ ./internal/archtest/`, and
-   `git show main:scripts/ratchet_gate.py | python3 - main`; the full
+   `git show main:ops/scripts/ratchet_gate.py | python3 - main`; the full
    suite for engine changes. Then `git merge --ff-only` + push from the main
    checkout and mark the ticket merged through IssueStore.
 
@@ -90,13 +90,13 @@ vocabulary; no Forge-produced value, message or script text is committed.
 Forge's raw rows, request files and caches stay under `$FORGE_ORACLE_DIR`
 and are rebuildable from the pinned driver.
 
-Run the pass after `scripts/compliance-pass.sh`, so the XMage result cache it
+Run the pass after `lab/scripts/compliance-pass.sh`, so the XMage result cache it
 adjudicates against is current. Run the XMage pass at the same level (the
 ledger is level B):
 
-    LEVEL=B scripts/compliance-pass.sh    # first: the XMage leg
-    scripts/forge-pass.sh                 # then: every printed set
-    scripts/forge-pass.sh FDN OTJ         # or named sets only
+    LEVEL=B lab/scripts/compliance-pass.sh    # first: the XMage leg
+    lab/scripts/forge-pass.sh                 # then: every printed set
+    lab/scripts/forge-pass.sh FDN OTJ         # or named sets only
 
 Under the heavy lock it runs, per set, `oraclediff gen` (level B),
 `forge-export`, a replay of only the requests the Forge cache does not hold,
@@ -118,11 +118,11 @@ driver starts cold, but a `FORGE_ORACLE_REF` bump whose driver source is
 otherwise unchanged does not. Force every request to replay when you need to
 be sure the rows are current:
 
-    scripts/forge-pass.sh --force         # or FORGE_PASS_FORCE=1
+    lab/scripts/forge-pass.sh --force         # or FORGE_PASS_FORCE=1
 
-`scripts/tests/forge_pass_smoke.sh` pins the incremental behaviour (cold
+`ops/scripts/tests/forge_pass_smoke.sh` pins the incremental behaviour (cold
 replays all, warm replays 0, `--force` replays all) with the runner and
 `oraclediff` stubbed, so it needs no Java, Forge checkout or corpus. A
 `FORGE_REF` bump still follows DESIGN section 7.3: merge the fork's `gorge`
 branch into `oracle-harness`, bump `FORGE_ORACLE_REF`, rerun
-`scripts/forge-oracle-setup.sh`.
+`lab/scripts/forge-oracle-setup.sh`.

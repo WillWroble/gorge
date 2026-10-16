@@ -3,7 +3,7 @@ package gate
 import "testing"
 
 // TestCertVerdictClassifiesStaleOnly pins the classification the per-ticket
-// gate's stale-only path depends on (scripts/gate_affected.sh reads the
+// gate's stale-only path depends on (ops/scripts/gate_affected.sh reads the
 // GORGE-CERT-RESULT line the chunk tests log from CertVerdict): a set whose
 // only problems are stale verdicts is "stale-only" (a host XMage replay
 // clears it, so the gate must not charge a fix round), any non-stale problem

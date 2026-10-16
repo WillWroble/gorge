@@ -56,7 +56,7 @@ not a commitment: each item is decided on its own.
 | Four hidden-information search stacks (PIMC `searchprobe`+`searchseat`, PUCT `azmcts`, `spellbench/sbsearch`, `searchbench`; ~22k lines) | Overlapping functionality. | Decide survivors from [benchmark evidence](../performance/bots.md). (L) |
 | `kshadow` vs `v2shadow` | Both rebuild engine state from observations. | Keep at most one. (M) |
 | `policynet` features vs `mzenc` | Two state encoders; `mzenc` is used only for ablations and the GPU pool. | Decide after the ablation study. (L) |
-| Two "brokers" | `scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package is now `lab/training/inferbroker` (tag `broker`). |
+| Two "brokers" | `ops/scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package is now `lab/training/inferbroker` (tag `broker`). |
 
 ## Legitimately unimported
 

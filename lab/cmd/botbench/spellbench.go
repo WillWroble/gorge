@@ -25,7 +25,7 @@ package main
 //
 // Results are written as a SpellBench match ledger (matches.jsonl, schema
 // spellbench-match-ledger/v1) in schedule order, so SpellBench's own
-// leaderboard code rates them (scripts/spellbench-rate.py): natural wins and
+// leaderboard code rates them (lab/scripts/spellbench-rate.py): natural wins and
 // draws are rated; a game ended by -max-turns / -max-intents /
 // -max-turn-intents is "truncated" and one ended by an engine panic,
 // livelock or a refused answer is "halted" -- both recorded, both excluded,
@@ -209,7 +209,7 @@ type sbResult struct {
 // it carries its world and simulation count so a clairvoyant number can
 // never be read as a fair one -- and a COMPOSED az spec keeps that marker
 // ahead of its decorators ("az+passguard" is
-// "az-clairvoyant-sims<N>+passguard"), so scripts/spellbench-rate.py's
+// "az-clairvoyant-sims<N>+passguard"), so lab/scripts/spellbench-rate.py's
 // name tag (a leading "az-") still classifies it as a search agent and no
 // composed clairvoyant spec can be rated as a fair one.
 func sbDisplayName(policy string) string {

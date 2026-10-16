@@ -231,7 +231,7 @@ ignore_uncommitted = []
 
 # gates.py:114-148, in order; each gate's argv/timeout/env/cwd is gates.py:34-103.
 
-# 2026-10-04: ratchets-only-fall (scripts/ratchet_gate.py). FIRST and cheap
+# 2026-10-04: ratchets-only-fall (ops/scripts/ratchet_gate.py). FIRST and cheap
 # (git + a stdlib Python tokenizer, well under a second): it fails a branch
 # that raises or deletes a shrink-only ratchet constant, widens an allow-list,
 # drops or rewires a TestCodeShapeOnlyShrinks row, adds a longFuncCeilings key
@@ -246,13 +246,13 @@ ignore_uncommitted = []
 # the pipeline. Seats cannot run XMage, and 7883f6b25 merged a driver change
 # that turned every Standard scenario into a harness failure (4944 rows) until
 # a host full replay caught it. A branch touching lab/oracle/xmageoracle/ fails here
-# and parks; scripts/driver_replay_batch.sh (unit gorge-driver-replay-batch)
+# and parks; ops/scripts/driver_replay_batch.sh (unit gorge-driver-replay-batch)
 # batches every parked ticket, runs ONE lab/oracle/validation/oracle/full-replay.sh,
 # compares verdicts against main and lands them (2026-10-06; before that an
 # operator did this by hand, .ds4/operator-compliance-refresh.md).
 [[gates]]
 name = "xmage driver needs host replay"
-cmd = ["bash", "-c", "set -o pipefail; changed=$(git diff --name-only $(git merge-base {base} HEAD) HEAD -- lab/oracle/xmageoracle/); if [ -n \"$changed\" ]; then echo \"XMAGE DRIVER CHANGED -- parked for scripts/driver_replay_batch.sh (gorge-driver-replay-batch):\"; echo \"$changed\"; exit 1; fi; echo 'xmage driver untouched'"]
+cmd = ["bash", "-c", "set -o pipefail; changed=$(git diff --name-only $(git merge-base {base} HEAD) HEAD -- lab/oracle/xmageoracle/); if [ -n \"$changed\" ]; then echo \"XMAGE DRIVER CHANGED -- parked for ops/scripts/driver_replay_batch.sh (gorge-driver-replay-batch):\"; echo \"$changed\"; exit 1; fi; echo 'xmage driver untouched'"]
 timeout = 60
 # Only an operator host full replay + hand landing clears this gate; a seat
 # fix round cannot (2026-10-05: four tickets looped 8-10 paid sol rounds on it).
@@ -260,7 +260,7 @@ on_fail = "park"
 
 [[gates]]
 name = "ratchets only fall"
-cmd = ["bash", "-c", "set -o pipefail; git show {base}:scripts/ratchet_gate.py | python3 - {base}"]
+cmd = ["bash", "-c", "set -o pipefail; git show {base}:ops/scripts/ratchet_gate.py | python3 - {base}"]
 timeout = 60
 
 # 2026-09-29: the resource broker's gate bracket (design
@@ -268,13 +268,13 @@ timeout = 60
 # This gate runs FIRST and pauses every heavy and probe lease, so the whole
 # suite below runs without a training run or a sweep competing for memory --
 # two OOMs on 2026-09-27 were exactly that collision. The release half is
-# orchestrator.hooks:testheads_policy's gate-end call, and broker.sh expires an
+# ops.orchestrator.hooks:testheads_policy's gate-end call, and broker.sh expires an
 # abandoned flag after GATE_FLAG_TTL_S so a crashed tick cannot strand heavy
 # work paused. It cannot fail a landing: the script exits 0 whether or not any
 # lease exists.
 [[gates]]
 name = "broker gate-begin"
-cmd = ["scripts/broker.sh", "gate-begin"]
+cmd = ["ops/scripts/broker.sh", "gate-begin"]
 timeout = 60
 # A gate runs in the seat's WORKTREE, whose own .ds4/reward is empty, so the
 # state dir is pinned to the main checkout where the leases actually live.
@@ -350,18 +350,18 @@ env = { GOMEMLIMIT = "1GiB", GOMAXPROCS = "4", GOFLAGS = "-p=4 -trimpath" }
 [[gates]]
 # 2026-10-05 (operator): per-ticket validation cut to 1-2 min. The old module
 # gate (go vet ./... + go test ./..., 300-500s under fleet load) moved to the
-# post-merge full suite (scripts/postmerge_full.sh), run on main after
+# post-merge full suite (ops/scripts/postmerge_full.sh), run on main after
 # landings; a red there is bisected and fixed at once. This gate tests ./engine/rules
 # (minus four whole-corpus censuses, which run post-merge), the Kr8 pair in
 # their own processes, ./engine/view, ./internal/codeshape and every package the
 # branch touched. Run from the BASE copy so a branch cannot edit its own gate.
 name = "go test (affected)"
-cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then lock=\"$GORGE_HEAVY_LOCK\"; else common=\"$(git rev-parse --path-format=absolute --git-common-dir)\"; lock=\"$(dirname \"$common\")/.ds4/heavy.lock\"; fi; lanes=${GORGE_HEAVY_LANES:-3}; mkdir -p \"$(dirname \"$lock\")\"; acquired=; deadline=$(( $(date +%s) + 1500 )); while [ -z \"$acquired\" ]; do i=1; while [ \"$i\" -le \"$lanes\" ]; do f=\"$lock\"; [ \"$i\" = 1 ] || f=\"$lock.lane$i\"; : >>\"$f\" 2>/dev/null || { i=$((i+1)); continue; }; exec 9>>\"$f\"; if flock -n 9 2>/dev/null; then acquired=\"$f\"; break; fi; i=$((i+1)); done; if [ -z \"$acquired\" ]; then now=$(date +%s); if [ \"$now\" -lt \"$deadline\" ]; then rem=$(( deadline - now )); [ \"$rem\" -gt 5 ] && rem=5; sleep \"$rem\" 9>&-; else echo \"gate: every heavy lane of $lock still held after 1500s; affected gate not run\" >&2; exit 75; fi; fi; done; systemd-run --user --scope -q -p MemoryMax=16G -p CPUQuota=1600% bash -c 'set -o pipefail; git show {base}:scripts/gate_affected.sh | bash -s {base}'; rc=$?; exit \"$rc\""]
+cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then lock=\"$GORGE_HEAVY_LOCK\"; else common=\"$(git rev-parse --path-format=absolute --git-common-dir)\"; lock=\"$(dirname \"$common\")/.ds4/heavy.lock\"; fi; lanes=${GORGE_HEAVY_LANES:-3}; mkdir -p \"$(dirname \"$lock\")\"; acquired=; deadline=$(( $(date +%s) + 1500 )); while [ -z \"$acquired\" ]; do i=1; while [ \"$i\" -le \"$lanes\" ]; do f=\"$lock\"; [ \"$i\" = 1 ] || f=\"$lock.lane$i\"; : >>\"$f\" 2>/dev/null || { i=$((i+1)); continue; }; exec 9>>\"$f\"; if flock -n 9 2>/dev/null; then acquired=\"$f\"; break; fi; i=$((i+1)); done; if [ -z \"$acquired\" ]; then now=$(date +%s); if [ \"$now\" -lt \"$deadline\" ]; then rem=$(( deadline - now )); [ \"$rem\" -gt 5 ] && rem=5; sleep \"$rem\" 9>&-; else echo \"gate: every heavy lane of $lock still held after 1500s; affected gate not run\" >&2; exit 75; fi; fi; done; systemd-run --user --scope -q -p MemoryMax=16G -p CPUQuota=1600% bash -c 'set -o pipefail; git show {base}:ops/scripts/gate_affected.sh | bash -s {base}'; rc=$?; exit \"$rc\""]
 # 2026-10-12 (operator): exit 75 is "every heavy lane still held" -- an
 # infrastructure wait, not the ticket's defect. Requeue it with no fix round
 # (18 of 45 gate_fails 10-09..10-12 were this, each billed a paid round).
 # 2026-10-14: exit 76 is the same shape for a stale-only certification failure
-# (scripts/gate_affected.sh's heavy pool: every failing ./lab/oracle/compliance/gate or
+# (ops/scripts/gate_affected.sh's heavy pool: every failing ./lab/oracle/compliance/gate or
 # ./lab/oracle/compliance/adopt test logged GORGE-CERT-RESULT <name> stale-only, a moved
 # scenario sha a host XMage replay clears, not the ticket's defect -- 69 of 74
 # certification-only gate_fails 10-05..10-14 were stale-only, each billed a
@@ -374,7 +374,7 @@ requeue_max = 3
 # the repo heavy pool like postmerge_batch.sh and heavy.sh. The lane
 # acquisition is INLINED here: the path is derived inline from the shared git
 # common dir (`git rev-parse --git-common-dir`), exactly as
-# scripts/heavy_lock.sh does, and the lane scan is the same first-free lane
+# ops/scripts/heavy_lock.sh does, and the lane scan is the same first-free lane
 # over GORGE_HEAVY_LANES lanes with lane 1 = the base file (2026-10-09: the
 # single lock became a 2-lane pool when the box went to 120 GiB, so this gate
 # and the post-merge full suite can run at the same time; later the same day
@@ -388,7 +388,7 @@ requeue_max = 3
 # because no branch-only file has to come from {base} (extracting a helper
 # that did not exist in `main` failed the extraction on the ticket that
 # introduced it). A branch still cannot weaken this: nothing here is read from
-# the branch, and {base} is only used to fetch scripts/gate_affected.sh as
+# the branch, and {base} is only used to fetch ops/scripts/gate_affected.sh as
 # before. GORGE_HEAVY_LOCK overrides the base path (tests/operators). The
 # lane fd (9) is held by THIS bash, which then runs systemd-run as a child:
 # the child inherits the open fd (and the lock on it, flock being a property
@@ -414,7 +414,7 @@ requeue_max = 3
 # shard's working set is 1.2-1.9 GiB RSS (serial, GOMEMLIMIT=3GiB), so
 # 1536MiB sits UNDER it and GC thrash stretches the rules phase (the
 # 2026-10-08 two-shard figure of 62 s read 78.8 s under this gate's own
-# scope). The shard lines in scripts/gate_affected.sh override both
+# scope). The shard lines in ops/scripts/gate_affected.sh override both
 # GOMAXPROCS and GOMEMLIMIT themselves; this env stays the ceiling for vet,
 # the others set and the two Kr8 runs (others peak ~1.0 GiB at -p=6, Kr8 ~12
 # s each).
@@ -436,7 +436,7 @@ timeout = 300
 # GOGC=200: same setting as the module gate above, for the same reason -- this
 # runs the same rules test binary, whose GC cost GOGC=200 cuts ~20%.
 env = { GORGE_CR_CONFORMANCE = "1", GOMEMLIMIT = "1GiB", GOGC = "200", GOFLAGS = "-p=2 -trimpath" }
-accept = "orchestrator.hooks:cr_no_fail_lines"
+accept = "ops.orchestrator.hooks:cr_no_fail_lines"
 
 [[gates]]
 name = "TestHeads"
@@ -451,7 +451,7 @@ name = "make sim"
 cmd = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "-p", "CPUQuota=800%", "make", "sim"]
 timeout = 600
 env = { GOMEMLIMIT = "1GiB", GOFLAGS = "-p=2 -trimpath" }
-accept = "orchestrator.hooks:sim_all_replayed"
+accept = "ops.orchestrator.hooks:sim_all_replayed"
 
 [[gates]]
 name = "npm run check"
@@ -518,13 +518,13 @@ push = false
 # 2026-10-12 (operator): gate a burst of queued landings as one combined tip
 # (agentctl land.py merge train; a red train is halved and re-gated).
 merge_train = true
-# 2026-10-05 (operator): main is pushed by scripts/postmerge_batch.sh only
+# 2026-10-05 (operator): main is pushed by ops/scripts/postmerge_batch.sh only
 # after the full suite passes, every 5 landings (or 60 min).
 # 2026-09-22 (operator): the demo is no longer redeployed on every merge --
 # a redeploy kills every in-flight vs-bot game (SIGTERM aborts live matches
 # and the persistence dir is wiped). Deploy by hand: `make deploy-demo`.
 deploy_cmd = []
-# make ledger serialises on its OWN lock (.ds4/ledger.lock, scripts/ledger-lane.sh),
+# make ledger serialises on its OWN lock (.ds4/ledger.lock, ops/scripts/ledger-lane.sh),
 # never the shared heavy lock (operator, 2026-10-06): behind benches and full
 # suites it stalled every merge. It waits at most 300 s; a failure only logs.
 post_merge = [["env", "LEDGER_LANE_WAIT=300", "make", "ledger"]]
@@ -541,7 +541,7 @@ cmd = ["kubectl", "--context", "k3d-bm", "-n", "llm-system", "get", "secret", "b
 decode = "base64"
 
 [hooks]
-post_gates = "orchestrator.hooks:testheads_policy"
+post_gates = "ops.orchestrator.hooks:testheads_policy"
 
 # 2026-10-05 (operator): every seat runs in its own capped systemd scope
 # (agentctl 36c55ec/652bf8a; defaults MemoryMax=4G, CPUQuota=200%,

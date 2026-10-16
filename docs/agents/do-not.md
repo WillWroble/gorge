@@ -86,7 +86,7 @@ so most of these hurt someone other than you.
 
 - **Don't bind ports 8080–8081** (the demo), and **don't run `make
   deploy-demo`** or `make gorged` as-is (it binds `:8080`). Engine-side task
-  agents use ports 8090–8099; `scripts/fleet.sh port` prints a free one.
+  agents use ports 8090–8099; `ops/scripts/fleet.sh port` prints a free one.
 - **Don't point two servers at one persistence directory,** and don't use the
   repo-root `gorged-data/`. Use `-dir /tmp/gorge-<unique>`.
 - **Don't stop a server with `pkill -f` or a bare `pgrep -f`.** It has killed a

@@ -29,7 +29,7 @@ maintain.
 ## Test budgets
 
 Every single test fits 2 GB RSS, 2 vCPU and 1 minute wall. `cmd/testbudget`
-enforces it in the post-merge full suite (`scripts/postmerge_full.sh`): it
+enforces it in the post-merge full suite (`ops/scripts/postmerge_full.sh`): it
 names every top-level test over 60 s and every test binary whose peak RSS is
 over 2 GB, and fails the batch on any that the shrink-only inventories
 `internal/testutil/testdata/wall_exceptions.txt` and `rss_exceptions.txt` do
@@ -89,9 +89,9 @@ full `cmd/` list are in [docs/agents/repo-map.md](docs/agents/repo-map.md).
 - `internal/` — `archtest` (import-graph/determinism enforcement), `testutil`
   (fixtures shared by tests), `tsgen` (Go→TypeScript for the web client)
 
-`orchestrator/` is not part of the Go module: it is the Python daemon that
+`ops/orchestrator/` is not part of the Go module: it is the Python daemon that
 watches for defects and drives each through triage, implementation, review
-and the deterministic gates to a merged fix (see `orchestrator/README.md`).
+and the deterministic gates to a merged fix (see `ops/orchestrator/README.md`).
 
 `cmd/` holds the commands, each a `main.go` program:
 
@@ -360,7 +360,7 @@ A 200-game run is about ±7pp: a smoke test, not a verdict
 (`reports/2026-09-28-spellbench-theory-and-references.md` §7, on
 spellbench-prep).
 
-**(spellbench-prep)** `scripts/sb-gauntlet.sh <spec>` rates candidates on the
+**(spellbench-prep)** `lab/scripts/sb-gauntlet.sh <spec>` rates candidates on the
 SpellBench scale. It plays them against sb-uniform (the 1000-Elo anchor),
 sb-heuristic, `bot` and the promoted champions, and reports anchored
 Bradley–Terry Elo with bootstrap CIs. Policies are registered by name in

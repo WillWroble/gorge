@@ -280,7 +280,7 @@ func build(args []string, out io.Writer) error {
 	outDir := fs.String("out", "", "output directory")
 	corpus := fs.String("corpus", ".cards", "compiled Forge corpus")
 	python := fs.String("python", defaultPython, "python with upstream's requirements")
-	script := fs.String("prep", "scripts/searchbench/prep.py", "prep.py")
+	script := fs.String("prep", "lab/scripts/searchbench/prep.py", "prep.py")
 	upstream := fs.String("upstream", "", "pinned draft-zero clone (prep.py's default when empty)")
 	workers := fs.Int("workers", 4, "prep.py serve workers")
 	lru := fs.Int("lru", 4, "parsed games each prep worker caches")

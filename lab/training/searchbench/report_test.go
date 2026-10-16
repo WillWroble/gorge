@@ -148,7 +148,7 @@ func TestAnalyzeAndCompareReports(t *testing.T) {
 }
 
 // TestDumpUpstreamFixture writes a synthetic manifest and two arms for the
-// upstream cross-check (scripts/searchbench/crosscheck_upstream.py) when
+// upstream cross-check (lab/scripts/searchbench/crosscheck_upstream.py) when
 // SEARCHBENCH_FIXTURE_DIR is set.
 func TestDumpUpstreamFixture(t *testing.T) {
 	dir := os.Getenv("SEARCHBENCH_FIXTURE_DIR")
@@ -217,7 +217,7 @@ func TestMatchesUpstreamAnalyzePy(t *testing.T) {
 }
 
 // Upstream's values on the fixture: value, CI low, CI high. Printed by
-// scripts/searchbench/crosscheck_upstream.py against draft-zero b1e0ba68.
+// lab/scripts/searchbench/crosscheck_upstream.py against draft-zero b1e0ba68.
 var (
 	upstreamASet     = [3]float64{0.765, 0.7324508713385243, 0.7976226727123079}
 	upstreamAStrict  = [3]float64{0.755, 0.7211221393286091, 0.7882946511938109}

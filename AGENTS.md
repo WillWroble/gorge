@@ -60,7 +60,7 @@ every test fits 4 GB RSS, 4 vCPU and 1 minute wall; one outside it is a defect
 to split, never to trim. Agents run tests focused and capped, never
 `go test ./...`, `./lab/oracle/compliance/...` or `-count=1`:
 `systemd-run --user --scope -q -p MemoryMax=4G -p CPUQuota=400% env GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -timeout 2m -run X ./pkg`.
-The full suite is `scripts/postmerge_batch.sh`'s (once per batch on main;
+The full suite is `ops/scripts/postmerge_batch.sh`'s (once per batch on main;
 red pauses the pipeline and bisects to a CULPRIT). Rules and rationale:
 [invariants.md](docs/agents/invariants.md#workflow).
 
@@ -285,7 +285,7 @@ and it has killed a session here. Find the server by its listening socket
 is the BINARY's name -- if you built `gorged-after`, its `comm` is
 `gorged-after`, not `gorged` -- so match on the port rather than the name.
 
-`scripts/fleet.sh ports` prints the current allocation, and `scripts/fleet.sh
+`ops/scripts/fleet.sh ports` prints the current allocation, and `ops/scripts/fleet.sh
 port` prints a free one in your range.
 
 ## Working in a task worktree
@@ -333,7 +333,7 @@ recorded in `docs/superpowers/agent-seats.md`.
 
 ## Hot files: a branch that touches one of these is sequenced, not parallel
 
-Measured by `scripts/reward_collect.py hotspots --repo .`: one merge in four
+Measured by `ops/scripts/reward_collect.py hotspots --repo .`: one merge in four
 (199 of 802 tickets, 7d) needed a resolver round, and one ticket burned 48 of
 them. The cause is always the same shape — two or three live branches editing
 the same file, each rebasing onto the other's landing. If your brief touches a
@@ -341,9 +341,9 @@ file below, keep the change as small as the brief allows; prefer adding a new
 file next to it over growing it.
 
 **This table is generated; do not hand-edit it.** Regenerate with:
-`python3 scripts/reward_collect.py hotspots --repo . --format md` (add
+`python3 ops/scripts/reward_collect.py hotspots --repo . --format md` (add
 `--max-rows N` for this embedded cut). The durable "why it collides" prose
-lives only in `scripts/hotfiles-notes.json` (tracked): a seat filing a new
+lives only in `ops/scripts/hotfiles-notes.json` (tracked): a seat filing a new
 contended pair adds one note entry there in its own commit and never mirrors
 the prose here.
 Rendered 2026-10-01 at merge of main@0b368ba80 into 078f1bb3d, with `--max-rows 5`:
@@ -356,4 +356,4 @@ Rendered 2026-10-01 at merge of main@0b368ba80 into 078f1bb3d, with `--max-rows 
 | `lab/cmd/botbench/azcost.go` | the az policy flag block: every az workstream ticket registers a flag in registerAZFlags or rewords one in azFrontDoor — one function, so edits are adjacent by construction. The 2026-10-01 pair (cpu-redeal adds -az-node-cache; libcomp rewords -az-corpus-features' help and error) is line-disjoint and merges clean on rebase. Append new flags to the registration list; no split is honest inside one flag block RECURRED: re-briefed as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) recorded it; dedupe against that id. The cpu head's name rotates; the note is keyed by FILE and covers whichever cpu head is live. |
 … and 11 more; run the command for the live list
 
-Durable per-file notes, including those for files not shown above, live only in `scripts/hotfiles-notes.json`; they are not mirrored here.
+Durable per-file notes, including those for files not shown above, live only in `ops/scripts/hotfiles-notes.json`; they are not mirrored here.

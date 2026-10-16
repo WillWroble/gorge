@@ -15,7 +15,7 @@ import org.mage.test.player.TestPlayer;
 import sun.misc.Unsafe;
 
 /** Answer-routing checks of the real driver, without H2 or a game. Run
- * scripts/xmage-oracle-test-split-room.sh. A host replay (scripts/driver_replay_batch.sh)
+ * scripts/xmage-oracle-test-split-room.sh. A host replay (ops/scripts/driver_replay_batch.sh)
  * is still what proves XMage consumes these answers. */
 public final class ScenarioReplayAnswerRoutingTest {
     /** Records every queue write as "<seat>:<queue>:<value>" and every cast. */

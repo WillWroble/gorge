@@ -12,7 +12,7 @@
 // a ratchet.
 //
 // This package is measurement only: it exposes nothing and changes no policy.
-// scripts/reward_collect.py's collect_obs reads the same facts list and sums
+// ops/scripts/reward_collect.py's collect_obs reads the same facts list and sums
 // `exposed` for the obs axis rows observable_facts_exposed/observable_facts_total.
 package botobs
 

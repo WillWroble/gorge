@@ -1,6 +1,6 @@
 # The seed agent's rubric
 
-`scripts/seed-agent.sh` runs this rubric every 20 minutes from a user systemd
+`ops/scripts/seed-agent.sh` runs this rubric every 20 minutes from a user systemd
 timer. It is the loop's own caretaker: it keeps the box safe, keeps the pipeline
 moving, and keeps work flowing toward the reward axes when nobody is steering.
 

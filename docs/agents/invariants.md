@@ -200,8 +200,8 @@ Adding an entry means a regression, and a branch cannot land one (see below).
 above, the shrink-only constants and `longFuncCeilings` in
 `internal/codeshape`, the constants and allow-lists of `internal/archtest`,
 and `internal/testutil/agentsdoc_test.go`. The pipeline's first gate,
-"ratchets only fall" (`scripts/ratchet_gate.py`), enforces this. It runs from
-the BASE copy (`git show <base>:scripts/ratchet_gate.py | python3 - <base>`),
+"ratchets only fall" (`ops/scripts/ratchet_gate.py`), enforces this. It runs from
+the BASE copy (`git show <base>:ops/scripts/ratchet_gate.py | python3 - <base>`),
 so a branch cannot weaken the gate that judges it. Measured against the
 merge-base, it fails a raised or deleted constant, an added allow-list entry,
 a removed or rewired `TestCodeShapeOnlyShrinks` row, a new or grown
@@ -264,7 +264,7 @@ by millions.
 
 **Enforced by:** convention, plus `make gc-gate` (by hand). The per-test
 resource budget (4 GB RSS, 4 vCPU, 1 min wall; doubled 2026-10-09) is enforced by `cmd/testbudget`
-in `scripts/postmerge_full.sh`: any test over budget that
+in `ops/scripts/postmerge_full.sh`: any test over budget that
 `internal/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
 shrink-only) do not list fails the post-merge batch. Peak RSS is measured per test binary by
 `go test -exec "testbudget exec"`; a new test package needs no TestMain for it.
@@ -281,7 +281,7 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
    report green.
 3. **Run the right gates before merging.**
    - Focused, capped tests of the packages you touched (step 4). The full
-     suite is `scripts/postmerge_batch.sh`'s: it runs once per batch of
+     suite is `ops/scripts/postmerge_batch.sh`'s: it runs once per batch of
      landings on main, pauses the pipeline on red, bisects and logs `CULPRIT`
      lines to `.ds4/postmerge-culprits.log`. Never run an uncapped
      `go test ./...` or `./lab/oracle/compliance/...` by hand.

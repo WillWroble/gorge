@@ -164,7 +164,7 @@ type config struct {
 	seatToken string
 	// feedback is the -feedback flag: where a player's own bug reports are
 	// written (feedback.go). It is deliberately NOT under -dir. The
-	// persistence directory is disposable by design — scripts/deploy-demo.sh
+	// persistence directory is disposable by design — ops/scripts/deploy-demo.sh
 	// `rm -rf`s it on every deploy so a config written by an older binary
 	// cannot come back with zero-valued fields — which would mean a report
 	// filed against a bug was destroyed by the deploy that shipped its fix.
@@ -193,7 +193,7 @@ type config struct {
 	prewarm bool
 	// prewarmArtOnly is the -prewarm-art-only flag: fill the card-art cache
 	// from -decks into artCacheDir() and exit, before any listener opens —
-	// what scripts/deploy-demo.sh runs ahead of both servers so a deploy
+	// what ops/scripts/deploy-demo.sh runs ahead of both servers so a deploy
 	// never serves a cold cache, and what `make prewarm-art` runs by hand.
 	// Exit code 1 when any name FAILED (a genuine 404 is not a failure) or
 	// the pass was stopped by one of the two bounds below.
@@ -616,7 +616,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	// net/http/pprof's init registers its handlers on http.DefaultServeMux,
 	// which gorged never serves (both listeners use their own mux), so the
 	// import alone publishes nothing. The routes exist only when -pprof
-	// mounts them on topMux here. scripts/deploy-demo.sh passes it only when
+	// mounts them on topMux here. ops/scripts/deploy-demo.sh passes it only when
 	// the operator sets PPROF=true for that deploy.
 	if c.pprof {
 		topMux.HandleFunc("GET /debug/pprof/", pprof.Index)

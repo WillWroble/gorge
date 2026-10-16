@@ -6,7 +6,7 @@ import java.util.List;
 
 /** No database or game: pins how the driver classifies the active seat-1
  * player's own pass and which cast_mode values it elects. Run
- * scripts/xmage-oracle-test-active-pass.sh; the replay itself is a host gate. */
+ * lab/scripts/xmage-oracle-test-active-pass.sh; the replay itself is a host gate. */
 public final class ScenarioReplayActivePassFlashbackTest {
     private static void check(boolean condition, String message) {
         if (!condition) {

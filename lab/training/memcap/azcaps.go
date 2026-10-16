@@ -49,7 +49,7 @@ func AzCapsError(workers, sims int, soft, hard int64) error {
 	softKnown := soft > 0 && soft < math.MaxInt64>>4
 	if softKnown && soft < need {
 		return fmt.Errorf(
-			"az needs ~%d GiB for %d workers (-az-sims %d; proven ~1 GiB/worker at sims 25) but GOMEMLIMIT is %d GiB: the run would thrash the GC and be OOM-killed. Raise GOMEMLIMIT to at least %d GiB (scripts/heavy.sh --mem with MemoryMax >= 1.4x GOMEMLIMIT, the proven 16GiB/24G pair) or lower -workers",
+			"az needs ~%d GiB for %d workers (-az-sims %d; proven ~1 GiB/worker at sims 25) but GOMEMLIMIT is %d GiB: the run would thrash the GC and be OOM-killed. Raise GOMEMLIMIT to at least %d GiB (ops/scripts/heavy.sh --mem with MemoryMax >= 1.4x GOMEMLIMIT, the proven 16GiB/24G pair) or lower -workers",
 			need>>30, workers, sims, soft>>30, need>>30)
 	}
 	if hard <= 0 {
@@ -64,7 +64,7 @@ func AzCapsError(workers, sims int, soft, hard int64) error {
 	if hard*azCapDen < required*azCapNum {
 		capGiB := (required*azCapNum + azCapDen - 1) / azCapDen >> 30
 		return fmt.Errorf(
-			"az working set ~%d GiB (%s, %d workers at -az-sims %d) needs a hard cap of at least %d GiB (proven 1.4x headroom; 1.5x in cardval/runs.sh) but the cgroup cap is %d GiB: the run would be memcg OOM-killed. Raise the cap (scripts/heavy.sh --mem) or lower -workers/GOMEMLIMIT",
+			"az working set ~%d GiB (%s, %d workers at -az-sims %d) needs a hard cap of at least %d GiB (proven 1.4x headroom; 1.5x in cardval/runs.sh) but the cgroup cap is %d GiB: the run would be memcg OOM-killed. Raise the cap (ops/scripts/heavy.sh --mem) or lower -workers/GOMEMLIMIT",
 			required>>30, src, workers, sims, capGiB, hard>>30)
 	}
 	return nil

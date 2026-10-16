@@ -121,7 +121,7 @@ func TestCertificationRatchet(t *testing.T) {
 	}
 	fails, slack := CheckRatchet(cs.SetCodes(), measured, declared, ratchet)
 	// The per-ticket gate's stale-only classifier reads this line (see
-	// scripts/gate_affected.sh): the ratchet's outstanding count includes stale
+	// ops/scripts/gate_affected.sh): the ratchet's outstanding count includes stale
 	// verdicts, so a ratchet that only grew on stale problems is a host XMage
 	// replay's to clear, not a defect to fix. Emitted on every run (go test
 	// prints it only for a failing test), so a non-stale problem leaves no
@@ -141,7 +141,7 @@ func TestCertificationRatchet(t *testing.T) {
 }
 
 // ratchetVerdict classifies TestCertificationRatchet's failure for the
-// per-ticket gate's stale-only classifier (scripts/gate_affected.sh): "clean"
+// per-ticket gate's stale-only classifier (ops/scripts/gate_affected.sh): "clean"
 // (no fail), "stale-only" (every fail is a set's outstanding GROWTH and that
 // set's problems are ALL stale verdicts, a moved scenario sha a host XMage
 // replay clears), or "mixed" (any other fail -- a set no longer committed, a

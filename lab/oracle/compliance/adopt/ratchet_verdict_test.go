@@ -4,7 +4,7 @@ import "testing"
 
 // TestRatchetVerdictClassifiesOnlyStaleGrowth pins the classification the
 // per-ticket gate's stale-only path depends on for TestCertificationRatchet
-// (scripts/gate_affected.sh reads the GORGE-CERT-RESULT line from
+// (ops/scripts/gate_affected.sh reads the GORGE-CERT-RESULT line from
 // ratchetVerdict): only a per-set outstanding GROWTH whose set is entirely
 // stale verdicts is "stale-only" (a moved scenario sha a host XMage replay
 // clears, not a fix round). A structural ratchet fail -- a set no longer

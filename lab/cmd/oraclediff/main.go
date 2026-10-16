@@ -22,7 +22,7 @@
 // the ones XMage has not replayed yet. The XMage driver (scripts/xmage-
 // oracle-run.sh) replays the latter; diff runs gorge on each scenario,
 // compares the two engines' snapshots and writes one verdict per scenario.
-// scripts/compliance-pass.sh (make compliance-pass) runs the whole pass.
+// lab/scripts/compliance-pass.sh (make compliance-pass) runs the whole pass.
 //
 // Disagreements are triaged by shape (lab/oracle/compliance/shape): diff classifies a
 // new disagreement that a lab/oracle/compliance/rulings/<id>.json ruling matches, and

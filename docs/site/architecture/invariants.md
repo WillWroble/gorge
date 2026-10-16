@@ -15,7 +15,7 @@ after-the-fact or by convention, the table says so. *As of 2026-10-12,
 | **Information boundary** | Seats see only a `view.View`, never the engine. Clairvoyant search never reaches a hosted or rated game. | `TestNoExportLeaksAnEngineGame`, the `view` redaction tests. |
 | **Forge GPL boundary** | Forge card scripts are never committed. | `engine/cards/boundary_test.go` `TestNoForgeScriptsTracked`. |
 | **No cgo, no third-party deps, 32-bit clean** | Pure Go in the card pipeline and rules core. | `TestEngineCompilesFor32Bit`, `CGO_ENABLED=0` in the `Makefile`. There is no check on `go.mod` `require` lines; see the note below. |
-| **Ratchets only fall** | Known-unsupported cards, unread card parameters and known approximations can only shrink. | `engine/rules/testdata/known-unsupported/` + `TestEveryRepoDeckIsFullySupported` (fails in both directions), the param census, `internal/testutil/agentsdoc_test.go`, `scripts/ratchet_gate.py`. |
+| **Ratchets only fall** | Known-unsupported cards, unread card parameters and known approximations can only shrink. | `engine/rules/testdata/known-unsupported/` + `TestEveryRepoDeckIsFullySupported` (fails in both directions), the param census, `internal/testutil/agentsdoc_test.go`, `ops/scripts/ratchet_gate.py`. |
 | **Per-test budget** | Every test fits 4 GB RSS, 4 vCPU and 1 minute of wall time. | `cmd/testbudget` in the post-merge suite, with shrink-only exception inventories in `internal/testutil/testdata/`. |
 | **Corpus or it didn't run** | Corpus-dependent tests skip when `.cards/` is absent. | Convention: a fast green run without the corpus has tested very little. |
 

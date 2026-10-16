@@ -45,9 +45,9 @@ type Problem struct {
 
 // StaleVerdictReason is the reason prefix rowOK reports for a verdict recorded
 // for a different scenario (a moved scenario sha). Only a host XMage replay
-// (scripts/compliance-pass.sh) clears it, so it is not a defect a ticket can
+// (lab/scripts/compliance-pass.sh) clears it, so it is not a defect a ticket can
 // fix; adopt.Bucket classifies it as BucketStale and the per-ticket gate
-// (scripts/gate_affected.sh) treats a stale-only certification failure as a
+// (ops/scripts/gate_affected.sh) treats a stale-only certification failure as a
 // non-charging requeue instead of a fix round.
 const StaleVerdictReason = "verdict is for an older scenario"
 
@@ -56,7 +56,7 @@ const StaleVerdictReason = "verdict is for an older scenario"
 func Stale(p Problem) bool { return strings.HasPrefix(p.Reason, StaleVerdictReason) }
 
 // CertVerdict classifies a certification check's problems for the per-ticket
-// gate's stale-only classifier (scripts/gate_affected.sh, which reads the
+// gate's stale-only classifier (ops/scripts/gate_affected.sh, which reads the
 // GORGE-CERT-RESULT line the chunk tests log): "clean" (no problems),
 // "stale-only" (every problem is a stale verdict, so the failure is a host
 // replay's to clear, not a defect), or "mixed" (at least one non-stale

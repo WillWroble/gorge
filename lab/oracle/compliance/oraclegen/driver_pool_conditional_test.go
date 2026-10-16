@@ -10,7 +10,7 @@ import (
 // unconditional pool items; restricted mana (DFT Boommobile, HOB Desolation of
 // Smaug) is a ConditionalMana item. The driver's pool snapshot must read
 // getConditionalMana() too, or the comparator sees "" where gorge sees "WWWW".
-// The executable check is scripts/xmage-oracle-test-pool.sh (needs the host's
+// The executable check is lab/scripts/xmage-oracle-test-pool.sh (needs the host's
 // XMage build); this pins the source shape where seats cannot run it.
 func TestDriverPoolSnapshotCountsConditionalMana(t *testing.T) {
 	source, err := os.ReadFile("../../xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java")

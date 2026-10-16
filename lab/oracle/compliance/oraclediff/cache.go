@@ -11,7 +11,7 @@ import (
 // row's scenario_sha). XMage's side of a scenario is a pure function of the
 // scenario, XMAGE_REF and the driver source, so a cache directory is
 // specific to one (XMAGE_REF, driver) pair: the pass driver
-// (scripts/compliance-pass.sh) names it after both. Lives off-repo, under
+// (lab/scripts/compliance-pass.sh) names it after both. Lives off-repo, under
 // XMAGE_ORACLE_DIR, next to the XMage build.
 type Cache struct{ Dir string }
 

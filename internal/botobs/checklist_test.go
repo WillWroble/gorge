@@ -314,7 +314,7 @@ func TestChecklistMatchesMeasuredExposure(t *testing.T) {
 	if recordedExposed != measuredExposed {
 		t.Errorf("exposed count: recorded %d, measured %d; the checklist and the observation path disagree", recordedExposed, measuredExposed)
 	}
-	// Cross-check the number scripts/reward_collect.py will sum: it counts
+	// Cross-check the number ops/scripts/reward_collect.py will sum: it counts
 	// f.get("exposed") truthiness over the facts list, which is recordedExposed.
 	if recordedExposed == 0 {
 		t.Errorf("no fact is recorded exposed; the obs axis would be 0/%d and the ratchet proves nothing", len(c.Facts))

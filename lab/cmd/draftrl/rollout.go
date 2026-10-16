@@ -204,7 +204,7 @@ type rolloutResult struct {
 }
 
 // waitPause blocks while the heavy broker's pause file exists
-// (scripts/heavy.sh: GORGE_PAUSE_FILE), checked at each pod and game
+// (ops/scripts/heavy.sh: GORGE_PAUSE_FILE), checked at each pod and game
 // boundary so the job is never stopped mid-step.
 func waitPause() {
 	p := os.Getenv("GORGE_PAUSE_FILE")

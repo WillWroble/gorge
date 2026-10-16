@@ -30,7 +30,7 @@ export out level repo
 one_set() {
   s=$1; d=$out/$s; mkdir -p "$d"
   GOMEMLIMIT=2GiB GOMAXPROCS=4 "$out/oraclediff" gen -level "$level" -manifest lab/oracle/compliance/manifests/$s.json -out "$d/scen.jsonl" >"$d/gen.log" 2>&1 || { echo "$s gen FAILED"; return; }
-  "$repo/scripts/xmage-oracle-run.sh" "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; rm -f "$d/xmage.jsonl"; }
+  "$repo/lab/scripts/xmage-oracle-run.sh" "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; rm -f "$d/xmage.jsonl"; }
 }
 export -f one_set
 for f in lab/oracle/compliance/printed/*.json; do basename "$f" .json; done | xargs -P "$jobs" -I{} bash -c 'one_set "$@"' _ {}

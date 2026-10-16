@@ -1,6 +1,6 @@
 // Package memcap reads the effective cgroup v2 hard memory limit that binds
 // this process. A kernel memcg OOM kill is what the reward loop's oom_kills
-// stability veto counts (scripts/reward.py), so a job whose working set
+// stability veto counts (ops/scripts/reward.py), so a job whose working set
 // cannot fit under the limit that binds it must fail fast at startup instead
 // of running until the kernel kills it and the launcher retries into another
 // kill. The first consumer is lab/cmd/cardval's az pilot (2026-10-14: the

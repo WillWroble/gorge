@@ -13,7 +13,7 @@ for s in "$@"; do
   if [ -f "$old/$s/xmage.jsonl" ] && cmp -s "$d/scen.jsonl" "$old/$s/scen.jsonl" && [[ " ${FORCE_XMAGE:-} " != *" $s "* ]]; then
     cp "$old/$s/xmage.jsonl" "$d/xmage.jsonl"; how=reused
   else
-    "$W/scripts/xmage-oracle-run.sh" "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; continue; }; how=rerun
+    "$W/lab/scripts/xmage-oracle-run.sh" "$d/scen.jsonl" "$d/xmage.jsonl" || { echo "$s xmage FAILED"; continue; }; how=rerun
   fi
   "$new/oraclediff" diff -scenarios "$d/scen.jsonl" -xmage "$d/xmage.jsonl" -out "$d/verdicts.jsonl" -write lab/oracle/compliance/verdicts -xmage-ref "$ref" >"$d/diff.log" 2>&1 || { echo "$s diff FAILED"; tail -3 "$d/diff.log"; continue; }
   echo "$s xmage=$how $(tr '\n' ' ' <"$d/diff.log" | tr -s ' ' | tail -c 200)"

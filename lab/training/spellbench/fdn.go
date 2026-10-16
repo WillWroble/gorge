@@ -14,7 +14,7 @@ import (
 // >= 60% game-win-rate bucket, one per (draft_id, build_index). SpellBench
 // lists "FDN Limited" as a proposed benchmark with no definition of its
 // own yet; see docs/superpowers/reports/2026-09-28-spellbench-fdn-limited.md.
-// scripts/spellbench-fdn-catalog.py regenerates the directory.
+// lab/scripts/spellbench-fdn-catalog.py regenerates the directory.
 const FDNLimited = "decks/fdn-limited"
 
 // FDNPool is the FDN Limited rotating deck pool, in catalog order.

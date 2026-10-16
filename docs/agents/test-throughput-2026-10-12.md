@@ -1,6 +1,6 @@
 # gorge test-runtime audit — 2026-10-12 (internal)
 
-No edits, no tests run (box at load 78–95/32 cores). **est.** / **hypothesis** where unmeasured. Verified by orchestrator: `scripts/heavy_lock.sh:~162` does `kill -STOP`; `cmd/testbudget/check.go:221-228` returns 0 when wall exceptions are unseeded.
+No edits, no tests run (box at load 78–95/32 cores). **est.** / **hypothesis** where unmeasured. Verified by orchestrator: `ops/scripts/heavy_lock.sh:~162` does `kill -STOP`; `cmd/testbudget/check.go:221-228` returns 0 when wall exceptions are unseeded.
 
 ## TL;DR
 
@@ -15,7 +15,7 @@ No edits, no tests run (box at load 78–95/32 cores). **est.** / **hypothesis**
 | Stage | What runs | Wall | Source |
 |---|---|---|---|
 | Seat self-test | focused capped `go test -run` | not instrumented | AGENTS.md |
-| Gate (agentctl; landings in `.ds4/orchestrator/staging`, merge_train since 10-12) | xmage driver ≈0 · ratchets ≈0 · broker ≈0 · `go build ./...` p50 13/p90 27 · `go test (affected)` (`scripts/gate_affected.sh`) **p50 144/p90 271/max 436** · CR conformance p50 9 · TestHeads p50 11 · make sim p50 12 · **total p50 196/p90 313/max 453 s** | n=28 since 10-09, `.ds4/orchestrator/gates/*/` mtimes |
+| Gate (agentctl; landings in `.ds4/orchestrator/staging`, merge_train since 10-12) | xmage driver ≈0 · ratchets ≈0 · broker ≈0 · `go build ./...` p50 13/p90 27 · `go test (affected)` (`ops/scripts/gate_affected.sh`) **p50 144/p90 271/max 436** · CR conformance p50 9 · TestHeads p50 11 · make sim p50 12 · **total p50 196/p90 313/max 453 s** | n=28 since 10-09, `.ds4/orchestrator/gates/*/` mtimes |
 | Gate wall trend (daily median) | 10-05 211 · 10-07 91 · 10-08 106 · 10-09 213 · 10-10 190 · 10-12 172 s | `.ds4/reward/scoreboard.jsonl` |
 | Heavy-lane wait in affected gate | 1,500 s then exit 75 | 20/612 logs |
 | Post-merge (`postmerge_batch.sh` → `postmerge_full.sh`) | vet; `go test -p=8 -json ./...` + testbudget; TestHeads; sim; reward_loop smoke | mean 10-05 417 · 10-06 270 · 10-07 195 · 10-08 207 · 10-09 415 · **10-10 1,412** · 10-12 619 (max 1,819). 36 RED, 31 CULPRIT, 13 FLAKY | `.ds4/postmerge-batch.log`, `postmerge-culprits.log` |

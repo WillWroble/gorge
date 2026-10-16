@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// deployStub is a stand-in gorged for scripts/deploy-demo.sh: each call
+// deployStub is a stand-in gorged for ops/scripts/deploy-demo.sh: each call
 // appends one record line (its kind, then every argument, \x1f-separated) to
 // the record file. The -prewarm-art-only call then fails or hangs as the case
 // asks; a server call just exits, because the test's own listeners answer
@@ -67,7 +67,7 @@ func TestDeployStartsTheServersWhenTheArtFillFails(t *testing.T) {
 			t.Fatalf("deploy-demo.sh needs %s: %v", tool, err)
 		}
 	}
-	script, err := filepath.Abs("../../scripts/deploy-demo.sh")
+	script, err := filepath.Abs("../../ops/scripts/deploy-demo.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,18 +214,18 @@ func TestDeployStartsTheServersWhenTheArtFillFails(t *testing.T) {
 }
 
 // deployScriptDefault reads one `NAME=${NAME:-value}` default out of
-// scripts/deploy-demo.sh, so a test asserting what the deploy passes tracks the
+// ops/scripts/deploy-demo.sh, so a test asserting what the deploy passes tracks the
 // script instead of duplicating a value the operator changes by hand.
 func deployScriptDefault(t *testing.T, name string) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "..", "scripts", "deploy-demo.sh"))
+	b, err := os.ReadFile(filepath.Join("..", "..", "ops", "scripts", "deploy-demo.sh"))
 	if err != nil {
 		t.Fatalf("read deploy-demo.sh: %v", err)
 	}
 	re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(name) + `=\$\{` + regexp.QuoteMeta(name) + `:-([^}]*)\}`)
 	m := re.FindSubmatch(b)
 	if m == nil {
-		t.Fatalf("scripts/deploy-demo.sh has no %s=${%s:-...} default", name, name)
+		t.Fatalf("ops/scripts/deploy-demo.sh has no %s=${%s:-...} default", name, name)
 	}
 	return string(m[1])
 }

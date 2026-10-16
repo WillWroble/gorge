@@ -29,7 +29,7 @@ mkdir -p "$BENCH_DIR"
 GATE_FLAG=${GATE_FLAG:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.ds4/reward/gate-active}
 
 # gate_active: the broker's gate flag is set and younger than its 1800 s TTL
-# (scripts/broker.sh gate_active; an older flag is abandoned).
+# (ops/scripts/broker.sh gate_active; an older flag is abandoned).
 gate_active() {
 	[ -e "$GATE_FLAG" ] || return 1
 	[ $(($(date +%s) - $(stat -c %Y "$GATE_FLAG" 2>/dev/null || echo 0))) -le 1800 ]

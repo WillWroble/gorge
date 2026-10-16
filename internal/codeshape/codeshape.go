@@ -3,7 +3,7 @@
 // much of its behaviour is still keyed on string literals. It is the metric
 // behind the W0 shrink-only ratchets of the rules-engine refactor spec
 // (docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
-// 4) and behind the steward axis of scripts/reward_collect.py, which replaced
+// 4) and behind the steward axis of ops/scripts/reward_collect.py, which replaced
 // the old file-size count: a long FUNCTION is a concern without a seam, while
 // a long FILE says nothing about boundaries and rewarded size-only splits.
 //
@@ -368,7 +368,7 @@ type Func struct {
 func (f Func) CeilingKey() string { return path.Dir(f.File) + " " + f.Name }
 
 // Metrics is one measurement. The JSON names are the contract
-// scripts/reward_collect.py reads; extend, never rename.
+// ops/scripts/reward_collect.py reads; extend, never rename.
 type Metrics struct {
 	// FuncsOver300 counts non-test FuncDecls in engine/rules/ and engine/effects/ spanning
 	// more than LongFuncLines lines.

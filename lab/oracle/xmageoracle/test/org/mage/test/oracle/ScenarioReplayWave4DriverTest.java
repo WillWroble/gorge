@@ -13,7 +13,7 @@ import java.util.List;
 
 /** No database or game: pins the wave-4 driver asks (the lb4w2-driver
  * branch). Each block names the Level B row it clears. Run
- * scripts/xmage-oracle-test-wave4-driver.sh; the replay itself is a host gate. */
+ * lab/scripts/xmage-oracle-test-wave4-driver.sh; the replay itself is a host gate. */
 public final class ScenarioReplayWave4DriverTest {
     private static void check(boolean condition, String message) {
         if (!condition) {

@@ -16,7 +16,7 @@
 //
 // Usage:
 //
-//	scripts/ledger-lane.sh lane.txt   # cached, capped, under the heavy lock
+//	ops/scripts/ledger-lane.sh lane.txt   # cached, capped, under the heavy lock
 //	go run ./cmd/ledger -lane lane.txt -out .ds4/ledger.json
 //
 // -lane may be repeated for lanes in more than one package. -issues defaults to

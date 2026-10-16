@@ -2,7 +2,7 @@ package main
 
 // searchbench leak: docs/012 §2.5's hidden-information test (E1), the
 // gorge run of upstream's tools/search_bench/leak.py over the pairs
-// scripts/searchbench/leak_prep.py writes. Every (pair, arm, seed) searches
+// lab/scripts/searchbench/leak_prep.py writes. Every (pair, arm, seed) searches
 // both members X and Y with the same seeds; rows go to <out>/probes.jsonl in
 // job order (a restart skips the searches already there), then the report
 // to <out>/leak_report.json and <out>/leak_report.md.

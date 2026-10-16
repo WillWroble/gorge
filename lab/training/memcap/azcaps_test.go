@@ -68,7 +68,7 @@ func TestAzCapsScaleWithSimsBelowTheCalibrationPoint(t *testing.T) {
 // launcher can fix the launch instead of retrying into the next OOM kill.
 func TestAzCapsRefusalNamesTheFix(t *testing.T) {
 	err := AzCapsError(4, 25, 3*gib, 4*gib)
-	if !strings.Contains(err.Error(), "scripts/heavy.sh") || !strings.Contains(err.Error(), "-workers") {
+	if !strings.Contains(err.Error(), "ops/scripts/heavy.sh") || !strings.Contains(err.Error(), "-workers") {
 		t.Fatalf("refusal does not name the fix: %v", err)
 	}
 }
