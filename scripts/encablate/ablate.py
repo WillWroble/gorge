@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Encoding ablation harness (2026-10-10, docs/superpowers/reports/2026-10-10-encoding-ablation.md).
 
-Reads a cmd/encablate dump and trains a small bag-of-tokens policy+value net:
+Reads a lab/cmd/encablate dump and trains a small bag-of-tokens policy+value net:
 
   state h  = MLP(EmbeddingBag(state tokens [+ identity tokens]))
   cand  c  = EmbeddingBag(candidate option tokens [+ option identity tokens])

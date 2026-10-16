@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
 )
 
 // The coverage command writes the card-support overview: a full breakdown

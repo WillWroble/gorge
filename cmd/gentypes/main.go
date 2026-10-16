@@ -13,15 +13,15 @@ import (
 	"path/filepath"
 
 	"github.com/adams-shaun/gorge/internal/tsgen"
-	"github.com/adams-shaun/gorge/protocol"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
-const header = "// TypeScript twins of package protocol (github.com/adams-shaun/gorge/protocol).\n" +
+const header = "// TypeScript twins of package protocol (github.com/adams-shaun/gorge/server/protocol).\n" +
 	"// Regenerate with `make gentypes`; `make lint` fails when this file is stale.\n"
 
 // Render is the whole generation, shared by main and the freshness test.
 func Render() (string, error) {
-	const protoPkg, decisionPkg = "github.com/adams-shaun/gorge/protocol", "github.com/adams-shaun/gorge/decision"
+	const protoPkg, decisionPkg = "github.com/adams-shaun/gorge/server/protocol", "github.com/adams-shaun/gorge/engine/decision"
 	rootNames := []struct{ pkg, name string }{
 		{protoPkg, "Frame"}, {protoPkg, "Hello"}, {protoPkg, "TableInfo"},
 		{protoPkg, "Widget"}, {protoPkg, "SeatInfo"}, {protoPkg, "MatchStart"},

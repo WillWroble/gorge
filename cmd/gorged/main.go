@@ -23,13 +23,13 @@ import (
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/bots/azc4"
 	"github.com/adams-shaun/gorge/bots/azc5"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
-	"github.com/adams-shaun/gorge/eventhost"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/deck"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/lab/draft/eventhost"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // Command gorged runs perpetual bot tables and serves them to browsers:
@@ -216,7 +216,7 @@ type config struct {
 	// that loopback is not private when a reverse proxy or tunnel forwards
 	// public traffic to that port, as the demo's does.
 	pprof bool
-	// manabrew is the -manabrew flag: mount host/manabrewhttp's routes
+	// manabrew is the -manabrew flag: mount server/host/manabrewhttp's routes
 	// (manabrew.go). Off by default so an unmounted server is byte-identical
 	// to today (scoping spec §5.4). A non-empty manabrewAddr implies this
 	// (applyManaBrew).
@@ -367,7 +367,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	c.az4.registerFlags(fs, azc4.Policy, "its .dzgw network")
 	c.az5.registerFlags(fs, azc5.Policy, "its .dzgw network (the C5 net, trained after the payment-plan fixes)")
 	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
-	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
+	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (server/host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")
 	fs.BoolVar(&c.events, "events", false, "host 4-seat draft events under /api/events (eventhost; persistence under <dir>/events)")

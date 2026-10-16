@@ -19,12 +19,12 @@ import (
 	"runtime/metrics"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/internal/testutil"
 
 	// Register the effects' ParamCoders exactly as a real process does, so the
 	// census reflects what a server holds, not a bare parser.
-	_ "github.com/adams-shaun/gorge/rules"
+	_ "github.com/adams-shaun/gorge/engine/rules"
 )
 
 // The ceilings, in absolute bytes/objects. They are the values the spec's §1.1
@@ -35,7 +35,7 @@ const (
 	// Lowered at S4 (the imaged lazy registry): measured 1.4 MB scan,
 	// 40.5 MB heap, 18,405 objects. S4 set the heap ceiling to 35.6 MB from
 	// the design's ESTIMATE ("~35-40 MB") rather than from the measurement
-	// it logged, so it landed just above the ceiling; cmd/botbench failed
+	// it logged, so it landed just above the ceiling; lab/cmd/botbench failed
 	// first in the same batch run and masked it.
 	//
 	// Re-pinned 2026-10-07 (agent-20261007T001003Z-312ebafa) when the census

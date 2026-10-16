@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # forge-pass.sh [SET...] -- one incremental Forge oracle pass over the named
-# sets (default: every set with a printed list under compliance/printed/).
+# sets (default: every set with a printed list under lab/oracle/compliance/printed/).
 #
 # The Forge oracle is the third reference beside gorge and XMage (design:
 # .ds4/forge-oracle/DESIGN.md sections 7-9). This is the standing
@@ -83,11 +83,11 @@ xroot=${XMAGE_ORACLE_DIR:-$(sed -n 's/^XMAGE_ORACLE_DIR *?= *//p' Makefile)}
 
 if [ $# -eq 0 ]; then
 	sets=()
-	for f in compliance/printed/*.json; do
+	for f in lab/oracle/compliance/printed/*.json; do
 		[ -e "$f" ] || continue
 		sets+=("$(basename "$f" .json)")
 	done
-	[ ${#sets[@]} -gt 0 ] || { echo "forge-pass: no printed sets under compliance/printed/" >&2; exit 2; }
+	[ ${#sets[@]} -gt 0 ] || { echo "forge-pass: no printed sets under lab/oracle/compliance/printed/" >&2; exit 2; }
 	set -- "${sets[@]}"
 fi
 
@@ -108,7 +108,7 @@ fi
 drv=$(printf '%s\n' "$compile_out" | sed -n 's/^driver_sha=\([0-9a-f]\{1,\}\).*/\1/p' | tail -1)
 [ -n "$drv" ] || { echo "forge-pass: no driver_sha from $runner --compile" >&2; exit 2; }
 
-xdriver=tools/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java
+xdriver=lab/oracle/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java
 xdrv=$(sha256sum "$xdriver" | cut -c1-12)
 
 out=${FORGE_PASS_OUT:-$root/runs/forge-pass}
@@ -120,7 +120,7 @@ mkdir -p "$out" "$cache"
 od=${FORGE_PASS_ORACLEDIFF:-}
 if [ -z "$od" ]; then
 	mkdir -p "$root/bin"
-	go build -o "$root/bin/oraclediff" ./cmd/oraclediff
+	go build -o "$root/bin/oraclediff" ./lab/cmd/oraclediff
 	od=$root/bin/oraclediff
 fi
 
@@ -135,7 +135,7 @@ allfd=$out/adjudicate-forge-diff.jsonl
 for s in "$@"; do
 	d=$out/$s
 	rm -rf "$d" && mkdir -p "$d"
-	if ! "$od" gen -manifest "compliance/manifests/$s.json" -level "${LEVEL:-B}" -out "$d/scen.jsonl" >"$d/gen.log" 2>&1; then
+	if ! "$od" gen -manifest "lab/oracle/compliance/manifests/$s.json" -level "${LEVEL:-B}" -out "$d/scen.jsonl" >"$d/gen.log" 2>&1; then
 		echo "$s: gen FAILED"; tail -3 "$d/gen.log"; rc=1; continue
 	fi
 	if ! "$od" forge-export -scenarios "$d/scen.jsonl" -out "$d/forge-req.jsonl" >"$d/export.log" 2>&1; then

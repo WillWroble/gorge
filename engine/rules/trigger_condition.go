@@ -1,0 +1,676 @@
+// The CR 603.4 intervening-if gate, shared by every trigger mode.
+//
+// triggerMatches applies this to every mode after its matcher, so the same T:
+// line grammar -- a LifeAmount$ or IsPresent$/PresentCompare$ clause -- is
+// honoured wherever it appears.
+//
+// Split out of trigger_match.go so tickets touching different modes stop
+// colliding on one file. Registration is at the bottom; a duplicate mode
+// panics (trigmatch.registerTrigMatcher).
+
+package rules
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules/trigmatch"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+// evolveConditionHolds is the bare `Condition$ Evolve` gate (CR 702.99a):
+// the entering creature's derived power OR toughness must strictly exceed
+// the source's. It is the same comparison the Evolve$ keyword gate
+// (engine/rules/trigmatch/zone.go) makes, shared through this free function so the
+// two spellings cannot drift. The narrow powerReader parameter (rather than
+// *Engine) keeps the gate out of the engine-surface side door; *Engine
+// satisfies it.
+func evolveConditionHolds(r interface {
+	Power(state.ObjID) int32
+	Toughness(state.ObjID) int32
+}, ev events.Event, source state.ObjID) bool {
+	if ev.To != state.ZBattlefield || ev.Obj == 0 {
+		return false
+	}
+	return r.Power(ev.Obj) > r.Power(source) || r.Toughness(ev.Obj) > r.Toughness(source)
+}
+
+// noResolvingCheck reports whether the trigger carries NoResolvingCheck$ True:
+// Forge's marker that its condition clause (an intervening-if, an
+// IsPresent$/PresentCompare$ or a CheckSVar$/SVarCompare$ gate) is checked
+// ONLY when the trigger would fire, never again as it resolves. Measured over
+// the corpus: 88 raw T: lines across 87 files, every one True -- transient
+// fire-time battlefield counts (pack tactics' attacking power, battalion's
+// other attackers, Valakut's Mountains, Vengevine's second creature spell,
+// Love on the Battlefield's exactly-two) whose re-evaluation at resolution
+// would wrongly fizzle the ability after the state moved. The read sits in
+// the ONE resolution-time recheck site (resolveTop's CR 603.4 half, via
+// triggerResolvingCheckHolds); every fire-time site (triggerMatches,
+// the event-matched delayed walker, the AttackerBlocked hook) keeps its own
+// check.
+func noResolvingCheck(t cards.Trigger) bool {
+	return strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKNoResolvingCheck)), "True")
+}
+
+// triggerResolvingCheckHolds is the resolution-time half of the CR 603.4
+// condition check, beside triggerMatches' fire-time half: a triggered
+// ability's condition is checked when it triggers AND as it resolves, and a
+// false answer at resolution removes the ability from the stack (CR 603.4).
+// NoResolvingCheck$ True opts the trigger out of this second check.
+//
+// tc is the ability's captured event roles (Engine.triggerContexts[id] at the
+// resolveTop call site), which is what lets the event-RELATIVE clauses below
+// be re-evaluated here: an intervening-if that names the attacked player has
+// no event at resolution time, but the role was captured when the trigger
+// queued and travels with the ability (effects.TriggerContext.DefendingPlayer).
+// A nil tc leaves those clauses to their fire-time matcher, so this function
+// is safe to call with no context for a trigger whose mode evaluates them
+// itself (the fire-time general gate passes nil for exactly that reason).
+func (e *Engine) triggerResolvingCheckHolds(t cards.Trigger, source state.ObjID, controller state.PlayerID, tc *effects.TriggerContext, ownedSVars map[string]string) bool {
+	if noResolvingCheck(t) {
+		return true
+	}
+	// The ability's controller was fixed when it went on the stack. A delayed
+	// Effect can have another owner than its source card; an ordinary trigger's
+	// source can also change control while the ability waits to resolve.
+	return e.triggerConditionHoldsWithSVars(t, source, controller, tc, ownedSVars)
+}
+
+// triggerConditionHolds evaluates the CR 603.4 intervening-if clause (and the
+// CR 603.8 state-trigger condition) carried on a T: line. Two clause shapes
+// are recognised, the two the corpus uses on the trigger lines this engine
+// routes through the modes above:
+//
+//   - LifeAmount$ <op><n> against LifeTotal$ (<who>): the named player's life
+//     total compared to n.
+//   - IsPresent$ <spec> with PresentCompare$ <op><n>: the count of objects
+//     matching <spec> compared to n.
+//   - Metalcraft$ True (and the bare-Condition$ Metalcraft spelling): the
+//     controller controls three or more artifacts -- the trigger-side named
+//     condition the ability word uses (6 corpus files: Vedalken Humiliator's
+//     attack pump, Blade-Tribe Berserkers' and Bleak Coven Vampires' ETBs,
+//     Lumengrid Drake's bounce, Inventors' Fair's upkeep lifegain, Screeching
+//     Silcaw's mill), read through the SAME metalcraftHolds census
+//     costConditionHolds' Condition$ Metalcraft case and the Continuous
+//     static gate read, so the three cannot drift apart.
+//
+// An absent clause is vacuously true. A clause whose shape this build cannot
+// evaluate FAILS CLOSED -- a false condition means the trigger simply does not
+// fire, never that an unreadable life/creature count is presumed large
+// enough to let a win or counter trigger slip through.
+func (e *Engine) triggerConditionHolds(t cards.Trigger, source state.ObjID) bool {
+	return e.triggerConditionHoldsCtx(t, source, e.controllerOf(source), nil)
+}
+
+// triggerConditionHoldsAs is triggerConditionHolds with "you" supplied
+// explicitly rather than derived from source's controller. An event-matched
+// delayed trigger's "you" is the registration's effect owner (dt.Controller),
+// which can differ from the source card's own controller -- see
+// checkEventDelayedTriggers.
+func (e *Engine) triggerConditionHoldsAs(t cards.Trigger, source state.ObjID, you state.PlayerID) bool {
+	return e.triggerConditionHoldsCtx(t, source, you, nil)
+}
+
+// triggerConditionHoldsCtx is the shared condition walk with the ability's
+// captured event roles supplied (nil at fire time, since the general gate has
+// no event to name a role and the per-mode matcher -- trigmatch.AttacksMatches for
+// Condition$ AttackedPlayerWithMostLife -- owns the fire-time answer).
+func (e *Engine) triggerConditionHoldsCtx(t cards.Trigger, source state.ObjID, you state.PlayerID, tc *effects.TriggerContext) bool {
+	return e.triggerConditionHoldsWithSVars(t, source, you, tc, nil)
+}
+
+// triggerConditionHoldsAsWithDelayedRemembered is triggerConditionHoldsAs with
+// a delayed registration's OWN captured set (state.DelayedTrigger.Remembered)
+// bound as the IsTriggerRemembered referent. An event-matched delayed
+// registration whose inline trigger body carries an IsPresent$ clause named
+// after the capture (Stolen Uniform's "if it's attached to a creature you
+// control") must evaluate that clause against the REGISTRATION's remembered
+// objects, not against an unbound context: the generic walk otherwise fails
+// closed, because effects' Card.IsTriggerRemembered predicate needs
+// SpecContext.DelayedRemembered bound to answer at all. The binding rides the
+// caller's TriggerContext, so the clause keeps ONE evaluation site with
+// unchanged semantics for every other caller.
+func (e *Engine) triggerConditionHoldsAsWithDelayedRemembered(t cards.Trigger, source state.ObjID, you state.PlayerID, remembered []state.Target) bool {
+	tc := effects.TriggerContext{DelayedRemembered: remembered}
+	return e.triggerConditionHoldsWithSVars(t, source, you, &tc, nil)
+}
+
+// The resolution-time caller passes the recorded line owner's table; at
+// fire time a printed trigger's own face is the owner so ownedSVars stays nil,
+// while the granted-trigger paths pass the GRANTOR's table through
+// triggerMatchesWithSVars (source is the affected recipient, whose same-named
+// SVar must not answer the condition).
+func (e *Engine) triggerConditionHoldsWithSVars(t cards.Trigger, source state.ObjID, you state.PlayerID, tc *effects.TriggerContext, ownedSVars map[string]string) bool {
+	// A kw:Class level band is an independent AND gate beside every clause
+	// below (and beside the body's own IsPresent$/IsPresent2$ clauses).
+	if !e.classBandGateHolds(t.ParamStr(cards.PKClassBand), source) {
+		return false
+	}
+	// LifeLost's and LifeGained's LifeAmount$ are matched against the causing
+	// loss/gain by their matchers (trigmatch.lifeLostMatches/trigmatch.lifeGainedMatches), rather
+	// than against a player's current life total.
+	if v, ok := t.Param(cards.PKLifeAmount); ok && t.Mode != "LifeLost" && t.Mode != "LifeLostAll" && t.Mode != "LifeGained" {
+		if !e.lifeConditionHoldsAs(t, you, v) {
+			return false
+		}
+	}
+	// IsPresent$ and IsPresent2$ are two INDEPENDENT present clauses that
+	// must BOTH hold (Forge's meetsCommonRequirements reads each with its own
+	// PresentCompare/PresentZone/PresentDefined suffix set): Hidden
+	// Predators' "an opponent controls a creature with power 4 or greater,
+	// if CARDNAME is an enchantment", the meld pairs' "you control X and a
+	// creature named Y", "Name Sticker" Goblin's "if it's on the battlefield
+	// and you control 9 or fewer ...". The earlier UNION reading made Hidden
+	// Predators' Mode$ Always trigger fire while it was merely an
+	// enchantment and, once animated, re-fire forever on the opponent's
+	// creature alone, stacking one Permanent Animate effect per resolution
+	// (cardfuzz batch3 lines 4/21: 500+ continuous effects, every Derived
+	// walking all of them -- the "hang").
+	if _, ok := t.Param(cards.PKIsPresent); ok &&
+		!e.presentClauseHolds(t, source, you, tc, "IsPresent", "PresentCompare", "PresentDefined", "PresentZone") {
+		return false
+	}
+	if _, ok := t.Param(cards.PKIsPresent2); ok &&
+		!e.presentClauseHolds(t, source, you, tc, "IsPresent2", "PresentCompare2", "PresentDefined2", "PresentZone2") {
+		return false
+	}
+	if v, ok := t.Param(cards.PKMetalcraft); ok {
+		// The trigger-side named condition (task trig-attacks-metalcraft):
+		// a value this build cannot read as True is an unreadable clause
+		// shape and fails closed like the other clauses above.
+		if !strings.EqualFold(strings.TrimSpace(v), "True") || !e.metalcraftHolds(you) {
+			return false
+		}
+	}
+	if strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKCondition)), "Metalcraft") {
+		// The bare-Condition$ spelling of the same gate. The trigger path
+		// reads no OTHER bare Condition$ value here (LifePaid, Sacrificed and
+		// friends stay unread; Evolve is read in triggerMatchesWithSVars,
+		// where the entering object from the event is in scope), and no
+		// corpus trigger carries this spelling today -- the bare Condition$
+		// Metalcraft carriers are S: statics the Continuous gate already
+		// reads -- but the spelling is kept beside Metalcraft$ so the two
+		// cannot drift apart.
+		if !e.metalcraftHolds(you) {
+			return false
+		}
+	}
+	if v, ok := t.Param(cards.PKBlessing); ok {
+		// Blessing$ True is the trigger-side city's-blessing gate (CR
+		// 702.131). It is evaluated for the trigger's "you" player, including
+		// delayed triggers whose controller is supplied explicitly. A malformed
+		// value fails closed, as do all other unreadable trigger conditions.
+		if !strings.EqualFold(strings.TrimSpace(v), "True") || int(you) >= len(e.G.Players) || e.G.Players[you].Lost || !e.G.Players[you].Blessing {
+			return false
+		}
+	}
+	if v, ok := t.Param(cards.PKRevolt); ok {
+		// Revolt$ (the CR 702.38 ability word, "if a permanent you
+		// controlled left the battlefield this turn"): the SAME
+		// revoltThisTurn scan the replacement path's Revolt$ clause reads
+		// (engine/rules/replacement.go), the one Engine.RevoltHolds -- effects'
+		// bare Condition$ Revolt gate and Count$Revolt branch head --
+		// delegates to, so the three spellings cannot drift apart. Measured
+		// over the corpus: 29 files carry Revolt$ True; 24 of its lines are
+		// triggers -- 16 Mode$ Phase end-step shapes (Aid from the Cowl,
+		// Hidden Stockpile, Krang) and 8 Mode$ ChangesZone ETBs (Airdrop
+		// Aeronauts, Vengeful Rebel, Deadeye Harpooner); the rest are a
+		// replacement line (Aether Revolt, already read on the replacement
+		// path) and non-trigger text. A value this build cannot read as
+		// True is an unreadable clause shape and fails closed like the
+		// Metalcraft$ clause above.
+		if !strings.EqualFold(strings.TrimSpace(v), "True") || !e.revoltThisTurn(you) {
+			return false
+		}
+	}
+	if strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKCondition)), "Revolt") {
+		// The bare-Condition$ spelling of the same gate. No corpus trigger
+		// carries it today (the one bare Condition$ Revolt carrier,
+		// Decommission, is a DB$ GainLife sub the effects condition gate
+		// reads), kept beside the bare Condition$ Metalcraft spelling so
+		// the two cannot drift apart.
+		if !e.revoltThisTurn(you) {
+			return false
+		}
+	}
+	if v, ok := t.Param(cards.PKDelirium); ok {
+		// Delirium$ True (the CR 207.2c ability word, "four or more card
+		// types among cards in your graveyard"): the trigger-side gate,
+		// read through the SAME graveyardCardTypeCount census the
+		// replacement path's Delirium$ clause (engine/rules/replacement.go), the
+		// Continuous static gate (engine/rules/layers.go), the ability-offer gate
+		// (engine/rules/legal.go's activationConditionOK) and the effects bare
+		// Condition$ Delirium gate (Host.DeliriumHolds) read, so every
+		// spelling answers identically and the two directions cannot
+		// disagree. Measured over the corpus at this pin: 22 raw T: lines
+		// across 21 files (Winter, Cynical Opportunist; Ishkanah,
+		// Grafwidow; Demolisher Spawn; Wickerfolk Thresher and the rest of
+		// the Death Toll family) -- before this clause the trigger fired
+		// UNCONDITIONALLY, the over-fire direction. A value this build
+		// cannot read as True is an unreadable clause shape and fails
+		// closed like the Metalcraft$ and Revolt$ clauses above.
+		if !strings.EqualFold(strings.TrimSpace(v), "True") || e.graveyardCardTypeCount(you) < 4 {
+			return false
+		}
+	}
+	if v, ok := t.Param(cards.PKAdamant); ok {
+		// Adamant$ on a trigger is an intervening-if (CR 603.4): reuse
+		// the Count$Adamant evaluator so trigger conditions and keyword
+		// counts read the same pay-time per-colour mana provenance. Any
+		// unreadable spelling fails closed.
+		ctx := effects.NewCtxPtr(source, you, effects.CtxInit{})
+		holds, evaluated := effects.AdamantHolds(e, ctx, e.G, 3, strings.TrimSpace(v))
+		if !evaluated || !holds {
+			return false
+		}
+	}
+	if v, ok := t.Param(cards.PKThreshold); ok {
+		// Threshold$ True (the CR 207.2c ability word, "seven or more cards
+		// in your graveyard"): the trigger-side gate, read through the SAME
+		// thresholdHolds census the Continuous static gate reads
+		// (engine/rules/layers.go continuousConditionHolds' Condition$ Threshold
+		// arm), so the two spellings cannot drift apart. Measured over the
+		// corpus at this pin: 5 raw T: lines across 5 files -- Kiora, the
+		// Rising Tide and Crypt Feaster on Mode$ Attacks, Persistent
+		// Marshstalker on Mode$ AttackersDeclared, Tidecaller Mentor on
+		// Mode$ ChangesZone -- before this clause the trigger fired
+		// UNCONDITIONALLY, the over-fire direction. CR 603.4 makes it an
+		// intervening-if, so the same clause is re-evaluated at resolution
+		// through triggerResolvingCheckHolds. A value this build cannot
+		// read as True is an unreadable clause shape and fails closed like
+		// the Metalcraft$, Revolt$ and Delirium$ clauses above.
+		if !strings.EqualFold(strings.TrimSpace(v), "True") || !e.thresholdHolds(you) {
+			return false
+		}
+	}
+	if !triggerHellbentHolds(e.G, t, you) {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKCondition)), "AttackedPlayerWithMostLife") {
+		// Scourge of the Throne's intervening-if ("if it's attacking the
+		// player with the most life or tied for most life"): an
+		// event-RELATIVE clause, so it is re-evaluated here only when the
+		// ability's captured roles name the defender. A nil tc is the
+		// fire-time general gate, whose caller trigmatch.AttacksMatches already
+		// evaluated the clause against the DeclareAttackers event against
+		// the SAME trigmatch.PlayerHasMostLife read -- skipping it here is what keeps
+		// the two halves from double-gating a passing trigger. A non-nil tc
+		// (resolution) with no defender binding is a condition this build
+		// cannot confirm and fails closed, the convention every clause above
+		// documents (an unreadable condition must never let a trigger slip
+		// through).
+		if tc != nil {
+			if !tc.DefendingPlayer.IsPlayer || !trigmatch.PlayerHasMostLife(boardOf(e), tc.DefendingPlayer.Player) {
+				return false
+			}
+		}
+	}
+	if name, ok := t.Param(cards.PKCheckSVar); ok {
+		// CheckSVar$/SVarCompare$ (Kozilek, the Great Distortion's cast
+		// trigger: "if you have fewer than seven cards in hand"): the
+		// CR 603.4 intervening-if the shared SVar-compare evaluator reads,
+		// evaluated with the source face's SVar table and the trigger's
+		// "you" -- the same wrapper rules' static gate uses. A condition
+		// this build cannot evaluate fails closed (the trigger does not
+		// fire), the same convention triggerConditionHolds' other clauses
+		// document above.
+		src := e.G.Obj(source)
+		if (src == nil || src.Face() == nil) && ownedSVars == nil {
+			return false
+		}
+		// A mutated pile's under-card trigger (CR 702.140d) is gated by the
+		// UNDER-CARD's own SVar table: Face() on a pile is always its top
+		// card, and the top card of a mutate pile can be any creature, so
+		// reading its table would evaluate the gate against a body it never
+		// defined (failing closed, i.e. silently never firing). An ordinary
+		// trigger's owning face IS the top face, so nothing else moves.
+		svars := ownedSVars
+		if svars == nil {
+			svars = src.Face().SVars
+			if mf := e.faceOwningTrigger(source, t); mf != nil {
+				svars = mf.SVars
+			}
+		}
+		ctx := effects.NewCtxPtr(source, you, effects.CtxInit{SVars: svars})
+		holds, evaluated := effects.CheckSVarHolds(e, ctx, name, strings.TrimSpace(t.ParamStr(cards.PKSVarCompare)))
+		if !evaluated || !holds {
+			return false
+		}
+	}
+	if spec, ok := t.Param(cards.PKCheckDefinedPlayer); ok && !e.checkDefinedPlayerHolds(spec, source, you) {
+		// CR 603.4 intervening-if (Servant of the Stinger's "if you've
+		// committed a crime this turn"). Evaluated for EVERY trigger mode,
+		// and a predicate this build cannot read fails closed.
+		return false
+	}
+	return true
+}
+
+// checkDefinedPlayerHolds evaluates CheckDefinedPlayer$ "<base>.<property>",
+// Forge's "the defined players having the property are not empty" gate: the
+// CR 603.4 intervening-if on a trigger and the applicability gate on a
+// replacement (Jared Carthalion's "while you're the monarch"). base picks the
+// candidate seats (You; Opponent/Other; Player/Any), property is read from ONE
+// home: a designation or turn ledger the engine owns (isMonarch,
+// hasInitiative, committedCrimeThisTurn -- engine/rules/turn_ledgers.go) or else the
+// shared player filter (withMost*, IsRemembered+counters_EQ0_<type>, ...),
+// with source bound so a source-anchored qualifier reads its own state.
+//
+// It FAILS CLOSED for every trigger mode: a malformed spec, an unknown base
+// or a property neither home can read holds for nobody (the shared filter
+// matches no seat for a qualifier it does not know). The corpus census in
+// engine/rules/check_defined_player_census_test.go pins which spellings are read.
+func (e *Engine) checkDefinedPlayerHolds(spec string, source state.ObjID, you state.PlayerID) bool {
+	base, property, ok := strings.Cut(strings.TrimSpace(spec), ".")
+	if !ok || property == "" {
+		return false
+	}
+	// A property may carry a comparator ("damageDoneSingleSource GE5"); the
+	// word picks the code, the unsplit string stays the shared-filter spelling.
+	word, cmp, _ := strings.Cut(strings.TrimSpace(property), " ")
+	code := definedPlayerPropertyCodes.Code(string(word))
+	var filter string
+	var pc effects.PlayerSpecCtx
+	if code == 0 {
+		filter, pc = "Player."+property, e.playerSpecCtx(source)
+	}
+	holds := func(p state.PlayerID) bool {
+		switch code {
+		case definedPlayerPropertyIsMonarch:
+			return e.G.IsMonarch(p)
+		case definedPlayerPropertyHasInitiative:
+			// CR 726.1: the initiative designation (Loot Dispute's
+			// AttackedTarget$, Rasaad yn Bashir's / Imoen's end-step
+			// intervening-if), the folded state.Initiative.
+			return e.G.IsInitiative(p)
+		case definedPlayerPropertyCommittedCrimeThisTurn:
+			// CR 700.13: the per-turn crime ledger the TargetsChosen fold
+			// maintains (Servant of the Stinger).
+			return e.CommittedCrimeThisTurn(p)
+		case definedPlayerPropertyDamageDoneSingleSource:
+			// Dragon Cultist: the per-source damage ledger; an absent or
+			// malformed comparator holds for nobody.
+			return compareLife(maxDamageBySingleSourceThisTurn(e.G, p), strings.TrimSpace(cmp))
+		}
+		return effects.MatchesPlayerSpecCtx(e.G, filter, p, you, pc)
+	}
+	switch definedPlayerBaseCodes.Code(string(base)) {
+	case definedPlayerBaseYou:
+		return holds(you)
+	case definedPlayerBaseOpponent:
+		for _, p := range e.G.AliveFrom(you) {
+			if p != you && holds(p) {
+				return true
+			}
+		}
+	case definedPlayerBasePlayer:
+		for _, p := range e.G.AliveFrom(0) {
+			if holds(p) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// lifeConditionHoldsAs evaluates the LifeTotal$/LifeAmount$ intervening-if.
+// The "you" for a You-qualified LifeTotal$ is the caller's chosen player --
+// normally the source's controller, but an event-matched delayed trigger
+// passes its registration's effect owner instead (see
+// checkEventDelayedTriggers).
+func (e *Engine) lifeConditionHoldsAs(t cards.Trigger, you state.PlayerID, amount string) bool {
+	who := you
+	if v, ok := t.Param(cards.PKLifeTotal); ok {
+		v = strings.TrimSpace(v)
+		switch lifeConditionHoldsAsCodes.Code(string(v)) {
+		case lifeConditionHoldsAsYou:
+			// the controller, which who already is
+		case lifeConditionHoldsAsActivePlayer:
+			who = e.G.Active
+		default:
+			return false // unevaluable player selector: fail closed
+		}
+	}
+	if int(who) >= len(e.G.Players) || e.G.Players[who].Lost {
+		return false
+	}
+	return compareLife(e.G.Players[who].Life, amount)
+}
+
+// presentClauseHolds evaluates one present clause -- IsPresent$ or
+// IsPresent2$, each with its own suffixed parameter set named by the key
+// arguments: the compare (absent = "at least one match", Forge's reading of a
+// bare present clause -- Mana Vault's draw-step damage), the defined set and
+// the zone. Counts are taken relative to the trigger's source and the
+// caller's chosen "you".
+//
+//   - PresentDefined$ names a Defined$ group (including Self), and counts
+//     matching objects in that group using the trigger's captured context.
+//   - PresentZone$ (Jocasta, Automaton Avenger's "if this card is in your
+//     graveyard") counts the named zone in every living seat's copy of it,
+//     in deterministic seat/zone order; an unknown zone word fails closed.
+//   - otherwise the battlefield is counted.
+//
+// The caller's TriggerContext, when it names a delayed registration's capture
+// through DelayedRemembered, is bound into the SpecContext the spec matches
+// resolve against, so a capture-aware present spec (Card.IsTriggerRemembered
+// +...) counts against the REGISTRATION's own remembered set -- the same
+// binding delayedPresentGateHolds gives the Phase arm. A nil tc binds
+// nothing, exactly the pre-existing read.
+//
+// A comparison this build cannot fold (PresentCompare$ EQX) fails closed.
+func (e *Engine) presentClauseHolds(t cards.Trigger, source state.ObjID, you state.PlayerID, tc *effects.TriggerContext, isKey, cmpKey, definedKey, zoneKey string) bool {
+	spec := strings.TrimSpace(t.Params[isKey])
+	cmp, hasCmp := t.Params[cmpKey]
+	if !hasCmp {
+		cmp = "GE1"
+	}
+	cmp = e.presentCompareFor(cmp, source, you)
+	sc := e.specCtx(source, you)
+	if tc != nil {
+		sc.TriggerContext = *tc
+	}
+	if pd := strings.TrimSpace(t.Params[definedKey]); pd != "" {
+		o := e.G.Obj(source)
+		if o == nil {
+			return comparePresent(0, cmp)
+		}
+		if pd == "Self" {
+			if o.Zone != state.ZBattlefield || !e.matchesSpec(spec, source, sc) {
+				return comparePresent(0, cmp)
+			}
+			return comparePresent(1, cmp)
+		}
+		// A printed trigger's Remembered group is the source's persistent
+		// remembered set. Delayed registrations additionally carry their
+		// own captured set in TriggerContext, already bound above.
+		remembered := append([]state.Target(nil), o.Remembered...)
+		if tc != nil && len(tc.DelayedRemembered) > 0 {
+			// A delayed registration owns its captured Remembered group; the
+			// source's persistent memory is unrelated to this trigger context.
+			remembered = append([]state.Target(nil), tc.DelayedRemembered...)
+		}
+		sc.Remembered = remembered
+		var resolverContext effects.TriggerContext
+		if tc != nil {
+			// Defined selectors resolve against the event captured by this
+			// trigger, not the source object's unrelated or persistent context.
+			resolverContext = *tc
+		}
+		ctx := effects.NewCtxPtr(source, you, effects.CtxInit{Remembered: remembered, TriggerContext: resolverContext})
+		group := effects.DefinedSpec(e, ctx, pd)
+		n := 0
+		for _, target := range group {
+			if !target.IsPlayer && target.Obj != 0 && e.G.Obj(target.Obj) != nil &&
+				e.matchesSpec(spec, target.Obj, sc) {
+				n++
+			}
+		}
+		return comparePresent(n, cmp)
+	}
+	if pz := strings.TrimSpace(t.Params[zoneKey]); pz != "" {
+		zones, known := presentZoneFromParam(pz)
+		if !known {
+			return false
+		}
+		n := 0
+		for _, zone := range zones {
+			n += e.presentZoneCountCtx(zone, spec, source, you, sc)
+		}
+		return comparePresent(n, cmp)
+	}
+	return comparePresent(e.countPresentCtx(spec, source, you, sc), cmp)
+}
+
+// presentZoneCount counts spec matches over one zone across every living
+// seat, the deterministic walk countPresent makes over the battlefield.
+func (e *Engine) presentZoneCount(zone state.Zone, spec string, source state.ObjID, you state.PlayerID) int {
+	return e.presentZoneCountCtx(zone, spec, source, you, e.specCtx(source, you))
+}
+
+// presentZoneCountCtx is presentZoneCount with the caller's own SpecContext,
+// so a capture-aware spec resolves against a binding the generic constructor
+// does not carry (see presentClauseHolds).
+func (e *Engine) presentZoneCountCtx(zone state.Zone, spec string, source state.ObjID, you state.PlayerID, sc effects.SpecContext) int {
+	n := 0
+	for _, p := range e.G.AliveFrom(0) {
+		for _, id := range e.G.Zone(zone, p) {
+			if e.matchesSpec(presentSpecForZone(spec, zone), id, sc) {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// countPresent walks every object on the battlefield once and counts those
+// matching spec, excluding the source where the spec's own Other/StrictlyOther
+// predicate already handles it (Emperor Crocodile's Creature.Other+YouCtrl).
+func (e *Engine) countPresent(spec string, source state.ObjID, you state.PlayerID) int {
+	return e.countPresentCtx(spec, source, you, e.specCtx(source, you))
+}
+
+// countPresentCtx is countPresent with the caller's own SpecContext, so a
+// capture-aware spec resolves against a binding the generic constructor does
+// not carry (see presentClauseHolds).
+func (e *Engine) countPresentCtx(spec string, source state.ObjID, you state.PlayerID, sc effects.SpecContext) int {
+	n := 0
+	e.forEachObject(func(id state.ObjID) {
+		o := e.G.Obj(id)
+		if o == nil || o.Zone != state.ZBattlefield {
+			return
+		}
+		if e.matchesSpec(spec, id, sc) {
+			n++
+		}
+	})
+	return n
+}
+
+// presentCompareFor folds a PresentCompare$ whose right-hand side names an
+// SVar (Zealots en-Dal's and Mob Mentality's EQX, X a Count$Valid over the
+// same set -- "if ALL nonland permanents you control are white") into the
+// numeric literal comparePresent reads: the SVar is looked up on the
+// source's own face and evaluated with effects.EvalCountOK from you's
+// perspective. A numeric rhs, an unknown name or an unresolvable body is
+// returned unchanged, so comparePresent keeps failing it closed.
+func (e *Engine) presentCompareFor(cmp string, source state.ObjID, you state.PlayerID) string {
+	cmp = strings.TrimSpace(cmp)
+	if len(cmp) < 3 {
+		return cmp
+	}
+	rhs := cmp[2:]
+	if _, err := strconv.Atoi(rhs); err == nil {
+		return cmp
+	}
+	o := e.G.Obj(source)
+	if o == nil || o.Face() == nil {
+		return cmp
+	}
+	body, ok := o.Face().SVars[rhs]
+	if !ok {
+		return cmp
+	}
+	v, ok := effects.EvalCountOK(e, effects.NewCtxPtr(source, you, effects.CtxInit{SVars: o.Face().SVars}), body)
+	if !ok {
+		return cmp
+	}
+	return cmp[:2] + strconv.Itoa(int(v))
+}
+
+// stateTriggerOutstanding reports whether a state trigger (Mode$ Always)
+// already has an instance where one would be enqueued -- either still in the
+// pending queue or already placed on the stack. This is the CR 603.8 latch:
+// it is what stops a continuously-true condition from enqueuing an unbounded
+// run of the same trigger.
+func (e *Engine) stateTriggerOutstanding(source state.ObjID, idx int) bool {
+	for _, pt := range e.pendingTriggers {
+		if pt.Source == source && pt.Idx == idx {
+			return true
+		}
+	}
+	o := e.G.Obj(source)
+	if o == nil {
+		return false
+	}
+	f := o.Face()
+	if f == nil || idx < 0 || idx >= len(f.Triggers) {
+		return false
+	}
+	sa := f.Triggers[idx].Effect
+	for _, sid := range e.G.Stack {
+		so := e.G.Obj(sid)
+		if so != nil && so.Source == source && so.Ability == sa {
+			return true
+		}
+	}
+	return false
+}
+
+type definedPlayerPropertyCode uint16
+
+const (
+	definedPlayerPropertyIsMonarch definedPlayerPropertyCode = iota + 1
+	definedPlayerPropertyHasInitiative
+	definedPlayerPropertyCommittedCrimeThisTurn
+	definedPlayerPropertyDamageDoneSingleSource
+)
+
+var definedPlayerPropertyCodes = state.NewStrCodes(
+	state.StrEntry[definedPlayerPropertyCode]{Key: "isMonarch", Val: definedPlayerPropertyIsMonarch},
+	state.StrEntry[definedPlayerPropertyCode]{Key: "hasInitiative", Val: definedPlayerPropertyHasInitiative},
+	state.StrEntry[definedPlayerPropertyCode]{Key: "committedCrimeThisTurn", Val: definedPlayerPropertyCommittedCrimeThisTurn},
+	state.StrEntry[definedPlayerPropertyCode]{Key: "damageDoneSingleSource", Val: definedPlayerPropertyDamageDoneSingleSource},
+)
+
+type definedPlayerBaseCode uint16
+
+const (
+	definedPlayerBaseYou definedPlayerBaseCode = iota + 1
+	definedPlayerBaseOpponent
+	definedPlayerBasePlayer
+)
+
+var definedPlayerBaseCodes = state.NewStrCodes(
+	state.StrEntry[definedPlayerBaseCode]{Key: "You", Val: definedPlayerBaseYou},
+	state.StrEntry[definedPlayerBaseCode]{Key: "Opponent", Val: definedPlayerBaseOpponent},
+	state.StrEntry[definedPlayerBaseCode]{Key: "Other", Val: definedPlayerBaseOpponent},
+	state.StrEntry[definedPlayerBaseCode]{Key: "Player", Val: definedPlayerBasePlayer},
+	state.StrEntry[definedPlayerBaseCode]{Key: "Any", Val: definedPlayerBasePlayer},
+)
+
+type lifeConditionHoldsAsCode uint16
+
+const (
+	lifeConditionHoldsAsYou lifeConditionHoldsAsCode = iota + 1
+	lifeConditionHoldsAsActivePlayer
+)
+
+var lifeConditionHoldsAsCodes = state.NewStrCodes(
+	state.StrEntry[lifeConditionHoldsAsCode]{Key: "", Val: lifeConditionHoldsAsYou},
+	state.StrEntry[lifeConditionHoldsAsCode]{Key: "You", Val: lifeConditionHoldsAsYou},
+	state.StrEntry[lifeConditionHoldsAsCode]{Key: "ActivePlayer", Val: lifeConditionHoldsAsActivePlayer},
+)

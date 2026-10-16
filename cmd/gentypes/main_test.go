@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/internal/tsgen"
-	"github.com/adams-shaun/gorge/protocol"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
 func TestCommittedProtocolTSIsFresh(t *testing.T) {

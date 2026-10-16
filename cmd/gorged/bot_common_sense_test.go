@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // TestBotCommonSenseFlagPlumbsToTables pins -bot-common-sense end to end at

@@ -3,12 +3,14 @@ package bench_test
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/rules/resolve"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // TestSyncAnswerMatchesTape is the kernel-era successor of
@@ -42,7 +44,7 @@ func TestSyncAnswerMatchesTape(t *testing.T) {
 		for g := uint64(0); g < 6; g++ {
 			cfg := rules.Config{Seed: 4100 + g, Names: p[:], Decks: [][]*cards.Card{da, db}, Tokens: reg.Tokens}
 			play := func(inline bool) *rules.Engine {
-				seats := []seat.Seat{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)}
+				seats := []seat.Seat{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)}
 				_, e, err := bench.PlayGame(cfg, seats, 60, 4000, bench.Hooks{SyncAnswer: inline})
 				if err != nil {
 					t.Fatal(err)

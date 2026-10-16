@@ -6,12 +6,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/searchseat"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
 )
 
-// az.go links the tree search (internal/azmcts, which a4af596 does not have):
+// az.go links the tree search (bots/azmcts, which a4af596 does not have):
 // the eval seat (DefaultSeatConfig: argmax, no noise, heuristic leaf with no
 // network) over honest redeals -- every simulation a fresh deal of what seat
 // 0 cannot see (World = redeal, Worlds = 0).

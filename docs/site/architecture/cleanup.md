@@ -13,13 +13,13 @@ not a commitment: each item is decided on its own.
 
 1. **Restore a zero-dependency `go.mod`** (H). Done: the purego-backed GPU
    scorer and `gamepool` command live in the nested module
-   `experimental/gamepool`, and `internal/archtest`
+   `lab/training/experimental/gamepool`, and `internal/archtest`
    `TestRootModuleHasNoRequires` fails on any root `require` line.
 2. **Remove dead weight** (H). Done: `patches/`, `internal/hindsight` and
    `cmd/hindsight` are deleted, and the three `bots/sb*` wrappers are merged
    into `bots/sbbuiltin`.
 3. **Decouple the parked SpellBench stacks** (M). Done: front end V moved to
-   `internal/policynet/v2front`, so `cmd/gorged` no longer links
+   `lab/training/v2front`, so `cmd/gorged` no longer links
    `spellbench/v2agent`, and SpellBench v1 and v2 (~21k lines) build only with
    `-tags spellbench_bridge` (`make test-spellbench-bridge`).
 4. **Regenerate the package map** (H) from `go list` doc strings, and correct the
@@ -30,8 +30,8 @@ not a commitment: each item is decided on its own.
 
 | Item | Evidence | Direction |
 |---|---|---|
-| A third-party dependency exists | `go.mod` requires `github.com/ebitengine/purego v0.8.4` (added 2026-10-08), used only by `internal/gamepool/gpu_cuda.go` under `gamepool && gamepool_gpu`. The invariants say "no require lines", and nothing enforces it. | Nested module for gamepool, broker and `cmd/dzbroker`; archtest on `require`. (H) |
-| Repo map is incomplete | About 57 of 122 packages are missing, including all of `compliance/*`, `azmcts`, `spellbench/*`, the ManaBrew packages and the `rules` sub-packages. | Generate it from `go list` doc strings. (H) |
+| A third-party dependency exists | `go.mod` requires `github.com/ebitengine/purego v0.8.4` (added 2026-10-08), used only by `internal/gamepool/gpu_cuda.go` under `gamepool && gamepool_gpu`. The invariants say "no require lines", and nothing enforces it. | Nested module for gamepool, broker and `lab/cmd/dzbroker`; archtest on `require`. (H) |
+| Repo map is incomplete | About 57 of 122 packages are missing, including all of `lab/oracle/compliance/*`, `azmcts`, `spellbench/*`, the ManaBrew packages and the `rules` sub-packages. | Generate it from `go list` doc strings. (H) |
 | Stale limits in docs | `cmd/testbudget`'s doc still says 2 GB / 2 vCPU (now 4 / 4); the invariants say only the host and CLIs import `time`, but the archtest allowlist has 22 entries. | Correct the text. (H) |
 
 ## Parked or concluded programmes
@@ -40,10 +40,10 @@ not a commitment: each item is decided on its own.
 |---|---|---|
 | `internal/hindsight` + `cmd/hindsight` (~1.1k lines) | Last substantive change 2026-09-24 recorded a negative result; no Makefile or script references. | Done: deleted. |
 | SpellBench v2 (`spellbench/{v2agent,v2engine,v2shadow}`, `cmd/{sbagent,sbv2engine,sbv2local,sbv2shadow}`, ~11.5k) | Development continues on a separate branch; the commands on `main` are last touched 2026-09-28. Front end V now lives in `policynet/v2front`, so `gorged` no longer links `v2agent`. | Done: behind build tag `spellbench_bridge` (`make test-spellbench-bridge`). |
-| SpellBench v1 (`v1agent`, `kshadow`, `cmd/sbv1agent`, `cmd/kshadowcheck`, ~9.8k) | Last touched 2026-09-28; self-contained; the commands have no tests. | Done: behind build tag `spellbench_bridge`. |
+| SpellBench v1 (`v1agent`, `kshadow`, `lab/cmd/sbv1agent`, `lab/cmd/kshadowcheck`, ~9.8k) | Last touched 2026-09-28; self-contained; the commands have no tests. | Done: behind build tag `spellbench_bridge`. |
 | ManaBrew wire stack (~11k non-test) | Deprioritised, but both wires are kept as permanent; compiled into `gorged`; `cardfuzz` uses its mock client. | Keep; optionally tag the non-test code. (L) |
-| `cmd/exitloop` (1.1k) | Last touched 2026-09-29; the expert-iteration line it drives did not beat the heuristic bot. | Delete unless retraining is planned. (L) |
-| `cmd/dzgorge` + root `benchmark.md` | DraftZero-style self-play driver, still used by side experiments. | Keep the command; move the notes into `docs/`. (M) |
+| `lab/cmd/exitloop` (1.1k) | Last touched 2026-09-29; the expert-iteration line it drives did not beat the heuristic bot. | Delete unless retraining is planned. (L) |
+| `lab/cmd/dzgorge` + root `benchmark.md` | DraftZero-style self-play driver, still used by side experiments. | Keep the command; move the notes into `docs/`. (M) |
 
 ## Redundancy
 
@@ -51,19 +51,19 @@ not a commitment: each item is decided on its own.
 |---|---|---|
 | `patches/0001`–`0006` | 0001, 0002 and 0006 reverse-apply cleanly (already applied); 0005's file exists; 0003/0004 are obsolete; nothing references them. | Done: deleted. |
 | `bots/sbfirst`, `bots/sbuniform`, `bots/sbheuristic` | Identical 65-line wrappers from one commit. | Done: merged into `bots/sbbuiltin`. |
-| `bots` vs `internal/spellbench/registry` | Two policy registries. | Fold together, or make the second a thin decorator. (M) |
+| `bots` vs `lab/training/spellbench/registry` | Two policy registries. | Fold together, or make the second a thin decorator. (M) |
 | `botpolicy` vs `spellbench/builtins` heuristics | An intentional replication of an external benchmark's bots. | Keep; document why. (M) |
 | Four hidden-information search stacks (PIMC `searchprobe`+`searchseat`, PUCT `azmcts`, `spellbench/sbsearch`, `searchbench`; ~22k lines) | Overlapping functionality. | Decide survivors from [benchmark evidence](../performance/bots.md). (L) |
 | `kshadow` vs `v2shadow` | Both rebuild engine state from observations. | Keep at most one. (M) |
 | `policynet` features vs `mzenc` | Two state encoders; `mzenc` is used only for ablations and the GPU pool. | Decide after the ablation study. (L) |
-| Two "brokers" | `scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package is now `internal/inferbroker` (tag `broker`). |
+| Two "brokers" | `scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package is now `lab/training/inferbroker` (tag `broker`). |
 
 ## Legitimately unimported
 
 These have no importers by design and are **not** cleanup candidates:
 `internal/archtest`, `internal/corpusheap` and `internal/botobs` (test-only
-ratchets), `protocol/manabrew/internal/schemagen` (a generator), and
-`internal/gamepool` / `internal/inferbroker` (build-tag stubs).
+ratchets), `server/protocol/manabrew/internal/schemagen` (a generator), and
+`lab/training/gamepool` / `lab/training/inferbroker` (build-tag stubs).
 
 ## Commands with no Makefile or script reference
 

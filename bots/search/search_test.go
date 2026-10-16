@@ -5,19 +5,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	// the caretaker every search entry names (spec §3.1); Validate below
 	// refuses an entry whose caretaker is not a registered non-Env policy,
 	// so the caretaker must be linked into this test binary.
-	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/bot"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // delegate is a recording stand-in for *searchseat.SearchBot: it notes which
@@ -95,8 +96,8 @@ func TestHostedSearchEntryIsRegistered(t *testing.T) {
 	if _, ok := s.(bots.EnvSeat); !ok {
 		t.Error("the built seat does not implement bots.EnvSeat: the host would never build an Env for it")
 	}
-	if _, ok := s.(seat.BoardSeat); !ok {
-		t.Error("the built seat does not implement seat.BoardSeat: non-Env decisions would pay a View projection")
+	if _, ok := s.(heuristic.BoardSeat); !ok {
+		t.Error("the built seat does not implement heuristic.BoardSeat: non-Env decisions would pay a View projection")
 	}
 }
 

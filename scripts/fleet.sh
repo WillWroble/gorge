@@ -167,14 +167,14 @@ port_owner() {
 }
 
 lane_for() {
-	# The SHARED arm MUST come first: rules/heads_test.go and the goldens in
-	# rules/testdata/heads/ are owned by both threads and would otherwise be
-	# swallowed by the rules/* pattern in the engine arm. Order in a case
+	# The SHARED arm MUST come first: engine/rules/heads_test.go and the goldens in
+	# engine/rules/testdata/heads/ are owned by both threads and would otherwise be
+	# swallowed by the engine/rules/* pattern in the engine arm. Order in a case
 	# statement is the whole classification.
 	case "$1" in
-		Makefile|AGENTS.md|go.mod|go.sum|rules/heads_test.go|rules/testdata/heads/*|rules/acceptance_test.go) echo SHARED ;;
-		rules/*|effects/*|state/*|events/*|cards/*|decision/*|view/*|replay/*|protocol/*|host/*|web/*|cmd/gorged/*|cmd/gentypes/*|scripts/*|.githooks/*) echo engine ;;
-		botpolicy/*|seat/*|cmd/botbench/*|internal/testutil/*|distill/*) echo distill ;;
+		Makefile|AGENTS.md|go.mod|go.sum|engine/rules/heads_test.go|engine/rules/testdata/heads/*|engine/rules/acceptance_test.go) echo SHARED ;;
+		engine/rules/*|engine/effects/*|engine/state/*|engine/events/*|engine/cards/*|engine/decision/*|engine/view/*|engine/replay/*|server/protocol/*|server/host/*|web/*|cmd/gorged/*|cmd/gentypes/*|scripts/*|.githooks/*) echo engine ;;
+		bots/botpolicy/*|engine/seat/*|lab/cmd/botbench/*|internal/testutil/*|distill/*) echo distill ;;
 		*) echo unclaimed ;;
 	esac
 }

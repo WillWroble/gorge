@@ -39,7 +39,7 @@ func TestEquivalentReportWithMismatchingRouteIsFinding(t *testing.T) {
 func TestEquivalentReportWithHorizonPanicIsFinding(t *testing.T) {
 	report := &paymirror.Report{Card: "Ad Nauseam", Routes: []paymirror.RouteResult{
 		{Route: paymirror.RouteFloat, Status: paymirror.Equivalent, Resolved: "skipped:panic:livelock",
-			HorizonPanic: "both: livelock detected\n  at rules.(*livelockWatcher).abort rules/livelock.go:363"},
+			HorizonPanic: "both: livelock detected\n  at rules.(*livelockWatcher).abort engine/rules/livelock.go:363"},
 	}}
 	if status, _ := report.Verdict(); status != paymirror.Equivalent {
 		t.Fatalf("fixture verdict = %s, want equivalent", status)

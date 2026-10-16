@@ -108,7 +108,7 @@
 //	                                   events shift by the manual route's extra decisions
 //	pending                            compared by (2.) with Seq-bound identities masked
 //	derivedMemo*, charsWalk (the       per-walk Derived memo and scratch, keyed by an epoch
-//	rules/chars layer-walk scratch),   that advances with every ask; Clone copies none
+//	engine/rules/chars layer-walk scratch),   that advances with every ask; Clone copies none
 //	boardStaticsCache,
 //	activeStaticsCache, mayPlaysCache,
 //	combatStatics
@@ -176,7 +176,7 @@
 //	                                   route re-prices offers against a hypothetical floating
 //	                                   pool the control route never opens, so it counts the
 //	                                   route's work, not the game
-//	ManaAbilityHook, PaymentStats      harness-only observers (rules/clone.go): Clone copies
+//	ManaAbilityHook, PaymentStats      harness-only observers (engine/rules/clone.go): Clone copies
 //	                                   neither, and cmd/cardfuzz installs the hook on its live
 //	                                   run A, so the control would read "<func> vs nil"
 //	derivedSeq, derivedPrev*,          the Derived memo's cross-walk key and active()'s double

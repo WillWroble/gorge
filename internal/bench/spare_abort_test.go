@@ -10,11 +10,13 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // TestSparePoolDropsEngineBugAbort pins that PlayGameRecycled does not recycle
@@ -33,7 +35,7 @@ func TestSparePoolDropsEngineBugAbort(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	pd, decks := sparePair(t, reg)
 	seats := func(seed uint64) []seat.Seat {
-		return []seat.Seat{seat.NewBot(seed ^ 1), seat.NewBot(seed ^ 2)}
+		return []seat.Seat{heuristic.NewBot(seed ^ 1), heuristic.NewBot(seed ^ 2)}
 	}
 	cfg := func(seed uint64) rules.Config {
 		return rules.Config{

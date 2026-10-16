@@ -2,7 +2,7 @@
 """ratchets-only-fall: a branch may lower a shrink-only ratchet, never raise one.
 
 The ratchets (internal/codeshape, internal/archtest, internal/testutil's
-agentsdoc_test.go, rules/testdata/known-unsupported/) are tests in the
+agentsdoc_test.go, engine/rules/testdata/known-unsupported/) are tests in the
 branch's own tree, so a branch that raises a constant passes its own tests.
 This gate compares the branch against merge-base(<base>, HEAD) and fails when
 the branch:
@@ -14,7 +14,7 @@ the branch:
       (and, the mirror image, removes an entry from a deny-list collection);
   (d) removes or rewires a ratchet row of TestCodeShapeOnlyShrinks, or drops
       the comparison that makes a ratchet fail;
-  (e) adds a file under rules/testdata/known-unsupported/;
+  (e) adds a file under engine/rules/testdata/known-unsupported/;
   (f) edits scripts/ratchet_gate.py itself;
   (g) adds a key to, or raises a value of, longFuncCeilings.
 
@@ -39,7 +39,7 @@ import sys
 import tempfile
 
 GATE_PATH = "scripts/ratchet_gate.py"
-KNOWN_UNSUPPORTED = "rules/testdata/known-unsupported/"
+KNOWN_UNSUPPORTED = "engine/rules/testdata/known-unsupported/"
 RATCHET_TEST = "internal/codeshape/ratchet_test.go"
 
 
@@ -61,10 +61,10 @@ def watched(path: str) -> bool:
 #   allow-lists (an added entry loosens a guard):
 #     internal/archtest/arch_test.go       allowed := map[string]bool{ module + "/host": true, ... }
 #     internal/archtest/tape_owner_test.go allowed := map[string]string{ "(*Engine).entryPreview": "...", ... }
-#     internal/archtest/filename_test.go   var sizeOnlyFileNamesAllowed = map[string]bool{ "effects/misc.go": true, ... }
+#     internal/archtest/filename_test.go   var sizeOnlyFileNamesAllowed = map[string]bool{ "engine/effects/misc.go": true, ... }
 #     internal/archtest/layering*_test.go  var charsImports / payImports / paramsImports / resolveImports /
 #                                          costVocabularyImports / trigmatchImports / combatImports = map[string]bool{ module + "/cards": true, ... }
-#     internal/codeshape/codeshape.go      var CtxConstructorFiles = []string{"effects/ctx_new.go", ...}
+#     internal/codeshape/codeshape.go      var CtxConstructorFiles = []string{"engine/effects/ctx_new.go", ...}
 #
 #   deny-lists (a removed entry loosens a guard):
 #     internal/archtest/arch_test.go       forbidden := []struct{ from, to string }{ {module + "/effects", module + "/rules"}, ... }
@@ -463,14 +463,14 @@ const LongFuncLines = 300
 
 var ScannedDirs = []string{"rules", "effects"}
 
-var CtxConstructorFiles = []string{"effects/ctx_new.go", "rules/ctx_new.go"}
+var CtxConstructorFiles = []string{"engine/effects/ctx_new.go", "engine/rules/ctx_new.go"}
 
-var DrawFiles = []string{"effects/draw.go"}
+var DrawFiles = []string{"engine/effects/draw.go"}
 """,
     "internal/archtest/filename_test.go": """package archtest
 
 var sizeOnlyFileNamesAllowed = map[string]bool{
-	"effects/misc.go": true,
+	"engine/effects/misc.go": true,
 }
 
 func TestTime(t *testing.T) {
@@ -526,22 +526,22 @@ CASES = [
     ("(b) a constant moved to another watched file is kept", lambda t: (
         _sub("internal/archtest/filename_test.go", "const charsBoardMethods = 8\n", "")(t),
         _sub("internal/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 600\n\tcharsBoardMethods = 8")(t)), None),
-    ("(c) add to a package-level allow-list", _sub("internal/archtest/filename_test.go", '"effects/misc.go": true,', '"effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
-    ("(c) remove from a package-level allow-list", _sub("internal/archtest/filename_test.go", '\t"effects/misc.go": true,\n', ""), None),
+    ("(c) add to a package-level allow-list", _sub("internal/archtest/filename_test.go", '"engine/effects/misc.go": true,', '"engine/effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
+    ("(c) remove from a package-level allow-list", _sub("internal/archtest/filename_test.go", '\t"engine/effects/misc.go": true,\n', ""), None),
     ("(c) add to a local allow-list", _sub("internal/archtest/filename_test.go", 'module + "/host": true,', 'module + "/host": true,\n\t\tmodule + "/rules": true,'), "(c)"),
     ("(c) remove from a local allow-list", _sub("internal/archtest/filename_test.go", '\t\tmodule + "/host": true,\n', ""), None),
-    ("(c) add a codeshape exemption file", _sub("internal/codeshape/codeshape.go", '"rules/ctx_new.go"}', '"rules/ctx_new.go", "rules/more.go"}'), "(c)"),
-    ("(c) drop a codeshape exemption file", _sub("internal/codeshape/codeshape.go", ', "rules/ctx_new.go"}', "}"), None),
+    ("(c) add a codeshape exemption file", _sub("internal/codeshape/codeshape.go", '"engine/rules/ctx_new.go"}', '"engine/rules/ctx_new.go", "rules/more.go"}'), "(c)"),
+    ("(c) drop a codeshape exemption file", _sub("internal/codeshape/codeshape.go", ', "engine/rules/ctx_new.go"}', "}"), None),
     ("(c) drop a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"rules", "effects"}', '{"rules"}'), "(c)"),
     ("(c) add a scanned dir (deny-list)", _sub("internal/codeshape/codeshape.go", '{"rules", "effects"}', '{"rules", "effects", "cards"}'), None),
     ("(c) drop a forbidden edge", _sub("internal/archtest/filename_test.go", '\t\t{module + "/effects", module + "/rules"},\n', ""), "(c)"),
     ("(c) add a forbidden edge", _sub("internal/archtest/filename_test.go", '{module + "/effects", module + "/rules"},', '{module + "/effects", module + "/rules"},\n\t\t{module + "/view", module + "/rules"},'), None),
     ("(c) rename an allow-list to launder an entry", _sub("internal/archtest/filename_test.go",
-        'var sizeOnlyFileNamesAllowed = map[string]bool{\n\t"effects/misc.go": true,',
-        'var sizeOnlyNamesAllowed = map[string]bool{\n\t"effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
+        'var sizeOnlyFileNamesAllowed = map[string]bool{\n\t"engine/effects/misc.go": true,',
+        'var sizeOnlyNamesAllowed = map[string]bool{\n\t"engine/effects/misc.go": true,\n\t"rules/more.go": true,'), "(c)"),
     ("(c) a brand-new allow-list in a new file is fine", _add("internal/archtest/layering_new_test.go",
         'package archtest\n\nvar newImports = map[string]bool{\n\tmodule + "/cards": true,\n}\n'), None),
-    ("(c) an API's own Files list may move", _sub("internal/codeshape/codeshape.go", '"effects/draw.go"', '"effects/draw_resolve.go"'), None),
+    ("(c) an API's own Files list may move", _sub("internal/codeshape/codeshape.go", '"engine/effects/draw.go"', '"effects/draw_resolve.go"'), None),
     ("(d) remove a ratchet row", _sub(RATCHET_TEST, '\t\t{"engineMethodCount", m.EngineMethods, engineMethodCount, "advice"},\n', ""), "(d)"),
     ("(d) rewire a ratchet row's limit", _sub(RATCHET_TEST, "m.EngineMethods, engineMethodCount,", "m.EngineMethods, engineMethodCount + 50,"), "(d)"),
     ("(d) add a ratchet row", _sub(RATCHET_TEST, '"engineMethodCount", m.EngineMethods, engineMethodCount, "advice"},',

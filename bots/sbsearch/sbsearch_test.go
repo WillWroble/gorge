@@ -2,7 +2,7 @@ package sbsearch
 
 // BP-14 (spec 2026-09-28-hosted-bot-packages §11): the sb-search-lite-atk
 // adapter's own gate. The host-level rows for the entry live in
-// host/hosted_policies_test.go (determinism, leak); this file covers the
+// server/host/hosted_policies_test.go (determinism, leak); this file covers the
 // adapter's contract:
 //
 //   - the registry entry is linked, declares Env+Search with the bot
@@ -26,18 +26,20 @@ import (
 	"context"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	gsearch "github.com/adams-shaun/gorge/internal/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	gsearch "github.com/adams-shaun/gorge/bots/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
 )
 
 // sampleRegistry builds a cards registry over testutil.SampleDecks' inline
@@ -106,8 +108,8 @@ func TestSBSearchRegistryEntryIsRegisteredAndRefusesZeroDeps(t *testing.T) {
 	if !pc.WantsPaymentActions() {
 		t.Fatalf("%s WantsPaymentActions() = false; the inner AutoPay sb-tactical reads the host's plans", Policy)
 	}
-	if _, ok := s.(seat.BoardSeat); ok {
-		t.Fatalf("%s implements seat.BoardSeat; §5.1 keeps this adapter on the plain View path (the fallback is the inner tactical on env.View)", Policy)
+	if _, ok := s.(heuristic.BoardSeat); ok {
+		t.Fatalf("%s implements heuristic.BoardSeat; §5.1 keeps this adapter on the plain View path (the fallback is the inner tactical on env.View)", Policy)
 	}
 }
 
@@ -166,7 +168,7 @@ func TestSBSearchHostedIsTheLiteAtkRow(t *testing.T) {
 func driveToPriority(t *testing.T, cfg rules.Config) (*rules.Engine, *decision.Decision, view.View) {
 	t.Helper()
 	e := rules.New(cfg)
-	bot := seat.NewBot(1)
+	bot := heuristic.NewBot(1)
 	ctx := context.Background()
 	for step := 0; step < 4000; step++ {
 		e.Advance()
@@ -239,7 +241,7 @@ func TestSBSearchFallbackIsTheInnerTacticalOnTheView(t *testing.T) {
 		if found {
 			break
 		}
-		in, err := seat.NewBot(1).Decide(context.Background(), view.Project(e.G, e, d.Player, d), *d)
+		in, err := heuristic.NewBot(1).Decide(context.Background(), view.Project(e.G, e, d.Player, d), *d)
 		if err != nil {
 			t.Fatalf("advance: %v", err)
 		}

@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/eventhost"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/lab/draft/eventhost"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // eventhost.Host already satisfies the /api/events backend interface; the

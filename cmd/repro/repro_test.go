@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/view"
 )
 
 // fixtureRel is the committed fixture's path from this package's directory
@@ -425,7 +425,7 @@ func TestReproEmitTestSkeletonCompilesAndFailsOnTODO(t *testing.T) {
 
 // TestReproEmitTestIntoRulesCompilesAndFailsOnTODO probes the NATURAL
 // emit-test target: an ENGINE package (the reported behaviour lives in
-// rules/), where an internal-package skeleton would form
+// engine/rules/), where an internal-package skeleton would form
 // rules -> feedback -> rules — an import cycle the go toolchain refuses at
 // setup. The skeleton is the external test package, so emitting into a
 // rules-shaped engine target must compile and fail only on the TODO.
@@ -433,8 +433,8 @@ func TestReproEmitTestSkeletonCompilesAndFailsOnTODO(t *testing.T) {
 // The target is a runtime CLONE of the rules package (its non-test sources
 // copied verbatim into an emitScratch directory, so the package is still
 // named rules and every import stays inside the module), not the
-// real rules/ directory. Writing the skeleton into the real rules dir made
-// this probe a hazard to every other build of ./rules: a gate process
+// real engine/rules/ directory. Writing the skeleton into the real rules dir made
+// this probe a hazard to every other build of ./engine/rules: a gate process
 // killed between emit and cleanup left the skeleton (and its snapshot)
 // behind, and the next module gate's probe then refused to emit ("already
 // exists; not overwriting" -> exit 2 with a discarded stderr) while its
@@ -461,12 +461,12 @@ func TestReproEmitTestIntoRulesCompilesAndFailsOnTODO(t *testing.T) {
 	if err != nil {
 		t.Fatalf("go list feedback imports: %v\n%s", err, depsOut)
 	}
-	if !strings.Contains(string(depsOut), "github.com/adams-shaun/gorge/rules") {
+	if !strings.Contains(string(depsOut), "github.com/adams-shaun/gorge/engine/rules") {
 		t.Fatalf("premise lost: internal/testutil/feedback no longer imports the rules package:\n%s", depsOut)
 	}
 
 	target, rel := emitScratch(t, root, "zzrepro-emitrules", "")
-	ents, err := os.ReadDir(filepath.Join(root, "rules"))
+	ents, err := os.ReadDir(filepath.Join(root, "engine", "rules"))
 	if err != nil {
 		t.Fatal(err)
 	}

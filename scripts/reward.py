@@ -89,7 +89,7 @@ METRICS: tuple[MetricSpec, ...] = (
     # Stewardship: the recurring tax each landed change leaves on every future
     # iteration. Gate wall time is paid by every ticket that ever lands again;
     # the agent context is paid by every seat on every turn (it was 290 KB here
-    # once); a function over 300 lines (cmd/codeshape, rules/ + effects/) is a
+    # once); a function over 300 lines (cmd/codeshape, engine/rules/ + engine/effects/) is a
     # concern with no seam, paid by every ticket that has to edit inside it.
     # All three are levels, not events, so the loop is paid for driving them
     # DOWN and charged for letting them grow.

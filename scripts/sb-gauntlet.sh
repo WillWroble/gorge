@@ -5,7 +5,7 @@
 # usage: scripts/sb-gauntlet.sh <spec>[,<spec>...] [pairs] [decks] [catalog]
 #
 #   specs   comma list of candidate policy specs, each a registry spec
-#           (internal/spellbench/registry): "bot", "sb-heuristic",
+#           (lab/training/spellbench/registry): "bot", "sb-heuristic",
 #           "bot+passguard", "bot+dec1+dec2", ... Every candidate plays
 #           every reference; a candidate that IS a reference is skipped
 #           with a note.
@@ -33,7 +33,7 @@
 # once, among the references alone, and cached under
 # /mnt/sata/gorge-training/spellbench-work/gauntlet/ref/<key>/ where <key>
 # is the SHA-256 of the `git rev-parse HEAD:<path>` tree hashes of
-# rules effects cards decision botpolicy internal/spellbench cmd/botbench
+# rules effects cards decision botpolicy lab/training/spellbench lab/cmd/botbench
 # plus the pairs and decks values -- so any engine or policy change
 # invalidates the cache and replays the references.
 #
@@ -160,14 +160,14 @@ BOTLIST=$(IFS=,; echo "${BOTS[*]}")
 REFLIST=$(IFS=,; echo "${REFS[*]}")
 
 # Build the binary the runs share (one build, many games).
-(cd "$ROOT" && go build -o "$WORK/botbench" ./cmd/botbench)
+(cd "$ROOT" && go build -o "$WORK/botbench" ./lab/cmd/botbench)
 
 # The cache key: HEAD tree hashes of everything that can change an outcome,
 # plus the shape of the schedule. The champions file's CONTENT is part of
 # the key too: with a ref cache already on disk, a new champion line must
 # get its own ref-vs-ref games, not ride a cache built without it.
 keysrc=""
-for p in rules effects cards decision botpolicy internal/spellbench cmd/botbench; do
+for p in rules effects cards decision botpolicy lab/training/spellbench lab/cmd/botbench; do
 	keysrc+="$(git -C "$ROOT" rev-parse "HEAD:$p")
 "
 done
@@ -202,7 +202,7 @@ sed 's/"game_id":"m/"game_id":"ref-m/g' "$CACHE/matches.jsonl" >"$WORK/ratedref/
 
 # Each candidate plays the matchups that include it, full-schedule seeds and
 # indices kept. The candidate's own ledger is written UNDER the gauntlet root
-# (not the scratch dir) so it survives the EXIT trap: cmd/traindash walks the
+# (not the scratch dir) so it survives the EXIT trap: lab/cmd/traindash walks the
 # root for any matches.jsonl, so a kept candidate dir renders a per-deck chart
 # with no schema change and no new games. <git_head> keeps two heads' runs from
 # overwriting one another; the spec segment is sanitised in case it holds a

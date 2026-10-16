@@ -69,7 +69,7 @@ fi
 # that looks like success, so it ends by proving the corpus is reachable
 # rather than by reporting that it made a symlink.
 say "verifying the corpus is reachable (the skip this script exists to prevent)..."
-out=$(cd "$WT" && GOMEMLIMIT=5GiB go test -p=2 ./rules/ -run 'TestHeads' -v 2>&1 || true)
+out=$(cd "$WT" && GOMEMLIMIT=5GiB go test -p=2 ./engine/rules/ -run 'TestHeads' -v 2>&1 || true)
 if grep -q 'no .cards/ corpus present' <<<"$out"; then
 	die "corpus STILL not reachable — tests would skip and read as green. Fix before dispatching."
 fi

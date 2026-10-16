@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adams-shaun/gorge/limited/setdata"
+	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
 )
 
 // artCache serves card art from this server's own origin instead of sending
@@ -1186,7 +1186,7 @@ func prewarmArt(ctx context.Context, ac *artCache, dir string, logf func(string,
 }
 
 // prewarmSetArt fills the cache for every card on every sheet of every
-// embedded draft set (limited/setdata), after the deck prewarm. No deck file
+// embedded draft set (lab/draft/limited/setdata), after the deck prewarm. No deck file
 // names most of a set's cards, so without it a draft pack is the first
 // request for its art, the client's wait budget expires on a burst of cold
 // names, and a fresh pack renders blank until those fetches settle.

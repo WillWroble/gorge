@@ -6,8 +6,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/manabrew/mbtest"
 	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/server/manabrew/mbtest"
 )
 
 // TestManabrewLanePlaysCleanAndStampsRecords plays a cardfuzz game through

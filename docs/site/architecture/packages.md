@@ -42,8 +42,8 @@ go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 |---|---|---|
 | `web/` (462 files) | Svelte+Vite client (~68k LOC) | SUPP |
 | `scripts/` (101) | worktree/fleet/postmerge/ratchet/broker/heavy/reward/oracle/enginebench/spellbench-arena | TOOL (spellbench-arena EXT) |
-| `tools/xmageoracle/` | Java XMage replay driver | TOOL |
-| `validation/oracle/` | verdict refresh runbook | TOOL |
+| `lab/oracle/xmageoracle/` | Java XMage replay driver | TOOL |
+| `lab/oracle/validation/oracle/` | verdict refresh runbook | TOOL |
 | `orchestrator/` | `hooks.py` merge-gate hooks for the CI-style landing pipeline | TOOL (live) |
 | `deploy/` | systemd units | TOOL |
 | `docs/` (167) | specs, plans, reports, agent guide | SUPP |

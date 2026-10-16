@@ -3,8 +3,8 @@ package paymirror
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // TestPreferLiftedFlagsATapsForManaExtraWheel pins the trigger that widens

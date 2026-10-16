@@ -6,12 +6,13 @@ import (
 	"math/rand/v2"
 	"sort"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // GameSpec is one driver game: the engine seed (also the root of every
@@ -157,13 +158,13 @@ func (d *Decks) config(spec GameSpec) (rules.Config, error) {
 }
 
 // botFor builds seat i's auto-pay bot for the spec.
-func botFor(spec GameSpec, i int) *seat.Bot {
+func botFor(spec GameSpec, i int) *heuristic.Bot {
 	s := spec.Seed*1000003 + uint64(i)
-	var b *seat.Bot
+	var b *heuristic.Bot
 	if spec.Policy == "lethal" {
-		b = seat.NewLethalPressureBot(s)
+		b = heuristic.NewLethalPressureBot(s)
 	} else {
-		b = seat.NewBot(s)
+		b = heuristic.NewBot(s)
 	}
 	return b.EnableAutoPayMana()
 }
@@ -196,7 +197,7 @@ func PlayConfig(cfg rules.Config, spec GameSpec, opt DriverOptions) (res GameRes
 	res.Spec = spec
 
 	e := rules.NewStartingPlayerChoice(cfg)
-	bots := make([]*seat.Bot, len(cfg.Names))
+	bots := make([]*heuristic.Bot, len(cfg.Names))
 	for i := range bots {
 		bots[i] = botFor(spec, i)
 	}

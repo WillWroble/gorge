@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/protocol"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
 // TestEventsBotOnlyBo3PodCompletesOverHTTP drives a whole all-bot best-of-3

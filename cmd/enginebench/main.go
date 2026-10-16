@@ -11,11 +11,11 @@
 //
 // Compatibility: the harness uses only APIs that exist at a4af596 (the pin
 // docs/015 measured) and at today's main: rules.New/Advance/Pending/Submit/
-// Clone, decision.Decision/Intent, seat.NewBot(+EnableAutoPayMana),
-// botpolicy.BoardFromGameInto, internal/bench.PlayGame, internal/searchseat
+// Clone, decision.Decision/Intent, heuristic.NewBot(+EnableAutoPayMana),
+// botpolicy.BoardFromGameInto, internal/bench.PlayGame, bots/searchseat
 // (Feed, NewSearchBot, Watch) and testutil.OpenCorpusRegistry. The azmcts
 // row lives behind the build tag enginebench_az (az.go), because
-// internal/azmcts does not exist at a4af596; built without the tag, -row az
+// bots/azmcts does not exist at a4af596; built without the tag, -row az
 // reports "unavailable".
 //
 // The wall clock is read only to report elapsed time; no game, decision or
@@ -42,7 +42,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/adams-shaun/gorge/rules/resolve"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
 )
 
 type result struct {

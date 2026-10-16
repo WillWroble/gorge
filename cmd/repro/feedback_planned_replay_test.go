@@ -14,12 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/host"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 // TestPaymentPlanAuditFeedbackCaptureReplaysPlannedIntents replays a planned
@@ -42,7 +44,7 @@ func TestPaymentPlanAuditFeedbackCaptureReplaysPlannedIntents(t *testing.T) {
 	r, err := host.New(host.Options{
 		LoadDeck: load, Tokens: reg.Tokens, NameUniverse: reg.Universe(),
 		Seats: func(_ []string, seed uint64) []seat.Seat {
-			return []seat.Seat{seat.NewBot(seed ^ 1).EnableAutoPayMana(), seat.NewBot(seed ^ 2).EnableAutoPayMana()}
+			return []seat.Seat{heuristic.NewBot(seed ^ 1).EnableAutoPayMana(), heuristic.NewBot(seed ^ 2).EnableAutoPayMana()}
 		},
 		Sleep: func(time.Duration, <-chan struct{}) {},
 	})

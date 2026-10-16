@@ -41,7 +41,7 @@ build_bin() {
 	if [ "$rev" = "." ]; then
 		lbl="wt-$(git rev-parse --short=12 HEAD)"
 		out="$bindir/botbench-$lbl"
-		(cd "$repo" && go build -o "$out" ./cmd/botbench) || return 1
+		(cd "$repo" && go build -o "$out" ./lab/cmd/botbench) || return 1
 		printf '%s\n' "$out"
 		return
 	fi
@@ -55,7 +55,7 @@ build_bin() {
 			git archive "$sha" | tar -x -C "$src.tmp"
 			mv "$src.tmp" "$src"
 		fi
-		(cd "$src" && go build -o "$out" ./cmd/botbench) || return 1
+		(cd "$src" && go build -o "$out" ./lab/cmd/botbench) || return 1
 	fi
 	printf '%s\n' "$out"
 }

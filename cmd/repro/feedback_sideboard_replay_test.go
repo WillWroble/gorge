@@ -14,13 +14,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/host"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 const sideboardReplayDeck = "the-epic-storm"
@@ -59,12 +61,12 @@ func TestReproSideboardCaptureReplaysWithSideboards(t *testing.T) {
 		}
 		return d, nil
 	}
-	gate := &gateSeat{bot: seat.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
+	gate := &gateSeat{bot: heuristic.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
 	r, err := host.New(host.Options{
 		LoadDeck: load,
 		Tokens:   reg.Tokens,
 		Seats: func(seatNames []string, seed uint64) []seat.Seat {
-			return []seat.Seat{gate, seat.NewBot(seed ^ 2)}
+			return []seat.Seat{gate, heuristic.NewBot(seed ^ 2)}
 		},
 		Sleep: func(time.Duration, <-chan struct{}) {},
 	})

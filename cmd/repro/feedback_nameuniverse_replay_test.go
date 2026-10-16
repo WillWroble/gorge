@@ -25,14 +25,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/host"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/internal/testutil/feedback"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 // nameUniverseDeckCards builds the deck the table below plays: Pithing
@@ -64,7 +66,7 @@ func nameUniverseDeckCards(t *testing.T, reg *cards.Registry) []*cards.Card {
 }
 
 // nameChoices counts the name elections a log recorded: the Choose events
-// rules/cast.go emits with Counter "name" for an ETB name ask. It is the
+// engine/rules/cast.go emits with Counter "name" for an ETB name ask. It is the
 // precondition every assertion below rests on — with none, a replay that
 // lost the universe would succeed by accident and the test would prove
 // nothing.
@@ -112,7 +114,7 @@ func TestFeedbackSnapshotReplaysAUniverseBackedMatch(t *testing.T) {
 		Tokens:       reg.Tokens,
 		NameUniverse: reg.Universe(),
 		Seats: func(seatNames []string, seed uint64) []seat.Seat {
-			return []seat.Seat{seat.NewBot(seed ^ 1), seat.NewBot(seed ^ 2)}
+			return []seat.Seat{heuristic.NewBot(seed ^ 1), heuristic.NewBot(seed ^ 2)}
 		},
 		Sleep: func(time.Duration, <-chan struct{}) {},
 	})

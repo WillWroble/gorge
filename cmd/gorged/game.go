@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // createGame returns the Options.CreateGame closure gorged arms so the
@@ -85,7 +85,7 @@ func (c config) createGame(r *host.Registry, gate *seatGate, cmdPool, conPool []
 		// pick and the reserved-pool picker above, whose reservedPick hit
 		// would otherwise name az-c3 here. A closed-list policy (az-c4,
 		// bots.Info.ClosedLists) does not read decklists and passes; the
-		// host checks its seats at match start (host/closedlist.go).
+		// host checks its seats at match start (server/host/closedlist.go).
 		if bots.ReadsDecklists(policy) {
 			return httpapi.CreateGameResponse{}, fmt.Errorf("bot policy %q reads opponents' decklists and cannot play at a table with a human", policy)
 		}

@@ -1119,7 +1119,7 @@ def validated_set(repo: Path) -> tuple[int, int, int]:
                         n = e.get("name") or e.get("card")
                         if n:
                             names.add(str(n))
-    # Both ratchets are one file per card since W2 (rules/testdata/...).
+    # Both ratchets are one file per card since W2 (engine/rules/testdata/...).
     gaps = _ratchet_files(repo / "rules" / "testdata" / "known-unsupported")
     pgaps = _ratchet_files(repo / "rules" / "testdata" / "paramcensus")
     return len(names), gaps, pgaps
@@ -1517,8 +1517,8 @@ def selftest() -> int:
             "string_param_reads": 2142,
             "string_case_literals": 2886,
             "long_funcs": [
-                {"name": "effEffect", "file": "effects/misc.go", "line": 219, "lines": 1200},
-                {"name": "(*Engine).cloneWith", "file": "rules/clone.go", "line": 103, "lines": 970},
+                {"name": "effEffect", "file": "engine/effects/misc.go", "line": 219, "lines": 1200},
+                {"name": "(*Engine).cloneWith", "file": "engine/rules/clone.go", "line": 103, "lines": 970},
             ],
         }
         stw = [json.loads(r) for r in collect_steward(repo, shape=shape)]
@@ -1529,7 +1529,7 @@ def selftest() -> int:
         lf = next((r for r in stw if r["metric"] == "funcs_over_300"), None)
         check("funcs_over_300 carries codeshape's count", lf is not None and lf["value"] == 2, lf)
         check("funcs_over_300's note leads with the longest function",
-              lf is not None and lf["note"].startswith("effects/misc.go:219 effEffect(1200); "), lf)
+              lf is not None and lf["note"].startswith("engine/effects/misc.go:219 effEffect(1200); "), lf)
         check("funcs_over_300's note carries every ratchet",
               lf is not None and all(f"{k}={shape[k]}" in lf["note"] for k in CODESHAPE_RATCHETS), lf)
         # A checkout without cmd/codeshape (older main, a bare fixture) records

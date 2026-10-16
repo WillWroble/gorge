@@ -7,10 +7,10 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/internal/gonet"
-	"github.com/adams-shaun/gorge/internal/policynet"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/bots/gonet"
+	"github.com/adams-shaun/gorge/bots/policynet"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 // Hosted is one hosted az policy: the az-redeal search seat over one .dzgw
@@ -38,7 +38,7 @@ type HostedSpec struct {
 	// refuses to build a seat without one. Info must then declare
 	// ClosedLists, which lets the host seat it against a human -- and the
 	// host checks every seat it builds rather than trusting the declaration
-	// (host/closedlist.go).
+	// (server/host/closedlist.go).
 	Closed bool
 }
 

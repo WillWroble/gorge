@@ -10,27 +10,27 @@ is the only backstop.
 ### 1. Dependency direction
 
 ```
-cards → state → decision → events → effects → botpolicy → rules → view → seat → replay → protocol → host → host/httpapi → cmd/*
+cards → state → decision → events → effects → botpolicy → rules → view → seat → replay → protocol → host → server/host/httpapi → cmd/*
 ```
 
 A package imports only packages to its left. `deck` sits beside the chain: it
 imports `cards` only and is imported by `rules`, `host` and the test fixtures.
-`seat` also imports `internal/policynet`. That is the measured import graph
+`seat` also imports `bots/policynet`. That is the measured import graph
 (`go list`, 2026-09-28). The enforced contract is the set of edges that must
 never appear: `effects` never imports `rules` (effects reaches the engine only
 through `effects.Host`). `view`, `protocol` and `deck` never import `rules`.
-`botpolicy` never imports `view`, `rules` or `seat`. `host`, `host/httpapi`
+`botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
 and `cmd/gorged` never import `internal/testutil`. Inside the engine, the
 lasagna packages (spec `2026-10-03-rules-engine-lasagna-design.md` §3) are
-pinned as they land: `rules/cost`, the cost vocabulary leaf, imports only
+pinned as they land: `engine/rules/cost`, the cost vocabulary leaf, imports only
 `state` (`TestCostVocabularyIsALeaf`) and never `rules`, `effects` or a rules
-subsystem package. `rules/combat`, attack/block legality, imports only
+subsystem package. `engine/rules/combat`, attack/block legality, imports only
 `cards`, `state`, `events` and `effects` (`TestCombatImportsStayBelowRules`)
 and reads the game through `combat.Board`, whose method count only shrinks
-(`TestCombatBoardOnlyShrinks`). `rules/trigmatch`, the L5 trigger matchers,
+(`TestCombatBoardOnlyShrinks`). `engine/rules/trigmatch`, the L5 trigger matchers,
 reads the engine only through `trigmatch.Board`, imports only `cards`, `state`,
-`events`, `effects` and `rules/cost` (`TestTrigmatchImportsStayBelowL5`) and
-never `rules` or a sibling L5/L6 package. `rules/chars`, the CR 613 layer
+`events`, `effects` and `engine/rules/cost` (`TestTrigmatchImportsStayBelowL5`) and
+never `rules` or a sibling L5/L6 package. `engine/rules/chars`, the CR 613 layer
 walk, imports only `cards`, `state` and `effects` and never `rules` or an L5
 subsystem package (`TestCharsImportsStayBelowRules`), and reads the game
 through `chars.Board`, whose method count only shrinks
@@ -63,15 +63,15 @@ The engine is a pure function of `(Config, intents)`.
   map in `internal/archtest/arch_test.go` (`TestTimeIsImportedOnlyByTheHost`),
   not this page. It holds four classes, each argued in that test's doc
   comment:
-  - the host/server tier: `host`, `host/httpapi`, `host/manabrewhttp`,
+  - the host/server tier: `host`, `server/host/httpapi`, `server/host/manabrewhttp`,
     `cmd/gorged` (injected sleep, SSE keep-alive, write and shutdown
     deadlines);
   - measurement and developer CLIs that read the clock only to bound a run or
-    report elapsed time (`cmd/botbench`, `cmd/enginebench`, `cmd/searchbench`,
-    `cmd/cardfuzz`, `cmd/paymirror`, `cmd/ledger`, `cmd/traindash`, the
+    report elapsed time (`lab/cmd/botbench`, `cmd/enginebench`, `lab/cmd/searchbench`,
+    `cmd/cardfuzz`, `cmd/paymirror`, `cmd/ledger`, `lab/cmd/traindash`, the
     search/SpellBench agents and probes, and similar);
   - a few batching/scheduling libraries whose timers decide only WHEN work is
-    flushed, never what a game sees: `internal/gamepool` and the
+    flushed, never what a game sees: `lab/training/gamepool` and the
     inference-batching decision broker;
   - nothing in the engine, card pipeline, effects, view or bot policies.
 
@@ -79,7 +79,7 @@ The engine is a pure function of `(Config, intents)`.
   (`searchseat.Millis`, `sbsearch.Millis`, `azmcts.Millis`, installed by the
   CLI).
 - No ambient randomness. Use `math/rand/v2` with a seeded source; the engine
-  has one seeded PCG with a draw counter (`rules/rng.go`). A bot's rng is
+  has one seeded PCG with a draw counter (`engine/rules/rng.go`). A bot's rng is
   seeded from `(match seed, seat)`.
 - No `map` range whose order can reach an event, a decision's option order, a
   trace, or a checkpoint. Sort keys, or use dense slices or bitsets.
@@ -105,7 +105,7 @@ clock.
 - `events.Kind` is **append-only**. Add a new kind after the last constant,
   never in between: inserting one renumbers the ordinals, which moves the hash
   chain and invalidates every recorded log. Each kind needs one entry in
-  `events/kindinfo.go`'s `kindInfo` table (name, trigger class, optional
+  `engine/events/kindinfo.go`'s `kindInfo` table (name, trigger class, optional
   Describe template); names, rules' trigger interest and the template
   transcript lines all derive from it.
 - `decision.Kind` is a **closed set** (`decision.Kinds`). Every seat, bot, the
@@ -113,9 +113,9 @@ clock.
   it is an option on every priority decision.
 
 **Enforced by:**
-- `events/kindinfo_test.go` `TestEveryKindHasADescriptor`.
-- `rules/trigger_eligibility_test.go`.
-- `decision/decision_test.go` `TestKindsListsEveryKindOnce`.
+- `engine/events/kindinfo_test.go` `TestEveryKindHasADescriptor`.
+- `engine/rules/trigger_eligibility_test.go`.
+- `engine/decision/decision_test.go` `TestKindsListsEveryKindOnce`.
 - Golden replays.
 
 **To change:** a new decision kind needs an operator decision and a spec.
@@ -138,9 +138,9 @@ bot that cheats is a product bug.
 **Enforced by:**
 - `TestNoExportLeaksAnEngineGame`.
 - The view redaction tests.
-- The closed hosted-policy vocabulary in `host/bot_policy.go`.
-- On `spellbench-prep`: an archtest rule that forbids `host`, `host/httpapi`
-  and `cmd/gorged` from importing `internal/azmcts`, and
+- The closed hosted-policy vocabulary in `server/host/bot_policy.go`.
+- On `spellbench-prep`: an archtest rule that forbids `host`, `server/host/httpapi`
+  and `cmd/gorged` from importing `bots/azmcts`, and
   `azmcts.ErrClairvoyantRefused` unless `AllowClairvoyant()` was called.
 
 ### 6. Licensing boundary
@@ -157,21 +157,21 @@ pasted script lines in docs or tests.
 - Feedback fixtures strip token text into the gitignored
   `cmd/repro/testdata/.tokens/`.
 
-**Enforced by:** `cards/boundary_test.go` `TestNoForgeScriptsTracked`, which
+**Enforced by:** `engine/cards/boundary_test.go` `TestNoForgeScriptsTracked`, which
 checks the worktree, the index and HEAD.
 
 ### 7. No cgo, no third-party dependencies
 
 The root `go.mod` has no `require` lines and the root `go.sum` is empty or
 absent. The card pipeline, the rules core and the learned-policy stack
-(`internal/policynet`: hand-derived gradients, no autodiff) are pure Go. The
+(`bots/policynet`: hand-derived gradients, no autodiff) are pure Go. The
 engine must also build for 32-bit, so it cannot depend on packed 64-bit ints.
 
 An experiment that genuinely needs a third-party module goes in its own nested
 module that imports the root through a `replace`, never the other way round:
-`experimental/gamepool` (the tag-gated GPU scorer and the `gamepool` command)
+`lab/training/experimental/gamepool` (the tag-gated GPU scorer and the `gamepool` command)
 requires purego for its CUDA binding; the pool scheduler it drives stays in
-the root's `internal/gamepool`.
+the root's `lab/training/gamepool`.
 
 **Enforced by:**
 - `internal/archtest` `TestRootModuleHasNoRequires` (parses the root `go.mod`
@@ -184,10 +184,10 @@ the root's `internal/gamepool`.
 
 Several tables fail both ways:
 
-- `knownUnsupported`, one file per card in `rules/testdata/known-unsupported/`
+- `knownUnsupported`, one file per card in `engine/rules/testdata/known-unsupported/`
   (every repo deck is fully supported except the listed cards).
-- `knownUnsupportedParams`, one file per card in `rules/testdata/paramcensus/`.
-- `rules/count_head_ratchet_test.go` `knownUnmodelledCountHeads`.
+- `knownUnsupportedParams`, one file per card in `engine/rules/testdata/paramcensus/`.
+- `engine/rules/count_head_ratchet_test.go` `knownUnmodelledCountHeads`.
 - `effects.modelledValueHeads`.
 
 A card or parameter that newly breaks fails. So does a table entry that the
@@ -210,14 +210,14 @@ gate itself. There is no escape trailer: an operator raise is landed by hand.
 
 ### 9. Golden chain heads move only with a named cause
 
-`TestHeads` (`rules/heads_test.go`) pins the hash-chain head of the
+`TestHeads` (`engine/rules/heads_test.go`) pins the hash-chain head of the
 deterministic acceptance games at 2/4/6/8 seats, one file per seat count:
-`rules/testdata/heads/<seats>.txt` holds the hash and nothing else. The game
-itself is non-test code (`rules/acceptance_game.go`,
+`engine/rules/testdata/heads/<seats>.txt` holds the hash and nothing else. The game
+itself is non-test code (`engine/rules/acceptance_game.go`,
 `testutil.AcceptanceDecks` and `botpolicy.GameBot`), so `cmd/headdiff` plays
 exactly the game the goldens pin. A legitimate behaviour change moves them:
 
-- Re-pin with `GORGE_UPDATE_HEADS=1 go test ./rules/ -run '^TestHeads$'`,
+- Re-pin with `GORGE_UPDATE_HEADS=1 go test ./engine/rules/ -run '^TestHeads$'`,
   which rewrites the files.
 - Name the first diverging event and its cause in the **commit message**,
   never in a file. Find the event by diffing the two event streams, not by
@@ -284,11 +284,11 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
      suite is `scripts/postmerge_batch.sh`'s: it runs once per batch of
      landings on main, pauses the pipeline on red, bisects and logs `CULPRIT`
      lines to `.ds4/postmerge-culprits.log`. Never run an uncapped
-     `go test ./...` or `./compliance/...` by hand.
+     `go test ./...` or `./lab/oracle/compliance/...` by hand.
    - `make lint`: gofmt, vet, `gentypes -check`, plus web lint.
    - `make sim`: 20/20 `replay OK`.
    - If you touched `web/` or changed when a decision is posed, also run the
-     `./view` package and the web gates.
+     `./engine/view` package and the web gates.
 4. **Every test fits the budget: 4 GB RSS, 4 vCPU, 1 minute wall** (operator,
    2026-10-05; doubled 2026-10-09 when the box went to 120 GiB). Run tests
    focused and capped, one package per invocation:

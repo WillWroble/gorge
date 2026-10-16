@@ -60,10 +60,10 @@ filter() ( bash -c "source '$GATE'; gate_affected_default_build_pkgs" )
 # cmd/autopayaudit was the instance that motivated the filter, but it now has a
 # default-build test file (c2feefbd9), so it is no longer a probe for the class:
 # the throwaway module below is.
-out=$(printf './view\n' | filter)
+out=$(printf './engine/view\n' | filter)
 case $out in
-*./view*) check "helper keeps ./view (filter is not dropping everything)" 0 ;;
-*) check "helper keeps ./view (filter is not dropping everything)" 1 "out=$out" ;;
+*./engine/view*) check "helper keeps ./engine/view (filter is not dropping everything)" 0 ;;
+*) check "helper keeps ./engine/view (filter is not dropping everything)" 1 "out=$out" ;;
 esac
 
 # --- the CLASS: a fresh build-constrained-only package the helper has never
@@ -135,16 +135,16 @@ check "candidate derivation pipes pkgs through the default-build filter" $?
 # on exactly its class.
 plan() ( cd "$ROOT" && bash -c "source '$GATE'; gate_affected_plan" )
 STRUCT=$(cd "$ROOT" && bash -c "source '$GATE'; gate_structural_pkgs")
-for want in ./cmd/testbudget ./cmd/gentypes ./compliance/levelb ./internal/policynet ./cmd/pkgmap; do
+for want in ./cmd/testbudget ./cmd/gentypes ./lab/oracle/compliance/levelb ./bots/policynet ./cmd/pkgmap; do
 	printf '%s\n' "$STRUCT" | grep -qx -- "$want"
 	check "structural set names $want" $?
 done
 has() { printf '%s\n' "$1" | grep -qx -- "others $2"; }
 flag() { printf '%s\n' "$1" | grep -qx -- "$2 $3"; }
-for case in '' 'docs/agents/README.md' 'web/src/protocol.ts' 'rules/mana.go' 'cards/open.go' 'internal/archtest/arch_test.go'; do
+for case in '' 'docs/agents/README.md' 'web/src/protocol.ts' 'engine/rules/mana.go' 'engine/cards/open.go' 'internal/archtest/arch_test.go'; do
 	P=$(printf '%s\n' "$case" | plan)
 	miss=
-	for want in $STRUCT ./internal/codeshape ./view ./compliance/gate ./compliance/adopt; do
+	for want in $STRUCT ./internal/codeshape ./engine/view ./lab/oracle/compliance/gate ./lab/oracle/compliance/adopt; do
 		has "$P" "$want" || miss="$miss $want"
 	done
 	[ -z "$miss" ]
@@ -156,20 +156,20 @@ check "docs-only plan: archtest lean, no engine triggers" $? "$P"
 P=$(printf 'internal/archtest/arch_test.go\n' | plan)
 has "$P" ./internal/archtest && flag "$P" archtest_lean 0
 check "touched internal/archtest runs whole, not lean" $? "$P"
-P=$(printf 'rules/mana.go\n' | plan)
-has "$P" ./bots && ! has "$P" ./rules && ! has "$P" ./deck && flag "$P" traj 1 && flag "$P" tplrest 1 && flag "$P" botbench_subset 0
-check "rules non-test edit: fast rdep closure (./bots), no corpus-heavy rdep (./deck), traj + templates remainder" $? "$P"
-P=$(printf 'rules/mana_test.go\n' | plan)
+P=$(printf 'engine/rules/mana.go\n' | plan)
+has "$P" ./bots && ! has "$P" ./engine/rules && ! has "$P" ./engine/deck && flag "$P" traj 1 && flag "$P" tplrest 1 && flag "$P" botbench_subset 0
+check "rules non-test edit: fast rdep closure (./bots), no corpus-heavy rdep (./engine/deck), traj + templates remainder" $? "$P"
+P=$(printf 'engine/rules/mana_test.go\n' | plan)
 ! has "$P" ./bots && flag "$P" traj 0 && flag "$P" tplrest 0
 check "rules test-only edit: no rdep closure, no engine triggers" $? "$P"
-P=$(printf 'cards/open.go\n' | plan)
-has "$P" ./internal/corpusheap && has "$P" ./cards && flag "$P" botbench_subset 1 && flag "$P" tplrest 1 && flag "$P" traj 0
+P=$(printf 'engine/cards/open.go\n' | plan)
+has "$P" ./internal/corpusheap && has "$P" ./engine/cards && flag "$P" botbench_subset 1 && flag "$P" tplrest 1 && flag "$P" traj 0
 check "corpus loader edit: corpusheap + botbench subset + templates remainder" $? "$P"
-P=$(printf 'cards/open.go\ncmd/botbench/main.go\n' | plan)
-has "$P" ./cmd/botbench && flag "$P" botbench_subset 0
-check "touched cmd/botbench runs whole, not the subset test" $? "$P"
-P=$(printf 'compliance/oraclegen/templates/trigger.go\n' | plan)
-flag "$P" tpl 1 && flag "$P" tplrest 0 && ! has "$P" ./compliance/oraclegen/templates
+P=$(printf 'engine/cards/open.go\ncmd/botbench/main.go\n' | plan)
+has "$P" ./lab/cmd/botbench && flag "$P" botbench_subset 0
+check "touched lab/cmd/botbench runs whole, not the subset test" $? "$P"
+P=$(printf 'lab/oracle/compliance/oraclegen/templates/trigger.go\n' | plan)
+flag "$P" tpl 1 && flag "$P" tplrest 0 && ! has "$P" ./lab/oracle/compliance/oraclegen/templates
 check "touched templates: four shards, not in the batch, no extra remainder" $? "$P"
 P=$(printf 'compliance/oraclegen/generate.go\n' | plan)
 flag "$P" tpl 0 && flag "$P" tplrest 1
@@ -187,7 +187,7 @@ awk '/^if \[ "\$list_only" = 1 \]/{l=NR} /^GOMAXPROCS=6 go vet/{v=NR} END{exit !
 check "--list exits before vet/test" $?
 grep -qF "go test -p=1 -skip '^TestEngineCompilesFor32Bit\$' ./internal/archtest/" "$GATE"
 check "lean archtest skips only the 32-bit compile" $?
-[ "$(grep -cF 'go test -p=1 -skip "$tpl4" ./compliance/oraclegen/templates' "$GATE")" = 2 ]
+[ "$(grep -cF 'go test -p=1 -skip "$tpl4" ./lab/oracle/compliance/oraclegen/templates' "$GATE")" = 2 ]
 check "templates remainder trigger reuses the h4 invocation" $?
 ! grep -q 'TestInvariantsUnderSeedFuzz' "$GATE"
 check "no dead //go:build fuzz skip pattern in the gate" $?
@@ -218,8 +218,8 @@ PY
 [ "$(printf '%s\n' "$uncovered" | /usr/bin/grep -c .)" = 0 ]
 check "shard partition is complete and disjoint (incl. a digit-prefixed name)" $? "uncovered=[$uncovered]"
 
-# The real ./rules list: every listed test must land in exactly one pattern.
-REALLIST=$(go test -list '.*' ./rules/ 2>/dev/null | /usr/bin/grep '^Test' || true)
+# The real ./engine/rules list: every listed test must land in exactly one pattern.
+REALLIST=$(go test -list '.*' ./engine/rules/ 2>/dev/null | /usr/bin/grep '^Test' || true)
 if [ -n "$REALLIST" ]; then
 	printf '%s\n' "$REALLIST" | patterns >"$TMP/patterns.txt"
 	printf '%s\n' "$REALLIST" >"$TMP/names.txt"
@@ -232,12 +232,12 @@ print(len(miss))
 PY
 )
 	[ "$bad" = 0 ]
-	check "every real ./rules test lands in exactly one shard pattern" $? "bad=$bad"
+	check "every real ./engine/rules test lands in exactly one shard pattern" $? "bad=$bad"
 else
-	printf 'skip real-list shard check (no ./rules tests listed)\n'
+	printf 'skip real-list shard check (no ./engine/rules tests listed)\n'
 fi
 
-# --- the compliance/oraclegen/templates shard selectors: exactly four, all
+# --- the lab/oracle/compliance/oraclegen/templates shard selectors: exactly four, all
 # anchored, the remainder the anchored union of the three named patterns
 # (templates_shard_patterns). An unanchored -skip remainder deleted any
 # future name that merely extends one of the prefixes from EVERY shard (r2
@@ -282,9 +282,9 @@ PY
 [ -z "$tplbad" ]
 check "a future prefix-extending name is still run by exactly one shard" $? "miss=[$tplbad]"
 
-# The real ./compliance/oraclegen/templates list: every listed test must be
+# The real ./lab/oracle/compliance/oraclegen/templates list: every listed test must be
 # run by exactly one of the four shards, mirroring the REALLIST check above.
-TPLLIST=$(go test -list '.*' ./compliance/oraclegen/templates 2>/dev/null | /usr/bin/grep '^Test' || true)
+TPLLIST=$(go test -list '.*' ./lab/oracle/compliance/oraclegen/templates 2>/dev/null | /usr/bin/grep '^Test' || true)
 if [ -n "$TPLLIST" ]; then
 	tplbad=$(python3 - "$TPLSEL" "$TPLLIST" <<'PY'
 import re, sys
@@ -320,12 +320,12 @@ printf 'TestAlpha\nTestBravo\nTestAlphaTwo\n' | patterns >/dev/null 2>&1
 [ "$?" != 0 ]
 check "fewer than six distinct prefixes makes the shard helper fail (caller falls back)" $?
 
-# --- the heavy $others packages: compliance/gate and compliance/adopt (plus
-# internal/paymirror, cmd/repro, effects, compliance/oraclegen/templates) are
+# --- the heavy $others packages: lab/oracle/compliance/gate and lab/oracle/compliance/adopt (plus
+# internal/paymirror, cmd/repro, effects, lab/oracle/compliance/oraclegen/templates) are
 # extracted from the -p=6 batch and split by test_name_packs_from_list into
 # three count-balanced packs run as concurrent `go test` processes
 # (heavy_shard_pool). A heavy package is never put back in the batch whole.
-# compliance/gate and compliance/adopt run on EVERY ticket, so this block pins
+# lab/oracle/compliance/gate and lab/oracle/compliance/adopt run on EVERY ticket, so this block pins
 # their extraction and the complete+disjoint partition of their real test
 # lists: a future test cannot fall outside every pack, and removing either
 # package from the heavy selector (putting it back in the whole-package batch)
@@ -384,9 +384,9 @@ check "heavy partition is complete and disjoint (incl. a prefix-extending name)"
 HEAVYRE=$(sed -n "s/^heavy='\(.*\)'$/\1/p" "$GATE")
 [ -n "$HEAVYRE" ]
 check "gate defines a heavy-package selector (precondition)" $? "HEAVYRE=[$HEAVYRE]"
-nheavy=$(printf '%s\n' ./compliance/gate ./compliance/adopt | /usr/bin/grep -cE "$HEAVYRE" || true)
+nheavy=$(printf '%s\n' ./lab/oracle/compliance/gate ./lab/oracle/compliance/adopt | /usr/bin/grep -cE "$HEAVYRE" || true)
 [ "$nheavy" = 2 ]
-check "heavy selector names compliance/gate and compliance/adopt" $? "nheavy=$nheavy"
+check "heavy selector names lab/oracle/compliance/gate and lab/oracle/compliance/adopt" $? "nheavy=$nheavy"
 grep -Eq 'batch=.*grep -v -E "\$heavy"' "$GATE"
 check "the -p=6 batch excludes the heavy packages" $?
 grep -qF "heavy_pkgs=\$(printf '%s\n' \$others | /usr/bin/grep -E \"\$heavy\" || true)" "$GATE"
@@ -420,7 +420,7 @@ check "the heavy pool pid is waited on by the gate" $?
 GLOBALRE=$(sed -n "s/^global='\(.*\)'$/\1/p" "$GATE")
 [ -n "$GLOBALRE" ]
 check "gate defines the process-global skip (precondition)" $? "GLOBALRE=[$GLOBALRE]"
-for pkg in ./compliance/gate ./compliance/adopt; do
+for pkg in ./lab/oracle/compliance/gate ./lab/oracle/compliance/adopt; do
 	list=$(go test -list '.*' "$pkg" 2>/dev/null | /usr/bin/grep '^Test' || true)
 	[ -n "$list" ]
 	check "$pkg lists its tests (precondition for the pack check)" $? "list empty"
@@ -515,7 +515,7 @@ printf '%s\n' \
 check "a mixed stale/non-stale certification failure is NOT stale-only" $?
 
 # A clean certification (no failing test) is not a stale-only failure.
-printf 'ok  \tgithub.com/adams-shaun/gorge/compliance/gate\t9.0s\n' | cert
+printf 'ok  \tgithub.com/adams-shaun/gorge/lab/oracle/compliance/gate\t9.0s\n' | cert
 [ "$?" != 0 ]
 check "a clean certification run is NOT classified stale-only" $?
 
@@ -533,8 +533,8 @@ grep -qF 'gate_affected_cert_stale_only' "$GATE"
 check "the heavy pool calls the stale-only classifier" $?
 grep -qE 'requeue_exit *= *\[75, 76\]' "$ROOT/.agentctl/config.toml"
 check "the affected gate maps exit 76 to a non-charging requeue" $?
-grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/gate/declared_chunks_test.go" \
-	&& grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/adopt/ratchet_test.go"
+grep -qF 'GORGE-CERT-RESULT' "$ROOT/lab/oracle/compliance/gate/declared_chunks_test.go" \
+	&& grep -qF 'GORGE-CERT-RESULT' "$ROOT/lab/oracle/compliance/adopt/ratchet_test.go"
 check "both certification tests emit the GORGE-CERT-RESULT verdict line" $?
 
 printf '\ngate_affected_smoke: %s\n' "$([ $fails = 0 ] && echo ALL GREEN || echo FAILURES ABOVE)"

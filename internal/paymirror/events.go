@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // routeEvent reports whether an event records the ROUTE rather than the game:

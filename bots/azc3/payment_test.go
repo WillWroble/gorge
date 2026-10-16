@@ -6,7 +6,7 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 // az-c3 and az-c4 (azc4 reuses azc3.ClosedConfig) search the auto-payment

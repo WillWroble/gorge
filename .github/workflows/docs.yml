@@ -59,12 +59,12 @@ jobs:
       - name: Fetch and compile the Forge corpus
         run: make fetch-cards compile-cards
 
-      # ~7.5 min on 4 CPUs. `status -all` also checks compliance/ratchet.json
+      # ~7.5 min on 4 CPUs. `status -all` also checks lab/oracle/compliance/ratchet.json
       # and exits non-zero when a set moves past it; that is not a docs
       # failure, so the exit is tolerated and the output used if non-empty.
       - name: Measure set support
         run: |
-          go run ./cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl || true
+          go run ./lab/cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl || true
           if [ -s status-A.jsonl ]; then
             python3 scripts/docs_sets.py status-A.jsonl \
               --commit "$GITHUB_SHA" --date "$(date -u +%F)" || true

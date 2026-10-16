@@ -7,13 +7,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/manabrewhttp"
-	"github.com/adams-shaun/gorge/internal/manabrew"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/manabrewhttp"
+	"github.com/adams-shaun/gorge/server/manabrew"
 )
 
 // MB-9 of the ManaBrew protocol scoping spec (§5.4, §9): the gorged-side
-// toggle for host/manabrewhttp (MB-10). Everything here is additive and
+// toggle for server/host/manabrewhttp (MB-10). Everything here is additive and
 // opt-in -- with -manabrew off (the default), applyManaBrew and
 // mountManaBrew are no-ops and serve()'s behaviour is byte-identical to a
 // binary built before this file existed.
@@ -70,7 +70,7 @@ func (c config) manabrewThinkTimeout() time.Duration {
 	return c.manabrewThink
 }
 
-// mountManaBrew wires host/manabrewhttp onto either topMux (the default:
+// mountManaBrew wires server/host/manabrewhttp onto either topMux (the default:
 // sharing the main listener, ahead of httpapi) or, when -manabrew-addr
 // names one, a second listener of its own. It is a no-op when -manabrew is
 // off. gate must be non-nil whenever c.manabrew is true; serve's own

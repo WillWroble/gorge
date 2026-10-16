@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 func TestMapAnswerCanRepeatModes(t *testing.T) {

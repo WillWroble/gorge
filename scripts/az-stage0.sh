@@ -55,18 +55,18 @@ cd "$REPO"
 } | tee "$OUT/commit.txt"
 
 # 1. Build once.
-heavy go build -o "$OUT/botbench" ./cmd/botbench
+heavy go build -o "$OUT/botbench" ./lab/cmd/botbench
 
 # 2. Per-simulation and per-searched-decision cost (spec §3, §4): ns/sim and
 #    allocs per searched decision, early and late positions.
 heavy go test -p 1 -count=1 -run '^$' -bench 'BenchmarkSearchDecision' -benchmem -benchtime "$BENCHTIME" \
-	./internal/azmcts/ | tee "$OUT/bench.txt"
+	./bots/azmcts/ | tee "$OUT/bench.txt"
 
 # 3. Peak RSS of the new test binaries (spec §4: a multi-GB test binary is a
 #    bug). -v is required: go test in package-list mode drops a passing
 #    binary's stderr, which is where /usr/bin/time writes.
-heavy go test -v -p 1 -count=1 -exec '/usr/bin/time -f peak-rss-kb=%M' ./internal/azmcts/ > "$OUT/rss-azmcts.txt" 2>&1
-heavy go test -v -p 1 -count=1 -run 'TestAZ' -exec '/usr/bin/time -f peak-rss-kb=%M' ./cmd/botbench/ > "$OUT/rss-botbench.txt" 2>&1
+heavy go test -v -p 1 -count=1 -exec '/usr/bin/time -f peak-rss-kb=%M' ./bots/azmcts/ > "$OUT/rss-azmcts.txt" 2>&1
+heavy go test -v -p 1 -count=1 -run 'TestAZ' -exec '/usr/bin/time -f peak-rss-kb=%M' ./lab/cmd/botbench/ > "$OUT/rss-botbench.txt" 2>&1
 /usr/bin/grep -hE '^peak-rss-kb=|^ok|^FAIL' "$OUT/rss-azmcts.txt" "$OUT/rss-botbench.txt"
 
 # arm NAME GAMES_PER_PAIR BOTBENCH_ARGS... -- one matrix run on the eval block.

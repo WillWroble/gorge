@@ -20,12 +20,12 @@ GO_SRC     := $(shell $(GO_FILES) 2>/dev/null) go.mod
 # local agent fleet on the machine, that OOMed and locked the box. -p bounds
 # how many package binaries run concurrently, and GOMEMLIMIT gives each one's
 # GC a soft ceiling to collect against instead of growing until the kernel
-# steps in (host/ peaks at 8.5G unbounded, 5.2G under this limit, and
+# steps in (server/host/ peaks at 8.5G unbounded, 5.2G under this limit, and
 # still finishes inside its 30s budget at 24.8s -- 4GiB thrashes it to 33.5s).
 #
 # -parallel and GOMAXPROCS are deliberately left at their defaults: capping
 # them to 2 was measured and bought only ~1.4G more headroom while doubling
-# rules/ (4.6s -> 11.0s) and pushing every package past its recorded budget.
+# engine/rules/ (4.6s -> 11.0s) and pushing every package past its recorded budget.
 #
 # GOMEMLIMIT bounds the Go HEAP only. The race detector's shadow memory sits
 # outside it, so -race stays one package at a time, and never in two
@@ -77,7 +77,7 @@ help:
 	@echo "  make enginebench-pair BASE=main CAND=. — paired engine-speed comparison (cmd/enginebench)"
 	@echo "  make enginebench-profile [REV=.]       — CPU/alloc profiles of the bench rows, tops printed"
 	@echo "  make enginebench-verify [REV=.]        — memo-verify-mode smoke over the bench rows"
-	@echo "  make compliance-manifests — regenerate compliance/manifests from XMage set classes at XMAGE_REF"
+	@echo "  make compliance-manifests — regenerate lab/oracle/compliance/manifests from XMage set classes at XMAGE_REF"
 	@echo "  make xmage-oracle-setup — build XMage at XMAGE_REF out of tree (heavy; run alone)"
 	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
 	@echo "  make compliance-status — generated per-set/per-format compliance status (compliance/status.md, never committed) + ratchet check"
@@ -97,7 +97,7 @@ help:
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
 	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; scripts/nightly.sh)"
-	@echo "  make oracle-audit   — run the Oracle-text card audit (rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
+	@echo "  make oracle-audit   — run the Oracle-text card audit (engine/rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
 	@echo "  make clean-seats    — delete finished pi-agent seat dirs (~/.cache/pi-agent); dry run unless APPLY=1"
 	@echo "  make clean-worktrees — remove merged, clean .worktrees/* and their branches; dry run unless APPLY=1"
 	@echo "  make readopt-worktree NAME=<name> — re-register an orphaned .worktrees/<name> (branch wt/<name>); dry run unless APPLY=1"
@@ -120,11 +120,11 @@ $(BIN_DIR)/gorged: $(GO_SRC)
 
 $(BIN_DIR)/botbench: $(GO_SRC)
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -o $@ ./cmd/botbench
+	CGO_ENABLED=0 go build -o $@ ./lab/cmd/botbench
 
 $(BIN_DIR)/draftsim: $(GO_SRC)
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -o $@ ./cmd/draftsim
+	CGO_ENABLED=0 go build -o $@ ./lab/cmd/draftsim
 
 .PHONY: draftsim
 # draftsim runs E0's headless limited lab: 4-bot draft pods over the two
@@ -141,7 +141,7 @@ draftsim: $(BIN_DIR)/draftsim
 gorged: $(BIN_DIR)/gorged
 	$(BIN_DIR)/gorged -decks internal/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
 
-# dzbroker is the experimental, tag-gated decision broker (internal/inferbroker).
+# dzbroker is the experimental, tag-gated decision broker (lab/training/inferbroker).
 # It batches learner decisions from many independent games into one inference
 # call with no all-games barrier, and expands one deck matchup into -multiply
 # games with distinct shuffles. The tag keeps it, its seat wrapper and its
@@ -151,10 +151,10 @@ gorged: $(BIN_DIR)/gorged
 BROKER_DECKS ?= internal/testutil/decks
 dzbroker:
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./cmd/dzbroker
+	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./lab/cmd/dzbroker
 
 # gamepool is the experimental, tag-gated pooled-games driver. It is built
-# from the nested module experimental/gamepool, which alone requires purego
+# from the nested module lab/training/experimental/gamepool, which alone requires purego
 # (the GPU scorer's CUDA binding): the root go.mod has no require lines
 # (TestRootModuleHasNoRequires). Add gamepool_gpu to GAMEPOOL_TAGS for the GPU
 # scorer.
@@ -162,20 +162,20 @@ dzbroker:
 GAMEPOOL_TAGS ?= gamepool
 gamepool:
 	@mkdir -p $(BIN_DIR)
-	cd experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
+	cd lab/training/experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
 
 # test-broker runs the broker package's tests under the tag. Kept out of the
 # default `make test` for the same reason the build is.
 test-broker:
-	go test -tags broker -count=1 ./internal/inferbroker
+	go test -tags broker -count=1 ./lab/training/inferbroker
 
 .PHONY: traindash
 # traindash serves the read-only live training dashboard over the policynet/PPO
-# runs under TRAIN_ROOT (cmd/traindash). Port range 8082-8089, never 8080/8081.
+# runs under TRAIN_ROOT (lab/cmd/traindash). Port range 8082-8089, never 8080/8081.
 TRAIN_ROOT ?= /mnt/sata/gorge-training
 TRAINDASH_ADDR ?= 127.0.0.1:8086
 traindash:
-	go run ./cmd/traindash -root $(TRAIN_ROOT) -addr $(TRAINDASH_ADDR)
+	go run ./lab/cmd/traindash -root $(TRAIN_ROOT) -addr $(TRAINDASH_ADDR)
 
 .PHONY: deploy-demo stop-demo
 # deploy-demo refreshes the local demo: one server on 127.0.0.1:8080 whose
@@ -237,7 +237,7 @@ compile-cards: $(BIN_DIR)/forgec
 
 .PHONY: compliance-manifests
 compliance-manifests:
-	go run ./cmd/compliance manifest -xmage $(XMAGE_ORACLE_DIR)/sets-only -ref $(XMAGE_REF) -out compliance/manifests
+	go run ./lab/cmd/compliance manifest -xmage $(XMAGE_ORACLE_DIR)/sets-only -ref $(XMAGE_REF) -out lab/oracle/compliance/manifests
 
 .PHONY: xmage-oracle-setup
 xmage-oracle-setup:
@@ -247,7 +247,7 @@ forge-oracle-setup:
 	FORGE_REPO='$(FORGE_REPO)' FORGE_REF='$(FORGE_REF)' FORGE_ORACLE_REF='$(FORGE_ORACLE_REF)' FORGE_ORACLE_DIR='$(FORGE_ORACLE_DIR)' scripts/forge-oracle-setup.sh
 
 # compliance-pass runs the XMage compliance pass (gen, plan, XMage replay of
-# the stale scenarios only, diff -write into compliance/verdicts, summary)
+# the stale scenarios only, diff -write into lab/oracle/compliance/verdicts, summary)
 # over SETS, under the heavy-job lock. Needs the xmage-oracle-setup build.
 SETS ?=
 .PHONY: compliance-pass
@@ -256,10 +256,10 @@ compliance-pass:
 
 # compliance-status writes the generated per-set / per-format status page
 # (compliance/status.md, gitignored: never committed) and checks the
-# certification ratchet (compliance/ratchet.json). Spec 2026-10-03 11.3 C8.
+# certification ratchet (lab/oracle/compliance/ratchet.json). Spec 2026-10-03 11.3 C8.
 .PHONY: compliance-status
 compliance-status:
-	go run ./cmd/oraclediff status -all -out compliance/status.md
+	go run ./lab/cmd/oraclediff status -all -out compliance/status.md
 
 # compliance-sets runs the compliance gate at BOTH levels over every
 # committed printed set and writes the per-set table to
@@ -268,7 +268,7 @@ compliance-status:
 .PHONY: compliance-sets
 compliance-sets:
 	@mkdir -p .coverage
-	go run ./cmd/oraclediff sets -out .coverage/compliance-sets.md
+	go run ./lab/cmd/oraclediff sets -out .coverage/compliance-sets.md
 
 .PHONY: report
 report: $(BIN_DIR)/forgec
@@ -314,7 +314,7 @@ test:
 .PHONY: conformance
 conformance:
 	@echo "== CR 601/733 conformance: all audited leaves fixed; ordinary-suite assertions =="
-	go test $(GO_TEST_FLAGS) -count=1 ./rules -run TestCR -v
+	go test $(GO_TEST_FLAGS) -count=1 ./engine/rules -run TestCR -v
 
 # oracle-audit runs the Oracle-text card audit: scenarios whose expected
 # outcomes were written from printed card text and the CR, never the Forge
@@ -324,7 +324,7 @@ conformance:
 ORACLE_RUN ?=
 .PHONY: oracle-audit
 oracle-audit:
-	go test $(GO_TEST_FLAGS) -count=1 ./rules -run 'TestOracleAudit/$(ORACLE_RUN)' -v
+	go test $(GO_TEST_FLAGS) -count=1 ./engine/rules -run 'TestOracleAudit/$(ORACLE_RUN)' -v
 
 # gc-gate budgets the share of consumed CPU a package's tests spend collecting
 # garbage. GC_PROCS pins GOMAXPROCS so the figure is a property of the code
@@ -333,7 +333,7 @@ oracle-audit:
 # budget counts it. GC_BUDGET is a fraction of user+sys, NOT the percentage
 # gctrace prints (that one divides by every core the process could have used
 # and reads ~1% however badly the code allocates).
-GC_PKG    ?= ./host
+GC_PKG    ?= ./server/host
 GC_PROCS  ?= 32
 GC_BUDGET ?= 0.30
 .PHONY: gc-gate
@@ -346,26 +346,26 @@ gc-gate:
 # test` and the pipeline gates; run by hand or at night.
 .PHONY: fuzz
 fuzz:
-	go test $(GO_TEST_FLAGS) -tags fuzz,manabrew -count=1 -run 'Fuzz' ./rules ./protocol/manabrew ./internal/manabrew
+	go test $(GO_TEST_FLAGS) -tags fuzz,manabrew -count=1 -run 'Fuzz' ./engine/rules ./server/protocol/manabrew ./server/manabrew
 
 # test-manabrew runs the ManaBrew wire/translator tests (build tag `manabrew`).
 # ManaBrew work is deprioritised (operator, 2026-10-02), so these test files
 # are excluded from `go test ./...`, `make test` and the pipeline gates.
 .PHONY: test-manabrew
 test-manabrew:
-	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./protocol/manabrew ./internal/manabrew/... ./host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
+	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./server/protocol/manabrew ./server/manabrew/... ./server/host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
 
 # test-spellbench-bridge builds and tests the parked SpellBench protocol v1/v2
-# bridge (build tag `spellbench_bridge`): internal/spellbench/{v1agent,kshadow,
-# v2agent,v2engine,v2shadow}, internal/policynet/v2front and the sbagent,
+# bridge (build tag `spellbench_bridge`): lab/training/spellbench/{v1agent,kshadow,
+# v2agent,v2engine,v2shadow}, lab/training/v2front and the sbagent,
 # sbv1agent, kshadowcheck, sbv2engine, sbv2local and sbv2shadow commands. Like
 # test-manabrew it is excluded from `go test ./...`, `make test` and the
 # pipeline gates; the live bots' spellbench catalogs, builtins, sbsearch,
 # payexec and registry stay untagged.
-SPELLBENCH_BRIDGE_PKGS = ./internal/spellbench/v1agent ./internal/spellbench/kshadow \
-	./internal/spellbench/v2agent ./internal/spellbench/v2engine ./internal/spellbench/v2shadow \
-	./internal/policynet/v2front ./cmd/sbagent ./cmd/sbv1agent ./cmd/kshadowcheck \
-	./cmd/sbv2engine ./cmd/sbv2local ./cmd/sbv2shadow
+SPELLBENCH_BRIDGE_PKGS = ./lab/training/spellbench/v1agent ./lab/training/spellbench/kshadow \
+	./lab/training/spellbench/v2agent ./lab/training/spellbench/v2engine ./lab/training/spellbench/v2shadow \
+	./lab/training/v2front ./lab/cmd/sbagent ./lab/cmd/sbv1agent ./lab/cmd/kshadowcheck \
+	./lab/cmd/sbv2engine ./lab/cmd/sbv2local ./lab/cmd/sbv2shadow
 .PHONY: test-spellbench-bridge
 test-spellbench-bridge:
 	go vet -tags spellbench_bridge $(SPELLBENCH_BRIDGE_PKGS)

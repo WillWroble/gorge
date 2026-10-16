@@ -88,7 +88,7 @@ Generators, in the order they are consulted:
   verdict. The ticket is to drive it through the oracle harness and record the
   verdict; a disagreement becomes a defect row in `.ds4/reward/defects.jsonl`,
   which is what the axis pays for.
-- **steward (100x).** The longest function in `rules/` + `effects/`
+- **steward (100x).** The longest function in `engine/rules/` + `engine/effects/`
   (`go run ./cmd/codeshape`; the metric is `funcs_over_300`), the gate suite's
   slowest gate, the agent context's growth. The ticket names the measured
   number and the number it must reach. A long-function ticket is done when it

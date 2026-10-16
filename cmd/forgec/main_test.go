@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // reportScript writes one synthetic card script into dir/cardsfolder. The

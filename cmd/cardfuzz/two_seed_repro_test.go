@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/rules/resolve"
 )
 
 // TestTapeMissCensusReportedSeeds replays the two specific census jobs a
@@ -19,7 +19,7 @@ import (
 // a card when the build fully supports it, and `generate` samples from that
 // pool, so as engine support grows the same seed builds a DIFFERENT deck at a
 // different commit. The filing branch tip is 147 commits behind main (105 of
-// them in effects/ and rules/), so the reported seed->deck mapping describes a
+// them in engine/effects/ and engine/rules/), so the reported seed->deck mapping describes a
 // pool that no longer exists: main's game 231 is a red/green pair with no
 // RepeatEach carrier at all. This test therefore pins current-main behaviour
 // for these two named jobs, not the reported failure; a seed-based bisect

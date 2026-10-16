@@ -3,7 +3,7 @@
 
 Reads the JSONL that
 
-    go run ./cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl
+    go run ./lab/cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl
 
 prints (one adopt.SetStatus object per line; any non-JSON line, such as the
 ratchet summary the command also prints, is skipped) and writes a markdown

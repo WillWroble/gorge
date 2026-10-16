@@ -1,7 +1,7 @@
 package bench_test
 
 // The Env driver (E5-c5): Hooks.EnvSeats drives a bots.EnvSeat the way the
-// host does (host/botenv.go envData), so a hosted wrapper is answered with its
+// host does (server/host/botenv.go envData), so a hosted wrapper is answered with its
 // bots.Env instead of being silently driven as a plain seat. These tests pin
 // the two halves the host relies on: the branch runs at the seat's WantsEnv
 // decisions and never hands the seat the live engine, and it is off by default
@@ -11,14 +11,16 @@ import (
 	"context"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/spellbench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/lab/training/spellbench"
 )
 
 const (
@@ -30,13 +32,13 @@ const (
 // assert the Env it is given never points at it.
 type envBox struct{ live *rules.Engine }
 
-// envTestSeat is a bots.EnvSeat that stays a seat.BoardSeat (it embeds a
-// *seat.Bot), so its non-priority decisions fall through to the BoardSeat
+// envTestSeat is a bots.EnvSeat that stays a heuristic.BoardSeat (it embeds a
+// *heuristic.Bot), so its non-priority decisions fall through to the BoardSeat
 // branch and an EnvSeats-false run is byte-identical to plain bots. Its
 // DecideEnv counts calls and records how many carried an honest root and how
 // many (illegally) carried the live engine.
 type envTestSeat struct {
-	*seat.Bot
+	*heuristic.Bot
 	box    *envBox
 	calls  int
 	rooted int
@@ -94,9 +96,9 @@ func TestPlayGameDrivesEnvSeats(t *testing.T) {
 	const seed = 7717
 
 	box := &envBox{}
-	env := &envTestSeat{Bot: seat.NewBot(seed ^ 1), box: box}
+	env := &envTestSeat{Bot: heuristic.NewBot(seed ^ 1), box: box}
 	o1, _, err := bench.PlayGame(envCfg(seed, reg, deckA, deckB),
-		[]seat.Seat{env, seat.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
+		[]seat.Seat{env, heuristic.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
 		bench.Hooks{EnvSeats: true, Setup: func(e *rules.Engine) { box.live = e }})
 	if err != nil {
 		t.Fatalf("EnvSeats run: %v", err)
@@ -115,9 +117,9 @@ func TestPlayGameDrivesEnvSeats(t *testing.T) {
 	}
 
 	box2 := &envBox{}
-	env2 := &envTestSeat{Bot: seat.NewBot(seed ^ 1), box: box2}
+	env2 := &envTestSeat{Bot: heuristic.NewBot(seed ^ 1), box: box2}
 	_, off, err := bench.PlayGame(envCfg(seed, reg, deckA, deckB),
-		[]seat.Seat{env2, seat.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
+		[]seat.Seat{env2, heuristic.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
 		bench.Hooks{EnvSeats: false, Setup: func(e *rules.Engine) { box2.live = e }})
 	if err != nil {
 		t.Fatalf("EnvSeats-false run: %v", err)
@@ -126,7 +128,7 @@ func TestPlayGameDrivesEnvSeats(t *testing.T) {
 		t.Fatalf("DecideEnv ran %d times with EnvSeats false", env2.calls)
 	}
 	_, plain, err := bench.PlayGame(envCfg(seed, reg, deckA, deckB),
-		[]seat.Seat{seat.NewBot(seed ^ 1), seat.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
+		[]seat.Seat{heuristic.NewBot(seed ^ 1), heuristic.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
 		bench.Hooks{})
 	if err != nil {
 		t.Fatalf("plain run: %v", err)
@@ -145,9 +147,9 @@ func TestPlayGameEnvSeatsIsDeterministic(t *testing.T) {
 
 	play := func() string {
 		box := &envBox{}
-		env := &envTestSeat{Bot: seat.NewBot(seed ^ 1), box: box}
+		env := &envTestSeat{Bot: heuristic.NewBot(seed ^ 1), box: box}
 		_, e, err := bench.PlayGame(envCfg(seed, reg, deckA, deckB),
-			[]seat.Seat{env, seat.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
+			[]seat.Seat{env, heuristic.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
 			bench.Hooks{EnvSeats: true, Setup: func(e *rules.Engine) { box.live = e }})
 		if err != nil {
 			t.Fatalf("EnvSeats run: %v", err)

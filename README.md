@@ -43,7 +43,7 @@ Packages have a strict, one-directional dependency order:
 
 ```
 cards → state → decision → events → effects → botpolicy → rules → view →
-seat → replay → protocol → host → host/httpapi → cmd/*
+seat → replay → protocol → host → server/host/httpapi → cmd/*
 ```
 
 `cards` depends on nothing in this module. Each later package may depend on
@@ -54,7 +54,7 @@ must never import `rules`, the wire-facing packages (`view`, `protocol`,
 `internal/archtest`'s `TestDependencyOrderHolds`, which walks the module's
 import graph and fails when a forbidden edge (direct or transitive) appears;
 `internal/archtest` also pins the determinism rule that only the host tier
-(`host`, `host/httpapi`, `cmd/gorged`) and an allowlist of measurement
+(`host`, `server/host/httpapi`, `cmd/gorged`) and an allowlist of measurement
 commands (the `allowed` map in `TestTimeIsImportedOnlyByTheHost`) may import
 `time`.
 
@@ -84,7 +84,7 @@ full `cmd/` list are in [docs/agents/repo-map.md](docs/agents/repo-map.md).
   only, never imports the engine
 - `host` — keeps tables running (one goroutine per table), sessions,
   snapshots, append-only persistence, crash handling
-- `host/httpapi` — serves a `host.Registry` over plain net/http: JSON, one
+- `server/host/httpapi` — serves a `host.Registry` over plain net/http: JSON, one
   SSE stream per client, and the embedded web client
 - `internal/` — `archtest` (import-graph/determinism enforcement), `testutil`
   (fixtures shared by tests), `tsgen` (Go→TypeScript for the web client)
@@ -99,7 +99,7 @@ and the deterministic gates to a merged fix (see `orchestrator/README.md`).
 - `cmd/gorged` — runs perpetual bot tables and serves them to a browser
 - `cmd/gentypes` — regenerates `web/src/protocol.ts` from package `protocol`
 - `cmd/mtgsim` — headless self-play over the repo decks, verifying replay
-- `cmd/botbench` — plays N matches between two bot policies, reports the split
+- `lab/cmd/botbench` — plays N matches between two bot policies, reports the split
 - `cmd/keywordbench` — measures keyword presence separately from event-log use
 - `cmd/testbudget` — enforces the per-test wall and peak-RSS budgets post-merge
 - `cmd/gcgate` — by-hand check of the CPU share a package's tests spend on GC
@@ -115,7 +115,7 @@ gorge itself is Apache-2.0. Card *behaviour* is compiled from
 are GPL-3.0 — this repo ships a compiler for that script format, never the
 scripts themselves. `forgec fetch` pulls the card corpus and its token
 scripts into `.cards/`, which is gitignored and never committed.
-`cards/boundary_test.go` fails the build if any Forge `.txt` script is ever
+`engine/cards/boundary_test.go` fails the build if any Forge `.txt` script is ever
 tracked in git, working tree, index, or HEAD.
 
 ## Getting started
@@ -154,12 +154,12 @@ regardless. Match files accumulate in `gorged-data/` (override with `-dir`).
 
 The engine fully supports every card across the repo's bundled constructed
 and Commander decks (`internal/testutil/decks/`), apart from the handful that
-`rules/acceptance_test.go`'s `knownUnsupported` names; that ratchet fails in
+`engine/rules/acceptance_test.go`'s `knownUnsupported` names; that ratchet fails in
 both directions, so the table is the live count. The 12 pinned Legacy decks
 play golden games at every seat count and replay byte-identically, and `gorged` serves perpetual bot tables
 to a browser. But it is **not** ready for parity or production use.
 
-`make conformance` (`go test ./rules -run TestCR`) runs the focused CR
+`make conformance` (`go test ./engine/rules -run TestCR`) runs the focused CR
 601/733 conformance audit on its own. Its leaves are fixed and also run in the
 ordinary suite; the old opt-in `GORGE_CR_CONFORMANCE=1` switch is gone.
 Remaining known deviations are listed in `AGENTS.md`'s "Known approximations"
@@ -208,13 +208,13 @@ opt-in extensions:
 
 External processes can play a seat in three ways:
 
-- over HTTP, through `host/httpapi`: `…/pending`, `…/intent`, `…/view`,
+- over HTTP, through `server/host/httpapi`: `…/pending`, `…/intent`, `…/view`,
   `…/events`, SSE `/api/stream`;
 - **(spellbench-prep)** as a SpellBench v2 agent, in NDJSON over stdio
-  (`internal/spellbench/v2agent`, `cmd/sbagent`; built only with
+  (`lab/training/spellbench/v2agent`, `lab/cmd/sbagent`; built only with
   `-tags spellbench_bridge`, see `make test-spellbench-bridge`);
 - **(manabrew)** as a ManaBrew protocol client, over SSE + POST
-  (`host/manabrewhttp`, `internal/manabrew`). Opt-in and off by default;
+  (`server/host/manabrewhttp`, `server/manabrew`). Opt-in and off by default;
   `gorged -manabrew` mounts it (`-manabrew-addr` for a separate listener),
   and it requires a seat gate (`-humans` or `-vsbot`).
 
@@ -224,10 +224,10 @@ External processes can play a seat in three ways:
 |---|---|---|
 | Step environment | `rules.New(Config)`, `Pending()`, `Submit(Intent)`, `Advance()` | Deterministic: same `Config.Seed` plus same intents gives the same events. |
 | Legal actions | `Decision.Options`; `decision.PotentialAction` | The action space *is* the option list. Mana taps are options too, unless auto-pay is on. `PotentialAction` lists the plays that would become castable after floating mana. |
-| Intent-level mana | bot auto-pay (`EnableAutoPayMana`); **(spellbench-prep)** `rules.(*Engine).PotentialPaymentPlans` plus `internal/spellbench/payexec` | Plan "cast X / activate Y" and lower the payment witness to taps afterwards, so taps never enter a search tree. Naive manual-tap bots lose about 190–230 Elo. |
+| Intent-level mana | bot auto-pay (`EnableAutoPayMana`); **(spellbench-prep)** `rules.(*Engine).PotentialPaymentPlans` plus `bots/spellbench/payexec` | Plan "cast X / activate Y" and lower the payment witness to taps afterwards, so taps never enter a search tree. Naive manual-tap bots lose about 190–230 Elo. |
 | Fork / simulate | `(*Engine).Clone()`, `CloneInto(*Spare)` / `Release()` | Clone at an intent boundary only. Recycle spares on hot paths. |
 | Chance-honest worlds | `rules.NewHypothetical`, `(*Engine).CloneHypothetical(seed)`, `SubmitHypothetical`, `AdvanceHypothetical` | A search clone gets a fresh chance stream, so it cannot peek at the real game's future shuffles and draws. |
-| Hidden-information sampling | `internal/searchprobe`: `NewCollector` / `Capture`, `Sample`, `Redealer`, known-card tracking | Determinization. `Sample` never sees the real engine, log, seed or hidden hash. **(spellbench-prep)** `azmcts.NewRedeal` wraps it for search. |
+| Hidden-information sampling | `bots/searchprobe`: `NewCollector` / `Capture`, `Sample`, `Redealer`, known-card tracking | Determinization. `Sample` never sees the real engine, log, seed or hidden hash. **(spellbench-prep)** `azmcts.NewRedeal` wraps it for search. |
 | Observation | `view.Project` / `ProjectFor` (`Seat` / `Public` / `Omniscient`); `policynet.EncodeState` / `EncodeOption` | Hidden zones are counts. Omniscient never exposes library order. |
 | Terminal / reward | `View.Over`, `View.Winner`; `searchprobe.LeafValue` (heuristic leaf); `policynet` value head | No shaped reward is built in. Win/loss is the ground truth. |
 | Replay and audit | `events.Log` (sha256 chain, `Head()`), `replay.Replay` / `ReplayTo` | Any game a policy plays can be re-run and checked event for event. |
@@ -261,8 +261,8 @@ opens the shared imaged registry.
 
 ### Search
 
-- **PIMC teacher and seat (main).** `internal/searchseat` and
-  `internal/searchprobe`, used by `cmd/searchteacher` and `botbench -a
+- **PIMC teacher and seat (main).** `bots/searchseat` and
+  `bots/searchprobe`, used by `lab/cmd/searchteacher` and `botbench -a
   search`. The method is ensemble determinization:
   - sample K hidden-information worlds;
   - roll every candidate out with the default policy;
@@ -274,7 +274,7 @@ opens the shared imaged registry.
   coverage falls to 4.8% after turn 13
   (`docs/superpowers/reports/2026-09-24-training-approaches-summary.md`). It
   is merged opt-in and has not been promoted.
-- **AlphaZero-style PUCT (spellbench-prep).** `internal/azmcts`, used by
+- **AlphaZero-style PUCT (spellbench-prep).** `bots/azmcts`, used by
   `botbench -a az` and `-a az-redeal`:
   - The search is single-perspective: tree nodes are only the seat's own
     searched decisions, and `botpolicy.Decide` plays everything else.
@@ -296,7 +296,7 @@ opens the shared imaged registry.
 
 ### Learned policies
 
-`internal/policynet` is a pure-Go learned policy:
+`bots/policynet` is a pure-Go learned policy:
 
 - hashed FNV features, an MLP scorer and an optional value head;
 - hand-derived gradients, no autodiff;
@@ -304,14 +304,14 @@ opens the shared imaged registry.
 
 The tools around it:
 
-- `cmd/policytrain` trains it with single-threaded, deterministic SGD. The
+- `lab/cmd/policytrain` trains it with single-threaded, deterministic SGD. The
   same seed and corpus produce a byte-identical checkpoint, which is why it
   has no `-workers` flag. It supports CE, hybrid, PPO and value-only losses.
-- `cmd/searchteacher` produces label corpora.
-- `cmd/exitloop` runs the teacher → train → bench generations.
-- `cmd/policytune` SPSA-fits the small JSON cast profiles in
-  `botpolicy/profiles/`.
-- `cmd/traindash` is a read-only dashboard.
+- `lab/cmd/searchteacher` produces label corpora.
+- `lab/cmd/exitloop` runs the teacher → train → bench generations.
+- `lab/cmd/policytune` SPSA-fits the small JSON cast profiles in
+  `bots/botpolicy/profiles/`.
+- `lab/cmd/traindash` is a read-only dashboard.
 - `seat.NewPolicyNetBot` plays a checkpoint. Any kind the net does not answer
   goes to the default bot.
 
@@ -341,7 +341,7 @@ criteria at each stage (`docs/superpowers/specs/2026-09-27-alphazero-mcts-design
 
 ### Evaluating a policy
 
-`cmd/botbench` is the only evaluation harness.
+`lab/cmd/botbench` is the only evaluation harness.
 
 - Game *i* is seeded `base + i`, seats trade policies every game, and
   `-pairs all` runs the full deck-pair matrix with per-pair and pooled 95% CIs.
@@ -364,18 +364,18 @@ spellbench-prep).
 SpellBench scale. It plays them against sb-uniform (the 1000-Elo anchor),
 sb-heuristic, `bot` and the promoted champions, and reports anchored
 Bradley–Terry Elo with bootstrap CIs. Policies are registered by name in
-`internal/spellbench/registry`, with the `base+decorator+decorator` spec
+`lab/training/spellbench/registry`, with the `base+decorator+decorator` spec
 grammar; `passguard` is the worked example of a decorator.
 
 ### Adoption ladder
 
 A policy moves up one rung at a time. Each rung has a gate.
 
-1. **Bench-only.** Wire it into `cmd/botbench` (`-a <name>`) or, after
-   spellbench-prep lands, register it in `internal/spellbench/registry`. No
+1. **Bench-only.** Wire it into `lab/cmd/botbench` (`-a <name>`) or, after
+   spellbench-prep lands, register it in `lab/training/spellbench/registry`. No
    gate beyond the rules below. Research modes (clairvoyant, oracle, `search`,
    `az`, `policynet`) stay here.
-2. **Hosted, opt-in.** Add it to `host/bot_policy.go`'s closed vocabulary
+2. **Hosted, opt-in.** Add it to `server/host/bot_policy.go`'s closed vocabulary
    (today: `bot`, `lethal-pressure`, `cast-profile`), so that `POST /api/games`
    can select it with `bot_policy`. Requirements:
    - It must be seat-honest (no clairvoyance, nothing the view does not

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 )
 
 // searchOutcome is one timed search at one root.
@@ -77,7 +78,7 @@ func runSearch(r *result, w workload, base uint64, secs float64, mode string, si
 	switch mode {
 	case "az":
 		if azSearch == nil {
-			return fmt.Errorf("unavailable: internal/azmcts is not linked (build with -tags enginebench_az at a commit that has it)")
+			return fmt.Errorf("unavailable: bots/azmcts is not linked (build with -tags enginebench_az at a commit that has it)")
 		}
 		mk = func(seed uint64) searchFn { return azSearch(seed, sims) }
 		r.Row = fmt.Sprintf("az%d", sims)
@@ -119,7 +120,7 @@ func runSearch(r *result, w workload, base uint64, secs float64, mode string, si
 func searchGame(cfg rules.Config, search searchFn, det *searchDetail) error {
 	e := rules.New(cfg)
 	e.Advance()
-	bots := []*seat.Bot{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)}
+	bots := []*heuristic.Bot{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)}
 	feed := searchseat.NewFeed(0)
 	setup := searchprobe.PublicGame{Names: cfg.Names, Decks: cfg.Decks, Tokens: cfg.Tokens, StartingLife: cfg.StartingLife}
 	board := botpolicy.NewBoard(2)

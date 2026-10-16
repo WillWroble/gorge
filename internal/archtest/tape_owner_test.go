@@ -14,7 +14,7 @@ import (
 // TestTapeStateOwnedOnlyByTheResolutionKernel is the kernel-era successor of
 // TestResumeStateOwnedOnlyByTheResolutionMachinery (ruling T21-e's static
 // half for the mid-resolution ask). The legacy Engine.resume frame is gone:
-// every mid-resolution ask is now the resolution kernel's (rules/resolve), and
+// every mid-resolution ask is now the resolution kernel's (engine/rules/resolve), and
 // its per-engine state is the Engine.tape field (a resolve.Kernel whose
 // fields are unexported, so package rules can only drive it through its
 // methods). What rules CAN still do is overwrite the field wholesale -- and a
@@ -28,7 +28,7 @@ import (
 //
 // Named limits (a syntactic census, not a type-checked one): a write counts
 // when any selector in the assignment target's chain is named `tape`, except
-// rules/unless_payment.go's unrelated `unlessPayment.tape bool` (a chain whose
+// engine/rules/unless_payment.go's unrelated `unlessPayment.tape bool` (a chain whose
 // `tape` hangs off a selector named `unlessPayment`, or an assignment of the
 // bool literals true/false). An alias bound from e.tape and assigned through
 // would defeat it, as would a whole-engine `*e = ...` copy (the one today,
@@ -36,9 +36,9 @@ import (
 // is itself a listed writer).
 func TestTapeStateOwnedOnlyByTheResolutionKernel(t *testing.T) {
 	allowed := map[string]string{
-		"cloneFieldsEngineResolveKernel": "a snapshot clone starts from tape.ForClone(): the posed checkpoint shared, nothing in flight (rules/clone_gen.go, generated from the clone tags)",
-		"(*Engine).entryPreview":         "a speculative entry preview carries no kernel state, so its private asks never join the live run (rules/entry_counters.go)",
-		"(*resolveBoard).Restore":        "the kernel's own checkpoint restore: the live kernel and epoch survive the in-place copy of S0 (rules/resolve_board.go)",
+		"cloneFieldsEngineResolveKernel": "a snapshot clone starts from tape.ForClone(): the posed checkpoint shared, nothing in flight (engine/rules/clone_gen.go, generated from the clone tags)",
+		"(*Engine).entryPreview":         "a speculative entry preview carries no kernel state, so its private asks never join the live run (engine/rules/entry_counters.go)",
+		"(*resolveBoard).Restore":        "the kernel's own checkpoint restore: the live kernel and epoch survive the in-place copy of S0 (engine/rules/resolve_board.go)",
 	}
 	writers := kr9TapeFieldWriters(t)
 	for fn, sites := range writers {
@@ -66,12 +66,12 @@ func TestTapeStateOwnedOnlyByTheResolutionKernel(t *testing.T) {
 	}
 }
 
-// kr9TapeFieldWriters walks the non-test rules/ sources (recursively) and
+// kr9TapeFieldWriters walks the non-test engine/rules/ sources (recursively) and
 // returns every function assigning through a `tape` selector, keyed by the
 // receiver-qualified function name, with the sites it writes.
 func kr9TapeFieldWriters(t *testing.T) map[string][]string {
 	t.Helper()
-	dir := filepath.Join("..", "..", "rules")
+	dir := filepath.Join("..", "..", "engine", "rules")
 	files := goSourcesUnder(t, dir)
 	if len(files) == 0 {
 		t.Fatalf("no rules sources found under %s (cwd %s)", dir, mustCwd())

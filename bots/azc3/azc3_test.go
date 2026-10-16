@@ -11,15 +11,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/gonet/gonettest"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 func TestNothingIsRegisteredUntilEnabled(t *testing.T) {
@@ -122,8 +123,8 @@ func TestFactoryNeedsAutoPayAndBuildsAnEnvSeat(t *testing.T) {
 	if _, ok := s.(bots.EnvSeat); !ok {
 		t.Errorf("%T is not a bots.EnvSeat", s)
 	}
-	if _, ok := s.(seat.BoardSeat); !ok {
-		t.Errorf("%T is not a seat.BoardSeat", s)
+	if _, ok := s.(heuristic.BoardSeat); !ok {
+		t.Errorf("%T is not a heuristic.BoardSeat", s)
 	}
 	b, ok := s.(bots.BudgetedSeat)
 	if !ok || b.DecisionBudgetMS() != 1234 {

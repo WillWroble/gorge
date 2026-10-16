@@ -9,16 +9,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // autoPay is a run's auto-pay configuration (-autopay, -explore-autopay):
 // which seats play with the hosted bot's payment-plan wrapper
-// (seat.Bot.EnableAutoPayMana -- the seat host.NewBotPolicySeatWithAutoPayMana
+// (heuristic.Bot.EnableAutoPayMana -- the seat host.NewBotPolicySeatWithAutoPayMana
 // builds, and the one gorged's -bot-auto-mana default puts on every hosted
 // bot). An auto-pay seat casts through the engine's offered PaymentActions
 // plan instead of floating mana by hand.

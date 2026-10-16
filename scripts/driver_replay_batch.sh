@@ -2,7 +2,7 @@
 # Batch-land tickets parked for an XMage driver host replay (operator, 2026-10-06).
 #
 # agentctl's gate "xmage driver needs host replay" (.agentctl/config.toml)
-# parks every ticket whose branch touches tools/xmageoracle/ at human_needed:
+# parks every ticket whose branch touches lab/oracle/xmageoracle/ at human_needed:
 # only a host XMage replay can judge a driver change. Doing that by hand was 7
 # tickets in 4 replays on 2026-10-06. This loop does it unattended, ONE replay
 # per pass instead of one per ticket:
@@ -25,7 +25,7 @@
 #   2. merge their branches onto ONE integration branch wt/driver-batch-<stamp>
 #      (a branch that conflicts is skipped and stays parked; never resolved here);
 #   3. run the capped build/tests, then ONE forced full replay
-#      (validation/oracle/full-replay.sh) under the heavy lock;
+#      (lab/oracle/validation/oracle/full-replay.sh) under the heavy lock;
 #   4. verdict-compare against main: "regressed 0" lands everything;
 #   5. otherwise each regressed row is replayed 4x on the integration driver --
 #      not all equal = FLAKY (main's verdict row is kept, .ds4/driver-flakes.log
@@ -33,8 +33,8 @@
 #      so a known flake is never named CULPRIT); stable = attributed by
 #      replaying that row on the batch WITHOUT each branch in turn (newest
 #      first). A branch that touches gorge's side of the comparison -- any Go
-#      change outside tools/xmageoracle (touches_gorge), which includes the
-#      compliance/oraclegen and cmd/oraclediff generator -- can change both the
+#      change outside lab/oracle/xmageoracle (touches_gorge), which includes the
+#      lab/oracle/compliance/oraclegen and lab/cmd/oraclediff generator -- can change both the
 #      scenario and gorge's result, so the row is REGENERATED on the batch
 #      without that branch (oraclediff gen, that set) AND replayed on the
 #      probe's own driver (one_scenario). Every selected ticket changed the
@@ -54,8 +54,8 @@
 #      other row no single branch clears (MAIN-ALONE says why) lands NOTHING and
 #      every ticket stays parked with the findings.
 #
-# DRIFT pass: a change to the scenario generator (compliance/oraclegen,
-# cmd/oraclediff, compliance/manifests) changes what XMage is asked, but is never
+# DRIFT pass: a change to the scenario generator (lab/oracle/compliance/oraclegen,
+# lab/cmd/oraclediff, lab/oracle/compliance/manifests) changes what XMage is asked, but is never
 # replayed on its own, so its breakage would surface as unattributable
 # "regressions" in an unrelated driver batch (where DRIFT-MAIN above catches it).
 # When NO ticket is parked, the gates
@@ -114,17 +114,17 @@ POLL=${DRB_POLL:-120}
 COOLDOWN=${DRB_COOLDOWN:-1800}
 LASTMAIN=${DRB_LASTMAIN:-$repo/.ds4/driver-replay-last-main}
 DRIFTLOG=${DRB_DRIFT_LOG:-$repo/.ds4/driver-drift.log}
-GEN_PATHS=(compliance/oraclegen cmd/oraclediff compliance/manifests)
+GEN_PATHS=(lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests)
 FLAKE_RUNS=4
 KEEP_RUNS=3
 
 read -ra LOCKRUN <<<"${DRB_LOCKRUN:-$repo/scripts/heavy_lock.sh run --}"
 read -ra WORKTREE_CMD <<<"${DRB_WORKTREE_CMD:-scripts/agent-worktree.sh}"
 read -ra REPLAY_CMD <<<"${DRB_REPLAY_CMD:-validation/oracle/full-replay.sh}"
-read -ra COMPARE_CMD <<<"${DRB_COMPARE_CMD:-python3 validation/oracle/verdict-compare.py}"
+read -ra COMPARE_CMD <<<"${DRB_COMPARE_CMD:-python3 lab/oracle/validation/oracle/verdict-compare.py}"
 read -ra SCEN_CMD <<<"${DRB_SCENARIO_CMD:-scripts/xmage-oracle-run.sh}"
 read -ra GEN_CMD <<<"${DRB_GEN_CMD:-}"
-read -ra RATCHET_CMD <<<"${DRB_RATCHET_CMD:-go run ./cmd/oraclediff status -all -write-ratchet}"
+read -ra RATCHET_CMD <<<"${DRB_RATCHET_CMD:-go run ./lab/cmd/oraclediff status -all -write-ratchet}"
 
 mkdir -p "$(dirname "$LOG")" "$(dirname "$FLAKES")"
 say() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
@@ -150,11 +150,11 @@ checks() {
     # -timeout is the PACKAGE wall, not the 1-minute per-test budget: oraclegen/
     # templates takes 120-170 s even on a quiet box and lb-roomspell was parked
     # "red alone" on a 2m timeout at load 76 (2026-10-12), so give it 10m.
-    capped go test -timeout 10m ./compliance/oraclegen ./compliance/oraclegen/templates ./cmd/oraclediff || exit 1
-    if [ "$1" = post ]; then capped go test -timeout 10m ./compliance/adopt ./compliance/gate ./compliance || exit 1; fi
-    # Census guards too: a driver/runner branch that edits rules/ trips the
+    capped go test -timeout 10m ./lab/oracle/compliance/oraclegen ./lab/oracle/compliance/oraclegen/templates ./lab/cmd/oraclediff || exit 1
+    if [ "$1" = post ]; then capped go test -timeout 10m ./lab/oracle/compliance/adopt ./lab/oracle/compliance/gate ./lab/oracle/compliance || exit 1; fi
+    # Census guards too: a driver/runner branch that edits engine/rules/ trips the
     # param census (50a74c19c went red on oracleRun.build). ~10s, 0.9 GB.
-    capped go test -timeout 10m -run 'Oracle|Census' ./rules || exit 1
+    capped go test -timeout 10m -run 'Oracle|Census' ./engine/rules || exit 1
   ) >"$2" 2>&1
 }
 
@@ -381,7 +381,7 @@ elif cmd == "scenariochanged":
     wt, ref, rid = args
     import subprocess
     current = None
-    for f in sorted(glob.glob(os.path.join(wt, "compliance/verdicts/*.jsonl"))):
+    for f in sorted(glob.glob(os.path.join(wt, "lab/oracle/compliance/verdicts/*.jsonl"))):
         for line in open(f):
             if line.strip() and json.loads(line).get("id") == rid:
                 current = json.loads(line).get("scenario_sha")
@@ -390,8 +390,8 @@ elif cmd == "scenariochanged":
             break
     if current is None:
         sys.exit(1)
-    for f in sorted(glob.glob(os.path.join(wt, "compliance/verdicts/*.jsonl"))):
-        rel = "compliance/verdicts/" + os.path.basename(f)
+    for f in sorted(glob.glob(os.path.join(wt, "lab/oracle/compliance/verdicts/*.jsonl"))):
+        rel = "lab/oracle/compliance/verdicts/" + os.path.basename(f)
         show = subprocess.run(["git", "-C", wt, "show", ref + ":" + rel], capture_output=True, text=True, check=True).stdout
         for line in show.split("\n"):
             if line.strip() and json.loads(line).get("id") == rid:
@@ -402,12 +402,12 @@ elif cmd == "keepmain":
     # keepmain WT MAINSHA ID: put main's verdict row for ID back in WT's file
     wt, ref, rid = args
     import subprocess
-    for f in sorted(glob.glob(os.path.join(wt, "compliance/verdicts/*.jsonl"))):
+    for f in sorted(glob.glob(os.path.join(wt, "lab/oracle/compliance/verdicts/*.jsonl"))):
         lines = open(f).read().split("\n")
         idx = [i for i, l in enumerate(lines) if l.strip() and json.loads(l).get("id") == rid]
         if not idx:
             continue
-        rel = "compliance/verdicts/" + os.path.basename(f)
+        rel = "lab/oracle/compliance/verdicts/" + os.path.basename(f)
         show = subprocess.run(["git", "-C", wt, "show", ref + ":" + rel], capture_output=True, text=True, check=True).stdout
         old = [l for l in show.split("\n") if l.strip() and json.loads(l).get("id") == rid]
         if not old:
@@ -419,8 +419,8 @@ elif cmd == "keepmain":
 elif cmd == "mainrow":
     wt, ref, rid = args
     import subprocess
-    for f in sorted(glob.glob(os.path.join(wt, "compliance/verdicts/*.jsonl"))):
-        rel = "compliance/verdicts/" + os.path.basename(f)
+    for f in sorted(glob.glob(os.path.join(wt, "lab/oracle/compliance/verdicts/*.jsonl"))):
+        rel = "lab/oracle/compliance/verdicts/" + os.path.basename(f)
         show = subprocess.run(["git", "-C", wt, "show", ref + ":" + rel], capture_output=True, text=True).stdout
         for l in show.split("\n"):
             if l.strip() and json.loads(l).get("id") == rid:
@@ -472,7 +472,7 @@ last_main() {
 }
 record_last_main() { git rev-parse --verify -q "$1^{commit}" >"$LASTMAIN.tmp" && mv -f "$LASTMAIN.tmp" "$LASTMAIN"; }
 # gen_key <ref>: identifies the driver + generator at <ref> (their tree ids).
-gen_key() { git ls-tree -d "$1" -- tools/xmageoracle compliance/oraclegen cmd/oraclediff compliance/manifests | sha1sum | cut -c1-12; }
+gen_key() { git ls-tree -d "$1" -- lab/oracle/xmageoracle lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests | sha1sum | cut -c1-12; }
 # drift_known <row>: 0 iff a DRIFT replay of this driver+generator regressed the row.
 drift_known() {
   [ -e "$DRIFTLOG" ] || return 1
@@ -546,9 +546,9 @@ one_scenario() {
 # Fall back to the driver's tree hash if there is no commit in its path history.
 driver_sha() {
   local sha
-  sha=$(git log -1 --format=%H "$1" -- tools/xmageoracle | cut -c1-12)
+  sha=$(git log -1 --format=%H "$1" -- lab/oracle/xmageoracle | cut -c1-12)
   if [ -z "$sha" ]; then
-    sha=$(git rev-parse "$1:tools/xmageoracle" 2>/dev/null | cut -c1-12)
+    sha=$(git rev-parse "$1:lab/oracle/xmageoracle" 2>/dev/null | cut -c1-12)
   fi
   printf '%s' "$sha"
 }
@@ -573,7 +573,7 @@ known_flaky() {
 # or the code that computes gorge's side of the comparison. Driver-only Java
 # changes remain on the XMage replay path.
 touches_gorge() {
-  git diff --name-only "$MAIN"..."${BR[$1]}" -- compliance/oraclegen cmd/oraclediff compliance/manifests '*.go' ':!tools/xmageoracle/**' 2>/dev/null | /usr/bin/grep -q .
+  git diff --name-only "$MAIN"..."${BR[$1]}" -- lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests '*.go' ':!lab/oracle/xmageoracle/**' 2>/dev/null | /usr/bin/grep -q .
 }
 
 # regen_row <probe> <id> <outfile>: regenerate the scenario row <id> on <probe>'s
@@ -588,7 +588,7 @@ regen_row() {
   if [ "${#GEN_CMD[@]}" -gt 0 ]; then
     (cd "$dir" && "${GEN_CMD[@]}" "$set" "$gen" "$repo/.cards") >"$gen.stdout.log" 2>"$genlog" || { say "ATTRIBUTE generator failed for $id: $(head -n1 "$genlog")"; return 1; }
   else
-    (cd "$dir" && capped go run ./cmd/oraclediff gen -cards "$repo/.cards" -level "${ORACLE_LEVEL:-B}" -manifest "compliance/manifests/$set.json" -out "$gen") >"$gen.stdout.log" 2>"$genlog" || { say "ATTRIBUTE generator failed for $id: $(head -n1 "$genlog")"; return 1; }
+    (cd "$dir" && capped go run ./lab/cmd/oraclediff gen -cards "$repo/.cards" -level "${ORACLE_LEVEL:-B}" -manifest "lab/oracle/compliance/manifests/$set.json" -out "$gen") >"$gen.stdout.log" 2>"$genlog" || { say "ATTRIBUTE generator failed for $id: $(head -n1 "$genlog")"; return 1; }
   fi
   py row "$id" "$gen" >"$out" || return 1
   [ -s "$out" ]
@@ -623,7 +623,7 @@ cleared() {
     if [ -n "$tree" ]; then (cd "$tree" && $DRB_DIFF_CMD "$scen" "$xm" "$v") >/dev/null 2>&1
     else $DRB_DIFF_CMD "$scen" "$xm" "$v" >/dev/null 2>&1; fi
   elif [ -n "$tree" ]; then
-    (cd "$tree" && capped go run ./cmd/oraclediff diff -cards "$repo/.cards" -scenarios "$scen" -xmage "$xm" -out "$v" -write "$v.rows" -xmage-ref "$(sed -n 's/^XMAGE_REF *?= *//p' "$wt/Makefile")") >/dev/null 2>&1
+    (cd "$tree" && capped go run ./lab/cmd/oraclediff diff -cards "$repo/.cards" -scenarios "$scen" -xmage "$xm" -out "$v" -write "$v.rows" -xmage-ref "$(sed -n 's/^XMAGE_REF *?= *//p' "$wt/Makefile")") >/dev/null 2>&1
   else
     "$SCEN_ROOT/oraclediff" diff -scenarios "$scen" -xmage "$xm" -out "$v" -write "$v.rows" -xmage-ref "$(sed -n 's/^XMAGE_REF *?= *//p' "$wt/Makefile")" >/dev/null 2>&1
   fi
@@ -786,7 +786,7 @@ classify() {
 land() { # land <regressed count> <flaky count>; returns 0 landed, 1 aborted/held, 2 redo
   local id sha lbl=${MERGED[*]:-drift-refresh}
   (cd "$wt" && "${RATCHET_CMD[@]}") >"$run.ratchet.log" 2>&1 || { infra_fail "ratchet command failed (see $run.ratchet.log)"; return 1; }
-  git -C "$wt" add -A -- compliance/verdicts compliance/triage compliance/ratchet.json
+  git -C "$wt" add -A -- lab/oracle/compliance/verdicts lab/oracle/compliance/triage lab/oracle/compliance/ratchet.json
   if ! git -C "$wt" diff --cached --quiet; then
     git -C "$wt" commit -q -m "compliance: driver batch replay $bid ($(echo "$lbl" | tr ' ' ','))" || { infra_fail "commit failed"; return 1; }
   fi
@@ -1017,7 +1017,7 @@ record_drift() {
     file_ticket "XMage drift: $cls scenarios regressed after a generator change" "$origin (driver_replay_batch, $bid) regressed these \`$cls\` rows against main's recorded verdicts. The XMage driver was not changed; the scenario generator was.
 
 $rows
-Candidate commits (compliance/oraclegen, cmd/oraclediff since the last replayed main ${last:0:12}): $commits
+Candidate commits (lab/oracle/compliance/oraclegen, lab/cmd/oraclediff since the last replayed main ${last:0:12}): $commits
 
 The refreshed verdicts are landed on main; this ticket fixes the generator or the driver so the rows agree again. Log: .ds4/driver-replay-batch.log (DRIFT lines), run $rdir." >/dev/null 2>&1 &&
       say "DRIFT-TICKET filed for class $cls" ||

@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
 )
 
 func TestBudgetPredicateDoesNotChangeGame(t *testing.T) {

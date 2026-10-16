@@ -1,4 +1,4 @@
-// Command mtgsim plays headless games between seat.Bot instances over the
+// Command mtgsim plays headless games between heuristic.Bot instances over the
 // repo's 12 Legacy decks and verifies that each one replays to the same
 // event chain. It is the harness M5's performance work and the AI seat will
 // both build on -- a way to run many real games with no client, no network
@@ -14,16 +14,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
 )
 
-// maxIntents bounds a single game the same way rules/acceptance_test.go's
+// maxIntents bounds a single game the same way engine/rules/acceptance_test.go's
 // own acceptance gate does: a game that has not produced a decision inside
 // this many intents is not "slow", it is not terminating, and mtgsim reports
 // that as a failure rather than spinning forever.
@@ -157,7 +159,7 @@ func playOne(out io.Writer, seed uint64, names []string, decks [][]*cards.Card, 
 			sparePool.Put(spare, e)
 		}
 	}()
-	b := seat.NewBot(seed)
+	b := heuristic.NewBot(seed)
 	// CR 103.1's winner-chooses ask: pose it so the bot answers it (the
 	// recorded Intent replays through the log's DecisionAsk).
 	e.AskStartingPlayer()
@@ -210,7 +212,7 @@ func reportDriveFailure(out io.Writer, seed uint64, seats, n int, err error) boo
 }
 
 // driveGame submits bot intents until the game ends, a seat errors, an
-// intent is rejected -- or the engine's livelock watcher (rules/livelock.go)
+// intent is rejected -- or the engine's livelock watcher (engine/rules/livelock.go)
 // aborts the game from inside Advance/Submit. That last shape cannot be a
 // returned error from Submit: the loop is stuck INSIDE one Submit call, so
 // the watcher panics with a *rules.LivelockError and this recovers it,

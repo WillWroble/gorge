@@ -19,7 +19,7 @@ from pathlib import Path
 # conformance lane is 0 FAIL and `make sim` is 20/20 replay OK.
 AUTO_ACCEPT_HEAD_MOVES = True
 
-HEADS_CMD = ["go", "test", "./rules", "-run", "TestHeads", "-v"]   # gates.py:64-65
+HEADS_CMD = ["go", "test", "./engine/rules", "-run", "TestHeads", "-v"]   # gates.py:64-65
 HEADS_TIMEOUT = 120
 _HEAD_RE = re.compile(r"(\d+) seats: chain head ([0-9a-f]{16}), golden [0-9a-f]{16}")  # daemon.py:788
 
@@ -37,9 +37,9 @@ def sim_all_replayed(output: str) -> bool:
 
 
 def apply_head_move(wt: Path, seat_count: int, new_hash: str, reason: str) -> bool:
-    """Re-pin one seat count's golden: rules/testdata/heads/<seats>.txt holds
+    """Re-pin one seat count's golden: engine/rules/testdata/heads/<seats>.txt holds
     the hash and a newline, nothing else. The cause is NOT written into the
-    tree (that prose, prepended to rules/heads_test.go on every move, was a
+    tree (that prose, prepended to engine/rules/heads_test.go on every move, was a
     merge conflict by construction; its history is frozen in
     docs/agents/heads-history.md) -- testheads_policy puts it in the commit
     message instead; `reason` stays in the signature for its callers."""

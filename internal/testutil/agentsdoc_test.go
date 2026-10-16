@@ -23,7 +23,7 @@ const (
 	// data rows (main had 15; its constant had not yet been lowered from 16).
 	// Earlier merges kept four
 	// disjoint closures alongside the prior deletions: this branch's rv1
-	// RevealAllValid$ closure (effects/cardflow.go effReveal,
+	// RevealAllValid$ closure (engine/effects/cardflow.go effReveal,
 	// agent-20260922T191943Z-4ffa25b7), main's task scrybottom
 	// `T:Mode$ Scry`/`R:Event$ Scry` row (whose "whenever you scry" trigger
 	// half is closed there; the still-unclosed `R:Event$ Scry` replacement
@@ -36,11 +36,11 @@ const (
 	// the controller choice landed in 74870371 and the IgnoreLegendRule
 	// exemption (incl. its IsPresent$/PresentCompare$ condition gate) here.
 	// agent-20260919T142536Z-0a361fe7 deleted the devthr1 `Count$`-bodies row:
-	// its `CardNumAttacksThisTurn` member is now modelled (effects/count.go
+	// its `CardNumAttacksThisTurn` member is now modelled (engine/effects/count.go
 	// evalCountBody reads state.Object.AttacksThisTurn); the other five bodies
 	// it bundled (MaxOppDamageThisTurn, YourStartingLife, ResolvedThisTurn,
 	// NonCombatDamageThisTurn, ChosenNumber) remain tracked bidirectionally by
-	// rules/count_head_ratchet_test.go's knownUnmodelledCountHeads and are
+	// engine/rules/count_head_ratchet_test.go's knownUnmodelledCountHeads and are
 	// recorded in that ticket's commit message and report, not a new row.
 	// The PayLife<X> replacement closure (cli-20260922T225142Z-226d3d19)
 	// deletes one further row (main measured 15 against a stale constant of 16).

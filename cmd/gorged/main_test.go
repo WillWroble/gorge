@@ -15,13 +15,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/deck"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/deck"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/protocol"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
 func TestServesTablesOverHTTP(t *testing.T) {
@@ -389,7 +389,7 @@ func fastPollDecision(t *testing.T, pendingURL, seat, tok string) decision.Decis
 // than `after` (strictly greater Seq; after == 0 accepts the first decision
 // served) — the shape every poll that FOLLOWS an answer needs. Between
 // SubmitIntent's 204 and the match goroutine consuming the answer, the seat
-// slot is still installed (host/humanseat.go: the parked await's defer clears
+// slot is still installed (server/host/humanseat.go: the parked await's defer clears
 // it), so Pending serves the just-answered ask with 200; a first-200 poll
 // inside that window re-serves the stale decision. That is exactly what
 // flaked the 2026-10-01 module gate on

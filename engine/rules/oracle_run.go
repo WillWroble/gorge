@@ -1,0 +1,2713 @@
+package rules
+
+// Oracle-text card audit (docs/superpowers/specs/2026-09-27-oracle-text-card-audit.md).
+//
+// Every scenario under testdata/oracle/<family>/<card>.json states what a
+// card does according to its PRINTED (Oracle) text and the Comprehensive
+// Rules, written by an author who never read the card's Forge script. The
+// runner below builds a real two-seat game around real corpus cards, drives
+// it only through the actions a player has (cast, activate, attack, block,
+// pass priority, answer a decision), and asserts observable state: zones,
+// life, P/T, keywords, counters, the stack, and what the engine offers. A
+// failure therefore means the engine+script disagrees with the printed card,
+// whichever side is wrong.
+//
+// The runner's only non-player actions are SETUP (placing named cards into
+// zones and setting life totals before turn 1, as logged MoveZone and
+// LifeChange events) and the "mana"/"move"/"life" ops, which stand in for
+// an unspecified outside effect. All of them go through e.emit, so every
+// scenario still replays from its log.
+//
+// Nothing here embeds card script or Oracle text: scenarios name cards and
+// the corpus is read at run time (the GPL boundary, AGENTS.md).
+
+import (
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules/pay"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+type oracleFile struct {
+	Card      string           `json:"card"`
+	Family    string           `json:"family"`
+	Author    string           `json:"author"`
+	OracleSHA string           `json:"oracle_sha,omitempty"`
+	Scenarios []oracleScenario `json:"scenarios"`
+}
+
+type oracleScenario struct {
+	Name   string   `json:"name"`
+	Turn   *int     `json:"turn,omitempty"`
+	CR     []string `json:"cr"`
+	Why    string   `json:"why"`
+	Format string   `json:"format,omitempty"`
+	// Players is the seat count: 0 (absent) seats the two-player game every
+	// scenario but a multiplayer one plays, so its bytes never carry the
+	// field; 3 seats p0 plus two opponents, where a player who loses the game
+	// leaves it (CR 800.4a) and the game goes on (CR 104.2a).
+	Players int                   `json:"players,omitempty"`
+	Setup   map[string]oracleSeat `json:"setup"`
+	// SetupAnswers answer decisions posed while the runner drives from
+	// genesis to turn 1's first main phase (a setup permanent's upkeep
+	// trigger), in place of the fallback.
+	SetupAnswers []oracleAnswer `json:"setup_answers,omitempty"`
+	Steps        []oracleStep   `json:"steps"`
+	Expect       []oracleExpect `json:"expect"`
+	// xmageFixture marks a generated compliance scenario
+	// (RunOracleScenarioJSON). Setup permanents are present before turn 1 in
+	// both engines (build drops the triggers their placement queued); the
+	// driver clears XMage's seeded entry history. Never decoded from JSON.
+	xmageFixture bool
+}
+
+type oracleSeat struct {
+	Hand        []string `json:"hand,omitempty"`
+	Battlefield []string `json:"battlefield,omitempty"`
+	// BackFace names battlefield cards setup places on their back face (face
+	// index 1), by emitting an events.FlipFace after the battlefield move. It
+	// lets a permanent start transformed without a transform game action (the
+	// setup shortcut a DoubleFaced/Modal face-1 scenario needs).
+	BackFace  []string `json:"back_face,omitempty"`
+	Tapped    []string `json:"tapped,omitempty"`
+	Graveyard []string `json:"graveyard,omitempty"`
+	Library   []string `json:"library,omitempty"`
+	Exile     []string `json:"exile,omitempty"`
+	Command   []string `json:"command,omitempty"`
+	// LibraryTop puts these cards on top of the library, first = top.
+	LibraryTop []string `json:"library_top,omitempty"`
+	// Sideboard is the seat's cards outside the game (Config.Sideboards),
+	// for "from outside the game" effects. They are genesis configuration,
+	// not dealt from the deck, and are bound as "pN:Name" refs like the rest.
+	Sideboard []string `json:"sideboard,omitempty"`
+	// Mana seeds these symbols (WUBRGC) into the seat's pool once the setup
+	// drive reaches turn 1's first main phase, before any decision there is
+	// answered -- the outside effect that funds a first-main-phase trigger's
+	// cost (Vanille's {3}{B}{G}). It is emitted as ordinary ManaAdd events,
+	// so the scenario still replays from its log like every other setup op.
+	Mana string `json:"mana,omitempty"`
+	Life *int32 `json:"life,omitempty"`
+	// Counters puts counters on this seat's battlefield placements at setup:
+	// card name -> counter kind (gorge spelling: LOYALTY, P1P1) -> how many,
+	// ADDED to whatever the card enters with (a planeswalker's printed
+	// loyalty). Like Tapped it applies to every placement of that name. It
+	// stands in for an unspecified outside effect, as logged CounterChange
+	// events, so the scenario still replays from its log.
+	Counters map[string]map[string]int32 `json:"counters,omitempty"`
+	// Speed is the seat's starting speed (CR 702.179), 0..4, set with a
+	// SpeedChange event during setup.
+	Speed int32 `json:"speed,omitempty"`
+}
+
+// setupCounters lists the counters a seat's setup puts on a battlefield
+// placement named name, kinds sorted so the emitted events are deterministic.
+func setupCounters(s oracleSeat, name string) []events.Event {
+	var out []events.Event
+	for card, kinds := range s.Counters {
+		if cards.NormalizeName(card) != cards.NormalizeName(name) {
+			continue
+		}
+		for kind, n := range kinds {
+			if n != 0 {
+				out = append(out, events.Event{Kind: events.CounterChange, Counter: normCounter(kind), Amount: n})
+			}
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Counter != out[j].Counter {
+			return out[i].Counter < out[j].Counter
+		}
+		return out[i].Amount < out[j].Amount
+	})
+	return out
+}
+
+type oracleStep struct {
+	Op       string   `json:"op"`
+	Seat     int      `json:"seat"`
+	Card     string   `json:"card,omitempty"`
+	Mana     string   `json:"mana,omitempty"`
+	Targets  []string `json:"targets,omitempty"`
+	Kicked   bool     `json:"kicked,omitempty"`
+	CastMode string   `json:"cast_mode,omitempty"`
+	Ability  string   `json:"ability,omitempty"`
+	// AbilityIndex names an activated ability by its IR index -- the index
+	// into the source's Face().Abilities, the same anchor
+	// decision.Option.Ability carries -- so a level-B activate template can
+	// select an ability without pasting the script's SpellDescription text
+	// into the step. It wins over Ability; when both are given the label must
+	// also match or the step fails.
+	AbilityIndex *int           `json:"ability_index,omitempty"`
+	Attackers    []string       `json:"attackers,omitempty"`
+	Defender     string         `json:"defender,omitempty"`
+	Blocks       [][2]string    `json:"blocks,omitempty"`
+	Step         string         `json:"step,omitempty"`
+	Active       string         `json:"active,omitempty"`
+	Decision     string         `json:"decision,omitempty"`
+	To           string         `json:"to,omitempty"`
+	AttachedTo   string         `json:"attached_to,omitempty"`
+	Amount       int32          `json:"amount,omitempty"`
+	Answers      []oracleAnswer `json:"answers,omitempty"`
+	Observe      *oracleObserve `json:"observe,omitempty"`
+	Expect       []oracleExpect `json:"expect,omitempty"`
+}
+
+// oracleOfferedKindAlias maps an offered kind a scenario names to the option
+// kind gorge poses it as: playing a land is the "play" the XMage side offers.
+var oracleOfferedKindAlias = map[string]string{"play": "play_land"}
+
+type oracleObserve struct {
+	Kind   string   `json:"kind"`
+	Source string   `json:"source,omitempty"`
+	Has    []string `json:"has,omitempty"`
+	Not    []string `json:"not,omitempty"`
+}
+
+type oracleAnswer struct {
+	Kind string   `json:"kind"`
+	Pick []string `json:"pick"`
+	// Seat, when set, asserts the engine poses the decision this answer is
+	// consumed by to that seat; a mismatch is a harness failure (checked
+	// once the pick has proven consumption, so the generator's wildcard
+	// retry still sees its not-offered failures). The generated xmageport
+	// scenarios set it from the XMage choice's own player, so a decider that
+	// resolves to the wrong seat is caught even when the wrong seat's answer
+	// still produces the right board (B8: OptionalDecider$
+	// TriggeredSourceController asked the trigger source's controller
+	// instead of the damage source's). nil = no assertion.
+	Seat *int `json:"seat,omitempty"`
+}
+
+type oracleExpect struct {
+	Card       string   `json:"card,omitempty"`
+	Zone       string   `json:"zone,omitempty"`
+	PT         string   `json:"pt,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
+	NoKeywords []string `json:"no_keywords,omitempty"`
+	Types      []string `json:"types,omitempty"`
+	NoTypes    []string `json:"no_types,omitempty"`
+	// Colours asserts the card's current colour set (CR 105.2, layer 5) as
+	// WUBRG letters in any order; "" asserts colourless.
+	Colours        *string               `json:"colours,omitempty"`
+	Tapped         *bool                 `json:"tapped,omitempty"`
+	Damage         *int32                `json:"damage,omitempty"`
+	Counters       map[string]int32      `json:"counters,omitempty"`
+	Life           map[string]int32      `json:"life,omitempty"`
+	HandSize       map[string]int        `json:"hand_size,omitempty"`
+	GraveyardSize  map[string]int        `json:"graveyard_size,omitempty"`
+	Pool           map[string]string     `json:"pool,omitempty"`
+	TriggerOnStack string                `json:"trigger_on_stack,omitempty"`
+	StackSize      *int                  `json:"stack_size,omitempty"`
+	Offered        *oracleOffered        `json:"offered,omitempty"`
+	CanBlock       *oracleCanBlock       `json:"can_block,omitempty"`
+	CanAttack      *oracleCanAttack      `json:"can_attack,omitempty"`
+	AttackRequired *oracleAttackRequired `json:"attack_required,omitempty"`
+	// LookAtLibraryTop asserts, per seat, whether that player may look at
+	// the top card of their own library right now (a Continuous MayLookAt$
+	// grant, Engine.MayLookAtLibraryTop): hidden-information permission no
+	// snapshot field carries.
+	LookAtLibraryTop map[string]bool `json:"look_at_library_top,omitempty"`
+	// LookAt asserts, per seat, whether that player may look at the named
+	// battlefield object right now (a Continuous MayLookAt$ grant over a
+	// face-down permanent, mayLookAtObject): hidden-information permission
+	// no snapshot field carries. The value is the object ref, resolved like
+	// every other expect card.
+	LookAt map[string]string `json:"look_at,omitempty"`
+	// MaxHandSize asserts, per seat, that player's effective CR 514.1
+	// maximum hand size (a Continuous SetMaxHandSize$ static, the same read
+	// cleanupStep discards to): a player-rule number no snapshot field
+	// carries.
+	MaxHandSize map[string]int `json:"max_hand_size,omitempty"`
+	Count       *oracleCount   `json:"count,omitempty"`
+	Eq          *int           `json:"eq,omitempty"`
+	Want        *bool          `json:"want,omitempty"`
+}
+
+type oracleOffered struct {
+	Seat  int    `json:"seat"`
+	Kind  string `json:"kind"`
+	Card  string `json:"card"`
+	Label string `json:"label,omitempty"`
+}
+
+// mayLookAtObject is the Continuous MayLookAt grant's read over an arbitrary
+// object (Engine.MayLookAtLibraryTop is the same rule on the library top,
+// whose spec pins the object to a zone lookup a battlefield object does not
+// carry): a live grant's Affected$ spec matches id under the granting
+// controller. A free function over the engine's active slice and spec
+// matcher, passed as values so no new *Engine parameter joins the surface
+// ratchet; the look_at expectation's assertion is this permission read, and
+// the seat it asserts for is the granting static's controller in every
+// corpus shape (layers.go's MayLookAt branch names who may look).
+func mayLookAtObject(ces []ContinuousEffect, matches func(string, state.ObjID, state.PlayerID, state.ObjID) bool, id state.ObjID) bool {
+	for ceI := 0; ceI < len(ces); ceI++ {
+		ce := &ces[ceI]
+		if ce.MayLookAt && matches(ce.Affects, id, ce.Controller, ce.Source) {
+			return true
+		}
+	}
+	return false
+}
+
+type oracleCanBlock struct {
+	Blocker  string `json:"blocker"`
+	Attacker string `json:"attacker"`
+	// MaxBlockers, when set, additionally asserts the MinMaxBlocker Max$
+	// bound the matched pair option publishes (0 = no bound).
+	MaxBlockers *int `json:"max_blockers,omitempty"`
+}
+
+// oracleAttackRequired asserts whether the attacker option carries the
+// MustAttack requirement (Option.Required, set from mustAttackRequired in
+// askAttackers): a legality static that makes attacking MANDATORY is
+// otherwise invisible to the offered-options read.
+type oracleAttackRequired struct {
+	Attacker string `json:"attacker"`
+}
+
+type oracleCount struct {
+	Seat  int    `json:"seat"`
+	Zone  string `json:"zone"`
+	Name  string `json:"name"`
+	Token *bool  `json:"token,omitempty"`
+}
+
+// oracleHarnessError marks a failure to PERFORM a scenario (unknown card, a
+// ref that names nothing, a decision the runner cannot answer) as opposed
+// to an expectation mismatch. Triage reads the two differently: an action the
+// Oracle text says is legal but the engine does not offer is still reported
+// here, and may itself be the bug.
+type oracleHarnessError struct{ msg string }
+
+func (h oracleHarnessError) Error() string { return "harness: " + h.msg }
+
+func harnessf(format string, a ...any) error {
+	return oracleHarnessError{fmt.Sprintf(format, a...)}
+}
+
+type oracleRun struct {
+	cfg     Config
+	reg     *cards.Registry
+	e       *Engine
+	refs    map[string]state.ObjID
+	targets []string
+	answers []oracleAnswer
+	// borrowed holds, per step index, the answers of that step the previous
+	// checkpoint's settleTriggerAsks already consumed (what is left of them).
+	borrowed map[int][]oracleAnswer
+	// askedAtCheckpoint counts checkpoints (setup excluded) taken while a
+	// trigger-order or triggered-cost ask was still pending: what
+	// settleTriggerAsks exists to keep at zero. OracleResult reports it.
+	askedAtCheckpoint int
+	log               []string
+	extraFails        []string
+	snaps             []OracleSnapshot
+	decisions         []OracleDecision
+	// flips records every coin-flip result Note the run's log holds, in log
+	// order; flipScan is how far of the log recordFlips has already read.
+	// OracleResult reports the flips so the generator can script XMage's
+	// side of each one.
+	flips      []OracleFlip
+	flipScan   int
+	noSnapshot bool // runOracleScenarioWith's switch
+	// xmageFixture mirrors sc.xmageFixture: this run replays a GENERATED
+	// compliance scenario, where XMage is the reference engine. The
+	// hand-authored audit fixtures are gorge-internal (no XMage snapshot to
+	// align with) and keep the harness's own fallbacks.
+	xmageFixture bool
+	// revisitsUpkeep mirrors the scenario's shape: true when any step is a
+	// pass_to op that stops at the upkeep step. That is the trigger#0.x
+	// template's shape ([{op:pass_to,step:upkeep},...]), where the scenario
+	// later stops at the same phase the setup drive already walked; the
+	// activate/cast templates carry no such step. The setup-drive arrange
+	// fallback reads it: see the KArrange arm in (*oracleRun).answer.
+	revisitsUpkeep bool
+	// spare, when non-nil, is recycled engine storage build hands to the
+	// probe and the scenario's game (RunOracleScenarioJSON's pool).
+	spare *Spare
+	step  int // the scenario step being played; -1 during setup
+	// preChecked marks, per step index, the Expect indices already evaluated
+	// PRE-submit (the attack op's attack_required / can_attack offered-options
+	// reads, against the still-pending declare-attackers decision):
+	// runOracleScenarioSpare's post-step re-check skips exactly those, because
+	// after the declaration the phase has advanced and the attackers decision
+	// is gone. Every other expect on the same step (a board read like
+	// `{card tapped:true}`, which only becomes true AFTER the declaration)
+	// stays on the ordinary post-step path. Only the attack op writes it; nil
+	// until the first such step (the audit-test oracleRun{} literal carries
+	// none).
+	preChecked map[int]map[int]bool
+	// exactRefs marks the setup refs the driver reconstructs from object
+	// identity: a ref bound to a card placed on the BATTLEFIELD at setup.
+	// Battlefield is first in both gorge's setup order and XMage's
+	// registerAliases zone order, so its ordinal agrees; a hand/library/
+	// exile/graveyard ref is rank-derived and unsafe. Tokens are exact by
+	// their live creation order and need no entry here.
+	exactRefs map[string]bool
+}
+
+func (r *oracleRun) logf(format string, a ...any) {
+	r.log = append(r.log, fmt.Sprintf(format, a...))
+}
+
+// recordFlips scans the log's new events for canonical coin-flip result
+// Notes (effects.FlipNoteResult) and records one OracleFlip per flip: the
+// turn the runner is on, the scenario step whose window the flip fell in
+// (step < 0 is the setup drive, before the first gameplay step), the
+// flipper's seat and the side the seeded RNG landed. The runner calls it
+// once after the setup drive and once per gameplay step, so each flip is
+// attributed to exactly one window. Rewinding inside the resolution kernel
+// re-executes the recorded events byte for byte, so the scan never sees a
+// flip twice.
+func (r *oracleRun) recordFlips(step int) {
+	evs := r.e.L.Events
+	for i := r.flipScan; i < len(evs); i++ {
+		flipper, win, ok := effects.FlipNoteResult(evs[i])
+		if !ok {
+			continue
+		}
+		r.flips = append(r.flips, OracleFlip{Turn: int(r.e.G.Turn), Step: step, Seat: int(flipper), Win: win})
+	}
+	r.flipScan = len(evs)
+}
+
+var oracleZones = map[string]state.Zone{
+	"library": state.ZLibrary, "hand": state.ZHand, "battlefield": state.ZBattlefield,
+	"graveyard": state.ZGraveyard, "exile": state.ZExile, "stack": state.ZStack,
+	"command": state.ZCommand, "sideboard": state.ZSideboard,
+}
+
+// oracleFiller pads setup decks (with extra draw room for later turns). Wastes has no colour, no
+// subtype and no ability beyond {T}: Add {C}, so it influences no Oracle
+// condition a scenario is likely to test.
+const oracleFiller = "Wastes"
+
+// oracleSeatNames names the seats of a scenario game; a two-seat game keeps
+// the historical "a", "b", so its log and replay are unchanged.
+var oracleSeatNames = []string{"a", "b", "c"}
+
+// oracleSeatCount is a scenario's seat count: 0 (the field absent) is the
+// two-player game; a multiplayer scenario names 3. The XMage driver seats at
+// most three, so a larger count is a harness error, never a silent clamp.
+func oracleSeatCount(n int) (int, error) {
+	switch n {
+	case 0:
+		return 2, nil
+	case 2, 3:
+		return n, nil
+	}
+	return 0, harnessf("scenario players %d (want 2 or 3)", n)
+}
+
+func parseSeatRef(s string) (state.PlayerID, bool) {
+	if len(s) < 2 || s[0] != 'p' {
+		return 0, false
+	}
+	n, err := strconv.Atoi(s[1:])
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return state.PlayerID(n), true
+}
+
+// splitRef parses "p1:Name", "p1:Name#2", "p1:token:Name#2" and
+// "p1:ability:Name#2" (an ability object PENDING on the stack, named by its
+// source card's name: the plain ref cannot serve, the source permanent sits
+// on the battlefield under the same name and the plain loop returns it
+// first).
+func splitRef(ref string) (seat state.PlayerID, name string, token, ability bool, nth int, err error) {
+	i := strings.IndexByte(ref, ':')
+	if i < 0 {
+		return 0, "", false, false, 0, harnessf("bad card ref %q (want pN:Name)", ref)
+	}
+	p, ok := parseSeatRef(ref[:i])
+	if !ok {
+		return 0, "", false, false, 0, harnessf("bad seat in ref %q", ref)
+	}
+	name = ref[i+1:]
+	if strings.HasPrefix(name, "token:") {
+		token, name = true, strings.TrimPrefix(name, "token:")
+	} else if strings.HasPrefix(name, "ability:") {
+		ability, name = true, strings.TrimPrefix(name, "ability:")
+	}
+	nth = 1
+	if j := strings.LastIndexByte(name, '#'); j >= 0 {
+		n, perr := strconv.Atoi(name[j+1:])
+		if perr != nil || n < 1 {
+			return 0, "", false, false, 0, harnessf("bad ordinal in ref %q", ref)
+		}
+		name, nth = name[:j], n
+	}
+	return p, name, token, ability, nth, nil
+}
+
+func (r *oracleRun) objName(o *state.Object) string {
+	if o == nil || o.Face() == nil {
+		return ""
+	}
+	return o.Face().Name
+}
+
+// fieldName is the name the snapshot reports for a permanent. A face-down
+// battlefield permanent has no name (CR 708.2a), so it reports the empty
+// string, exactly as the XMage driver's perm.getName() does. Every other
+// battlefield permanent wears its BOUND derived name (effects.Chars.NameSet):
+// a battlefield Room wears the CR 709.5 name its unlocked doors give it --
+// the empty string when both doors are locked, one door's name when one is
+// unlocked, "Left // Right" when both are, the same string XMage's
+// RoomCharacteristicsEffect computes -- and a layer-3 SetName$ effect (CR
+// 613.1b) overwrites that when it applies. The bound flag is what makes the
+// both-locked Room's empty string a real answer rather than "read the printed
+// face". A battlefield permanent with no bound name wears its printed face
+// name (the layer walk seeds exactly that). Every other zone names the
+// printed face, since a continuous effect only applies on the battlefield.
+func (r *oracleRun) fieldName(o *state.Object) string {
+	if o == nil || o.Face() == nil {
+		return ""
+	}
+	if o.Zone == state.ZBattlefield {
+		if o.FaceDown {
+			return ""
+		}
+		if c := r.e.Derived(o.ID); c.NameSet {
+			return c.Name
+		}
+	}
+	return o.Face().Name
+}
+
+// resolve maps a card ref to an object id: setup-bound refs first (a card
+// keeps its ObjID across zones), then the k-th matching object in id order.
+// An "ability:" ref resolves to the k-th PENDING ability object on the stack
+// whose controller is the named seat and whose SOURCE face's name matches
+// (the same walk objRef emits; only a stack object is offered -- CR 115.5
+// targets a spell or ability ON the stack).
+func (r *oracleRun) resolve(ref string) (state.ObjID, error) {
+	if id, ok := r.refs[ref]; ok {
+		return id, nil
+	}
+	seat, name, token, ability, nth, err := splitRef(ref)
+	if err != nil {
+		return 0, err
+	}
+	seen := 0
+	for i := range r.e.G.Objs {
+		o := &r.e.G.Objs[i]
+		if ability {
+			if o.Zone != state.ZStack || o.Ability == nil || o.Controller != seat ||
+				cards.NormalizeName(r.objName(r.e.G.Obj(o.Source))) != cards.NormalizeName(name) {
+				continue
+			}
+		} else {
+			if o.Zone == state.ZCeased || o.Ability != nil || o.Face() == nil {
+				continue
+			}
+			if token {
+				if !o.IsToken || o.Controller != seat || o.Zone != state.ZBattlefield ||
+					!strings.Contains(strings.ToLower(o.Face().Name), strings.ToLower(name)) {
+					continue
+				}
+			} else if o.Owner != seat || (o.Face().Name != name && oracleAltFaceMode(o, name) == "") {
+				continue
+			}
+		}
+		seen++
+		if seen == nth {
+			return o.ID, nil
+		}
+	}
+	return 0, harnessf("ref %q names no object", ref)
+}
+
+// build constructs the game: named cards seeded into each seat's deck (so
+// genesis mints them as real cards), commanders in the command zone, then --
+// BEFORE turn 1 begins -- every opening hand returned to the library and each
+// named card moved to its setup zone. Placing permanents before the first
+// TurnChange means seat 0's battlefield is not summoning sick on turn 1.
+func (r *oracleRun) build(sc oracleScenario) error {
+	seats, err := oracleSeatCount(sc.Players)
+	if err != nil {
+		return err
+	}
+	turn := 1
+	if sc.Turn != nil {
+		turn = *sc.Turn
+	}
+	if turn < 1 || turn > 100 {
+		return harnessf("invalid scenario turn %d (want 1..100)", turn)
+	}
+	targetTurn := int32(turn)
+	lookup := func(name string) (*cards.Card, error) {
+		c, ok := r.reg.Lookup(name)
+		if !ok {
+			return nil, harnessf("card %q not in the corpus", name)
+		}
+		return c, nil
+	}
+	filler, err := lookup(oracleFiller)
+	if err != nil {
+		return err
+	}
+	type placement struct {
+		name string
+		zone state.Zone
+		top  bool
+	}
+	decks := make([][]*cards.Card, seats)
+	sideboards := make([][]*cards.Card, seats)
+	commanders := make([][]int, seats)
+	places := make([][]placement, seats)
+	for key := range sc.Setup {
+		if p, ok := parseSeatRef(key); !ok || int(p) >= seats {
+			return harnessf("setup key %q (want p0..p%d)", key, seats-1)
+		}
+	}
+	for p := 0; p < seats; p++ {
+		s := sc.Setup[fmt.Sprintf("p%d", p)]
+		for _, z := range []struct {
+			names []string
+			zone  state.Zone
+			top   bool
+		}{{s.Battlefield, state.ZBattlefield, false}, {s.Hand, state.ZHand, false},
+			{s.Graveyard, state.ZGraveyard, false}, {s.Library, state.ZLibrary, false},
+			{s.Exile, state.ZExile, false}, {s.Command, state.ZCommand, false},
+			{s.LibraryTop, state.ZLibrary, true}} {
+			top := z.top
+			for _, n := range z.names {
+				c, err := lookup(n)
+				if err != nil {
+					return err
+				}
+				if z.zone == state.ZCommand {
+					commanders[p] = append(commanders[p], len(decks[p]))
+				}
+				decks[p] = append(decks[p], c)
+				places[p] = append(places[p], placement{n, z.zone, top})
+			}
+		}
+		// Preserve turn-1 decks exactly. Later checkpoints need at most
+		// turn/2 ordinary draws per seat, plus one card left in the library.
+		// Count named cards even when setup moves them OUT of the library;
+		// match ScenarioReplay.build's filler calculation.
+		deckSize := 40
+		if turn > 1 {
+			deckSize = max(deckSize, len(decks[p])+turn/2+1)
+		}
+		for len(decks[p]) < deckSize {
+			decks[p] = append(decks[p], filler)
+		}
+		for _, n := range s.Sideboard {
+			c, err := lookup(n)
+			if err != nil {
+				return err
+			}
+			sideboards[p] = append(sideboards[p], c)
+		}
+		if err := validateSetupState(p, s); err != nil {
+			return err
+		}
+	}
+	cfg := Config{Seed: 42, Names: oracleSeatNames[:seats], Decks: decks, Tokens: r.reg.Tokens, NamedCorpus: r.reg.Universe()}
+	// A scenario seating a card-name choice ranges it over the scenario's own
+	// cards (oracleNameUniverse); every other scenario is unchanged.
+	cfg.NameUniverse = oracleNameUniverse(decks, sideboards)
+	for p := range sideboards {
+		if len(sideboards[p]) > 0 {
+			// Only a scenario that names a sideboard sets the field, so every
+			// other scenario's Config (and its replay) is unchanged.
+			cfg.Sideboards = sideboards
+			break
+		}
+	}
+	switch oracleFormatCodes.Code(string(sc.Format)) {
+	case oracleFormatConstructed:
+	case oracleFormatCommander:
+		cfg.Format = FormatCommander
+		cfg.StartingLife = 40 // CR 903.7
+		cfg.Commanders = commanders
+	default:
+		return harnessf("unknown format %q", sc.Format)
+	}
+	// r.spare (RunOracleScenarioJSON's pooled storage, nil otherwise) backs
+	// both the seat-0 probe and the real game: Spare reuse is invisible to
+	// the game (TestSpareReuseIsInvisible), so a scenario plays and logs
+	// exactly as with fresh arrays.
+	cfg = seatZeroStartSpare(cfg, r.spare)
+	r.cfg = cfg
+	// NewStartingPlayerChoice defers turn 1 to the first Advance (the toss
+	// is identical to New's, so seatZeroStart's seed still starts seat 0).
+	built := cfg
+	built.Spare = r.spare
+	e := NewStartingPlayerChoice(built)
+	r.e = e
+	if e.G.StartingPlayer != 0 {
+		return harnessf("seat 0 does not start (seed %d)", cfg.Seed)
+	}
+	for p := 0; p < seats; p++ {
+		pid := state.PlayerID(p)
+		for _, id := range append([]state.ObjID(nil), e.G.Zone(state.ZHand, pid)...) {
+			e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: state.ZHand, To: state.ZLibrary})
+		}
+		bound := map[state.ObjID]bool{}
+		counts := map[string]int{}
+		var tops []state.ObjID
+		for _, pl := range places[p] {
+			var id state.ObjID
+			for _, z := range []state.Zone{state.ZCommand, state.ZLibrary} {
+				if pl.zone != state.ZCommand && z == state.ZCommand {
+					continue
+				}
+				for _, cand := range e.G.Zone(z, pid) {
+					if o := e.G.Obj(cand); !bound[cand] && cards.NormalizeName(r.objName(o)) == cards.NormalizeName(pl.name) {
+						id = cand
+						break
+					}
+				}
+				if id != 0 {
+					break
+				}
+			}
+			if id == 0 {
+				return harnessf("setup: p%d's %q was not dealt", p, pl.name)
+			}
+			bound[id] = true
+			counts[pl.name]++
+			ref := fmt.Sprintf("p%d:%s", p, pl.name)
+			if counts[pl.name] > 1 {
+				ref = fmt.Sprintf("%s#%d", ref, counts[pl.name])
+			}
+			r.refs[ref] = id
+			if pl.zone == state.ZBattlefield {
+				r.exactRefs[ref] = true
+			}
+			backFace := setupPlacedBackFace(sc.Setup[fmt.Sprintf("p%d", p)], pl.name)
+			if from := e.G.Obj(id).Zone; from != pl.zone {
+				// A back-face battlefield card enters ON its back face: the
+				// FlipFace rides ahead of the MoveZone (the same sequence a
+				// transformed ChangeZone emits, effects.applyTransformed), so
+				// the entry fold reads the face XMage's addCard places --
+				// a back-face Saga creature enters with its lore counter, a
+				// back-face non-Saga (a transformed Saga's creature, the
+				// crafted Braided Quipu) enters with none and no chapter
+				// trigger. A flip after the entry would leave the FRONT
+				// face's entry grants (The Legend of Kuruk's lore counter)
+				// stranded on a permanent whose face never carried them.
+				if backFace && pl.zone == state.ZBattlefield {
+					// Placement is not a transform (CR 701.28): the back
+					// face's "as this transforms" replacement (Sephiroth's
+					// emblem) must not run for a card the harness merely
+					// seats on that face, as XMage's addCard does.
+					prior := e.applyingReplacement
+					e.applyingReplacement = true
+					e.emit(events.Event{Kind: events.FlipFace, Obj: id, Amount: 1, Text: "Transformed"})
+					e.applyingReplacement = prior
+				}
+				r.placeSetupCard(id, from, pl.zone, sc.xmageFixture, backFace)
+			}
+			if pl.zone == state.ZBattlefield && backFace {
+				// A back-face PLANESWALKER whose entering face prints no
+				// positive loyalty (Forge's "Loyalty: 0" carry-over spelling,
+				// Oko, Lorwyn Liege's Shadowmoor Scion) is not enterable as
+				// printed: a real Oko reaches the back face by transforming,
+				// carrying its loyalty. XMage's addCard places the back face
+				// with the front face's starting loyalty, so the harness
+				// grants that where the entry fold (reading the back face)
+				// granted none; without it the walker sits at 0 loyalty and
+				// the CR 704.5i state-based action removes it before its
+				// first-main-phase trigger can fire.
+				if n := setupBackFaceLoyalty(e.G.Obj(id)); n > 0 {
+					e.emit(events.Event{Kind: events.CounterChange, Obj: id, Counter: "LOYALTY", Amount: n})
+				}
+			}
+			for _, tapped := range sc.Setup[fmt.Sprintf("p%d", p)].Tapped {
+				if cards.NormalizeName(tapped) == cards.NormalizeName(pl.name) {
+					e.emit(events.Event{Kind: events.Tap, Obj: id})
+					break
+				}
+			}
+			if pl.zone == state.ZBattlefield {
+				for _, ev := range setupCounters(sc.Setup[fmt.Sprintf("p%d", p)], pl.name) {
+					ev.Obj = id
+					e.emit(ev)
+				}
+			}
+			if pl.top {
+				tops = append(tops, id)
+			}
+		}
+		// Sideboard cards were minted straight into the sideboard at genesis;
+		// bind them in setup order, continuing the per-name ordinals.
+		for _, n := range sc.Setup[fmt.Sprintf("p%d", p)].Sideboard {
+			var id state.ObjID
+			for _, cand := range e.G.Zone(state.ZSideboard, pid) {
+				if o := e.G.Obj(cand); !bound[cand] && cards.NormalizeName(r.objName(o)) == cards.NormalizeName(n) {
+					id = cand
+					break
+				}
+			}
+			if id == 0 {
+				return harnessf("setup: p%d's sideboard %q was not minted", p, n)
+			}
+			bound[id] = true
+			counts[n]++
+			ref := fmt.Sprintf("p%d:%s", p, n)
+			if counts[n] > 1 {
+				ref = fmt.Sprintf("%s#%d", ref, counts[n])
+			}
+			r.refs[ref] = id
+		}
+		if len(tops) > 0 {
+			// LibraryOrder's IDs are the complete new order, top first.
+			order := append([]state.ObjID(nil), tops...)
+			isTop := map[state.ObjID]bool{}
+			for _, id := range tops {
+				isTop[id] = true
+			}
+			for _, id := range e.G.Zone(state.ZLibrary, pid) {
+				if !isTop[id] {
+					order = append(order, id)
+				}
+			}
+			e.emit(events.Event{Kind: events.LibraryOrder, Player: pid, IDs: order, Secret: true})
+		}
+		if life := sc.Setup[fmt.Sprintf("p%d", p)].Life; life != nil {
+			if d := *life - e.G.Players[p].Life; d != 0 {
+				e.emit(events.Event{Kind: events.LifeChange, Player: pid, Amount: d})
+			}
+		}
+		if !sc.xmageFixture {
+			emitSetupSpeed(e.emit, p, e.G.Players[p].Speed, sc.Setup[fmt.Sprintf("p%d", p)])
+		}
+	}
+	e.Advance()
+	r.answers = append([]oracleAnswer(nil), sc.SetupAnswers...)
+	// A setup mana seed lands the moment the drive enters the requested turn's
+	// first main phase (before the trigger it funds is answered) and never
+	// earlier: a pool added during an earlier step would empty at that step's
+	// end (CR 500.4), and the first-main-phase trigger is posed in main1.
+	seededMana := false
+	// Drive to the requested turn's first main phase. Only triggers caused by
+	// setup actions that XMage itself performs are drained here; fixture
+	// battlefield placements have already had their entry triggers dropped.
+	//
+	// Only a generated compliance scenario (xmageFixture) stops at the FIRST
+	// priority even with a non-empty stack -- that is the exact point XMage's
+	// ScenarioReplay pauses at for its "setup" snapshot (runCode("setup",
+	// TURN, MAIN, ...)), so a beginning-of-first-main-phase trigger (and a
+	// Saga's precombat-main chapter trigger) is still on the stack at the
+	// setup checkpoint, not already resolved under the fallback. Every other
+	// scenario keeps the empty-stack stop: its fixture is written for the
+	// trigger to resolve during setup, and there is no XMage snapshot to
+	// align with.
+	// XMage's ScenarioReplay.applySetupState raises a setup speed inside the
+	// "setup" checkpoint -- at the target turn's first main phase, AFTER the
+	// upkeep and draw steps (CR 702.179). A generated scenario therefore
+	// seeds it at the last decision before main 1 (the draw step, or the
+	// upkeep when the first turn skips its draw): early enough that main 1's
+	// options are posed with it, late enough that a static-GRANTED "Max
+	// speed — at the beginning of your upkeep" trigger (Endrider
+	// Spikespitter) is never queued while speed is still 0, as in XMage.
+	speedSeeded := !sc.xmageFixture
+	for i := 0; i < 400*turn; i++ {
+		if !speedSeeded && e.G.Turn == targetTurn && !e.G.Over &&
+			(e.G.Step == state.StepDraw ||
+				(e.G.Step == state.StepUpkeep && skipFirstDrawStep(e.G, state.StepDraw) != state.StepDraw)) {
+			speedSeeded = true
+			for p := 0; p < seats; p++ {
+				// Like applySetupState (speed > 0 only): an absent speed
+				// leaves whatever a Start-your-engines card already
+				// started, never lowering it back to 0.
+				if setup := sc.Setup[fmt.Sprintf("p%d", p)]; setup.Speed > 0 {
+					emitSetupSpeed(e.emit, p, e.G.Players[p].Speed, setup)
+				}
+			}
+		}
+		if !seededMana && e.G.Turn == targetTurn && e.G.Step == state.StepMain1 {
+			seededMana = true
+			for p := 0; p < seats; p++ {
+				for _, c := range sc.Setup[fmt.Sprintf("p%d", p)].Mana {
+					e.emit(events.Event{Kind: events.ManaAdd, Player: state.PlayerID(p), Counter: string(c), Amount: 1})
+				}
+			}
+		}
+		d := e.Pending()
+		if d == nil || e.G.Over {
+			return harnessf("game stopped during setup")
+		}
+		if d.Kind == decision.KPriority && e.G.Step == state.StepMain1 && e.G.Turn == targetTurn &&
+			(len(e.G.Stack) == 0 || sc.xmageFixture) {
+			// The drive window's flip attribution point. A drive flip that
+			// fired here is attributed to step < 0; if the drive ever stopped
+			// short of this exact state, the next call (after the first
+			// gameplay step) would misattribute it as a step-0 gameplay flip
+			// -- unreachable, because a generated scenario must replay clean
+			// and build() fails loudly ("setup never reached") otherwise.
+			r.recordFlips(-1)
+			r.logf("setup done: turn %d %s, stack %d", e.G.Turn, e.G.Step, len(e.G.Stack))
+			// A parked placement's drop is setup-only (placeSetupCard).
+			e.setupEntryDrops = nil
+			return nil
+		}
+		if err := r.answer(d, "setup"); err != nil {
+			return err
+		}
+	}
+	return harnessf("setup never reached turn %d main1", turn)
+}
+
+// manaAskColours reads a mana ask's offered colour set, in option order: the
+// options are laid out unit-major, so the first unit's ManaSymbols are the
+// set exactly as XMage's AddManaInAnyCombinationEffect lists its messages.
+func manaAskColours(d *decision.Decision) []string {
+	if d.Max <= 0 {
+		return nil
+	}
+	set := len(d.Options) / d.Max
+	if set <= 0 || set > len(d.Options) {
+		return nil
+	}
+	out := make([]string, 0, set)
+	for k := 0; k < set; k++ {
+		out = append(out, d.Options[k].ManaSymbol)
+	}
+	return out
+}
+
+func pickPass(d *decision.Decision) int {
+	for _, o := range d.Options {
+		if o.Kind == "pass" {
+			return o.Index
+		}
+	}
+	return -1
+}
+
+func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) error {
+	labels := make([]string, 0, len(choices))
+	for _, c := range choices {
+		if c >= 0 && c < len(d.Options) {
+			labels = append(labels, d.Options[c].Label)
+		}
+	}
+	r.logf("  [%s] p%d %s -> %q", why, d.Player, d.Kind, labels)
+	var chain trigChainMark
+	recorded := -1
+	if kind, ok := oracleDecisionKind(d.Kind); ok {
+		od := OracleDecision{Step: r.step, Seat: int(d.Player), Kind: kind, Options: len(d.Options), Picks: labels,
+			PickIdx: append([]int{}, choices...), PickRefs: []string{}, Via: why, GorgeKind: string(d.Kind), Resume: d.ResumeKind, Min: d.Min, Max: d.Max}
+		if d.Kind == decision.KTarget && d.ResumeSA != nil && effects.TargetsOf(d.ResumeSA).Has(effects.TgtForEachPlayer) {
+			// TargetsForEachPlayer$ (CR 601.2c): XMage asks one target per
+			// player in seat order, so the generator answers per seat. Only
+			// this shape expands -- the sibling TargetsWithDifferentControllers$
+			// shares the wire's per-controller exclusivity but XMage does not
+			// pose it per player.
+			od.PerPlayer = true
+			od.SeatCount = len(r.e.G.Players)
+			// An opponents-only filter (Celebrate the Mountain-king's
+			// Permanent.nonLand+OppCtrl): XMage poses no ask for the
+			// controller's own seat.
+			od.PerOpponent = strings.Contains(effects.TargetsOf(d.ResumeSA).ValidTgts, "OppCtrl")
+		}
+		if d.Kind == decision.KChoose && d.ResumeKind == "choice" && d.ResumeSA != nil && d.ResumeSA.API == "ChangeTargets" {
+			od.Retarget = true
+		}
+		if d.Kind == decision.KChoose && len(d.Options) > 0 && d.Options[0].Kind == "x" && r.e.cast != nil && r.e.cast.cost.X > 1 {
+			od.XMulti = true
+		}
+		if d.Kind == decision.KTarget && d.ResumeSA != nil {
+			od.Divided = effects.DividedTotal(d.ResumeSA)
+		} else if d.Kind == decision.KTarget && d.ResumeKind == "" && r.e.cast != nil && r.e.cast.isAbility() {
+			// An activation's own root target ask (cast_targets.go) carries
+			// no ResumeSA; its body is the proposal's ability. A divided
+			// activation (The Earth Crystal's DividedAsYouChoose$ 2) is
+			// XMage's TargetAmount, which the generator answers per
+			// recipient with its share. A spell's root ask stays unmarked:
+			// its divided targets reach XMage through castSpell.
+			if sa := r.e.pcAbility(r.e.cast); sa != nil {
+				od.Divided = effects.DividedTotal(sa)
+			}
+		}
+		if d.Kind == decision.KTarget && d.ResumeKind == "copy_targets" {
+			// CR 707.10c: XMage poses one "Change this N of M target?"
+			// chooseUse per INHERITED target of the declaration before the
+			// new-target pick, so the generator needs the count. The ask's
+			// declaration is the stage just posed: copyTargetStage[obj] is
+			// the NEXT stage, so the one answered is one less. Computed here
+			// (not a new Engine method) because the oracle runner already
+			// reaches the engine through exported fields and the method/
+			// surface ratchets only fall.
+			if o := r.e.G.Obj(d.Source); o != nil {
+				decls := r.e.copyTargetDeclarations(o)
+				stage := 0
+				if r.e.copyTargetStage != nil {
+					stage = r.e.copyTargetStage[o.ID] - 1
+				}
+				if stage < 0 {
+					stage = 0
+				}
+				od.CopyInherited = len(r.e.copyInheritedForDeclaration(o, decls, stage))
+			}
+		}
+		if d.Kind == decision.KChoose && d.ResumeKind == "mana_color" && d.ResumeSA != nil {
+			// A Produced$ "Combo <colours>" ask is XMage's
+			// AddManaInAnyCombinationEffect at every unit count: one
+			// multi-amount message per offered colour, in the set's order.
+			// A produced-Any ask is DynamicManaEffect's colour dialog at one
+			// unit and a WUBRG multi-amount above it, so it stays unmarked
+			// and the generator's existing routing answers it unchanged.
+			if _, ok := effects.ComboColours(effects.ManaOf(d.ResumeSA).Produced); ok {
+				od.ManaColours = manaAskColours(d)
+			}
+		}
+		if len(d.Options) == 1 && d.Options[0].Kind == "trigger_cost_decline" && r.e.triggerCost != nil {
+			od.CostPosed = xmageAlwaysAsksCost(r.e.triggerCost.announcedCost())
+		}
+		if len(d.Options) > 0 {
+			od.First = d.Options[0].Label
+			if d.Options[0].Kind == "altaddcost" {
+				od.AltPayable = altPayableCount(r.e.cast, d, r.e.castable)
+			}
+		}
+		for _, option := range d.Options {
+			if option.Obj != 0 {
+				od.OptionRefs = append(od.OptionRefs, r.objRef(r.e.G.Obj(option.Obj)))
+			}
+			if option.Group != "" {
+				od.OptionGroups = append(od.OptionGroups, option.Group)
+			}
+			if d.Kind == decision.KArrange {
+				od.ArrangeLabels = append(od.ArrangeLabels, option.Label)
+			}
+		}
+		if d.Kind == decision.KArrange {
+			od.ArrangeKind = arrangeSharedKind(d)
+		}
+		for _, c := range choices {
+			if c < 0 || c >= len(d.Options) {
+				continue
+			}
+			o := d.Options[c]
+			od.PickKinds = append(od.PickKinds, o.Kind)
+			inexact := false
+			switch {
+			case o.Obj != 0:
+				obj := r.e.G.Obj(o.Obj)
+				ref := r.objRef(obj)
+				od.PickRefs = append(od.PickRefs, ref)
+				od.ObjectPicks = append(od.ObjectPicks, ref)
+				inexact = !obj.IsToken && !r.exactRefs[ref]
+			case strings.Contains(o.Kind, "player"):
+				od.PickRefs = append(od.PickRefs, fmt.Sprintf("p%d", o.Player))
+			default:
+				od.PickRefs = append(od.PickRefs, o.Label)
+			}
+			od.PickRefsInexact = append(od.PickRefsInexact, inexact)
+		}
+		od.TriggerCostMana = triggerCostAskManaOnly(r.e, d)
+		chain = markTrigChain(r.e.trigSub, d)
+		od.LeadingUnposed = chain.leading
+		r.decisions = append(r.decisions, od)
+		recorded = len(r.decisions) - 1
+	}
+	if err := r.e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: choices}); err != nil {
+		return harnessf("submit %s %v: %v (options %s)", d.Kind, choices, err, optionDump(d))
+	}
+	if recorded >= 0 {
+		r.decisions[recorded].UnposedSlots = chain.unposed(r.e.trigSub)
+	}
+	return nil
+}
+
+// arrangeSharedKind is the option Kind every option of a KArrange shares (its
+// destination, ruling J5), or "" for an empty or disagreeing option list.
+func arrangeSharedKind(d *decision.Decision) string {
+	if len(d.Options) == 0 {
+		return ""
+	}
+	kind := d.Options[0].Kind
+	for _, o := range d.Options {
+		if o.Kind != kind {
+			return ""
+		}
+	}
+	return kind
+}
+
+// altPayableCount counts the options of the pending AlternateAdditionalCost
+// ask the cast could pay, by the same test altAddAsk ordered them with.
+func altPayableCount(pc *pendingCast, d *decision.Decision, castable func(state.PlayerID, state.ObjID, Cost, bool) bool) int {
+	if pc == nil {
+		return 0
+	}
+	n := 0
+	for _, o := range d.Options {
+		if o.Amount < 0 || o.Amount >= len(pc.altAddParts) {
+			continue
+		}
+		if castable(pc.player, pc.card, pc.cost.Plus(ParseCost(pc.altAddParts[o.Amount])), pc.isAbility()) {
+			n++
+		}
+	}
+	return n
+}
+
+// oracleActivateKind reports whether an option's Kind names an action the
+// `activate` scenario op may select. Besides the ordinary "ability" and the
+// engine's generic "activate" composite, the engine poses three actions
+// under their own option kinds -- Station (an activated ability whose offer
+// and tap cost are rules-side, CR 702.184a, "station"), Room unlock
+// ("unlock") and morph-family turn face up ("turn_face_up"). A
+// scenario drives them through `activate` plus the option's label, exactly
+// as a named ability is driven; they are not a separate op.
+func oracleActivateKind(kind string) bool {
+	return oracleActivateKindSet.Has(kind)
+}
+
+func oracleLabelMatches(label, want string) bool {
+	normalize := func(s string) string {
+		s = strings.ToLower(s)
+		s = oracleBraceStripper.Replace(s)
+		return s
+	}
+	return strings.Contains(normalize(label), normalize(want))
+}
+
+// oracleBraceStripper is built once: a strings.Replacer compiles its lookup
+// table on first use, and a per-call one rebuilt it for every option label
+// every answered decision compared.
+var oracleBraceStripper = strings.NewReplacer("{", "", "}", "")
+
+// oracleManaColourAliases maps a scenario's colour word or letter to the
+// mana symbol. Package-level, not a local: rules' param census scans every
+// non-test file in the package and classifies local map[string]string reads
+// as card-param reads.
+var oracleManaColourAliases = map[string]string{
+	"w": "W", "white": "W", "u": "U", "blue": "U", "b": "B", "black": "B",
+	"r": "R", "red": "R", "g": "G", "green": "G",
+}
+
+func oracleManaColourMatches(symbol, want string) bool {
+	wantSymbol, ok := oracleManaColourAliases[strings.ToLower(strings.TrimSpace(want))]
+	return ok && strings.EqualFold(symbol, wantSymbol)
+}
+
+func oracleOptionMatches(o decision.Option, want string) bool {
+	return oracleManaColourMatches(o.ManaSymbol, want) || oracleLabelMatches(o.Label, want)
+}
+
+func oracleObserveMismatches(d *decision.Decision, observe oracleObserve) []string {
+	var mismatches []string
+	for _, want := range observe.Has {
+		found := false
+		for _, o := range d.Options {
+			if oracleOptionMatches(o, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			mismatches = append(mismatches, fmt.Sprintf("observed %s options missing %q", d.Kind, want))
+		}
+	}
+	for _, want := range observe.Not {
+		for _, o := range d.Options {
+			if oracleOptionMatches(o, want) {
+				mismatches = append(mismatches, fmt.Sprintf("observed %s options unexpectedly contain %q", d.Kind, want))
+				break
+			}
+		}
+	}
+	return mismatches
+}
+
+func hasOracleAnswer(answers []oracleAnswer, kind decision.Kind) bool {
+	for _, answer := range answers {
+		if strings.EqualFold(answer.Kind, string(kind)) {
+			return true
+		}
+	}
+	return false
+}
+
+// manaAbilityLabels returns the engine's currently available mana abilities,
+// which are the authoritative named candidates behind the generic priority option.
+func (r *oracleRun) manaAbilityLabels(seat state.PlayerID, id state.ObjID) []string {
+	abilities := r.e.availableManaAbilities(seat, id)
+	labels := make([]string, 0, len(abilities))
+	for _, ma := range abilities {
+		labels = append(labels, pay.ManaAbilityLabel(ma, pay.ChosenProducedColour(r.e.G, id)))
+	}
+	return labels
+}
+
+func optionDump(d *decision.Decision) string {
+	var b strings.Builder
+	for _, o := range d.Options {
+		fmt.Fprintf(&b, "[%d %s %q obj=%d pl=%d att=%d mode=%s] ", o.Index, o.Kind, o.Label, o.Obj, o.Player, o.Attacker, o.Mode)
+	}
+	return b.String()
+}
+
+// matchPick maps one pick string onto an option index: "pN" is a player,
+// "pN:..." a card ref, anything else a case-insensitive label substring or
+// an exact option kind.
+func (r *oracleRun) matchPick(d *decision.Decision, pick string, used map[int]bool) (int, error) {
+	if p, ok := parseSeatRef(pick); ok {
+		for _, o := range d.Options {
+			if !used[o.Index] && o.Obj == 0 && o.Player == p && o.Kind != "pass" {
+				return o.Index, nil
+			}
+		}
+		for _, o := range d.Options {
+			if !used[o.Index] && o.Obj == state.PlayerRef(p) {
+				return o.Index, nil
+			}
+		}
+		return -1, nil
+	}
+	if strings.HasPrefix(pick, "p") && strings.Contains(pick, ":") {
+		id, err := r.resolve(pick)
+		if err != nil {
+			return -1, err
+		}
+		for _, o := range d.Options {
+			if !used[o.Index] && o.Obj == id {
+				return o.Index, nil
+			}
+		}
+		return -1, nil
+	}
+	lp := strings.ToLower(pick)
+	// "yes"/"no" are the author's abstract accept/decline: they match the
+	// engine's yes/no/decline option kinds or a label that starts that way,
+	// so a scenario never has to know the engine's prompt wording.
+	if lp == "yes" || lp == "no" {
+		for _, o := range d.Options {
+			k, l := strings.ToLower(o.Kind), strings.ToLower(o.Label)
+			if used[o.Index] {
+				continue
+			}
+			if lp == "yes" && (k == "yes" || k == "accept" || o.Mode == "unless_pay" || strings.HasSuffix(k, "_pay") ||
+				strings.HasPrefix(l, "yes") || strings.HasPrefix(l, "play ") || strings.HasPrefix(l, "cast ")) {
+				return o.Index, nil
+			}
+			if lp == "no" && (oracleDeclineOption(o) || strings.HasPrefix(l, "no")) {
+				return o.Index, nil
+			}
+		}
+		if lp == "yes" {
+			// An optional ask with one way to accept ("Exile 1 card" /
+			// "Do not pay", or a lone "Play X" the seat may skip): yes is
+			// that option.
+			if i := oracleSoleAccept(d, used); i >= 0 {
+				return i, nil
+			}
+		}
+	}
+	for _, o := range d.Options {
+		if !used[o.Index] && oracleManaColourMatches(o.ManaSymbol, pick) {
+			return o.Index, nil
+		}
+	}
+	for _, o := range d.Options {
+		if !used[o.Index] && (strings.EqualFold(o.Kind, pick) || oracleLabelMatches(o.Label, pick)) {
+			return o.Index, nil
+		}
+	}
+	return -1, nil
+}
+
+// oracleDeclineOption reports whether o is a decline: a no/decline kind or
+// mode, or a label that says so ("No", "Decline", "Do not pay"). A "no"
+// pick also takes any label starting "no" (matchPick).
+func oracleDeclineOption(o decision.Option) bool {
+	k, l := strings.ToLower(o.Kind), strings.ToLower(o.Label)
+	return k == "no" || k == "decline" || strings.HasSuffix(k, "_decline") || o.Mode == "unless_decline" ||
+		l == "no" || strings.HasPrefix(l, "decline") || strings.HasPrefix(l, "refuse") ||
+		strings.HasPrefix(l, "don't") || strings.HasPrefix(l, "do not")
+}
+
+// oracleSoleAccept returns the one unused non-decline option of a choose or
+// modes ask that can be declined (it offers a decline option, or takes zero
+// answers), or -1 when there is no such single option. Declarations
+// (attackers, blockers) and targets are never a yes.
+func oracleSoleAccept(d *decision.Decision, used map[int]bool) int {
+	if d.Kind != decision.KChoose && d.Kind != decision.KModes {
+		return -1
+	}
+	accept, declinable := -1, d.Min == 0
+	for _, o := range d.Options {
+		if used[o.Index] {
+			continue
+		}
+		if oracleDeclineOption(o) {
+			declinable = true
+			continue
+		}
+		if accept >= 0 {
+			return -1
+		}
+		accept = o.Index
+	}
+	if !declinable {
+		return -1
+	}
+	return accept
+}
+
+// oracleColourSet normalises a colour string to its WUBRG letters in fixed
+// order, so an expectation need not know the engine's letter order.
+func oracleColourSet(s string) string {
+	var b strings.Builder
+	for _, c := range "WUBRG" {
+		if strings.ContainsRune(strings.ToUpper(s), c) {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+// abstractYesNo reports whether a pick is the author's abstract yes/no.
+func abstractYesNo(pick string) bool {
+	lp := strings.ToLower(pick)
+	return lp == "yes" || lp == "no"
+}
+
+// answer handles one pending decision. Priority is passed. Anything else is
+// answered from the step's queues (targets, then answers of the matching
+// kind), else by the documented fallback: accept an optional trigger, keep
+// orders as offered, and otherwise take the first Min options. Every
+// fallback is logged so a failure shows exactly what the runner chose.
+func (r *oracleRun) answer(d *decision.Decision, why string) error {
+	if d.Kind == decision.KPriority {
+		idx := pickPass(d)
+		if idx < 0 {
+			return harnessf("priority with no pass option")
+		}
+		return r.e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{idx}})
+	}
+	if d.Kind == decision.KTarget && len(r.targets) > 0 {
+		used := map[int]bool{}
+		var choices []int
+		for len(r.targets) > 0 && len(choices) < max(d.Max, 1) {
+			idx, err := r.matchPick(d, r.targets[0], used)
+			if err != nil {
+				return err
+			}
+			if idx < 0 {
+				if len(choices) == 0 {
+					return harnessf("target %q not offered: %s", r.targets[0], optionDump(d))
+				}
+				break
+			}
+			r.targets = r.targets[1:]
+			used[idx] = true
+			choices = append(choices, idx)
+		}
+		return r.submit(d, choices, "target")
+	}
+	for i, a := range r.answers {
+		if a.Kind != string(d.Kind) && a.Kind != "any" {
+			continue
+		}
+		// An "any" yes/no is the author's abstract accept/decline: a
+		// decision that offers no yes/no-shaped option (a mana-payment tap
+		// prompt posed ahead of the real ask) is not the one it was meant
+		// for, so the answer stays queued for the next decision.
+		if a.Kind == "any" && len(a.Pick) == 1 && abstractYesNo(a.Pick[0]) {
+			if idx, _ := r.matchPick(d, a.Pick[0], map[int]bool{}); idx < 0 {
+				continue
+			}
+		}
+		r.answers = append(r.answers[:i:i], r.answers[i+1:]...)
+		used := map[int]bool{}
+		var choices []int
+		for _, p := range a.Pick {
+			// A Repeatable modes decision accepts the same option index more
+			// than once (CanRepeatModes$ True, e.g. "Draw" twice): a repeated
+			// pick must SUBMIT the same index again, so each mode pick sees a
+			// fresh one-use map. Every other kind keeps its one-use rule.
+			pickUsed := used
+			if d.Kind == decision.KModes && d.Repeatable {
+				pickUsed = map[int]bool{}
+			}
+			idx, err := r.matchPick(d, p, pickUsed)
+			if err != nil {
+				return err
+			}
+			if idx < 0 {
+				return harnessf("answer %q not offered for %s: %s", p, d.Kind, optionDump(d))
+			}
+			used[idx] = true
+			choices = append(choices, idx)
+		}
+		// The seat assertion fires only once the pick proves this decision
+		// is the one the answer is consumed by: a wildcard "any" answer that
+		// a foreign decision merely touches keeps its not-offered failure,
+		// which the generator's placement loop retries on the kinds and
+		// steps a setChoice can mean. A consumed answer posed to the wrong
+		// seat is the B8 bug shape and fails here.
+		if a.Seat != nil && int(d.Player) != *a.Seat {
+			return harnessf("answer %q posed to p%d, scenario says p%d: %s",
+				strings.Join(a.Pick, ","), d.Player, *a.Seat, optionDump(d))
+		}
+		return r.submit(d, choices, "answer")
+	}
+	var choices []int
+	switch d.Kind {
+	case decision.KTriggerOptional:
+		for _, o := range d.Options {
+			if o.Kind == "yes" {
+				choices = []int{o.Index}
+			}
+		}
+	case decision.KTriggerOrder, decision.KArrange:
+		// A generated compliance scenario's arrange whose shared option kind
+		// is "graveyard" and whose ask is optional (Min 0, the shape an upkeep
+		// Surveil poses) falls back to the EMPTY choice set: every looked-at
+		// card goes to the graveyard. Scoped to the GENERATED scenarios
+		// (xmageFixture) -- XMage is their reference. An audit fixture
+		// (engine/rules/testdata/oracle) has no XMage snapshot to align with and its
+		// expectations are written for the choose-all fallback (Ransom Note's
+		// cloak audit relies on the setup ETB surveil keeping the seeded top
+		// card on top), so it keeps today's behaviour.
+		//
+		// WHICH ask takes the empty set depends on the scenario shape
+		// (revisitsUpkeep), because the stored XMage references of the two
+		// level-B templates disagree and only the shape tells them apart:
+		//   - the activate/cast templates never revisit the phase; their
+		//     reference graveyards the SETUP ask (the D1 rows Broodheart
+		//     Engine / Essence Anchor / Morcant's Eyes activate#0.0), so the
+		//     setup drive answers empty and a step-time ask keeps the
+		//     choose-all fallback;
+		//   - the trigger#0.x template walks turn 1's upkeep with a pass_to,
+		//     so its setup drive resolves the same upkeep trigger once and the
+		//     reference KEEPS the looked-at card on top at the setup
+		//     checkpoint; the SECOND resolution, at the pass_to upkeep's
+		//     resolve step, is the one the cached reference graveyarded (the
+		//     six stored trigger#0.0 rows read `step 1 (resolve)
+		//     p0.graveyard: gorge "[]", xmage "[Wastes]"`). So the setup ask
+		//     keeps the card on top and the step-time ask answers empty.
+		// The recorded empty answer is transcribed by lab/oracle/compliance/oraclegen
+		// into one name selection per looked-at card, which pins XMage to the
+		// same outcome (see its arrange arm).
+		if r.xmageFixture && (why == "setup") != r.revisitsUpkeep && d.Kind == decision.KArrange &&
+			d.ResumeKind == "arrange" && d.Min == 0 && len(d.Options) > 0 {
+			uniformGraveyard := arrangeAnswerRecordCodes.Code(arrangeSharedKind(d)) == arrangeAnswerRecordGraveyard
+			if uniformGraveyard {
+				// Leave choices nil: the Min-first block below turns that
+				// into the empty answer, and the empty pile A sends every
+				// looked-at card to the graveyard via arrangeAnswerRecord's
+				// graveyard arm.
+				break
+			}
+		}
+		for _, o := range d.Options {
+			choices = append(choices, o.Index)
+		}
+	case decision.KMulligan:
+		for _, o := range d.Options {
+			if o.Kind == "keep" {
+				choices = []int{o.Index}
+			}
+		}
+	case decision.KChoose:
+		if idx, ok := r.unpayableTriggerCostWindowDone(d); ok {
+			choices = []int{idx}
+		} else if idx, ok := legendKeepSurvivor(r.e, d); ok {
+			choices = []int{idx}
+		}
+	}
+	if choices == nil {
+		for i := 0; i < d.Min && i < len(d.Options); i++ {
+			choices = append(choices, d.Options[i].Index)
+		}
+		if fit, ok := oracleSumFitChoices(d, choices); ok {
+			choices = fit
+		}
+		if choices == nil {
+			choices = []int{}
+		}
+	}
+	return r.submit(d, choices, why+" fallback")
+}
+
+// blockersDecision answers non-blockers decisions until the declare-blockers
+// decision (KBlockers) is pending, then returns it. The generated blocking
+// scenario declares the block directly after the attack, because XMage's
+// driver cannot snapshot the pre-block declare-blockers state (its engine
+// selects blockers in DeclareBlockersStep.beginStep before any player gets
+// priority), so the generator emits no pass_to checkpoint there and the block
+// op must advance from the post-attack priority itself. A scenario that
+// already stopped at KBlockers (a hand-written one following a pass_to) finds
+// it pending on the first pass. A free function, not a method: oracleRun holds
+// a *Engine, so a method would grow engineSurface.
+func blockersDecision(r *oracleRun) (*decision.Decision, error) {
+	for i := 0; i < 200; i++ {
+		d := r.e.Pending()
+		if d == nil || r.e.G.Over {
+			return nil, harnessf("block: game stopped before the blockers decision")
+		}
+		if d.Kind == decision.KBlockers {
+			return d, nil
+		}
+		if err := r.answer(d, "to-block"); err != nil {
+			return nil, err
+		}
+	}
+	return nil, harnessf("block: no blockers decision pending")
+}
+
+// oracleExpectReadsPendingAttackers reports whether an expectation reads the
+// PENDING declare-attackers decision -- the offered-options reads
+// attack_required and can_attack. Only these must be evaluated pre-submit;
+// every other expectation is a board read that must stay on the ordinary
+// post-step path (an existing attack step asserts e.g. `{card tapped:true}`,
+// which only becomes true after the declaration).
+func oracleExpectReadsPendingAttackers(x oracleExpect) bool {
+	return x.AttackRequired != nil || x.CanAttack != nil
+}
+
+// oracleAttackExpectPreSubmit evaluates the decision-dependent expectations of
+// an attack step (attack_required and can_attack, which read the PENDING
+// declare-attackers decision) before the declaration is submitted: at that
+// point e.Pending() IS the attackers decision, so those reads see the real
+// board. After the submit the phase advances and the same reads would fail
+// loudly ("no attackers decision pending"), so a passing set marks the
+// consumed expect indices on oracleRun.preChecked and runOracleScenarioSpare's
+// post-step re-check skips exactly those. Every other expectation on the step
+// is left to the ordinary post-step check. A non-empty result aborts the step
+// BEFORE any declaration goes in. A free function, not a method, like
+// blockersDecision: oracleRun holds a *Engine, so a method would grow
+// engineSurface.
+func oracleAttackExpectPreSubmit(r *oracleRun, st oracleStep) []string {
+	var bad []string
+	var consumed []int
+	for j, x := range st.Expect {
+		if !oracleExpectReadsPendingAttackers(x) {
+			continue
+		}
+		consumed = append(consumed, j)
+		for _, b := range r.check(x) {
+			bad = append(bad, fmt.Sprintf("pre-submit (attack): %s", b))
+		}
+	}
+	if len(bad) > 0 {
+		return bad
+	}
+	if len(consumed) > 0 {
+		if r.preChecked == nil {
+			r.preChecked = map[int]map[int]bool{}
+		}
+		m := r.preChecked[r.step]
+		if m == nil {
+			m = map[int]bool{}
+			r.preChecked[r.step] = m
+		}
+		for _, j := range consumed {
+			m[j] = true
+		}
+	}
+	return nil
+}
+
+// untilPriority answers non-priority decisions until a priority decision
+// (or the end of the game) is pending.
+func (r *oracleRun) untilPriority(why string) error {
+	for i := 0; i < 200; i++ {
+		d := r.e.Pending()
+		if d == nil || r.e.G.Over || d.Kind == decision.KPriority {
+			return nil
+		}
+		if err := r.answer(d, why); err != nil {
+			return err
+		}
+	}
+	return harnessf("%s: decisions never returned to priority", why)
+}
+
+func (r *oracleRun) addMana(seat state.PlayerID, mana string) error {
+	d := r.e.Pending()
+	if d == nil || d.Kind != decision.KPriority || d.Player != seat {
+		return harnessf("mana: p%d does not hold priority", seat)
+	}
+	before := r.e.Pending()
+	for _, c := range mana {
+		if !strings.ContainsRune("WUBRGC", c) {
+			return harnessf("mana: bad symbol %q", c)
+		}
+		r.e.emit(events.Event{Kind: events.ManaAdd, Player: seat, Counter: string(c), Amount: 1})
+	}
+	r.e.priorityRound()
+	regrantStalePriority(r.e, pendingSeq(before))
+	r.logf("  [mana] p%d +%s", seat, mana)
+	return nil
+}
+
+func (r *oracleRun) priorityFor(seat state.PlayerID, op string) (*decision.Decision, error) {
+	d := r.e.Pending()
+	if d == nil || d.Kind != decision.KPriority || d.Player != seat {
+		got := "none"
+		if d != nil {
+			got = fmt.Sprintf("%s for p%d", d.Kind, d.Player)
+		}
+		return nil, harnessf("%s: p%d does not hold priority (pending %s)", op, seat, got)
+	}
+	return d, nil
+}
+
+// regrantStalePriority re-poses a priority decision whose option list
+// pre-dates what the caller's emit just queued: putTriggersOnStack returns
+// early when it pushes a trigger while a priority decision is ALREADY
+// pending (engine/rules/trigger_queue.go), leaving that decision -- and its stale
+// option list -- pending, so an action the push made available (Kirol's
+// CopySpellAbility targeting the just-pushed ETB trigger) is never offered.
+// One more round drains the queue and grants a fresh decision. Cheap no-op
+// in the common case: a fresh grant (new Seq) or a mid-flow ask returns
+// without a second walk.
+func regrantStalePriority(e *Engine, beforeSeq uint64) {
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KPriority || d.Seq != beforeSeq {
+		return
+	}
+	e.priorityRound()
+}
+
+// pendingSeq is a pending decision's Seq, 0 when nothing is pending (0 is
+// never a posed decision's Seq, so a nil pending never matches a re-grant).
+func pendingSeq(d *decision.Decision) uint64 {
+	if d == nil {
+		return 0
+	}
+	return d.Seq
+}
+
+func oraclePrelude(r *oracleRun, st oracleStep, seat state.PlayerID) error {
+	if oracleOpCodes.Code(st.Op) == oracleOpAttach {
+		equipment, err := r.resolve(st.Card)
+		if err != nil {
+			return err
+		}
+		bearer, err := r.resolve(st.AttachedTo)
+		if err != nil {
+			return err
+		}
+		before := r.e.Pending()
+		r.e.emit(events.Event{Kind: events.Attach, Obj: equipment, IDs: []state.ObjID{bearer}})
+		r.e.priorityRound()
+		regrantStalePriority(r.e, pendingSeq(before))
+		return r.untilPriority("attach")
+	}
+	before := r.e.Pending()
+	r.e.emit(events.Event{Kind: events.LifeChange, Player: seat, Amount: st.Amount})
+	r.e.priorityRound()
+	regrantStalePriority(r.e, pendingSeq(before))
+	return r.untilPriority("life")
+}
+
+// oraclePickStepOption resolves the option index a `cast` or `activate` step
+// selects. A cast picks the option whose Mode matches ("kicked" for a kicked
+// cast, an explicit cast_mode when given, the Adventure offer for a ref naming
+// an Adventure face, and otherwise the plain/only cast). An activate picks by
+// the step's ability label, or -- when ability_index is set -- by the source's
+// IR ability index, which wins over the label but must still agree with it
+// when both are given. A named mana ability lives behind the generic
+// "Activate <card> for mana" priority option, so for it this returns that
+// option and oracleAnswerManaStage answers the second-stage wheel. A free
+// function, not a method: oracleRun holds a *Engine, so a method would grow
+// engineSurface.
+func oraclePickStepOption(r *oracleRun, st oracleStep, seat state.PlayerID, id state.ObjID, d *decision.Decision) (int, error) {
+	e := r.e
+	op := oracleOpCodes.Code(string(st.Op))
+	if op == oracleOpActivate && st.AbilityIndex != nil {
+		return oraclePickActivateByIndex(r, st, seat, id, d)
+	}
+	// A cast is not an ability activation: there is no ability index a cast
+	// step could honour, so an index on a cast step must fail loudly rather
+	// than be silently discarded (the cast-mode selection below would ignore
+	// it). Worded like the wrong-index activate path.
+	if op == oracleOpCast && st.AbilityIndex != nil {
+		return -1, harnessf("%s %s not offered (ability_index: %d): %s", st.Op, st.Card, *st.AbilityIndex, optionDump(d))
+	}
+	idx, fallback, manaFallback := -1, -1, -1
+	wantMode := oracleCastWantMode(st, e.G.Obj(id))
+	// A named mana ability lives behind the generic "Activate <card> for
+	// mana" priority option: the engine asks a second-stage KChoose over
+	// the source's available mana abilities (or, when exactly one is
+	// available, resolves it with no ask at all). The generic option may
+	// stand in for a requested label only when that label names an ability
+	// the source can currently produce -- the same authoritative set the
+	// offer and the second stage are built from -- otherwise the step must
+	// fail loudly below instead of silently activating a different ability
+	// (or a mana ability when a non-mana label was requested).
+	manaLabels := []string(nil)
+	requestedManaAbility := false
+	if op == oracleOpActivate && st.Ability != "" {
+		manaLabels = r.manaAbilityLabels(seat, id)
+		for _, label := range manaLabels {
+			if oracleLabelMatches(label, st.Ability) {
+				requestedManaAbility = true
+				break
+			}
+		}
+	}
+	for _, o := range d.Options {
+		if o.Obj != id {
+			continue
+		}
+		if op == oracleOpCast && o.Kind == "cast" {
+			if oracleCastModeMatches(o, wantMode) {
+				idx = o.Index
+				break
+			}
+			if wantMode == "" && fallback < 0 && !strings.HasPrefix(o.Mode, "kicked") {
+				fallback = o.Index
+			}
+		}
+		if op == oracleOpActivate && oracleActivateKind(o.Kind) {
+			if st.Ability == "" || oracleLabelMatches(o.Label, st.Ability) {
+				idx = o.Index
+				break
+			}
+			if o.Kind == "activate" && requestedManaAbility && strings.Contains(strings.ToLower(o.Label), "for mana") && manaFallback < 0 {
+				manaFallback = o.Index
+			}
+		}
+	}
+	if idx < 0 {
+		idx = manaFallback
+	}
+	if idx < 0 {
+		idx = fallback
+	}
+	if idx < 0 {
+		want := ""
+		if st.Ability != "" {
+			want = fmt.Sprintf(" (ability: %q)", st.Ability)
+		}
+		return -1, harnessf("%s %s not offered%s: %s", st.Op, st.Card, want, optionDump(d))
+	}
+	return idx, nil
+}
+
+// oraclePickActivateByIndex selects the `activate` option for the ability
+// st.AbilityIndex names, the index into the source's Face().Abilities (the
+// same anchor decision.Option.Ability carries). A mana ability -- one of the
+// source's currently available mana abilities -- sits behind the generic
+// "Activate <card> for mana" option, which carries no index, so this returns
+// that option for the second stage to resolve; it does NOT fall through to a
+// non-mana option, so a gated-out mana ability fails loudly instead of
+// activating a different ability. Any other ability is an "ability" option
+// carrying that index; when the step also names a label, the label must agree
+// with the indexed option or the step fails.
+func oraclePickActivateByIndex(r *oracleRun, st oracleStep, seat state.PlayerID, id state.ObjID, d *decision.Decision) (int, error) {
+	k := *st.AbilityIndex
+	notOffered := harnessf("%s %s not offered (ability_index: %d): %s", st.Op, st.Card, k, optionDump(d))
+	o := r.e.G.Obj(id)
+	if o == nil || o.Face() == nil {
+		return -1, notOffered
+	}
+	// The generic "Activate <card> for mana" placeholder is labelled with
+	// the engine's cached manaActivateLabel for the source's face name; a
+	// genuine ability option never shares that label. Matching the label
+	// exactly is how the placeholder -- whose Kind is "activate" and whose
+	// Ability anchor is the zero value, aliasing index 0 -- is excluded from
+	// the non-mana accept below.
+	manaLabel := r.e.manaActivateLabel(o.Face().Name)
+	pa, ok := o.PileAbilityAt(k)
+	if !ok || pa.SA == nil {
+		return -1, notOffered
+	}
+	for _, ma := range r.e.availableManaAbilities(seat, id) {
+		if ma != pa.SA {
+			continue
+		}
+		for _, opt := range d.Options {
+			if opt.Obj == id && opt.Label == manaLabel {
+				return opt.Index, nil
+			}
+		}
+		return -1, notOffered
+	}
+	for _, opt := range d.Options {
+		// Exclude the generic mana placeholder by identity: only a genuine
+		// ability option can satisfy an index, so index 0 selects the first
+		// real ability instead of the mana placeholder.
+		if opt.Obj != id || opt.Label == manaLabel || !oracleActivateKind(opt.Kind) || opt.Ability != k {
+			continue
+		}
+		if st.Ability != "" && !oracleLabelMatches(opt.Label, st.Ability) {
+			continue
+		}
+		return opt.Index, nil
+	}
+	return -1, notOffered
+}
+
+// oracleAnswerManaStage answers the second-stage KChoose (or verifies the
+// no-ask single-ability resolution) that follows the generic "for mana"
+// option when a step names a mana ability by label or by ability_index.
+// abilities is the source's available mana abilities as they were BEFORE the
+// generic option was submitted -- after it the ability may already have
+// resolved, so a post-submit recomputation would see an empty list.
+// decision.Option.Ability on the wheel is the index into that AVAILABLE list
+// (Face().ManaAbilities plus intrinsic and granted ones), so it need not
+// equal the Face().Abilities index ability_index names; the requested ability
+// is located in the list by identity and, when no option carries that index,
+// by its wheel label (pay.ManaAbilityLabel). A step that cannot name an
+// available ability fails loudly, never silently activating a different one.
+func oracleAnswerManaStage(r *oracleRun, st oracleStep, seat state.PlayerID, id state.ObjID, abilities []*cards.SA) error {
+	e := r.e
+	manaLabels := make([]string, 0, len(abilities))
+	for _, ma := range abilities {
+		manaLabels = append(manaLabels, pay.ManaAbilityLabel(ma, pay.ChosenProducedColour(e.G, id)))
+	}
+	wantSA, wantIdx := (*cards.SA)(nil), -1
+	if st.AbilityIndex != nil {
+		if pa, ok := e.G.Obj(id).PileAbilityAt(*st.AbilityIndex); ok {
+			wantSA = pa.SA
+		}
+		for i, ma := range abilities {
+			if ma == wantSA {
+				wantIdx = i
+				break
+			}
+		}
+	}
+	choice := e.Pending()
+	if choice != nil && choice.Kind == decision.KChoose && choice.Source == id {
+		// A queued answer owns the pending decision: fall back to selection
+		// only when the scenario did not queue one, so a costed any-colour
+		// wheel behaves like every other colour wheel.
+		if hasOracleAnswer(r.answers, choice.Kind) {
+			return nil
+		}
+		want := oracleRequestedManaLabel(st, wantSA, e.G, id)
+		// Two passes: the ability_index match must win over the label match,
+		// which is scanned only when no option carries the requested
+		// ability. One pass over both let option 0's identical label
+		// ("Add G" for Itlimoc's "{T}: Add {G}." vs "{T}: Add {G} for each
+		// creature you control") hijack a step that named the second
+		// ability by index -- the loop reached option 0's label check before
+		// option 1's Ability match.
+		idx, sawMana := -1, false
+		for _, o := range choice.Options {
+			if o.Kind != "mana" {
+				continue
+			}
+			sawMana = true
+			if idx < 0 && wantIdx >= 0 && o.Obj == id && o.Ability == wantIdx {
+				idx = o.Index
+			}
+		}
+		if idx < 0 {
+			for _, o := range choice.Options {
+				if o.Kind != "mana" {
+					continue
+				}
+				if want != "" && oracleLabelMatches(o.Label, want) {
+					idx = o.Index
+					break
+				}
+			}
+		}
+		if !sawMana {
+			// The KChoose is not the mana wheel (some other ask of this
+			// source): leave it to the ordinary answer machinery.
+			return nil
+		}
+		if idx < 0 {
+			if st.AbilityIndex != nil {
+				return harnessf("mana ability_index %d not offered: %s", *st.AbilityIndex, optionDump(choice))
+			}
+			return harnessf("mana ability %q not offered: %s", st.Ability, optionDump(choice))
+		}
+		// A combination ask ("Add two mana in any combination of colors",
+		// Flamebraider) wants Min picks from the wheel: fill the remaining
+		// slots with the wanted ability's next options in order. The single
+		// Min==1 case keeps today's one-pick submit unchanged.
+		picks := []int{idx}
+		if choice.Min > 1 {
+			used := map[int]bool{idx: true}
+			for _, o := range choice.Options {
+				if len(picks) >= choice.Min {
+					break
+				}
+				if used[o.Index] || o.Obj != id || wantIdx >= 0 && o.Ability != wantIdx {
+					continue
+				}
+				used[o.Index] = true
+				picks = append(picks, o.Index)
+			}
+		}
+		return r.submit(choice, picks, "mana ability")
+	}
+	// No second stage: exactly one available ability was resolved with no ask.
+	// It must have been the one the step named.
+	if st.AbilityIndex != nil {
+		ok := len(abilities) == 1 && abilities[0] == wantSA
+		if ok && st.Ability != "" && !oracleLabelMatches(manaLabels[0], st.Ability) {
+			ok = false
+		}
+		if !ok {
+			return harnessf("mana ability_index %d not offered (available: %v)", *st.AbilityIndex, manaLabels)
+		}
+		return nil
+	}
+	if len(manaLabels) != 1 || !oracleLabelMatches(manaLabels[0], st.Ability) {
+		return harnessf("mana ability %q not offered (available: %v)", st.Ability, manaLabels)
+	}
+	return nil
+}
+
+// oracleRequestedManaLabel is the wheel label the stage carries for the
+// ability a step names: the label of the ability_index's own SA when the step
+// gives an index, else the step's own ability string (so the label path keeps
+// its existing oracleLabelMatches semantics).
+func oracleRequestedManaLabel(st oracleStep, sa *cards.SA, g *state.Game, id state.ObjID) string {
+	if st.AbilityIndex == nil {
+		return st.Ability
+	}
+	if sa == nil {
+		return ""
+	}
+	return pay.ManaAbilityLabel(sa, pay.ChosenProducedColour(g, id))
+}
+
+func (r *oracleRun) do(st oracleStep) error {
+	e := r.e
+	r.targets = append([]string(nil), st.Targets...)
+	r.answers = append([]oracleAnswer(nil), st.Answers...)
+	if rest, ok := r.borrowed[r.step]; ok {
+		// settleTriggerAsks answered the head of this step's script one
+		// checkpoint early; only the remainder is still owed.
+		r.answers = rest
+	}
+	seat := state.PlayerID(st.Seat)
+	r.logf("step %s %s", st.Op, st.Card)
+	op := oracleOpCodes.Code(string(st.Op))
+	switch op {
+	case oracleOpMana:
+		return r.addMana(seat, st.Mana)
+	case oracleOpCast, oracleOpActivate:
+		if st.Mana != "" {
+			if err := r.addMana(seat, st.Mana); err != nil {
+				return err
+			}
+		}
+		id, err := r.resolve(st.Card)
+		if err != nil {
+			return err
+		}
+		d, err := r.priorityFor(seat, st.Op)
+		if err != nil {
+			return err
+		}
+		manaAbilities := []*cards.SA(nil)
+		if op == oracleOpActivate && (st.Ability != "" || st.AbilityIndex != nil) {
+			manaAbilities = e.availableManaAbilities(seat, id)
+		}
+		idx, err := oraclePickStepOption(r, st, seat, id, d)
+		if err != nil {
+			return err
+		}
+		// Read the picked option's Kind/Label BEFORE the Submit: a posed
+		// decision is valid only until the next Submit on the engine
+		// (decision_arena_live.go), and r.submit consumes d.
+		manaStage := op == oracleOpActivate && d.Options[idx].Kind == "activate" &&
+			(st.AbilityIndex != nil || (st.Ability != "" && !oracleLabelMatches(d.Options[idx].Label, st.Ability)))
+		if err := r.submit(d, []int{idx}, st.Op); err != nil {
+			return err
+		}
+		if st.Observe != nil {
+			pending := e.Pending()
+			if pending == nil || pending.Kind != decision.Kind(st.Observe.Kind) {
+				got := "none"
+				if pending != nil {
+					got = string(pending.Kind)
+				}
+				return harnessf("observe expected pending %s decision, got %s", st.Observe.Kind, got)
+			}
+			if st.Observe.Source != "" {
+				source, err := r.resolve(st.Observe.Source)
+				if err != nil {
+					return err
+				}
+				if pending.Source != source {
+					return harnessf("observe expected source %s (object %d), got %d", st.Observe.Source, source, pending.Source)
+				}
+			}
+			r.extraFails = append(r.extraFails, oracleObserveMismatches(pending, *st.Observe)...)
+		}
+		if manaStage {
+			if err := oracleAnswerManaStage(r, st, seat, id, manaAbilities); err != nil {
+				return err
+			}
+		}
+		return r.untilPriority(st.Op)
+	case oracleOpPlay:
+		id, err := r.resolve(st.Card)
+		if err != nil {
+			return err
+		}
+		d, err := r.priorityFor(seat, st.Op)
+		if err != nil {
+			return err
+		}
+		for _, o := range d.Options {
+			if o.Obj == id && o.Kind == "play_land" {
+				if err := r.submit(d, []int{o.Index}, "play"); err != nil {
+					return err
+				}
+				return r.untilPriority("play")
+			}
+		}
+		return harnessf("play %s not offered: %s", st.Card, optionDump(d))
+	case oracleOpResolve:
+		for i := 0; i < 300; i++ {
+			d := e.Pending()
+			if d == nil || e.G.Over {
+				return nil
+			}
+			if d.Kind == decision.KPriority && len(e.G.Stack) == 0 {
+				return nil
+			}
+			if err := r.answer(d, "resolve"); err != nil {
+				return err
+			}
+		}
+		return harnessf("resolve: stack never emptied")
+	case oracleOpAttack:
+		def, ok := parseSeatRef(st.Defender)
+		if !ok {
+			return harnessf("attack: bad defender %q", st.Defender)
+		}
+		for i := 0; ; i++ {
+			d := e.Pending()
+			if d == nil || e.G.Over || i > 200 {
+				return harnessf("attack: never reached the declare-attackers decision")
+			}
+			if d.Kind == decision.KAttackers && d.Player == seat {
+				// The step's decision-dependent expects (attack_required /
+				// can_attack) read the PENDING attackers decision, so they are
+				// evaluated here, before the declaration goes in -- the
+				// post-step re-check would only see the gone decision. Every
+				// other expect stays on the post-step path. See
+				// oracleAttackExpectPreSubmit.
+				if len(st.Expect) > 0 {
+					if bad := oracleAttackExpectPreSubmit(r, st); len(bad) > 0 {
+						return harnessf("%s", strings.Join(bad, "; "))
+					}
+				}
+				used := map[int]bool{}
+				var choices []int
+				for _, a := range st.Attackers {
+					id, err := r.resolve(a)
+					if err != nil {
+						return err
+					}
+					idx := -1
+					for _, o := range d.Options {
+						if !used[o.Index] && o.Obj == id && o.Player == def {
+							idx = o.Index
+							break
+						}
+					}
+					if idx < 0 {
+						return harnessf("attack: %s at p%d not offered: %s", a, def, optionDump(d))
+					}
+					used[idx] = true
+					choices = append(choices, idx)
+				}
+				if err := r.submit(d, choices, "attack"); err != nil {
+					return err
+				}
+				return r.untilPriority("attack")
+			}
+			if d.Kind == decision.KPriority && len(e.G.Stack) == 0 && e.G.Active == seat && e.G.Step > state.StepDeclareAttackers {
+				return harnessf("attack: passed declare-attackers without being asked")
+			}
+			if err := r.answer(d, "to-attack"); err != nil {
+				return err
+			}
+		}
+	case oracleOpBlock:
+		d, err := blockersDecision(r)
+		if err != nil {
+			return err
+		}
+		used := map[int]bool{}
+		var choices []int
+		for _, pair := range st.Blocks {
+			b, err := r.resolve(pair[0])
+			if err != nil {
+				return err
+			}
+			a, err := r.resolve(pair[1])
+			if err != nil {
+				return err
+			}
+			idx := -1
+			for _, o := range d.Options {
+				if !used[o.Index] && o.Obj == b && o.Attacker == a {
+					idx = o.Index
+				}
+			}
+			if idx < 0 {
+				return harnessf("block: %s on %s not offered: %s", pair[0], pair[1], optionDump(d))
+			}
+			used[idx] = true
+			choices = append(choices, idx)
+		}
+		if err := r.submit(d, choices, "block"); err != nil {
+			return err
+		}
+		return r.untilPriority("block")
+	case oracleOpPass:
+		// `pass` answers exactly one priority decision: the named seat must
+		// hold priority right now, or this fails loudly rather than silently
+		// passing someone else's priority (which `pass_to` does not check).
+		d, err := r.priorityFor(seat, st.Op)
+		if err != nil {
+			return err
+		}
+		return r.submit(d, []int{pickPass(d)}, "pass")
+	case oracleOpPassTo:
+		var want state.Step
+		if st.Step != "" {
+			s, ok := state.ParseStep(st.Step)
+			if !ok {
+				return harnessf("pass_to: unknown step %q", st.Step)
+			}
+			want = s
+		}
+		active, hasActive := parseSeatRef(st.Active)
+		for i := 0; i < 2000; i++ {
+			d := e.Pending()
+			if d == nil || e.G.Over {
+				return harnessf("pass_to: game stopped")
+			}
+			if st.Decision != "" && string(d.Kind) == st.Decision {
+				return nil
+			}
+			if st.Step != "" && i > 0 && e.G.Step == want && (!hasActive || e.G.Active == active) {
+				return nil
+			}
+			if err := r.answer(d, "pass_to"); err != nil {
+				return err
+			}
+		}
+		return harnessf("pass_to: target never reached")
+	case oracleOpMove:
+		id, err := r.resolve(st.Card)
+		if err != nil {
+			return err
+		}
+		to, ok := oracleZones[st.To]
+		if !ok {
+			return harnessf("move: unknown zone %q", st.To)
+		}
+		before := e.Pending()
+		e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: e.G.Obj(id).Zone, To: to})
+		e.priorityRound()
+		regrantStalePriority(e, pendingSeq(before))
+		return r.untilPriority("move")
+	case oracleOpAttach, oracleOpLife:
+		return oraclePrelude(r, st, seat)
+	}
+	return harnessf("unknown op %q", st.Op)
+}
+
+func normCounter(k string) string {
+	if v, ok := normCounterTab.Get(strings.ReplaceAll(strings.ToLower(k), " ", "")); ok {
+		return v
+	}
+	return strings.ToUpper(k)
+}
+
+func poolString(m state.Mana) string {
+	var b strings.Builder
+	for i, c := range "WUBRGC" {
+		b.WriteString(strings.Repeat(string(c), int(m[i])))
+	}
+	return b.String()
+}
+
+func normPool(s string) string {
+	var m state.Mana
+	for i, c := range "WUBRGC" {
+		m[i] = int32(strings.Count(strings.ToUpper(s), string(c)))
+	}
+	return poolString(m)
+}
+
+func oracleHasFold(list []string, s string) bool {
+	for _, x := range list {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *oracleRun) wantBool(x oracleExpect) bool { return x.Want == nil || *x.Want }
+
+// check evaluates one expectation and returns its mismatches.
+func (r *oracleRun) check(x oracleExpect) []string {
+	e := r.e
+	var bad []string
+	failf := func(format string, a ...any) { bad = append(bad, fmt.Sprintf(format, a...)) }
+	seatOf := func(k string) (state.PlayerID, bool) {
+		p, ok := parseSeatRef(k)
+		if !ok || int(p) >= len(e.G.Players) {
+			failf("bad seat key %q", k)
+			return 0, false
+		}
+		return p, true
+	}
+	if x.Card != "" {
+		id, err := r.resolve(x.Card)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		o := e.G.Obj(id)
+		if x.Zone != "" && o.Zone.String() != x.Zone {
+			failf("%s: zone %s, want %s", x.Card, o.Zone, x.Zone)
+		}
+		if x.PT != "" {
+			if got := fmt.Sprintf("%d/%d", e.Power(id), e.Toughness(id)); got != x.PT {
+				failf("%s: P/T %s, want %s", x.Card, got, x.PT)
+			}
+		}
+		kws := e.Keywords(id)
+		for _, k := range x.Keywords {
+			if !oracleHasFold(kws, k) {
+				failf("%s: lacks keyword %q (has %v)", x.Card, k, kws)
+			}
+		}
+		for _, k := range x.NoKeywords {
+			if oracleHasFold(kws, k) {
+				failf("%s: has keyword %q, want none", x.Card, k)
+			}
+		}
+		types := e.Derived(id).Types
+		for _, ty := range x.Types {
+			if !oracleHasFold(types, ty) {
+				failf("%s: lacks type %q (types %v)", x.Card, ty, types)
+			}
+		}
+		for _, ty := range x.NoTypes {
+			if oracleHasFold(types, ty) {
+				failf("%s: has type %q, want not (types %v)", x.Card, ty, types)
+			}
+		}
+		if x.Colours != nil {
+			if got, want := oracleColourSet(e.Derived(id).Colors), oracleColourSet(*x.Colours); got != want {
+				failf("%s: colours %q, want %q", x.Card, got, want)
+			}
+		}
+		if x.Tapped != nil && o.Tapped != *x.Tapped {
+			failf("%s: tapped=%v, want %v", x.Card, o.Tapped, *x.Tapped)
+		}
+		if x.Damage != nil && o.Damage != *x.Damage {
+			failf("%s: damage %d, want %d", x.Card, o.Damage, *x.Damage)
+		}
+		for k, n := range x.Counters {
+			var got int32
+			for _, c := range o.Counters {
+				if strings.EqualFold(c.Kind, normCounter(k)) {
+					got += c.N
+				}
+			}
+			if got != n {
+				failf("%s: %s counters %d, want %d (counters %v)", x.Card, k, got, n, o.Counters)
+			}
+		}
+	}
+	for k, want := range x.Life {
+		if p, ok := seatOf(k); ok && e.G.Players[p].Life != want {
+			failf("%s life %d, want %d", k, e.G.Players[p].Life, want)
+		}
+	}
+	for k, want := range x.HandSize {
+		if p, ok := seatOf(k); ok && len(e.G.Zone(state.ZHand, p)) != want {
+			failf("%s hand size %d, want %d", k, len(e.G.Zone(state.ZHand, p)), want)
+		}
+	}
+	for k, want := range x.LookAtLibraryTop {
+		if p, ok := seatOf(k); ok && e.MayLookAtLibraryTop(p) != want {
+			failf("%s may look at library top=%v, want %v", k, !want, want)
+		}
+	}
+	for seat, ref := range x.LookAt {
+		if _, ok := seatOf(seat); !ok {
+			continue
+		}
+		id, err := r.resolve(ref)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		if mayLookAtObject(e.active(), e.matchesSpecFrom, id) != r.wantBool(x) {
+			failf("%s: %s may look at it=%v, want %v", ref, seat, !r.wantBool(x), r.wantBool(x))
+		}
+	}
+	for k, want := range x.MaxHandSize {
+		if p, ok := seatOf(k); ok && e.maxHandSizeFor(p) != want {
+			failf("%s max hand size %d, want %d", k, e.maxHandSizeFor(p), want)
+		}
+	}
+	for k, want := range x.GraveyardSize {
+		if p, ok := seatOf(k); ok && len(e.G.Zone(state.ZGraveyard, p)) != want {
+			failf("%s graveyard size %d, want %d", k, len(e.G.Zone(state.ZGraveyard, p)), want)
+		}
+	}
+	for k, want := range x.Pool {
+		if p, ok := seatOf(k); ok {
+			if got := poolString(e.G.Players[p].Pool); got != normPool(want) {
+				failf("%s pool %q, want %q", k, got, normPool(want))
+			}
+		}
+	}
+	if x.TriggerOnStack != "" {
+		id, err := r.resolve(x.TriggerOnStack)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		found := false
+		for _, sid := range e.G.Stack {
+			if o := e.G.Obj(sid); o != nil && o.Source == id && o.Ability != nil {
+				found = true
+			}
+		}
+		if found != r.wantBool(x) {
+			failf("trigger from %s on stack=%v, want %v (stack %s)", x.TriggerOnStack, found, r.wantBool(x), r.stackDump())
+		}
+	}
+	if x.StackSize != nil && len(e.G.Stack) != *x.StackSize {
+		failf("stack size %d, want %d (%s)", len(e.G.Stack), *x.StackSize, r.stackDump())
+	}
+	if x.Offered != nil {
+		id, err := r.resolve(x.Offered.Card)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		d := e.Pending()
+		if d == nil || d.Kind != decision.KPriority || int(d.Player) != x.Offered.Seat {
+			failf("offered: p%d does not hold priority", x.Offered.Seat)
+		} else {
+			found := false
+			alias, aliased := oracleOfferedKindAlias[x.Offered.Kind]
+			for _, o := range d.Options {
+				kindOK := o.Kind == x.Offered.Kind || (x.Offered.Kind == "activate" && o.Kind == "ability") || (aliased && o.Kind == alias)
+				if o.Obj == id && kindOK && oracleLabelMatches(o.Label, x.Offered.Label) {
+					found = true
+				}
+			}
+			if x.Offered.Kind == "activate" && x.Offered.Label != "" {
+				for _, label := range r.manaAbilityLabels(state.PlayerID(x.Offered.Seat), id) {
+					if oracleLabelMatches(label, x.Offered.Label) {
+						found = true
+					}
+				}
+			}
+			if found != r.wantBool(x) {
+				failf("%s %s offered=%v, want %v", x.Offered.Kind, x.Offered.Card, found, r.wantBool(x))
+			}
+		}
+	}
+	if x.CanBlock != nil {
+		b, err1 := r.resolve(x.CanBlock.Blocker)
+		a, err2 := r.resolve(x.CanBlock.Attacker)
+		if err1 != nil || err2 != nil {
+			return []string{fmt.Sprint(err1, err2)}
+		}
+		d := e.Pending()
+		if d == nil || d.Kind != decision.KBlockers {
+			failf("can_block: no blockers decision pending")
+		} else {
+			found := false
+			var matched decision.Option
+			for _, o := range d.Options {
+				if o.Obj == b && o.Attacker == a {
+					found = true
+					matched = o
+				}
+			}
+			if found != r.wantBool(x) {
+				failf("%s can block %s = %v, want %v", x.CanBlock.Blocker, x.CanBlock.Attacker, found, r.wantBool(x))
+			}
+			if found && x.CanBlock.MaxBlockers != nil && matched.MaxBlockers != *x.CanBlock.MaxBlockers {
+				failf("%s blocks %s with bound %d, want %d", x.CanBlock.Blocker, x.CanBlock.Attacker, matched.MaxBlockers, *x.CanBlock.MaxBlockers)
+			}
+		}
+	}
+	if x.AttackRequired != nil {
+		id, err := r.resolve(x.AttackRequired.Attacker)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		d := e.Pending()
+		if d == nil || d.Kind != decision.KAttackers {
+			failf("attack_required: no attackers decision pending")
+		} else {
+			found, required := false, false
+			for _, o := range d.Options {
+				if o.Obj == id {
+					found, required = true, o.Required
+				}
+			}
+			if !found {
+				failf("%s is not offered as an attacker", x.AttackRequired.Attacker)
+			} else if required != r.wantBool(x) {
+				failf("%s must attack = %v, want %v", x.AttackRequired.Attacker, required, r.wantBool(x))
+			}
+		}
+	}
+	if x.CanAttack != nil {
+		bad = append(bad, oracleCanAttackFails(r, x)...)
+	}
+	if x.Count != nil {
+		z, ok := oracleZones[x.Count.Zone]
+		if !ok {
+			return []string{fmt.Sprintf("count: unknown zone %q", x.Count.Zone)}
+		}
+		n := 0
+		for _, id := range e.G.Zone(z, state.PlayerID(x.Count.Seat)) {
+			o := e.G.Obj(id)
+			if o == nil || !strings.Contains(strings.ToLower(r.objName(o)), strings.ToLower(x.Count.Name)) {
+				continue
+			}
+			if x.Count.Token != nil && o.IsToken != *x.Count.Token {
+				continue
+			}
+			n++
+		}
+		if x.Eq == nil {
+			failf("count without eq")
+		} else if n != *x.Eq {
+			failf("count p%d %s %q = %d, want %d", x.Count.Seat, x.Count.Zone, x.Count.Name, n, *x.Eq)
+		}
+	}
+	return bad
+}
+
+func (r *oracleRun) stackDump() string {
+	var parts []string
+	for _, id := range r.e.G.Stack {
+		o := r.e.G.Obj(id)
+		src := ""
+		if o != nil && o.Source != 0 {
+			src = "<-" + r.objName(r.e.G.Obj(o.Source))
+		}
+		parts = append(parts, r.objName(o)+src)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// oracleUnconsumedMarker tags the fail a step raises when its declared
+// `answers` queue still holds entries after the step finished: the fixture
+// declared a decision this step never posed (or posed on a later step), so
+// nothing matched it and the engine fell back. It is distinct from a known
+// engine divergence so the audit can excuse exactly these rows via the
+// shrinking known-unconsumed ratchet without hiding a real failure.
+const oracleUnconsumedMarker = "unconsumed answer(s) for this step:"
+
+// oracleUnusedTargetMarker tags the fail a step raises when its declared
+// `targets` still hold entries after the step finished: the fixture declared
+// a target the step's cast/activate never asked for (a surplus slot, an
+// optional target the engine skips), so the runner silently dropped it. XMage
+// rejects such a cast, so the runner must fail loudly for the same reason the
+// unconsumed-answer check does. Exported so the generator can identify and
+// tolerate over-offering while it learns gorge's real targets.
+const OracleUnusedTargetMarker = "unused target(s) for this step:"
+
+// oracleUnusedTargetFail formats the one fail a step gets for unused
+// targets: the step index, the op, and every leftover target ref verbatim.
+func oracleUnusedTargetFail(step int, op string, targets []string) string {
+	j, _ := json.Marshal(targets)
+	return fmt.Sprintf("step %d (%s): %s %s", step, op, OracleUnusedTargetMarker, j)
+}
+
+// oracleUnconsumedFail formats the one fail a step gets for leftovers: the
+// step index, the op, and every leftover answer verbatim (kind + pick).
+func oracleUnconsumedFail(step int, op string, answers []oracleAnswer) string {
+	j, _ := json.Marshal(answers)
+	return fmt.Sprintf("step %d (%s): %s %s", step, op, oracleUnconsumedMarker, j)
+}
+
+// runOracleScenario plays one scenario and returns its mismatches (nil =
+// pass), a transcript, and the run (for the replay check; its engine is nil
+// when setup failed before genesis).
+func runOracleScenario(reg *cards.Registry, sc oracleScenario) (fails []string, transcript []string, run *oracleRun) {
+	return runOracleScenarioWith(reg, sc, false)
+}
+
+// runOracleScenarioWith is runOracleScenario with snapshots switched off
+// when noSnapshot is set (the A/B check that snapshotting is read-only).
+func runOracleScenarioWith(reg *cards.Registry, sc oracleScenario, noSnapshot bool) (fails []string, transcript []string, run *oracleRun) {
+	return runOracleScenarioSpare(reg, sc, noSnapshot, nil)
+}
+
+// scenarioRevisitsUpkeep reports whether the scenario's steps stop at the
+// upkeep step -- the trigger#0.x template's shape, where the scenario walks
+// the same phase the setup drive already walked. It is the discriminator the
+// setup-drive arrange fallback reads (oracleRun.revisitsUpkeep).
+func scenarioRevisitsUpkeep(sc oracleScenario) bool {
+	for _, st := range sc.Steps {
+		if oracleOpCodes.Code(st.Op) == oracleOpPassTo {
+			if s, ok := state.ParseStep(st.Step); ok && s == state.StepUpkeep {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// runOracleScenarioSpare is runOracleScenarioWith building its engines on
+// sp's recycled storage (see oracleRun.spare).
+func runOracleScenarioSpare(reg *cards.Registry, sc oracleScenario, noSnapshot bool, sp *Spare) (fails []string, transcript []string, run *oracleRun) {
+	r := &oracleRun{reg: reg, refs: map[string]state.ObjID{}, exactRefs: map[string]bool{}, noSnapshot: noSnapshot, step: -1, spare: sp, xmageFixture: sc.xmageFixture, revisitsUpkeep: scenarioRevisitsUpkeep(sc)}
+	run = r
+	defer func() {
+		if p := recover(); p != nil {
+			fails = append(fails, fmt.Sprintf("harness: panic: %v", p))
+			transcript = r.log
+		}
+	}()
+	if err := r.build(sc); err != nil {
+		return []string{err.Error()}, r.log, r
+	}
+	if !r.noSnapshot {
+		r.snaps = append(r.snaps, r.snapshot("setup"))
+	}
+	for i, st := range sc.Steps {
+		r.step = i
+		top := r.passResolves(st)
+		if err := r.do(st); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		if err := r.settleResolutionAsk(sc.Steps, i, top); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		if err := r.settleTriggerAsks(sc.Steps, i); err != nil {
+			return append(fails, fmt.Sprintf("step %d (%s): %v", i, st.Op, err)), r.log, r
+		}
+		r.recordFlips(i)
+		if r.pendingTriggerAsk() {
+			r.askedAtCheckpoint++
+		}
+		if !r.noSnapshot {
+			r.snaps = append(r.snaps, r.snapshot(fmt.Sprintf("step %d (%s)", i, st.Op)))
+		}
+		// A step's answers are consumed lazily by r.answer as decisions are
+		// posed. A leftover means no decision on THIS step matched it: either
+		// the fixture declares a decision the engine never asks, or the answer
+		// was written on the wrong step. Fail loudly -- the engine's fallback
+		// otherwise masks the stale fixture.
+		if len(r.answers) > 0 {
+			fails = append(fails, oracleUnconsumedFail(i, st.Op, r.answers))
+		}
+		if len(r.targets) > 0 {
+			fails = append(fails, oracleUnusedTargetFail(i, st.Op, r.targets))
+		}
+		for _, msg := range r.extraFails {
+			fails = append(fails, fmt.Sprintf("after step %d (%s): %s", i, st.Op, msg))
+		}
+		r.extraFails = nil
+		// The attack step's decision-dependent expects (attack_required /
+		// can_attack) were already evaluated pre-submit, against the
+		// still-pending attackers decision (see oracleAttackExpectPreSubmit);
+		// re-checking exactly those here would read the gone decision and fail
+		// loudly for a shape that passed. Every other expect -- a board read
+		// like `{card tapped:true}`, true only AFTER the declaration -- is
+		// checked here as usual.
+		pre := r.preChecked[i]
+		for j, x := range st.Expect {
+			if pre[j] {
+				continue
+			}
+			for _, b := range r.check(x) {
+				fails = append(fails, fmt.Sprintf("after step %d (%s): %s", i, st.Op, b))
+			}
+		}
+	}
+	for _, x := range sc.Expect {
+		fails = append(fails, r.check(x)...)
+	}
+	return fails, r.log, r
+}
+
+// pendingTriggerAsk reports whether the pending decision is one XMage has
+// already answered by the time its checkpoint is taken: the CR 603.3b order
+// ask for several triggers put on the stack at once, or the payment window
+// of a "you may pay" triggered cost (CR 603.5, e.choosing == chooseTriggeredCost,
+// including its mana-source taps).
+func (r *oracleRun) pendingTriggerAsk() bool {
+	d := r.e.Pending()
+	if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+		return false
+	}
+	return d.Kind == decision.KTriggerOrder || r.e.choosing == chooseTriggeredCost
+}
+
+// settleTriggerAsks answers a trigger-order or triggered-cost ask still
+// pending when step i finishes, BEFORE the step's checkpoint. XMage poses
+// both asks inside the pass that put the trigger on the stack and consumes its
+// scripted answer there, so its checkpoint already shows the ordered stack /
+// the paid cost; gorge, which left the ask pending until the next step drove
+// it, showed an empty stack or an unpaid cost (Twinflame Travelers, Katara,
+// Brigid, Trystan: final states agreed, the mid-step diverged). The answers are
+// the ones the scenario scripts on the NEXT step that has any -- the generator
+// writes them on the following resolve/pass_to step -- and what is left of
+// them stays owed to that step (r.borrowed); with none scripted the ask takes
+// the harness's own fallback, exactly as that later step would have. Both the
+// answers and the fallback are the same ones the later step would have used,
+// so only WHEN the ask is answered moves, never its outcome.
+func (r *oracleRun) settleTriggerAsks(steps []oracleStep, i int) error {
+	if !r.xmageFixture || !r.pendingTriggerAsk() {
+		return nil
+	}
+	next := -1
+	for j := i + 1; j < len(steps); j++ {
+		if len(steps[j].Answers) > 0 {
+			next = j
+			break
+		}
+	}
+	saved := r.answers
+	r.answers = nil
+	if next >= 0 {
+		r.answers = append([]oracleAnswer(nil), steps[next].Answers...)
+	}
+	defer func() {
+		if next >= 0 {
+			if r.borrowed == nil {
+				r.borrowed = map[int][]oracleAnswer{}
+			}
+			r.borrowed[next] = r.answers
+		}
+		r.answers = saved
+	}()
+	for n := 0; n < 100; n++ {
+		d := r.e.Pending()
+		if d == nil || d.Kind == decision.KPriority || r.e.G.Over {
+			return nil
+		}
+		// A scripted answer keeps the chain going through the ask's own
+		// sub-asks (the mana-ability colour pick between two taps); with
+		// none left, only a trigger ask itself is settled.
+		if len(r.answers) == 0 && !r.pendingTriggerAsk() {
+			return nil
+		}
+		if err := r.answer(d, "settle"); err != nil {
+			return err
+		}
+	}
+	return harnessf("settle: trigger ask never resolved")
+}
+
+// seatZeroStart lives here, not in a test file, because runOracleScenario
+// (non-test since the compliance pipeline calls it) needs it; every test in
+// the package still uses it.
+//
+// seatZeroStart returns cfg with the smallest seed >= cfg.Seed whose CR 103.1
+// toss starts seat 0. The scenario fixtures predate the toss: their
+// protagonist is seat 0 -- before the toss seat 0 was always the starting
+// player, so every fixture addresses seats and turns by index -- and the
+// winner-chooses arm that would let a fixture name its starter is
+// deliberately unbuilt (the "Known approximations" row in AGENTS.md). The
+// toss draw sits BEFORE any shuffle, but opening-hand effects can run before
+// turn 1 and affect whether seat 0 starts. Preserve the full-engine probe for
+// each seed while recycling its storage; the effective seed travels in the
+// returned Config, which is what a replay must be handed.
+func seatZeroStart(cfg Config) Config {
+	var sp Spare
+	return seatZeroStartSpare(cfg, &sp)
+}
+
+// seatZeroStartSpare is seatZeroStart building each probe game on sp's
+// recycled storage (nil: fresh arrays) and handing the spent probe's back
+// into sp, so the caller's real game reuses it too.
+func seatZeroStartSpare(cfg Config, sp *Spare) Config {
+	for {
+		probe := cfg
+		probe.Spare = sp
+		e := New(probe)
+		ok := e.G.Active == 0
+		if sp != nil {
+			*sp = e.Release()
+		}
+		if ok {
+			return cfg
+		}
+		cfg.Seed++
+	}
+}
+
+var oracleActivateKindSet = state.NewNameSet(
+	"ability",
+	"activate",
+	"station",
+	"unlock",
+	"turn_face_up",
+)
+
+var normCounterTab = state.NewStrTable[string](
+	state.StrEntry[string]{Key: "+1/+1", Val: "P1P1"},
+	state.StrEntry[string]{Key: "p1p1", Val: "P1P1"},
+	state.StrEntry[string]{Key: "-1/-1", Val: "M1M1"},
+	state.StrEntry[string]{Key: "m1m1", Val: "M1M1"},
+)
+
+type oracleFormatCode uint16
+
+const (
+	oracleFormatConstructed oracleFormatCode = iota + 1
+	oracleFormatCommander
+)
+
+var oracleFormatCodes = state.NewStrCodes(
+	state.StrEntry[oracleFormatCode]{Key: "", Val: oracleFormatConstructed},
+	state.StrEntry[oracleFormatCode]{Key: "constructed", Val: oracleFormatConstructed},
+	state.StrEntry[oracleFormatCode]{Key: "commander", Val: oracleFormatCommander},
+)
+
+type oracleOpCode uint16
+
+const (
+	oracleOpMana oracleOpCode = iota + 1
+	oracleOpCast
+	oracleOpActivate
+	oracleOpPlay
+	oracleOpResolve
+	oracleOpAttack
+	oracleOpBlock
+	oracleOpPass
+	oracleOpPassTo
+	oracleOpMove
+	oracleOpLife
+	oracleOpAttach
+)
+
+var oracleOpCodes = state.NewStrCodes(
+	state.StrEntry[oracleOpCode]{Key: "mana", Val: oracleOpMana},
+	state.StrEntry[oracleOpCode]{Key: "cast", Val: oracleOpCast},
+	state.StrEntry[oracleOpCode]{Key: "activate", Val: oracleOpActivate},
+	state.StrEntry[oracleOpCode]{Key: "play", Val: oracleOpPlay},
+	state.StrEntry[oracleOpCode]{Key: "resolve", Val: oracleOpResolve},
+	state.StrEntry[oracleOpCode]{Key: "attack", Val: oracleOpAttack},
+	state.StrEntry[oracleOpCode]{Key: "block", Val: oracleOpBlock},
+	state.StrEntry[oracleOpCode]{Key: "pass", Val: oracleOpPass},
+	state.StrEntry[oracleOpCode]{Key: "pass_to", Val: oracleOpPassTo},
+	state.StrEntry[oracleOpCode]{Key: "move", Val: oracleOpMove},
+	state.StrEntry[oracleOpCode]{Key: "life", Val: oracleOpLife},
+	state.StrEntry[oracleOpCode]{Key: "attach", Val: oracleOpAttach},
+)

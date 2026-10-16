@@ -27,7 +27,7 @@ import (
 //     while the Bolt was in hand; CR 601.2a moves it to the stack before
 //     CR 601.2c, so the planned cast reversed with no legal target. The
 //     payment offer now runs the census with the card on the stack
-//     (rules/castprobe.go).
+//     (engine/rules/castprobe.go).
 func TestRoundNineFindings(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	f, err := os.Open("testdata/round9.jsonl")

@@ -39,8 +39,8 @@
 # The race step runs one package at a time (Makefile:30-32: the race
 # detector's shadow memory sits outside GOMEMLIMIT, so -race is never
 # parallel across packages) over NIGHTLY_RACE_PKGS, each with
-# `-race -p=1 -count=1 -timeout NIGHTLY_RACE_TIMEOUT`. host/ shrinks its own
-# fixture under -race (host/fixture_race_test.go, raceEnabled).
+# `-race -p=1 -count=1 -timeout NIGHTLY_RACE_TIMEOUT`. server/host/ shrinks its own
+# fixture under -race (server/host/fixture_race_test.go, raceEnabled).
 #
 # The perf step runs only when PERF_NIGHTLY=1, and only if the tag
 # perf-anchor-1 exists (otherwise SKIP with a note): scripts/enginebench-pair.sh
@@ -75,7 +75,7 @@ REF=${NIGHTLY_REF:-origin/main}
 LANE_WAIT=${NIGHTLY_LANE_WAIT:-7200}
 PM_WAIT=${NIGHTLY_PM_WAIT:-3600}
 SLICE=${NIGHTLY_SLICE:-gorge-heavy.slice}
-RACE_PKGS=${NIGHTLY_RACE_PKGS:-./state ./decision ./events ./effects ./rules/... ./replay ./view ./seat ./host ./cards}
+RACE_PKGS=${NIGHTLY_RACE_PKGS:-./state ./engine/decision ./engine/events ./engine/effects ./engine/rules/... ./engine/replay ./engine/view ./engine/seat ./server/host ./engine/cards}
 RACE_TIMEOUT=${NIGHTLY_RACE_TIMEOUT:-45m}
 RACE_MEM=${NIGHTLY_RACE_MEM:-10G}
 SUMMARY=$ROOT/.ds4/nightly.log

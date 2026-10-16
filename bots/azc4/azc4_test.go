@@ -10,15 +10,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/bots/azc4"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/gonet/gonettest"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 func belief(t *testing.T) *searchprobe.Belief {
@@ -125,8 +126,8 @@ func TestFactoryBuildsAClosedListSeat(t *testing.T) {
 	if _, ok := s.(bots.EnvSeat); !ok {
 		t.Errorf("%T is not a bots.EnvSeat", s)
 	}
-	if _, ok := s.(seat.BoardSeat); !ok {
-		t.Errorf("%T is not a seat.BoardSeat", s)
+	if _, ok := s.(heuristic.BoardSeat); !ok {
+		t.Errorf("%T is not a heuristic.BoardSeat", s)
 	}
 	cl, ok := s.(searchseat.ClosedListSeat)
 	if !ok || cl.SearchBelief() == nil {

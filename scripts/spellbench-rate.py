@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rate a gorge SpellBench workup with SpellBench's own leaderboard code.
 
-cmd/botbench -spellbench writes a SpellBench match ledger (matches.jsonl,
+lab/cmd/botbench -spellbench writes a SpellBench match ledger (matches.jsonl,
 schema spellbench-match-ledger/v1). This script feeds one or more such
 ledgers (e.g. a cheap run and a separately played az run of the same round
 robin) to spellbench.arena.leaderboard.build_leaderboard -- the anchored

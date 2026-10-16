@@ -14,16 +14,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/host"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 // The feedback snapshot (task fbrepro1) is exercised end to end here, on a
@@ -76,14 +78,14 @@ func gatedRegistry(t *testing.T, n int) (*gateSeat, func(int), *host.Registry) {
 		}
 		return host.Deck{Name: name, Cards: cs}, nil
 	}
-	gate := &gateSeat{bot: seat.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
+	gate := &gateSeat{bot: heuristic.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
 	r, err := host.New(host.Options{
 		LoadDeck: load,
 		Seats: func(seatNames []string, seed uint64) []seat.Seat {
 			out := make([]seat.Seat, len(seatNames))
 			out[0] = gate
 			for i := 1; i < len(seatNames); i++ {
-				out[i] = seat.NewBot(seed ^ uint64(i+1))
+				out[i] = heuristic.NewBot(seed ^ uint64(i+1))
 			}
 			return out
 		},
@@ -344,7 +346,7 @@ func TestFeedbackViewForSeat0CarriesNoOtherSeatsHiddenInfo(t *testing.T) {
 	}
 	// The direct reading of the brief: no card identity from another seat's
 	// hand or library anywhere in the file. Seat i of match 1 plays deck
-	// (i+1)%4 (host/table.go's rotation), so the reporter's own deck is the
+	// (i+1)%4 (server/host/table.go's rotation), so the reporter's own deck is the
 	// Forest deck and the deck at seat 1 is the Plains deck — and at this
 	// point, seat 0's first decision before any other seat has acted,
 	// nothing of any other seat's can be on a public zone. So "Plains" (the
@@ -540,7 +542,7 @@ func postFeedbackSeat(t *testing.T, fs *feedbackStore, text, url, seat string) *
 // names, which is what the snapshot's token capture reads back — and returns
 // it compiled through the corpus's own pipeline. The text is authored here,
 // never copied from the corpus's GPL-3.0 tokenscripts (echoing the real
-// r_1_1_goblin stem name, the way effects/token_test.go's fixtures do).
+// r_1_1_goblin stem name, the way engine/effects/token_test.go's fixtures do).
 func tokenFixture(t *testing.T) *cards.Card {
 	t.Helper()
 	return tokenCardOnDisk(t, "r_1_1_goblin", "Name:Goblin Token\nTypes:Creature Goblin\nPT:1/1\nOracle:x\n")
@@ -611,7 +613,7 @@ func TestFeedbackReplaysAMatchThatCreatesTokens(t *testing.T) {
 		deckCards = append(deckCards, spell)
 	}
 
-	gate := &gateSeat{bot: seat.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
+	gate := &gateSeat{bot: heuristic.NewBot(1), reached: make(chan struct{}), release: make(chan struct{})}
 	r, err := host.New(host.Options{
 		LoadDeck: func(name string) (host.Deck, error) {
 			if name != "m" {
@@ -623,7 +625,7 @@ func TestFeedbackReplaysAMatchThatCreatesTokens(t *testing.T) {
 			out := make([]seat.Seat, len(seatNames))
 			out[0] = gate
 			for i := 1; i < len(seatNames); i++ {
-				out[i] = seat.NewBot(seed ^ uint64(i+1))
+				out[i] = heuristic.NewBot(seed ^ uint64(i+1))
 			}
 			return out
 		},

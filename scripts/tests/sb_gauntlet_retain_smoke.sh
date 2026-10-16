@@ -5,7 +5,7 @@
 # The defect this guards: the candidate output dir was created inside the
 # script's mktemp scratch dir and removed by its EXIT trap, so a candidate's
 # matches.jsonl/games.jsonl were thrown away and only the pooled rating row
-# survived. cmd/traindash walks the gauntlet root for any matches.jsonl, so a
+# survived. lab/cmd/traindash walks the gauntlet root for any matches.jsonl, so a
 # kept candidate dir is what renders a per-deck chart. The second regression
 # this guards: the inline Python head-to-head table globbed a hardcoded
 # scratch path, so moving the dirs without updating the glob would leave the

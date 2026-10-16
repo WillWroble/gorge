@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # xmage-oracle-run.sh IN.jsonl OUT.jsonl
 #
-# Replays oracle scenarios (one JSON object per line, rules/testdata/oracle
-# schema) in XMage through tools/xmageoracle's ScenarioReplay driver and
+# Replays oracle scenarios (one JSON object per line, engine/rules/testdata/oracle
+# schema) in XMage through lab/oracle/xmageoracle's ScenarioReplay driver and
 # writes one snapshot line per scenario. Needs the out-of-tree build that
 # scripts/xmage-oracle-setup.sh makes. The driver is compiled against
 # Mage.Tests on first use and whenever its source changes.
@@ -18,7 +18,7 @@ in=$(realpath "$in")
 out=$(realpath -m "$out")
 root=${XMAGE_ORACLE_DIR:-/mnt/sata/gorge-training/xmageoracle}
 here=$(cd "$(dirname "$0")/.." && pwd)
-src="$here/tools/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java"
+src="$here/lab/oracle/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java"
 
 export JAVA_HOME="$root/jdk"
 export PATH="$JAVA_HOME/bin:$PATH"
@@ -57,7 +57,7 @@ flock -u 9; exec 9>&-
 
 mem=${XMAGE_ORACLE_MEM:-12G}; mem_g=${mem%[Gg]}
 heap=${XMAGE_ORACLE_HEAP:-$(( mem_g > 2 ? mem_g - 1 : 1 ))g}
-# Parallel replays (validation/oracle/full-replay.sh, FULL_REPLAY_JOBS) must
+# Parallel replays (lab/oracle/validation/oracle/full-replay.sh, FULL_REPLAY_JOBS) must
 # not share XMage's H2 card DB at ./db/cards.h2: H2's auto-server handoff
 # fails a JVM at start-up ("Locked by another process", or "Connection
 # refused" once the owning JVM exits). XMAGE_ORACLE_PRIVATE_DB=1 runs the

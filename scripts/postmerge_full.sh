@@ -34,7 +34,7 @@ if [ "${GORGE_TESTBUDGET_RSS:-1}" = 1 ]; then
 fi
 go test -p=8 -json -exec "$budget/testbudget exec" -skip "$skip" ./... | "$budget/testbudget" tee -events "$budget/events.json"
 "$budget/testbudget" check -events "$budget/events.json" "${rss_flag[@]}"
-go test ./rules -run '^TestHeads$'
+go test ./engine/rules -run '^TestHeads$'
 make sim
 # Shell smokes run in the post-merge batch, not the lean per-ticket gate (~63s).
 bash scripts/tests/reward_loop.sh

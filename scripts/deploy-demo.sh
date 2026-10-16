@@ -50,7 +50,7 @@ PACE=${PACE:-50ms}
 # order; it must never be used for a table with a person in it.
 SPECTATOR=${SPECTATOR:-omniscient}
 VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
-# Hosted bot policy (host/bot_policy.go's closed vocabulary) for every
+# Hosted bot policy (server/host/bot_policy.go's closed vocabulary) for every
 # startup table and for a play-vs-bot game that names none.
 #
 # 2026-10-13: bot. Of the three commander-capable entries (bot,

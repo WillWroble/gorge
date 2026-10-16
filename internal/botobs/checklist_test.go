@@ -8,10 +8,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/deck"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/deck"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // designDocFacts are the six facts the design doc's §6 names by hand. They are
@@ -200,7 +200,7 @@ func repoRootFromTest(t *testing.T) string {
 
 // policySources concatenates botpolicy's non-test .go sources.
 func policySources(repoRoot string) ([]byte, error) {
-	dir := filepath.Join(repoRoot, "botpolicy")
+	dir := filepath.Join(repoRoot, "bots", "botpolicy")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err

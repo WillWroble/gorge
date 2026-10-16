@@ -96,7 +96,7 @@ func measureSideDoors(files []parsedFile, m *Metrics) {
 	}
 }
 
-// measureEngineSurface counts, under rules/ (recursive), the *Engine methods,
+// measureEngineSurface counts, under engine/rules/ (recursive), the *Engine methods,
 // the free functions with a *Engine parameter, and the methods of struct
 // types holding a *Engine field (a method two of these describe counts once).
 func measureEngineSurface(files []parsedFile, m *Metrics) {

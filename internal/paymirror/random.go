@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
 )
 
 // The random deck source is a two-colour variant of cmd/cardfuzz's

@@ -20,7 +20,7 @@ import (
 //     printed face" -- in an entry that had never held a keyword, so a
 //     clone's fresh memo answered a with<Keyword> filter from the printed
 //     face while the live engine's older entry answered from the derived
-//     list (rules/derivedmemo.go memoOwned; the rules-side pin is
+//     list (engine/rules/derivedmemo.go memoOwned; the rules-side pin is
 //     TestDerivedMemoKeepsEmptyKeywordListBound).
 //   - 8529 (random4, 34x control|mismatch|state_differs|discardAllFirstTime):
 //     rules.Engine.discardAllFirstTime is the DiscardedAll matcher's FirstTime$

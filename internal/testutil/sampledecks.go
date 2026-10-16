@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // colours cycles WUBRG's basic-land shapes in a fixed order, so seat i's
@@ -20,7 +20,7 @@ var colours = [...]struct{ letter, land string }{
 // (so seats are not mirror images of each other), a burn spell that targets
 // a creature or a player, a pump spell, a permanent with a mandatory
 // triggered ability, and a permanent with an OptionalDecider$ You triggered
-// ability -- the shapes rules/trigger_order_test.go already exercises,
+// ability -- the shapes engine/rules/trigger_order_test.go already exercises,
 // re-authored here rather than imported (testutil cannot import rules: the
 // fuzz test using this is package rules itself). SampleDecks is a pure
 // function of n: no randomness, so the same n always yields the same decks
@@ -67,7 +67,7 @@ func deckFor(t testing.TB, seat int) []*cards.Card {
 		"Name:%s Growth %d\nManaCost:%s\nTypes:Instant\n"+
 			"A:SP$ Pump | ValidTgts$ Creature | NumAtt$ +2 | NumDef$ +2\nOracle:x\n",
 		c.land, seat, c.letter))
-	// warden mirrors rules/trigger_order_test.go's gainerSrc shape: a plain
+	// warden mirrors engine/rules/trigger_order_test.go's gainerSrc shape: a plain
 	// Mode$ Phase upkeep trigger with no OptionalDecider$, so it is never
 	// asked about (CR 603.3b needs a choice only when there is one).
 	warden := parseCard(t, fmt.Sprintf(
@@ -99,7 +99,7 @@ func deckFor(t testing.TB, seat int) []*cards.Card {
 	return deck
 }
 
-// parseCard is card(t, src) from rules/turn_test.go, re-authored here
+// parseCard is card(t, src) from engine/rules/turn_test.go, re-authored here
 // (testutil cannot import rules, and rules' own test helper is unexported):
 // parse, link the SVar/trigger chain, then apply the intrinsics (basic land
 // mana) the corpus assumes the engine supplies.

@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
 )
 
 // TestStaticMemoRefreshAtUnmovedLogHeadIsNotServedStale is the regression for
@@ -19,7 +19,7 @@ import (
 //
 // Root cause: active()'s cached, CR-613-sorted effect list (activeBuf, built
 // from the staticContinuous memo) was keyed on (activeEpoch, activeVersion)
-// alone. staticControlWants (rules/control_static.go) refreshes
+// alone. staticControlWants (engine/rules/control_static.go) refreshes
 // staticContinuous outside active() through refreshStaticContinuous, and on a
 // content-changing rebuild the memo advances while the log head and
 // continuousVersion do not -- so active() served a stale one-effect buffer

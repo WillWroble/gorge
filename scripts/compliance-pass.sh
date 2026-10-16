@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # compliance-pass.sh [SET...] -- one XMage compliance pass over the named sets
-# (default: every set with a printed list under compliance/printed/), writing
+# (default: every set with a printed list under lab/oracle/compliance/printed/), writing
 # verdict rows into compliance/verdicts.
 #
 # docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md section
@@ -16,12 +16,12 @@
 #   3. XMage replays the stale scenarios its result cache does not hold
 #                          (scripts/xmage-oracle-run.sh)
 #   4. oraclediff diff -write -- recompute the stale verdicts, merging them
-#                          into compliance/verdicts; the cache keeps XMage's
+#                          into lab/oracle/compliance/verdicts; the cache keeps XMage's
 #                          results, so a later pass replays nothing it has
 #                          already seen
 # then oraclediff triage -apply (shape rulings, section 11.3 C2: rows a
-# compliance/rulings/<id>.json ruling matches are classified, the rest are
-# clustered by shape under compliance/triage/), a summary (scripts/compliance-summary.py) and `oraclediff status` per set.
+# lab/oracle/compliance/rulings/<id>.json ruling matches are classified, the rest are
+# clustered by shape under lab/oracle/compliance/triage/), a summary (scripts/compliance-summary.py) and `oraclediff status` per set.
 #
 # The pass runs under the heavy-job lock (scripts/heavy.sh heavy) unless it
 # already holds it (GORGE_BROKER_CLASS is set) or COMPLIANCE_PASS_LOCK=none.
@@ -52,10 +52,10 @@ root=${XMAGE_ORACLE_DIR:-$(sed -n 's/^XMAGE_ORACLE_DIR *?= *//p' Makefile)}
 [ -d .cards ] || { echo "compliance-pass: no .cards corpus here (make fetch-cards compile-cards)" >&2; exit 2; }
 
 if [ $# -eq 0 ]; then
-	set -- $(for f in compliance/printed/*.json; do basename "$f" .json; done)
+	set -- $(for f in lab/oracle/compliance/printed/*.json; do basename "$f" .json; done)
 fi
 
-driver=tools/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java
+driver=lab/oracle/xmageoracle/src/org/mage/test/oracle/ScenarioReplay.java
 drv=$(sha256sum "$driver" | cut -c1-12)
 out=${COMPLIANCE_PASS_OUT:-$root/pass}
 cache=${COMPLIANCE_PASS_CACHE:-$root/cache/${ref:0:12}-$drv}
@@ -63,9 +63,9 @@ mkdir -p "$out" "$cache"
 [ -d /mnt/sata/gorge-training/gotmp ] && export GOTMPDIR=/mnt/sata/gorge-training/gotmp
 export GOMEMLIMIT=${GOMEMLIMIT:-8GiB}
 
-go build -o "$out/oraclediff" ./cmd/oraclediff
+go build -o "$out/oraclediff" ./lab/cmd/oraclediff
 od=$out/oraclediff
-write=(-write compliance/verdicts -xmage-ref "$ref")
+write=(-write lab/oracle/compliance/verdicts -xmage-ref "$ref")
 [ "${COMPLIANCE_PASS_NO_WRITE:-}" = 1 ] && write=()
 
 echo "== compliance pass: ${#} set(s), XMAGE_REF ${ref:0:12}, driver $drv, cache $cache"
@@ -73,7 +73,7 @@ rc=0
 for s in "$@"; do
 	d=$out/$s
 	rm -rf "$d" && mkdir -p "$d"
-	if ! "$od" gen -manifest "compliance/manifests/$s.json" -level "${LEVEL:-A}" -out "$d/scen.jsonl" >"$d/gen.log" 2>&1; then
+	if ! "$od" gen -manifest "lab/oracle/compliance/manifests/$s.json" -level "${LEVEL:-A}" -out "$d/scen.jsonl" >"$d/gen.log" 2>&1; then
 		echo "$s: gen FAILED"; tail -3 "$d/gen.log"; rc=1; continue
 	fi
 	if ! "$od" plan -scenarios "$d/scen.jsonl" -xmage-ref "$ref" -cache "$cache" \
@@ -100,7 +100,7 @@ done
 
 if [ "${COMPLIANCE_PASS_NO_WRITE:-}" != 1 ]; then
 	# Re-apply the shape rulings to every row and rewrite the clusters
-	# (compliance/triage/): what remains is one triage item per shape.
+	# (lab/oracle/compliance/triage/): what remains is one triage item per shape.
 	"$od" triage -apply >"$out/triage.txt" 2>&1 || rc=1
 	sed -n '1,/^open:/p' "$out/triage.txt"
 fi

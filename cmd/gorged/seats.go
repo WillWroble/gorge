@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // seatGate is the Options.Seat resolver of a -humans server. Each opaque

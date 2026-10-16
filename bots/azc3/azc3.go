@@ -8,7 +8,7 @@
 //	az:sims=100:autopay:oppnodes:oppfull:morekinds:topk=6:gonet=c3.dzgw
 //
 // with the London mulligan by land count (dzgorge play -mull-heuristic). The
-// net is the in-process mlp (internal/gonet) read from a .dzgw file, shared by
+// net is the in-process mlp (bots/gonet) read from a .dzgw file, shared by
 // every table in the process.
 //
 // Unlike every other entry it registers only when asked: Enable(path) loads
@@ -25,11 +25,11 @@
 package azc3
 
 import (
-	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/azmcts"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
 )
 
 // Policy is the registry key.
@@ -88,7 +88,7 @@ func info() bots.Info {
 
 // Config is the search config the c3 net was trained and measured with:
 // azredeal.Hosted (honest redeal world, no clairvoyant source) plus the keys
-// of the spec in the package comment. cmd/dzgorge/policy.go maps the same
+// of the spec in the package comment. lab/cmd/dzgorge/policy.go maps the same
 // keys onto the same fields; TestConfigMatchesTheMeasuredSpec pins them.
 func Config() azmcts.SeatConfig {
 	cfg := azredeal.Hosted()

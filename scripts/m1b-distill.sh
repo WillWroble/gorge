@@ -78,7 +78,7 @@ EV=$M/clair/eval/v.jsonl.gz,$M/honest/eval/v.jsonl.gz
 S=$M/students
 case "${1:-}" in
 build)
-	cd "$REPO" && heavy go build -o "$M/bin/botbench" ./cmd/botbench && heavy go build -o "$M/bin/policytrain" ./cmd/policytrain
+	cd "$REPO" && heavy go build -o "$M/bin/botbench" ./lab/cmd/botbench && heavy go build -o "$M/bin/policytrain" ./lab/cmd/policytrain
 	;;
 gen)
 	for arm in clair honest; do

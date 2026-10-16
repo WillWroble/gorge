@@ -4,11 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // planEnvSeat answers its priority decisions with a payment plan chosen on
@@ -17,7 +19,7 @@ import (
 // the live decision for them). It counts the plan answers and the Env
 // decisions that arrived with no feed after one -- a feed the driver stopped.
 type planEnvSeat struct {
-	*seat.Bot
+	*heuristic.Bot
 	plans, fedAfter, unfedAfter int
 }
 
@@ -53,14 +55,14 @@ func (s *planEnvSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.De
 // live decision's PaymentActions were never built for such a seat, so the
 // recorded answer did not translate and the seat was fed nothing (no honest
 // root, its search silently off) for the rest of the game -- the hosted bug
-// 964bab2f7 fixed in host/match.go, here in the lab's driver.
+// 964bab2f7 fixed in server/host/match.go, here in the lab's driver.
 func TestEnvSeatPaymentPlanAnswerKeepsItsFeed(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	deckA, deckB := fdnPair(t, reg)
 	const seed = 7717
-	s := &planEnvSeat{Bot: seat.NewBot(seed ^ 1).EnableAutoPayMana()}
+	s := &planEnvSeat{Bot: heuristic.NewBot(seed ^ 1).EnableAutoPayMana()}
 	o, _, err := bench.PlayGame(envCfg(seed, reg, deckA, deckB),
-		[]seat.Seat{s, seat.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
+		[]seat.Seat{s, heuristic.NewBot(seed ^ 2)}, envTestTurns, envTestIntents,
 		bench.Hooks{EnvSeats: true, HonestRoot: true})
 	if err != nil {
 		t.Fatalf("run: %v", err)

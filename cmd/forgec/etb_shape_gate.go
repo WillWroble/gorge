@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
 )
 
 // etbCopyShapeGate is cards.Registry.ShapeGate for the coverage report: one

@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// layering_pay_seam_test.go pins the two role interfaces rules/pay reaches
+// layering_pay_seam_test.go pins the two role interfaces engine/rules/pay reaches
 // the engine through besides pay.Engine (lasagna spec §9.2): chars.Reader,
 // the characteristics layer's read direction, and the rule that the payment
 // layer never holds an effects.Host -- an evaluation that needs one goes
 // through a named, counted pay.Eval method on the engine side.
 
 // charsReaderMethods is the method count of chars.Reader
-// (rules/chars/reader.go). It is a BUDGETED ratchet like payEngineMethods:
+// (engine/rules/chars/reader.go). It is a BUDGETED ratchet like payEngineMethods:
 // it may rise only in a commit that moves ring code onto the new read, the
 // comment recording the step, and never above charsReaderCeiling (the
 // spec's narrow-interface target). E4 slice 1 landed it with the six reads
@@ -35,10 +35,10 @@ const (
 
 // TestCharsReaderBudget counts chars.Reader's declared methods.
 func TestCharsReaderBudget(t *testing.T) {
-	n := interfaceMethods(t, filepath.Join("..", "..", "rules", "chars"), "Reader")
+	n := interfaceMethods(t, filepath.Join("..", "..", "engine", "rules", "chars"), "Reader")
 	switch {
 	case n < 0:
-		t.Fatal("rules/chars declares no Reader interface; the budget would run vacuously")
+		t.Fatal("engine/rules/chars declares no Reader interface; the budget would run vacuously")
 	case n > charsReaderCeiling:
 		t.Errorf("chars.Reader has %d methods, above the ceiling %d", n, charsReaderCeiling)
 	case n > charsReaderMethods:
@@ -91,15 +91,15 @@ func interfaceMethods(t *testing.T, dir, name string) int {
 	return n
 }
 
-// TestPayHoldsNoHost fails on any reference to effects.Host in rules/pay's
+// TestPayHoldsNoHost fails on any reference to effects.Host in engine/rules/pay's
 // non-test files. The payment layer may name effects.Ctx and call the pure
 // effects helpers, but an evaluation that needs the engine as a Host goes
 // through pay.Eval, so the Host never crosses into the package.
 func TestPayHoldsNoHost(t *testing.T) {
-	dir := filepath.Join("..", "..", "rules", "pay")
+	dir := filepath.Join("..", "..", "engine", "rules", "pay")
 	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil || len(files) == 0 {
-		t.Fatal("rules/pay has no files")
+		t.Fatal("engine/rules/pay has no files")
 	}
 	for _, file := range files {
 		if strings.HasSuffix(file, "_test.go") {
@@ -128,14 +128,14 @@ func TestPayHoldsNoHost(t *testing.T) {
 				return true
 			}
 			if id, ok := se.X.(*ast.Ident); ok && id.Name == local && se.Sel.Name == "Host" {
-				t.Errorf("%s: rules/pay names effects.Host; evaluate through pay.Eval instead (lasagna spec §9.2)", fset.Position(se.Pos()))
+				t.Errorf("%s: engine/rules/pay names effects.Host; evaluate through pay.Eval instead (lasagna spec §9.2)", fset.Position(se.Pos()))
 			}
 			return true
 		})
 	}
 }
 
-// payEvalMethods is the method count of pay.Eval (rules/pay/eval.go), the
+// payEvalMethods is the method count of pay.Eval (engine/rules/pay/eval.go), the
 // payment layer's evaluation seam, budgeted like charsReaderMethods. E4
 // slice 2 landed it with EvalCount, MatchesSpec and WindowUnits (the
 // unless-payment reachability and the SVar-fixed cost counts). Slice 6
@@ -151,10 +151,10 @@ const (
 
 // TestPayEvalBudget counts pay.Eval's declared methods.
 func TestPayEvalBudget(t *testing.T) {
-	n := interfaceMethods(t, filepath.Join("..", "..", "rules", "pay"), "Eval")
+	n := interfaceMethods(t, filepath.Join("..", "..", "engine", "rules", "pay"), "Eval")
 	switch {
 	case n < 0:
-		t.Fatal("rules/pay declares no Eval interface; the budget would run vacuously")
+		t.Fatal("engine/rules/pay declares no Eval interface; the budget would run vacuously")
 	case n > payEvalCeiling:
 		t.Errorf("pay.Eval has %d methods, above the ceiling %d", n, payEvalCeiling)
 	case n > payEvalMethods:

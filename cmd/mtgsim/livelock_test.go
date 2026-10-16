@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/view"
 )
 
 // livelockSeat is a seat whose Decide panics with a *rules.LivelockError --
-// the shape the engine's livelock watcher (rules/livelock.go) produces from
+// the shape the engine's livelock watcher (engine/rules/livelock.go) produces from
 // inside Submit when a game's event stream provably never terminates. The
 // harness's drive loop must convert that panic into the game's failure and
 // the diagnostic, not hang on it and not crash on it. The variants cover the

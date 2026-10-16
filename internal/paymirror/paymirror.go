@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // Answerer answers one follow-up decision of run A (a target, a mode, a

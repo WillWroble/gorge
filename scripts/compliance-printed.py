@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""compliance-printed.py OUTDIR CODE... -- write compliance/printed/<CODE>.json.
+"""compliance-printed.py OUTDIR CODE... -- write lab/oracle/compliance/printed/<CODE>.json.
 
 The printed list is every card name in the set's Forge edition file [cards]
 section at FORGE_REF, plus each name XMage's manifest lists under the same set
@@ -8,7 +8,7 @@ printings, which carry the set code and are legal wherever it is). A name that
 differs from a [cards] name only by accents or punctuation is the same card.
 FRA predates the union and keeps its [cards]-only list (it has no such extras).
 
-Usage: python3 scripts/compliance-printed.py compliance/printed WOE FDN ...
+Usage: python3 scripts/compliance-printed.py lab/oracle/compliance/printed WOE FDN ...
 """
 import json, os, re, sys, unicodedata, urllib.parse, urllib.request
 

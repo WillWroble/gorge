@@ -3,7 +3,7 @@ package feedback
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // TestStartChooserRestoresTheConfigField pins the E3-2 replay input: a

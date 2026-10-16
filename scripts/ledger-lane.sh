@@ -3,7 +3,7 @@
 #
 # Runs after every landing (post_merge in .agentctl/config.toml), so it must be
 # cheap and bounded (operator, 2026-10-05):
-#   - NO -count=1: an unchanged ./rules package is answered from the Go test
+#   - NO -count=1: an unchanged ./engine/rules package is answered from the Go test
 #     cache, so a landing that did not touch rules costs seconds, not a re-run
 #     of the lane. The cached replay is byte-identical to the live -v output
 #     except the final `ok ... (cached)` line, which cmd/ledger does not read.
@@ -46,7 +46,7 @@ trap 'rm -f "$TMP"' EXIT
 # -E 99: a lock timeout is distinguishable from go test's own exit 1 (FAIL).
 lock=(flock -o -E 99 -w "$WAIT" "$LOCK")
 "${lock[@]}" "${scope[@]}" env GOMAXPROCS=4 GOMEMLIMIT=3GiB \
-	go test -timeout 2m ./rules -run TestCR -v >"$TMP"
+	go test -timeout 2m ./engine/rules -run TestCR -v >"$TMP"
 rc=$?
 if [ "$rc" -eq 99 ]; then
 	printf 'ledger-lane.sh: could not take %s within %ss\n' "$LOCK" "$WAIT" >&2

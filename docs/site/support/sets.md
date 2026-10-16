@@ -24,7 +24,7 @@ Support is layered. Each tier certifies more than the one above it.
 |---|---|---|---|
 | Compiles | `forgec` → IR cache | the Forge script parses into the IR | behaviour |
 | **Playable** | `forgec report` / `make coverage` | every primitive the card uses (`api:`, `trig:`, `kw:`, `stat:`, `count:`, …) is implemented | that the card behaves correctly; a parameter can still be unread (tracked by a separate census ratchet) |
-| **Level A** | `compliance/gate` against `compliance/verdicts/*.jsonl` | playable **and** a generated cast-and-resolve, play-land or counter-spell scenario agrees with XMage (or a ruled divergence, or a hand-written oracle scenario). Basic lands are skipped; cards XMage lacks need a hand scenario | activated abilities, trigger modes, attacks and blocks, static abilities |
+| **Level A** | `lab/oracle/compliance/gate` against `lab/oracle/compliance/verdicts/*.jsonl` | playable **and** a generated cast-and-resolve, play-land or counter-spell scenario agrees with XMage (or a ruled divergence, or a hand-written oracle scenario). Basic lands are skipped; cards XMage lacks need a hand scenario | activated abilities, trigger modes, attacks and blocks, static abilities |
 | **Level B** | the same gate, level B ([spec](https://github.com/adams-shaun/gorge/blob/main/docs/superpowers/specs/2026-10-05-compliance-level-b.md)) | Level A plus one XMage-compared scenario **per requirement**: each activated ability (mana abilities included), each trigger, each static ability, and attack/block for creatures with combat keywords or legality statics | requirements no scenario template serves yet are reported as a *template gap*; keywords are not compared on their own |
 
 **Oracle verdicts.** Each (card, template, scenario hash) gets one verdict:
@@ -39,9 +39,9 @@ A third oracle, Forge itself, is being added for three-way adjudication. It
 only corroborates; it never writes verdicts.
 
 **Set membership.** Forge scripts carry no set information, so set lists
-come from XMage's set classes (`compliance/manifests/<SET>.json`, 589 sets,
+come from XMage's set classes (`lab/oracle/compliance/manifests/<SET>.json`, 589 sets,
 only cards XMage implements) and, for the 20 Standard sets, from full printed
-lists (`compliance/printed/<SET>.json`). `compliance/declared.json` declares
+lists (`lab/oracle/compliance/printed/<SET>.json`). `lab/oracle/compliance/declared.json` declares
 all 20 Standard sets at Level A; none is declared at Level B yet.
 
 ## Standard (measured)

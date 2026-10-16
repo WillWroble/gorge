@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 // decodeLiveCaptureTokens reads a captured match.json back into host's own
@@ -43,8 +43,8 @@ func decodeLiveCaptureTokens(t *testing.T, dir string) (map[string]string, []str
 }
 
 // TestReproCorpusCachedTokenPathsReadable is the real-corpus regression pin
-// for the shared-IR-cache reroot fix (cards/open.go rerootPaths). The
-// synthetic cards/cache_fingerprint_test.go:TestCachedPathsFollowTheOpenedDirectory
+// for the shared-IR-cache reroot fix (engine/cards/open.go rerootPaths). The
+// synthetic engine/cards/cache_fingerprint_test.go:TestCachedPathsFollowTheOpenedDirectory
 // checks a moved root's paths in isolation; this pin instead drives the
 // live path the symptom was reported through: open the shared .cards corpus
 // (a real on-disk cache compiled by whichever worktree got there first),

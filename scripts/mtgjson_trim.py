@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mtgjson_trim.py -- regenerate limited/setdata/mtgjson/<SET>.json.
+"""mtgjson_trim.py -- regenerate lab/draft/limited/setdata/mtgjson/<SET>.json.
 
 Usage (operator; needs network, writes nothing but the output file):
 
@@ -11,7 +11,7 @@ Usage (operator; needs network, writes nothing but the output file):
 It keeps each set's "play" and "play-arena" booster configs and the cards
 they reference (the set's own cards plus SPG special guests), with the
 MTGJSON version and MIT notice recorded in the file (see LICENSE-MTGJSON.txt).
-Then run `go generate ./limited/setdata/...` to rebuild the specs.
+Then run `go generate ./lab/draft/limited/setdata/...` to rebuild the specs.
 """
 import json,sys
 D=sys.argv[1]; code=sys.argv[2]; out=sys.argv[3]

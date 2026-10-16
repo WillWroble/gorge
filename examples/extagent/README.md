@@ -4,7 +4,7 @@
 speaks gorge's external-agent wire, `gorge-agent/1`. It is the starting point
 for a training team: it handshakes, answers draft picks, builds a deck from a
 pool, and answers game decisions — all uniformly at random, so it plays badly
-on purpose. It is the Python twin of `draftlab/extern/refagent` and need not
+on purpose. It is the Python twin of `lab/draft/draftlab/extern/refagent` and need not
 agree with it bit for bit.
 
 The wire protocol of record is section 4 of
@@ -15,10 +15,10 @@ one JSON object per line, `{"v":1,"type":...}`, gorge writing `hello`,
 
 ## Run the example
 
-Through the lab (once `cmd/labdemo` accepts `ext:` players, E5d-5):
+Through the lab (once `lab/cmd/labdemo` accepts `ext:` players, E5d-5):
 
 ```sh
-go run ./cmd/labdemo -player ext:exec:examples/extagent/random_agent.py -seed 1
+go run ./lab/cmd/labdemo -player ext:exec:examples/extagent/random_agent.py -seed 1
 ```
 
 The script has a `#!/usr/bin/env python3` shebang and mode 755, so
@@ -36,8 +36,8 @@ examples/extagent/random_agent.py
 Or run gorge's reference agent on a Unix socket and point `ext:unix:` at it:
 
 ```sh
-go run ./cmd/extagent -listen unix:/tmp/gorge-agent.sock
-go run ./cmd/labdemo -player ext:unix:/tmp/gorge-agent.sock -seed 1
+go run ./lab/cmd/extagent -listen unix:/tmp/gorge-agent.sock
+go run ./lab/cmd/labdemo -player ext:unix:/tmp/gorge-agent.sock -seed 1
 ```
 
 ## The agent contract

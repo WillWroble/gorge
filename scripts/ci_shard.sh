@@ -16,9 +16,9 @@ idx=${1:?usage: ci_shard.sh <index|all> <count>}
 count=${2:?usage: ci_shard.sh <index|all> <count>}
 
 HEAVY=(
-	github.com/adams-shaun/gorge/rules
-	github.com/adams-shaun/gorge/host
-	github.com/adams-shaun/gorge/eventhost
+	github.com/adams-shaun/gorge/engine/rules
+	github.com/adams-shaun/gorge/server/host
+	github.com/adams-shaun/gorge/lab/draft/eventhost
 )
 nheavy=${#HEAVY[@]}
 if [ "$count" -le "$nheavy" ]; then
@@ -46,7 +46,7 @@ shard_of() {
 # tuned to the operator's box and fail on a GitHub runner). PRs and pushes skip
 # them; the nightly run sets CI_FULL=1 and runs everything. `go vet ./...` in
 # the lint job still compiles every one of them, so a build break is caught.
-EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|botbench|searchbench|enginebench|encablate|keywordbench|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|autopayaudit|manamodelstats|xmageport)|protocol/manabrew(/.*)?|host/manabrewhttp|internal/(manabrew(/.*)?|gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|corpusheap|mzenc|bench)|draftlab/extern(/.*)?)$'
+EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|botbench|searchbench|enginebench|encablate|keywordbench|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|autopayaudit|manamodelstats|xmageport)|server/protocol/manabrew(/.*)?|server/host/manabrewhttp|internal/(manabrew(/.*)?|gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|corpusheap|mzenc|bench)|lab/draft/draftlab/extern(/.*)?)$'
 
 pkgs=$(go list ./...)
 if [ "${CI_FULL:-0}" != 1 ]; then

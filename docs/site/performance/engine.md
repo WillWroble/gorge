@@ -16,8 +16,8 @@ benchmark results; nothing here was re-run for this page.*
 | `make enginebench-verify [REV=]` | A memo-verifying build; fails on errors, stalls, panics or stale memos | pass/fail |
 | `make smoke-perf` | A five-minute whole-game smoke (four scenarios), base vs candidate, pinned to one core | text |
 | `make sim` | 20 verified four-seat games | replay OK count |
-| `make gc-gate` | GC CPU share of one package's tests (default `./host`, budget 0.30) | ratio |
-| `cmd/botbench -out json` | Win rates with 95% confidence intervals, stalls, livelocks, mean turns | JSON (no timing) |
+| `make gc-gate` | GC CPU share of one package's tests (default `./server/host`, budget 0.30) | ratio |
+| `lab/cmd/botbench -out json` | Win rates with 95% confidence intervals, stalls, livelocks, mean turns | JSON (no timing) |
 
 The `enginebench` workloads use four 17lands Foundations (FDN) draft decks
 (CC BY 4.0) and an mtg-kernel Burn deck (MIT), in

@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 func TestSBBuiltinRegistrationAndSharedConstructors(t *testing.T) {

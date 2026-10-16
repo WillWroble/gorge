@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 type Tier string
@@ -37,7 +37,7 @@ type Info struct {
 	Strength                 []Measurement
 	Cost                     Cost
 	// Env marks a policy whose seat builds a full search engine over every
-	// seat's REAL decklist (host/botenv.go envData: searchprobe.PublicGame
+	// seat's REAL decklist (server/host/botenv.go envData: searchprobe.PublicGame
 	// from m.cfg.Decks). "Honest" root redeals the hidden cards, but the
 	// deck LIST it redeals from is each seat's true list, so an Env seat
 	// knows every seat's real decklist. Operator ruling 2026-10-13: Env
@@ -48,13 +48,13 @@ type Info struct {
 	// ClosedLists marks an Env policy whose every seat closes its
 	// opponents' deck lists: the seat is a searchseat.ClosedListSeat whose
 	// SearchBelief is never nil, so the host hands it a closed Setup and a
-	// closed honest root (host/botenv.go envData, searchseat.SeatSetup) and
+	// closed honest root (server/host/botenv.go envData, searchseat.SeatSetup) and
 	// it never reads an opponent's real list or real hidden cards. Such a
 	// policy does not read decklists (ReadsDecklists is false) and may seat
 	// against a human without AllowDecklistBots. The declaration is not
 	// trusted on its own: at a table with a human the host checks every
 	// built seat at match start and refuses an open one, and envData
-	// refuses an open root at every decision (host/closedlist.go).
+	// refuses an open root at every decision (server/host/closedlist.go).
 	ClosedLists bool
 	Formats     []string
 	MaxSeats    int
@@ -73,7 +73,7 @@ type Options struct {
 	SearchParallelism int
 	Deps              Deps
 	// DecisionDeadlineMS is the per-decision wall-clock budget a HOSTED
-	// search seat declares (host/bot_policy.go's hostedDecisionDeadlineMS;
+	// search seat declares (server/host/bot_policy.go's hostedDecisionDeadlineMS;
 	// bench and training factories leave it zero and stay unbounded for
 	// reproducible measurement). The host arms it as the deadline of the
 	// context it hands DecideEnv (host.decisionCtx -- this package may not
@@ -154,7 +154,7 @@ func Names() []string {
 
 // ReadsDecklists reports whether the named policy builds a search engine
 // over every seat's REAL decklist (Info.Env without Info.ClosedLists;
-// host/botenv.go's envData). The single discriminator for the operator
+// server/host/botenv.go's envData). The single discriminator for the operator
 // ruling of 2026-10-13: such a policy seats only on a bot-only table that
 // set TableConfig's AllowDecklistBots, and never against a human. A
 // closed-list policy (az-c4) is an Env policy that does NOT read decklists.

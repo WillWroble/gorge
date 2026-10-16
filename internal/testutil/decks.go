@@ -10,14 +10,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/deck"
 )
 
 // decksFS embeds the project's own 12 Legacy archetype deck lists -- a bare
 // {name, count} card list per deck, authored for this repo and Apache-2.0
 // like the rest of it. Embedding these is not the licensing hazard
-// cards/boundary_test.go guards against: that guard fires on a Forge
+// engine/cards/boundary_test.go guards against: that guard fires on a Forge
 // script's own Name:/Oracle: shape (GPL-3.0), which a JSON name-and-count
 // list never carries, no matter how it is packaged (Ruling P11).
 //
@@ -53,7 +53,7 @@ func RepoDeckNames() []string {
 // legacyDeckNames is the 12 60-card constructed Legacy decks the acceptance
 // suite pins its golden games to (Ruling M38-P). The deck directory also
 // holds the five interim 100-card Commander decks (foundations-*), which are
-// not part of the 12: the acceptance chain heads in rules/testdata/heads/ are
+// not part of the 12: the acceptance chain heads in engine/rules/testdata/heads/ are
 // byte-identical games over these 12, and adding commander decks earlier
 // silently moved those heads by changing the index-based round-robin seat
 // assignment (i % len(all)). Seating the golden games off an explicit,
@@ -79,7 +79,7 @@ var legacyDeckNames = [...]string{
 // LegacyDeckNames is the closed, sorted list of the 12 60-card constructed
 // Legacy repo decks that the replay-golden acceptance games seat from. The
 // captain of the replay chain: a deck file added to the directory must never
-// change what these games are, or every golden head in rules/testdata/heads/
+// change what these games are, or every golden head in engine/rules/testdata/heads/
 // moves for no behavioural reason.
 func LegacyDeckNames() []string {
 	return legacyDeckNames[:]
@@ -145,7 +145,7 @@ func RepoDeck(t testing.TB, r *cards.Registry, name string) []*cards.Card {
 }
 
 // LoadRepoDeckFile reads and parses one embedded deck file un-resolved,
-// for non-test callers that need the deck.File shape (cmd/botbench's
+// for non-test callers that need the deck.File shape (lab/cmd/botbench's
 // commander mode needs CommanderIndices — one flat index per commander, a
 // CR 903.13 partner pair naming two — and a deck that names a commander
 // carries them to tell a commander deck from a constructed one). It is
@@ -227,7 +227,7 @@ func loadRepoCorpusRegistry() corpusRegistryResult {
 	return corpusRegistryResult{reg: r, dir: dir}
 }
 
-// CorpusRegistry finds the repo root the way cards/boundary_test.go does --
+// CorpusRegistry finds the repo root the way engine/cards/boundary_test.go does --
 // `git rev-parse --show-toplevel`, not a hard-coded relative path, which is
 // exactly what silently broke that file's own license-boundary test when
 // this package was transplanted to a new module root (Ruling P11) -- and
@@ -239,11 +239,11 @@ func loadRepoCorpusRegistry() corpusRegistryResult {
 func CorpusRegistry(t testing.TB) *cards.Registry {
 	t.Helper()
 	// The child git MUST run with cards.GitEnv() -- os.Environ() with every
-	// inherited GIT_* variable stripped -- for the same reason cards/fetch.go
-	// and cards/boundary_test.go do. Git EXPORTS GIT_DIR to every hook it
+	// inherited GIT_* variable stripped -- for the same reason engine/cards/fetch.go
+	// and engine/cards/boundary_test.go do. Git EXPORTS GIT_DIR to every hook it
 	// runs, usually as the relative path ".git", and GIT_DIR outranks the
 	// "-C ." above. A test binary's working directory is its own package
-	// directory (rules/, effects/, ...), never the repo root, so under a hook
+	// directory (engine/rules/, engine/effects/, ...), never the repo root, so under a hook
 	// that relative GIT_DIR resolves to rules/.git, which does not exist:
 	// rev-parse fails, the corpus is never found, and every corpus test in
 	// the package quietly stops testing the corpus.

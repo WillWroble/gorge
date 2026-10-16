@@ -9,7 +9,7 @@
 // Everything but the network is az-c4's: the search config (azc3.ClosedConfig),
 // the London mulligan by land count, the census, the belief, the decks and
 // the closed-list contract (bots.Info.ClosedLists; the host checks the seats
-// it builds, host/closedlist.go). The implementation is az-c3's
+// it builds, server/host/closedlist.go). The implementation is az-c3's
 // (bots/azc3.Hosted); only the entry differs.
 //
 // Like az-c4 it registers only when asked: Enable(path, belief) loads the
@@ -21,8 +21,8 @@ package azc5
 import (
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
 )
 
 // Policy is the registry key.

@@ -1,13 +1,13 @@
 """Score a gorge searchbench fixture with upstream's own analysis code.
 
-    SEARCHBENCH_FIXTURE_DIR=DIR go test ./internal/searchbench -run TestDumpUpstreamFixture
+    SEARCHBENCH_FIXTURE_DIR=DIR go test ./lab/training/searchbench -run TestDumpUpstreamFixture
     python scripts/searchbench/crosscheck_upstream.py --upstream <draft-zero>/tools/search_bench DIR
 
 Converts the gorge manifest (schema 2) and two result files (a.jsonl, b.jsonl)
 into upstream's item and decision-row shapes, then calls draft-zero's
 analyze.py (score_row, macro, bootstrap, paired, chance, balanced_score) and
 diagnose.py (act_split) unchanged. The printed numbers are the goldens pinned
-by internal/searchbench TestMatchesUpstreamAnalyzePy.
+by lab/training/searchbench TestMatchesUpstreamAnalyzePy.
 """
 
 import argparse

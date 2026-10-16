@@ -1,0 +1,252 @@
+package cards
+
+import (
+	"sync/atomic"
+	"unsafe"
+)
+
+// maxSVarDepth caps sub-ability nesting. The deepest real chain in the corpus
+// is well under this; the cap exists so a cyclic SVar reference in upstream
+// data cannot hang the compiler.
+const maxSVarDepth = 32
+
+// Link resolves SVar-named sub-abilities into a tree. Call it once, after
+// Parse, before the card is used.
+func (c *Card) Link() []Diag {
+	if c.compiledSlot == nil {
+		c.compiledSlot = &Slot{}
+	}
+	var diags []Diag
+	for _, f := range c.Faces {
+		diags = append(diags, f.link(c.Path)...)
+	}
+	return diags
+}
+
+func (f *Face) link(path string) []Diag {
+	f.expandKeywords()
+	var diags []Diag
+
+	var resolve func(name string, depth int) *SA
+	resolve = func(name string, depth int) *SA {
+		if name == "" || depth > maxSVarDepth {
+			return nil
+		}
+		body, ok := f.SVars[name]
+		if !ok {
+			diags = append(diags, Diag{path, "unresolved SVar ref: " + name})
+			return nil
+		}
+		sa, d := parseSA(path, body)
+		diags = append(diags, d...)
+		if sa != nil {
+			sa.Sub = resolve(sa.ParamStr(PKSubAbility), depth+1)
+		}
+		return sa
+	}
+	walk := func(sa *SA) {
+		for d := 0; sa != nil && d <= maxSVarDepth; d++ {
+			if sa.Sub == nil {
+				sa.Sub = resolve(sa.ParamStr(PKSubAbility), d+1)
+			}
+			sa = sa.Sub
+		}
+	}
+
+	for _, a := range f.Abilities {
+		walk(a)
+	}
+	for i := range f.Triggers {
+		f.Triggers[i].Effect = resolve(f.Triggers[i].ParamStr(PKExecute), 0)
+		walk(f.Triggers[i].Effect)
+	}
+	for i := range f.Repls {
+		f.Repls[i].With = resolve(f.Repls[i].Params["ReplaceWith"], 0)
+		walk(f.Repls[i].With)
+	}
+	// Linking replaced trigger and replacement bodies: bind their compiled
+	// parameter sets (a later derive rebinds everything again).
+	f.deriveParamSets()
+	return diags
+}
+
+// builtinSVars are the SVar bodies the RULES layer references by name from
+// delayed-trigger registrations (dash's end-step return, warp's end-step
+// exile, encore's end-step sacrifice) whose SOURCE object has no SVar table
+// to hold them: a Face is immutable card-script data, and the registering
+// source may be a token or copy with no script SVars at all. resolveSVar
+// falls back to this table when the face's own table lacks the name, so a
+// replayed DelayedPush resolves the identical ability a live game did.
+var builtinSVars = map[string]string{
+	// Evoke's mandatory ETB trigger. It is minted as a real triggered ability
+	// by KeywordTriggerPush, so players receive priority and may counter it.
+	"__kwEvokeSacrifice": "DB$ Sacrifice | Defined$ Self",
+	// Madness's real triggered ability is handled by rules at resolution: its
+	// owner may cast the exiled source card for the madness cost, otherwise it
+	// goes to the graveyard. A distinct API marker lets the ordinary stack
+	// object stay respondable without pretending this is an effects primitive.
+	"__kwMadnessCast": "DB$ MadnessCast",
+	// Dash (CR 702): "returned from the battlefield to its owner's hand at
+	// the beginning of the next end step". The registered source is the
+	// dashed permanent itself, so Defined$ Self is it.
+	"__kwDashReturn": "DB$ ChangeZone | Defined$ Self | Origin$ Battlefield | Destination$ Hand",
+	// Warp: "exile this creature at the beginning of the next end step".
+	"__kwWarpExile": "DB$ ChangeZone | Defined$ Self | Origin$ Battlefield | Destination$ Exile",
+	// Unearth (CR 702.84a): "exile it at the beginning of the next end
+	// step". A distinct name from __kwWarpExile because rules reads the
+	// registration back at the leave-replacement boundary
+	// (engine/rules/unearth.go's unearthReplacementApplies) to decide whether a
+	// permanent that would leave the battlefield is exiled instead; a
+	// warped creature's own departure must not be captured by that read.
+	// The registered source is the unearthed permanent itself, so
+	// Defined$ Self is it.
+	"__kwUnearthExile": "DB$ ChangeZone | Defined$ Self | Origin$ Battlefield | Destination$ Exile",
+	// Encore tokens: "Sacrifice them at the beginning of the next end step".
+	// Each token registers its own delayed trigger, so Self is that token.
+	"__kwEncoreSacrifice":      "DB$ Sacrifice | Defined$ Self",
+	"__kwEncoreSacrificeGroup": "DB$ Sacrifice | Defined$ DelayTriggerRememberedLKI",
+	// CopyPermanent AtEOTTrig$ (Chandra, Flameshaper; Electroduplicate; Heat
+	// Shimmer): the copy token's own "At the beginning of the end step,
+	// sacrifice/exile this token" triggered ability, part of its copiable
+	// values for a token copy to inherit. rules' checkGrantedAtEOTTriggers
+	// synthesizes the Phase/EndStep trigger for an object carrying the body
+	// name (Object.AtEOTTrigBody), and the synthesized trigger's Defined$ Self
+	// names the token itself -- exactly the __kwEncoreSacrifice shape, whose
+	// body is likewise the token's own one-shot end-step promise.
+	"__cpAtEOTSacrifice": "DB$ Sacrifice | Defined$ Self",
+	"__cpAtEOTExile":     "DB$ ChangeZone | Defined$ Self | Origin$ Battlefield | Destination$ Exile",
+	// AtEOT$ Destroy (the end-of-turn rider's destroy arm, read by the shared
+	// effects.scheduleAtEOT helper on Animate/Pump/PumpAll/Token/ChangeZone
+	// bodies): the registered source is the affected permanent itself.
+	"__kwAtEOTDestroy": "DB$ Destroy | Defined$ Self",
+	// Earthbend (engine/effects/earthbend.go): the animated land's "when it dies or
+	// is exiled, return it to the battlefield tapped" promise. The
+	// registration's Source is the land itself, so Defined$ Self is it. The
+	// name deliberately carries none of the tracked prefixes above
+	// (__kwDash/__kwWarp/__kwAtEOT), so a re-entering land is NOT
+	// incarnation-tracked: the one-shot registration is consumed at its
+	// first fire, and the returned land is a plain tapped land whose
+	// counters were removed by CR 122.2. Origin$ is comma-split by
+	// effects.ParseZones at resolution, so the single body serves both the
+	// Graveyard and Exile registrations.
+	"__kwEarthbendReturn": "DB$ ChangeZone | Defined$ Self | Origin$ Graveyard,Exile | Destination$ Battlefield | Tapped$ True",
+	// K:MayFlashSac (CR 702.8): "if you cast it any time a sorcery couldn't
+	// have been cast, the controller of the permanent it becomes sacrifices
+	// it at the beginning of the next cleanup step". The registration's
+	// Source is the permanent the spell became, so Defined$ Self is it.
+	"__kwMayFlashSacrifice": "DB$ Sacrifice | Defined$ Self",
+	// Rebound (CR 702.95a): "At the beginning of your next upkeep, you may
+	// cast this card from exile without paying its mana cost." The
+	// registration's Source is the exiled card itself, so the Play's
+	// population is Card.Self; ValidZone$ Exile pins the offer to the exile
+	// zone, so a card that left exile (and even one that later returned) is
+	// never cast from anywhere else by a stale registration. Optional$ True
+	// makes the ask declinable -- a decline leaves the card exiled, which is
+	// exactly CR 702.95's result.
+	"__kwReboundCast": "DB$ Play | Valid$ Card.Self | ValidZone$ Exile | WithoutManaCost$ True | Optional$ True",
+	// Blitz (CR 702.152c-d): the cast-for-blitz permanent is sacrificed at
+	// the beginning of the next end step. The registration's Source is the
+	// permanent itself, so Defined$ Self is it.
+	"__kwBlitzSacrifice": "DB$ Sacrifice | Defined$ Self",
+	// Decayed (CR 702.147a): "When this creature attacks, sacrifice it at
+	// end of combat." The registered source is the attacking decayed
+	// permanent itself, so Defined$ Self is it -- the __kwBlitzSacrifice
+	// shape, registered for the end-of-COMBAT step rather than end step.
+	"__kwDecayedSacrifice": "DB$ Sacrifice | Defined$ Self",
+	// Blitz (CR 702.152c): the cast-for-blitz permanent has "When this
+	// creature dies, draw a card." engine/rules/altcast.go's blitzEnter registers a
+	// ContinuousEffect whose AddTrigger$ names this SVar, so the body is
+	// resolved against the permanent's own face (or this builtin fallback).
+	"__kwBlitzDraw": "DB$ Draw | NumCards$ 1",
+	// Impending (CR 702.176a): "At the beginning of your end step, remove a
+	// time counter from it." engine/rules/impending.go's impendingTickGrant registers a
+	// ContinuousEffect whose AddTrigger$ names this SVar; the body is resolved
+	// against the permanent's own face (or this builtin fallback), and
+	// Defined$ Self is the permanent itself -- the __kwBlitzSacrifice shape.
+	// The trigger's IsPresent$ counters_GT0_TIME gate is what stops it once
+	// the last counter leaves, so the body never runs at zero.
+	"__kwImpendingTick": "DB$ RemoveCounter | Defined$ Self | CounterType$ TIME | CounterNum$ 1",
+}
+
+// ResolveSVar compiles the ability an SVar name refers to, recursively
+// resolving its own SubAbility$ chain the same way Link does for a face's
+// printed abilities. Some Forge parameters point at a sub-ability by SVar
+// name rather than through the auto-linked "SubAbility$" (Charm's Choices$,
+// Repeat's RepeatSubAbility$), so effects primitives that need to actually
+// run one of those need a way to compile it on demand, after Parse/Link, from
+// the resolving face's own SVar table. A missing name, or a body that fails
+// to parse, yields nil rather than a partial result -- callers already treat
+// a nil *SA as "nothing to run", the same degrade-to-nothing convention Num
+// and EvalCount use for an expression this build does not model.
+func ResolveSVar(svars map[string]string, name string) *SA {
+	return resolveSVar(svars, name, 0)
+}
+
+func resolveSVar(svars map[string]string, name string, depth int) *SA {
+	if name == "" || depth > maxSVarDepth {
+		return nil
+	}
+	body, ok := svars[name]
+	if !ok {
+		body, ok = builtinSVars[name]
+	}
+	if !ok {
+		return nil
+	}
+	tmpl := svarTemplate(body)
+	if tmpl == nil {
+		return nil
+	}
+	// A fresh SA per call (callers own its identity and may rebind its
+	// fields), sharing the template's immutable parse: Kind/API/Line and
+	// the Params map with its bound ParamSet. The shared map is read-only:
+	// every engine site that rewrites an ability's parameters first copies
+	// Params into a map of its own (effects' Defined splitter, reveal and
+	// exchange rewrites, damage riders, prevention shields, paid-X mana
+	// copies -- audited 2026-09-27), exactly as it must for a printed
+	// ability's map. TestResolveSVarTemplateMatchesFreshParse pins the
+	// shared parse to a fresh one over the corpus.
+	sa := new(SA)
+	*sa = *tmpl
+	sa.Sub = resolveSVar(svars, sa.ParamStr(PKSubAbility), depth+1)
+	return sa
+}
+
+// svarTemplate is parseSA("", body) compiled once per body text: the SVar
+// bodies ResolveSVar re-read on every activation offer, grant scan and
+// delayed-trigger push are immutable card text, so their parse is too. The
+// front is a fixed-size direct-mapped table keyed by the body string's
+// identity (bodies are configured text with stable storage); an entry is
+// re-checked by content, so a collision or a runtime-built body can only
+// cost a re-parse, never a wrong template. A body with no ability head
+// caches as a nil template.
+func svarTemplate(body string) *SA {
+	slot := &svarFront[svarFrontSlot(body)]
+	if e := slot.Load(); e != nil && e.body == body {
+		return e.sa
+	}
+	sa, _ := parseSA("", body)
+	if sa != nil {
+		sa.ps = newParamSet(sa.Params)
+	}
+	slot.Store(&svarFrontEntry{body: body, sa: sa})
+	return sa
+}
+
+const svarFrontBits = 12
+
+type svarFrontEntry struct {
+	body string
+	sa   *SA
+}
+
+var svarFront [1 << svarFrontBits]atomic.Pointer[svarFrontEntry]
+
+func svarFrontSlot(s string) uint {
+	p := uintptr(unsafe.Pointer(unsafe.StringData(s)))
+	h := uint64(p>>3) ^ uint64(len(s))*0x9e3779b97f4a7c15
+	h ^= h >> 29
+	h *= 0xbf58476d1ce4e5b9
+	h ^= h >> 32
+	return uint(h) & (1<<svarFrontBits - 1)
+}

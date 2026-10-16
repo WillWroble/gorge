@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// layering_resolve_test.go pins rules/resolve, the L6 resolution kernel of
+// layering_resolve_test.go pins engine/rules/resolve, the L6 resolution kernel of
 // the rules-engine lasagna (spec 2026-10-03 §3 and §7, W3): checkpoint at the
 // intent boundary that begins a resolution, the intent tape, and the
 // ask/answer protocol, read and driven through the resolve.Board interface
@@ -19,7 +19,7 @@ import (
 // parallel do not edit the same lines; the checks are the same direct and
 // transitive ones.
 
-// resolveImports is the closed set of module packages rules/resolve may
+// resolveImports is the closed set of module packages engine/rules/resolve may
 // import directly: the L1 decision and event vocabulary its tape is made of
 // (intents, posed decisions, the event log's verify window) and the L0/L1
 // object vocabulary. The kernel never sees an effects.Ctx, a SpecContext or a
@@ -37,7 +37,7 @@ var resolveImports = map[string]bool{
 	module + "/events":   true,
 }
 
-// TestResolveImportsStayBelowRules pins rules/resolve's direct module imports
+// TestResolveImportsStayBelowRules pins engine/rules/resolve's direct module imports
 // to resolveImports and forbids the transitive edges the layering rules out:
 // rules itself (the kernel reaches the engine only through Board), the
 // effects layer (no Ctx or SpecContext crosses the interface), the subsystem
@@ -48,7 +48,7 @@ func TestResolveImportsStayBelowRules(t *testing.T) {
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
-		t.Skip("rules/resolve is not built yet")
+		t.Skip("engine/rules/resolve is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -111,7 +111,7 @@ func TestNothingBelowRulesReachesTheKernel(t *testing.T) {
 }
 
 // resolveBoardMethods is the method count of resolve.Board, the interface
-// rules/resolve drives the engine through (rules/resolve/board.go). It is a
+// engine/rules/resolve drives the engine through (engine/rules/resolve/board.go). It is a
 // SHRINK-ONLY ratchet on the pattern of combatBoardMethods: measured 15 when
 // the kernel landed (W3 steps 0-1). A change that removes a method lowers the
 // constant in the same commit; NEVER raise it -- fold a new need into an
@@ -123,10 +123,10 @@ const resolveBoardMethods = 15
 // interfaces are counted by name and fail: Board declares every method
 // itself, so its size is visible here).
 func TestResolveBoardOnlyShrinks(t *testing.T) {
-	dir := filepath.Join("..", "..", "rules", "resolve")
+	dir := filepath.Join("..", "..", "engine", "rules", "resolve")
 	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil || len(files) == 0 {
-		t.Skip("rules/resolve is not built yet")
+		t.Skip("engine/rules/resolve is not built yet")
 	}
 	n, found := 0, false
 	for _, file := range files {
@@ -161,7 +161,7 @@ func TestResolveBoardOnlyShrinks(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("rules/resolve declares no Board interface; the ratchet would run vacuously")
+		t.Fatal("engine/rules/resolve declares no Board interface; the ratchet would run vacuously")
 	}
 	switch {
 	case n > resolveBoardMethods:

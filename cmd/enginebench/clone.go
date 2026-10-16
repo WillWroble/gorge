@@ -8,11 +8,12 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // rootTurns are the mid-game turns docs/015 copied at (turns 5-8).
@@ -30,7 +31,7 @@ type rootInfo struct {
 
 // botStep answers the pending decision with the per-seat heuristic bot and
 // submits it.
-func botStep(e *rules.Engine, bots []*seat.Bot, board *botpolicy.Board) (decision.Intent, error) {
+func botStep(e *rules.Engine, bots []*heuristic.Bot, board *botpolicy.Board) (decision.Intent, error) {
 	d := e.Pending()
 	b := botpolicy.BoardFromGameInto(e.G, e, d.Player, board)
 	in, err := bots[d.Player].DecideBoard(context.Background(), b, *d)
@@ -92,7 +93,7 @@ func findRoots(w workload, base uint64) ([]*rules.Engine, []rootInfo, error) {
 		cfg := w.config(decks, names, base, g)
 		e := rules.New(cfg)
 		e.Advance()
-		bots := []*seat.Bot{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)}
+		bots := []*heuristic.Bot{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)}
 		board := botpolicy.NewBoard(2)
 		var roots []*rules.Engine
 		var infos []rootInfo

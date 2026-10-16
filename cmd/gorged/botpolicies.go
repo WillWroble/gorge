@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/protocol"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
 // defaultBotPoliciesRaw is -bot-policies' default: the empty string means

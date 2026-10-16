@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // fatalSignal is what fakeTB.Fatalf panics with, so runCheck's recover can

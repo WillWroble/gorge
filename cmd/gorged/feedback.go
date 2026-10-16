@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/server/host"
 )
 
 // feedbackStore accepts a player's own bug report — the FEEDBACK affordance in

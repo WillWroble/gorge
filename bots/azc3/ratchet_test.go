@@ -6,14 +6,14 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
+	"github.com/adams-shaun/gorge/bots/azmcts"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/azmcts"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // TestAZSearchRatchet is the az search's failure ratchet: a fixed set of

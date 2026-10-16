@@ -1,10 +1,11 @@
 package bot
 
 import (
-	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
 	"github.com/adams-shaun/gorge/bots/sanity"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 func init() {
@@ -19,9 +20,9 @@ func init() {
 func newBot(o bots.Options) (seat.Seat, error) {
 	var s seat.Seat
 	if o.AutoPayMana {
-		s = seat.NewAttackSimBot(o.Seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana()
+		s = heuristic.NewAttackSimBot(o.Seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana()
 	} else {
-		s = seat.NewBot(o.Seed)
+		s = heuristic.NewBot(o.Seed)
 	}
 	if o.CommonSense {
 		return sanity.Wrap(s), nil

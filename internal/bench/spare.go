@@ -3,8 +3,8 @@ package bench
 import (
 	"sync"
 
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 // SparePool recycles finished games' log and object arrays (rules.Spare)
@@ -26,21 +26,21 @@ import (
 // why each caller does or does not draw from a SparePool here:
 //
 //   - recycled: cmd/enginebench playRandom/playBot (the -row random and -row
-//     bot rows), cmd/botbench playMatchTraced and sbPlay, cmd/policytune's
+//     bot rows), lab/cmd/botbench playMatchTraced and sbPlay, lab/cmd/policytune's
 //     pair player, cmd/mtgsim playOne, cmd/keywordbench play.
 //   - NOT recycled, no single last-use point: cmd/enginebench findRoots (its
 //     roots are e.Clone()s that share e's log prefix, so e must outlive
 //     them), cmd/enginebench searchGame (the engine is handed to the search
 //     and to searchseat.Feed, whose results may retain clones),
-//     cmd/searchteacher playGame (returns the engine to its caller),
+//     lab/cmd/searchteacher playGame (returns the engine to its caller),
 //     internal/paymirror PlayConfig (a deferred handler reads e.G at return
-//     and CheckLive may retain), internal/spellbench kshadow/v2engine/v2shadow
+//     and CheckLive may retain), lab/training/spellbench kshadow/v2engine/v2shadow
 //     (the engine outlives the "game" as the observer/translator pipeline).
-//   - already owns spare recycling: internal/searchprobe (per goroutine since
+//   - already owns spare recycling: bots/searchprobe (per goroutine since
 //     75c053d09; its verifyActual rebuilds a replay that owns its output),
-//     internal/azmcts (clairvoyant/nodecache/redeal/seat/world).
-//   - out of scope or by construction: host/ engines outlive the game
-//     (feedback capture and replay); replay/ builds the engine that produces
+//     bots/azmcts (clairvoyant/nodecache/redeal/seat/world).
+//   - out of scope or by construction: server/host/ engines outlive the game
+//     (feedback capture and replay); engine/replay/ builds the engine that produces
 //     its own output log; cmd/autopayaudit and cmd/cardfuzz read the engine
 //     across several post-game phases (verify replay, failure context).
 type SparePool struct {

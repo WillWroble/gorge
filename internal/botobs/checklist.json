@@ -17,7 +17,7 @@
     {
       "id": "opp_archetype_posterior",
       "description": "A posterior over an opponent's archetype, inferred from the cards revealed about that opponent.",
-      "where": "view.PlayerView.Archetype (*view.ArchetypePosterior), inferred in view/archetype.go from the seat's public battlefield/graveyard/exile/command lists",
+      "where": "view.PlayerView.Archetype (*view.ArchetypePosterior), inferred in engine/view/archetype.go from the seat's public battlefield/graveyard/exile/command lists",
       "exposed": true
     },
     {
@@ -35,7 +35,7 @@
     {
       "id": "decision_routing_arms",
       "description": "The bot router answers every decision kind the engine can pose (a human answers them all).",
-      "where": "botpolicy/policy.go decide(): a routing site per decision.Kinds entry",
+      "where": "bots/botpolicy/policy.go decide(): a routing site per decision.Kinds entry",
       "exposed": true
     },
     {

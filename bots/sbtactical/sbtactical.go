@@ -15,7 +15,7 @@
 // built for an earlier decision.
 //
 // The adapter never sees the live engine: the host's Env carries only the
-// honest root (host/botenv.go envData), and the planner derives the actor's
+// honest root (server/host/botenv.go envData), and the planner derives the actor's
 // own pool and sources from it. Priority is the only kind the host builds an
 // Env for here (WantsEnv), so an sb-tactical table costs one honest redeal
 // per priority decision and nothing else beyond a plain bot.
@@ -27,10 +27,10 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/sanity"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Policy is the registry key.

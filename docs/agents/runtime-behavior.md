@@ -21,7 +21,7 @@ registered continuous effect, and the Self/Other target-source normalisation
 ## Cast-provenance filter arguments (castprov1/2/3 + wascastfrom)
 
 The `Card.wasCast*` family is a rules-side split, not a filter predicate:
-`castProvenanceAdmits` (`rules/cast_provenance.go`) strips the tokens and reads
+`castProvenanceAdmits` (`engine/rules/cast_provenance.go`) strips the tokens and reads
 the log (latest PutOnStack cast wins; a copy was never cast; a never-cast card
 reads false). Hand family: `wasCastFromYourHandByYou`, `wasCastByYou`,
 `wasCastFromYourHand`. Origin-zone family: `wasCastFromExile`,
@@ -40,7 +40,7 @@ may-play provenance predicates (`MayPlaySource`/`CastSa`) stay fail-closed
 ## Decision-arena lifetime contract
 
 A fresh `rules.Engine` carves its decisions -- the posed `*decision.Decision`
-and its `Options` -- out of a bump-allocated arena (rules/decision_arena.go)
+and its `Options` -- out of a bump-allocated arena (engine/rules/decision_arena.go)
 to keep them off the GC's plate (~34% of alloc_space on enginebench's play
 rows). That storage is reclaimed by generation: a posed decision, its
 `Options` slice and everything they reference are **valid only until the next
@@ -49,7 +49,7 @@ the decision past that point (the host's decision feed, the view projection,
 a bot policy that stores offers, a bench trace) must copy it with
 `decision.Decision.Clone()` (or an equivalent deep copy). A live engine keeps
 two generations and retires one at each Submit boundary
-(rules/decision_arena_live.go), so the arena is bounded across a whole game;
+(engine/rules/decision_arena_live.go), so the arena is bounded across a whole game;
 a search simulation's engine uses `SetDecisionArena` and is Release-scoped
 instead. The rules, host and view test binaries enable a poison verify mode
 (`decisionArenaVerify`) that overwrites a retired generation with a sentinel,
@@ -66,7 +66,7 @@ persistence failures inside the callback.
 
 ## Payment plans for bot seats
 
-A driver (`internal/bench.PlayGame`, `host/match.go`, cmd tools) builds a
+A driver (`internal/bench.PlayGame`, `server/host/match.go`, cmd tools) builds a
 decision's mana-payment plans (`Engine.EnsurePaymentActions`) only for a
 seat that implements `seat.PaymentPlanConsumer` and answers true. Bots
 default to true; a wrapper forwards to what it wraps. Without plans the
@@ -98,7 +98,7 @@ target-dependent and optional costs, restricted or last-resort sources).
 
 A seat credential names **both its table and seat**. Every current
 seat-authorised HTTP route (`view`, `events`, `pending`, `intent`, `undo`)
-goes through `host/httpapi`'s `claimForTable`; a mismatched or legacy unbound
+goes through `server/host/httpapi`'s `claimForTable`; a mismatched or legacy unbound
 claim is 403 and must never reach registry state. `cmd/gorged` mints startup
 and vs-bot tokens with that pair, so after deployment old tokens stop working;
 the web client returns a rejected stale join to the lobby, where it obtains a

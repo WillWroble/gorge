@@ -28,29 +28,29 @@ targets, attackers, blockers, trigger order, modes, mulligan, and so on).
 
 | Tier | Contents | Role |
 |---|---|---|
-| T0 card pipeline | `cards`, `deck`, `cards/oracletext` | Forge script → IR compiler, keyword expanders, card registry, coverage |
+| T0 card pipeline | `cards`, `deck`, `engine/cards/oracletext` | Forge script → IR compiler, keyword expanders, card registry, coverage |
 | T1 rules core | `state`, `decision`, `events`, `effects`, `rules` and its sub-packages, `replay`, `botpolicy` | the engine itself, plus the default heuristic bot (which search code uses as its environment model) |
-| T2 projection / host / wire | `view`, `seat`, `protocol`, `host`, `host/httpapi`, the ManaBrew adapter stack, `cmd/gorged` | per-seat projections, decision answerers, tables, persistence, HTTP + SSE + the embedded Svelte client (`web/`) |
-| T3 bots / ML / search | `bots/*`, `internal/policynet`, `internal/searchprobe`, `internal/searchseat`, `internal/azmcts`, `internal/spellbench/*` | hosted bot policies, learned policy plumbing, search harnesses |
-| T4 tooling | `compliance/*`, `tools/xmageoracle`, `internal/archtest`, `internal/codeshape`, `internal/testbudget`, `internal/testutil`, ~40 `cmd/` binaries | the XMage compliance oracle, architecture ratchets, benchmarks |
+| T2 projection / host / wire | `view`, `seat`, `protocol`, `host`, `server/host/httpapi`, the ManaBrew adapter stack, `cmd/gorged` | per-seat projections, decision answerers, tables, persistence, HTTP + SSE + the embedded Svelte client (`web/`) |
+| T3 bots / ML / search | `bots/*`, `bots/policynet`, `bots/searchprobe`, `bots/searchseat`, `bots/azmcts`, `lab/training/spellbench/*` | hosted bot policies, learned policy plumbing, search harnesses |
+| T4 tooling | `lab/oracle/compliance/*`, `lab/oracle/xmageoracle`, `internal/archtest`, `internal/codeshape`, `internal/testbudget`, `internal/testutil`, ~40 `cmd/` binaries | the XMage compliance oracle, architecture ratchets, benchmarks |
 
 ```mermaid
 flowchart TB
   subgraph T0["T0 Card pipeline"]
     cards["cards"]
     deck["deck"]
-    oracletext["cards/oracletext"]
+    oracletext["engine/cards/oracletext"]
   end
   subgraph T1["T1 Rules core"]
     state["state"] --> cards
     decision["decision"] --> state
     events["events (Apply, log, hash chain)"] --> decision
-    params["effects/params"] --> decision
-    cost["rules/cost"] --> state
+    params["engine/effects/params"] --> decision
+    cost["engine/rules/cost"] --> state
     effects["effects"] --> events
     effects --> cost
     effects --> params
-    sub["rules/chars, combat, trigmatch, pay, resolve, scriptfacts"] --> effects
+    sub["engine/rules/chars, combat, trigmatch, pay, resolve, scriptfacts"] --> effects
     rules["rules (Engine)"] --> sub
     rules --> deck
     replay["replay"] --> rules
@@ -65,23 +65,23 @@ flowchart TB
     host --> seat
     host --> replay
     host --> protocol
-    httpapi["host/httpapi"] --> host
+    httpapi["server/host/httpapi"] --> host
     mb["manabrew stack"] --> httpapi
     gorged["cmd/gorged"] --> httpapi
     gorged --> mb
   end
   subgraph T3["T3 Bots / ML / search"]
-    policynet["internal/policynet"]
-    searchprobe["internal/searchprobe"] --> rules
-    searchseat["internal/searchseat"] --> searchprobe
-    azmcts["internal/azmcts"] --> searchseat
-    sbx["internal/spellbench/*"]
+    policynet["bots/policynet"]
+    searchprobe["bots/searchprobe"] --> rules
+    searchseat["bots/searchseat"] --> searchprobe
+    azmcts["bots/azmcts"] --> searchseat
+    sbx["lab/training/spellbench/*"]
     bots["bots/*"] --> searchseat
     bots --> sbx
     bots --> azmcts
   end
   subgraph T4["T4 Tooling"]
-    compliance["compliance/*"] --> rules
+    compliance["lab/oracle/compliance/*"] --> rules
     archtest["archtest, codeshape, testbudget, testutil"]
     cmds["cmd/*"]
   end
@@ -102,7 +102,7 @@ roughly 249k / 494k of that; the `rules` package alone is 124.5k non-test and
 
 ## Observations
 
-1. **The rules core is clean.** `go list -deps ./rules` reaches 15 in-repo
+1. **The rules core is clean.** `go list -deps ./engine/rules` reaches 15 in-repo
    packages, all in T0/T1. The dependency direction is enforced by
    `internal/archtest` (see [Invariants](invariants.md)).
 2. **`botpolicy` is effectively core.** 28 packages import it, and an
@@ -110,11 +110,11 @@ roughly 249k / 494k of that; the `rules` package alone is 124.5k non-test and
    search seat uses it as the opponent and environment model.
 3. **The production server links research code.** `cmd/gorged` links 41
    in-repo packages, including the MCTS, PIMC, learned-policy and SpellBench
-   stacks, through two back-edges: `seat/policynet.go` → `internal/policynet`,
-   and `host/botenv.go` → `internal/searchseat`. Decoupling these is on the
-   [cleanup roadmap](cleanup.md). (The former `internal/policynet` →
-   `internal/spellbench/v2agent` edge is cut: front end V moved to
-   `internal/policynet/v2front`, and the SpellBench v1/v2 bridge builds only
+   stacks, through two back-edges: `engine/seat/policynet.go` → `bots/policynet`,
+   and `server/host/botenv.go` → `bots/searchseat`. Decoupling these is on the
+   [cleanup roadmap](cleanup.md). (The former `bots/policynet` →
+   `lab/training/spellbench/v2agent` edge is cut: front end V moved to
+   `lab/training/v2front`, and the SpellBench v1/v2 bridge builds only
    with `-tags spellbench_bridge`.)
 
 ## Further reading

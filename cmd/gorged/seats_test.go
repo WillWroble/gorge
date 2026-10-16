@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // TestSeatGateMintsAndResolvesTokens covers the resolver's own contract,

@@ -4,13 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
 )
 
 // refuseFirstSeat answers every decision from a wrapped bot, except that its
@@ -55,8 +57,8 @@ func TestPlayGameReanswersRefusedDecision(t *testing.T) {
 		Seed: seed, Names: []string{"mono-black-aggro", "mono-red-prowess"},
 		Decks: [][]*cards.Card{da, db}, Tokens: reg.Tokens,
 	}
-	naughty := &refuseFirstSeat{inner: seat.NewBot(seed ^ 1)}
-	seats := []seat.Seat{naughty, seat.NewBot(seed ^ 2)}
+	naughty := &refuseFirstSeat{inner: heuristic.NewBot(seed ^ 1)}
+	seats := []seat.Seat{naughty, heuristic.NewBot(seed ^ 2)}
 	_, e, err := bench.PlayGame(cfg, seats, 60, 4000, bench.Hooks{})
 	if err != nil {
 		t.Fatalf("game died on a refused intent instead of re-asking: %v", err)

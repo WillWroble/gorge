@@ -2,13 +2,13 @@
 
 A **contract** is anything a program outside this module reads or writes: a
 file layout, a wire, a command grammar. DraftZero's trainer (Python, driving
-`cmd/dzgorge` as a subprocess) is the first such consumer, and its shards,
+`lab/cmd/dzgorge` as a subprocess) is the first such consumer, and its shards,
 networks and configs outlive any one gorge commit. So each contract has a name
 and a major version, golden files whose SHA-256 the registry pins, and readers
 that refuse a version they cannot read.
 
 The registry is the package [`contracts`](../contracts/contracts.go):
-`contracts/registry.json` lists every contract (name, major, description,
+`lab/contracts/registry.json` lists every contract (name, major, description,
 owner package, goldens with their hashes), and Go constants mirror each name
 and major (`contracts.DZGPack`, `contracts.DZGPackVersion`, ...).
 `dzgorge version` prints every contract's major.
@@ -17,8 +17,8 @@ and major (`contracts.DZGPack`, `contracts.DZGPackVersion`, ...).
 
 | Change | What to do |
 |---|---|
-| **Additive**: a new field a reader may ignore, a new entry appended to an append-only table (`contracts.PackKinds`) | Keep the major. Regenerate the golden (the owner test's `-update` / `-update-contracts` flag), put its new hash in `contracts/registry.json`, and add a CHANGELOG line naming the contract. |
-| **Anything else**: a field renamed, removed, retyped or given a new meaning; a table reordered; a default changed | A new major: bump the constant in `contracts/contracts.go` and the entry in `registry.json`, write the new format tag, and keep the reader (or a `-format` switch on the writer) accepting the previous major for one release. Add a CHANGELOG line. |
+| **Additive**: a new field a reader may ignore, a new entry appended to an append-only table (`contracts.PackKinds`) | Keep the major. Regenerate the golden (the owner test's `-update` / `-update-contracts` flag), put its new hash in `lab/contracts/registry.json`, and add a CHANGELOG line naming the contract. |
+| **Anything else**: a field renamed, removed, retyped or given a new meaning; a table reordered; a default changed | A new major: bump the constant in `lab/contracts/contracts.go` and the entry in `registry.json`, write the new format tag, and keep the reader (or a `-format` switch on the writer) accepting the previous major for one release. Add a CHANGELOG line. |
 | **Reading** | A reader that meets a major it does not know refuses it by name. It never guesses. |
 
 The tests that hold this:
@@ -40,7 +40,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 
 ### dzg-games, v1
 
-- **Producer:** `dzgorge play -out games.jsonl` (`cmd/dzgorge/play.go`, `gameRec`),
+- **Producer:** `dzgorge play -out games.jsonl` (`lab/cmd/dzgorge/play.go`, `gameRec`),
   plus `games.jsonl.summary.json`.
 - **Consumers:** DraftZero's evaluation and paired scoring.
 - **Layout:** one JSON object per game, in game order. Every record and the
@@ -49,7 +49,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   an empty revision for a `go run` or test build). The record fields are
   `game, pair, leg, seed, decks, side, pols, winner, result, stall, turns,
   intents, starter, ms, in_hand, mull, mm, visits, error, lines`.
-- **Golden:** `cmd/dzgorge/testdata/contracts/games.jsonl`
+- **Golden:** `lab/cmd/dzgorge/testdata/contracts/games.jsonl`
   (`TestContractGamesRecord`).
 - **Known gaps:** the summary's keys are not pinned by a golden; only its
   `format` and `gorge` fields are part of the contract today.
@@ -57,7 +57,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 ### dzg-pack, v2
 
 - **Producer:** `dzgorge pack -in corpus.jsonl.gz[,...] -out DIR`
-  (`cmd/dzgorge/pack.go`).
+  (`lab/cmd/dzgorge/pack.go`).
 - **Consumers:** DraftZero's shard reader (`gorge/dzg`), and shards published
   on disk and on Hugging Face.
 - **Layout:** `DIR/00000/, 00001/, ...`, each holding version 1.0 `.npy`
@@ -68,7 +68,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   - `kinds`: the whole canonical kind table, `contracts.PackKinds`. The
     `kind.npy` column is an index into it. The table is append-only: an index
     never changes meaning, so a reader may hard-code it. It is pinned by
-    `contracts/testdata/pack_kinds.txt` (`TestPackKindsAppendOnly`).
+    `lab/contracts/testdata/pack_kinds.txt` (`TestPackKindsAppendOnly`).
   - `encoder_hash`, `record_type`, `schema_version`: the input corpus's
     identity, copied from its records.
   - `gorge`: `{version, revision}` of the build that packed it.
@@ -81,25 +81,25 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 - **v1, deprecated:** `pack -format 1` writes the dzg-pack-1 layout byte for
   byte. Its `kinds` are indexed in first-seen order per pack run, and its
   meta has no identity fields. It will be removed one release after v2.
-  Golden: `cmd/dzgorge/testdata/contracts/pack1/`, frozen, written by the
+  Golden: `lab/cmd/dzgorge/testdata/contracts/pack1/`, frozen, written by the
   pre-contract pack.
-- **Goldens:** `cmd/dzgorge/testdata/contracts/pack2/SHA256SUMS` and
+- **Goldens:** `lab/cmd/dzgorge/testdata/contracts/pack2/SHA256SUMS` and
   `pack1/SHA256SUMS` (manifests over the golden shard files),
-  `contracts/testdata/pack_kinds.txt` (`TestContractPack2`,
+  `lab/contracts/testdata/pack_kinds.txt` (`TestContractPack2`,
   `TestContractPack1`).
 
 ### azvisits, v1
 
-- **Producer:** the az seat's recorder (`internal/azmcts/record.go`), written
+- **Producer:** the az seat's recorder (`bots/azmcts/record.go`), written
   by `dzgorge play -corpus` and `botbench -az-corpus`.
 - **Consumers:** `dzgorge pack`, `policytrain -visits-corpus`
   (`policynet.LoadVisits`), DraftZero.
 - **Layout:** gzip members of JSON lines, one `policynet.VisitRecord` per
   searched decision: `record_type: "azvisits-v1"`, `schema_version: 1`, and
   `encoder_hash` set to `%016x` of `policynet.EncoderHashFor(feature set)`.
-  The schema comment on `VisitRecord` (`internal/policynet/visits.go`) is the
+  The schema comment on `VisitRecord` (`bots/policynet/visits.go`) is the
   field reference.
-- **Golden:** `internal/policynet/testdata/contracts/azvisits.jsonl`
+- **Golden:** `bots/policynet/testdata/contracts/azvisits.jsonl`
   (`TestContractVisitRecord`).
 - **Known gaps:** the entity feature set has no version number of its own.
   `encoder_hash` is its identity, and `dzgorge version` prints the current
@@ -108,7 +108,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 ### dzgw, v1
 
 - **Producer:** DraftZero's `python -m dzg.export`.
-- **Consumer:** `internal/gonet` (`gonet.Load`, the `gonet=` policy key).
+- **Consumer:** `bots/gonet` (`gonet.Load`, the `gonet=` policy key).
 - **Layout:** the magic `DZGW0001`, a little-endian uint64 header length, a
   JSON header, zero padding to a 64-byte boundary, then little-endian float32
   tensors at the header's offsets. The header holds `format: "dzgw-1"`,
@@ -122,13 +122,13 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   refuse encoder drift. When absent the file loads, `Net.EncoderHashChecked()`
   reports false, and dzgorge prints one stderr warning per path. The exporter
   should write it. That change belongs on the DraftZero side.
-- **Golden:** `internal/gonet/testdata/contracts/dzgw_header.json`
+- **Golden:** `bots/gonet/testdata/contracts/dzgw_header.json`
   (`TestContractDZGWHeader`; `TestLoadChecksEncoderHash`).
 
 ### dzg-remote, v1 (GZB1 / GZR1)
 
 - **Producer and consumer:** `dzgorge`'s `remote=` client
-  (`cmd/dzgorge/remote.go`) and `python -m dzg.serve`.
+  (`lab/cmd/dzgorge/remote.go`) and `python -m dzg.serve`.
 - **Layout:** a request is a little-endian uint32 byte count, then
   `GZB1` (0x31425A47), B (states), the sparse, card, card-row, option,
   option-slot and option-hashed counts, then the `want` bytes and the packed
@@ -136,7 +136,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   response is a byte count, then `GZR1` (0x31525A47), B, the option count and
   a reserved word, then B float32 values (padded to 8 bytes) and the option
   scores of the states that asked for them.
-- **Goldens:** `cmd/dzgorge/testdata/contracts/remote_request.bin` and
+- **Goldens:** `lab/cmd/dzgorge/testdata/contracts/remote_request.bin` and
   `remote_response.bin` (`TestContractRemoteFrames`).
 - **Known gaps:** there is no handshake, so neither side checks the other's
   encoder hash or version. Adding one changes the wire, so it would be
@@ -145,12 +145,12 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 
 ### gorge-agent, v1
 
-- **Owner:** `draftlab/extern/wire` (`Protocol = "gorge-agent/1"`, `Version = 1`).
+- **Owner:** `lab/draft/draftlab/extern/wire` (`Protocol = "gorge-agent/1"`, `Version = 1`).
 - **Consumers:** out-of-process drafters, builders and players
-  (`draftlab/extern`).
+  (`lab/draft/draftlab/extern`).
 - **Layout:** JSON lines; the hello exchange names the protocol and a mismatch
   ends the session.
-- **Goldens:** every file in `draftlab/extern/wire/testdata/`
+- **Goldens:** every file in `lab/draft/draftlab/extern/wire/testdata/`
   (`TestMessageGoldens`).
 
 ### gorge-protocol, v1
@@ -158,11 +158,11 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
 - **Owner:** `protocol` (`protocol.Version`), the host-client frame envelope.
 - **Consumers:** the web client (TypeScript via `make gentypes`) and any
   external client.
-- **Goldens:** every file in `protocol/testdata/` (`TestGoldens`).
+- **Goldens:** every file in `server/protocol/testdata/` (`TestGoldens`).
 
 ### dzgorge-spec, v1
 
-- **Owner:** `cmd/dzgorge/policy.go` (`parsePolicy`).
+- **Owner:** `lab/cmd/dzgorge/policy.go` (`parsePolicy`).
 - **Consumers:** every DraftZero config and script
   (`src/draftzero/engine/specs.py`).
 - **Grammar:** `kind[:key=value|:flag]...`, where kind is `random`, `bot`,
@@ -171,14 +171,14 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   `mull`, `keep7`, `oppnodes`, `oppfull`, `closedlist`, `morekinds`) given a
   value is an error: before this contract `autopay=0` silently turned autopay
   on. `skippass` takes an optional value.
-- **Golden:** `cmd/dzgorge/testdata/contracts/spec_grammar.jsonl`, each
+- **Golden:** `lab/cmd/dzgorge/testdata/contracts/spec_grammar.jsonl`, each
   accepted spec's parsed struct and the refused spellings
   (`TestContractSpecGrammar`, `TestFlagKeysRefuseValue`).
 - **Known gaps:** the `dzgorge play` flags are not pinned.
 
 ### dzgorge-version, v1
 
-- **Owner:** `dzgorge version` (`cmd/dzgorge/version.go`).
+- **Owner:** `dzgorge version` (`lab/cmd/dzgorge/version.go`).
 - **Consumers:** DraftZero's build record (`bin/dzgorge.build.json`).
 - **Layout:** one JSON object with these fields:
   - `format: "dzgorge-version-1"`
@@ -189,7 +189,7 @@ is `0123456789abcdef`, and the gorge build is `v0.0.0-golden`.
   - `cards_compiler_fingerprint` and `ir_cache_version`
   - `cards_lock {repo, commit, digest}`, read from `-cards` (default
     `.cards`), or `null` when there is no `cards.lock`
-- **Golden:** the key set, `cmd/dzgorge/testdata/contracts/version_keys.txt`
+- **Golden:** the key set, `lab/cmd/dzgorge/testdata/contracts/version_keys.txt`
   (`TestContractVersionKeys`). Values vary by build.
 
 ## Not yet registered

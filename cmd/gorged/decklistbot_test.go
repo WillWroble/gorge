@@ -14,13 +14,15 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/host"
-	"github.com/adams-shaun/gorge/host/httpapi"
-	"github.com/adams-shaun/gorge/internal/gonet/gonettest"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
 
 // formatSpyPolicy is a test-only NON-decklist constructed-only entry, so
@@ -38,7 +40,7 @@ func registerFormatSpy(t *testing.T) {
 			Name: formatSpyPolicy, Label: "test-only constructed-only", Tier: bots.Experimental,
 			Description: "test-only entry for the default-format refusal",
 			Formats:     []string{"constructed"}, MaxSeats: 2,
-		}, New: func(o bots.Options) (seat.Seat, error) { return seat.NewBot(o.Seed), nil }})
+		}, New: func(o bots.Options) (seat.Seat, error) { return heuristic.NewBot(o.Seed), nil }})
 	})
 	e, ok := bots.Lookup(formatSpyPolicy)
 	if !ok {

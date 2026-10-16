@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // Diff is one field-level difference between the two engines a mirror check
@@ -56,7 +56,7 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "derivedMemoTail"}:      true,
 	{"rules.Engine", "derivedMemoAliasFrom"}: true,
 	{"rules.Engine", "derivedMemoAliasTo"}:   true,
-	// The rules/chars layer walk's per-call scratch (chars.Scratch: keyword
+	// The engine/rules/chars layer walk's per-call scratch (chars.Scratch: keyword
 	// and type buffers, re-entry depth, in-progress P/T frames, colour
 	// stash): rebuilt every call; Clone copies none.
 	{"rules.Engine", "charsWalk"}: true,
@@ -66,7 +66,7 @@ var excluded = map[excludedField]bool{
 	// since W5 E3 (trigmatch.Board), so a live engine holds the last read
 	// while its control clone holds none (round-9 paymirror, seed 8175).
 	{"rules.Engine", "charsScratch"}: true,
-	// combatBoard.Statics' per-mode conversion buffer (rules/combat_board.go):
+	// combatBoard.Statics' per-mode conversion buffer (engine/rules/combat_board.go):
 	// per-call scratch rewritten in full on every read; Clone copies none.
 	{"rules.Engine", "combatStatics"}:      true,
 	{"rules.Engine", "boardStaticsCache"}:  true,
@@ -217,15 +217,15 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "PaymentPlanCarriersEvents"}: true,
 	{"rules.Engine", "PaymentPlanCarriersValid"}:  true,
 	// The payment planner's kept and recycled query scopes and the
-	// incremental zone-entry index (rules/payment_plan_search.go,
-	// rules/payment_zone_entry.go): pure caches of reads of G and the log,
+	// incremental zone-entry index (engine/rules/payment_plan_search.go,
+	// engine/rules/payment_zone_entry.go): pure caches of reads of G and the log,
 	// validated on every use; Clone copies none.
 	{"rules.Engine", "PlanQueryKept"}:             true,
 	{"rules.Engine", "paymentPlanQueryKeptStamp"}: true,
 	{"rules.Engine", "PlanQueryFree"}:             true,
 	{"rules.Engine", "zoneEntry"}:                 true,
 	// The priority walk's pool-independent block record for the potential
-	// walk (rules/walk_block_reuse.go) and its served-block counter: a walk
+	// walk (engine/rules/walk_block_reuse.go) and its served-block counter: a walk
 	// cache keyed like priorityWalk, and a diagnostic; Clone copies none.
 	{"rules.Engine", "walkRec"}:           true,
 	{"rules.Engine", "walkReuse"}:         true,
@@ -241,7 +241,7 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "sbaIDBuf"}:     true,
 	{"rules.Engine", "graveCandBuf"}: true,
 	{"rules.Engine", "foreachBuf"}:   true,
-	// auraEntryCands (rules/aura_entry.go) is auraEnchantCandidates' reused
+	// auraEntryCands (engine/rules/aura_entry.go) is auraEnchantCandidates' reused
 	// candidate buffer -- its doc calls it "the scratch buffer the result
 	// reuses", the field is clone:"reset", and its contents after a walk
 	// are garbage. A route that ends at a different walk (or on a cloned
@@ -255,7 +255,7 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "ManaAbScratch"}:   true,
 	{"rules.Engine", "offStackSlots"}:   true,
 	{"rules.Engine", "offStackDepth"}:   true,
-	// The hypothetical-clone and read-scratch pool (rules/hypclone.go):
+	// The hypothetical-clone and read-scratch pool (engine/rules/hypclone.go):
 	// recycled Spares and per-call scratch (PotentialMana's among them),
 	// owner-guarded; Clone copies none.
 	{"rules.Engine", "hypSpares"}: true,
@@ -274,7 +274,7 @@ var excluded = map[excludedField]bool{
 	// game (ticket cli-20260927T103840Z-0fb8a354: the field was read by this
 	// differ in round 1 and every route pair mismatched on it).
 	{"rules.Engine", "legalActionWalks"}: true,
-	// Harness-only observers (rules/clone.go: Clone deliberately copies
+	// Harness-only observers (engine/rules/clone.go: Clone deliberately copies
 	// neither). cmd/cardfuzz installs ManaAbilityHook on its LIVE engine, so
 	// CheckLive's control -- the live run A against a clone replaying it --
 	// read "ManaAbilityHook <func> vs nil" on every planned cast (round-5

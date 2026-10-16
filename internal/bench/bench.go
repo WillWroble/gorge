@@ -1,5 +1,5 @@
 // Package bench is the policy-agnostic, head-to-head game matrix shared by
-// cmd/botbench and cmd/policytune. It owns the three pieces both callers
+// lab/cmd/botbench and cmd/policytune. It owns the three pieces both callers
 // need and neither should re-implement:
 //
 //   - the engine drive loop (PlayGame), including the two watchdogs and the
@@ -34,16 +34,18 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // SeatCtor builds the seat for one side of one game from that seat's seed.
@@ -120,7 +122,7 @@ func IsAbort(stallOn string) bool { return stallOn == "livelock" || stallOn == "
 // when the caller does not need the count.
 //
 // NeedBoard forces the botpolicy.Board to be built for a View-only seat (a
-// seat that is not a seat.BoardSeat) even when the decision came from the
+// seat that is not a heuristic.BoardSeat) even when the decision came from the
 // projected View -- the trace wants the board facts regardless. A BoardSeat
 // always receives a board and never needs this.
 //
@@ -133,7 +135,7 @@ func IsAbort(stallOn string) bool { return stallOn == "livelock" || stallOn == "
 // around a seat's search -- a feed that stopped (its capture or answer
 // record failed) or an honest root that refused on a live feed -- with the
 // game seed, the seat index, the decision and the reason. Diagnostic only
-// (cmd/draftrl -az-fallbacks); set once before any game starts, and the
+// (lab/cmd/draftrl -az-fallbacks); set once before any game starts, and the
 // consumer synchronises itself.
 var FallbackTrace func(seed uint64, seatIdx int, d *decision.Decision, reason string)
 
@@ -167,13 +169,13 @@ type Hooks struct {
 	// Outcome.Intents. With the kernel off it changes nothing.
 	SyncAnswer bool
 	// NewEngine builds the engine, in place of the default rules.New: the
-	// place a caller that needs a different constructor (cmd/draftsim's
+	// place a caller that needs a different constructor (lab/cmd/draftsim's
 	// rules.NewStartingPlayerChoice, which defers the pregame rounds and
 	// lets Setup pose the CR 103.1 ask) selects it. Nil (the zero value) is
 	// exactly rules.New, so every existing caller's shape is unchanged.
 	NewEngine func(rules.Config) *rules.Engine
 	// EnvSeats drives every seat implementing bots.EnvSeat the way the host
-	// does (host/botenv.go envData): the seat gets its own observation feed,
+	// does (server/host/botenv.go envData): the seat gets its own observation feed,
 	// and at a decision where WantsEnv(d) is true it answers DecideEnv with a
 	// bots.Env whose Search.Engine is the honest root searchseat.HonestRoot
 	// builds from that feed at bots.RootSeed(cfg.Seed^uint64(seat+1), d.Seq)
@@ -185,7 +187,7 @@ type Hooks struct {
 // PlayGame plays one game between the given per-seat seats to completion, or
 // ends it as a stall at whichever watchdog cap fires first. maxTurns and
 // maxIntents are the two harness props: 0 means no cap. It is the single
-// engine drive loop both cmd/botbench and cmd/policytune run; the optional
+// engine drive loop both lab/cmd/botbench and lab/cmd/policytune run; the optional
 // hooks let a statistics or trace collector observe without a second copy of
 // the loop.
 //
@@ -215,7 +217,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				return decision.Intent{}, false
 			}
 			b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
-			in, err := seats[d.Player].(seat.BoardSeat).DecideBoard(context.Background(), b, *d)
+			in, err := seats[d.Player].(heuristic.BoardSeat).DecideBoard(context.Background(), b, *d)
 			return in, err == nil
 		})
 	}
@@ -224,7 +226,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 	// rounds folds the board clock incrementally over the append-only log.
 	leanViews := make([]view.View, len(seats))
 	var rounds view.RoundFold
-	// Search-seat feeds (the seat.BoardSeat branch, mirrored one level up):
+	// Search-seat feeds (the heuristic.BoardSeat branch, mirrored one level up):
 	// an engine-aware seat needs the driver-maintained observation stream --
 	// searchprobe.Collector.Capture takes the *rules.Engine and the raw event
 	// burst since the previous capture and must run at EVERY decision of
@@ -237,7 +239,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 	// a Feed and never pays a capture: its loop is byte-identical to the
 	// pre-feed one, which is what the bot-vs-bot self-control run relies on.
 	// With Hooks.EnvSeats a bots.EnvSeat gets a feed the same way (the host's
-	// newMatchFeeds, host/botenv.go) so the Env branch below can build its
+	// newMatchFeeds, server/host/botenv.go) so the Env branch below can build its
 	// honest root; stopped marks a feed the driver has retired early -- a
 	// failed capture (matchFeeds.observe) or a RecordAnswer translation
 	// failure (matchFeeds.record) -- because its history would miss an answer,
@@ -311,7 +313,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 			// bursts, exactly the teacher's loop (which captures at every
 			// decision, not only the search seat's). A feed that fails a
 			// capture stops observing; the game plays on. This is the host's
-			// matchFeeds.observe (host/botenv.go): a stopped or non-live feed
+			// matchFeeds.observe (server/host/botenv.go): a stopped or non-live feed
 			// is skipped, and a capture failure stops only that one feed.
 			var fdFrame bool
 			if feeds != nil {
@@ -337,7 +339,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 			}
 			var envRecorded bool
 			if es, ok := seats[d.Player].(bots.EnvSeat); hooks.EnvSeats && ok && es.WantsEnv(d) {
-				// The Env branch, mirroring host/botenv.go envData line for
+				// The Env branch, mirroring server/host/botenv.go envData line for
 				// line: the deciding seat's own feed, the honest root
 				// searchseat.HonestRoot builds from it at this seat's
 				// per-seat seed and decision seq, the projected View and the
@@ -375,7 +377,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					// config, or a test seat) leaves them unbuilt here, the answer
 					// would not translate and the feed would stop for the
 					// rest of the game -- the hosted fix of 964bab2f7
-					// (host/match.go). A pure derived read: no event, no RNG.
+					// (server/host/match.go). A pure derived read: no event, no RNG.
 					if in.Payment != nil || in.Announce != nil {
 						e.EnsurePaymentActions()
 					}
@@ -444,7 +446,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					}
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideBoard(context.Background(), b, *d)
 				}
-			} else if s, ok := seats[d.Player].(seat.BoardSeat); ok {
+			} else if s, ok := seats[d.Player].(heuristic.BoardSeat); ok {
 				// Match the live host's reusable, seat-private Board path.
 				// Seats opting out (including legacy) still receive the full
 				// View.
@@ -543,7 +545,7 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 }
 
 // reanswerRefused is PlayGame's refusal ladder, the driver-side mirror of the
-// hosted match's BP-06 ladder (host/match.go): after the engine refuses a
+// hosted match's BP-06 ladder (server/host/match.go): after the engine refuses a
 // Submit the pending decision survives, so the seat is asked once more -- if
 // it opts in with bots.RefusalAnswerer -- and then the shared bots.Fallbacks
 // are tried in order. The first intent the engine accepts wins; nil means one
@@ -688,7 +690,7 @@ func FullPairs(names []string) []PairDef {
 // deck pairs "a:b,c:d". Deck names must exist in names. The lookup map is
 // only probed by key -- never ranged over in the report path -- so iteration
 // order cannot reach the output. The error strings are the shared vocabulary
-// cmd/botbench and cmd/policytune both report.
+// lab/cmd/botbench and lab/cmd/policytune both report.
 func ParsePairs(spec string, names []string) ([]PairDef, error) {
 	if spec == "all" {
 		return FullPairs(names), nil
@@ -836,7 +838,7 @@ func (p *GamePool) Close() {
 type PairPlayer func(pos int, seed uint64, g int, seats [2]seat.Seat) (Outcome, error)
 
 // Progress receives live progress lines (nil is silent). It must be safe to
-// call from several workers; cmd/botbench's progressWriter serialises with a
+// call from several workers; lab/cmd/botbench's progressWriter serialises with a
 // mutex. Progress never reaches a deterministic report.
 type Progress func(format string, a ...any)
 
@@ -1025,11 +1027,11 @@ func playOnePairWithPool(baseSeed uint64, pos, games int, pd PairDef, a, b SeatC
 }
 
 // allPlainBoardSeats reports whether every seat answers from the board
-// alone (a seat.BoardSeat that is not a search seat): the seats a
+// alone (a heuristic.BoardSeat that is not a search seat): the seats a
 // synchronous answerer can ask inline.
 func allPlainBoardSeats(seats []seat.Seat) bool {
 	for _, s := range seats {
-		if _, ok := s.(seat.BoardSeat); !ok {
+		if _, ok := s.(heuristic.BoardSeat); !ok {
 			return false
 		}
 		if _, ok := s.(searchseat.SearchSeat); ok {

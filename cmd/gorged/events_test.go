@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/protocol"
+	"github.com/adams-shaun/gorge/server/protocol"
 )
 
 // eventsPollEvery is the sleep between polls. It is a poll interval, not a

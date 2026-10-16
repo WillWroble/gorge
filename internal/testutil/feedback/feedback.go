@@ -35,11 +35,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // matchJSON is match.json's shape, mirroring host.FeedbackMatch's tags
@@ -297,7 +297,7 @@ func config(m matchJSON, reg *cards.Registry, tokens map[string]*cards.Card) (ru
 		cfg.StartChooser = &chooser
 	}
 	// The name-card universe is a match MODE, restored the way host's own
-	// matchForLog restores it (host/viewat.go): only a capture that records
+	// matchForLog restores it (server/host/viewat.go): only a capture that records
 	// the mode replays with one, so a pre-feature snapshot still takes the
 	// legacy no-ask path and reproduces unchanged. With the mode set, the
 	// universe itself is the live corpus (the same registry the decks were
@@ -475,7 +475,7 @@ func EngineAt(t testing.TB, dir string, n int) *rules.Engine {
 }
 
 // openCorpus finds and opens the repo's .cards corpus. The repo root is
-// resolved the way cards/boundary_test.go and testutil.CorpusRegistry do —
+// resolved the way engine/cards/boundary_test.go and testutil.CorpusRegistry do —
 // `git rev-parse --show-toplevel` with every inherited GIT_* variable
 // stripped (cards.GitEnv), because a hook or test harness exports GIT_DIR
 // as a relative path that does not resolve from this package's own

@@ -66,8 +66,8 @@ printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1
 git -C "$TARGET" -c user.email=t@t -c user.name=t commit -qm init >/dev/null 2>&1
 printf '{"name":"D","cards":["Lightning Bolt","Mountain"]}\n' >"$TARGET/internal/testutil/decks/d.json"
-: >"$TARGET/rules/acceptance_test.go"
-: >"$TARGET/rules/paramcensus_test.go"
+: >"$TARGET/engine/rules/acceptance_test.go"
+: >"$TARGET/engine/rules/paramcensus_test.go"
 # One healthy transition: no provider storm, no candidate to file.
 printf '{"ts":"%s","kind":"transition","evidence":{"to":"merged"}}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 	>"$TARGET/.ds4/orchestrator/journal.jsonl"

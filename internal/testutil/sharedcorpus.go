@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // SharedCorpusDir resolves the .cards corpus for code running inside the

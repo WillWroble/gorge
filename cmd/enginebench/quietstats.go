@@ -15,7 +15,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/rules"
 )
 
 // quietStatsFlag is set from -quietstats in main.

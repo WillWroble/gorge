@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 )
 
 // TestKrenkoBoardDefaultCapFiresMidResolution is the DEFAULT budget's storm

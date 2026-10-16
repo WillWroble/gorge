@@ -2,16 +2,16 @@
 # driver_replay_batch_smoke.sh -- scripts/driver_replay_batch.sh's selection and
 # decision logic against fakes: a temp git repo, fake issue files carrying the
 # park History line, and stub replay / scenario / diff / check commands. The real
-# validation/oracle/verdict-compare.py judges the verdict rows. No XMage, no Go
+# lab/oracle/validation/oracle/verdict-compare.py judges the verdict rows. No XMage, no Go
 # build, no network, no systemd.
 #
 #   scripts/tests/driver_replay_batch_smoke.sh
 #
 # Stub conventions (all inside the integration / probe tree the script runs in):
-#   tools/xmageoracle/*.regress  ids a branch makes regress, STABLY (bad output)
-#   tools/xmageoracle/*.flaky    ids a branch makes regress with a VARYING output
-#   tools/xmageoracle/*.badtest  the pre-check command fails while it exists
-#   compliance/oraclegen/*.genregress  ids whose GENERATED scenario is bad (the
+#   lab/oracle/xmageoracle/*.regress  ids a branch makes regress, STABLY (bad output)
+#   lab/oracle/xmageoracle/*.flaky    ids a branch makes regress with a VARYING output
+#   lab/oracle/xmageoracle/*.badtest  the pre-check command fails while it exists
+#   lab/oracle/compliance/oraclegen/*.genregress  ids whose GENERATED scenario is bad (the
 #                                generator changed; the driver is fine)
 #   $STUB_ALWAYS                 ids that regress whatever the branches are
 set -uo pipefail
@@ -58,29 +58,29 @@ python3 - "$rdir/S/scen.jsonl" <<'PY'
 import glob, json, os, sys
 rdir = os.path.dirname(os.path.dirname(sys.argv[1]))
 bad = set()
-for pat in ("tools/xmageoracle/*.regress", "tools/xmageoracle/*.flaky", "compliance/oraclegen/*.genregress"):
+for pat in ("lab/oracle/xmageoracle/*.regress", "lab/oracle/xmageoracle/*.flaky", "lab/oracle/compliance/oraclegen/*.genregress"):
     for f in glob.glob(pat):
         bad |= set(open(f).read().split("\n")) - {""}
-if os.path.exists("rules/oracle_run.go"):
-    bad |= set(open("rules/oracle_run.go").read().split("\n")) - {""}
+if os.path.exists("engine/rules/oracle_run.go"):
+    bad |= set(open("engine/rules/oracle_run.go").read().split("\n")) - {""}
 if os.environ.get("STUB_ALWAYS") and os.path.exists(os.environ["STUB_ALWAYS"]):
     bad |= set(open(os.environ["STUB_ALWAYS"]).read().split("\n")) - {""}
 with open(sys.argv[1], "w") as sc:
-    for f in glob.glob("compliance/verdicts/*.jsonl"):
+    for f in glob.glob("lab/oracle/compliance/verdicts/*.jsonl"):
         rows = [json.loads(l) for l in open(f) if l.strip()]
         for r in rows:
             gb = set()
-            for g in glob.glob("compliance/oraclegen/*.genregress"):
+            for g in glob.glob("lab/oracle/compliance/oraclegen/*.genregress"):
                 gb |= set(open(g).read().split("\n")) - {""}
-            if os.environ.get("STUB_RUNNER_SCEN") and os.path.exists("rules/oracle_run.go"):
-                gb |= set(open("rules/oracle_run.go").read().split("\n")) - {""}
+            if os.environ.get("STUB_RUNNER_SCEN") and os.path.exists("engine/rules/oracle_run.go"):
+                gb |= set(open("engine/rules/oracle_run.go").read().split("\n")) - {""}
             sc.write(json.dumps({"id": r["id"], "card": r["card"], "scen": "bad" if r["id"] in gb else "ok"}) + "\n")
             if r["id"] in bad:
                 r["status"] = "diverge"
                 # The compliance row's detail, formatted as oraclediff's runDiff
                 # does; diff.sh's verdict for the same snapshot carries the parts.
                 od = set()
-                for g in glob.glob("tools/xmageoracle/*.otherdet"):
+                for g in glob.glob("lab/oracle/xmageoracle/*.otherdet"):
                     od |= set(open(g).read().split("\n")) - {""}
                 r["detail"] = 'setup graveyard: gorge "[Wastes x5]", xmage "%s"' % ("[Island]" if r["id"] in od else "[]")
             elif r["card"] == "Gamma":
@@ -94,20 +94,20 @@ with open(sys.argv[1], "w") as sc:
             scenarios[row["id"]] = row.get("scen", "ok")
     os.makedirs(os.path.join(rdir, "S"), exist_ok=True)
     # The retained snapshot is the BATCH's driver output: a candidate that adds a
-    # tools/xmageoracle/*.regress driver change (every selected ticket has one)
+    # lab/oracle/xmageoracle/*.regress driver change (every selected ticket has one)
     # is present here, so its row's state is bad. The probe replay, without the
     # candidate, is what turns it good again.
     driver_bad = set()
-    for f in glob.glob("tools/xmageoracle/*.regress"):
+    for f in glob.glob("lab/oracle/xmageoracle/*.regress"):
         driver_bad |= set(open(f).read().split("\n")) - {""}
     with open(os.path.join(rdir, "S", "xmage.jsonl"), "w") as xm:
-        for f in glob.glob("compliance/verdicts/*.jsonl"):
+        for f in glob.glob("lab/oracle/compliance/verdicts/*.jsonl"):
             for line in open(f):
                 if line.strip():
                     r = json.loads(line)
                     state = "bad" if r["id"] in driver_bad else "good"
                     xv = "[]"
-                    for g in glob.glob("tools/xmageoracle/*.otherdet"):
+                    for g in glob.glob("lab/oracle/xmageoracle/*.otherdet"):
                         if r["id"] in set(open(g).read().split("\n")):
                             xv = "[Island]"
                     xm.write(json.dumps({"id": r["id"], "scen": scenarios.get(r["id"], "ok"), "state": state, "xv": xv, "ms": 1}) + "\n")
@@ -121,7 +121,7 @@ id=$(python3 -c 'import json,sys; print(json.loads(open(sys.argv[1]).readline())
 scenario=$(python3 -c 'import json,sys; print(json.loads(open(sys.argv[1]).readline()).get("scen", "ok"))' "$1")
 [ -z "${DRB_SCENARIO_TRACE:-}" ] || printf '%s %s %s\n' "$PWD" "$id" "$scenario" >>"$DRB_SCENARIO_TRACE"
 state=good
-d=tools/xmageoracle
+d=lab/oracle/xmageoracle
 for f in $d/*.regress; do [ -e "$f" ] && /usr/bin/grep -qxF -- "$id" "$f" && state=bad; done
 [ -n "${STUB_ALWAYS:-}" ] && [ -e "$STUB_ALWAYS" ] && /usr/bin/grep -qxF -- "$id" "$STUB_ALWAYS" && state=bad
 # Gorge's runner cannot change XMage's result for an unchanged scenario.
@@ -147,12 +147,12 @@ if os.environ.get("STUB_REQUIRE_CARDS") and (len(sys.argv) < 3 or sys.argv[2] !=
     print("explicit cards directory required", file=sys.stderr)
     sys.exit(1)
 gb = set()
-for g in glob.glob("compliance/oraclegen/*.genregress"):
+for g in glob.glob("lab/oracle/compliance/oraclegen/*.genregress"):
     gb |= set(open(g).read().split("\n")) - {""}
-if os.environ.get("STUB_RUNNER_SCEN") and os.path.exists("rules/oracle_run.go"):
-    gb |= set(open("rules/oracle_run.go").read().split("\n")) - {""}
+if os.environ.get("STUB_RUNNER_SCEN") and os.path.exists("engine/rules/oracle_run.go"):
+    gb |= set(open("engine/rules/oracle_run.go").read().split("\n")) - {""}
 with open(sys.argv[1], "w") as sc:
-    for f in glob.glob("compliance/verdicts/*.jsonl"):
+    for f in glob.glob("lab/oracle/compliance/verdicts/*.jsonl"):
         for l in open(f):
             if l.strip():
                 r = json.loads(l)
@@ -182,7 +182,7 @@ PY
 st=DIVERGE
 if [ "$scenario" = "$(echo "$xmage" | cut -d' ' -f1)" ] && [ "$(echo "$xmage" | cut -d' ' -f2)" = "good" ] && [ "$state" = "good" ]; then
   st=agree
-  for f in compliance/oraclegen/*.genregress rules/oracle_run.go; do
+  for f in lab/oracle/compliance/oraclegen/*.genregress engine/rules/oracle_run.go; do
     [ -e "$f" ] && /usr/bin/grep -qxF -- "$id" "$f" && st=DIVERGE
   done
 fi
@@ -215,8 +215,8 @@ EOF
 cat >"$S/check.sh" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = pre ] || exit 0
-ls tools/xmageoracle/*.badtest >/dev/null 2>&1 && { echo "stub test red"; exit 1; }
-ls tools/xmageoracle/*.redalone >/dev/null 2>&1 && { echo "stub branch red alone"; exit 1; }
+ls lab/oracle/xmageoracle/*.badtest >/dev/null 2>&1 && { echo "stub test red"; exit 1; }
+ls lab/oracle/xmageoracle/*.redalone >/dev/null 2>&1 && { echo "stub branch red alone"; exit 1; }
 [ -e tools/xmageoracle/t1.combo ] && [ -e tools/xmageoracle/t3.combo ] && { echo "stub combination red"; exit 1; }
 exit 0
 EOF
@@ -232,7 +232,7 @@ cat >"$S/ticket.sh" <<'EOF'
 # ticket.sh TITLE BRIEF: records one filed agentctl ticket.
 printf 'TICKET %s\n%s\n--END--\n' "$1" "$2" >>"$DRB_REPO/tickets.out"
 EOF
-# Fake `systemd-run` + `go` so the production `capped go run ./cmd/oraclediff gen|diff`
+# Fake `systemd-run` + `go` so the production `capped go run ./lab/cmd/oraclediff gen|diff`
 # branches run (DRB_GEN_CMD / DRB_DIFF_CMD unset): they forward to gen.sh / diff.sh.
 mkdir -p "$S/bin"
 cat >"$S/bin/systemd-run" <<'EOF'
@@ -242,8 +242,8 @@ exec "$@"
 EOF
 cat >"$S/bin/go" <<'EOF'
 #!/usr/bin/env bash
-# go run ./cmd/oraclediff gen|diff FLAGS...
-[ "$1 $2" = "run ./cmd/oraclediff" ] || { echo "unexpected go $*" >&2; exit 1; }
+# go run ./lab/cmd/oraclediff gen|diff FLAGS...
+[ "$1 $2" = "run ./lab/cmd/oraclediff" ] || { echo "unexpected go $*" >&2; exit 1; }
 sub=$3; shift 3
 declare -A f
 while [ $# -gt 1 ]; do f[${1#-}]=$2; shift 2; done
@@ -260,15 +260,15 @@ chmod +x "$S"/*.sh "$S"/bin/*
 # mkrepo <name>: a main checkout with three verdict rows (Gamma diverges on main).
 mkrepo() {
 	R=$TMP/$1
-	mkdir -p "$R/compliance/verdicts" "$R/compliance/triage" "$R/tools/xmageoracle" "$R/.ds4/issues"
+	mkdir -p "$R/lab/oracle/compliance/verdicts" "$R/lab/oracle/compliance/triage" "$R/lab/oracle/xmageoracle" "$R/.ds4/issues"
 	git -C "$R" init -q -b main
 	printf '.ds4\n.worktrees\n' >"$R/.git/info/exclude"
 	printf 'XMAGE_REF ?= abc123\n' >"$R/Makefile"
 	: >"$R/compliance/triage/.keep"
-	echo '{}' >"$R/compliance/ratchet.json"
+	echo '{}' >"$R/lab/oracle/compliance/ratchet.json"
 	echo base >"$R/tools/xmageoracle/base.txt"
 	# every path gen_key and GEN_PATHS name must exist, or a key test cannot see it
-	mkdir -p "$R/compliance/oraclegen" "$R/cmd/oraclediff" "$R/compliance/manifests"
+	mkdir -p "$R/lab/oracle/compliance/oraclegen" "$R/lab/cmd/oraclediff" "$R/lab/oracle/compliance/manifests"
 	echo base >"$R/compliance/oraclegen/base.txt"
 	echo base >"$R/cmd/oraclediff/base.txt"
 	echo base >"$R/compliance/manifests/base.txt"
@@ -276,7 +276,7 @@ mkrepo() {
 		echo '{"id":"Alpha/cast-resolve/v1","card":"Alpha","status":"agree"}'
 		echo '{"id":"Beta/cast-resolve/v1","card":"Beta","scenario_sha":"original-scenario-sha","status":"agree"}'
 		echo '{"id":"Gamma/cast-resolve/v1","card":"Gamma","status":"diverge"}'
-	} >"$R/compliance/verdicts/a.jsonl"
+	} >"$R/lab/oracle/compliance/verdicts/a.jsonl"
 	git -C "$R" add -A && git -C "$R" commit -q -m init
 	echo "2026-10-06 00:00:00 GREEN abcdef012 pushed (3s)" >"$R/.ds4/postmerge-batch.log"
 }
@@ -341,14 +341,14 @@ mkrequeue() {
 		echo '### go test (affected)'
 		case $mode in
 			note) echo "$STALE_NOTE" ;;
-			dry) echo 'FAIL compliance/gate: verdict is for an older scenario' ;;
+			dry) echo 'FAIL lab/oracle/compliance/gate: verdict is for an older scenario' ;;
 		esac
 	} >"$R/.ds4/issues/$id.md"
 	case $mode in
 		note) mkdir -p "$R/.ds4/orchestrator/gates/$id/r2"
-			printf 'ok compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
+			printf 'ok lab/oracle/compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
 		dry) mkdir -p "$R/.ds4/orchestrator/gates/$id/r2"
-			printf 'FAIL compliance/gate: verdict is for an older scenario\n' >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
+			printf 'FAIL lab/oracle/compliance/gate: verdict is for an older scenario\n' >"$R/.ds4/orchestrator/gates/$id/r2/go-test-affected.log" ;;
 	esac
 }
 # runpass: one pass of the script against $R.
@@ -357,7 +357,7 @@ runpass() {
 		cd "$R" || exit 1
 		export DRB_REPO=$R DRB_ONCE=${DRB_ONCE:-1} DRB_POLL=0 DRB_RUNS=$TMP/runs-$(basename "$R") DRB_LOCKRUN=env \
 			DRB_WORKTREE_CMD=$S/worktree.sh DRB_REPLAY_CMD=$S/replay.sh \
-			DRB_COMPARE_CMD="python3 $ROOT/validation/oracle/verdict-compare.py" \
+			DRB_COMPARE_CMD="python3 $ROOT/lab/oracle/validation/oracle/verdict-compare.py" \
 			DRB_SCENARIO_CMD=$S/scen.sh DRB_GEN_CMD=$S/gen.sh DRB_DIFF_CMD=$S/diff.sh DRB_CHECK_CMD=$S/check.sh \
 			DRB_RATCHET_CMD=true DRB_ISSUE_TOOL=$S/issue.sh DRB_ISSUES=$R/.ds4/issues DRB_TICKET_TOOL=$S/ticket.sh \
 			STUB_ALWAYS=$R/always.txt
@@ -418,7 +418,7 @@ check "A main lacks the held ticket's file" $?
 check "A the conflicting ticket stays parked with a HELD line" $?
 [ -d "$R/.worktrees/t2" ]
 check "A the conflicting ticket's worktree is kept" $?
-git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
+git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
 check "A the batch's improved verdict row landed (ratchet commit)" $?
 git -C "$R" worktree list | /usr/bin/grep -q driver-batch && r=1 || r=0
 check "A the integration worktree is removed" $r
@@ -434,7 +434,7 @@ hasnt "$L" 'CULPRIT'
 check "B no CULPRIT for a flaky row" $?
 has "$R/.ds4/driver-flakes.log" 'Alpha'
 check "B driver-flakes.log names the card" $?
-git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '{"id":"Alpha/cast-resolve/v1","card":"Alpha","status":"agree"}'
+git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '{"id":"Alpha/cast-resolve/v1","card":"Alpha","status":"agree"}'
 check "B main's verdict row is kept for the flaky row" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1 t3$' "$L"
 check "B both tickets landed" $?
@@ -589,7 +589,7 @@ for row in rows:
 with open(p,"w") as f:
     f.write("\n".join(json.dumps(row) for row in rows)+"\n")
 PY
-git -C "$R/.worktrees/t3" add compliance/verdicts/a.jsonl tools/xmageoracle/t3.flaky && git -C "$R/.worktrees/t3" commit -q -m "change scenario hash"
+git -C "$R/.worktrees/t3" add lab/oracle/compliance/verdicts/a.jsonl tools/xmageoracle/t3.flaky && git -C "$R/.worktrees/t3" commit -q -m "change scenario hash"
 runpass
 has "$L" 'STABLE Beta/cast-resolve/v1 (' && has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
 check "H1 variable output with a changed scenario is promoted to stable attribution" $?
@@ -600,14 +600,14 @@ check "H1 stale main verdict is not kept for the changed scenario" $?
 mkrepo H
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
-driver_sha=$(git -C "$R" log -1 --format=%H main -- tools/xmageoracle | cut -c1-12)
+driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 driver-batch-20261006T100503Z Beta Beta/cast-resolve/v1 driver=$driver_sha varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
 has "$L" 'FLAKY Beta/cast-resolve/v1 (listed in driver-flakes.log)'
 check "H a stable-looking row listed in the flakes log is FLAKY without re-testing" $?
 hasnt "$L" 'CULPRIT'
 check "H a known-flaky row is never named CULPRIT" $?
-git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"id":"Beta/cast-resolve/v1".*"status":"agree"'
+git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"id":"Beta/cast-resolve/v1".*"status":"agree"'
 check "H main's verdict row is kept for the known flake" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1 t3$' "$L" && [ "$(status_of t3)" = merged ]
 check "H the branch that only looked guilty lands with the rest" $?
@@ -616,7 +616,7 @@ check "H the branch that only looked guilty lands with the rest" $?
 mkrepo H2
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
-driver_sha=$(git -C "$R" log -1 --format=%H main -- tools/xmageoracle | cut -c1-12)
+driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=000000000000 varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
 has "$L" 'CULPRIT t3 row Beta/cast-resolve/v1'
@@ -632,7 +632,7 @@ mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
 printf 'Beta/cast-resolve/v1\n' >"$R/.worktrees/t3/tools/xmageoracle/x.flaky"
 git -C "$R/.worktrees/t3" add tools/xmageoracle/x.flaky && git -C "$R/.worktrees/t3" commit -q -m 'make row vary'
-driver_sha=$(git -C "$R" log -1 --format=%H main -- tools/xmageoracle | cut -c1-12)
+driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=000000000000 varies: /state" >"$R/.ds4/driver-flakes.log"
 runpass
 has "$L" 'FLAKY Beta/cast-resolve/v1 ('
@@ -646,7 +646,7 @@ check "H3 a varying row is never a CULPRIT" $?
 mkrepo H4
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/x.regress 'Beta/cast-resolve/v1'
-driver_sha=$(git -C "$R" log -1 --format=%H main -- tools/xmageoracle | cut -c1-12)
+driver_sha=$(git -C "$R" log -1 --format=%H main -- lab/oracle/xmageoracle | cut -c1-12)
 echo "2026-10-06 10:05:03 old-batch Beta Beta/cast-resolve/v1 driver=$driver_sha varies: /state" >"$R/.ds4/driver-flakes.log"
 mkdir -p "$TMP/loopbin"
 cat >"$TMP/loopbin/sleep" <<'EOF'
@@ -687,7 +687,7 @@ chmod +x "$TMP/loopbin/sleep"
   cd "$R" || exit 1
   export DRB_REPO=$R DRB_ONCE=0 DRB_POLL=0 DRB_RUNS=$TMP/runs-H4 DRB_LOCKRUN=env \
     DRB_WORKTREE_CMD=$S/worktree.sh DRB_REPLAY_CMD=$S/replay.sh \
-    DRB_COMPARE_CMD="python3 $ROOT/validation/oracle/verdict-compare.py" \
+    DRB_COMPARE_CMD="python3 $ROOT/lab/oracle/validation/oracle/verdict-compare.py" \
     DRB_SCENARIO_CMD=$S/scen.sh DRB_GEN_CMD=$S/gen.sh DRB_DIFF_CMD=$S/diff.sh DRB_CHECK_CMD=$S/check.sh \
     DRB_RATCHET_CMD=true DRB_ISSUE_TOOL=$S/issue.sh DRB_ISSUES=$R/.ds4/issues DRB_TICKET_TOOL=$S/ticket.sh \
     STUB_ALWAYS=$R/always.txt PATH=$TMP/loopbin:$PATH
@@ -727,7 +727,7 @@ check "I the others land" $?
 # ---- I2: a rules-side runner change with identical scenarios and XMage output
 mkrepo I2
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z rules/oracle_run.go 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
 mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
 export DRB_DIFF_TRACE=$R/diff.trace
 runpass
@@ -750,7 +750,7 @@ check "I2 the non-culprit branches land" $?
 # ---- I3: a runner change that alters the GENERATED scenario (generation runs the engine) ----
 mkrepo I3
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z rules/oracle_run.go 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
 mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
 export STUB_RUNNER_SCEN=1 DRB_SCENARIO_TRACE=$R/scenario.trace
 runpass
@@ -764,10 +764,10 @@ check "I3 the regenerated scenario is replayed on the probe" $?
 [ "$(status_of t3)" = human_needed ] && [ "$(status_of t1)" = merged ] && [ "$(status_of t8)" = merged ]
 check "I3 only the runner culprit stays parked; innocent branches land" $?
 
-# ---- I4: the production `go run ./cmd/oraclediff gen|diff` branches (no DRB_GEN_CMD/DRB_DIFF_CMD) ----
+# ---- I4: the production `go run ./lab/cmd/oraclediff gen|diff` branches (no DRB_GEN_CMD/DRB_DIFF_CMD) ----
 mkrepo I4
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
-mkticket t3 2026-10-06T04:00:00Z rules/oracle_run.go 'Beta/cast-resolve/v1'
+mkticket t3 2026-10-06T04:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1'
 mkticket t8 2026-10-06T05:00:00Z tools/xmageoracle/t8.txt eight
 mkdir -p "$R/.cards"
 export STUB_PROD_GO=1 STUB_REQUIRE_CARDS=1 STUB_RUNNER_SCEN=1 DRB_GO_TRACE=$R/go.trace
@@ -793,7 +793,7 @@ has "$L" 'UNATTRIBUTED row Beta/cast-resolve/v1' && hasnt "$L" 'CULPRIT' && hasn
 check "I5 failed regeneration cannot clear a row" $?
 
 # ---- X: a candidate that changes BOTH the driver and gorge Go is attributed -------
-# Every selected ticket changes tools/xmageoracle/ (that is the park gate), so a
+# Every selected ticket changes lab/oracle/xmageoracle/ (that is the park gate), so a
 # ticket that ALSO changes a non-driver .go file is the mixed case: removing it
 # for attribution must remove its DRIVER half too, not just re-run the
 # generator, or the row can never clear and every ticket is held.
@@ -824,8 +824,8 @@ mkdrift() {
 	drift_base=$(git -C "$R" rev-parse main)
 }
 gencommit() { # gencommit <file> <content>: a generator commit on main
-	mkdir -p "$R/compliance/oraclegen"
-	printf '%s\n' "$2" >"$R/compliance/oraclegen/$1"
+	mkdir -p "$R/lab/oracle/compliance/oraclegen"
+	printf '%s\n' "$2" >"$R/lab/oracle/compliance/oraclegen/$1"
 	git -C "$R" add -A && git -C "$R" commit -q -m "feat(oraclegen): $1"
 }
 mkdrift J
@@ -837,7 +837,7 @@ hasnt "$L" 'MERGED-INTO-BATCH' && hasnt "$L" ' START '
 check "J the DRIFT pass merges no branch" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} drift-refresh$' "$L" && [ "$(git -C "$R" rev-parse --short=9 main)" = "$(/usr/bin/grep -o 'LANDED [0-9a-f]*' "$L" | awk '{print $2}')" ]
 check "J the refreshed verdicts land on main" $?
-git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
+git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
 check "J main's verdict row is refreshed" $?
 [ "$(cat "$R/.ds4/driver-replay-last-main")" = "$(git -C "$R" rev-parse main)" ] && [ "$(cat "$R/.ds4/driver-replay-last-main")" != "$drift_base" ]
 check "J the new last-main is recorded (main's head after the landing)" $?
@@ -884,7 +884,7 @@ check "K a batch landing records last-main too" $?
 
 # ---- L: a stable DRIFT regression is logged with its commits and ticketed per class ----
 mkrepo L
-echo '{"id":"Delta/trigger#0.0/v1","card":"Delta","status":"agree"}' >>"$R/compliance/verdicts/a.jsonl"
+echo '{"id":"Delta/trigger#0.0/v1","card":"Delta","status":"agree"}' >>"$R/lab/oracle/compliance/verdicts/a.jsonl"
 git -C "$R" add -A && git -C "$R" commit -q -m "a trigger row"
 git -C "$R" rev-parse main >"$R/.ds4/driver-replay-last-main"
 printf 'Alpha/cast-resolve/v1\nBeta/cast-resolve/v1\nDelta/trigger#0.0/v1\n' >"$R/x.list"
@@ -895,7 +895,7 @@ has "$L" "DRIFT Beta/cast-resolve/v1 diverge" && has "$L" "DRIFT Delta/trigger#0
 check "L each stable regressed row is logged as DRIFT <row> <detail> commits=<sha>" $?
 hasnt "$L" 'FLAKY' && hasnt "$L" 'CULPRIT' && hasnt "$L" 'UNATTRIBUTED'
 check "L a DRIFT row is neither flaky nor attributed to a branch" $?
-/usr/bin/grep -q 'LANDED' "$L" && git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Beta".*"status": "diverge"'
+/usr/bin/grep -q 'LANDED' "$L" && git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Beta".*"status": "diverge"'
 check "L the refreshed (regressed) verdicts land so main matches its generator" $?
 [ "$(/usr/bin/grep -c '^TICKET ' "$R/tickets.out")" = 2 ]
 check "L one ticket per regressed template class (two rows of one class: one ticket)" $?
@@ -912,7 +912,7 @@ mkrepo M
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
 mkticket t3 2026-10-06T04:00:00Z tools/xmageoracle/t3.txt three
 printf 'Beta/cast-resolve/v1\n' >"$R/always.txt"
-key=$(git -C "$R" ls-tree -d main -- tools/xmageoracle compliance/oraclegen cmd/oraclediff compliance/manifests | sha1sum | cut -c1-12)
+key=$(git -C "$R" ls-tree -d main -- lab/oracle/xmageoracle lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests | sha1sum | cut -c1-12)
 echo "2026-10-06 09:00:00 $key Beta/cast-resolve/v1 | diverge" >"$R/.ds4/driver-drift.log"
 runpass
 has "$L" 'DRIFT-KNOWN Beta/cast-resolve/v1'
@@ -955,9 +955,9 @@ has "$L" 'DRIFT-MAIN Beta/cast-resolve/v1 diverge' && hasnt "$L" 'UNATTRIBUTED' 
 check "P a row diverging the same way on main alone is DRIFT-MAIN, not UNATTRIBUTED" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1$' "$L" && [ "$(status_of t1)" = merged ] && hasnt "$R/.ds4/issues/t1.md" 'HELD'
 check "P the ticket lands" $?
-git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Beta".*"status": "diverge"'
+git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Beta".*"status": "diverge"'
 check "P the batch's refreshed row lands for the drift row" $?
-key=$(git -C "$R" ls-tree -d "$(git -C "$R" rev-parse main^1)" -- tools/xmageoracle compliance/oraclegen cmd/oraclediff compliance/manifests | sha1sum | cut -c1-12)
+key=$(git -C "$R" ls-tree -d "$(git -C "$R" rev-parse main^1)" -- lab/oracle/xmageoracle lab/oracle/compliance/oraclegen lab/cmd/oraclediff lab/oracle/compliance/manifests | sha1sum | cut -c1-12)
 /usr/bin/grep -qE " $key Beta/cast-resolve/v1 \| diverge" "$R/.ds4/driver-drift.log"
 check "P a drift line is written under the replayed main's key" $?
 [ "$(/usr/bin/grep -c '^TICKET XMage drift: cast-resolve' "$R/tickets.out" 2>/dev/null)" = 1 ] && has "$R/tickets.out" 'Beta/cast-resolve/v1'
@@ -967,7 +967,7 @@ check "P one ticket: the without-candidate replay is reused as main alone (one p
 [ "$(cat "$R/.ds4/driver-replay-last-main")" = "$(git -C "$R" rev-parse main)" ]
 check "P the batch landing records last-main" $?
 
-# ---- P3: case P on the production `go run ./cmd/oraclediff diff` branch: the main-alone
+# ---- P3: case P on the production `go run ./lab/cmd/oraclediff diff` branch: the main-alone
 # verdict's detail comes from the -write compliance row, not the detail-less -out file ----
 mkrepo P3
 mkticket t1 2026-10-06T03:00:00Z tools/xmageoracle/t1.txt one
@@ -1025,41 +1025,41 @@ check "O last-main stays at the replayed main M0" $?
 # ---- Q: tickets parked past requeue_max on gate_affected's stale-only exit 76 ----
 STALE_NOTE='gate_affected: heavy certification failure is stale-only (a moved scenario sha; see the GORGE-CERT-RESULT lines) -- a host XMage replay clears it, not a fix round. Requeuing (exit 76).'
 mkrepo Q1
-mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 note
+mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'gorge: fix wing' 76 note
 main0=$(git -C "$R" rev-parse main)
 runpass
 has "$L" 'SELECT-STALE76 t1'
 check "Q1 a stale-only requeue-parked ticket is selected" $?
 /usr/bin/grep -qE 'LANDED [0-9a-f]{9} t1$' "$L" && [ "$(status_of t1)" = merged ] && [ "$(git -C "$R" rev-parse main)" != "$main0" ]
 check "Q1 the stale-only ticket lands" $?
-git -C "$R" cat-file -e main:rules/oracle_run.go && git -C "$R" show main:compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
+git -C "$R" cat-file -e main:engine/rules/oracle_run.go && git -C "$R" show main:lab/oracle/compliance/verdicts/a.jsonl | /usr/bin/grep -q '"card": "Gamma", "status": "agree"'
 check "Q1 the landing carries the branch and the replay-refreshed verdict rows" $?
 [ ! -e "$R/.worktrees/t1" ]
 check "Q1 the ticket's worktree is removed" $?
 
 mkrepo Q2
-mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 nolog
+mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'gorge: fix wing' 76 nolog
 runpass
 hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH' && [ "$(status_of t1)" = human_needed ]
 check "Q2 a stale-only park with NO gate log is not selected" $?
 
 mkrepo Q3
-mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 75 dry
+mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'gorge: fix wing' 75 dry
 runpass
 hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH' && [ "$(status_of t1)" = human_needed ]
 check "Q3 a requeue park on exit 75 (dry log) is not selected" $?
 
 mkrepo Q4
-mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'gorge: fix wing' 76 dry
+mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'gorge: fix wing' 76 dry
 mkdir -p "$R/.ds4/orchestrator/gates/t1/r1"
-printf 'ok compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/t1/r1/go-test-affected.log"
+printf 'ok lab/oracle/compliance/gate ok\n%s\n' "$STALE_NOTE" >"$R/.ds4/orchestrator/gates/t1/r1/go-test-affected.log"
 touch -d '2026-10-14 10:00' "$R/.ds4/orchestrator/gates/t1/r1/go-test-affected.log"
 runpass
 hasnt "$L" 'SELECT-STALE76' && hasnt "$L" 'MERGED-INTO-BATCH'
 check "Q4 the LAST gate log rules: a newer dry log overrides an older stale-only one" $?
 
 mkrepo Q5
-mkrequeue t1 2026-10-14T20:00:00Z rules/oracle_run.go 'Beta/cast-resolve/v1' 76 note
+mkrequeue t1 2026-10-14T20:00:00Z engine/rules/oracle_run.go 'Beta/cast-resolve/v1' 76 note
 mkrequeue t8 2026-10-14T21:00:00Z tools/xmageoracle/t8.txt eight 76 note
 runpass
 has "$L" 'CULPRIT t1 row Beta/cast-resolve/v1'
@@ -1070,7 +1070,7 @@ check "Q5 the regressing stale-only ticket stays parked with a HELD line" $?
 check "Q5 the innocent stale-only ticket lands" $?
 
 mkrepo Q6
-mkrequeue t1 2026-10-14T19:00:00Z rules/oracle_run.go 'gorge: fix thing' 76 note
+mkrequeue t1 2026-10-14T19:00:00Z engine/rules/oracle_run.go 'gorge: fix thing' 76 note
 mkticket t2 2026-10-14T20:00:00Z tools/xmageoracle/t2.txt two
 runpass
 [ "$(/usr/bin/grep -c 'MERGED-INTO-BATCH' "$L")" = 2 ] && has "$L" 'SELECT-STALE76 t1' &&

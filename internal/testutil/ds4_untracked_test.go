@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // TestNothingUnderDS4IsTracked: .ds4/ is the pipeline's per-worktree scratch

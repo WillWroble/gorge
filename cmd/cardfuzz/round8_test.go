@@ -18,7 +18,7 @@ import (
 // ability removed Defender, and the fresh replay engine did not, because the
 // Derived memo stored the empty post-removal keyword list as nil -- which
 // SpecContext reads as "unbound, use the printed face" -- in an entry that
-// had never held a keyword (rules/derivedmemo.go memoOwned; the rules-side
+// had never held a keyword (engine/rules/derivedmemo.go memoOwned; the rules-side
 // pin is TestDerivedMemoKeepsEmptyKeywordListBound).
 //
 // Seed 20814263898706950 (all-r7) diverged at 011316363 but no longer

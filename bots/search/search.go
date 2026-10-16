@@ -16,12 +16,14 @@ package search
 import (
 	"context"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Policy is the registry key.
@@ -52,7 +54,7 @@ func init() {
 }
 
 // Hosted is the hosted config (spec §4.3): exactly the measured teacher's
-// knobs — searchseat.Defaults(), which are cmd/searchteacher's flag defaults
+// knobs — searchseat.Defaults(), which are lab/cmd/searchteacher's flag defaults
 // and the config the +3.3pp measurement was taken with — with Parallelism
 // left 0 (sequential). The caller that builds a seat sets Parallelism; it
 // changes latency only, never an answer (searchseat.Options.Parallelism).
@@ -81,8 +83,8 @@ type hostedSeat struct {
 }
 
 var (
-	_ bots.EnvSeat   = (*hostedSeat)(nil)
-	_ seat.BoardSeat = (*hostedSeat)(nil)
+	_ bots.EnvSeat        = (*hostedSeat)(nil)
+	_ heuristic.BoardSeat = (*hostedSeat)(nil)
 	// The bench driver's SearchSeat contract (BP-16): internal/bench.PlayGame
 	// builds an observation feed for a SearchSeat and hands the decision's Env
 	// to it — the live engine with -hosted-root off (the bench keeps the real
@@ -132,7 +134,7 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 // env.Search to the wrapped DecideSearch when the honest root built AND the
 // actor's feed is live; otherwise play the wrapped bot on env.Board — exactly
 // the bench's fallback. A nil feed is the host's signal for a stopped feed or
-// a table that built none (host/botenv.go envData), the same state
+// a table that built none (server/host/botenv.go envData), the same state
 // Feed.Live() == false reports, and DecideSearch itself re-checks both.
 func (s *hostedSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
 	if env.Search.Engine != nil && env.Search.Feed != nil && env.Search.Feed.Live() {

@@ -18,7 +18,7 @@ if DZG_SRC not in sys.path:
 import numpy as np  # noqa: E402
 
 # ---- fixed formulas (written down before any result; see the report) -------------------------
-# Dense layout (internal/policynet/policynet.go): seat block b starts at 28 + 10*b; block 0 is the
+# Dense layout (bots/policynet/policynet.go): seat block b starts at 28 + 10*b; block 0 is the
 # VIEWER's. Offsets inside a block: 0 life, 6 total battlefield power (zoneTotals' pw).
 COL_LIFE0, COL_POW0, COL_LIFE1, COL_POW1 = 28, 34, 38, 44
 SIGNAL_SCALE = 2.0      # S = sigmoid(SIGNAL_SCALE * raw), raw = (own-opp life)/20 + (own-opp power)/10

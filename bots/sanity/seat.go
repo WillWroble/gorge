@@ -3,11 +3,13 @@ package sanity
 import (
 	"context"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Mulligan is the London-mulligan rule the guard answers keep/mulligan and
@@ -45,7 +47,7 @@ func answerMulligan(b func() botpolicy.Board, d *decision.Decision) (decision.In
 // (Mulligan).
 func Wrap(inner seat.Seat) seat.Seat {
 	base := guarded{inner: inner}
-	if _, ok := inner.(seat.BoardSeat); ok {
+	if _, ok := inner.(heuristic.BoardSeat); ok {
 		return guardedBoard{base}
 	}
 	if es, ok := inner.(bots.EnvSeat); ok {
@@ -71,7 +73,7 @@ func (s guarded) WantsPaymentActions() bool {
 }
 
 func (s guarded) Decide(ctx context.Context, v view.View, d decision.Decision) (decision.Intent, error) {
-	if in, ok := answerMulligan(func() botpolicy.Board { return seat.BoardFromView(v) }, &d); ok {
+	if in, ok := answerMulligan(func() botpolicy.Board { return heuristic.BoardFromView(v) }, &d); ok {
 		return in, nil
 	}
 	f := Filter(d)
@@ -89,7 +91,7 @@ func (s guardedBoard) DecideBoard(ctx context.Context, b botpolicy.Board, d deci
 		return in, nil
 	}
 	f := Filter(d)
-	in, err := s.inner.(seat.BoardSeat).DecideBoard(ctx, b, f.D)
+	in, err := s.inner.(heuristic.BoardSeat).DecideBoard(ctx, b, f.D)
 	if err != nil {
 		return in, err
 	}
@@ -105,7 +107,7 @@ type guardedEnv struct {
 func (s guardedEnv) WantsEnv(d *decision.Decision) bool { return s.es.WantsEnv(d) }
 
 func (s guardedEnv) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
-	if in, ok := answerMulligan(func() botpolicy.Board { return seat.BoardFromView(env.View) }, &d); ok {
+	if in, ok := answerMulligan(func() botpolicy.Board { return heuristic.BoardFromView(env.View) }, &d); ok {
 		return in, nil
 	}
 	f := Filter(d)

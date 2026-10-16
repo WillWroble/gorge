@@ -69,7 +69,7 @@ exec env "$@"
 EOS
 cat >"$TMP/bin/go" <<'EOS'
 #!/usr/bin/env bash
-echo 'ok  github.com/adams-shaun/gorge/rules  0.001s'
+echo 'ok  github.com/adams-shaun/gorge/engine/rules  0.001s'
 EOS
 chmod +x "$TMP/bin/systemd-run" "$TMP/bin/go"
 PATH="$TMP/bin:/usr/bin:/bin" LEDGER_LOCK=$TMP/mode.lock LEDGER_LANE_WAIT=1 \

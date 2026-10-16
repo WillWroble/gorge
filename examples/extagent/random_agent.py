@@ -6,14 +6,14 @@ protocol lines to stdout and logs diagnostics to stderr.
 
 The wire protocol of record is section 4 of
 docs/superpowers/plans/2026-10-14-draft-events-e5d-plan.md. This is the
-Python twin of draftlab/extern/refagent (it need not agree with it bit for
+Python twin of lab/draft/draftlab/extern/refagent (it need not agree with it bit for
 bit): a training team's starting point, not a good player.
 
 Run it under gorge's lab with:
 
-    go run ./cmd/labdemo -player ext:exec:examples/extagent/random_agent.py -seed 1
+    go run ./lab/cmd/labdemo -player ext:exec:examples/extagent/random_agent.py -seed 1
 
-or serve it yourself over stdio, or (with cmd/extagent) on a Unix socket.
+or serve it yourself over stdio, or (with lab/cmd/extagent) on a Unix socket.
 """
 
 import json

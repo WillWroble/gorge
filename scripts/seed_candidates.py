@@ -60,8 +60,8 @@ COST_GATE_TRIM = 2.0
 MERGE_FIX_RATE_ALARM = 0.25
 GATE_WALL_ALARM_S = 240.0
 CONTEXT_ALARM_BYTES = 80_000
-# A steward seam ticket is minted for the longest function in rules/ +
-# effects/ (cmd/codeshape) once it is at least this long. This replaced
+# A steward seam ticket is minted for the longest function in engine/rules/ +
+# engine/effects/ (cmd/codeshape) once it is at least this long. This replaced
 # BIG_FILE_ALARM_LINES (a 4000-line FILE), whose split tickets rewarded
 # size-only splits (rules-engine refactor spec, W0).
 LONG_FUNC_ALARM_LINES = 500
@@ -415,7 +415,7 @@ parked, and every decision is one line in the commit message.
     # section 11.3 C4): the XMage oracle now covers whole sets, and its
     # findings are grouped into class tickets -- one per unsupported primitive
     # (with the primitives only its cards carry), gorge_wrong ruling or shape,
-    # and untriaged shape cluster -- by `go run ./cmd/oraclediff tickets -out
+    # and untriaged shape cluster -- by `go run ./lab/cmd/oraclediff tickets -out
     # <state>/compliance-tickets`. Each candidate reuses the generator's stable
     # id and complete brief, so the loop and an operator filing file.sh by hand
     # name the same ticket.
@@ -574,10 +574,10 @@ what moved where), and `go test ./internal/testutil` is green.
                 f"steward-seam-{slug(path + '-' + name)}",
                 "steward",
                 f"{name} is {lines} lines — move a cohesive concern behind a named seam",
-                f"""# {name} ({path}:{line}) is the longest function in rules/ + effects/
+                f"""# {name} ({path}:{line}) is the longest function in engine/rules/ + engine/effects/
 
 Measured by `go run ./cmd/codeshape -table`: `{name}` spans {lines} lines, and
-{int(shape.value)} non-test functions in rules/ and effects/ are over 300 lines.
+{int(shape.value)} non-test functions in engine/rules/ and engine/effects/ are over 300 lines.
 A function this long is a concern with no seam: every ticket that changes one
 case of it edits inside the same body, which is where sibling-path misses and
 merge conflicts come from. The next longest:
@@ -607,7 +607,7 @@ change, no renamed exported symbols.
 - `go run ./cmd/codeshape` reports `funcs_over_300` no higher than {int(shape.value)}
   and no other ratchet higher than above (`go test ./internal/codeshape` green,
   with any constant the change lowered lowered in the same commit).
-- `go test ./rules -run TestHeads -v` prints the pinned chain heads unchanged.
+- `go test ./engine/rules -run TestHeads -v` prints the pinned chain heads unchanged.
 - No new size-only file names: `go test ./internal/archtest -run
   TestNoNewSizeOnlyFileNames` is green.
 - `go build ./...` succeeds; the touched packages' tests pass focused and
@@ -639,7 +639,7 @@ is to buy strength by making the engine cheaper, not by spending more of it.
 
 Profile the grind and remove the top hotspot:
 
-    go build -o /tmp/botbench ./cmd/botbench
+    go build -o /tmp/botbench ./lab/cmd/botbench
     scripts/heavy.sh probe --name prof -- /tmp/botbench -grind mono-red-prowess \\
         -grind-seconds 30 -cpuprofile /tmp/cpu.prof
     go tool pprof -top /tmp/cpu.prof | head -30
@@ -654,7 +654,7 @@ optimisation.
 
 ## Done means
 
-`go test ./rules -run TestHeads -v` prints the pinned chain heads UNCHANGED
+`go test ./engine/rules -run TestHeads -v` prints the pinned chain heads UNCHANGED
 (byte-identical replay proves no answer moved), a benchstat shows the hotspot's
 improvement, and `scripts/reward-probe.sh eff` records a lower `ms_per_game`.
 """,
@@ -758,7 +758,7 @@ def selftest() -> int:
                         ("steward", "gate_wall_s", 300.0, "median"),
                         ("steward", "agent_context_bytes", 120000, "AGENTS.md=..."),
                         ("steward", "funcs_over_300", 54,
-                         "effects/misc.go:219 effEffect(1200); rules/clone.go:103 (*Engine).cloneWith(970)"
+                         "engine/effects/misc.go:219 effEffect(1200); engine/rules/clone.go:103 (*Engine).cloneWith(970)"
                          " | engine_methods=2162 host_methods=96"),
                         ("eff", "ms_per_game", 8.04, "grind"),
                         ("obs", "observable_facts_exposed", 0, "checklist.json absent — no denominator"),
@@ -774,7 +774,7 @@ def selftest() -> int:
         ct = state / "compliance-tickets"
         ct.mkdir()
         (ct / "compliance-prim-kw-bargain.md").write_text(
-            "# Implement kw:Bargain\n\n## Done means\n\n`go test ./rules -run TestClassKwBargainCensus`\n"
+            "# Implement kw:Bargain\n\n## Done means\n\n`go test ./engine/rules -run TestClassKwBargainCensus`\n"
         )
         (ct / "index.jsonl").write_text(
             json.dumps({"id": "compliance-prim-kw-bargain", "class": "primitive", "title": "Implement kw:Bargain",

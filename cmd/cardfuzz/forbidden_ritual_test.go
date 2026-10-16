@@ -17,7 +17,7 @@ import (
 // Ctx.Modes; the next iteration's forced sacrifice did not ask, so the same
 // Ctx reached the per-player GenericChoice, which took the stale list as its
 // previous chooser's answer and read chooser -1. The rules-level pin is
-// rules/resume_modes_test.go; this keeps the original game in the suite.
+// engine/rules/resume_modes_test.go; this keeps the original game in the suite.
 func TestForbiddenRitualRepeatYesFinding(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	raw, err := os.ReadFile("testdata/forbidden_ritual.jsonl")

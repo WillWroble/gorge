@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/replay"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/replay"
 )
 
 // TestCompileTokenDerivesTheCard pins the token recompilation Load does:

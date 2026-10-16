@@ -2,7 +2,8 @@ package lethalpressure
 
 import (
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 func init() {
@@ -15,7 +16,7 @@ func init() {
 }
 
 func newLethalPressure(o bots.Options) (seat.Seat, error) {
-	b := seat.NewLethalPressureBot(o.Seed)
+	b := heuristic.NewLethalPressureBot(o.Seed)
 	if o.AutoPayMana {
 		b.EnableAutoPayMana()
 	}

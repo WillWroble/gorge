@@ -4,11 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/spellbench"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/lab/training/spellbench"
 
 	gbench "github.com/adams-shaun/gorge/internal/bench"
 )
@@ -41,7 +43,7 @@ func tokenDecks(t *testing.T, reg *cards.Registry) [][]*cards.Card {
 func botSeats(seed uint64, n int) []seat.Seat {
 	out := make([]seat.Seat, n)
 	for i := range out {
-		out[i] = seat.NewBot(seed ^ uint64(i+1))
+		out[i] = heuristic.NewBot(seed ^ uint64(i+1))
 	}
 	return out
 }

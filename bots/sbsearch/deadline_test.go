@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	gsearch "github.com/adams-shaun/gorge/internal/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	gsearch "github.com/adams-shaun/gorge/bots/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/view"
 )
 
 // TestSBSearchDecisionDeadlineBailsToTactical is the hosted bail-out's

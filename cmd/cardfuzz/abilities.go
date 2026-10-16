@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // abilitySlot is one ability of a card that play can "use".
@@ -16,7 +16,7 @@ import (
 // Face.Abilities, mana abilities included) and every triggered ability (a
 // Face.Triggers entry), on every face of the card (DFC back faces, split
 // halves, adventures, flip/meld faces). Keyword-expanded abilities count:
-// cards/keywords.go's expandKeywords compiles keywords such as Cycling,
+// engine/cards/keywords.go's expandKeywords compiles keywords such as Cycling,
 // Equip, Ward or Annihilator into ordinary Abilities/Triggers entries at load,
 // and those are real activations/triggers the fuzzer should reach.
 //
@@ -235,8 +235,8 @@ func creditRefs(e *rules.Engine, bySA map[*cards.SA][]slotRef, refs []probeRef, 
 //
 // Activated and triggered abilities: every AbilityPush/TriggerPush mints a
 // stack object whose Ability is the compiled SA pointer from the source
-// face's Abilities/Triggers slice (events/apply.go; the pointer identity
-// state/stackkind.go also relies on), and ability objects stay in the arena
+// face's Abilities/Triggers slice (engine/events/apply.go; the pointer identity
+// engine/state/stackkind.go also relies on), and ability objects stay in the arena
 // after they resolve. So the walk is over the arena, not the log: an ability
 // object whose Ability is a known slot's SA is a use of that slot, credited
 // only when its Source (walked through tokens/copies by name) is the card

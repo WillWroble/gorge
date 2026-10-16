@@ -66,7 +66,7 @@ lists every flag (`-tables`, `-seats`, `-format`, `-pace`, `-mulligans`,
 
 ```sh
 make test lint        # the full suite; heavy, see the note below
-go test ./rules/ -run 'TestHeads$|TestRepoDeckGamesReplayExactly' -v
+go test ./engine/rules/ -run 'TestHeads$|TestRepoDeckGamesReplayExactly' -v
 ```
 
 The full suite is large (about 12,000 tests). For day-to-day work run single
@@ -99,7 +99,7 @@ committed** to this repository:
 
 - `forgec fetch` downloads them into `.cards/`, which is gitignored, pinned to
   a commit SHA (`FORGE_REF`).
-- `cards/boundary_test.go` fails the build if any Forge script is tracked in
+- `engine/cards/boundary_test.go` fails the build if any Forge script is tracked in
   the working tree, the index or `HEAD`.
 - Replay fixtures strip embedded token-script text before they are committed;
   it is resolved from the local corpus at load time.

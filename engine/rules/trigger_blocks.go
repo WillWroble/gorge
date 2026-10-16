@@ -1,0 +1,937 @@
+package rules
+
+import (
+	"strings"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+// pairMemberMatches reads one Valid spec of a become-blocked trigger against
+// one member of a declared (attacker, blocker) pair, with the source's spec
+// context. It is the ONE place both become-blocked walks (Mode$ AttackerBlocked
+// and Mode$ AttackerBlockedByCreature) build that context: the member's
+// DERIVED keyword list is what a keyword predicate must read -- a blocker
+// granted flanking by a layer-6 AddKeyword$ (Agility, Flanking Licid,
+// Sidewinder Sliver, Cavalry Master) HAS flanking and takes no -1/-1, and
+// Creature.withFlying on a granted-flying attacker must match; the
+// object-alone read the filter would otherwise use sees only the printed face
+// plus marker counters. An empty spec matches everything.
+func (e *Engine) pairMemberMatches(spec string, member state.ObjID, sc effects.SpecContext) bool {
+	if spec == "" {
+		return true
+	}
+	sc.ExtraKeywords, sc.ExtraKeywordsOwner = e.Derived(member).Keywords, member
+	sc.PredicatePrograms = nil
+	return e.matchesSpec(spec, member, sc)
+}
+
+// attackerBlockedCandidates lists the (attacker, blocker) pairs one
+// become-blocked trigger fires for (Forge Mode$ AttackerBlocked; She-Hulk,
+// Wallbreaker's "Whenever a Hero you control becomes blocked", Wall of Frost's
+// "Whenever CARDNAME blocks a creature", Tel-Jilad Wolf's "becomes blocked by
+// an artifact creature"). A DeclareBlockers event's Pairs name exactly the
+// attacker-blocker assignments this defender's declaration just made -- an
+// attacker already carrying blockers is never re-paired, so the declared pairs
+// ARE the became-blocked transition, and a trigger fires once per DISTINCT
+// matching attacker (two Heroes blocked by one declaration are two trigger
+// instances, CR 603.2c). ValidCard$ is read against the attacker and
+// ValidBlocker$ against that attacker's blockers: the attacker qualifies when
+// at least one of its blockers in this declaration matches (absent: any
+// blocker does), and ValidBlockerAmount$ ("blocked by two or more
+// creatures", Seifer) compares the count of those matching blockers. The
+// pair's blocker is the FIRST matching one in event order -- the referent
+// TriggeredBlocker names; Forge leaves a choice among several unspecified.
+// Deterministic order: the event's own pair order, deduplicated by attacker.
+func (e *Engine) attackerBlockedCandidates(t cards.Trigger, source state.ObjID, ev events.Event) [][2]state.ObjID {
+	if ev.Kind != events.DeclareBlockers || len(ev.Pairs) == 0 {
+		return nil
+	}
+	sc := e.specCtx(source, e.controllerOf(source))
+	cardSpec := t.ParamStr(cards.PKValidCard)
+	blockerSpec := t.ParamStr(cards.PKValidBlocker)
+	amount := t.ParamStr(cards.PKValidBlockerAmount)
+	seen := map[state.ObjID]bool{}
+	var out [][2]state.ObjID
+	for i, pr := range ev.Pairs {
+		a := pr[0]
+		if seen[a] {
+			continue
+		}
+		seen[a] = true
+		if !e.pairMemberMatches(cardSpec, a, sc) {
+			continue
+		}
+		var first state.ObjID
+		matched := 0
+		// The first occurrence of an attacker is at i (earlier ones would have
+		// marked it seen), so its remaining pairs are at i and after.
+		for _, q := range ev.Pairs[i:] {
+			if q[0] != a || !e.pairMemberMatches(blockerSpec, q[1], sc) {
+				continue
+			}
+			if matched == 0 {
+				first = q[1]
+			}
+			matched++
+		}
+		if matched == 0 || (amount != "" && !comparePresent(matched, amount)) {
+			continue
+		}
+		out = append(out, [2]state.ObjID{a, first})
+	}
+	return out
+}
+
+// attackerBlockedByPairCandidates lists the (attacker, blocker) pairs one
+// Forge Mode$ AttackerBlockedByCreature trigger fires for (kw:Flanking's
+// expansion, CR 702.25a, and the "blocks or becomes blocked" pair family).
+// There is no hard role gate: the trigger's own specs select the pairs, read
+// ValidCard$ against the pair's ATTACKER and ValidBlocker$ against the pair's
+// BLOCKER with the source's spec context -- so ValidCard$ Card.Self selects
+// the pairs whose attacker is the source, ValidBlocker$ Card.Self the pairs
+// whose blocker is the source, and the attachment spellings
+// (.AttachedBy/.EnchantedBy/.EquippedBy) select the pairs whose blocker (or
+// attacker) is the source's bearer. A blocker WITH flanking matches nothing,
+// so it debuffs nobody. Which pair member is the source decides the referent
+// capture (triggerAnchoredAtBlocker, the queue branch below): the attacker's
+// trigger remembers the blocker; the blocker's remembers the attacker.
+// ValidCard$ Card.Self works for the attacker half because the trigger's
+// source IS the flanking attacker.
+func (e *Engine) attackerBlockedByPairCandidates(t cards.Trigger, source state.ObjID, ev events.Event) [][2]state.ObjID {
+	if ev.Kind != events.DeclareBlockers || len(ev.Pairs) == 0 {
+		return nil
+	}
+	sc := e.specCtx(source, e.controllerOf(source))
+	cardSpec := t.ParamStr(cards.PKValidCard)
+	blockerSpec := t.ParamStr(cards.PKValidBlocker)
+	var out [][2]state.ObjID
+	for _, pr := range ev.Pairs {
+		if e.pairMemberMatches(cardSpec, pr[0], sc) && e.pairMemberMatches(blockerSpec, pr[1], sc) {
+			out = append(out, pr)
+		}
+	}
+	return out
+}
+
+// specHasSourceAnchor reports whether a Valid spec names the trigger's own
+// source side: Card.Self, Card.EffectSource (its Effect-delivered alias,
+// engine/effects/filter.go: EffectSource = Self), or an attachment predicate (the
+// source's bearer). A spec without one never anchors the source to a pair.
+func specHasSourceAnchor(spec string) bool {
+	if spec == "" {
+		return false
+	}
+	for _, part := range strings.FieldsFunc(spec, func(r rune) bool { return r == ',' || r == '&' }) {
+		if strings.Contains(part, "Card.Self") || strings.Contains(part, "Card.EffectSource") ||
+			strings.Contains(part, ".AttachedBy") || strings.Contains(part, ".EnchantedBy") ||
+			strings.Contains(part, ".EquippedBy") {
+			return true
+		}
+	}
+	return false
+}
+
+// triggerAnchoredAtBlocker reports which pair member a Mode$
+// AttackerBlockedByCreature trigger's source anchors to: true when the
+// source-side anchor (Card.Self or an attachment predicate) sits in
+// ValidBlocker$ and not in ValidCard$ ("Whenever CARDNAME blocks...", 31
+// corpus lines), false when it sits in ValidCard$ ("...becomes blocked",
+// the flanking shape) or nowhere (the default). The queue branch uses it to
+// pick the role-correct referent capture.
+func triggerAnchoredAtBlocker(t cards.Trigger) bool {
+	if specHasSourceAnchor(t.ParamStr(cards.PKValidCard)) {
+		return false
+	}
+	return specHasSourceAnchor(t.ParamStr(cards.PKValidBlocker))
+}
+
+// flankingPumpSA is kw:Flanking's resolution body (CR 702.25a): the blocked
+// creature gets -1/-1 until end of turn through the ordinary pump/continuous
+// path, naming the blocker the hook remembered. It is a package-level value so
+// a printed K:Flanking expansion and a granted flanking instance resolve to
+// the SAME body.
+var flankingPumpSA = &cards.SA{Kind: "DB", API: "Pump", Params: map[string]string{
+	"Defined": "TriggeredBlockerLKICopy", "NumAtt": "-1", "NumDef": "-1",
+}}
+
+// flankingTrigger is the trigger shape flanking instances share; only its
+// ValidBlocker$ spec matters (the hook supplies the source and the pairs).
+func flankingTrigger() cards.Trigger {
+	return cards.Trigger{Mode: "AttackerBlockedByCreature", Params: map[string]string{
+		"Mode": "AttackerBlockedByCreature", "ValidCard": "Card.Self",
+		"ValidBlocker": "Creature.withoutFlanking", "TriggerZones": "Battlefield",
+		"Keyword": "Flanking",
+	}, Effect: flankingPumpSA}
+}
+
+// isFlankingMarker reports whether a face trigger is kw:Flanking's own
+// expansion (addKeywordTrigger tags it Keyword$ Flanking). Such a trigger is a
+// MARKER: the derived-keyword flanking walk (queueGrantedFlanking and the
+// in-loop multiplication) owns the instance count, so the marker fires once
+// per DERIVED instance, not once per line -- and a creature granted flanking
+// with no printed line fires through the synthesized path instead.
+func isFlankingMarker(t cards.Trigger) bool {
+	return t.Mode == "AttackerBlockedByCreature" && strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKKeyword)), "Flanking")
+}
+
+// flankingInstances is the number of DERIVED flanking instances an object has
+// (CR 702.25b: each instance triggers separately). The derived keyword list
+// already folds the printed K:Flanking line, marker-counter grants and
+// layer-6 AddKeyword$ grants, and it preserves duplicates -- so Cavalry
+// Master's "other creatures you control with flanking have flanking" gives an
+// already-flanking creature a second instance and it triggers twice.
+func (e *Engine) flankingInstances(id state.ObjID) int {
+	n := 0
+	for _, k := range e.Derived(id).Keywords {
+		if strings.EqualFold(cards.KeywordHead(k), "Flanking") {
+			n++
+		}
+	}
+	return n
+}
+
+// queueGrantedFlanking fires the flanking trigger for a creature that has the
+// keyword DERIVED but does NOT print a K:Flanking line -- the layer-6
+// AddKeyword$ carriers (Agility, Flanking Licid, Sidewinder Sliver, Cavalry
+// Master). A granted keyword has no face trigger for the ordinary loop to
+// index, so its instance rides a KeywordTriggerPush whose __kwFlanking:
+// payload events.Apply rebuilds into the same pump body (pushTrigger's
+// Flanking branch, the Ward/Afflict shape). Printed flanking is handled by the
+// in-loop marker branch, which reuses the face trigger's own TriggerPush path;
+// running both would double-count a printed flanking creature, so the helper
+// defers whenever a marker exists. One trigger per NON-FLANKING blocker per
+// derived instance (CR 702.25a/b).
+func (e *Engine) queueGrantedFlanking(id state.ObjID, o *state.Object, ev events.Event) {
+	f := o.Face()
+	if f == nil {
+		return
+	}
+	for _, t := range f.Triggers {
+		if isFlankingMarker(t) {
+			return // printed path owns this creature's flanking
+		}
+	}
+	instances := e.flankingInstances(id)
+	if instances == 0 {
+		return
+	}
+	tr := flankingTrigger()
+	for _, pr := range e.attackerBlockedByPairCandidates(tr, id, ev) {
+		bid := pr[1]
+		for i := 0; i < instances; i++ {
+			key := triggerKey{Source: id, Idx: -1}
+			if e.triggerFireCount == nil {
+				e.triggerFireCount = map[triggerKey]int32{}
+			}
+			if e.triggerFireCount[key] >= maxTriggerFires {
+				return
+			}
+			e.triggerFireCount[key]++
+			e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+				Source:     id,
+				Controller: o.Controller,
+				Idx:        -1,
+				Flanking:   true,
+				Ctx: effects.NewCtx(id, o.Controller, effects.CtxInit{
+					Remembered: []state.Target{{Obj: bid}},
+					Captured:   []state.Target{{Obj: bid}},
+					TriggerContext: effects.TriggerContext{
+						TriggerCard:    bid,
+						TriggerSource:  pr[0],
+						TriggerBlocker: bid,
+					},
+				}),
+			})
+		}
+	}
+}
+
+// checkAttackerBlockedTriggers queues trigger instances off a DeclareBlockers
+// event for the two become-blocked modes the ordinary face scan cannot express
+// (it queues at most one entry per trigger per event, and both referents are
+// per-attacker or per-pair): Mode$ AttackerBlocked fires once per DISTINCT
+// matching blocked attacker (She-Hulk's counter count is each Hero's OWN
+// blocker count), and Forge Mode$ AttackerBlockedByCreature -- kw:Flanking's
+// expansion (CR 702.25a) is its only live carrier -- fires once per matching
+// (attacker, blocker) PAIR, the blocker remembered as the
+// TriggeredBlockerLKICopy referent. The same-scan-hook precedent is
+// checkChapterTriggers (engine/rules/saga.go). The gates mirror the ordinary scan's
+// per-trigger sequence (zone, phase, fire-count bound, ActivationLimit$);
+// Secondary$ and the Once damage-batch gates do not exist on these modes.
+// Each per-instance ctx carries the triggering objects as Remembered and as
+// TriggerCard, so Count$Valid Creature.blockingTriggeredAttacker counts that
+// Hero's blockers and Defined$ TriggeredBlockerLKICopy names the blocker.
+func (e *Engine) checkAttackerBlockedTriggers(ev events.Event) {
+	if ev.Kind != events.DeclareBlockers {
+		return
+	}
+	e.forEachObject(func(id state.ObjID) {
+		o := e.G.Obj(id)
+		if o == nil {
+			return
+		}
+		f := o.Face()
+		if f == nil {
+			return
+		}
+		// Flanking instances come from the DERIVED keyword list, not the
+		// printed trigger: a creature granted flanking (Agility, Sidewinder
+		// Sliver, Cavalry Master) has no face trigger to fire. This runs
+		// BEFORE the faceMayTrigger early return because a granted-only
+		// creature has no printed trigger line to make that gate true, and it
+		// defers to the in-loop marker branch when a printed K:Flanking
+		// exists (that branch owns the printed instance count).
+		if o.Zone == state.ZBattlefield && o.IsAttacking {
+			e.queueGrantedFlanking(id, o, ev)
+		}
+		if isRoom(o) && !o.DoorUnlocked(int(o.FaceIdx)) {
+			return
+		}
+		if !o.Unlocked && !e.faceMayTrigger(f, ev.Kind) {
+			return
+		}
+		for ti, t := range f.Triggers {
+			if t.Mode != "AttackerBlocked" && t.Mode != "AttackerBlockedByCreature" {
+				continue
+			}
+			e.queueAttackerBlockedTrigger(t, id, o.Controller, ti, false, 0, ev)
+		}
+	})
+	e.checkGrantedAttackerBlockedTriggers(ev)
+}
+
+// queueAttackerBlockedTrigger queues the instances one become-blocked trigger
+// fires for a DeclareBlockers event. Printed triggers and AddTrigger$-GRANTED
+// ones share this helper so their zone/phase gates, referent capture and
+// limit discipline cannot drift apart (queueAttackerUnblockedTrigger's
+// precedent). t.Mode is either Mode$ AttackerBlocked (one instance per
+// DISTINCT matching blocked attacker) or Mode$ AttackerBlockedByCreature (one
+// instance per matching (attacker, blocker) pair). source is the permanent
+// carrying the trigger (its own face for a printed line, the AFFECTED
+// recipient for a grant) and idx is its face Triggers index, or -1 for a
+// grant. granted/grantor/Execute carry the GrantTriggerPush provenance a
+// granted instance needs and are left zero for a printed one.
+func (e *Engine) queueAttackerBlockedTrigger(t cards.Trigger, source state.ObjID, controller state.PlayerID, idx int, granted bool, grantor state.ObjID, ev events.Event) {
+	if t.Mode != "AttackerBlocked" && t.Mode != "AttackerBlockedByCreature" {
+		return
+	}
+	// t.Effect is nil for a printed trigger with no body; the queue gate below
+	// keeps the pre-existing behaviour (nothing queued, no limit consumed).
+	if t.Effect == nil {
+		return
+	}
+	if !e.zoneGate(t, source, ev) || !e.phaseGate(t) {
+		return
+	}
+	key := triggerKey{Source: source, Idx: idx}
+	if e.triggerFireCount == nil {
+		e.triggerFireCount = map[triggerKey]int32{}
+	}
+	if e.triggerFireCount[key] >= maxTriggerFires {
+		return // cascade bound: see maxTriggerFires.
+	}
+	if !e.triggerGameActivationLimitAllows(t, key) {
+		return // GameActivationLimit$: already triggered enough this game.
+	}
+	if !e.triggerActivationLimitAllows(t, key) {
+		return
+	}
+	// The two limit gates above are READ-ONLY: a DeclareBlockers event whose
+	// pairs match nothing queues nothing and must not consume a use of either
+	// limit. The counts commit below, at the first instance actually appended.
+	reserved := false
+	reserve := func() {
+		if reserved {
+			return
+		}
+		reserved = true
+		e.reserveTriggerLimits(t, key)
+	}
+	pt := func(p state.PlayerID) state.Target { return state.Target{Player: p, IsPlayer: true} }
+	if t.Mode == "AttackerBlockedByCreature" {
+		// CR 702.25a: one instance per (attacker, non-flanking blocker) pair;
+		// the trigger's controller is the ATTACKER's controller, which the
+		// Source/Controller pair already are (the source is the flanking
+		// attacker itself). A kw:Flanking marker fires its trigger once per
+		// DERIVED flanking instance (CR 702.25b), so a creature with a printed
+		// instance plus a granted one -- Cavalry Master's lord -- debuffs a
+		// blocker twice; a marker whose keyword has since been removed fires
+		// not at all. A granted instance has no printed marker, so its derived
+		// flanking instances are its own to fire (any Keyword$ Flanking param
+		// on the grant is not consulted: the grant itself is the instance).
+		instances := 1
+		if isFlankingMarker(t) {
+			instances = e.flankingInstances(source)
+		}
+		// Which pair member the trigger's source anchors to decides the
+		// referent capture. The attacker half ("...becomes blocked", the
+		// flanking shape) remembers the BLOCKER: TriggeredBlockerLKICopy names
+		// it and TriggeredAttackerLKICopy (its source) falls back to the
+		// Remembered absence through the source itself. The blocker half
+		// ("Whenever CARDNAME blocks...", ValidBlocker$ Card.Self or an
+		// attachment spelling; 31 corpus lines) remembers the ATTACKER, so
+		// TriggeredAttackerLKICopy names the creature it blocked and
+		// TriggeredBlockerLKICopy resolves through the captured TriggerBlocker
+		// role -- the same capture checkBlocksTriggers (Mode$ Blocks) uses.
+		blockerRole := triggerAnchoredAtBlocker(t)
+		for _, pr := range e.attackerBlockedByPairCandidates(t, source, ev) {
+			aid, bid := pr[0], pr[1]
+			for i := 0; i < instances; i++ {
+				if e.triggerFireCount[key] >= maxTriggerFires {
+					break
+				}
+				reserve()
+				e.triggerFireCount[key]++
+				ctx := effects.CtxInit{
+					Remembered: []state.Target{{Obj: bid}},
+					Captured:   []state.Target{{Obj: bid}},
+					TriggerContext: effects.TriggerContext{
+						TriggerCard:   bid,
+						TriggerSource: aid,
+					},
+				}
+				if blockerRole {
+					ctx = effects.CtxInit{
+						Remembered: []state.Target{{Obj: aid}},
+						Captured:   []state.Target{{Obj: aid}},
+						TriggerContext: effects.TriggerContext{
+							TriggerCard:     aid,
+							TriggerSource:   aid,
+							TriggerBlocker:  bid,
+							AttackingPlayer: pt(e.controllerOf(aid)),
+							DefendingPlayer: pt(ev.Player),
+						},
+					}
+				}
+				e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+					Source:     source,
+					Controller: controller,
+					Idx:        idx,
+					SA:         t.Effect,
+					Granted:    granted,
+					Grantor:    grantor,
+					Execute:    t.ParamStr(cards.PKExecute),
+					Ctx:        effects.NewCtx(source, controller, ctx),
+				})
+			}
+		}
+		return
+	}
+	for _, pr := range e.attackerBlockedCandidates(t, source, ev) {
+		reserve()
+		e.triggerFireCount[key]++
+		e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+			Source:     source,
+			Controller: controller,
+			Idx:        idx,
+			SA:         t.Effect,
+			Granted:    granted,
+			Grantor:    grantor,
+			Execute:    t.ParamStr(cards.PKExecute),
+			Ctx:        effects.NewCtx(source, controller, e.attackerBlockedCtx(t, pr[0], pr[1], ev)),
+		})
+	}
+}
+
+// attackerBlockedCtx is the referent capture of one Mode$ AttackerBlocked
+// instance for the (attacker aid, blocker bid) pair attackerBlockedCandidates
+// chose. Every shape remembers the ATTACKER (TriggeredAttacker, the
+// She-Hulk/Afflict/Kraken bodies) and now also captures the blocker role, so
+// Defined$ TriggeredBlockerLKICopy (Righteous Indignation, "the blocking
+// creature gets +1/+1") names the creature that blocked. With several
+// matching blockers the first in declaration order is the referent. A
+// blocker-anchored line ("Whenever CARDNAME blocks a creature", Wall of Frost;
+// triggerAnchoredAtBlocker) takes the defending player from the declaring
+// event -- the blocking player, whose creature the source is -- the same
+// capture the blocker half of Mode$ AttackerBlockedByCreature uses; the other
+// shapes read the attacker's own defender, which is the same player here.
+func (e *Engine) attackerBlockedCtx(t cards.Trigger, aid, bid state.ObjID, ev events.Event) effects.CtxInit {
+	pt := func(p state.PlayerID) state.Target { return state.Target{Player: p, IsPlayer: true} }
+	defender := pt(0)
+	if triggerAnchoredAtBlocker(t) {
+		defender = pt(ev.Player)
+	} else if ao := e.G.Obj(aid); ao != nil {
+		defender = pt(ao.Attacking)
+	}
+	return effects.CtxInit{
+		Remembered: []state.Target{{Obj: aid}},
+		Captured:   []state.Target{{Obj: aid}},
+		TriggerContext: effects.TriggerContext{
+			TriggerCard:     aid,
+			TriggerSource:   aid,
+			TriggerBlocker:  bid,
+			AttackingPlayer: pt(e.controllerOf(aid)),
+			DefendingPlayer: defender,
+		},
+	}
+}
+
+// checkGrantedAttackerBlockedTriggers is the AddTrigger$ half of the
+// become-blocked walk. The ordinary granted-trigger event matcher
+// (checkGrantedStaticTriggersUsing) cannot dispatch these two modes: neither
+// has an entry in trigMatchers (they are dedicated hooks), so triggerMatches
+// rejects every DeclareBlockers event for them and a granted instance would
+// never fire. Instead each live grant whose Mode$ is AttackerBlocked or
+// AttackerBlockedByCreature queues through the same per-instance helper a
+// printed trigger uses, preserving its grantor so GrantTriggerPush can
+// rebuild the Execute$ body during replay (checkGrantedAttackerUnblockedTriggers'
+// precedent). Stormsurge Kraken, Retaliation and Mirror Shield are the
+// corpus carriers.
+func (e *Engine) checkGrantedAttackerBlockedTriggers(ev events.Event) {
+	for ceI, ceL := 0, e.active(); ceI < len(ceL); ceI++ {
+		ce := &ceL[ceI]
+		if ce.AddTrigger == nil {
+			continue
+		}
+		if ce.AddTrigger.Mode != "AttackerBlocked" && ce.AddTrigger.Mode != "AttackerBlockedByCreature" {
+			continue
+		}
+		grantorID := ce.Source
+		if ce.TriggerGrantor != 0 {
+			grantorID = ce.TriggerGrantor
+		}
+		grantor := e.G.Obj(grantorID)
+		if grantor == nil || grantor.Face() == nil {
+			continue
+		}
+		t := *ce.AddTrigger
+		t.Effect = grantedTriggerExecute(grantor, t.ParamStr(cards.PKExecute))
+		if t.Effect == nil {
+			continue
+		}
+		e.forEachObject(func(id state.ObjID) {
+			o := e.G.Obj(id)
+			if o == nil || o.Face() == nil {
+				return
+			}
+			if !e.matchesSpecFrom(ce.Affects, id, ce.Controller, ce.Source) {
+				return
+			}
+			e.queueAttackerBlockedTrigger(t, id, o.Controller, -1, true, grantorID, ev)
+		})
+	}
+}
+
+// checkAttackerUnblockedTriggers queues one Mode$ AttackerUnblocked instance
+// for every matching unblocked attacker at declare-blockers round completion.
+// Unlike AttackerUnblockedOnce, this mode matches ValidCard$ against the
+// attacker and ValidDefender$ against that attacker's actual defender.
+func (e *Engine) checkAttackerUnblockedTriggers() {
+	ev := events.Event{Kind: events.DeclareBlockers}
+	e.forEachObject(func(id state.ObjID) {
+		o := e.G.Obj(id)
+		if o == nil || o.Face() == nil {
+			return
+		}
+		f := o.Face()
+		if isRoom(o) && !o.DoorUnlocked(int(o.FaceIdx)) {
+			return
+		}
+		if !o.Unlocked && !e.faceMayTrigger(f, ev.Kind) {
+			return
+		}
+		for ti, t := range f.Triggers {
+			e.queueAttackerUnblockedTrigger(t, id, o.Controller, ti, false, 0, nil, ev)
+		}
+	})
+	e.checkGrantedAttackerUnblockedTriggers(ev)
+}
+
+// checkGrantedAttackerUnblockedTriggers is the AddTrigger$ half of the
+// round-complete unblocked-attacker walk. The ordinary granted-trigger event
+// matcher cannot dispatch this mode: it has no synthetic DeclareBlockers event
+// carrying all unblocked attackers. Instead each live grant queues through the
+// same per-attacker helper as a printed trigger, preserving its grantor so
+// GrantTriggerPush can rebuild the Execute$ body during replay.
+func (e *Engine) checkGrantedAttackerUnblockedTriggers(ev events.Event) {
+	for ceI, ceL := 0, e.active(); ceI < len(ceL); ceI++ {
+		ce := &ceL[ceI]
+		if ce.AddTrigger == nil || ce.AddTrigger.Mode != "AttackerUnblocked" {
+			continue
+		}
+		grantorID := ce.Source
+		if ce.TriggerGrantor != 0 {
+			grantorID = ce.TriggerGrantor
+		}
+		grantor := e.G.Obj(grantorID)
+		if grantor == nil || grantor.Face() == nil {
+			continue
+		}
+		t := *ce.AddTrigger
+		grantFace := grantedTriggerFace(grantor, t.ParamStr(cards.PKExecute))
+		if grantFace == nil {
+			continue
+		}
+		t.Effect = cards.ResolveSVar(grantFace.SVars, t.ParamStr(cards.PKExecute))
+		if t.Effect == nil {
+			continue
+		}
+		e.forEachObject(func(id state.ObjID) {
+			o := e.G.Obj(id)
+			if o == nil || !e.matchesSpecFrom(ce.Affects, id, ce.Controller, ce.Source) {
+				return
+			}
+			e.queueAttackerUnblockedTrigger(t, id, o.Controller, -1, true, grantorID, grantFace.SVars, ev)
+		})
+	}
+}
+
+// queueAttackerUnblockedTrigger queues one instance for every matching
+// unblocked attacker. Printed and AddTrigger$-granted instances share this
+// path so their ValidCard$/ValidDefender$ gates, captured attacker roles and
+// action-trigger limits cannot drift apart. ownedSVars is the trigger LINE's
+// owning SVar table, supplied for a granted instance (the GRANTOR's table) and
+// nil for a printed one; it is what a CheckSVar$/SVarCompare$ clause on the
+// line is evaluated against at fire time.
+func (e *Engine) queueAttackerUnblockedTrigger(t cards.Trigger, source state.ObjID, controller state.PlayerID, idx int, granted bool, grantor state.ObjID, ownedSVars map[string]string, ev events.Event) {
+	if t.Mode != "AttackerUnblocked" || t.Effect == nil ||
+		!e.zoneGate(t, source, ev) || !e.phaseGate(t) ||
+		!e.triggerConditionHoldsWithSVars(t, source, controller, nil, ownedSVars) {
+		return
+	}
+	key := triggerKey{Source: source, Idx: idx}
+	if e.triggerFireCount == nil {
+		e.triggerFireCount = map[triggerKey]int32{}
+	}
+	if e.triggerFireCount[key] >= maxTriggerFires || !e.triggerGameActivationLimitAllows(t, key) ||
+		!e.triggerActivationLimitAllows(t, key) {
+		return
+	}
+	pt := func(p state.PlayerID) state.Target { return state.Target{Player: p, IsPlayer: true} }
+	// The read-only limit gate consumes a use only after the first matching
+	// attacker actually queues an instance. Multiple unblocked attackers still
+	// produce their required individual triggers.
+	reserved := false
+	for _, p := range e.G.AliveFrom(0) {
+		for _, aid := range e.G.Zone(state.ZBattlefield, p) {
+			a := e.G.Obj(aid)
+			if a == nil || !a.IsAttacking || len(a.BlockedBy) != 0 {
+				continue
+			}
+			if v := t.ParamStr(cards.PKValidCard); v != "" {
+				// The IsGoaded static route (staticgoad1), bound inline -- the
+				// same shape matchesSpec keeps (this walk runs per attacker per
+				// Attacks event, so the context must not escape through a
+				// helper call).
+				sc := e.specCtx(source, controller)
+				if e.goadProbe == 0 && strings.Contains(v, "IsGoaded") {
+					sc.Layers.StaticGoads = e.staticallyGoaded()
+				}
+				if !effects.MatchesSpecCtx(e.G, v, aid, sc) {
+					continue
+				}
+			}
+			if v := t.ParamStr(cards.PKValidDefender); v != "" && !effects.MatchesPlayerSpec(e.G, v, a.Attacking, controller) {
+				continue
+			}
+			if !reserved {
+				reserved = true
+				e.reserveTriggerLimits(t, key)
+			}
+			e.triggerFireCount[key]++
+			e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+				Source: source, Controller: controller, Idx: idx, SA: t.Effect,
+				Granted: granted, Grantor: grantor, Execute: t.ParamStr(cards.PKExecute),
+				Ctx: effects.NewCtx(source, controller, effects.CtxInit{
+					Remembered: []state.Target{{Obj: aid}}, Captured: []state.Target{{Obj: aid}},
+					TriggerContext: effects.TriggerContext{
+						TriggerCard: aid, TriggerSource: aid,
+						AttackingPlayer: pt(e.controllerOf(aid)), DefendingPlayer: pt(a.Attacking),
+					},
+				}),
+			})
+			if e.triggerFireCount[key] >= maxTriggerFires {
+				return
+			}
+		}
+	}
+}
+
+// checkAttackerUnblockedOnceTriggers queues Mode$ AttackerUnblockedOnce
+// (Coveted Jewel's "Whenever one or more creatures an opponent controls attack
+// you and aren't blocked, that player draws three cards and gains control of
+// CARDNAME. Untap it."). It is a dedicated hook, like checkAttackerBlockedTriggers,
+// because the ordinary per-face scan cannot express it and the mode has no
+// triggerMatches case.
+//
+// It runs at the DECLARE-BLOCKERS ROUND COMPLETE instant (engine/rules/turn.go's
+// StepDeclareBlockers completion branch), NOT per DeclareBlockers event: those
+// events are per-defender, and a defender with attackers but no legal blockers
+// is skipped with no event at all, so a per-event scan of battlefield-wide
+// unblocked attackers would see a later defender's not-yet-blocked attackers
+// as unblocked and latch the trigger wrongly early on a split attack. At the
+// completion instant every defender has answered (or been skipped), so the
+// battlefield's IsAttacking && no-BlockedBy objects are exactly the unblocked
+// attackers. The condition is evaluated once, here: an attacker that BECOMES
+// unblocked later (its blocker leaves combat, or a stat:AssignCombatDamageAsUnblocked
+// election) does not fire this trigger -- Forge checks at the end of declare
+// blockers too.
+//
+// Fire semantics (Forge's AttackerUnblockedOnce): ONE instance per trigger per
+// combat when at least one matching unblocked attacker exists -- "one or more
+// creatures ... and aren't blocked" -- even when several attackers match. The
+// latch (Engine.unblockedOnceFired) stamps (Turn, CombatsThisTurn) so an extra
+// combat re-arms it. The matching AttackingPlayer is the first matching
+// attacker's controller in the battlefield walk order.
+//
+// Gates mirror the AttackerBlocked hook's sequence (zone, phase, fire-count
+// bound, ActivationLimit$); ValidDefenders$ and ValidAttackingPlayer$ are the
+// two player specs this mode carries, both base-Player/You shapes
+// effects.MatchesPlayerSpec already evaluates. Secondary$ needs no yield: a
+// paired primary can never match a declare-blockers-derived condition.
+// OptionalDecider$ is not read -- no corpus carrier of the Once mode carries
+// it (the only carrier is Coveted Jewel).
+func (e *Engine) checkAttackerUnblockedOnceTriggers() {
+	pt := func(p state.PlayerID) state.Target { return state.Target{Player: p, IsPlayer: true} }
+	stamp := combatFires{Turn: e.G.Turn, Combat: e.G.CombatsThisTurn}
+	e.forEachObject(func(id state.ObjID) {
+		o := e.G.Obj(id)
+		if o == nil {
+			return
+		}
+		f := o.Face()
+		if f == nil {
+			return
+		}
+		if isRoom(o) && !o.DoorUnlocked(int(o.FaceIdx)) {
+			return
+		}
+		if !o.Unlocked && !e.faceMayTrigger(f, events.DeclareBlockers) {
+			return
+		}
+		for ti, t := range f.Triggers {
+			if t.Mode != "AttackerUnblockedOnce" {
+				continue
+			}
+			if t.Effect == nil {
+				continue
+			}
+			if !e.zoneGate(t, id, events.Event{Kind: events.DeclareBlockers}) || !e.phaseGate(t) {
+				continue
+			}
+			key := triggerKey{Source: id, Idx: ti}
+			if e.triggerFireCount == nil {
+				e.triggerFireCount = map[triggerKey]int32{}
+			}
+			if e.triggerFireCount[key] >= maxTriggerFires {
+				continue // cascade bound: see maxTriggerFires.
+			}
+			if !e.triggerGameActivationLimitAllows(t, key) {
+				continue // GameActivationLimit$: already triggered enough this game.
+			}
+			if !e.triggerActivationLimitAllows(t, key) {
+				continue
+			}
+			// The limit gates above are READ-ONLY: a combat with no matching
+			// unblocked attacker queues nothing and must not consume a use.
+			// The counts commit below, when the instance is actually appended.
+			if e.unblockedOnceFired == nil {
+				e.unblockedOnceFired = map[triggerKey]combatFires{}
+			}
+			if e.unblockedOnceFired[key] == stamp {
+				continue // already fired this combat.
+			}
+
+			// Scan the battlefield for the unblocked attackers this trigger's
+			// defender is being attacked by, whose controller is an opponent of
+			// the trigger controller. The first match decides the fire; the
+			// matching attackers (in battlefield walk order) are remembered.
+			defenderSpec := t.ParamStr(cards.PKValidDefenders)
+			attackerSpec := t.ParamStr(cards.PKValidAttackingPlayer)
+			var attackerIDs []state.ObjID
+			for _, p := range e.G.AliveFrom(0) {
+				for _, bid := range e.G.Zone(state.ZBattlefield, p) {
+					b := e.G.Obj(bid)
+					if b == nil || !b.IsAttacking || len(b.BlockedBy) != 0 {
+						continue
+					}
+					if defenderSpec != "" && !effects.MatchesPlayerSpec(e.G, defenderSpec, b.Attacking, o.Controller) {
+						continue
+					}
+					if attackerSpec != "" && !effects.MatchesPlayerSpec(e.G, attackerSpec, e.controllerOf(bid), o.Controller) {
+						continue
+					}
+					attackerIDs = append(attackerIDs, bid)
+				}
+			}
+			if len(attackerIDs) == 0 {
+				continue
+			}
+			firstCtrl := e.controllerOf(attackerIDs[0])
+
+			remembered := make([]state.Target, 0, len(attackerIDs))
+			for _, aid := range attackerIDs {
+				remembered = append(remembered, state.Target{Obj: aid})
+			}
+			e.reserveTriggerLimits(t, key)
+			e.unblockedOnceFired[key] = stamp
+			e.triggerFireCount[key]++
+			e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+				Source:     id,
+				Controller: o.Controller,
+				Idx:        ti,
+				SA:         t.Effect,
+				Ctx: effects.NewCtx(id, o.Controller, effects.CtxInit{
+					Remembered: remembered,
+					Captured:   remembered,
+					TriggerContext: effects.TriggerContext{
+						TriggerCard:     attackerIDs[0],
+						TriggerSource:   attackerIDs[0],
+						AttackingPlayer: pt(firstCtrl),
+						DefendingPlayer: pt(o.Controller),
+					},
+				}),
+			})
+		}
+	})
+}
+
+// blocksCandidates lists the (attacker, blocker) pairs one Forge Mode$ Blocks
+// trigger fires for (task trig:Blocks; Savvy Hunter's "Whenever Savvy Hunter
+// attacks or blocks", Heat of Battle's "Whenever a creature blocks", Wand of
+// Orcus' bearer half). Each declared pair is evaluated per pair -- one
+// instance per matching pair, exactly Forge's per-block-event firing --
+// because the trigger's matching object is the pair's BLOCKER, not the
+// trigger's own source: ValidCard$ is read against the blocker (Card.Self
+// names the source-as-blocker; Card.AttachedBy/EquippedBy/EnchantedBy name
+// the bearer via the existing attachedBy predicate; the bare Creature spec
+// is the global-enchantment shape that fires for a blocker that is NOT the
+// source), and ValidBlocked$ is read against the pair's ATTACKER (Goblin
+// Cadets' becomes-blocked spelling ValidCard$ Creature | ValidBlocked$
+// Card.Self). A blocker appears in exactly one pair per event (CR 509.1a's
+// one-blocker-one-attacker pairing; Submit's validateBlockers rejects the
+// same ordinary blocker against multiple attackers), so no dedup is needed.
+func (e *Engine) blocksCandidates(t cards.Trigger, source state.ObjID, ev events.Event) [][2]state.ObjID {
+	if ev.Kind != events.DeclareBlockers || len(ev.Pairs) == 0 {
+		return nil
+	}
+	ctrl := e.controllerOf(source)
+	var out [][2]state.ObjID
+	for _, pr := range ev.Pairs {
+		if v := t.ParamStr(cards.PKValidCard); v != "" && !e.matchesSpec(v, pr[1], e.specCtx(source, ctrl)) {
+			continue
+		}
+		if v := t.ParamStr(cards.PKValidBlocked); v != "" && !e.matchesSpec(v, pr[0], e.specCtx(source, ctrl)) {
+			continue
+		}
+		out = append(out, pr)
+	}
+	return out
+}
+
+// checkBlocksTriggers queues trigger instances off a DeclareBlockers event
+// for Forge Mode$ Blocks (trig:Blocks): "whenever [this creature] blocks" and
+// its enchantment/equipment/global shapes. The ordinary per-face scan cannot
+// express it -- it queues at most one entry per trigger per event, and the
+// mode's matching object is the pair's BLOCKER while its referents split
+// between the blocker and the attacker (Godsend's Blocks half reads
+// DefinedCards$ TriggeredAttackers; Wand of Orcus' half pumps
+// TriggeredBlockerLKICopy) -- so it rides the same dedicated hook as
+// checkAttackerBlockedTriggers, with one instance per matching PAIR. The
+// gates mirror the ordinary scan's per-trigger sequence (zone, phase,
+// fire-count bound, the actionTriggerModes guard shape kept so a future
+// ActivationLimit$/PlayerTurn$ carrier joins with a one-word mode-row
+// change -- measured, no Blocks line carries either today) PLUS the shared
+// condition gate triggerConditionHoldsAs, which the AttackerBlocked hook
+// omits but the corpus's IsPresent$/PresentCompare$ Blocks lines need.
+// Each per-instance ctx: the ATTACKER as Remembered/Captured (Godsend's
+// TriggeredAttackers pool), the attacker as TriggerCard/TriggerSource, the
+// blocker in the new TriggerBlocker role (TriggeredBlockerLKICopy), both
+// combat players, and Source/Controller = the trigger face's own
+// object/controller (the enchantment/equipment, not the blocker).
+// Secondary$ needs no yield here: a Blocks half's paired primary is an
+// Attacks trigger, which can never match the same DeclareBlockers event, so
+// the secondary always fires on its own (the AttackerBlocked hook skips
+// secondaryYields for the same reason).
+func (e *Engine) checkBlocksTriggers(ev events.Event) {
+	if ev.Kind != events.DeclareBlockers {
+		return
+	}
+	pt := func(p state.PlayerID) state.Target { return state.Target{Player: p, IsPlayer: true} }
+	e.forEachObject(func(id state.ObjID) {
+		o := e.G.Obj(id)
+		if o == nil {
+			return
+		}
+		f := o.Face()
+		if f == nil {
+			return
+		}
+		if isRoom(o) && !o.DoorUnlocked(int(o.FaceIdx)) {
+			return
+		}
+		if !o.Unlocked && !e.faceMayTrigger(f, ev.Kind) {
+			return
+		}
+		for ti, t := range f.Triggers {
+			if t.Mode != "Blocks" {
+				continue
+			}
+			if !e.zoneGate(t, id, ev) || !e.phaseGate(t) {
+				continue
+			}
+			if !e.triggerConditionHoldsAs(t, id, o.Controller) {
+				continue
+			}
+			key := triggerKey{Source: id, Idx: ti}
+			if e.triggerFireCount == nil {
+				e.triggerFireCount = map[triggerKey]int32{}
+			}
+			if e.triggerFireCount[key] >= maxTriggerFires {
+				continue // cascade bound: see maxTriggerFires.
+			}
+			if !e.triggerGameActivationLimitAllows(t, key) {
+				continue // GameActivationLimit$: already triggered enough this game.
+			}
+			if !e.triggerActivationLimitAllows(t, key) {
+				continue
+			}
+			// The two limit gates above are READ-ONLY: a DeclareBlockers event
+			// whose pairs match nothing queues nothing and must not consume a
+			// use of either limit. The counts commit below, at the first pair
+			// instance actually appended.
+			reserved := false
+			for _, pr := range e.blocksCandidates(t, id, ev) {
+				if t.Effect == nil {
+					break
+				}
+				attacker := pr[0]
+				defender := pt(ev.Player)
+				if !reserved {
+					reserved = true
+					e.reserveTriggerLimits(t, key)
+				}
+				e.triggerFireCount[key]++
+				e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
+					Source:     id,
+					Controller: o.Controller,
+					Idx:        ti,
+					SA:         t.Effect,
+					Ctx: effects.NewCtx(id, o.Controller, effects.CtxInit{
+						Remembered: []state.Target{{Obj: attacker}},
+						Captured:   []state.Target{{Obj: attacker}},
+						TriggerContext: effects.TriggerContext{
+							TriggerCard:     attacker,
+							TriggerSource:   attacker,
+							TriggerBlocker:  pr[1],
+							AttackingPlayer: pt(e.controllerOf(attacker)),
+							DefendingPlayer: defender,
+						},
+					}),
+				})
+			}
+		}
+	})
+}
+
+func blockedAttackerIn(pairs [][2]state.ObjID, id state.ObjID) bool {
+	for _, pr := range pairs {
+		if pr[0] == id {
+			return true
+		}
+	}
+	return false
+}

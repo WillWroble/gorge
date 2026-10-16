@@ -49,7 +49,7 @@ probe_eff() {
 	out=$(mktemp -d "${TMPDIR:-/tmp}/reward-eff.XXXXXX")
 	trap 'rm -rf "$out"' RETURN
 	t0=$(date +%s)
-	if ! go build -o "$out/botbench" ./cmd/botbench 2>"$out/build.err"; then
+	if ! go build -o "$out/botbench" ./lab/cmd/botbench 2>"$out/build.err"; then
 		say "botbench build failed; eff not measured"
 		sed -n 1,5p "$out/build.err" >&2
 		return 1

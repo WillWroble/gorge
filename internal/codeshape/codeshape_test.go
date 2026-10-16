@@ -84,9 +84,9 @@ func f(m map[string]string, s string) {
 
 func TestMeasureSyntheticTree(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
-		"effects/long.go":     "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
-		"rules/engine.go": `package rules
+		"engine/effects/registry.go": effectsSrc,
+		"effects/long.go":            "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
+		"engine/rules/engine.go": `package rules
 
 type Engine struct{}
 type resumePoint struct {
@@ -138,7 +138,7 @@ func free()          {}
 		TargetLeaks:            []string{},
 		// effectsSrc's two Defined$ reads are outside the Defined compiler.
 		DefinedParamLeaks:   2,
-		DefinedLeaks:        []string{"effects/registry.go:42 Defined", "effects/registry.go:43 Defined"},
+		DefinedLeaks:        []string{"engine/effects/registry.go:42 Defined", "engine/effects/registry.go:43 Defined"},
 		DelayedTriggerLeaks: []string{},
 		CopyPermanentLeaks:  []string{},
 		CloneLeaks:          []string{},
@@ -164,7 +164,7 @@ func free()          {}
 
 func TestMeasureCountsContextLiterals(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
+		"engine/effects/registry.go": effectsSrc,
 		// Bare names inside package effects: 3 Ctx (one pointer, two elided
 		// slice elements), 1 SpecContext, 1 TriggerContext; never Other{}.
 		"effects/use.go": `package effects
@@ -178,21 +178,21 @@ func g() {
 }
 `,
 		// The designated constructor files are exempt.
-		"effects/ctx_new.go": "package effects\n\nfunc NewCtx() Ctx { return Ctx{} }\n",
-		"rules/ctx_new.go": `package rules
+		"engine/effects/ctx_new.go": "package effects\n\nfunc NewCtx() Ctx { return Ctx{} }\n",
+		"engine/rules/ctx_new.go": `package rules
 
-import "github.com/adams-shaun/gorge/effects"
+import "github.com/adams-shaun/gorge/engine/effects"
 
 func k() effects.Ctx { return effects.Ctx{} }
 `,
 		// Selector forms through the plain and an aliased import: 2 Ctx
 		// (one an elided map value), 1 SpecContext, 1 TriggerContext. A local
 		// type named Ctx in rules is not effects.Ctx.
-		"rules/engine.go": `package rules
+		"engine/rules/engine.go": `package rules
 
 import (
-	"github.com/adams-shaun/gorge/effects"
-	fx "github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/engine/effects"
+	fx "github.com/adams-shaun/gorge/engine/effects"
 )
 
 type Ctx struct{}
@@ -207,7 +207,7 @@ func h() {
 }
 `,
 		// Test files are never counted.
-		"rules/engine_test.go": "package rules\n\nimport \"github.com/adams-shaun/gorge/effects\"\n\nvar _ = effects.Ctx{}\n",
+		"rules/engine_test.go": "package rules\n\nimport \"github.com/adams-shaun/gorge/engine/effects\"\n\nvar _ = effects.Ctx{}\n",
 	})
 	m, err := Measure(root)
 	if err != nil {
@@ -221,8 +221,8 @@ func h() {
 
 func TestMeasureFailsWhenAMeasuredTypeIsMissing(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
-		"rules/engine.go":     "package rules\n",
+		"engine/effects/registry.go": effectsSrc,
+		"engine/rules/engine.go":     "package rules\n",
 	})
 	if _, err := Measure(root); err == nil || !strings.Contains(err.Error(), "resumePoint") {
 		t.Fatalf("Measure without resumePoint: err = %v, want a resumePoint error", err)
@@ -243,15 +243,15 @@ func TestMeasureIsDeterministic(t *testing.T) {
 // ChangeZone's files.
 func TestMeasureCountsChangeZoneParamLeaks(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
+		"engine/effects/registry.go": effectsSrc,
 		// The compiler reads everything; none of it counts.
-		"effects/changezone_params.go": `package effects
+		"engine/effects/changezone_params.go": `package effects
 
 func compile(sa *SA) { _ = sa.Params["Hidden"]; _ = sa.ParamStr(cards.PKOrigin) }
 `,
 		// A ChangeZone file: index read, PK read, HasParam and a Num key count
 		// (4); the map write does not.
-		"effects/zone_change.go": `package effects
+		"engine/effects/zone_change.go": `package effects
 
 func eff(sa *SA) {
 	_ = sa.Params["Defined"]
@@ -262,7 +262,7 @@ func eff(sa *SA) {
 }
 `,
 		// Elsewhere only a ChangeZone-only key counts (2), a shared key never.
-		"effects/cardflow.go": `package effects
+		"engine/effects/cardflow.go": `package effects
 
 func dig(sa *SA) {
 	_ = sa.Params["Hidden"]
@@ -270,16 +270,16 @@ func dig(sa *SA) {
 	_ = sa.ParamStr(cards.PKOrigin)
 }
 `,
-		"rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n",
+		"engine/rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n",
 	})
 	m, err := Measure(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		"effects/cardflow.go:4 Hidden", "effects/cardflow.go:5 DifferentNames",
-		"effects/zone_change.go:4 Defined", "effects/zone_change.go:5 Origin",
-		"effects/zone_change.go:6 Destination", "effects/zone_change.go:7 ChangeNum",
+		"engine/effects/cardflow.go:4 Hidden", "engine/effects/cardflow.go:5 DifferentNames",
+		"engine/effects/zone_change.go:4 Defined", "engine/effects/zone_change.go:5 Origin",
+		"engine/effects/zone_change.go:6 Destination", "engine/effects/zone_change.go:7 ChangeNum",
 	}
 	if m.ChangeZoneParamLeaks != len(want) || !reflect.DeepEqual(m.ChangeZoneLeaks, want) {
 		t.Errorf("ChangeZone leaks = %d %v, want %v", m.ChangeZoneParamLeaks, m.ChangeZoneLeaks, want)
@@ -287,17 +287,17 @@ func dig(sa *SA) {
 }
 
 // TestMeasureCountsTargetParamLeaks pins the targetParamLeaks census: a
-// targeting key read anywhere in rules/ or effects/ outside the targeting
+// targeting key read anywhere in engine/rules/ or engine/effects/ outside the targeting
 // compiler counts (every read form), never the compiler itself, never a write,
 // never a non-targeting key.
 func TestMeasureCountsTargetParamLeaks(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
-		"effects/params/targets.go": `package params
+		"engine/effects/registry.go": effectsSrc,
+		"engine/effects/params/targets.go": `package params
 
 func compile(sa *SA) { _ = sa.Params["TargetsWithSharedTypes"]; _ = sa.ParamStr(cards.PKValidTgts) }
 `,
-		"effects/damage.go": `package effects
+		"engine/effects/damage.go": `package effects
 
 func dmg(sa *SA) {
 	_ = sa.Param(cards.PKValidTgts)
@@ -306,15 +306,15 @@ func dmg(sa *SA) {
 	sub.Params["ValidTgts"] = "x"
 }
 `,
-		"rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n\nfunc f(sa *SA) { _ = sa.Params[\"MaxTotalTargetPower\"] }\n",
+		"engine/rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n\nfunc f(sa *SA) { _ = sa.Params[\"MaxTotalTargetPower\"] }\n",
 	})
 	m, err := Measure(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		"effects/damage.go:4 ValidTgts", "effects/damage.go:5 TargetMax",
-		"rules/engine.go:5 MaxTotalTargetPower",
+		"engine/effects/damage.go:4 ValidTgts", "engine/effects/damage.go:5 TargetMax",
+		"engine/rules/engine.go:5 MaxTotalTargetPower",
 	}
 	if m.TargetParamLeaks != len(want) || !reflect.DeepEqual(m.TargetLeaks, want) {
 		t.Errorf("target leaks = %d %v, want %v", m.TargetParamLeaks, m.TargetLeaks, want)
@@ -322,17 +322,17 @@ func dmg(sa *SA) {
 }
 
 // TestMeasureCountsDefinedParamLeaks pins the definedParamLeaks census: a
-// Defined-reference key read anywhere in rules/ or effects/ outside the
+// Defined-reference key read anywhere in engine/rules/ or engine/effects/ outside the
 // Defined compiler counts (every read form), never the compiler itself, never
 // a write, never a one-API Defined* key.
 func TestMeasureCountsDefinedParamLeaks(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
-		"effects/params/defined.go": `package params
+		"engine/effects/registry.go": effectsSrc,
+		"engine/effects/params/defined.go": `package params
 
 func compile(sa *SA) { _ = sa.Param(cards.PKDefined); _ = sa.Params["DefinedPlayer"] }
 `,
-		"effects/zone.go": `package effects
+		"engine/effects/zone.go": `package effects
 
 func z(sa *SA) {
 	_ = sa.ParamStr(cards.PKDefinedCards)
@@ -341,16 +341,16 @@ func z(sa *SA) {
 	_ = sa.HasParam(cards.PKDefinedTarget)
 }
 `,
-		"rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n\nfunc f(sa *SA) { _ = sa.Params[\"Defined\"] }\n",
+		"engine/rules/engine.go": "package rules\n\ntype resumePoint struct{ a int }\n\nfunc f(sa *SA) { _ = sa.Params[\"Defined\"] }\n",
 	})
 	m, err := Measure(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		"effects/registry.go:42 Defined", "effects/registry.go:43 Defined",
-		"effects/zone.go:4 DefinedCards", "effects/zone.go:7 DefinedTarget",
-		"rules/engine.go:5 Defined",
+		"engine/effects/registry.go:42 Defined", "engine/effects/registry.go:43 Defined",
+		"engine/effects/zone.go:4 DefinedCards", "engine/effects/zone.go:7 DefinedTarget",
+		"engine/rules/engine.go:5 Defined",
 	}
 	if m.DefinedParamLeaks != len(want) || !reflect.DeepEqual(m.DefinedLeaks, want) {
 		t.Errorf("defined leaks = %d %v, want %v", m.DefinedParamLeaks, m.DefinedLeaks, want)
@@ -360,11 +360,11 @@ func z(sa *SA) {
 // TestMeasureCountsSideDoors pins the side-door censuses of sidedoor.go.
 func TestMeasureCountsSideDoors(t *testing.T) {
 	root := writeTree(t, map[string]string{
-		"effects/registry.go": effectsSrc,
+		"engine/effects/registry.go": effectsSrc,
 		// Num is a string-keyed helper (key at 3); numStrict forwards its own
 		// key to Num at position 1, so it is one too. Literal keys: 2 at Num,
 		// 1 at numStrict; a variable key is not counted.
-		"effects/count.go": `package effects
+		"engine/effects/count.go": `package effects
 
 import "strings"
 
@@ -390,7 +390,7 @@ var t1 = state.NewStrCodes(
 var t2 = cards.NewStrTable[int](cards.StrEntry[int]{"Hand", 1}, cards.StrEntry[int]{"Library", 2})
 var t3 = state.NewNameSet("Hand", "Exile", "Hand")
 `,
-		"rules/engine.go": `package rules
+		"engine/rules/engine.go": `package rules
 
 type Engine struct{ self *Engine }
 type resumePoint struct{ a int }

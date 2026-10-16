@@ -16,7 +16,7 @@
 // opponent's seen cards, minus what the seat has seen. Because nothing of the
 // opponent's real list reaches the search, the policy does not read
 // decklists (bots.Info.ClosedLists) and may play humans; the host enforces
-// that on the seats it builds (host/closedlist.go), not on this declaration.
+// that on the seats it builds (server/host/closedlist.go), not on this declaration.
 //
 // Like az-c3 it registers only when asked: Enable(path, belief) loads the
 // network and registers the policy, and refuses without a belief. The
@@ -29,8 +29,8 @@ package azc4
 import (
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
 )
 
 // Policy is the registry key.

@@ -245,14 +245,14 @@ ignore_uncommitted = []
 # 2026-10-05: an XMage driver change is landed by a host operator, never by
 # the pipeline. Seats cannot run XMage, and 7883f6b25 merged a driver change
 # that turned every Standard scenario into a harness failure (4944 rows) until
-# a host full replay caught it. A branch touching tools/xmageoracle/ fails here
+# a host full replay caught it. A branch touching lab/oracle/xmageoracle/ fails here
 # and parks; scripts/driver_replay_batch.sh (unit gorge-driver-replay-batch)
-# batches every parked ticket, runs ONE validation/oracle/full-replay.sh,
+# batches every parked ticket, runs ONE lab/oracle/validation/oracle/full-replay.sh,
 # compares verdicts against main and lands them (2026-10-06; before that an
 # operator did this by hand, .ds4/operator-compliance-refresh.md).
 [[gates]]
 name = "xmage driver needs host replay"
-cmd = ["bash", "-c", "set -o pipefail; changed=$(git diff --name-only $(git merge-base {base} HEAD) HEAD -- tools/xmageoracle/); if [ -n \"$changed\" ]; then echo \"XMAGE DRIVER CHANGED -- parked for scripts/driver_replay_batch.sh (gorge-driver-replay-batch):\"; echo \"$changed\"; exit 1; fi; echo 'xmage driver untouched'"]
+cmd = ["bash", "-c", "set -o pipefail; changed=$(git diff --name-only $(git merge-base {base} HEAD) HEAD -- lab/oracle/xmageoracle/); if [ -n \"$changed\" ]; then echo \"XMAGE DRIVER CHANGED -- parked for scripts/driver_replay_batch.sh (gorge-driver-replay-batch):\"; echo \"$changed\"; exit 1; fi; echo 'xmage driver untouched'"]
 timeout = 60
 # Only an operator host full replay + hand landing clears this gate; a seat
 # fix round cannot (2026-10-05: four tickets looped 8-10 paid sol rounds on it).
@@ -310,7 +310,7 @@ env = { GORGE_REWARD_DIR = "/home/sadams/projects/gorge/.ds4/reward" }
 # 2026-10-05 (gate-vet1): raise the vet memory limit to stop GC thrash on
 # cache misses, then give the less GC-bound run more CPU. Measured in this
 # worktree, in the gate's systemd scope (cold = private empty GOCACHE; miss =
-# fresh rules/engine.go content with shared cache):
+# fresh engine/rules/engine.go content with shared cache):
 #   old 4G / 800% / -p=6 / GOMAXPROCS=6 / 1GiB -> cold 60.26s, 1.83GiB RSS;
 #                                                   miss 56.63s, 1.80GiB RSS
 #   new 8G / 1600% / -p=8 / GOMAXPROCS=8 / 4GiB -> cold 45.98s, 3.13GiB RSS;
@@ -351,9 +351,9 @@ env = { GOMEMLIMIT = "1GiB", GOMAXPROCS = "4", GOFLAGS = "-p=4 -trimpath" }
 # 2026-10-05 (operator): per-ticket validation cut to 1-2 min. The old module
 # gate (go vet ./... + go test ./..., 300-500s under fleet load) moved to the
 # post-merge full suite (scripts/postmerge_full.sh), run on main after
-# landings; a red there is bisected and fixed at once. This gate tests ./rules
+# landings; a red there is bisected and fixed at once. This gate tests ./engine/rules
 # (minus four whole-corpus censuses, which run post-merge), the Kr8 pair in
-# their own processes, ./view, ./internal/codeshape and every package the
+# their own processes, ./engine/view, ./internal/codeshape and every package the
 # branch touched. Run from the BASE copy so a branch cannot edit its own gate.
 name = "go test (affected)"
 cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then lock=\"$GORGE_HEAVY_LOCK\"; else common=\"$(git rev-parse --path-format=absolute --git-common-dir)\"; lock=\"$(dirname \"$common\")/.ds4/heavy.lock\"; fi; lanes=${GORGE_HEAVY_LANES:-3}; mkdir -p \"$(dirname \"$lock\")\"; acquired=; deadline=$(( $(date +%s) + 1500 )); while [ -z \"$acquired\" ]; do i=1; while [ \"$i\" -le \"$lanes\" ]; do f=\"$lock\"; [ \"$i\" = 1 ] || f=\"$lock.lane$i\"; : >>\"$f\" 2>/dev/null || { i=$((i+1)); continue; }; exec 9>>\"$f\"; if flock -n 9 2>/dev/null; then acquired=\"$f\"; break; fi; i=$((i+1)); done; if [ -z \"$acquired\" ]; then now=$(date +%s); if [ \"$now\" -lt \"$deadline\" ]; then rem=$(( deadline - now )); [ \"$rem\" -gt 5 ] && rem=5; sleep \"$rem\" 9>&-; else echo \"gate: every heavy lane of $lock still held after 1500s; affected gate not run\" >&2; exit 75; fi; fi; done; systemd-run --user --scope -q -p MemoryMax=16G -p CPUQuota=1600% bash -c 'set -o pipefail; git show {base}:scripts/gate_affected.sh | bash -s {base}'; rc=$?; exit \"$rc\""]
@@ -361,8 +361,8 @@ cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then
 # infrastructure wait, not the ticket's defect. Requeue it with no fix round
 # (18 of 45 gate_fails 10-09..10-12 were this, each billed a paid round).
 # 2026-10-14: exit 76 is the same shape for a stale-only certification failure
-# (scripts/gate_affected.sh's heavy pool: every failing ./compliance/gate or
-# ./compliance/adopt test logged GORGE-CERT-RESULT <name> stale-only, a moved
+# (scripts/gate_affected.sh's heavy pool: every failing ./lab/oracle/compliance/gate or
+# ./lab/oracle/compliance/adopt test logged GORGE-CERT-RESULT <name> stale-only, a moved
 # scenario sha a host XMage replay clears, not the ticket's defect -- 69 of 74
 # certification-only gate_fails 10-05..10-14 were stale-only, each billed a
 # paid round). Requeue it too; a non-stale certification failure still exits 1
@@ -410,7 +410,7 @@ requeue_max = 3
 #
 # 2026-10-09 (cli-20261009T114433Z-45f2f307): GOMEMLIMIT 1536MiB -> 3GiB with
 # the operator's doubled per-test budget (0d5e1a093 doubled the seat scope's
-# GOMEMLIMIT the same day; this gate env was missed). Measured: a ./rules
+# GOMEMLIMIT the same day; this gate env was missed). Measured: a ./engine/rules
 # shard's working set is 1.2-1.9 GiB RSS (serial, GOMEMLIMIT=3GiB), so
 # 1536MiB sits UNDER it and GC thrash stretches the rules phase (the
 # 2026-10-08 two-shard figure of 62 s read 78.8 s under this gate's own
@@ -419,7 +419,7 @@ requeue_max = 3
 # the others set and the two Kr8 runs (others peak ~1.0 GiB at -p=6, Kr8 ~12
 # s each).
 #
-# 2026-10-09 (cli-20261009T130325Z-2978e52d, gate-shard4): ./rules now runs
+# 2026-10-09 (cli-20261009T130325Z-2978e52d, gate-shard4): ./engine/rules now runs
 # four concurrent shards at GOMAXPROCS=4 each, alongside the two Kr8 runs,
 # searchprobe, the host overshoot check and the $others run at -p=6: at most
 # ~14 test binaries resident at the peak. No test's peak RSS is above ~2 GiB
@@ -431,7 +431,7 @@ env = { GOMEMLIMIT = "3GiB", GOMAXPROCS = "2", GOGC = "200", GOFLAGS = "-p=2 -tr
 
 [[gates]]
 name = "CR conformance"
-cmd = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "-p", "CPUQuota=800%", "go", "test", "-p=1", "./rules", "-run", "TestCR", "-v"]
+cmd = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "-p", "CPUQuota=800%", "go", "test", "-p=1", "./engine/rules", "-run", "TestCR", "-v"]
 timeout = 300
 # GOGC=200: same setting as the module gate above, for the same reason -- this
 # runs the same rules test binary, whose GC cost GOGC=200 cuts ~20%.
@@ -440,7 +440,7 @@ accept = "orchestrator.hooks:cr_no_fail_lines"
 
 [[gates]]
 name = "TestHeads"
-cmd = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "-p", "CPUQuota=800%", "go", "test", "./rules", "-run", "TestHeads", "-v"]
+cmd = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=8G", "-p", "CPUQuota=800%", "go", "test", "./engine/rules", "-run", "TestHeads", "-v"]
 timeout = 120
 # GOGC=200: as for the module and CR gates -- same rules test binary.
 env = { GOMEMLIMIT = "1GiB", GOGC = "200", GOFLAGS = "-p=2 -trimpath" }
@@ -549,7 +549,7 @@ post_gates = "orchestrator.hooks:testheads_policy"
 # it restates them. GOFLAGS adds -trimpath: without it every worktree's
 # absolute path is in every compile's cache key and no seat reuses another's
 # builds (measured: 0 cross-worktree hits; 4/5 with -trimpath).
-# 2026-10-06 (operator): compiles get 4 CPUs. ./rules is one 118k-line
+# 2026-10-06 (operator): compiles get 4 CPUs. ./engine/rules is one 118k-line
 # package and the compiler parallelises it only up to GOMAXPROCS (max 4);
 # at 2 a seat's cold rules compile took ~1 min. Test runs keep their budget
 # through their own capped scope (AGENTS.md test command).

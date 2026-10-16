@@ -54,18 +54,18 @@ func TestLaneEntriesCountsLeavesOnly(t *testing.T) {
 func TestApproximationsSplitsOnTheLastTwoCells(t *testing.T) {
 	md := "## Known approximations\n\n" +
 		"| Stand-in | Where | Removed by |\n|---|---|---|\n" +
-		"| plain row | `effects/misc.go:480` | M4 |\n" +
-		"| a row whose text has `DB$ Discard | Mode$ TgtChoose` inside it | `effects/cardflow.go` | M5 |\n" +
+		"| plain row | `engine/effects/misc.go:480` | M4 |\n" +
+		"| a row whose text has `DB$ Discard | Mode$ TgtChoose` inside it | `engine/effects/cardflow.go` | M5 |\n" +
 		"\n## Next section\n" +
 		"| not a row | in another table | ignored |\n"
 	got := approximations(md)
 	if len(got) != 2 {
 		t.Fatalf("got %d rows, want 2 — the header, the separator and the next section's table must all be excluded: %+v", len(got), got)
 	}
-	if got[0].Where != "`effects/misc.go:480`" || got[0].Disposition != "approved — removed by M4" {
+	if got[0].Where != "`engine/effects/misc.go:480`" || got[0].Disposition != "approved — removed by M4" {
 		t.Fatalf("plain row = %+v", got[0])
 	}
-	if got[1].Where != "`effects/cardflow.go`" {
+	if got[1].Where != "`engine/effects/cardflow.go`" {
 		t.Fatalf("Where = %q, want the LAST-but-one cell; a script fragment in the description "+
 			"must not be mistaken for the location", got[1].Where)
 	}

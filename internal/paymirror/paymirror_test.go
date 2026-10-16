@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // authored parses an authored minimal IR fixture -- never Forge script text,
@@ -136,7 +137,7 @@ func TestPayMirrorRepoDecksFixedSeedsEquivalent(t *testing.T) {
 func TestPayMirrorDetectsPerturbation(t *testing.T) {
 	cfg := rules.Config{Seed: 11, Names: []string{"rg", "ub"}, Decks: authoredDecks(t), Tokens: map[string]*cards.Card{}}
 	e := rules.NewStartingPlayerChoice(cfg)
-	bots := []*seat.Bot{seat.NewBot(1).EnableAutoPayMana(), seat.NewBot(2).EnableAutoPayMana()}
+	bots := []*heuristic.Bot{heuristic.NewBot(1).EnableAutoPayMana(), heuristic.NewBot(2).EnableAutoPayMana()}
 	answer := func(e *rules.Engine, d *decision.Decision) (decision.Intent, error) {
 		if bots[d.Player].WantsPaymentActions() {
 			e.EnsurePaymentActions()

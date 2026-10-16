@@ -22,7 +22,7 @@ case $arm in
   *) echo "unknown arm $arm" >&2; exit 2 ;;
 esac
 mkdir -p "$OUT/bin" "$OUT/gauntlet/$arm"
-(cd "$repo" && go build -o "$OUT/bin/draftrl" ./cmd/draftrl)
+(cd "$repo" && go build -o "$OUT/bin/draftrl" ./lab/cmd/draftrl)
 t=${TIMEOUT:-0}; tm=(); [ "$t" != 0 ] && tm=(timeout "$t")
 extra=(); [ "${MAXHUMAN:-0}" != 0 ] && extra=(-max-human "$MAXHUMAN")
 "${tm[@]}" systemd-run --user --scope -q -p MemoryMax=$MEMMAX -p MemorySwapMax=0 -p CPUQuota=$CPUQ \

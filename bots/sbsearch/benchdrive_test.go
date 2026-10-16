@@ -7,17 +7,19 @@ package sbsearch
 //
 // The two benches are the split this file guards (spec §5.1): the HOST
 // surface (`New`, what `bots.New` returns) is the plain View adapter and must
-// NOT satisfy searchseat.SearchSeat or seat.BoardSeat; the BENCH surface
+// NOT satisfy searchseat.SearchSeat or heuristic.BoardSeat; the BENCH surface
 // (`NewBench`) is the wrapper the driver's feed branch dispatches on.
 
 import (
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/internal/spellbench/sbsearch"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 // NewBench must produce the shape the bench driver dispatches: a full
@@ -57,8 +59,8 @@ func TestHostedSeatUnwrapsToTheSearchSeat(t *testing.T) {
 }
 
 // The HOST surface is deliberately NOT a searchseat.SearchSeat and NOT a
-// seat.BoardSeat (§5.1). DecideBoard's signature is byte-identical to
-// seat.BoardSeat's only method, so a hostedSeat carrying it would be
+// heuristic.BoardSeat (§5.1). DecideBoard's signature is byte-identical to
+// heuristic.BoardSeat's only method, so a hostedSeat carrying it would be
 // type-asserted by any host code looking for a BoardSeat and routed through
 // DecideBoard instead of the intended Decide/DecideEnv path. This is the
 // negative half of the split: `bots.New` returns this plain adapter.
@@ -67,8 +69,8 @@ func TestHostedNewIsNotASearchOrBoardSeat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, ok := s.(seat.BoardSeat); ok {
-		t.Fatalf("bots.New seat satisfies seat.BoardSeat: %T (DecideBoard routes it away from the plain View path)", s)
+	if _, ok := s.(heuristic.BoardSeat); ok {
+		t.Fatalf("bots.New seat satisfies heuristic.BoardSeat: %T (DecideBoard routes it away from the plain View path)", s)
 	}
 	if _, ok := s.(searchseat.SearchSeat); ok {
 		t.Fatalf("bots.New seat satisfies searchseat.SearchSeat: %T", s)
@@ -82,7 +84,7 @@ func TestHostedNewIsNotASearchOrBoardSeat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBench: %v", err)
 	}
-	if _, ok := bench.(seat.BoardSeat); !ok {
-		t.Fatalf("NewBench seat is not seat.BoardSeat: %T (the bench's DecideBoard fallback must exist)", bench)
+	if _, ok := bench.(heuristic.BoardSeat); !ok {
+		t.Fatalf("NewBench seat is not heuristic.BoardSeat: %T (the bench's DecideBoard fallback must exist)", bench)
 	}
 }

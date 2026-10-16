@@ -9,10 +9,10 @@ data whose player sits in the >= 60% game-win-rate bucket, one deck per
 names and counts only (no card text).
 
 Outputs (both committed):
-  internal/spellbench/fdn-cards.tsv        the FDN Limited card universe (the
+  lab/training/spellbench/fdn-cards.tsv        the FDN Limited card universe (the
                                            replay file's deck_* columns) with
                                            play-frequency weights
-  internal/spellbench/decks/fdn-limited/   the fixed benchmark pool: -n decks
+  lab/training/spellbench/decks/fdn-limited/   the fixed benchmark pool: -n decks
                                            chosen deterministically (sha256 of
                                            draft_id:build_index, ascending)
 

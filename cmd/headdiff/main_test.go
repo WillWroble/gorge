@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
 )
 
 // repoRootOrSkip resolves the repo root with git (cards.GitEnv, so a hook's
@@ -39,7 +39,7 @@ func TestDumpThenAgainst(t *testing.T) {
 	}
 	root := repoRootOrSkip(t)
 	corpus := testutil.CorpusDirOrSkip(t)
-	heads := filepath.Join(root, "rules", "testdata", "heads")
+	heads := filepath.Join(root, "engine", "rules", "testdata", "heads")
 	ref := filepath.Join(t.TempDir(), "ref.json")
 
 	var out, errOut bytes.Buffer

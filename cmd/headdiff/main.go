@@ -7,7 +7,7 @@
 // with replay.FirstDivergence, the byte comparison replay uses.
 //
 //	headdiff                    play every seat count; print each head and
-//	                            whether it matches rules/testdata/heads/
+//	                            whether it matches engine/rules/testdata/heads/
 //	headdiff -dump FILE         also write the event streams to FILE
 //	headdiff -against FILE      compare this tree's streams with FILE's and
 //	                            print the first divergent event per seat
@@ -30,7 +30,7 @@
 //
 // The base's deck lists come from its own embedded internal/testutil/decks,
 // so the dump is main's game even though the corpus directory is shared. If
-// the two builds differ in cards/ (CompilerFingerprint), each run recompiles
+// the two builds differ in engine/cards/ (CompilerFingerprint), each run recompiles
 // the corpus IR cache for its own fingerprint, which takes a minute.
 //
 // The engine runs its fast paths in production mode here, where the rules
@@ -55,13 +55,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
 )
 
 func main() {
@@ -81,7 +81,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	dir := fs.String("dir", ".cards", "corpus directory (holds ir.gob.gz / cardsfolder)")
 	seatsFlag := fs.String("seats", "all", "comma-separated seat counts to play, or all")
-	headsDir := fs.String("heads", filepath.Join("rules", "testdata", "heads"), "pinned head files to check against (skipped when absent)")
+	headsDir := fs.String("heads", filepath.Join("engine", "rules", "testdata", "heads"), "pinned head files to check against (skipped when absent)")
 	dump := fs.String("dump", "", "write each game's event stream to this file")
 	against := fs.String("against", "", "compare each game's event stream with this recording")
 	context := fs.Int("context", 5, "events of context to print around a divergence")

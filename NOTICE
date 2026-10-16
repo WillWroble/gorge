@@ -1,7 +1,7 @@
 gorge
 Copyright the gorge authors. Licensed under the Apache License, Version 2.0.
 
-compliance/manifests/*.json are derived from the set classes of XMage
+lab/oracle/compliance/manifests/*.json are derived from the set classes of XMage
 (https://github.com/magefree/mage), Mage.Sets/src/mage/sets, at the commit
 named in each file's "xmage_ref". XMage is distributed under the MIT License:
 

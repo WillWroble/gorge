@@ -94,7 +94,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .cards
-          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('cards/**/*.go') }}
+          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('engine/cards/**/*.go') }}
           restore-keys: cards-${{ steps.pin.outputs.forge_ref }}-
       - name: Fetch and compile the corpus
         if: steps.corpus.outputs.cache-hit != 'true'
@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .cards
-          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('cards/**/*.go') }}
+          key: cards-${{ steps.pin.outputs.forge_ref }}-${{ hashFiles('engine/cards/**/*.go') }}
       - name: Restore the Go cache
         uses: actions/cache/restore@v4
         with:
@@ -127,7 +127,7 @@ jobs:
           go test $count -timeout 20m -skip '^(TestHeads)$' $pkgs
       - name: Golden chain heads
         if: matrix.shard == 0
-        run: go test -timeout 10m -run '^TestHeads$' ./rules
+        run: go test -timeout 10m -run '^TestHeads$' ./engine/rules
       - name: Save the Go cache
         if: github.event_name != 'pull_request'
         uses: actions/cache/save@v4

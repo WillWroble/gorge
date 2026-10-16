@@ -1,6 +1,6 @@
 // Package testutil holds fixtures and checks shared by tests that sit
 // outside the rules package's own test binary -- Task 26's acceptance
-// harness and rules/fuzz_test.go's invariant gate both need this without
+// harness and engine/rules/fuzz_test.go's invariant gate both need this without
 // rules importing itself, so this package sits beside state and decision in
 // the dependency order (cards -> state -> decision -> events -> effects ->
 // rules -> view -> seat -> replay -> cmd/*) and imports only cards, state
@@ -10,8 +10,8 @@ package testutil
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // CheckInvariants is the rules core's acceptance gate: six checks from the

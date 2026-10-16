@@ -21,7 +21,7 @@ const cardMetaTag = `<meta name="gorge-cards" content="/">`
 // of the real build's index.html carrying cardMetaTag, while every other
 // file passes through untouched and the on-disk build is never modified.
 // gorged wraps the embedded web build with this before handing it to
-// httpapi as Options.Web, so the SPA fallback path (host/httpapi/static.go)
+// httpapi as Options.Web, so the SPA fallback path (server/host/httpapi/static.go)
 // serves the tag with the page that needs it.
 func withCardMeta(inner fs.FS) fs.FS {
 	return metaFS{inner: inner}

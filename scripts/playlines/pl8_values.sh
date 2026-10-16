@@ -15,7 +15,7 @@ CORPUS=${CORPUS:-$repo/.cards}
 PY=${PY:-/mnt/sata/gorge-training/cardval/venv/bin/python}
 WORKERS=${WORKERS:-16}; MEMMAX=${MEMMAX:-24G}; GOMEM=${GOMEM:-16}; CPUQ=${CPUQ:-1600%}
 mkdir -p "$OUT/bin" "$OUT/values/$arm"
-(cd "$repo" && go build -o "$OUT/bin/cardval" ./cmd/cardval)
+(cd "$repo" && go build -o "$OUT/bin/cardval" ./lab/cmd/cardval)
 t=${TIMEOUT:-0}; tm=(); [ "$t" != 0 ] && tm=(timeout "$t")
 "${tm[@]}" systemd-run --user --scope -q -p MemoryMax=$MEMMAX -p MemorySwapMax=0 -p CPUQuota=$CPUQ \
   env GOMAXPROCS=$WORKERS GOMEMLIMIT=${GOMEM}GiB \

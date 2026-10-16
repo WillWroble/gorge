@@ -17,13 +17,13 @@ import (
 // which the other layering checks deliberately exclude.
 //
 // Why it matters (repo-shape audit, 2026-10-14): two rules_test files that
-// imported compliance/oraclegen/templates and compliance/levelb put the
-// whole compliance tier in ./rules' test binary. The templates are the most
+// imported lab/oracle/compliance/oraclegen/templates and lab/oracle/compliance/levelb put the
+// whole compliance tier in ./engine/rules' test binary. The templates are the most
 // edited Go code in the repo, so 63% of the 883 merges 10-05..10-14
-// invalidated ./rules' test cache (193 s of tests and a 27 s rebuild per
+// invalidated ./engine/rules' test cache (193 s of tests and a 27 s rebuild per
 // gate run) against 42% once the edge was gone. A test that drives a
 // compliance scenario through the engine belongs in the compliance package
-// (compliance/oraclegen/templates/rules_oracle_*_test.go are the two that
+// (lab/oracle/compliance/oraclegen/templates/rules_oracle_*_test.go are the two that
 // moved), which depends on rules anyway.
 //
 // The check parses the _test.go files itself instead of asking `go list`:

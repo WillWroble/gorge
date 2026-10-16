@@ -21,7 +21,7 @@
 // the honest root) therefore does not apply here.
 //
 // The adapter never sees the live engine: the host's Env carries only the
-// honest root (host/botenv.go envData), and env.View is the actor's own
+// honest root (server/host/botenv.go envData), and env.View is the actor's own
 // projection. Priority and attackers are the only kinds WantsEnv claims
 // (§5.1), so an sb-search-lite-atk table costs one honest redeal per
 // priority-or-attack decision and a plain View answer everywhere else.
@@ -31,15 +31,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
 	"github.com/adams-shaun/gorge/bots/sbtactical"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	"github.com/adams-shaun/gorge/internal/spellbench/sbsearch"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/bots/spellbench/sbsearch"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Policy is the registry key.
@@ -70,7 +70,7 @@ func init() {
 }
 
 // LiteAtk is the registered sb-search budget (spec §11 BP-14): the
-// cmd/botbench spellbench registry's "sb-search-lite-atk" row -- W4, a
+// lab/cmd/botbench spellbench registry's "sb-search-lite-atk" row -- W4, a
 // 2-turn horizon, attacks searched -- with this entry's Name so the search's
 // Diags label the hosted policy. Hosted() and botbench share this one
 // function, so the hosted default and the bench's lite-atk arm cannot drift
@@ -112,7 +112,7 @@ func New(o bots.Options, cfg sbsearch.Config) (seat.Seat, error) {
 // and calls this; the driver's feed branch type-asserts the returned seat for
 // searchseat.SearchSeat. The host never calls it -- bots.New returns the bare
 // hostedSeat from New above, which deliberately does not satisfy either
-// searchseat.SearchSeat or seat.BoardSeat (§5.1's plain-View contract).
+// searchseat.SearchSeat or heuristic.BoardSeat (§5.1's plain-View contract).
 func NewBench(o bots.Options, cfg sbsearch.Config) (seat.Seat, error) {
 	s, err := newHostedSeat(o, cfg)
 	if err != nil {
@@ -223,8 +223,8 @@ func (s *hostedSeat) AnswerRefused(v view.View, d decision.Decision, refused dec
 
 // benchSearchSeat is the bench-only view of hostedSeat: the driver-facing
 // searchseat.SearchSeat half (spec §5.1 / BP-16). It exists so hostedSeat
-// itself never satisfies seat.BoardSeat -- DecideBoard's signature is
-// byte-identical to seat.BoardSeat's only method, so a hostedSeat carrying it
+// itself never satisfies heuristic.BoardSeat -- DecideBoard's signature is
+// byte-identical to heuristic.BoardSeat's only method, so a hostedSeat carrying it
 // would be type-asserted by any host code looking for a BoardSeat and routed
 // through DecideBoard instead of the intended Decide/DecideEnv path. The host
 // therefore only ever receives the plain hostedSeat from bots.New; the bench
@@ -251,7 +251,7 @@ var (
 	// never calls it; its Env dispatch routes the same wrapped call through
 	// DecideEnv, gated on WantsEnv. Only the bench wrapper satisfies this: the
 	// host's hostedSeat deliberately does not, since DecideBoard is also
-	// seat.BoardSeat's method.
+	// heuristic.BoardSeat's method.
 	_ searchseat.SearchSeat = (*benchSearchSeat)(nil)
 )
 
@@ -272,7 +272,7 @@ func (s *benchSearchSeat) DecideSearch(ctx context.Context, env searchseat.Env, 
 // DecideEnv); this method exists so botbench's existing SearchSeat branch
 // drives the same wrapped seat with the real engine the bench keeps.
 // Deliberately declared on benchSearchSeat and NOT on hostedSeat: the latter
-// would then structurally satisfy seat.BoardSeat.
+// would then structurally satisfy heuristic.BoardSeat.
 func (s *benchSearchSeat) DecideBoard(ctx context.Context, b botpolicy.Board, d decision.Decision) (decision.Intent, error) {
 	return s.bot.DecideBoard(ctx, b, d)
 }

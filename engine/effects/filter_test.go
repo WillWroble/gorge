@@ -1,0 +1,666 @@
+package effects
+
+import (
+	"testing"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+func board(t testing.TB) (*state.Game, map[string]state.ObjID) {
+	t.Helper()
+	g := state.NewGame([]string{"you", "them"})
+	mkIn := func(owner state.PlayerID, zone state.Zone, src string) state.ObjID {
+		c, d := cards.ParseBytes("t.txt", []byte(src))
+		if len(d) != 0 {
+			t.Fatalf("diags: %v", d)
+		}
+		c.Link()
+		for _, f := range c.Faces {
+			f.ApplyIntrinsics()
+		}
+		o := g.AddObject(c, owner)
+		o.Zone = zone
+		g.SetZone(zone, owner, append(g.Zone(zone, owner), o.ID))
+		return o.ID
+	}
+	mk := func(owner state.PlayerID, src string) state.ObjID {
+		return mkIn(owner, state.ZBattlefield, src)
+	}
+	ids := map[string]state.ObjID{
+		"myBear":        mk(0, "Name:Bear\nManaCost:1 G\nTypes:Creature Bear\nPT:2/2\nOracle:x\n"),
+		"myFlier":       mk(0, "Name:Flier\nManaCost:1 U\nTypes:Creature Bird\nPT:1/1\nK:Flying\nOracle:x\n"),
+		"myLand":        mk(0, "Name:Mountain\nTypes:Basic Land Mountain\nOracle:x\n"),
+		"myArtifact":    mk(0, "Name:Relic\nManaCost:1\nTypes:Artifact\nOracle:x\n"),
+		"myEnchantment": mk(0, "Name:Aura\nManaCost:W\nTypes:Enchantment\nOracle:x\n"),
+		"myWalker":      mk(0, "Name:Walker\nManaCost:2 U\nTypes:Legendary Planeswalker Test\nOracle:x\n"),
+		"myBattle":      mk(0, "Name:Siege\nManaCost:2 R\nTypes:Battle Siege\nOracle:x\n"),
+		"myInstant":     mkIn(0, state.ZGraveyard, "Name:Trick\nManaCost:U\nTypes:Instant\nOracle:x\n"),
+		"mySorcery":     mkIn(0, state.ZGraveyard, "Name:Ritual\nManaCost:R\nTypes:Sorcery\nOracle:x\n"),
+		"theirBig":      mk(1, "Name:Giant\nManaCost:4 R\nTypes:Creature Giant\nPT:5/5\nOracle:x\n"),
+	}
+	return g, ids
+}
+
+func TestBaseTypeMatching(t *testing.T) {
+	g, id := board(t)
+	cases := []struct {
+		spec string
+		obj  string
+		want bool
+	}{
+		{"Creature", "myBear", true},
+		{"Creature", "myLand", false},
+		{"Land", "myLand", true},
+		{"Permanent", "myLand", true},
+		{"Card", "myBear", true},
+		{"Card", "myLand", true},
+		{"Card", "myInstant", true},
+		{"Any", "myBear", true},
+		{"Any", "myWalker", true},
+		{"Any", "myBattle", true},
+		{"Any", "myLand", false},
+		{"Any", "myArtifact", false},
+		{"Any", "myEnchantment", false},
+		{"Any", "myInstant", false},
+		{"Any", "mySorcery", false},
+		{"Artifact", "myBear", false},
+		{"nonCreature", "myLand", true},
+		{"nonCreature", "myBear", false},
+		{"nonLand", "myBear", true},
+	}
+	for _, c := range cases {
+		if got := MatchesSpec(g, c.spec, id[c.obj], 0); got != c.want {
+			t.Errorf("MatchesSpec(%q, %s) = %v, want %v", c.spec, c.obj, got, c.want)
+		}
+	}
+}
+
+func TestControlAndOwnershipPredicates(t *testing.T) {
+	g, id := board(t)
+	for _, c := range []struct {
+		spec string
+		obj  string
+		you  state.PlayerID
+		want bool
+	}{
+		{"Creature.YouCtrl", "myBear", 0, true},
+		{"Creature.YouCtrl", "theirBig", 0, false},
+		{"Creature.OppCtrl", "theirBig", 0, true},
+		{"Creature.OppCtrl", "myBear", 0, false},
+		{"Creature.YouOwn", "myBear", 0, true},
+		{"Creature.YouDontCtrl", "theirBig", 0, true},
+	} {
+		if got := MatchesSpec(g, c.spec, id[c.obj], c.you); got != c.want {
+			t.Errorf("MatchesSpec(%q, %s, you=%d) = %v, want %v", c.spec, c.obj, c.you, got, c.want)
+		}
+	}
+}
+
+func TestWithKeywordPredicateSeesCounterGrantedKeyword(t *testing.T) {
+	g, id := board(t)
+	// A CR 122.1b menace counter grants the keyword exactly as a printed
+	// K:Menace does, so the +withMenace/+withoutMenace predicates must see it
+	// (Butch DeLoria's counter, Frillscare Mentor's ValidCards$ ...+withMenace).
+	bear := g.Obj(id["myBear"])
+	if MatchesSpec(g, "Creature.YouCtrl+withMenace", id["myBear"], 0) {
+		t.Fatal("a counterless bear matched +withMenace")
+	}
+	bear.AddCounter("Menace", 1)
+	if !MatchesSpec(g, "Creature.YouCtrl+withMenace", id["myBear"], 0) {
+		t.Fatal("a menace-countered creature did not match +withMenace")
+	}
+	if MatchesSpec(g, "Creature.YouCtrl+withoutMenace", id["myBear"], 0) {
+		t.Fatal("a menace-countered creature matched +withoutMenace")
+	}
+	// A non-keyword marker counter grants nothing.
+	bear2 := g.Obj(id["myFlier"])
+	bear2.AddCounter("P1P1", 1)
+	if MatchesSpec(g, "Creature.YouCtrl+withMenace", id["myFlier"], 0) {
+		t.Fatal("a +1/+1 counter granted menace")
+	}
+}
+
+func TestConjunctionAndAlternation(t *testing.T) {
+	g, id := board(t)
+	// AND: both predicates must hold.
+	if !MatchesSpec(g, "Creature.YouCtrl+withFlying", id["myFlier"], 0) {
+		t.Error("flier should match Creature.YouCtrl+withFlying")
+	}
+	if MatchesSpec(g, "Creature.YouCtrl+withFlying", id["myBear"], 0) {
+		t.Error("bear should not match +withFlying")
+	}
+	// OR: any alternative matching is enough.
+	if !MatchesSpec(g, "Land,Creature.YouCtrl", id["myLand"], 0) {
+		t.Error("land should match the first alternative")
+	}
+	if !MatchesSpec(g, "Land,Creature.YouCtrl", id["myBear"], 0) {
+		t.Error("bear should match the second alternative")
+	}
+	if MatchesSpec(g, "Land,Artifact", id["myBear"], 0) {
+		t.Error("bear matches neither alternative")
+	}
+}
+
+func TestStatePredicates(t *testing.T) {
+	g, id := board(t)
+	g.Obj(id["myBear"]).Tapped = true
+	g.Obj(id["theirBig"]).IsAttacking = true
+	if !MatchesSpec(g, "Creature.tapped", id["myBear"], 0) {
+		t.Error("tapped predicate failed")
+	}
+	if MatchesSpec(g, "Creature.untapped", id["myBear"], 0) {
+		t.Error("untapped must be the negation of tapped")
+	}
+	if !MatchesSpec(g, "Creature.attacking", id["theirBig"], 0) {
+		t.Error("attacking predicate failed")
+	}
+	if !MatchesSpec(g, "Creature.powerLE2", id["myBear"], 0) {
+		t.Error("powerLE2 should match a 2/2")
+	}
+	if MatchesSpec(g, "Creature.powerLE2", id["theirBig"], 0) {
+		t.Error("powerLE2 should not match a 5/5")
+	}
+	if !MatchesSpec(g, "Creature.cmcLE3", id["myBear"], 0) {
+		t.Error("cmcLE3 should match a two-drop")
+	}
+}
+
+func TestSelfAndOtherArePerspectiveDependent(t *testing.T) {
+	g, id := board(t)
+	// Self and Other are evaluated against the effect's source, which the
+	// caller passes as the "you" object via SpecCtx.
+	if !MatchesSpecFrom(g, "Card.Self", id["myBear"], 0, id["myBear"]) {
+		t.Error("Self should match the source object")
+	}
+	if MatchesSpecFrom(g, "Card.Self", id["myFlier"], 0, id["myBear"]) {
+		t.Error("Self must not match a different object")
+	}
+	if !MatchesSpecFrom(g, "Creature.Other", id["myFlier"], 0, id["myBear"]) {
+		t.Error("Other should match any object but the source")
+	}
+}
+
+func TestUnknownPredicatesAreReportedNotSilentlyTrue(t *testing.T) {
+	g, id := board(t)
+	got := UnknownPredicates("Creature.YouCtrl+someMechanicWeDoNotModel")
+	if len(got) != 1 || got[0] != "someMechanicWeDoNotModel" {
+		t.Fatalf("UnknownPredicates = %v", got)
+	}
+	// An unknown predicate must not match: a filter that silently widens is
+	// how a rules engine quietly does the wrong thing.
+	if MatchesSpec(g, "Creature.someMechanicWeDoNotModel", id["myBear"], 0) {
+		t.Fatal("unknown predicate matched")
+	}
+	if len(UnknownPredicates("Creature.YouCtrl+withFlying")) != 0 {
+		t.Fatal("known predicates reported as unknown")
+	}
+}
+
+// TestChosenCardStrictReadsSpecContextChosen pins api:ChooseSource's gate
+// predicate: ChosenCardStrict is the membership test a ChooseSource
+// replacement's ValidSource$ spec names (Deflecting Palm's
+// `Card.ChosenCardStrict,Emblem.ChosenCard`). It reads SpecContext.Chosen --
+// the binding rules seeds from the chosen-source answer -- matches exactly
+// that object, fails closed with no bound choice, and is reported as known by
+// UnknownPredicates so the census cannot drift from the matcher.
+func TestChosenCardStrictReadsSpecContextChosen(t *testing.T) {
+	g, id := board(t)
+	chosen := SpecContext{You: 0, Chosen: []state.Target{{Obj: id["myBear"]}}, ChosenValid: true}
+	if !MatchesObjectCtx(g, "Creature.ChosenCardStrict", g.Obj(id["myBear"]), chosen) {
+		t.Error("ChosenCardStrict must match the chosen object")
+	}
+	if MatchesObjectCtx(g, "Creature.ChosenCardStrict", g.Obj(id["myFlier"]), chosen) {
+		t.Error("ChosenCardStrict must not match an unchosen object")
+	}
+	if MatchesObjectCtx(g, "Creature.ChosenCardStrict", g.Obj(id["myBear"]), SpecContext{You: 0}) {
+		t.Error("ChosenCardStrict must fail closed with no bound choice")
+	}
+	if !MatchesObjectCtx(g, "Creature.!ChosenCardStrict", g.Obj(id["myFlier"]), chosen) {
+		t.Error("!ChosenCardStrict must admit an unchosen object")
+	}
+	for _, spec := range []string{"Creature.ChosenCardStrict", "Creature.!ChosenCardStrict"} {
+		if un := UnknownPredicates(spec); len(un) != 0 {
+			t.Errorf("UnknownPredicates(%q) = %v, want empty", spec, un)
+		}
+	}
+}
+
+func TestPlayerSpecs(t *testing.T) {
+	g, _ := board(t)
+	for _, tc := range []struct {
+		name string
+		spec string
+		p    state.PlayerID
+		want bool
+	}{
+		{name: "Player", spec: "Player", p: 1, want: true},
+		{name: "Any", spec: "Any", p: 0, want: true},
+		{name: "Opponent matches other seat", spec: "Opponent", p: 1, want: true},
+		{name: "Opponent rejects you", spec: "Opponent", p: 0, want: false},
+		{name: "You", spec: "You", p: 0, want: true},
+		{name: "Player.Opponent", spec: "Player.Opponent", p: 1, want: true},
+		{name: "Player.Opponent rejects you", spec: "Player.Opponent", p: 0, want: false},
+		{name: "Player.You", spec: "Player.You", p: 0, want: true},
+		{name: "Player.You rejects opponent", spec: "Player.You", p: 1, want: false},
+		{name: "Player.Other", spec: "Player.Other", p: 1, want: true},
+		{name: "Player.Other rejects you", spec: "Player.Other", p: 0, want: false},
+		{name: "comma list", spec: "Player.IsRemembered,Player.Opponent", p: 1, want: true},
+		{name: "unimplemented qualifier", spec: "Player.IsRemembered", p: 0, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MatchesPlayerSpec(g, tc.spec, tc.p, 0); got != tc.want {
+				t.Fatalf("MatchesPlayerSpec(%q, p=%d, you=0) = %v, want %v", tc.spec, tc.p, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestPlayerSpecIsMonarchStateLocal pins the monarch qualifier (CR 716.2)
+// in the shared player-spec grammar: Player.isMonarch (the base the static
+// GainControl$ value and every other consumer resolve through) matches only
+// the seat holding the monarch designation, and the fx20 qualifiers that
+// need player-state machinery this grammar does not carry still fail closed.
+func TestPlayerSpecIsMonarchStateLocal(t *testing.T) {
+	g, _ := board(t)
+	g.HasMonarch, g.Monarch = true, 1
+	if !MatchesPlayerSpec(g, "Player.isMonarch", 1, 0) {
+		t.Error("Player.isMonarch must match the monarch")
+	}
+	if MatchesPlayerSpec(g, "Player.isMonarch", 0, 0) {
+		t.Error("Player.isMonarch must not match a non-monarch seat")
+	}
+	// you is irrelevant: the qualifier is a state read, not a relation.
+	if !MatchesPlayerSpec(g, "Player.isMonarch", 1, 1) {
+		t.Error("Player.isMonarch must match the monarch regardless of you")
+	}
+	// No monarch on the board: nobody matches.
+	g.HasMonarch = false
+	if MatchesPlayerSpec(g, "Player.isMonarch", 1, 0) {
+		t.Error("Player.isMonarch with no monarch must match nobody")
+	}
+	g.HasMonarch, g.Monarch = true, 1
+	// A qualified You/Opponent/Other base still fails closed (the fx20
+	// convention -- narrow is the contract, never silently widened).
+	if MatchesPlayerSpec(g, "You.isMonarch", 1, 1) {
+		t.Error("You.isMonarch must still fail closed")
+	}
+	if MatchesPlayerSpec(g, "Opponent.isMonarch", 0, 1) {
+		t.Error("Opponent.isMonarch must still fail closed")
+	}
+	// NonActive is the complement of Active after the base qualifier is
+	// applied. In particular, Player/Any can select the other seat, while
+	// You selects only the active seat and Opponent/Other select only the
+	// non-active seat for this perspective.
+	for _, tc := range []struct {
+		spec string
+		p    state.PlayerID
+		want bool
+	}{
+		{"Player.NonActive", 0, false},
+		{"Player.NonActive", 1, true},
+		{"Any.NonActive", 0, false},
+		{"Any.NonActive", 1, true},
+		{"You.NonActive", 0, false},
+		{"You.NonActive", 1, false},
+		{"Opponent.NonActive", 0, false},
+		{"Opponent.NonActive", 1, true},
+		{"Other.NonActive", 0, false},
+		{"Other.NonActive", 1, true},
+	} {
+		if got := MatchesPlayerSpec(g, tc.spec, tc.p, 0); got != tc.want {
+			t.Errorf("MatchesPlayerSpec(%q, p=%d) = %v, want %v", tc.spec, tc.p, got, tc.want)
+		}
+	}
+	// The neighbouring unimplemented qualifiers remain dead.
+	for _, spec := range []string{"Player.EnchantedBy", "Player.descended", "Player.Chosen"} {
+		if MatchesPlayerSpec(g, spec, 1, 0) {
+			t.Errorf("%s must still fail closed", spec)
+		}
+	}
+}
+
+// twoSeatGame builds a fresh 2-seat game holding one object parsed from src,
+// owned by seat 0, for tests that need a plain board plus an unrelated
+// "source" object of their own (SpecContext.Source).
+func twoSeatGame(t *testing.T, src string) (*state.Game, state.ObjID) {
+	t.Helper()
+	g := state.NewGame([]string{"you", "them"})
+	return g, g.AddObject(mkCard(t, src), 0).ID
+}
+
+func TestSpecContextResolvesNumericRHSAndChoices(t *testing.T) {
+	g, id := twoSeatGame(t, "Name:Bolt\nManaCost:R\nTypes:Instant\nOracle:x\n") // cmc 1; helper in this file or write it
+	src := g.AddObject(g.Obj(id).Card, 0)
+	src.ChosenName, src.ChosenType, src.ChosenNumber = "Bolt", "Goblin", 1
+	sc := SpecContext{You: 0, Source: src.ID, Resolve: func(name string) (int32, bool) {
+		switch name {
+		case "Y":
+			return 1, true
+		case "Chosen":
+			return src.ChosenNumber, true
+		}
+		return 0, false
+	}}
+	for spec, want := range map[string]bool{
+		"Card.cmcEQY":        true,
+		"Card.cmcEQChosen":   true,
+		"Card.cmcGTY":        false,
+		"Card.cmcEQZ":        false, // unresolvable: never matches
+		"Card.NamedCard":     true,
+		"Card.ChosenType":    false, // Bolt is not a Goblin
+		"Card.kicked":        false,
+		"Card.StrictlyOther": true,
+	} {
+		if got := MatchesSpecCtx(g, spec, id, sc); got != want {
+			t.Errorf("%s: %v, want %v", spec, got, want)
+		}
+	}
+	g.Obj(id).CastFlags = state.FlagKicked | state.FlagSurged
+	if !MatchesSpecCtx(g, "Card.kicked+surged", id, sc) {
+		t.Error("kicked+surged")
+	}
+	if MatchesSpecFrom(g, "Card.cmcEQY", id, 0, src.ID) {
+		t.Error("MatchesSpecFrom has no resolver and must not match an SVar-shaped RHS")
+	}
+	// A copy off the stack matches nothing.
+	g.Obj(id).IsCopy = true
+	g.Obj(id).Zone = state.ZExile
+	if MatchesSpecCtx(g, "Card", id, sc) {
+		t.Error("an exiled copy matched")
+	}
+}
+
+// TestCountersPredicateFamily covers the counters_<CMP><n>_<KIND> family that
+// Undying's expansion uses (counters_EQ0_P1P1 -- "as it died, with no +1/+1
+// counter"), read off the object the spec is applied to.
+func TestCountersPredicateFamily(t *testing.T) {
+	g, id := board(t)
+	g.Obj(id["myBear"]).AddCounter("P1P1", 2)
+	g.Obj(id["myBear"]).AddCounter("M1M1", 1)
+	cases := []struct {
+		spec string
+		want bool
+	}{
+		{"Creature.counters_EQ0_P1P1", false}, // has two
+		{"Creature.counters_GE1_P1P1", true},
+		{"Creature.counters_EQ2_P1P1", true},
+		{"Creature.counters_LT2_P1P1", false},
+		{"Creature.counters_GT1_P1P1", true},
+		{"Creature.counters_LE1_P1P1", false},
+		{"Creature.counters_EQ0_M1M1", false},
+		{"Creature.counters_EQ1_M1M1", true},
+	}
+	for _, c := range cases {
+		if got := MatchesSpec(g, c.spec, id["myBear"], 0); got != c.want {
+			t.Errorf("%s = %v, want %v", c.spec, got, c.want)
+		}
+	}
+	// The recognised shape is not reported unknown.
+	if un := UnknownPredicates("Creature.counters_EQ0_P1P1"); len(un) != 0 {
+		t.Errorf("counters_EQ0_P1P1 reported unknown: %v", un)
+	}
+}
+
+// TestMatchesObjectCtxOnAnObjectValue is the LKI matcher: the same grammar
+// applied to an object handed in, not a live id, so a zone-change trigger can
+// match the object as it was the moment before the move reset it.
+func TestMatchesObjectCtxOnAnObjectValue(t *testing.T) {
+	g, id := board(t)
+	o := g.Obj(id["myBear"])
+	o.AddCounter("P1P1", 0)
+	// MatchesObjectCtx against an LKI-style snapshot that is NOT reachable by
+	// any live id (the card has been moved away) still evaluates normally.
+	clone := *o
+	clone.Zone = state.ZGraveyard
+	if !MatchesObjectCtx(g, "Card.Self+counters_EQ0_P1P1", &clone, SpecContext{You: 0, Source: o.ID}) {
+		t.Error("object-value Card.Self+counters_EQ0_P1P1 should match")
+	}
+	clone.AddCounter("P1P1", 1)
+	if MatchesObjectCtx(g, "Card.Self+counters_EQ0_P1P1", &clone, SpecContext{You: 0, Source: o.ID}) {
+		t.Error("a counter-bearing LKI copy must fail counters_EQ0_P1P1")
+	}
+	// A stack-copy that has left the stack matches nothing (CR 707.10h).
+	clone.IsCopy = true
+	if MatchesObjectCtx(g, "Card", &clone, SpecContext{}) {
+		t.Error("an exiled copy matched via an object value")
+	}
+}
+
+func TestPermanentOnlyMatchesBattlefield(t *testing.T) {
+	g, id := board(t)
+	// Object is initially on the battlefield; should match Permanent.
+	if !MatchesSpec(g, "Permanent", id["myBear"], 0) {
+		t.Error("card on battlefield should match Permanent")
+	}
+	if !MatchesSpec(g, "Card", id["myBear"], 0) {
+		t.Error("card on battlefield should match Card")
+	}
+
+	// Move the object to hand (ZHand = 1 as a typical zone ID).
+	g.Obj(id["myBear"]).Zone = state.ZHand
+	if MatchesSpec(g, "Permanent", id["myBear"], 0) {
+		t.Error("card in hand must not match Permanent")
+	}
+	if !MatchesSpec(g, "Card", id["myBear"], 0) {
+		t.Error("card in hand should still match Card")
+	}
+
+	// Also verify graveyard.
+	g.Obj(id["myBear"]).Zone = state.ZGraveyard
+	if MatchesSpec(g, "Permanent", id["myBear"], 0) {
+		t.Error("card in graveyard must not match Permanent")
+	}
+	if !MatchesSpec(g, "Card", id["myBear"], 0) {
+		t.Error("card in graveyard should still match Card")
+	}
+}
+
+// TestCtxSpecContextResolvesXAndSVarNumericRHS extends the numeric-RHS
+// resolver contract to the SVar table -- the resolution-time path, not the
+// hand-built SpecContext of TestSpecContextResolvesNumericRHSAndChoices. A
+// Ctx whose Host is bound (exactly what effects.Resolve does on entry, the
+// engine satisfying effects.Host the way fixLifeXCost already passes it to
+// EvalCountOK) resolves the bare "X" per the two-shape SVar:X reading
+// (engine/rules/mana.go's fixLifeXCost precedent), any other name through
+// EvalCountOK, and fails closed -- recognised shape, never matches -- on an
+// unresolvable body. A Ctx that never entered Resolve (Host nil, X unpaid,
+// no count-shaped SVar) keeps the resolver-free SpecContext it always built.
+func TestCtxSpecContextResolvesXAndSVarNumericRHS(t *testing.T) {
+	g, id := board(t)
+	h := &fakeHost{g: g}
+	// enterResolve mimics what effects.Resolve computes on entry (the Host
+	// binding and the numericRHS gate flag); a hand-built Ctx leaves both
+	// zero and stays resolver-free, which the gate assertions below pin.
+	enterResolve := func(c *Ctx) {
+		c.Host = h
+		c.numericRHS = c.X != 0 || len(c.SVars) > 0
+	}
+
+	// The paid X with no SVar:X at all: powerLTX/GTX read the paid value.
+	c := &Ctx{Source: id["myBear"], Controller: 0, X: 3}
+	enterResolve(c)
+	sc := c.SpecContext(0)
+	if !MatchesSpecCtx(g, "Creature.powerLTX", id["myBear"], sc) {
+		t.Error("bear (power 2) should match powerLTX with a paid X of 3")
+	}
+	if MatchesSpecCtx(g, "Creature.powerLTX", id["theirBig"], sc) {
+		t.Error("giant (power 5) should not match powerLTX with a paid X of 3")
+	}
+	if !MatchesSpecCtx(g, "Creature.powerGTX", id["theirBig"], sc) {
+		t.Error("giant (power 5) should match powerGTX with a paid X of 3")
+	}
+	if MatchesSpecCtx(g, "Creature.powerGTX", id["myBear"], sc) {
+		t.Error("bear (power 2) should not match powerGTX with a paid X of 3")
+	}
+
+	// SVar:X:Count$xPaid is the paid X itself (Whir of Invention's shape).
+	SetSVars(c, map[string]string{"X": "Count$xPaid"})
+	enterResolve(c)
+	if !MatchesSpecCtx(g, "Creature.powerLTX", id["myBear"], c.SpecContext(0)) {
+		t.Error("Count$xPaid must resolve to the paid X (bear matches powerLTX at 3)")
+	}
+
+	// SVar:X with any other RESOLVABLE body is a fixed value (Nightmare
+	// Unmaking's shape): Count$Valid Creature.YouCtrl counts seat 0's two
+	// creatures, so X is 2 and only the exactly-2-power bear is EQ.
+	SetSVars(c, map[string]string{"X": "Count$Valid Creature.YouCtrl"})
+	enterResolve(c)
+	sc = c.SpecContext(0)
+	if !MatchesSpecCtx(g, "Creature.powerEQX", id["myBear"], sc) {
+		t.Error("bear (power 2) should match powerEQX with X = the 2 controlled creatures")
+	}
+	if MatchesSpecCtx(g, "Creature.powerEQX", id["myFlier"], sc) {
+		t.Error("flier (power 1) should not match powerEQX with X = 2")
+	}
+
+	// An unresolvable SVar:X body fails closed: recognised shape, never
+	// matches -- the same verdict EvalCountOK reports, never a guessed zero.
+	SetSVars(c, map[string]string{"X": "Count$BogusHeadNoSuchCount"})
+	enterResolve(c)
+	sc = c.SpecContext(0)
+	if MatchesSpecCtx(g, "Creature.powerLTX", id["myBear"], sc) {
+		t.Error("an unresolvable SVar:X body must never match")
+	}
+	if MatchesSpecCtx(g, "Creature.powerGTX", id["theirBig"], sc) {
+		t.Error("an unresolvable SVar:X body must never match")
+	}
+
+	// A non-X SVar name resolves the same way: SVar:Y is a fixed count body.
+	SetSVars(c, map[string]string{"Y": "Count$Valid Creature.YouCtrl"})
+	enterResolve(c)
+	if !MatchesSpecCtx(g, "Creature.powerEQY", id["myBear"], c.SpecContext(0)) {
+		t.Error("bear (power 2) should match powerEQY with SVar:Y = 2")
+	}
+	if MatchesSpecCtx(g, "Creature.powerLTY", id["myBear"], c.SpecContext(0)) {
+		t.Error("bear (power 2) should not match powerLTY with SVar:Y = 2")
+	}
+
+	// The gate: a Ctx with a Host but neither a paid X nor a count-shaped
+	// SVar builds the plain resolver-free SpecContext -- no behaviour change
+	// for any card that does not carry one.
+	plain := &Ctx{Source: id["myBear"], Controller: 0, Host: h}
+	if sc := plain.SpecContext(0); sc.Resolve != nil {
+		t.Error("a Ctx with no paid X and no count SVar must not install a resolver")
+	}
+	// And a Ctx that never entered Resolve (Host nil) stays resolver-free
+	// even with a paid X -- the direct Num/EvalCount probe paths.
+	noHost := &Ctx{Source: id["myBear"], Controller: 0, X: 3}
+	if sc := noHost.SpecContext(0); sc.Resolve != nil {
+		t.Error("a Host-less Ctx must not install a resolver")
+	}
+
+	// The recursion guard: an SVar body that counts a spec carrying the same
+	// numeric RHS must terminate (deterministically, degraded to the count's
+	// zero) rather than overflow. Measured corpus-unreachable -- no SVar body
+	// counts a spec naming the SVar that would resolve it -- so this pins
+	// termination only.
+	SetSVars(c, map[string]string{"X": "Count$Valid Creature.powerGTX"})
+	enterResolve(c)
+	sc = c.SpecContext(0)
+	MatchesSpecCtx(g, "Creature.powerGTX", id["myBear"], sc) // must not hang
+}
+
+// TestNumTypesGEPredicate pins Forge's numTypesGE<n> card property
+// (pred:Card.numTypesGE<n>): the candidate's PRINTED face carries at least
+// n distinct real card types (CR 205.1), read through the same vocabulary
+// count.go's CardTypes count property uses (cardTypeWords) so the predicate
+// and the count head cannot disagree. The two-type carriers are an artifact
+// creature and an artifact land (Darksteel Citadel's shape); Legendary is a
+// SUPERTYPE, not a card type, so the walker fixture (Legendary Planeswalker)
+// is exactly one card type and must not match.
+func TestNumTypesGEPredicate(t *testing.T) {
+	g, id := board(t)
+	mk := func(owner state.PlayerID, src string) state.ObjID {
+		c, d := cards.ParseBytes("t.txt", []byte(src))
+		if len(d) != 0 {
+			t.Fatalf("diags: %v", d)
+		}
+		c.Link()
+		for _, f := range c.Faces {
+			f.ApplyIntrinsics()
+		}
+		o := g.AddObject(c, owner)
+		o.Zone = state.ZBattlefield
+		g.SetZone(state.ZBattlefield, owner, append(g.Zone(state.ZBattlefield, owner), o.ID))
+		return o.ID
+	}
+	artifactCreature := mk(0, "Name:Brass Squire\nManaCost:2\nTypes:Artifact Creature Myr\nPT:2/2\nOracle:x\n")
+	artifactLand := mk(0, "Name:Darksteel Citadel\nTypes:Artifact Land\nOracle:x\n")
+	enchantmentCreature := mk(0, "Name:Sentinel\nManaCost:2 G\nTypes:Enchantment Creature\nPT:2/2\nOracle:x\n")
+	id["artifactCreature"], id["artifactLand"], id["enchantmentCreature"] = artifactCreature, artifactLand, enchantmentCreature
+
+	// Precondition the comparisons ride on: the two carriers really are
+	// multi-type and the single-type fixtures really are not, under the same
+	// vocabulary the predicate itself reads -- otherwise every row below is
+	// vacuous.
+	for _, tc := range []struct {
+		id       state.ObjID
+		name     string
+		minTypes int
+		maxTypes int
+	}{
+		{id["myBear"], "myBear", 1, 1},
+		{artifactCreature, "artifactCreature", 2, 2},
+		{artifactLand, "artifactLand", 2, 2},
+		{enchantmentCreature, "enchantmentCreature", 2, 2},
+	} {
+		n := 0
+		for _, typ := range g.Obj(tc.id).Face().Types {
+			if cardTypeWords[typ] {
+				n++
+			}
+		}
+		if n < tc.minTypes || n > tc.maxTypes {
+			t.Fatalf("%s carries %d real card types %v, want between %d and %d -- fixture broken",
+				tc.name, n, g.Obj(tc.id).Face().Types, tc.minTypes, tc.maxTypes)
+		}
+	}
+
+	cases := []struct {
+		spec string
+		obj  string
+		want bool
+	}{
+		{"Card.numTypesGE2", "artifactCreature", true},
+		{"Land.numTypesGE2+YouCtrl", "artifactLand", true},
+		{"Land.numTypesGE2+YouCtrl", "myLand", false}, // Basic Land Mountain: one type
+		{"Card.numTypesGE2", "enchantmentCreature", true},
+		{"Card.numTypesGE2", "myBear", false},
+		{"Card.numTypesGE2", "myWalker", false}, // Legendary is a supertype
+		{"Card.numTypesGE1", "myBear", true},
+		{"Card.numTypesGE3", "artifactCreature", false},
+		{"Card.numTypesGE2", "myLand", false},
+		{"Creature.numTypesGE2", "artifactCreature", true},
+		{"Creature.numTypesGE2", "myBear", false},
+		// The generic non<X> negation: a single-type card matches the
+		// negated form, the two-type carriers do not.
+		{"Card.!numTypesGE2", "myBear", true},
+		{"Card.!numTypesGE2", "artifactCreature", false},
+	}
+	for _, c := range cases {
+		if got := MatchesSpec(g, c.spec, id[c.obj], 0); got != c.want {
+			t.Errorf("MatchesSpec(%q, %s) = %v, want %v", c.spec, c.obj, got, c.want)
+		}
+	}
+}
+
+// TestNumTypesGEFailClosedShapes: the classifier recognises only a
+// positive-integer GE suffix. A bare or malformed spelling stays unknown --
+// the census reports it and the matcher matches nobody -- so a future
+// corpus spelling the build does not implement is visible, never
+// silently-always-true.
+func TestNumTypesGEFailClosedShapes(t *testing.T) {
+	g, id := board(t)
+	for _, spec := range []string{"Card.numTypesGE", "Card.numTypesGEX", "Card.numTypesGE0", "Card.numTypesGE-1", "Card.numTypesGT2", "Card.numTypesEQ2"} {
+		if got := UnknownPredicates(spec); len(got) == 0 {
+			t.Errorf("UnknownPredicates(%q) = empty, want the malformed comparison reported unknown", spec)
+		}
+		if MatchesSpec(g, spec, id["myBear"], 0) {
+			t.Errorf("MatchesSpec(%q) matched, want fail-closed no-match", spec)
+		}
+	}
+	if got := UnknownPredicates("Card.numTypesGE2"); len(got) != 0 {
+		t.Errorf("UnknownPredicates(Card.numTypesGE2) = %v, want empty (the corpus spelling is recognised)", got)
+	}
+}

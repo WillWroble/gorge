@@ -1,0 +1,777 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"math/rand/v2"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/gonet"
+	"github.com/adams-shaun/gorge/bots/policynet"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
+	gbench "github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/lab/contracts"
+)
+
+// gameRec is one game, one JSON line of -out: contract dzg-games
+// (docs/contracts.md). Fields are only ever added; anything else bumps the
+// major in Format.
+type gameRec struct {
+	Format string     `json:"format"` // "dzg-games-1"
+	Gorge  gorgeBuild `json:"gorge"`  // the build that played it
+
+	Game    int       `json:"game"`
+	Pair    int       `json:"pair"`
+	Leg     int       `json:"leg"` // 0: A in seat 0; 1: the policies swapped
+	Seed    uint64    `json:"seed"`
+	Decks   [2]string `json:"decks"`
+	Side    [2]string `json:"side"` // "A" or "B" per seat
+	Pols    [2]string `json:"pols"`
+	Winner  int       `json:"winner"` // the winning seat, -1 for a draw, stall or error
+	Result  string    `json:"result"` // "A", "B", "draw", "stall" or "error"
+	Stall   string    `json:"stall,omitempty"`
+	Turns   int32     `json:"turns"`
+	Intents int       `json:"intents"`
+	Starter int       `json:"starter"`
+	MS      float64   `json:"ms"`
+	// InHand is every card each seat had in hand: its kept opening hand and every card it
+	// drew or put into its hand from its library (17lands' "game in hand").
+	InHand [2][]string `json:"in_hand"`
+	Mull   [2]int      `json:"mull"`
+	// MM is each seat's -mm-stats priority-window counters (mmstats.go).
+	MM     [2]mmStats `json:"mm,omitempty"`
+	Visits int        `json:"visits,omitempty"` // visit records this game added to -corpus
+	Err    string     `json:"error,omitempty"`
+	// Lines is the -lines probe (lines.go): each seat's early action sequence and instant timing.
+	Lines *lineRec `json:"lines,omitempty"`
+}
+
+type job struct {
+	game, pair, leg int
+	seed            uint64
+	decks           [2]string
+	sides           [2]int // index into specs per seat
+}
+
+type azAgg struct {
+	asked, searched, sims, refused, noWorld, allFailed, priorFallbacks atomic.Int64
+	msX1000                                                            atomic.Int64
+	topKPoints, topKCuts, topKBefore                                   atomic.Int64
+	oppPoints, oppExpanded                                             atomic.Int64
+	// The fuller search (:morekinds, :kinds=): root searches and in-walk points per fuller kind
+	// (azmcts.ExtraKindNames), and the opponent's payment points (:oppnodes:oppfull with :autopay).
+	extraSearched, extraPoints [azmcts.NumExtraKinds]atomic.Int64
+	oppPayPoints               atomic.Int64
+}
+
+var azStats azAgg
+
+// refusals counts redeal refusals and deal failures by reason (-out summary).
+var refusals struct {
+	sync.Mutex
+	m map[string]int
+}
+
+func noteRefusal(refused, failed string) {
+	refusals.Lock()
+	defer refusals.Unlock()
+	if refusals.m == nil {
+		refusals.m = map[string]int{}
+	}
+	if refused != "" {
+		refusals.m["refused: "+reasonKey(refused)]++
+	}
+	if failed != "" {
+		refusals.m["deal failed: "+reasonKey(failed)]++
+	}
+}
+
+// reasonKey is a reason up to its first parenthesis or colon-detail, so counts
+// aggregate over the card names and numbers a reason carries.
+func reasonKey(s string) string {
+	if i := strings.IndexByte(s, '('); i > 0 {
+		s = s[:i]
+	}
+	if len(s) > 120 {
+		s = s[:120]
+	}
+	return strings.TrimSpace(s)
+}
+
+func refusalReasons() map[string]int {
+	refusals.Lock()
+	defer refusals.Unlock()
+	out := make(map[string]int, len(refusals.m))
+	for k, v := range refusals.m {
+		out[k] = v
+	}
+	return out
+}
+
+func runPlay(args []string) int {
+	fs := flag.NewFlagSet("play", flag.ExitOnError)
+	cardsDir := fs.String("cards", ".cards", "gorge corpus directory")
+	decksDir := fs.String("decks", "", "pool deck directory (gorge/decks.py)")
+	poolPath := fs.String("pool", "", "pool.tsv (gorge/decks.py)")
+	split := fs.String("split", "eval", "pool split the decks come from: train, eval or all")
+	onlyPath := fs.String("only", "", "optional list of allowed decks (dzgorge coverage -out)")
+	aSpec := fs.String("a", "bot", "policy A (see policy.go)")
+	bSpec := fs.String("b", "bot", "policy B")
+	pairs := fs.Int("pairs", 100, "deck pairs; each is played twice (policies swapped) unless -a == -b or -single")
+	single := fs.Bool("single", false, "play each pair once, A in seat 0")
+	firstPair := fs.Int("first-pair", 0, "index of the first pair (to extend a run with fresh pairs on the same seed)")
+	seed := fs.Uint64("seed", 1, "base seed: the deck pairs and every game's shuffles derive from it")
+	workers := fs.Int("workers", 0, "games in parallel (0 = GOMAXPROCS)")
+	out := fs.String("out", "", "games JSONL (required)")
+	corpus := fs.String("corpus", "", "write every decision an az seat searched as a gzip visit corpus (policytrain -visits-corpus)")
+	maxTurns := fs.Int("max-turns", 100, "turn cap (gorge counts both players' turns); a capped game is a stall")
+	maxIntents := fs.Int("max-intents", 20000, "decision cap per game; a capped game is a stall")
+	// Off by default: gorge's bot answers keep/mulligan with a fixed 1/3 chance of a mulligan,
+	// whatever the hand holds (bots/botpolicy/policy.go), and every seat here delegates that ask to it.
+	// -mull-heuristic (or a seat's :mull key) replaces the coin with a land-count rule.
+	mulligans := fs.Int("mulligans", 0, "London mulligans each player may take (0 skips the round)")
+	mullHeur := fs.Bool("mull-heuristic", false, "every bot, sbtactical, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
+	progress := fs.Int("progress", 0, "print progress every N games (0 = about 20 times)")
+	fs.IntVar(&recordEvery, "record-every", 1, "write one searched decision in K to -corpus (cheap games for the value)")
+	recFeat := fs.String("record-features", "mz", "encoding of the -corpus records: mz, or entity for dzg's networks (dzgorge pack)")
+	fs.IntVar(&remoteConns, "remote-conns", remoteConns, "connections to each remote= network server")
+	fs.IntVar(&remoteBatch, "remote-batch", remoteBatch, "most states in one remote request")
+	fs.DurationVar(&remoteWait, "remote-wait", remoteWait, "how long a remote request waits for more states")
+	fs.IntVar(&remoteCache, "remote-cache", remoteCache, "cached remote evaluations (states)")
+	fs.IntVar(&gonet.CacheSize, "gonet-cache", gonet.CacheSize, "cached gonet= evaluations (states; 0 = none)")
+	fs.IntVar(&gonet.CardCacheSize, "gonet-card-cache", gonet.CardCacheSize, "cached gonet= card vectors (0 = none)")
+	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (engine/rules/paid_mana_census.go)")
+	fs.BoolVar(&linesOn, "lines", false, "record each seat's first-turns action sequence and instant timing counters (game record field lines; PL-3)")
+	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
+	beliefDecks := fs.String("belief-decks", "", "a :closedlist seat's belief corpus: deck directory (default -decks)")
+	beliefPool := fs.String("belief-pool", "", "a :closedlist seat's belief corpus: pool.tsv (default -pool)")
+	beliefSplit := fs.String("belief-split", "train", "a :closedlist seat's belief corpus: the pool split its decks come from")
+	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
+	fs.Parse(args)
+	tuneGC()
+	if *pprofAddr != "" {
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(1)
+		go func() {
+			if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
+				fmt.Fprintln(os.Stderr, "play: -pprof:", err)
+			}
+		}()
+	}
+	if f, err := policynet.ParseFeatureSet(*recFeat); err != nil || f.Diagnostic() {
+		fmt.Fprintf(os.Stderr, "play: -record-features %q: want mz or entity\n", *recFeat)
+		return 2
+	} else {
+		recordFeatures = f
+	}
+	if *out == "" {
+		fmt.Fprintln(os.Stderr, "play: -out is required")
+		return 2
+	}
+	specs := make([]*policySpec, 2)
+	for i, s := range []string{*aSpec, *bSpec} {
+		p, err := parsePolicy(s)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		if *mullHeur && p.Mull == botpolicy.MulliganCoin {
+			p.Mull = botpolicy.MulliganLands
+		}
+		specs[i] = p
+	}
+	reg, err := cards.SharedCorpus(*cardsDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	for _, p := range specs {
+		p.setLookup(reg)
+	}
+	if specs[0].Closed || specs[1].Closed {
+		bd, bp := *beliefDecks, *beliefPool
+		if bd == "" {
+			bd = *decksDir
+		}
+		if bp == "" {
+			bp = *poolPath
+		}
+		if *beliefSplit == *split && *split != "train" {
+			fmt.Fprintf(os.Stderr, "play: -belief-split %q is the games' own split: the belief would hold the opponents' real decks\n", *beliefSplit)
+			return 2
+		}
+		tb := time.Now()
+		b, skipped, err := loadBelief(reg, bd, bp, *beliefSplit)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "play:", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "belief: %d %s decks (%d skipped), %d distinct cards, %.1fs\n", b.Decks(), *beliefSplit, skipped, b.Cards().Len(), time.Since(tb).Seconds())
+		for _, p := range specs {
+			p.setBelief(b)
+		}
+	}
+	pool, err := readPool(*poolPath, *split)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *onlyPath != "" {
+		raw, err := os.ReadFile(*onlyPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		ok := map[string]bool{}
+		for _, l := range bytes.Split(raw, []byte("\n")) {
+			ok[string(bytes.TrimSpace(l))] = true
+		}
+		kept := pool[:0]
+		for _, p := range pool {
+			if ok[p.Name] {
+				kept = append(kept, p)
+			}
+		}
+		pool = kept
+	}
+	if len(pool) < 2 {
+		fmt.Fprintf(os.Stderr, "play: %d decks in split %q\n", len(pool), *split)
+		return 1
+	}
+	legs := 2
+	if *aSpec == *bSpec || *single {
+		legs = 1
+	}
+	// Deck pairs and seeds: a pure function of -seed and the pair index.
+	var jobs []job
+	for p := *firstPair; p < *firstPair+*pairs; p++ {
+		r := rand.New(rand.NewPCG(*seed, uint64(p)))
+		i := r.IntN(len(pool))
+		j := r.IntN(len(pool) - 1)
+		if j >= i {
+			j++
+		}
+		ps := r.Uint64()
+		for leg := 0; leg < legs; leg++ {
+			jb := job{game: len(jobs), pair: p, leg: leg, seed: ps, decks: [2]string{pool[i].Name, pool[j].Name}, sides: [2]int{0, 1}}
+			if leg == 1 {
+				jb.sides = [2]int{1, 0}
+			}
+			jobs = append(jobs, jb)
+		}
+	}
+	dc := &deckCache{reg: reg, dir: *decksDir, m: map[string][]*cards.Card{}, names: map[*cards.Card]string{}}
+	for _, jb := range jobs {
+		for _, d := range jb.decks {
+			if _, err := dc.get(d); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+		}
+	}
+	nw := *workers
+	if nw <= 0 {
+		nw = runtime.GOMAXPROCS(0)
+	}
+	t0 := time.Now()
+	azmcts.Millis = func() float64 { return float64(time.Since(t0).Microseconds()) / 1000 }
+	azmcts.Watch = func(d azmcts.Diag) {
+		if d.Kind == "" {
+			return
+		}
+		azStats.asked.Add(1)
+		azStats.refused.Add(int64(d.Stats.RedealRefused))
+		if d.Refused != "" || d.DealFailed != "" {
+			noteRefusal(d.Refused, d.DealFailed)
+		}
+		azStats.noWorld.Add(int64(d.Stats.NoWorld))
+		azStats.allFailed.Add(int64(d.Stats.AllFailed))
+		azStats.priorFallbacks.Add(int64(d.Stats.PriorFallbacks))
+		azStats.topKPoints.Add(int64(d.Stats.PriorTopKPoints))
+		azStats.topKCuts.Add(int64(d.Stats.PriorTopKCuts))
+		azStats.topKBefore.Add(int64(d.Stats.PriorTopKBefore))
+		if d.Searched {
+			azStats.searched.Add(1)
+			azStats.sims.Add(int64(d.Stats.Completed))
+			azStats.msX1000.Add(int64(d.MS * 1000))
+			azStats.oppPoints.Add(int64(d.Stats.OppPoints))
+			azStats.oppExpanded.Add(int64(d.Stats.OppExpanded))
+			azStats.oppPayPoints.Add(int64(d.Stats.OppPayPoints))
+			for x := range azStats.extraSearched {
+				azStats.extraSearched[x].Add(int64(d.Stats.ExtraSearched[x]))
+				azStats.extraPoints[x].Add(int64(d.Stats.ExtraPoints[x]))
+			}
+		}
+	}
+	outF, err := os.Create(*out)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer outF.Close()
+	w := bufio.NewWriter(outF)
+	var corpusF *os.File
+	if *corpus != "" {
+		if corpusF, err = os.Create(*corpus); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		defer corpusF.Close()
+	}
+	every := *progress
+	if every <= 0 {
+		every = max(1, len(jobs)/20)
+	}
+	var mu sync.Mutex
+	var tally struct {
+		done, a, b, draw, stall, errs, visits int
+		turns                                 int64
+		mull                                  [2]int // mulligans taken, by side (A, B)
+	}
+	// Games finish out of order; they are written in game order, so the output files (and a
+	// network trained on the corpus) are a pure function of the flags.
+	type finished struct {
+		line, member []byte
+	}
+	pending := map[int]finished{}
+	next := 0
+	ch := make(chan job)
+	var wg sync.WaitGroup
+	for k := 0; k < nw; k++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for jb := range ch {
+				rec, member := playOne(jb, specs, dc, reg, *maxTurns, *maxIntents, *mulligans, *corpus != "")
+				line, _ := json.Marshal(rec)
+				mu.Lock()
+				pending[jb.game] = finished{line, member}
+				for {
+					f, ok := pending[next]
+					if !ok {
+						break
+					}
+					delete(pending, next)
+					next++
+					w.Write(f.line)
+					w.WriteByte('\n')
+					if f.member != nil {
+						if _, err := corpusF.Write(f.member); err != nil {
+							panic(err)
+						}
+					}
+				}
+				tally.done++
+				tally.visits += rec.Visits
+				switch rec.Result {
+				case "A":
+					tally.a++
+				case "B":
+					tally.b++
+				case "draw":
+					tally.draw++
+				case "stall":
+					tally.stall++
+				default:
+					tally.errs++
+				}
+				tally.turns += int64(rec.Turns)
+				for s := 0; s < 2; s++ {
+					tally.mull[jb.sides[s]] += rec.Mull[s]
+				}
+				if tally.done%every == 0 || tally.done == len(jobs) {
+					el := time.Since(t0).Seconds()
+					fmt.Fprintf(os.Stderr, "[%d/%d %.0fs] %.1f games/s  A %d  B %d  draw %d  stall %d  error %d  A score %.3f\n",
+						tally.done, len(jobs), el, float64(tally.done)/el, tally.a, tally.b, tally.draw, tally.stall, tally.errs,
+						score(tally.a, tally.b, tally.draw+tally.stall))
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	for _, jb := range jobs {
+		ch <- jb
+	}
+	close(ch)
+	wg.Wait()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	el := time.Since(t0).Seconds()
+	sum := map[string]any{
+		"format":                    gamesFormat,
+		"gorge":                     buildGorge,
+		"a":                         specs[0].Raw,
+		"b":                         specs[1].Raw,
+		"split":                     *split,
+		"pairs":                     *pairs,
+		"first_pair":                *firstPair,
+		"legs":                      legs,
+		"seed":                      *seed,
+		"workers":                   nw,
+		"games":                     tally.done,
+		"a_wins":                    tally.a,
+		"b_wins":                    tally.b,
+		"draws":                     tally.draw,
+		"stalls":                    tally.stall,
+		"errors":                    tally.errs,
+		"a_score":                   score(tally.a, tally.b, tally.draw+tally.stall),
+		"wall_s":                    el,
+		"games_per_hour":            float64(tally.done) / el * 3600,
+		"games_per_hour_per_worker": float64(tally.done) / el * 3600 / float64(nw),
+		"mean_turns":                float64(tally.turns) / float64(max(1, tally.done)),
+		"visit_records":             tally.visits,
+		"max_turns":                 *maxTurns,
+		"mulligans":                 *mulligans,
+		"mull_heuristic":            *mullHeur,
+		"a_mulligans_per_game":      float64(tally.mull[0]) / float64(max(1, tally.done)),
+		"b_mulligans_per_game":      float64(tally.mull[1]) / float64(max(1, tally.done)),
+	}
+	if n := azStats.searched.Load(); n > 0 {
+		sum["az_decisions_asked"] = azStats.asked.Load()
+		sum["az_decisions_searched"] = n
+		sum["az_ms_per_searched"] = float64(azStats.msX1000.Load()) / 1000 / float64(n)
+		sum["az_completed_sims_per_searched"] = float64(azStats.sims.Load()) / float64(n)
+		if op, oe := azStats.oppPoints.Load(), azStats.oppExpanded.Load(); op+oe > 0 {
+			// oppnodes at work (azmcts Stats.OppPoints, OppExpanded): selections made at
+			// the opponent's tree points, and those points expanded, per searched decision.
+			sum["az_opp_points_per_searched"] = float64(op) / float64(n)
+			sum["az_opp_expanded_per_searched"] = float64(oe) / float64(n)
+		}
+		if op := azStats.oppPayPoints.Load(); op > 0 {
+			// :oppnodes:oppfull with :autopay: the opponent's priority points over the payment vocabulary.
+			sum["az_opp_pay_points_per_searched"] = float64(op) / float64(n)
+		}
+		extraS, extraP := map[string]int64{}, map[string]float64{}
+		for x, name := range azmcts.ExtraKindNames {
+			if v := azStats.extraSearched[x].Load(); v > 0 {
+				extraS[name] = v
+			}
+			if v := azStats.extraPoints[x].Load(); v > 0 {
+				extraP[name] = float64(v) / float64(n)
+			}
+		}
+		if len(extraS)+len(extraP) > 0 {
+			// :morekinds / :kinds=: searched decisions of the fuller kinds, and their points inside
+			// simulations per searched decision.
+			sum["az_extra_searched"] = extraS
+			sum["az_extra_points_per_searched"] = extraP
+		}
+	}
+	if azStats.asked.Load() > 0 {
+		sum["az_redeal_refused"] = azStats.refused.Load()
+		sum["az_no_world_sims"] = azStats.noWorld.Load()
+		sum["az_all_failed"] = azStats.allFailed.Load()
+		sum["az_prior_fallbacks"] = azStats.priorFallbacks.Load()
+		if r := refusalReasons(); len(r) > 0 {
+			// Why redeals refused or deals failed, by reason (numbers and names stripped).
+			sum["az_refusal_reasons"] = r
+		}
+	}
+	if n := azStats.topKPoints.Load(); n > 0 {
+		// topk=K: decisions (root and in-simulation) the network ranked, those where it cut, and
+		// the mean candidates it ranked at a cut.
+		sum["az_topk_points"] = n
+		sum["az_topk_cuts"] = azStats.topKCuts.Load()
+		sum["az_topk_mean_before"] = float64(azStats.topKBefore.Load()) / float64(max(1, azStats.topKCuts.Load()))
+	}
+	for k, v := range remoteStats() {
+		sum[k] = v
+	}
+	for k, v := range gonet.Stats() {
+		sum[k] = v
+	}
+	if os.Getenv("GORGE_PRIO_MEMO_STATS") != "" {
+		h, m, k := rules.PrioMemoStats()
+		fmt.Fprintf(os.Stderr, "prio_memo hits=%d misses=%d skips=%d\n", h, m, k)
+	}
+	js, _ := json.MarshalIndent(sum, "", " ")
+	if err := os.WriteFile(*out+".summary.json", js, 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Println(string(js))
+	return 0
+}
+
+// gamesFormat is games.jsonl's and its summary's format tag.
+var gamesFormat = contracts.Format(contracts.DZGGames, contracts.DZGGamesVersion)
+
+// score is A's share of the points, a draw or stall counting half.
+func score(a, b, half int) float64 {
+	n := a + b + half
+	if n == 0 {
+		return 0
+	}
+	return (float64(a) + 0.5*float64(half)) / float64(n)
+}
+
+var sparePool sync.Pool
+
+// noPaidManaCensus is play -no-paid-mana-census; mmStatsOn is play -mm-stats.
+var noPaidManaCensus, mmStatsOn bool
+
+func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, maxTurns, maxIntents, mulligans int, record bool) (gameRec, []byte) {
+	rec := gameRec{Format: gamesFormat, Gorge: buildGorge, Game: jb.game, Pair: jb.pair, Leg: jb.leg, Seed: jb.seed, Decks: jb.decks, Winner: -1}
+	seats := make([]seat.Seat, 2)
+	search := false
+	var vrecs []policynet.VisitRecord
+	for s := 0; s < 2; s++ {
+		sp := specs[jb.sides[s]]
+		rec.Side[s] = string("AB"[jb.sides[s]])
+		rec.Pols[s] = sp.Raw
+		st, err := sp.seat(jb.seed ^ uint64(s+1))
+		if err != nil {
+			rec.Result, rec.Err = "error", err.Error()
+			return rec, nil
+		}
+		seats[s] = st
+		if sp.searches() {
+			search = true
+		}
+		if az, ok := st.(*azmcts.Seat); ok && record && sp.Kind == "az" {
+			opp := specs[jb.sides[1-s]].Raw
+			pairKey := jb.decks[0] + "|" + jb.decks[1]
+			gid := fmt.Sprintf("p%07dg%d", jb.pair, jb.leg)
+			az.SetRecorder(func(r policynet.VisitRecord) {
+				if recordEvery > 1 && (r.Sequence+uint64(jb.game))%uint64(recordEvery) != 0 {
+					return // -record-every: keep one searched decision in K, spread over the game
+				}
+				r.GameID, r.Deck, r.Seed, r.Opponent = gid, pairKey, jb.seed, opp
+				vrecs = append(vrecs, r)
+			})
+		}
+	}
+	d0, _ := dc.get(jb.decks[0])
+	d1, _ := dc.get(jb.decks[1])
+	cfg := rules.Config{
+		Seed: jb.seed, Names: []string{"p0", "p1"}, Decks: [][]*cards.Card{d0, d1},
+		Tokens: reg.Tokens, NameUniverse: reg.Universe(), Mulligans: mulligans,
+		DisablePaidManaCensus: noPaidManaCensus,
+	}
+	spare, _ := sparePool.Get().(*rules.Spare)
+	if spare == nil {
+		spare = new(rules.Spare)
+	}
+	cfg.Spare = spare
+	if linesOn {
+		rec.Lines = &lineRec{}
+	}
+	var eng *rules.Engine
+	var auto [2]bool
+	for s := 0; s < 2; s++ {
+		k := specs[jb.sides[s]]
+		auto[s] = k.AutoPay || k.Kind == "random" || k.Kind == "sbtactical"
+	}
+	hooks := gbench.Hooks{
+		Setup: func(e *rules.Engine) {
+			eng = e
+			// The decision arena recycles decision storage; a search seat reads the live
+			// engine as its root, so a game with one keeps it off (as botbench does).
+			if !search {
+				e.SetDecisionArena(true)
+			}
+			for _, st := range seats {
+				if b, ok := st.(*builtins.Seat); ok {
+					b.SetPlanner(e)
+				}
+			}
+		},
+		Decision: func(seatIdx int, d *decision.Decision, in decision.Intent, _ *botpolicy.Board) error {
+			if rec.Lines != nil {
+				rec.Lines.observe(eng, seatIdx, d, in)
+			}
+			if mmStatsOn && eng != nil {
+				if rec.MM[seatIdx] == nil {
+					rec.MM[seatIdx] = mmStats{}
+				}
+				rec.MM[seatIdx].observe(eng, !noPaidManaCensus, auto[seatIdx], d, in)
+			}
+			if d.Kind == decision.KMulligan && len(d.Options) > 0 && d.Options[0].Kind != "bottom" &&
+				len(in.Choices) > 0 && optionKind(d, in.Choices[0]) == "mulligan" {
+				rec.Mull[seatIdx]++
+			}
+			return nil
+		},
+		Submit: submitWithFallback(seats),
+	}
+	t0 := time.Now()
+	o, e, err := gbench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)
+	rec.MS = float64(time.Since(t0).Microseconds()) / 1000
+	rec.Turns, rec.Intents, rec.Starter = o.Turns, o.Intents, o.Starter
+	switch {
+	case err != nil:
+		rec.Result, rec.Err = "error", err.Error()
+	case gbench.IsAbort(o.StallOn):
+		rec.Result, rec.Stall, rec.Err = "error", o.StallOn, firstLine(o.Livelock)
+	case o.IsStalled():
+		rec.Result, rec.Stall = "stall", o.StallOn
+	case o.Draw:
+		rec.Result = "draw"
+	default:
+		rec.Winner = o.WinnerSeat
+		rec.Result = rec.Side[o.WinnerSeat]
+	}
+	if e != nil {
+		rec.InHand = inHand(e, dc)
+	}
+	var member []byte
+	if len(vrecs) > 0 {
+		member = corpusMember(vrecs, o, err)
+		rec.Visits = len(vrecs)
+	}
+	if err == nil && e != nil && !gbench.IsAbort(o.StallOn) {
+		*spare = e.Release()
+		sparePool.Put(spare)
+	}
+	return rec, member
+}
+
+func optionKind(d *decision.Decision, idx int) string {
+	for _, o := range d.Options {
+		if o.Index == idx {
+			return o.Kind
+		}
+	}
+	return ""
+}
+
+func firstLine(s string) string {
+	if i := bytes.IndexByte([]byte(s), '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// inHand folds the event log into each seat's cards seen in hand: every card moved
+// from its owner's library to its hand, minus the cards returned to the library
+// before the first turn (a mulligan's shuffle and London bottoming).
+func inHand(e *rules.Engine, dc *deckCache) [2][]string {
+	var held [2]map[state.ObjID]bool
+	held[0], held[1] = map[state.ObjID]bool{}, map[state.ObjID]bool{}
+	started := false
+	for _, ev := range e.L.Events {
+		switch ev.Kind {
+		case events.TurnChange:
+			started = true
+		case events.Draw, events.MoveZone:
+			o := e.G.Obj(ev.Obj)
+			if o == nil || o.Card == nil || o.Owner > 1 {
+				continue
+			}
+			if ev.To == state.ZHand && (ev.Kind == events.Draw || ev.From == state.ZLibrary) {
+				held[o.Owner][ev.Obj] = true
+			} else if !started && ev.From == state.ZHand && ev.To == state.ZLibrary {
+				delete(held[o.Owner], ev.Obj)
+			}
+		}
+	}
+	var out [2][]string
+	for p := 0; p < 2; p++ {
+		for id := range held[p] {
+			out[p] = append(out[p], dc.cardName(e.G.Obj(id).Card))
+		}
+		sort.Strings(out[p])
+	}
+	return out
+}
+
+// submitWithFallback keeps a builtin seat's refused answer from halting the game:
+// the builtin's own refusal answer, then gorge's generic fallbacks (botbench's
+// sbSubmitWithFallback).
+func submitWithFallback(seats []seat.Seat) func(*rules.Engine, int, *decision.Decision, decision.Intent) (bool, error) {
+	return func(e *rules.Engine, seatIdx int, d *decision.Decision, in decision.Intent) (bool, error) {
+		err := e.Submit(in)
+		if err == nil {
+			return true, nil
+		}
+		b, ok := seats[seatIdx].(*builtins.Seat)
+		if !ok {
+			return true, err
+		}
+		v := view.Project(e.G, e, d.Player, d)
+		v.Round = view.RoundOf(e.G, e.L.Events)
+		if e.Submit(b.Refused(v, *d, in)) == nil {
+			return true, nil
+		}
+		brd := botpolicy.BoardFromGame(e.G, e, d.Player)
+		var err3 error
+		for _, fb := range bots.Fallbacks(d, brd, seatIdx) {
+			if err3 = e.Submit(fb); err3 == nil {
+				return true, nil
+			}
+		}
+		return true, fmt.Errorf("answer refused (%v); fallbacks refused (%v)", err, err3)
+	}
+}
+
+// corpusMember stamps each visit record with its seat's result and encodes the game's
+// records as one gzip member (members concatenate into the corpus file).
+func corpusMember(recs []policynet.VisitRecord, o gbench.Outcome, err error) []byte {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	enc := json.NewEncoder(zw)
+	for i := range recs {
+		r := &recs[i]
+		switch {
+		case err != nil || gbench.IsAbort(o.StallOn) || o.IsStalled():
+		case o.Draw:
+			r.Outcome, r.OutcomeKnown = 0.5, true
+		case o.WinnerSeat == r.Seat:
+			r.Outcome, r.OutcomeKnown = 1, true
+		default:
+			r.Outcome, r.OutcomeKnown = 0, true
+		}
+		if e := enc.Encode(r); e != nil {
+			panic(e)
+		}
+	}
+	if e := zw.Close(); e != nil {
+		panic(e)
+	}
+	return buf.Bytes()
+}
+
+var _ searchseat.SearchSeat = (*azmcts.Seat)(nil)
+
+// tuneGC sets the self-play GC defaults: the search loop allocates fast and
+// holds a small live heap, so a high GOGC trades a few hundred MB of headroom
+// for much less collector work, with a soft memory limit as the backstop.
+// GC pacing never changes the output. An explicit GOGC or GOMEMLIMIT wins.
+func tuneGC() {
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(400)
+	}
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(6 << 30)
+	}
+}
+
+// The in-process network times its evaluations for the run summary; the
+// package itself may not read the clock, so the command injects it.
+func init() { gonet.Clock = func() int64 { return time.Now().UnixNano() } }

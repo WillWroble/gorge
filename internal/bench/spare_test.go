@@ -11,7 +11,7 @@ package bench_test
 //     2026-10-05. A SparePool hands each worker its own spare, so the
 //     per-game log heads match the single-worker run exactly.
 //
-// The helper is a pure refactor of the pool cmd/botbench already ran, so
+// The helper is a pure refactor of the pool lab/cmd/botbench already ran, so
 // "same output with and without" is the regression bar. The worker test is
 // the one to run under -race (the controller runs it; seats do not).
 
@@ -21,11 +21,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // spareTestDecks is a deterministic repo-deck pair for the recycled-game
@@ -59,7 +61,7 @@ func playPooledPair(t *testing.T, reg *cards.Registry, pd bench.PairDef, decks [
 	var pool bench.SparePool
 	var mu sync.Mutex
 	heads := make([]string, spareTestGames)
-	ctor := func(seed uint64) seat.Seat { return seat.NewBot(seed) }
+	ctor := func(seed uint64) seat.Seat { return heuristic.NewBot(seed) }
 	play := func(pos int, seed uint64, g int, seats [2]seat.Seat) (bench.Outcome, error) {
 		cfg := rules.Config{
 			Seed: seed, Names: []string{pd.A, pd.B},
@@ -139,14 +141,14 @@ func TestSparePooledMatchesUnpooled(t *testing.T) {
 			Seed: seed, Names: []string{pd.A, pd.B},
 			Decks: [][]*cards.Card{decks[0], decks[1]}, Tokens: reg.Tokens,
 		}
-		_, fresh, err := bench.PlayGame(cfg, []seat.Seat{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)},
+		_, fresh, err := bench.PlayGame(cfg, []seat.Seat{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)},
 			spareTestTurns, spareTestInts, bench.Hooks{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		sp := pool.Get()
 		cfg.Spare = sp
-		_, recy, err := bench.PlayGame(cfg, []seat.Seat{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)},
+		_, recy, err := bench.PlayGame(cfg, []seat.Seat{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)},
 			spareTestTurns, spareTestInts, bench.Hooks{})
 		if err != nil {
 			t.Fatal(err)
@@ -181,7 +183,7 @@ func TestSparePoolCutsPerGameAllocation(t *testing.T) {
 				Seed: uint64(9500 + g), Names: []string{pd.A, pd.B},
 				Decks: [][]*cards.Card{decks[0], decks[1]}, Tokens: reg.Tokens,
 			}
-			seats := []seat.Seat{seat.NewBot(cfg.Seed ^ 1), seat.NewBot(cfg.Seed ^ 2)}
+			seats := []seat.Seat{heuristic.NewBot(cfg.Seed ^ 1), heuristic.NewBot(cfg.Seed ^ 2)}
 			var e *rules.Engine
 			var err error
 			if pooled {

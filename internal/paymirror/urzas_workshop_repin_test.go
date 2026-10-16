@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
 )
 
 // urzasWorkshopRepinList is the hand-built 60-card list this test drives: four
@@ -51,7 +52,7 @@ func driveUrzasWorkshopGame(t *testing.T, d *Decks, spec GameSpec) []watchedCast
 		t.Fatal(err)
 	}
 	e := rules.NewStartingPlayerChoice(cfg)
-	bots := make([]*seat.Bot, len(cfg.Names))
+	bots := make([]*heuristic.Bot, len(cfg.Names))
 	for i := range bots {
 		bots[i] = botFor(spec, i)
 	}
