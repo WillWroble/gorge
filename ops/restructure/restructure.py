@@ -412,9 +412,8 @@ def rewrite_all(new_to_old):
 def deepen_roots(path):
     """A script that moved one directory deeper finds the root one level up."""
     src = open(path).read()
-    new = re.sub(r'(dirname "(?:\$0|\$\{BASH_SOURCE\[0\]\})"\)/\.\.)(?=["/)])', r"\1/..", src)
-    new = re.sub(r'(\$here/\.\./\.\.)(?=["/)])', r"\1/..", new)
-    new = re.sub(r"(\$\(dirname \"\$0\"\)/\.\./\.\.)(?=[\"/)])", r"\1/..", new)
+    new = re.sub(r'(dirname "(?:\$0|\$\{BASH_SOURCE\[0\]\})"\)(?:/\.\.)+)(?=["/)])', r"\1/..", src)
+    new = re.sub(r'(\$here(?:/\.\.)+)(?=["/)])', r"\1/..", new)
     new = new.replace("os.path.dirname(os.path.dirname(os.path.abspath(__file__)))",
                       "os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))")
     if new != src:
