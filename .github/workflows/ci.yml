@@ -110,10 +110,13 @@ jobs:
           restore-keys: gocache-test${{ matrix.shard }}-
       - name: Test shard ${{ matrix.shard }} of ${{ env.SHARDS }}
         run: |
+          # The nightly run takes every package, experimental ones included.
+          if [ "${{ github.event_name }}" = schedule ]; then export CI_FULL=1; fi
           pkgs=$(bash scripts/ci_shard.sh ${{ matrix.shard }} "$SHARDS")
           echo "$pkgs" | wc -l | xargs echo "packages:"
           count=
           if [ "${{ github.event_name }}" = schedule ]; then count=-count=1; fi
+          if [ -z "$pkgs" ]; then echo "shard ${{ matrix.shard }} is empty"; exit 0; fi
           go test $count -timeout 20m -skip '^(TestHeads)$' $pkgs
       - name: Golden chain heads
         if: matrix.shard == 0

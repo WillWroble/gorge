@@ -41,7 +41,19 @@ shard_of() {
 	echo $((nheavy + h % light))
 }
 
-go list ./... | while read -r p; do
+# Experimental, benchmark, training-tool, fuzz and external-adapter packages,
+# plus box-calibrated measurement ratchets (corpusheap's heap ceilings are
+# tuned to the operator's box and fail on a GitHub runner). PRs and pushes skip
+# them; the nightly run sets CI_FULL=1 and runs everything. `go vet ./...` in
+# the lint job still compiles every one of them, so a build break is caught.
+EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|botbench|searchbench|enginebench|encablate|keywordbench|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|autopayaudit|manamodelstats|xmageport)|protocol/manabrew(/.*)?|host/manabrewhttp|internal/(manabrew(/.*)?|gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|corpusheap|mzenc|bench)|draftlab/extern(/.*)?)$'
+
+pkgs=$(go list ./...)
+if [ "${CI_FULL:-0}" != 1 ]; then
+	pkgs=$(printf '%s\n' "$pkgs" | grep -Ev "$EXCLUDE")
+fi
+
+printf '%s\n' "$pkgs" | while read -r p; do
 	s=$(shard_of "$p")
 	if [ "$idx" = all ]; then
 		echo "$s $p"
