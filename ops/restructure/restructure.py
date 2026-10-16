@@ -111,7 +111,7 @@ spellbench-arena/view.sh spellbench-arena/wl.py""".split()
 
 def ops_moves():
     m = {"orchestrator": "ops/orchestrator", "deploy": "ops/deploy"}
-    for name in sorted(os.listdir("scripts")):
+    for name in sorted({f.split("/")[1] for f in git_files() if f.startswith("scripts/")}):
         if name in DEV_SCRIPTS:
             continue
         if name in LAB_SCRIPTS or name.startswith("xmage-oracle-"):
