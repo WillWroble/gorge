@@ -2,6 +2,7 @@
 
 // Code moved verbatim out of engine/rules/resolution.go (moving code only; the
 // suspension/resumption mechanism is documented at the top of resolution.go).
+
 package rules
 
 import (

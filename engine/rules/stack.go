@@ -10,6 +10,7 @@
 // and candidate construction) and target_modes.go (modal/charm target groups
 // and target bounds). The split is a pure move: no symbol was renamed and no
 // behaviour changed.
+
 package rules
 
 import (

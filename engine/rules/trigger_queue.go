@@ -5,6 +5,7 @@
 // askTriggerOptional/handleTriggerOptional) are how a player orders or
 // accepts/declines the triggers this file offers them; nothing here decides
 // whether a trigger matches, only how an already-matched one gets resolved.
+
 package rules
 
 import (

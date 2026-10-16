@@ -13,6 +13,7 @@
 // triggerLabel special-case Miracle, askTriggerOptional asks the yes/no, and
 // a yes routes pushTrigger into castMiracle below. A no drops the offer
 // silently -- declining costs nothing and changes nothing but the offer.
+
 package rules
 
 import (

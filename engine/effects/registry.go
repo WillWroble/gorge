@@ -1,6 +1,3 @@
-// Package effects implements the primitives Forge card scripts reference. It
-// reaches the engine through the Host interface, so it never imports rules and
-// the dependency graph stays acyclic.
 package effects
 
 import (

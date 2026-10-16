@@ -14,6 +14,7 @@
 // the answered stamp when it is matched -- Forge's "as it attacks" action
 // happens during the declaration, not after the attack triggers are put on
 // the stack.
+
 package rules
 
 import (

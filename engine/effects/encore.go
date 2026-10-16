@@ -19,6 +19,7 @@
 // granted until end of turn through the layer system, and ONE end-step delayed
 // trigger remembering the whole token group. Countering that single trigger
 // therefore saves every surviving token, matching one Encore activation.
+
 package effects
 
 import (

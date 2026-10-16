@@ -2,6 +2,7 @@
 // stat:Continuous (layers.go's own concern). These change what is legal and
 // what things cost rather than what a permanent's characteristics are, so
 // they hook into legalActions and ParseCost rather than the layer system.
+
 package rules
 
 import (

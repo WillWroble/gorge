@@ -21,6 +21,7 @@
 //   - sacAsk applies the chosen creature's mana value as a reduction exactly
 //     once, after every Sac part is settled, before the mana window reads
 //     pc.cost.
+
 package rules
 
 import (

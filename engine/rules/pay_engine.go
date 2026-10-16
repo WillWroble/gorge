@@ -3,6 +3,7 @@
 // of *Engine, so its methods are not Engine methods), the aliases rules keeps
 // for the payment vocabulary, and the cast-flow helpers that read rules-only
 // types (pendingCast).
+
 package rules
 
 import (

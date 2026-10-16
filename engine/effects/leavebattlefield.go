@@ -13,6 +13,7 @@
 // registered after the object actually enters the battlefield, on both the
 // inlined object path and settleChangeZoneMoveAs). The `LeaveBattlefield$`
 // value is read from whichever SA resolves at those sites.
+
 package effects
 
 import (

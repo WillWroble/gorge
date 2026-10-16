@@ -24,6 +24,7 @@
 // from every other replacement family. A concession is deliberately NOT routed
 // through this gate: CR 104.3a's "a player may concede at any time" is not a
 // loss a replacement can stop, so the concede option emits PlayerLost directly.
+
 package rules
 
 import (

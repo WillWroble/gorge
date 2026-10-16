@@ -6,6 +6,7 @@
 // elemental-bend precedent. Without this, cards.Registry.Coverage would keep
 // reporting each `trig:<Mode>` as an unimplemented primitive and the
 // compliance gate would stay red even though a matcher is registered.
+
 package effects
 
 func init() {

@@ -9,6 +9,7 @@
 // applies (timing, restrictions, target availability, castable cost) applies
 // here too. The grant lives in rules (not effects) because it is consumed by
 // legalActions/beginCast, the same places the hand walk and its cast live.
+
 package rules
 
 import (

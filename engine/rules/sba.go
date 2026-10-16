@@ -17,6 +17,7 @@
 // removal pass below picks up on its next run regardless of how a player
 // came to be Lost); this build has no poison-counter mechanic, so CR
 // 704.5b's poison loss is checked with life and commander damage below.
+
 package rules
 
 import (

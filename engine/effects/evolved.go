@@ -13,6 +13,7 @@
 // effects side (the gift.go trig:GiveGift precedent) -- otherwise
 // cards.Registry.Coverage would keep reporting trig:Evolved as an
 // unimplemented primitive for both cards.
+
 package effects
 
 func init() { RegisterNonAPI("trig:Evolved") }

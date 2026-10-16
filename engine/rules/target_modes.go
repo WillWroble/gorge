@@ -3,6 +3,7 @@
 // ask, the cross-mode and copy-target asks, the same-controller and
 // different-controller normalisation, and the CMC/power total caps.
 // Split out of stack.go by a pure move (no rename, no behaviour change).
+
 package rules
 
 import (

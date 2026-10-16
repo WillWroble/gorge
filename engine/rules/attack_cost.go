@@ -25,6 +25,7 @@
 // unpriceable and not offered, rather than letting the creature attack or
 // block for free. Unsupported grammar is reported as a remaining deviation,
 // never silently degraded to phantom generic mana.
+
 package rules
 
 import (

@@ -17,6 +17,7 @@
 //
 // Measured corpus carriers at the 2026-09-28 pin: 45 card files
 // (`grep -rln 'choose not to untap' .cards/cardsfolder | wc -l`).
+
 package effects
 
 func init() {

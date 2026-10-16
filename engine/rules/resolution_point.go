@@ -1,6 +1,7 @@
 // resolution_point.go holds the resume point: the small record a rules-side
 // payment window carries to re-enter a resolution's body once the window has
 // settled (resumeResolution, engine/rules/resolution.go).
+
 package rules
 
 import (

@@ -13,6 +13,7 @@
 // with applyReplacements ahead of logging and checkTriggers behind it, so
 // this file's job is entirely about *deciding* what fires and *ordering*
 // what goes on the stack, never about writing state directly.
+
 package rules
 
 import (

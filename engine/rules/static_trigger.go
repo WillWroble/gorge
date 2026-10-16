@@ -25,6 +25,7 @@
 // corpus static triggers that ask (God-Eternal Kefnet and Inquisitor
 // Eisenhorn's optional Reveal chains, Buzzing Whack-a-Doodle's GenericChoice,
 // Ulamog's Despoiler's Mode) on their existing path.
+
 package rules
 
 import (

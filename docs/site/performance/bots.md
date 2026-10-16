@@ -89,5 +89,5 @@ targeted.
 `lab/cmd/botbench` plays seeded matches between registered policies and reports
 win rates with confidence intervals (`-out json` for machine-readable
 output). The adoption ladder, the evaluation protocol and the rules for
-training code are in the repository README under
-[*Bot player training and adoption guidelines*](https://github.com/adams-shaun/gorge/blob/main/README.md#bot-player-training-and-adoption-guidelines).
+training code are in
+[*Bot player training and adoption guidelines*](../research/bots.md).

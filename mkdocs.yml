@@ -74,6 +74,11 @@ extra_javascript:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Contributing:
+      - Your first card fix: contributing/first-card-fix.md
+      - Testing: contributing/testing.md
+      - The card pipeline: contributing/card-pipeline.md
+      - Glossary: contributing/glossary.md
   - Architecture:
       - Overview: architecture/overview.md
       - Packages: architecture/packages.md
@@ -83,6 +88,8 @@ nav:
       - Engine speed: performance/engine.md
       - Bots and learned policies: performance/bots.md
       - Tracking over time: performance/tracking.md
+  - Research:
+      - Bot training and adoption: research/bots.md
   - Card support:
       - Support by set: support/sets.md
       - Regenerating the tables: support/regenerating.md
