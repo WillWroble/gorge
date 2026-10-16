@@ -1,4 +1,5 @@
 // Ordinary event-backed trigger modes implemented in rules/trigmatch.
+
 package effects
 
 func init() {

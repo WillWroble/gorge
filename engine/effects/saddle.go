@@ -1,4 +1,5 @@
 // Package effects registration marker for the rules-side Saddle implementation.
+
 package effects
 
 // CR 702.171's keyword ability is expanded by engine/cards/kw_saddle.go; its

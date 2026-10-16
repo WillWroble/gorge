@@ -15,6 +15,7 @@
 // chapter queue -- ever sees the un-replaced entry. The completed stage is
 // consumed by foldEntryMove, which folds the move with the finalized amounts
 // in its Pairs payload exactly as an uncontested entry does.
+
 package rules
 
 import (

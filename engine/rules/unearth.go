@@ -26,6 +26,7 @@
 // stamps on the ChangeZone's MoveZone; altCostEnter reads it and calls
 // unearthEnter. Nothing here writes a state.Game field directly: the haste
 // is a ContinuousEffect and the exile promise is a logged DelayedRegister.
+
 package rules
 
 import (

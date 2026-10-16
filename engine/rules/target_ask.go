@@ -3,6 +3,7 @@
 // ask/handle for a target decision, and the charm target recheck that runs when
 // a copy resolves.
 // Split out of stack.go by a pure move (no rename, no behaviour change).
+
 package rules
 
 import (

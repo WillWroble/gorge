@@ -48,6 +48,8 @@ certifies.
   numbers, and the state of the bot and ML work.
 - **[Card support](support/sets.md)**: per-set support for Standard and estimates
   for everything else.
+- **[Contributing](contributing/first-card-fix.md)**: fix a card that plays
+  wrong, run the tests, and read the ratchets.
 - **[Cleanup roadmap](architecture/cleanup.md)**: code that is redundant,
   parked or optional, and what is planned for it.
 
@@ -61,7 +63,11 @@ and a test fails the build if a script is ever tracked. See
 
 ## Contributing
 
-The contributor guide lives in the repository rather than on this site:
-[`docs/agents/`](https://github.com/adams-shaun/gorge/tree/main/docs/agents)
-(the repo map, the invariants and the contributor workflow) and
-[`AGENTS.md`](https://github.com/adams-shaun/gorge/blob/main/AGENTS.md).
+Start with [Your first card fix](contributing/first-card-fix.md), then
+[Testing](contributing/testing.md), the [card pipeline](contributing/card-pipeline.md)
+and the [glossary](contributing/glossary.md). Setup, the rules that matter and
+the PR checklist are in
+[`CONTRIBUTING.md`](https://github.com/adams-shaun/gorge/blob/main/CONTRIBUTING.md).
+AI coding agents start at
+[`AGENTS.md`](https://github.com/adams-shaun/gorge/blob/main/AGENTS.md) and
+[`docs/agents/`](https://github.com/adams-shaun/gorge/tree/main/docs/agents).

@@ -3,6 +3,7 @@
 // the stack-object kind tests, and the candidate walks plus their validity and
 // controller filters.
 // Split out of stack.go by a pure move (no rename, no behaviour change).
+
 package rules
 
 import (

@@ -36,6 +36,7 @@
 // reach, and every step is event-emitted (or queue-appended, the same
 // memory-only channel checkTriggers already uses) so a replayed game
 // re-derives it identically.
+
 package rules
 
 import (

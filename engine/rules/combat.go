@@ -25,6 +25,7 @@
 //     pair, while validateBlockers rejects multiple pairs unless an applicable
 //     BlockAllDefined$ MustBlock effect explicitly permits that blocker to
 //     block its defined attacker set.
+
 package rules
 
 import (

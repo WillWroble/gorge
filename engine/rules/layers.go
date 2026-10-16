@@ -5,6 +5,7 @@
 // 7, but the full ladder is defined now so a later layer 2 control-change or
 // layer 4 type-change effect is an addition to this file, not a rewrite of
 // it — that retrofit is the project's own top-named risk.
+
 package rules
 
 import (

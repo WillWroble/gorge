@@ -1,5 +1,6 @@
 // token_rest.go holds publishTokenEntry, the one place a minted token's id
 // reaches the emitting effect's tokenMintSink.
+
 package rules
 
 import (

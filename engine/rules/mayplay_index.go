@@ -21,6 +21,7 @@
 // the nested scan emitted. Any other Affects shape (or the index disabled)
 // falls back to the scan, which also remains the reference arm the
 // mayPlayCandIndexVerify mode checks the indexed arm against.
+
 package rules
 
 import (

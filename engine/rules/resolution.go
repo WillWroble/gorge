@@ -5,6 +5,7 @@
 // they have settled their own window in line: a triggered ability's Cost$
 // window (kind "effect_paid"), an optional trigger's yes (kind "optional",
 // CR 603.5) and a copy's new-target election (kind "copy_targets").
+
 package rules
 
 import (
