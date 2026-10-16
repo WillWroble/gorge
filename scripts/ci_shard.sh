@@ -46,7 +46,7 @@ shard_of() {
 # tuned to the operator's box and fail on a GitHub runner). PRs and pushes skip
 # them; the nightly run sets CI_FULL=1 and runs everything. `go vet ./...` in
 # the lint job still compiles every one of them, so a build break is caught.
-EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|botbench|searchbench|enginebench|encablate|keywordbench|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|autopayaudit|manamodelstats|xmageport)|server/protocol/manabrew(/.*)?|server/host/manabrewhttp|internal/(manabrew(/.*)?|gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|corpusheap|mzenc|bench)|lab/draft/draftlab/extern(/.*)?)$'
+EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|enginebench|keywordbench)|lab/cmd/(botbench|searchbench|encablate|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|xmageport)|server/protocol/manabrew(/.*)?|server/host/manabrewhttp|server/manabrew(/.*)?|lab/training/(gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|mzenc)|bots/spellbench(/.*)?|internal/(corpusheap|bench)|lab/draft/draftlab/extern(/.*)?)$'
 
 pkgs=$(go list ./...)
 if [ "${CI_FULL:-0}" != 1 ]; then

@@ -65,7 +65,7 @@ External processes can play a seat in three ways:
 | Terminal / reward | `View.Over`, `View.Winner`; `searchprobe.LeafValue` (heuristic leaf); `policynet` value head | No shaped reward is built in. Win/loss is the ground truth. |
 | Replay and audit | `events.Log` (sha256 chain, `Head()`), `replay.Replay` / `ReplayTo` | Any game a policy plays can be re-run and checked event for event. |
 | Game runner | `internal/bench`: `PlayGame`, `RunPairs` | Watchdogs, livelock recovery, no clock. Shared by `botbench` and `policytune`. |
-| Throughput | measured | About 17.5 ms per bot-vs-bot game on one core (`docs/superpowers/specs/2026-09-06-gorge-learned-policy-research.md`). About 20–23 duel games/s/core after the hotspot work (`docs/superpowers/reports/2026-09-17-hotspot-resume.md`). |
+| Throughput | measured | About 17.5 ms per bot-vs-bot game on one core (`archived 2026-09-06-gorge-learned-policy-research.md (docs/design/ARCHIVE.md)`). About 20–23 duel games/s/core after the hotspot work (`archived 2026-09-17-hotspot-resume.md (docs/design/ARCHIVE.md)`). |
 
 ## Engine speed
 
@@ -105,7 +105,7 @@ opens the shared imaged registry.
   measured **53.7% [52.2, 55.2] vs a 50.4% control (+3.3pp)** on the held-out
   gate. It costs **664 ms mean / 2.2 s p95 per asked decision**, and its
   coverage falls to 4.8% after turn 13
-  (`docs/superpowers/reports/2026-09-24-training-approaches-summary.md`). It
+  (`archived 2026-09-24-training-approaches-summary.md (docs/design/ARCHIVE.md)`). It
   is merged opt-in and has not been promoted.
 - **AlphaZero-style PUCT (spellbench-prep).** `bots/azmcts`, used by
   `botbench -a az` and `-a az-redeal`:
@@ -123,7 +123,7 @@ opens the shared imaged registry.
   - Measured with honest redeal worlds at generation 0 (uniform prior,
     heuristic leaf): az25 **64.7% [63.2, 66.2] vs `bot`, +14.7pp, 45 ms mean
     per searched decision**, and az100 +20.5pp at about 250 ms
-    (`docs/superpowers/specs/2026-09-28-spellbench-agent-design.md` §12).
+    (`docs/design/2026-09-28-spellbench-agent-design.md` §12).
   - Caveat: `bot` is both the opponent and the search's environment model in
     those runs, which flatters every search arm.
 
@@ -149,7 +149,7 @@ The tools around it:
   goes to the default bot.
 
 What has been measured (all against `bot`; details in
-`docs/superpowers/reports/2026-09-24-training-approaches-summary.md`):
+`archived 2026-09-24-training-approaches-summary.md (docs/design/ARCHIVE.md)`):
 
 | Approach | Result |
 |---|---|
@@ -169,8 +169,8 @@ direction on `spellbench-prep` follows from that. The network *serves search*:
   `exitloop -mode az`).
 
 This is staged: clairvoyant AZ loop, then honest sampled worlds, with kill
-criteria at each stage (`docs/superpowers/specs/2026-09-27-alphazero-mcts-design.md`,
-`docs/superpowers/reports/2026-09-28-spellbench-policy-networks.md`).
+criteria at each stage (`docs/design/2026-09-27-alphazero-mcts-design.md`,
+`archived 2026-09-28-spellbench-policy-networks.md (docs/design/ARCHIVE.md)`).
 
 ## Evaluating a policy
 
@@ -190,7 +190,7 @@ Sample size decides what a result can show:
 | 1,792 | about +23 Elo (3.3pp) |
 
 A 200-game run is about ±7pp: a smoke test, not a verdict
-(`docs/superpowers/reports/2026-09-28-spellbench-theory-and-references.md` §7, on
+(`archived 2026-09-28-spellbench-theory-and-references.md (docs/design/ARCHIVE.md)` §7, on
 spellbench-prep).
 
 **(spellbench-prep)** `lab/scripts/sb-gauntlet.sh <spec>` rates candidates on the
@@ -229,7 +229,7 @@ A policy moves up one rung at a time. Each rung has a gate.
    - Development iterations are gated at +1.96σ against the current best
      before they spend a held-out run.
    - Promotion is the operator's decision
-     (`docs/superpowers/plans/2026-09-19-learned-cast-profile.md`,
+     (`archived 2026-09-19-learned-cast-profile.md (docs/design/ARCHIVE.md)`,
      "Operator decisions").
 
 **(spellbench-prep)** An agent that enters SpellBench-rated play must also
@@ -267,6 +267,6 @@ pass the agent spec's kill criteria (§12.3):
 - **Resources.** Run one heavy job at a time, under `systemd-run --user
   --scope -p MemoryMax=…` with `GOMEMLIMIT` set. This is a shared box.
 - **Report what you measured.** Record results in
-  `docs/superpowers/reports/`: the command, the seeds, the game count, and the
+  `docs/design/`: the command, the seeds, the game count, and the
   CI against a same-seed control.
 

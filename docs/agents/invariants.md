@@ -21,9 +21,9 @@ A package imports only packages to its left or in an earlier group. `deck`
 sits beside the engine chain: it imports `cards` only and is imported by
 `rules`, `view`, `host` and the test fixtures. `engine/seat` is the contract
 only and imports just `decision` and `view`. That is the measured import graph
-(`go list`, 2026-10-16, after the ADR 0001 restructure); the one exception is
-`cmd/gorged` linking `lab/draft/eventhost` and `lab/draft/limited/setdata`,
-which the registration seam removes. The enforced contract is the set of
+(`go list`, 2026-10-16, after the ADR 0001 restructure); `cmd/gorged` links
+`lab/draft` only under `-tags lab` (internal/archtest/lab_fence_test.go
+enforces the untagged fence). The enforced contract is the set of
 edges that must never appear: `effects` never imports `rules` (effects reaches
 the engine only through `effects.Host`). `view`, `protocol` and `deck` never
 import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host`, `internal/testutil` or `bots/azmcts/clairvoyant`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`

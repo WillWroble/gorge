@@ -153,5 +153,5 @@ example of the shape we like.
 The per-package map is [docs/agents/repo-map.md](docs/agents/repo-map.md)
 and `go run ./cmd/pkgmap` prints every package with its purpose and tier.
 Behaviour that looks like a bug but is deliberate is recorded in
-`docs/superpowers/specs/2026-09-22-engine-contracts.md` and in `AGENTS.md`'s
+`docs/design/2026-09-22-engine-contracts.md` and in `AGENTS.md`'s
 "Known approximations" table; read both before filing.

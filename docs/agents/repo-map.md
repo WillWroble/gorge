@@ -24,7 +24,7 @@ package does.
 | `server/` | `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`. | [repo-map-engine.md](repo-map-engine.md#server) |
 | `internal/` | Architecture ratchets, test support, shared bench runner, generators. | [repo-map-internal.md](repo-map-internal.md) |
 | `cmd/` | Product and developer binaries. | [repo-map-paths.md](repo-map-paths.md#cmd) |
-| `lab/` | Fenced extensions: draft events, compliance oracles, training research, their commands and scripts. Nothing outside `lab/` may import it (ADR 0001 decision 3; today `cmd/gorged` still links `lab/draft`). | [repo-map-research.md](repo-map-research.md) |
+| `lab/` | Fenced extensions: draft events, compliance oracles, training research, their commands and scripts. Nothing outside `lab/` may import it (ADR 0001 decision 3; enforced by `internal/archtest/lab_fence_test.go`; `cmd/gorged` composes `lab/draft` only under `-tags lab`). | [repo-map-research.md](repo-map-research.md) |
 | `ops/` | The agent pipeline: agentctl hooks, systemd units, pipeline and gate scripts. See [`ops/README.md`](../../ops/README.md). | [repo-map-paths.md](repo-map-paths.md#ops) |
 | `scripts/` | Contributor and CI helpers only. | [repo-map-paths.md](repo-map-paths.md#everything-else) |
 | `web/` | The Svelte + Vite client. | [repo-map-paths.md](repo-map-paths.md#everything-else) |

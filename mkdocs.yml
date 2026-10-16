@@ -1,6 +1,6 @@
 # Public documentation site, published to GitHub Pages by
 # .github/workflows/docs.yml. Only docs/site/ is published: docs/agents/ and
-# docs/superpowers/ are internal working documents and are linked on GitHub
+# docs/design/ holds the living design documents and are linked on GitHub
 # instead.
 #
 # Local preview (needs only uv or a virtualenv):

@@ -2,5 +2,5 @@
 //
 // The scripts themselves are GPL-3.0 and are never vendored here: forgec
 // fetches a pinned upstream ref at build time and this package compiles it
-// into a local cache. See docs/superpowers/specs/2026-09-03-mtgcore-go-engine-design.md.
+// into a local cache. See archived 2026-09-03-mtgcore-go-engine-design.md (docs/design/ARCHIVE.md).
 package cards

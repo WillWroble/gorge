@@ -76,14 +76,13 @@ flowchart TB
     draft["draft/eventhost, limited"]
     oracle["oracle/compliance, training/*"] --> rules
   end
-  gorged -. back-edge .-> draft
+  gorged -. "-tags lab" .-> draft
 ```
 
-Arrows point from an importer to the package it imports. The dashed edge is
-the one remaining *back-edge*: `cmd/gorged` still links
-`lab/draft/eventhost` and `lab/draft/limited/setdata`. ADR 0001 decision 5
-replaces it with a registration seam so that nothing outside `lab/` imports
-`lab/`. The generated tier graph on the [Packages](packages.md) page is the
+Arrows point from an importer to the package it imports. The dashed edge exists
+only in a `-tags lab` build: `cmd/gorged`'s draft-event wiring (`events.go`,
+`art_sets.go`) is the one composition point, and the untagged binary links no
+`lab/` package (ADR 0001 decision 5; `internal/archtest/lab_fence_test.go`). The generated tier graph on the [Packages](packages.md) page is the
 authority.
 
 ## Size

@@ -31,7 +31,7 @@ into a commit, a test or an issue.
 
 - `AGENTS.md`'s *Known approximations* table lists primitives that knowingly
   behave more narrowly than the card text.
-- `docs/superpowers/specs/2026-09-22-engine-contracts.md` lists behaviour
+- `docs/design/2026-09-22-engine-contracts.md` lists behaviour
   that is a deliberate contract, not a bug.
 - `engine/rules/testdata/known-unsupported/` names repo-deck cards the build
   does not fully support.
