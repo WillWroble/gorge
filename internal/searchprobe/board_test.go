@@ -33,13 +33,19 @@ import (
 // LifeLostThisTurn, TokensCreatedThisTurn), which every board's JSON and
 // canonical encoding now carries, so every prefix digest moves; the
 // legacy-encoding equivalence tests above still hold.
+//
+// Re-pinned 2026-10-16 (token-art-pt-key): view.CardView gained PrintedPT
+// (the face's printed P/T, so the token-art cache key stops keying on the
+// current, counter-modified value), which every board's JSON and canonical
+// encoding now carries, so every prefix digest moves. Attributed by hiding
+// only that field (json:"-"): the old digests return byte-for-byte.
 func TestHistoryDigestMatchesTheJSONBoardEncoding(t *testing.T) {
 	f := benchRoot(t)
 	golden := map[int]string{
-		1:   "075723d1bac50ba3df5a1547700b5a30de3340086919d628c529a89c6498204f",
-		2:   "078427bf090de5ac830f3aced397bc4e5921eaf3da5d84751870ca37b370d264",
-		17:  "de6cee347a4446d4fc3ca9982dc3f8986e8ef185c57b882d5dc5060f36302de0",
-		120: "9f9bf8ed9a42c6bae48991f4f7f39e23842a185abdf9199d9243183fa04ce45b",
+		1:   "5074d37819a5cb8a83a96aa5edcff463a4db54036de9802e82ae134fc2c5224a",
+		2:   "5782b165ba5cc5e68722a37cfa33ac960a9b6428564b4e2409918141b82aaaa4",
+		17:  "355ddaed8cfd831073e1d22407c556dd49277ac80b0d75f13c83d8d083d4e8e3",
+		120: "90d19be27cae25c186c00c8a4eb9565febfe7dc6642ff93a11fa0035f043e3cf",
 	}
 	if len(f.h.Frames) != 120 {
 		t.Fatalf("bench fixture has %d frames, the goldens were measured on 120", len(f.h.Frames))

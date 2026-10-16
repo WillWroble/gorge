@@ -71,11 +71,19 @@ export interface ImageFacts {
   isToken?: boolean;
   types?: string;
   pt?: string;
+  /**
+   * printedPt is the token's PRINTED P/T (CardView.printed_pt), the value the
+   * token card is printed with. The cache key and the server's pick key on
+   * this, not on pt: a 1/1 Soldier with a +1/+1 counter carries pt "2/2" but
+   * printedPt "1/1", so it resolves to the same entry as its un-pumped
+   * sibling instead of a second paced search for identical art.
+   */
+  printedPt?: string;
 }
 
-/** tokenCacheKey namespaces a token's storage/memo entries away from any same-named real card's entries: the names collide, the facts don't. */
+/** tokenCacheKey namespaces a token's storage/memo entries away from any same-named real card's entries: the names collide, the facts don't. Keyed on the PRINTED P/T so a counter or anthem does not mint a second entry. */
 function tokenCacheKey(name: string, facts: ImageFacts): string {
-  return `token\u001f${name}\u001f${facts.types ?? ''}\u001f${facts.pt ?? ''}`;
+  return `token\u001f${name}\u001f${facts.types ?? ''}\u001f${facts.printedPt ?? ''}`;
 }
 
 /** createImages resolves exact card names to card art served from this app's own origin (art.go proxies and caches Scryfall server-side) with memory + localStorage caches, request spacing and an offline backoff. */
@@ -167,7 +175,7 @@ export function createImages(src: Partial<ImageSource> = {}) {
     if (inflight) return inflight;
 
     const endpoint = isToken && facts
-      ? `/art/token?exact=${encodeURIComponent(name)}&types=${encodeURIComponent(facts.types ?? '')}&pt=${encodeURIComponent(facts.pt ?? '')}`
+      ? `/art/token?exact=${encodeURIComponent(name)}&types=${encodeURIComponent(facts.types ?? '')}&pt=${encodeURIComponent(facts.pt ?? '')}&ppt=${encodeURIComponent(facts.printedPt ?? '')}`
       : `/art/named?exact=${encodeURIComponent(name)}`;
 
     const idle = queue.length === 0 && pending.size === 0;

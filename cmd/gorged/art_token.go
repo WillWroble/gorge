@@ -24,12 +24,15 @@ const tokenArtKeyVersion = "gorge-art-token-v1"
 const scryfallSearchURL = "https://api.scryfall.com/cards/search?q="
 
 // tokenArtKey derives the cache key for a token's art from the wire facts the
-// client sends — display name, type line, printed P/T. Hashing all three (not
-// just the name) means two same-named tokens a P/T difference distinguishes
-// get their own entries, and the token version prefix keeps every token key
-// disjoint from the card keys artKey derives from the same string.
-func tokenArtKey(name, types, pt string) string {
-	sum := sha256.Sum256([]byte(tokenArtKeyVersion + "\x00" + name + "\x00" + types + "\x00" + pt))
+// client sends — display name, type line, PRINTED P/T. Hashing all three (not
+// just the name) means two same-named tokens a printed-P/T difference
+// distinguishes get their own entries, while a token whose CURRENT P/T a
+// counter or an anthem moved (a 1/1 Soldier pumped to 2/2) keeps its un-pumped
+// sibling's key: only the printed value is ever passed here. The token version
+// prefix keeps every token key disjoint from the card keys artKey derives from
+// the same string.
+func tokenArtKey(name, types, printedPT string) string {
+	sum := sha256.Sum256([]byte(tokenArtKeyVersion + "\x00" + name + "\x00" + types + "\x00" + printedPT))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -47,26 +50,37 @@ func tokenBaseName(name string) string {
 	return n
 }
 
-// token answers GET /art/token?exact=<name>&types=<typeline>&pt=<p/t> with
-// the same response shape named() serves, but the art is resolved by a
+// token answers GET /art/token?exact=<name>&types=<typeline>&pt=<p/t>&ppt=<printed p/t>
+// with the same response shape named() serves, but the art is resolved by a
 // cards/search lookup (t:token name:"<base>") instead of a named lookup,
 // because Scryfall's named endpoint has never heard of a token's display
 // name ("Goblin Token") — every token renders blank today. The client sends
-// the token's type line and P/T alongside the name (CardView.is_token rides
-// the view), and they feed the deterministic pick in pickTokenCard. The
-// cache, the miss records, the single-flight join, the 429 backoff and the
-// blob route are all the card path's own machinery, reused unchanged.
+// the token's type line and PRINTED P/T alongside the name (CardView.is_token
+// and CardView.printed_pt ride the view), and they feed the deterministic pick
+// in pickTokenCard. The cache, the miss records, the single-flight join, the
+// 429 backoff and the blob route are all the card path's own machinery, reused
+// unchanged.
 func (a *artCache) token(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimSpace(r.URL.Query().Get("exact"))
+	q := r.URL.Query()
+	name := strings.TrimSpace(q.Get("exact"))
 	if name == "" {
 		http.Error(w, "exact is required", http.StatusBadRequest)
 		return
 	}
-	types := strings.TrimSpace(r.URL.Query().Get("types"))
-	pt := strings.TrimSpace(r.URL.Query().Get("pt"))
-	key := tokenArtKey(name, types, pt)
+	types := strings.TrimSpace(q.Get("types"))
+	// The key and the pick use the token's PRINTED P/T (ppt), not its current
+	// one: a 1/1 Soldier pumped to 2/2 must resolve to the same key — and so
+	// the same cached art and the same single search — as its un-pumped
+	// sibling. pt (the CURRENT, layer-7 P/T) is only a fallback for a client
+	// that predates ppt, so an old client keeps its old behaviour instead of
+	// keying every token of a name on the empty string.
+	printed := strings.TrimSpace(q.Get("ppt"))
+	if !q.Has("ppt") {
+		printed = strings.TrimSpace(q.Get("pt"))
+	}
+	key := tokenArtKey(name, types, printed)
 	hit, err := a.boundedWait(r.Context(), func(c context.Context) (bool, error) {
-		return a.ensureToken(c, key, name, types, pt)
+		return a.ensureToken(c, key, name, types, printed)
 	})
 	if errors.Is(err, errArtPending) {
 		http.Error(w, "card art is still being fetched from the upstream catalog; retry shortly", http.StatusServiceUnavailable)
@@ -97,7 +111,7 @@ func (a *artCache) token(w http.ResponseWriter, r *http.Request) {
 // ensureToken is ensure() over the token key: disk first (art or a recorded
 // miss), then one shared fetch. It joins the same single-flight map, so a
 // burst of identical token names costs one search.
-func (a *artCache) ensureToken(ctx context.Context, key, name, types, pt string) (bool, error) {
+func (a *artCache) ensureToken(ctx context.Context, key, name, types, printedPT string) (bool, error) {
 	return a.singleFlight(ctx, key, func() (bool, bool) {
 		if fileExists(a.jpgPath(key)) {
 			return true, true
@@ -120,7 +134,7 @@ func (a *artCache) ensureToken(ctx context.Context, key, name, types, pt string)
 		if !known {
 			return false, a.writeMiss(key)
 		}
-		pick := pickTokenCard(card, name, types, pt)
+		pick := pickTokenCard(card, name, types, printedPT)
 		if pick == nil || pick.faceImage(tokenBaseName(name)) == "" {
 			return false, a.writeMiss(key)
 		}
@@ -200,13 +214,13 @@ func (a *artCache) lookupTokenSearch(ctx context.Context, base string) ([]*scryN
 //  1. printed name equals the base name — the token card the display name
 //     stripped its suffix from (Goblin Token -> Goblin);
 //  2. one of the card's faces does (a multi-faced token card);
-//  3. the printed P/T equals the token's wire P/T;
+//  3. the printed P/T equals the token's printed wire P/T;
 //  4. type-line words the token's wire type line shares (creature types).
 //
 // Ties resolve by the lexicographically smaller printed name and then the
 // list order, which the query itself pins with order=name&dir=asc — so the
 // same facts pick the same art forever, replay to replay.
-func pickTokenCard(cards []*scryNamed, name, types, pt string) *scryNamed {
+func pickTokenCard(cards []*scryNamed, name, types, printedPT string) *scryNamed {
 	base := tokenBaseName(name)
 	var best *scryNamed
 	bestScore := []int{-1, 0, 0}
@@ -220,8 +234,8 @@ func pickTokenCard(cards []*scryNamed, name, types, pt string) *scryNamed {
 		} else if c.faceFor(base) != nil {
 			score[0] = 3
 		}
-		if pt != "" && c.Power != "" && c.Toughness != "" &&
-			strings.TrimSpace(c.Power)+"/"+strings.TrimSpace(c.Toughness) == pt {
+		if printedPT != "" && c.Power != "" && c.Toughness != "" &&
+			strings.TrimSpace(c.Power)+"/"+strings.TrimSpace(c.Toughness) == printedPT {
 			score[1] = 2
 		}
 		score[2] = typeWordOverlap(c.TypeLine, types)

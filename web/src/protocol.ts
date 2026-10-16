@@ -334,6 +334,18 @@ export interface CardView {
   tapped: boolean;
   power: number;
   toughness: number;
+  /**
+   * PrintedPT is the face's PRINTED power/toughness as text ("1/1", "* /*"),
+   * the value the physical card or token is printed with. Power/Toughness
+   * above are the CURRENT layer-7 values a counter or an anthem moves; a
+   * token whose current P/T differs from its printed P/T (a 1/1 Soldier
+   * with a +1/+1 counter reads "2/2") must still resolve to the same art as
+   * its un-pumped sibling, and only the printed value is stable across
+   * pumping. Empty for a face with no printed P/T (a noncreature) and on
+   * every redacted face-down CardView, which is rebuilt from a fresh
+   * literal.
+   */
+  printed_pt?: string;
   damage: number;
   attacking: boolean;
   counters?: Record<string, number>;
