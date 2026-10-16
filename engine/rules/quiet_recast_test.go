@@ -1,7 +1,7 @@
 package rules
 
 // Q3a: the graveyard/exile recast mana floor (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md §6 Q3a).
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md §6 Q3a).
 //
 // The Q1 proof blocked on the raw recastKW head, so ANY flashback card in the
 // graveyard -- affordable or not -- made the window unprovable. Q3a prices the

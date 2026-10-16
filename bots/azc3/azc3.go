@@ -1,5 +1,5 @@
 // Package azc3 hosts the az-c3 policy: the az-redeal search seat with the c3
-// network of the aztrain self-play loop (docs/superpowers/reports/
+// network of the aztrain self-play loop (docs/design/
 // 2026-10-09-az-c3-hosted.md) in place of the heuristic prior and leaf.
 //
 // It is the search seat exactly as the loop trained and measured it, honest
@@ -63,20 +63,20 @@ func info() bots.Info {
 				Claim:   "63.0% [59.1, 66.8] vs sb-tactical (378-222)",
 				Versus:  "sb-tactical",
 				Setting: "dzgorge play, az sims=100 with c3, 600 paired games, FDN eval decks, seats swapped, London mulligan by land count",
-				Source:  "docs/superpowers/reports/2026-10-09-az-c3-hosted.md",
+				Source:  "docs/design/2026-10-09-az-c3-hosted.md",
 			},
 			{
 				Claim:   "55.8% [51.8, 59.8] vs the same search without a net (335-265)",
 				Versus:  "az-redeal-class full search, no net",
 				Setting: "dzgorge play, 600 paired games, FDN eval decks, seats swapped",
-				Source:  "docs/superpowers/reports/2026-10-09-az-c3-hosted.md",
+				Source:  "docs/design/2026-10-09-az-c3-hosted.md",
 			},
 		},
 		Cost: bots.Cost{
 			MeanMS: 185, P95MS: 259, Scope: "per bot-turn response",
 			Note: "hosted smoke: 4 games against a human who only passes, the 32 waits that included bot search (a small sample); " +
 				"the training loop's evaluations measured 202-344 ms mean per searched decision with 24 workers in parallel",
-			Source: "docs/superpowers/reports/2026-10-09-az-c3-hosted.md",
+			Source: "docs/design/2026-10-09-az-c3-hosted.md",
 		},
 		Env: true, Search: true,
 		Formats:      []string{"constructed"},

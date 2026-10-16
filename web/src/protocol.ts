@@ -2058,7 +2058,7 @@ export interface PaymentSelection {
 
   /**
    * AnnounceSelection is the announce-then-pay selector (spec
-   * docs/superpowers/specs/2026-09-27-announce-then-pay.md §3): it names an
+   * docs/design/2026-09-27-announce-then-pay.md §3): it names an
    * offered PaymentAction by ID and asks the engine to begin that ordinary cast
    * WITHOUT a payment witness, so the caster pays in the CR 601.2g mana window
    * ("select mana" prompt) instead. It is exclusive with Choices, Rest and

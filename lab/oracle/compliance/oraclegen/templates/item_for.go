@@ -1,6 +1,6 @@
 // ItemFor addresses a verdict row by (card, template), the one lookup
 // rule/triage/refreeze use so they reach a level-B row as well as a level-A
-// one (docs/superpowers/specs/2026-10-05-compliance-level-b.md section 4).
+// one (docs/design/2026-10-05-compliance-level-b.md section 4).
 //
 // A level-A template string has no "#": it returns Generate's item only when
 // the generator still makes that template, so a row whose scenario is stale

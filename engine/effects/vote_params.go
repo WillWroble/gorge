@@ -9,7 +9,7 @@ import (
 )
 
 // This file is api:Vote's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on CopyPermanent's pattern (copypermanent_params.go). compileVote is
 // the ONLY reader of a Vote ability's own parameters: the resolution
 // (vote_effect.go for the fixed-list and card ballots, vote.go for the

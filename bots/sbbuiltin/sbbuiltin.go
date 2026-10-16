@@ -22,8 +22,8 @@ const (
 )
 
 const (
-	designSource  = "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md"
-	packageSource = "docs/superpowers/specs/2026-09-28-hosted-bot-packages.md §3.2"
+	designSource  = "docs/design/2026-09-28-spellbench-agent-design.md"
+	packageSource = "docs/design/2026-09-28-hosted-bot-packages.md §3.2"
 )
 
 func init() {

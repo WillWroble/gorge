@@ -36,6 +36,6 @@
 // and TestProcessStateIsDeterministic plus TestProcessStateNoMapRange pin that
 // the walk is a pure, map-order-independent function of the view.
 //
-// See docs/superpowers/specs/2026-10-07-mzenc-design.md and
-// docs/superpowers/plans/2026-10-07-mzenc-hash-port.md.
+// See archived 2026-10-07-mzenc-design.md (docs/design/ARCHIVE.md) and
+// archived 2026-10-07-mzenc-hash-port.md (docs/design/ARCHIVE.md).
 package mzenc

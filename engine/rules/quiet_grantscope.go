@@ -9,7 +9,7 @@ import (
 )
 
 // Per-seat scope for the proof's grant board flags (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md §2.2 flags
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md §2.2 flags
 // 1, 3 and 5, step Q3c).
 //
 // A grant (AddAbility$, GainsAbilitiesOf$, AddKeyword$, MayPlay$) only

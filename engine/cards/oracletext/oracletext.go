@@ -1,6 +1,6 @@
 // Package oracletext renders the printed-card view of a corpus card -- what a
 // player can read, never the Forge script -- for the Oracle-text card audit
-// (docs/superpowers/specs/2026-09-27-oracle-text-card-audit.md).
+// (docs/design/2026-09-27-oracle-text-card-audit.md).
 //
 // It is a subpackage on purpose: cards.CompilerFingerprint hashes every
 // non-test .go file directly in engine/cards/, so a helper placed there would

@@ -9,7 +9,7 @@ The ledger is .ds4/reward/scoreboard.jsonl, one JSON object per measurement:
 
 Rows are append-only and never rewritten. This script only reads them.
 
-Scoring (docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md
+Scoring (docs/design/2026-09-29-reward-loop-and-seed-agent-design.md
 §2.1). Each axis contributes its primary metric's delta between the newest
 git_head present and the previous distinct git_head, normalised by that
 metric's own historical scale so Elo, milliseconds and card counts are

@@ -10,7 +10,7 @@ import (
 )
 
 // This file is api:Pump's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8). compilePump is the ONLY reader of a Pump ability's own parameters: the
 // resolution (pump.go), the shared per-object registration
 // (registerPumpEffects), rules' pure-keyword-grant legality check

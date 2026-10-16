@@ -9,7 +9,7 @@ import (
 )
 
 // This file is api:CopyPermanent's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on ChangeZone's pattern (changezone_params.go). compileCopyPermanent is
 // the ONLY reader of a CopyPermanent ability's own parameters: the resolution
 // (copypermanent.go) reads the compiled CopyPermanentParams, including the

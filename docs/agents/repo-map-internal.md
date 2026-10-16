@@ -1,16 +1,20 @@
 # Repo map — `internal/` infrastructure and shared tooling
 
-Part of the [repo map](repo-map.md) index. Research harnesses under
-`internal/` live in [repo-map-research.md](repo-map-research.md).
+Part of the [repo map](repo-map.md) index. Bot runtime packages are in
+[repo-map-engine.md](repo-map-engine.md#bots); research harnesses are under
+`lab/` ([repo-map-research.md](repo-map-research.md)).
 
 ## `internal/`
 
 | Package | What it owns |
 |---|---|
-| `archtest` | Import-graph and structural tests (dependency order, `time` allowlist, no `math/rand`, 32-bit build, resume-state census, no engine leaks from host). |
-| `testutil` | Corpus registry (`CorpusRegistry` — **skips when `.cards/` is absent**), repo decks (`testutil/decks/*.json`), shared invariants, and the AGENTS.md ratchet (`agentsdoc_test.go`). |
-| `testutil/feedback` | Loads player feedback snapshots; `feedback.EngineAt`. |
-| `divergence` | Human-divergence capture records (`divergence-v1`, `triage-v1` JSONL), the materiality predicate (`Material`), the shadow seed (`ShadowSeed`) and `ChoiceSummary`. Engine-side leaf: imports only `decision`/`state`; host, `rules`, `internal/testutil` and `time` are forbidden. Spec: `docs/superpowers/specs/2026-10-10-human-divergence-design.md` (HD-1). |
-| `tsgen` | Go→TypeScript for `web/src/protocol.ts`. |
-| `bench` | Policy-agnostic game runner: `PlayGame`, `RunPairs`, watchdogs, livelock recovery. Shared by `botbench` and `policytune`. |
-| `traceboard` | The redacted, map-free decision-trace board schema (`botbench -decision-trace`). |
+| `internal/archtest` | Import-graph and structural tests (dependency order, `time` allowlist, no `math/rand`, 32-bit build, root `go.mod` has no `require`, layering budgets for the `engine/rules` sub-packages, no engine leaks from host). |
+| `internal/testutil` | Corpus registry (`CorpusRegistry` — **skips when `.cards/` is absent**), repo decks (`internal/testutil/decks/*.json`), shared invariants, the per-test budget exception inventories (`internal/testutil/testdata/`), and the AGENTS.md ratchet (`agentsdoc_test.go`). |
+| `internal/testutil/feedback` | Loads player feedback snapshots; `feedback.EngineAt`. |
+| `internal/bench` | Policy-agnostic game runner: `PlayGame`, `RunPairs`, watchdogs, livelock recovery. Shared by `lab/cmd/botbench` and `lab/cmd/policytune`. |
+| `internal/botobs` | The observability checklist the reward loop's obs axis scores against ([`docs/design/2026-09-29-reward-loop-and-seed-agent-design.md`](../design/2026-09-29-reward-loop-and-seed-agent-design.md) §6). |
+| `internal/codeshape` | Code-shape metrics and ratchets for `engine/rules` and `engine/effects` (function length, interface width); `cmd/codeshape` prints them. |
+| `internal/corpusheap` | Heap-footprint ratchet for the opened corpus (tests only). |
+| `internal/paymirror` | A/B check of planned vs manual cast payment; `cmd/paymirror` drives it. |
+| `internal/testbudget` | Per-test-binary peak-RSS records for `cmd/testbudget`. |
+| `internal/tsgen` | Go→TypeScript for `web/src/protocol.ts` (`cmd/gentypes`). |

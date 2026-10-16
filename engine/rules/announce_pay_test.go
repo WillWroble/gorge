@@ -11,7 +11,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
-// Announce-then-pay (docs/superpowers/specs/2026-09-27-announce-then-pay.md):
+// Announce-then-pay (docs/design/2026-09-27-announce-then-pay.md):
 // rules-level coverage of the Intent.Announce selector and the announced
 // CR 601.2g window's options, Auto-fill, Undo last tap and Cancel cast.
 

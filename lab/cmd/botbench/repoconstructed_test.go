@@ -4,7 +4,7 @@ package main
 // 60-card constructed repo decks from internal/testutil/decks (mono-green-stompy
 // included in the dir, out of the pool). These tests guard the copies against
 // drift and prove botbench plays the catalog end to end. See
-// docs/superpowers/reports/2026-09-30-repo-constructed-gauntlet.md.
+// archived 2026-09-30-repo-constructed-gauntlet.md (docs/design/ARCHIVE.md).
 
 import (
 	"fmt"

@@ -9,8 +9,8 @@ package searchbench
 // the command boundary.
 //
 // Stated deviations from BenchSearch (the tree, PUCT, leaf and backup
-// semantics are azmcts's; docs/superpowers/plans/2026-09-30-searchbench-
-// replication.md "Search semantics" lists the rest):
+// semantics are azmcts's; the archived plan 2026-09-30-searchbench-
+// replication.md (docs/design/ARCHIVE.md) "Search semantics" lists the rest):
 //
 //   - Upstream caches each tree node's engine state the first time it is
 //     visited, so a node's chance outcome is drawn once. azmcts replays every

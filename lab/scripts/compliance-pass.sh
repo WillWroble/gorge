@@ -3,9 +3,9 @@
 # (default: every set with a printed list under lab/oracle/compliance/printed/), writing
 # verdict rows into compliance/verdicts.
 #
-# docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md section
+# docs/design/2026-10-03-rules-engine-lasagna-design.md section
 # 11.3 C1; the oracle itself is
-# docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md.
+# docs/design/2026-10-02-xmage-compliance-oracle-design.md.
 #
 # Per set:
 #   1. oraclediff gen   -- one level-A scenario per manifest card gorge supports

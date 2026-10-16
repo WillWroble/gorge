@@ -1,5 +1,5 @@
 // Level-B static template (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 7). It
+// docs/design/2026-10-05-compliance-level-b.md section 7). It
 // serves statics observed through stack/state differences, combat damage,
 // attack/block legality and priority options. A legality candidate is served
 // only when its control proves the action is available without the static and

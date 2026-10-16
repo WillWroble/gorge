@@ -13,7 +13,7 @@ import (
 // draft-zero) defines for FDN Limited -- every deck whose player sits in the
 // >= 60% game-win-rate bucket, one per (draft_id, build_index). SpellBench
 // lists "FDN Limited" as a proposed benchmark with no definition of its
-// own yet; see docs/superpowers/reports/2026-09-28-spellbench-fdn-limited.md.
+// own yet; see archived 2026-09-28-spellbench-fdn-limited.md (docs/design/ARCHIVE.md).
 // lab/scripts/spellbench-fdn-catalog.py regenerates the directory.
 const FDNLimited = "decks/fdn-limited"
 

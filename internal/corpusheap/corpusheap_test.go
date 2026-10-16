@@ -4,7 +4,7 @@
 // and in parallel with every other package's tests.
 //
 // The point is the pointer-free corpus work (S0 of
-// docs/superpowers/specs/2026-10-06-pointer-free-corpus-design.md): the whole
+// archived 2026-10-06-pointer-free-corpus-design.md (docs/design/ARCHIVE.md)): the whole
 // corpus is 163 MB live, 102 MB of it scannable, and every GC cycle re-marks
 // it. This test pins the measured values so a regression that grows the heap,
 // or a later step that shrinks it, cannot pass unnoticed: a measurement above

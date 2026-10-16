@@ -11,7 +11,7 @@ import (
 )
 
 // The Q3b part-bound rows (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md, §6 Q3b):
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md, §6 Q3b):
 // one satisfiable and one unsatisfiable row per bounded part kind. A
 // satisfiable row asserts the ability's group exists on the face and the
 // proof blocks with qbBattlefieldAbility; its unsatisfiable sibling differs

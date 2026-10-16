@@ -1,6 +1,6 @@
 // Package azc4 hosts the az-c4 policy: the az-redeal search seat with the C4
 // network of the aztrain closed-list, census-on loop
-// (docs/superpowers/reports/2026-10-14-az-c4-hosted.md), playing CLOSED
+// (docs/design/2026-10-14-az-c4-hosted.md), playing CLOSED
 // opponent lists only:
 //
 //	az:sims=100:autopay:oppnodes:oppfull:morekinds:closedlist:topk=6:gonet=c4.dzgw
@@ -37,7 +37,7 @@ import (
 const Policy = "az-c4"
 
 // report is the source every claim below cites.
-const report = "docs/superpowers/reports/2026-10-14-az-c4-hosted.md"
+const report = "docs/design/2026-10-14-az-c4-hosted.md"
 
 var c4 = azc3.NewHosted(azc3.HostedSpec{Info: info(), ErrPrefix: "azc4", Closed: true})
 

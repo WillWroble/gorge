@@ -1,5 +1,5 @@
 // Package pay is the L5 payment-planning layer of the rules engine (lasagna
-// spec docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md §9,
+// spec docs/design/2026-10-03-rules-engine-lasagna-design.md §9,
 // W5 step E7, first slice): the planner's vocabulary -- a source's Alt
 // alternatives, the Consequence an activation carries, the lexicographic Rank
 // that orders plans, the Witness a chosen plan discloses -- and its bounded,

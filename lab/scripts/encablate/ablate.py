@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Encoding ablation harness (2026-10-10, docs/superpowers/reports/2026-10-10-encoding-ablation.md).
+"""Encoding ablation harness (2026-10-10, archived 2026-10-10-encoding-ablation.md (docs/design/ARCHIVE.md)).
 
 Reads a lab/cmd/encablate dump and trains a small bag-of-tokens policy+value net:
 

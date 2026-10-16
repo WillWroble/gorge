@@ -1,7 +1,7 @@
 package heuristic
 
 // Cross-interface privacy acceptance for the seat deck manifest contract
-// (docs/superpowers/specs/2026-09-29-seat-deck-manifest.md, ticket
+// (docs/design/2026-09-29-seat-deck-manifest.md, ticket
 // seat-deck-03-acceptance). The per-interface unit pins live beside the code
 // they cover (engine/deck/manifest_test.go, engine/rules/deck_manifest_test.go,
 // engine/view/own_deck_test.go, server/manabrew/own_deck_test.go,

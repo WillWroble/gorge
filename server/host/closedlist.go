@@ -29,7 +29,7 @@ import (
 //     a seat at a human table must be closed (searchseat.SeatSetup gave it a
 //     belief). If not, the seat gets its own list only and no root.
 //
-// What "closed" buys is spelled out in docs/superpowers/reports/
+// What "closed" buys is spelled out in docs/design/
 // 2026-10-14-az-c4-hosted.md (the leak audit): the seat's Setup holds only
 // its own list; its honest root, and every world its search deals from that
 // root, re-identify the opponent's unknown hand and library cards from the

@@ -411,7 +411,7 @@ parked, and every decision is one line in the commit message.
 
     # ---- correct (1000x): compliance findings, one candidate per CLASS.
     # The per-card "Oracle-audit the next N validated cards" batch is retired
-    # (docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md
+    # (docs/design/2026-10-03-rules-engine-lasagna-design.md
     # section 11.3 C4): the XMage oracle now covers whole sets, and its
     # findings are grouped into class tickets -- one per unsupported primitive
     # (with the primitives only its cards carry), gorge_wrong ruling or shape,

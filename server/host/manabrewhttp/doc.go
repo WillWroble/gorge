@@ -1,5 +1,5 @@
 // Package manabrewhttp is MB-10 of the ManaBrew protocol scoping spec
-// (docs/superpowers/specs/2026-09-28-manabrew-protocol-scope.md §5.2): the
+// (archived 2026-09-28-manabrew-protocol-scope.md (docs/design/ARCHIVE.md) §5.2): the
 // wire transport that carries server/manabrew's translation over HTTP.
 //
 // It is stdlib-only SSE plus POST, at the host tier: it drives a

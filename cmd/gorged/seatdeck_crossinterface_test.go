@@ -2,7 +2,7 @@ package main
 
 // Cross-interface privacy acceptance over the REAL transports (ticket
 // seat-deck-03-acceptance, spec
-// docs/superpowers/specs/2026-09-29-seat-deck-manifest.md). This file mounts
+// docs/design/2026-09-29-seat-deck-manifest.md). This file mounts
 // the native httpapi handler and the ManaBrew adapter on one mux against one
 // registry and proves that, at the SAME match sequence:
 //

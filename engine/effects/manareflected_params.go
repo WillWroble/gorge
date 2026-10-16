@@ -9,7 +9,7 @@ import (
 )
 
 // This file is api:ManaReflected's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8). compileManaReflected is the ONLY reader of a reflected-mana ability's
 // own parameters: the resolution (mana_reflected.go's effManaReflected), the
 // candidate census rules' mana walk and activation share

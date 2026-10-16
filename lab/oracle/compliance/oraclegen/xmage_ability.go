@@ -1,5 +1,5 @@
 // XMage ability-text derivation (hypothesis H1,
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2.1).
+// docs/design/2026-10-05-compliance-level-b.md section 2.1).
 //
 // XMage's TestPlayer selects an activated ability by a prefix of its printed
 // rule text -- activateAbility(turn, step, player, "{2}, {T}") -- so a level-B

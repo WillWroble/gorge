@@ -1,5 +1,5 @@
 // Level-B activate template (spec
-// docs/superpowers/specs/2026-10-05-compliance-level-b.md section 2.1; ticket
+// docs/design/2026-10-05-compliance-level-b.md section 2.1; ticket
 // L5). It serves the activate.battlefield and activate.mana requirements --
 // and the channel-style activate.hand and activate.graveyard ones -- with the
 // card on p0's battlefield (or in p0's hand or graveyard), the ability's targets from the ordinary fixture

@@ -9,8 +9,8 @@ import (
 )
 
 // The per-card graveyard tokens (FeaturesMZGrave). mz sees a graveyard only
-// as a count; the encoding ablation (docs/superpowers/reports/
-// 2026-10-10-encoding-ablation.md, section 2) measured graveyard properties
+// as a count; the encoding ablation (archived
+// 2026-10-10-encoding-ablation.md, section 2; docs/design/ARCHIVE.md) measured graveyard properties
 // as significant signal for both seats. Each card in a graveyard emits, under
 // zone tag z = "gy-me" (the viewer's) or "gy-opp" (every other seat's):
 //

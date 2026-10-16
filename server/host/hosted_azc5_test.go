@@ -1,6 +1,6 @@
 package host
 
-// az-c5 (docs/superpowers/reports/2026-10-15-az-c5.md) through the host. It is
+// az-c5 (docs/design/2026-10-15-az-c5.md) through the host. It is
 // az-c4 with another network (bots/azc5), so it owes az-c4's rows
 // (hosted_azc4_test.go), run here for the az-c5 registration:
 //

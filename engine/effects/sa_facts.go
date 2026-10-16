@@ -8,7 +8,7 @@ import (
 )
 
 // SAFacts is the one per-ability compiled facts record (W4 steps 1 and 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8). An ability has exactly one downstream slot (cards.ExtSlot) and a second
 // claim on it fails silently, so every compiled per-ability fact lives in this
 // one struct hung on the slot and nothing competes for it: the per-API typed

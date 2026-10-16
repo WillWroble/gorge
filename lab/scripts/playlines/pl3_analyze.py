@@ -3,7 +3,7 @@
 Inputs (written by pl3_run.sh): <arm>.jsonl (win runs, -lines), <arm>.r<k>.jsonl (diversity replays),
 base2.jsonl (null control: the baseline on another seed). Arm A is always the arm under test.
 
-Pre-registered rule (docs/superpowers/reports/2026-10-16-pl-3-randomised-lines.md), applied literally:
+Pre-registered rule (docs/design/2026-10-16-pl-3-randomised-lines.md), applied literally:
   usable  = paired delta win rate >= -1.0 pp AND paired 95% lower bound on delta > -1.5 pp
             AND divergence-before-turn-4 >= baseline's own + 25 pp
   PURSUE  = some usable arm with a timing shift >= 5 pp on either row, or a split-half archetype gain >= +3 pp

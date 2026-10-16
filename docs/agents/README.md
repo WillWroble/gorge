@@ -14,7 +14,9 @@ so it can stay out of every turn's context.
 | [runtime-behavior.md](runtime-behavior.md) | When changing trigger-relative filters, cast provenance, host observer hooks, or seat privacy/session handling. |
 | [test-throughput-2026-10-12.md](test-throughput-2026-10-12.md) | Changing the gate, post-merge suite or test budgets: the 2026-10-12 audit of where test wall time goes, with ranked fixes. |
 | [README § Bot player training and adoption](../../README.md#bot-player-training-and-adoption-guidelines) | Building, training or evaluating a bot policy. |
-| `docs/superpowers/specs/2026-09-22-engine-contracts.md` | Behaviour that looks like a bug but is a deliberate contract. |
+| [`docs/design/2026-09-22-engine-contracts.md`](../design/2026-09-22-engine-contracts.md) | Behaviour that looks like a bug but is a deliberate contract. |
+| [`docs/design/`](../design/ARCHIVE.md) and [`docs/decisions/`](../decisions/0001-repo-layout.md) | Living designs (flat, date-prefixed) and architecture decisions. Historical records were parked; `docs/design/ARCHIVE.md` indexes them. |
+| [`ops/README.md`](../../ops/README.md) | Before touching the pipeline: gates, hooks, systemd units, postmerge. |
 
 ## The six rules that matter most
 

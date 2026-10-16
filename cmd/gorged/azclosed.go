@@ -1,8 +1,8 @@
 package main
 
 // Serving the closed-list az policies: az-c4
-// (docs/superpowers/reports/2026-10-14-az-c4-hosted.md) and az-c5
-// (docs/superpowers/reports/2026-10-15-az-c5.md).
+// (docs/design/2026-10-14-az-c4-hosted.md) and az-c5
+// (docs/design/2026-10-15-az-c5.md).
 //
 // Each is az-c3's search with its own network, playing CLOSED opponent lists
 // only: it guesses the opponent's deck from a belief corpus and never reads

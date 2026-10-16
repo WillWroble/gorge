@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # broker.sh — the resource arbiter that keeps heavy work from starving a gate.
 #
-# Design: docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md §3.
+# Design: docs/design/2026-09-29-reward-loop-and-seed-agent-design.md §3.
 #
 # Three classes, three cgroup slices. `gate` (gates, merges, landings) is never
 # paused and never capped below what it asks for. `probe` (reward measurement)

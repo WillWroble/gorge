@@ -1,5 +1,5 @@
 // Package draftfeat turns one seat's legal draft view into the pick
-// features of the draft-RL design (docs/superpowers/specs/
+// features of the draft-RL design (docs/design/
 // 2026-10-14-draft-rl-design.md §4): pool signals (group P), per-candidate
 // card strength (group S) and table reads (group T: wheels, lateness, seat
 // posteriors, availability, wheel probability).

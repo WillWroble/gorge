@@ -161,7 +161,7 @@ describe('SeatPanel — payment plans', () => {
     expect(html).toContain('Cast Grizzly Bears');
   });
 
-  // Amended by announce-then-pay (docs/superpowers/specs/2026-09-27-announce-then-pay.md
+  // Amended by announce-then-pay (docs/design/2026-09-27-announce-then-pay.md
   // §8, §9): with the preference off the legacy options are unchanged, no
   // suggested-plan group is shown, and a plan-only cast is offered as ONE
   // announce row that opens the select-mana window.

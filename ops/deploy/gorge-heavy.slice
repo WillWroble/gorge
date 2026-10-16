@@ -1,6 +1,6 @@
 [Unit]
 Description=gorge heavy work (training, gauntlets, sweeps, cardfuzz) — preemptible
-Documentation=file:///home/sadams/projects/gorge/docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md
+Documentation=file:///home/sadams/projects/gorge/docs/design/2026-09-29-reward-loop-and-seed-agent-design.md
 
 [Slice]
 # A hard ceiling so heavy work CANNOT take the box: two OOMs here (2026-09-27)

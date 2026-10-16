@@ -1,5 +1,5 @@
 // Command draftrl is the draft-RL program's driver (spec
-// docs/superpowers/specs/2026-10-14-draft-rl-design.md). Its
+// docs/design/2026-10-14-draft-rl-design.md). Its
 // subcommands are gate (DR-4, §3.0): homogeneous or mixed pods drafted
 // from fixed seeds, each seat's built deck measured against the
 // fdn-limited gauntlet under the scripted bot or the closed-list az pilot;

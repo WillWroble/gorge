@@ -76,7 +76,7 @@ func (r *Registry) SubmitIntent(id TableID, k int, player state.PlayerID, in dec
 
 // SubmitIntentFrom is SubmitIntent with HD-2's client-autopilot bit: auto
 // marks the answer as produced by the client's autopilot rather than a
-// deliberate human choice (docs/superpowers/specs/2026-10-10-human-divergence-design.md
+// deliberate human choice (docs/design/2026-10-10-human-divergence-design.md
 // §5.2). The flag travels to the parked slot — never into decision.Intent,
 // whose values are replay input — and the play loop records it in the match's
 // provenance ledger (server/host/divergence_ledger.go), so the divergence capture can
@@ -94,7 +94,7 @@ func (r *Registry) SubmitIntentFrom(id TableID, k int, player state.PlayerID, in
 		return err
 	}
 	if in.Announce != nil {
-		// Announce then pay (docs/superpowers/specs/2026-09-27-announce-then-pay.md
+		// Announce then pay (docs/design/2026-09-27-announce-then-pay.md
 		// §3.1): Decision.Validate proves the selector names an offered action
 		// that carries a plan; the engine's independent re-plan proves the cast
 		// is still payable before the parked match is woken.

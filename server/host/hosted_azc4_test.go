@@ -1,6 +1,6 @@
 package host
 
-// az-c4 (docs/superpowers/reports/2026-10-14-az-c4-hosted.md) through the host:
+// az-c4 (docs/design/2026-10-14-az-c4-hosted.md) through the host:
 // the closed-list policy that may seat against a human.
 //
 //   - TestAZC4NeverSeesTheHumansHiddenCards: the privacy proof. A real hosted

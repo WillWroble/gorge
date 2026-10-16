@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # heavy.sh — run a heavy or probe job under a lease, a slice and a pause contract.
 #
-# Design: docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md §3.1.
+# Design: docs/design/2026-09-29-reward-loop-and-seed-agent-design.md §3.1.
 #
 #   ops/scripts/heavy.sh heavy [options] -- <cmd> [args...]
 #   ops/scripts/heavy.sh probe [options] -- <cmd> [args...]

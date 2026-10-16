@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "One entry per fact a human player has access to, in the sense of the reward loop's obs axis (docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md §6). `where` names the engine-side accessor a bot could read the fact from, or null when no accessor exists. `exposed` records whether a bot view actually carries it today; the ratchet in checklist_test.go MEASURES each flag from the observation path and fails on any disagreement in either direction. Adding a fact carrier without recording it here fails; a recorded true fact regressing to false fails. This ticket measures only -- it exposes nothing new.",
+  "note": "One entry per fact a human player has access to, in the sense of the reward loop's obs axis (docs/design/2026-09-29-reward-loop-and-seed-agent-design.md §6). `where` names the engine-side accessor a bot could read the fact from, or null when no accessor exists. `exposed` records whether a bot view actually carries it today; the ratchet in checklist_test.go MEASURES each flag from the observation path and fails on any disagreement in either direction. Adding a fact carrier without recording it here fails; a recorded true fact regressing to false fails. This ticket measures only -- it exposes nothing new.",
   "facts": [
     {
       "id": "own_library_list",

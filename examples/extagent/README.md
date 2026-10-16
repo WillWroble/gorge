@@ -8,7 +8,7 @@ on purpose. It is the Python twin of `lab/draft/draftlab/extern/refagent` and ne
 agree with it bit for bit.
 
 The wire protocol of record is section 4 of
-[`docs/superpowers/plans/2026-10-14-draft-events-e5d-plan.md`](../../docs/superpowers/plans/2026-10-14-draft-events-e5d-plan.md):
+[`docs/design/2026-10-14-draft-events-e5d-plan.md`](../../docs/design/2026-10-14-draft-events-e5d-plan.md):
 one JSON object per line, `{"v":1,"type":...}`, gorge writing `hello`,
 `batch`, `stream_end` and `bye`, and the agent writing `hello`, `result` and
 `error`.

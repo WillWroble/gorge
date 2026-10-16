@@ -9,7 +9,7 @@ import (
 )
 
 // The quiet-seat proof (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md, §2).
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md, §2).
 //
 // seatQuiet(p) reports that the posed-priority legal-action walk would offer
 // p nothing but the mana section's "activate" options (plus pass and concede,

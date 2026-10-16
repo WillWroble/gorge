@@ -1,6 +1,7 @@
-# orchestrator — gate hooks for the agentctl pipeline
+# ops/orchestrator — gate hooks for the agentctl pipeline
 
-This package is no longer a pipeline. It holds the repo-specific gate hooks
+This package (`ops/orchestrator/`; the root `orchestrator/` before
+2026-10-16) is no longer a pipeline. It holds the repo-specific gate hooks
 that the pipeline calls by name, and nothing else.
 
 The autonomous defect pipeline that used to live here — `daemon.py`,
@@ -35,8 +36,11 @@ branch. Nothing runs from that branch; read it for history, not for behaviour.
 | `sim_all_replayed` | the `make sim` gate's `accept` |
 | `testheads_policy` | `[hooks] post_gates` |
 
-agentctl imports these as `ops.orchestrator.hooks` with the repo root on the path,
-so **this module must stay self-contained**: standard library only, no imports
+agentctl resolves each hook from `.agentctl/config.toml` as
+`ops.orchestrator.hooks:<name>`, importing `<repo>/ops/orchestrator/hooks.py`
+with the repo root on the path (`ops/` is a namespace package;
+`ops/orchestrator/` has an `__init__.py`). Because of that import,
+**this module must stay self-contained**: standard library only, no imports
 from anything else in this package, no assumption that any other module here
 exists. That constraint is why hooks.py survived the removal intact.
 

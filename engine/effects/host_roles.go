@@ -8,7 +8,7 @@ import (
 )
 
 // host_roles.go splits effects.Host into role interfaces (rules-engine
-// refactor spec W1d, docs/superpowers/specs/2026-10-03-rules-engine-lasagna-
+// refactor spec W1d, docs/design/2026-10-03-rules-engine-lasagna-
 // design.md section 5). Host stays the union of every role, so the change is
 // incremental: an effect body still receives a Host, while a new helper takes
 // the narrowest role it uses, so its signature says what it touches.

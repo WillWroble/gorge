@@ -1,5 +1,5 @@
 // Package botobs is the observability checklist the reward loop's obs axis
-// scores against (docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md
+// scores against (docs/design/2026-09-29-reward-loop-and-seed-agent-design.md
 // §6): a denominator for "how much of what a human player can see does a bot
 // seat actually see".
 //

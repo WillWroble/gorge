@@ -192,7 +192,7 @@ func (e *Engine) legalActionsWalkWithWindow(p state.PlayerID, hyp *state.Mana, c
 
 // postWalkTail is the offer walk's post-walk tail, extracted verbatim from
 // legalActionsWalkWithWindow (quiet-seat Q2, design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md §3.3) so
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md §3.3) so
 // the quiet serve (engine/rules/quiet_serve.go) runs the same code: the post-walk
 // filters, then pass, then concede, then the result build (the arena tail's
 // in-place commit, or a copy) and the scratch-buffer restore.

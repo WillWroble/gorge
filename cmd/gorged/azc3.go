@@ -1,6 +1,6 @@
 package main
 
-// Serving az-c3 (docs/superpowers/reports/2026-10-09-az-c3-hosted.md).
+// Serving az-c3 (docs/design/2026-10-09-az-c3-hosted.md).
 //
 // The policy is a network trained on one deck distribution (17lands FDN
 // limited decks) and measured on nothing else, so the server keeps it there:

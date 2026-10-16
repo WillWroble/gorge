@@ -1,7 +1,7 @@
 /**
  * wire.ts: the ManaBrew protocol's message shapes, hand-written from the
  * published spec (https://docs.manabrew.app/protocol/, CC-BY-4.0; condensed
- * in docs/superpowers/specs/2026-09-28-manabrew-protocol-scope.md Appendix A)
+ * in archived 2026-09-28-manabrew-protocol-scope.md (docs/design/ARCHIVE.md) Appendix A)
  * and from gorge's Go mirror in protocol/manabrew. Decoding is lenient:
  * every field a gorge server may omit is optional here, and unknown fields
  * are ignored.

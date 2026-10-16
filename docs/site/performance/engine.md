@@ -89,7 +89,7 @@ CPU milliseconds per game over 29 decks:
 | 2026-10-09/10 | quiet-machine series | MCTS-100 | +10.4% median |
 
 The engine-speed method and the first pinned comparison are written up in
-[`docs/superpowers/reports/2026-09-30-gorge-engine-speed.md`](https://github.com/adams-shaun/gorge/blob/main/docs/superpowers/reports/2026-09-30-gorge-engine-speed.md).
+[`2026-09-30-gorge-engine-speed.md` (archived)](https://github.com/adams-shaun/gorge/blob/main/docs/design/ARCHIVE.md).
 
 ## Tracking over time
 

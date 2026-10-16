@@ -48,7 +48,7 @@ func TestRenderIsDeterministic(t *testing.T) {
 	if !bytes.Equal(a.Bytes(), b.Bytes()) {
 		t.Fatal("two renders differ")
 	}
-	for _, want := range []string{"| `rules` |", "| `cmd/pkgmap` |", "```mermaid", "## Tier dependencies"} {
+	for _, want := range []string{"| `engine/rules` |", "| `cmd/pkgmap` |", "```mermaid", "## Tier dependencies"} {
 		if !strings.Contains(a.String(), want) {
 			t.Errorf("output lacks %q", want)
 		}

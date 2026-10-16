@@ -10,7 +10,7 @@ import (
 )
 
 // This file is api:Dig's parameter compiler (W4 step 3 of
-// docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
+// docs/design/2026-10-03-rules-engine-lasagna-design.md, section
 // 8), on CopyPermanent's pattern (copypermanent_params.go). compileDig is the
 // ONLY reader of a Dig ability's own parameters: the resolution (dig.go)
 // reads the compiled DigParams, including the defaulted ChangeValid$ spec,

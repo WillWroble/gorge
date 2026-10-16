@@ -2088,7 +2088,7 @@ export class SeatPanelState {
   }
 
   /** submitAnnounce posts the announce-then-pay selector for one offered cast
-   * (docs/superpowers/specs/2026-09-27-announce-then-pay.md
+   * (docs/design/2026-09-27-announce-then-pay.md
    * §3): the engine begins the cast and poses the "select mana" window. Like
    * submitPayment it re-resolves the action on the current decision, so a
    * stale button is inert after a seq swap. */

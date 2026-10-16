@@ -59,8 +59,8 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # combat-simulation attacker/blocker, while lethal-pressure plays as the
 # plain auto-pay bot. That arm passed the held-out gate at 53.69%
 # [52.73, 54.64] Commander and 53.17% [52.68, 53.65] constructed vs the
-# plain auto-pay bot (commit 66aa546dd; docs/superpowers/reports/
-# 2026-10-09-bot-consolidation-plan.md finding 1). Same cost (<1 ms per
+# plain auto-pay bot (commit 66aa546dd; archived
+# 2026-10-09-bot-consolidation-plan.md finding 1, docs/design/ARCHIVE.md). Same cost (<1 ms per
 # decision), so the 2026-10-07 load reasoning below still holds.
 #
 # 2026-10-07 (retired): lethal-pressure. The demo serves 8 constructed and 8 commander
@@ -80,7 +80,7 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # EITHER search-based policy (tracked: cli-20260929T214831Z-6b1aaa71, a
 # wall-clock deadline for the search loop); sb-search-lite-atk is not
 # meaningfully safer on cost -- 219ms mean/searched decision vs az-redeal's
-# 247ms, same ballpark (docs/superpowers/specs/2026-09-28-spellbench-agent-
+# 247ms, same ballpark (docs/design/2026-09-28-spellbench-agent-
 # design.md §12.6). Both are Experimental and constructed-only/2-seat-only
 # (bots.Info.Formats/MaxSeats), so neither could serve the commander half of
 # the demo at all. Before that (2026-09-28): lethal-pressure (AR7).
@@ -89,8 +89,8 @@ BOT_POLICY=${BOT_POLICY:-bot}
 # CommonSense guard. COMMON_SENSE=true opts the `bot` and `sb-tactical`
 # seats into the guard (hostile self-removal dropped from the option list,
 # the London mulligan answered by botpolicy.MulliganConstructed); measured
-# 2026-10-09 on constructed games only (docs/superpowers/reports/2026-10-09-
-# common-sense-rules-evaluation.md: `bot` 52.6% [50.9, 54.3], `sb-tactical`
+# 2026-10-09 on constructed games only (archived 2026-10-09-
+# common-sense-rules-evaluation.md, docs/design/ARCHIVE.md: `bot` 52.6% [50.9, 54.3], `sb-tactical`
 # 51.3% [49.6, 53.0], hostile self-hits 17% -> 0.4%), so it stays opt-in
 # until a commander measurement lands (cli-20261013T173521Z-a00fec60).
 COMMON_SENSE=${COMMON_SENSE:-false}
@@ -115,7 +115,7 @@ DEMO_GOMEMLIMIT=${DEMO_GOMEMLIMIT:-8GiB}
 PPROF=${PPROF:-false}
 
 # AZ_C3_NET / AZ_C3_DECKS (both or neither) serve the az-c3 bot: its .dzgw network
-# and the directory of the FDN decks it was trained on (docs/superpowers/reports/
+# and the directory of the FDN decks it was trained on (docs/design/
 # 2026-10-09-az-c3-hosted.md). Set, the demo gains an az-c3 vs az-c3 table —
 # bot-only, so setting AZ_C3_NET is the operator's explicit opt-in for
 # -allow-decklist-bots (az-c3 reads every seat's real decklist; it never plays
@@ -123,7 +123,7 @@ PPROF=${PPROF:-false}
 AZ_C3_NET=${AZ_C3_NET-}
 AZ_C3_DECKS=${AZ_C3_DECKS-}
 # AZ_C4_NET / AZ_C4_DECKS / AZ_C4_BELIEF (all three or none) serve the az-c4
-# bot (docs/superpowers/reports/2026-10-14-az-c4-hosted.md): its .dzgw network,
+# bot (docs/design/2026-10-14-az-c4-hosted.md): its .dzgw network,
 # the FDN decks it may play (AZ_C3_DECKS's directory may be reused: a shared
 # deck is reserved for both) and the belief corpus it guesses its opponent's
 # list from; AZ_C4_BELIEF_POOL optionally names a pool.tsv whose train split
@@ -137,7 +137,7 @@ AZ_C4_BELIEF=${AZ_C4_BELIEF-}
 AZ_C4_BELIEF_POOL=${AZ_C4_BELIEF_POOL-}
 # AZ_C5_NET / AZ_C5_DECKS / AZ_C5_BELIEF (all three or none), and the optional
 # AZ_C5_BELIEF_POOL, serve the az-c5 bot exactly as the AZ_C4 variables serve
-# az-c4 (docs/superpowers/reports/2026-10-15-az-c5.md): the C5 net, trained
+# az-c4 (docs/design/2026-10-15-az-c5.md): the C5 net, trained
 # after the payment-plan fixes, with az-c4's decks and belief. AZ_C5_DECKS may
 # be AZ_C4_DECKS's (or AZ_C3_DECKS's) directory: a shared deck is reserved for
 # every policy that names it. It gets its own az-c5 vs az-c5 spectator table.

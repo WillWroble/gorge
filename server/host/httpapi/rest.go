@@ -321,7 +321,7 @@ func (h *handler) pending(w http.ResponseWriter, r *http.Request) {
 // an HTTP status plus the registry's reason body (audit item 17); a 204 means
 // the intent was accepted and the parked seat is free.
 //
-// The ?auto=1 query flag (HD-2, docs/superpowers/specs/2026-10-10-human-divergence-design.md
+// The ?auto=1 query flag (HD-2, docs/design/2026-10-10-human-divergence-design.md
 // §5.2) marks the answer as produced by the client's autopilot rather than a
 // deliberate human choice: the handler forwards it as a boolean into
 // SubmitIntentFrom, which records it in the match's provenance ledger. It

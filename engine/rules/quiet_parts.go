@@ -8,7 +8,7 @@ import (
 )
 
 // The Q3b part bound (design
-// docs/superpowers/specs/2026-10-08-quiet-seat-walk-skip-design.md, §6 Q3b):
+// docs/design/2026-10-08-quiet-seat-walk-skip-design.md, §6 Q3b):
 // the proof-side half. The facts side (engine/rules/quiet_facts.go) stores each
 // admitting ability's bounded non-mana cost parts on the face; this file
 // evaluates their NECESSARY conditions against live state. Out of scope by

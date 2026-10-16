@@ -3,7 +3,7 @@
 #
 # Rubric: docs/agents/seed-rubric.md (that file is the judgement; this file is
 # the mechanism). Design:
-# docs/superpowers/specs/2026-09-29-reward-loop-and-seed-agent-design.md §4.
+# docs/design/2026-09-29-reward-loop-and-seed-agent-design.md §4.
 #
 #   ops/scripts/seed-agent.sh [--dry-run] [--cap N] [--no-probe]
 #

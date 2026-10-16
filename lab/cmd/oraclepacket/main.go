@@ -1,6 +1,6 @@
 // Command oraclepacket prints the printed-card view (name, cost, type line,
 // P/T, Oracle text, oracle_sha) of corpus cards -- the ONLY card text an
-// Oracle-text audit author sees (docs/superpowers/specs/
+// Oracle-text audit author sees (docs/design/
 // 2026-09-27-oracle-text-card-audit.md). It never prints script lines.
 //
 //	go run ./lab/cmd/oraclepacket "Fatal Push" "Relic Vial"

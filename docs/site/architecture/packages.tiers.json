@@ -1,29 +1,34 @@
 {
   "tiers": [
     {
-      "id": "core",
-      "title": "T0 card pipeline and T1 rules core",
-      "intro": "The card compiler, the event-sourced state and the rules engine itself."
-    },
-    {
-      "id": "host",
-      "title": "T2 projection, host and wire",
-      "intro": "What a client or server sees: the per-seat view, seats, the wire protocol and the host."
+      "id": "engine",
+      "title": "Engine (`engine/`): T0 card pipeline and T1 rules core",
+      "intro": "The card compiler, the event-sourced state, the rules engine, the per-seat view, replay, deck parsing and the `Seat` contract. Imports nothing outside `engine/`."
     },
     {
       "id": "bots",
-      "title": "T3 bots, ML and search",
-      "intro": "Hosted bot policies and the optional learned, search and SpellBench extensions."
+      "title": "Bots (`bots/`)",
+      "intro": "The bot policy board, the default heuristic bot, the bots registry and the hosted bots with their inference runtime (MCTS search, net forward pass, SpellBench builtins). Imports `engine/` only."
+    },
+    {
+      "id": "server",
+      "title": "Server (`server/`)",
+      "intro": "The reference host and its HTTP API, the wire protocol, the ManaBrew adapter and the divergence recorder."
     },
     {
       "id": "tooling",
-      "title": "T4 tooling",
-      "intro": "Ratchets, test support, code generators and the compliance pipeline."
+      "title": "Tooling (`internal/`)",
+      "intro": "Ratchets, test support, benchmarks and code generators. Shell and Python helpers live in `scripts/` (contributor/CI) and `ops/scripts/` (pipeline); they are not Go packages."
     },
     {
       "id": "cmd",
       "title": "Commands (`cmd/`)",
-      "intro": "Binaries. No package imports a command."
+      "intro": "Product and developer binaries. No package imports a command."
+    },
+    {
+      "id": "lab",
+      "title": "Lab (`lab/`)",
+      "intro": "Fenced extensions: draft events, compliance oracles and training research; nothing outside lab/ may import them; slated to move to their own repository."
     }
   ],
   "packages": {
@@ -65,7 +70,7 @@
       "purpose": "Thin registration of a built-in policy in the bots registry."
     },
     "bots/botpolicy": {
-      "tier": "core",
+      "tier": "bots",
       "status": "CORE"
     },
     "bots/castprofile": {
@@ -78,11 +83,11 @@
       "status": "EXT"
     },
     "bots/gonet/gonettest": {
-      "tier": "tooling",
+      "tier": "bots",
       "status": "TOOL"
     },
     "bots/heuristic": {
-      "tier": "host",
+      "tier": "bots",
       "status": "CORE"
     },
     "bots/lethalpressure": {
@@ -204,80 +209,80 @@
       "status": "TOOL"
     },
     "engine/cards": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/cards/oracletext": {
-      "tier": "core",
+      "tier": "engine",
       "status": "TOOL"
     },
     "engine/decision": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/deck": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/effects": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/effects/params": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/events": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/replay": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/chars": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/combat": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/cost": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/pay": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/resolve": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE (no own tests)"
     },
     "engine/rules/scriptfacts": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/rules/trigmatch": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/seat": {
-      "tier": "host",
+      "tier": "engine",
       "status": "CORE"
     },
     "engine/state": {
-      "tier": "core",
+      "tier": "engine",
       "status": "CORE",
       "purpose": "Objects, zones, players, the Game and the continuous-effect vocabulary (no package doc yet)."
     },
     "engine/view": {
-      "tier": "host",
+      "tier": "engine",
       "status": "CORE"
     },
     "internal/archtest": {
@@ -285,7 +290,7 @@
       "status": "TOOL (load-bearing)"
     },
     "internal/bench": {
-      "tier": "bots",
+      "tier": "tooling",
       "status": "TOOL/SUPP"
     },
     "internal/botobs": {
@@ -302,7 +307,7 @@
       "purpose": "Heap-footprint ratchet (tests only)."
     },
     "internal/paymirror": {
-      "tier": "bots",
+      "tier": "tooling",
       "status": "TOOL"
     },
     "internal/testbudget": {
@@ -322,317 +327,317 @@
       "status": "TOOL"
     },
     "lab/cmd/botbench": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/cardval": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/compliance": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/corpuscov": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/draftrl": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/draftsim": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/dzbroker": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/dzgorge": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/encablate": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/exitloop": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/extagent": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/kshadowcheck": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/labdemo": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/oraclediff": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/oraclepacket": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/cmd/policytrain": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/policytune": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/sbagent": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP/EXT"
     },
     "lab/cmd/sbv1agent": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/sbv2engine": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/sbv2local": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/sbv2shadow": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/cmd/searchbench": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/searchprobe": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/searchteacher": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/traindash": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/cmd/xmageport": {
-      "tier": "cmd",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/contracts": {
-      "tier": "host",
+      "tier": "lab",
       "status": "SUPP",
       "purpose": "Registry of external contracts (file layouts, wires, grammars): name, major version and pinned golden hashes."
     },
     "lab/draft/draftlab": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT",
       "purpose": "Training composition API over the draft stack: open packs, draft, build, play, gauntlet and whole events with named, versioned built-in agents; every call a pure function of inputs and seed; 17Lands-shaped artifacts."
     },
     "lab/draft/draftlab/extern": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT",
       "purpose": "Out-of-process agents for draftlab: dial an agent over a child's stdio or a Unix socket, batch its requests across concurrent games, and expose it as a Drafter, Builder and Player."
     },
     "lab/draft/draftlab/extern/refagent": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "TOOL",
       "purpose": "Reference gorge-agent/1 agent (uniform random, first legal) for tests, benchmarks and as a worked example."
     },
     "lab/draft/draftlab/extern/wire": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT",
       "purpose": "The gorge-agent/1 wire: JSON-lines messages an out-of-process drafter, builder or player speaks, carrying view.View, decision.Intent and protocol.DraftCard."
     },
     "lab/draft/event": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/eventhost": {
-      "tier": "host",
+      "tier": "lab",
       "status": "SUPP",
       "purpose": "Hosted draft events inside gorged: event store, lobby and join, draft with synchronous bots, per-event SSE frames; build and games land in later tickets."
     },
     "lab/draft/limited": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/booster": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/build": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/draft": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/draftbelief": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/draft/limited/draftfeat": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/draft/limited/draftnet": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/draft/limited/pickbot": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/setdata": {
-      "tier": "core",
+      "tier": "lab",
       "status": "CORE"
     },
     "lab/draft/limited/setdata/internal/gen": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/adopt": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/gate": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/levelb": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/oraclediff": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/oraclegen": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/oraclegen/templates": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/oracle/compliance/shape": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/training/corpuscov": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/training/gamepool": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/inferbroker": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/memcap": {
-      "tier": "tooling",
+      "tier": "lab",
       "status": "TOOL"
     },
     "lab/training/mzenc": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/searchbench": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/searchbench/statespec": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/spellbench": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT"
     },
     "lab/training/spellbench/kshadow": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/training/spellbench/registry": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "EXT (2nd registry)"
     },
     "lab/training/spellbench/v1agent": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/training/spellbench/v2agent": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/training/spellbench/v2engine": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/training/spellbench/v2shadow": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "lab/training/v2front": {
-      "tier": "bots",
+      "tier": "lab",
       "status": "SUSP"
     },
     "server/divergence": {
-      "tier": "host",
+      "tier": "server",
       "status": "SUPP"
     },
     "server/divergence/shadow": {
-      "tier": "bots",
+      "tier": "server",
       "status": "EXT (linked into host)"
     },
     "server/host": {
-      "tier": "host",
+      "tier": "server",
       "status": "SUPP"
     },
     "server/host/httpapi": {
-      "tier": "host",
+      "tier": "server",
       "status": "SUPP"
     },
     "server/host/manabrewhttp": {
-      "tier": "host",
+      "tier": "server",
       "status": "EXT"
     },
     "server/manabrew": {
-      "tier": "host",
+      "tier": "server",
       "status": "EXT"
     },
     "server/manabrew/mbtest": {
-      "tier": "host",
+      "tier": "server",
       "status": "EXT"
     },
     "server/protocol": {
-      "tier": "host",
+      "tier": "server",
       "status": "SUPP"
     },
     "server/protocol/manabrew": {
-      "tier": "host",
+      "tier": "server",
       "status": "EXT"
     },
     "server/protocol/manabrew/internal/schemagen": {
-      "tier": "host",
+      "tier": "server",
       "status": "TOOL"
     }
   }

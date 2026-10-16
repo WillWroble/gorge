@@ -6,7 +6,7 @@ import (
 )
 
 // Canonical feature-family ids. These are the families the mzenc design
-// (docs/superpowers/specs/2026-10-07-mzenc-design.md §5) names. Both the
+// (archived 2026-10-07-mzenc-design.md (docs/design/ARCHIVE.md) §5) names. Both the
 // specFamilies set, the unsupportedFeatures register and EVERY
 // w.unsupported[...] walk-site key and w.emit(...) site use these constants,
 // so a walk site and its register entry cannot drift in spelling.

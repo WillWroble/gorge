@@ -40,13 +40,12 @@ go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 
 | Path | What | Status |
 |---|---|---|
-| `web/` (462 files) | Svelte+Vite client (~68k LOC) | SUPP |
-| `scripts/` (101) | worktree/fleet/postmerge/ratchet/broker/heavy/reward/oracle/enginebench/spellbench-arena | TOOL (spellbench-arena EXT) |
-| `lab/oracle/xmageoracle/` | Java XMage replay driver | TOOL |
-| `lab/oracle/validation/oracle/` | verdict refresh runbook | TOOL |
-| `ops/orchestrator/` | `hooks.py` merge-gate hooks for the CI-style landing pipeline | TOOL (live) |
-| `ops/deploy/` | systemd units | TOOL |
-| `docs/` (167) | specs, plans, reports, agent guide | SUPP |
-| `deck.list` (root, 260 KB) | census scratch decklists | SUSP |
-| `benchmark.md` (root) | `dzgorge` benchmark notes | SUSP |
-
+| `web/` | Svelte+Vite client | SUPP |
+| `scripts/` | contributor and CI helpers: worktree creation, CI sharding, smokes, enginebench | TOOL |
+| `ops/scripts/` | the landing pipeline: post-merge suite, ratchet and affected-package gates, heavy-job lock, reward/seed agent, fleet and demo deploy | TOOL (live) |
+| `ops/orchestrator/` | `hooks.py` merge-gate hooks (`ops.orchestrator.hooks:*`) for agentctl | TOOL (live) |
+| `ops/deploy/` | systemd units installed by `ops/scripts/seed-install.sh` | TOOL |
+| `lab/scripts/` | oracle, training and SpellBench-arena drivers | EXT |
+| `lab/oracle/xmageoracle/` | Java XMage replay driver | EXT |
+| `lab/oracle/validation/oracle/` | verdict refresh runbook | EXT |
+| `docs/` | agent guide (`docs/agents/`), design docs (`docs/design/`), decisions (`docs/decisions/`), this site (`docs/site/`) | SUPP |
