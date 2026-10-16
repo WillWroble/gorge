@@ -35,15 +35,29 @@ describe('images', () => {
   it('resolves a token through /art/token under a namespaced key, leaving a same-named card entry alone', async () => {
     const { env, calls, store } = fakeEnv({ 'Goblin Token': { image_uris: { normal: '/art/blob/tok.jpg' } } });
     const im = createImages(env);
-    expect(await im.url('Goblin Token', { isToken: true, types: 'Creature Goblin', pt: '1/1' })).toBe('/art/blob/tok.jpg');
-    expect(calls[0]).toMatch(/^\/art\/token\?exact=Goblin%20Token&types=Creature%20Goblin&pt=1%2F1$/);
-    // The entry lives under the token namespace, keyed by name+types+pt, so a
-    // real card named exactly "Goblin Token" keeps its own storage slot.
+    expect(await im.url('Goblin Token', { isToken: true, types: 'Creature Goblin', pt: '1/1', printedPt: '1/1' })).toBe('/art/blob/tok.jpg');
+    expect(calls[0]).toMatch(/^\/art\/token\?exact=Goblin%20Token&types=Creature%20Goblin&pt=1%2F1&ppt=1%2F1$/);
+    // The entry lives under the token namespace, keyed by name+types+PRINTED
+    // P/T, so a real card named exactly "Goblin Token" keeps its own storage
+    // slot.
     expect(store.get(`${IMAGE_KEY}token\u001fGoblin Token\u001fCreature Goblin\u001f1/1`)).toBe('/art/blob/tok.jpg');
     expect(store.get(`${IMAGE_KEY}Goblin Token`)).toBeUndefined();
-    // A different P/T under the same display name resolves again, not from cache.
-    expect(await im.url('Goblin Token', { isToken: true, types: 'Creature Goblin', pt: '2/2' })).toBe('/art/blob/tok.jpg');
+    // A different PRINTED P/T under the same display name resolves again, not
+    // from cache.
+    expect(await im.url('Goblin Token', { isToken: true, types: 'Creature Goblin', pt: '3/3', printedPt: '3/3' })).toBe('/art/blob/tok.jpg');
     expect(calls).toHaveLength(2);
+  });
+  it('keys a token on its PRINTED P/T, so a pumped sibling shares the entry', async () => {
+    const { env, calls, store } = fakeEnv({ 'Soldier Token': { image_uris: { normal: '/art/blob/soldier.jpg' } } });
+    const im = createImages(env);
+    // Un-pumped: the current P/T equals the printed 1/1.
+    expect(await im.url('Soldier Token', { isToken: true, types: 'Creature Soldier', pt: '1/1', printedPt: '1/1' })).toBe('/art/blob/soldier.jpg');
+    // Pumped to 2/2 by a +1/+1 counter: the printed P/T is unchanged, so this
+    // is the SAME entry — no second request, no second storage slot.
+    expect(await im.url('Soldier Token', { isToken: true, types: 'Creature Soldier', pt: '2/2', printedPt: '1/1' })).toBe('/art/blob/soldier.jpg');
+    expect(calls).toHaveLength(1);
+    expect(store.get(`${IMAGE_KEY}token\u001fSoldier Token\u001fCreature Soldier\u001f1/1`)).toBe('/art/blob/soldier.jpg');
+    expect(store.get(`${IMAGE_KEY}token\u001fSoldier Token\u001fCreature Soldier\u001f2/2`)).toBeUndefined();
   });
   it('resolves the normal image, caches in memory and storage, and treats 404 as a known miss', async () => {
     const { env, calls, store } = fakeEnv({ 'Goblin Guide': { image_uris: { normal: 'https://img/gg.jpg' } } });

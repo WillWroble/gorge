@@ -22,7 +22,7 @@
       .url(
         n,
         card?.is_token
-          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}` }
+          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}`, printedPt: card.printed_pt }
           : undefined,
       )
       .then((u) => {

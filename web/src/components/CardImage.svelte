@@ -52,7 +52,7 @@
         // search over the stripped base name, lib/images.ts): send the wire
         // facts the server's deterministic pick reads.
         card.is_token
-          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}` }
+          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}`, printedPt: card.printed_pt }
           : undefined,
       )
       .then((u) => {

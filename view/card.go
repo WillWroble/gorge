@@ -81,15 +81,25 @@ type CardView struct {
 	// Attacking is true, nil otherwise; BlockedBy lists the creatures
 	// blocking it. Both exist for the arrow overlay (PL-17) and come
 	// straight from the object's combat fields, which EndCombatReset clears.
-	AttackingPlayer *state.PlayerID  `json:"attacking_player,omitempty"`
-	BlockedBy       []state.ObjID    `json:"blocked_by,omitempty"`
-	Tapped          bool             `json:"tapped"`
-	Power           int32            `json:"power"`
-	Toughness       int32            `json:"toughness"`
-	Damage          int32            `json:"damage"`
-	Attacking       bool             `json:"attacking"`
-	Counters        map[string]int32 `json:"counters,omitempty"`
-	Keywords        []string         `json:"keywords,omitempty"`
+	AttackingPlayer *state.PlayerID `json:"attacking_player,omitempty"`
+	BlockedBy       []state.ObjID   `json:"blocked_by,omitempty"`
+	Tapped          bool            `json:"tapped"`
+	Power           int32           `json:"power"`
+	Toughness       int32           `json:"toughness"`
+	// PrintedPT is the face's PRINTED power/toughness as text ("1/1", "*/*"),
+	// the value the physical card or token is printed with. Power/Toughness
+	// above are the CURRENT layer-7 values a counter or an anthem moves; a
+	// token whose current P/T differs from its printed P/T (a 1/1 Soldier
+	// with a +1/+1 counter reads "2/2") must still resolve to the same art as
+	// its un-pumped sibling, and only the printed value is stable across
+	// pumping. Empty for a face with no printed P/T (a noncreature) and on
+	// every redacted face-down CardView, which is rebuilt from a fresh
+	// literal.
+	PrintedPT string           `json:"printed_pt,omitempty"`
+	Damage    int32            `json:"damage"`
+	Attacking bool             `json:"attacking"`
+	Counters  map[string]int32 `json:"counters,omitempty"`
+	Keywords  []string         `json:"keywords,omitempty"`
 	// Controller and Owner can differ (a stolen permanent, a stack object
 	// created for someone else's turn); a client needs both. Battlefield
 	// zone lists are keyed by controller, every hidden/graveyard/exile list
@@ -508,6 +518,7 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 		}
 		cv.Types = p.typeLine(types, f.Types)
 		cv.ManaCost = f.ManaCost
+		cv.PrintedPT = f.PT
 		cv.Printing = Printing{Name: f.Name}
 		// The spell-ability API projection: the card's own SP$ line, the
 		// same fact boardFromGame reads for the casting census. Empty when
