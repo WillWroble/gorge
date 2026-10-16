@@ -19,7 +19,7 @@ import (
 // Scans engine/rules/, engine/effects/, bots/botpolicy/ and engine/view/ non-test files.
 func TestNoTwoCharsReadsInOneStatement(t *testing.T) {
 	root := filepath.Join("..", "..")
-	for _, dir := range []string{"rules", "effects", "botpolicy", "view"} {
+	for _, dir := range []string{"engine/rules", "engine/effects", "bots/botpolicy", "engine/view"} {
 		for _, file := range goSourcesUnder(t, filepath.Join(root, dir)) {
 			fset := token.NewFileSet()
 			f, err := parser.ParseFile(fset, file, nil, parser.SkipObjectResolution)

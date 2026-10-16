@@ -32,7 +32,7 @@ import (
 
 // engineTestRoots are the engine directories (walked recursively) whose test
 // files may not import compliance.
-var engineTestRoots = []string{"rules", "effects", "state", "events", "cards", "decision", "deck", "replay"}
+var engineTestRoots = []string{"engine"}
 
 func TestEngineTestsDoNotImportCompliance(t *testing.T) {
 	root := filepath.Join("..", "..")
@@ -63,7 +63,7 @@ func TestEngineTestsDoNotImportCompliance(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if imp == module+"/compliance" || strings.HasPrefix(imp, module+"/compliance/") {
+				if imp == module+"/lab/oracle/compliance" || strings.HasPrefix(imp, module+"/lab/oracle/compliance/") {
 					rel, _ := filepath.Rel(root, path)
 					bad = append(bad, rel+" imports "+imp)
 				}

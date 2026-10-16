@@ -85,7 +85,7 @@ func f(m map[string]string, s string) {
 func TestMeasureSyntheticTree(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"engine/effects/registry.go": effectsSrc,
-		"effects/long.go":            "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
+		"engine/effects/long.go":            "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
 		"engine/rules/engine.go": `package rules
 
 type Engine struct{}
@@ -101,9 +101,9 @@ func (x *Engine) B() {}
 func (e Engine) C()  {}
 func free()          {}
 `,
-		"rules/sub/deep.go":           "package sub\n\ntype Engine struct{}\n\nfunc (e *Engine) D() {}\n" + longFunc("deep", 400),
-		"rules/engine_test.go":        "package rules\n\nfunc (e *Engine) T() {}\n" + longFunc("testlong", 500),
-		"rules/testdata/x/fixture.go": "package x\n\n" + longFunc("fixture", 500),
+		"engine/rules/sub/deep.go":           "package sub\n\ntype Engine struct{}\n\nfunc (e *Engine) D() {}\n" + longFunc("deep", 400),
+		"engine/rules/engine_test.go":        "package rules\n\nfunc (e *Engine) T() {}\n" + longFunc("testlong", 500),
+		"engine/rules/testdata/x/fixture.go": "package x\n\n" + longFunc("fixture", 500),
 	})
 	m, err := Measure(root)
 	if err != nil {
@@ -153,8 +153,8 @@ func free()          {}
 		StringKeyedParamHelpers: []string{"f/2 key args 1"},
 		Files:                   4,
 		LongFuncs: []Func{
-			{Name: "deep", File: "rules/sub/deep.go", Line: 6, Lines: 402},
-			{Name: "long301", File: "effects/long.go", Line: 303, Lines: 301},
+			{Name: "deep", File: "engine/rules/sub/deep.go", Line: 6, Lines: 402},
+			{Name: "long301", File: "engine/effects/long.go", Line: 303, Lines: 301},
 		},
 	}
 	if !reflect.DeepEqual(m, want) {
@@ -167,7 +167,7 @@ func TestMeasureCountsContextLiterals(t *testing.T) {
 		"engine/effects/registry.go": effectsSrc,
 		// Bare names inside package effects: 3 Ctx (one pointer, two elided
 		// slice elements), 1 SpecContext, 1 TriggerContext; never Other{}.
-		"effects/use.go": `package effects
+		"engine/effects/use.go": `package effects
 
 func g() {
 	_ = &Ctx{Source: 1}
@@ -207,7 +207,7 @@ func h() {
 }
 `,
 		// Test files are never counted.
-		"rules/engine_test.go": "package rules\n\nimport \"github.com/adams-shaun/gorge/engine/effects\"\n\nvar _ = effects.Ctx{}\n",
+		"engine/rules/engine_test.go": "package rules\n\nimport \"github.com/adams-shaun/gorge/engine/effects\"\n\nvar _ = effects.Ctx{}\n",
 	})
 	m, err := Measure(root)
 	if err != nil {

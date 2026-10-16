@@ -35,7 +35,7 @@ var sizeOnlyFileNamesAllowed = map[string]bool{
 func TestNoNewSizeOnlyFileNames(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var seen []string
-	for _, dir := range []string{"rules", "effects"} {
+	for _, dir := range []string{"engine/rules", "engine/effects"} {
 		for _, file := range goSourcesUnder(t, filepath.Join(root, dir)) {
 			rel, err := filepath.Rel(root, file)
 			if err != nil {

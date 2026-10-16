@@ -31,10 +31,10 @@ import (
 // L6 and that the kernel needs it rather than a Board method; rules itself
 // never belongs in this list.
 var resolveImports = map[string]bool{
-	module + "/cards":    true,
-	module + "/state":    true,
-	module + "/decision": true,
-	module + "/events":   true,
+	module + "/engine/cards":    true,
+	module + "/engine/state":    true,
+	module + "/engine/decision": true,
+	module + "/engine/events":   true,
 }
 
 // TestResolveImportsStayBelowRules pins engine/rules/resolve's direct module imports
@@ -44,7 +44,7 @@ var resolveImports = map[string]bool{
 // packages below it that it has no business reaching around Board, and the
 // bot layer. It skips until the package exists.
 func TestResolveImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/resolve"
+	const sub = module + "/engine/rules/resolve"
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
@@ -65,13 +65,13 @@ func TestResolveImportsStayBelowRules(t *testing.T) {
 			"(internal/archtest/layering_resolve_test.go resolveImports)", sub, imp, sortedKeys(resolveImports))
 	}
 	for _, to := range []string{
-		module + "/rules",
-		module + "/effects",
-		module + "/rules/chars",
-		module + "/rules/combat",
-		module + "/rules/pay",
-		module + "/rules/trigmatch",
-		module + "/botpolicy",
+		module + "/engine/rules",
+		module + "/engine/effects",
+		module + "/engine/rules/chars",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/pay",
+		module + "/engine/rules/trigmatch",
+		module + "/bots/botpolicy",
 	} {
 		if p.deps[to] {
 			t.Errorf("%s depends on %s (transitively); the dependency order forbids it", sub, to)
@@ -85,20 +85,20 @@ func TestResolveImportsStayBelowRules(t *testing.T) {
 // packages sit below it. Rows whose from package does not exist yet are
 // skipped, so they bind as each package lands.
 func TestNothingBelowRulesReachesTheKernel(t *testing.T) {
-	const kernel = module + "/rules/resolve"
+	const kernel = module + "/engine/rules/resolve"
 	pkgs := packages(t)
 	for _, from := range []string{
-		module + "/cards",
-		module + "/state",
-		module + "/decision",
-		module + "/events",
-		module + "/effects",
-		module + "/botpolicy",
-		module + "/rules/cost",
-		module + "/rules/chars",
-		module + "/rules/combat",
-		module + "/rules/pay",
-		module + "/rules/trigmatch",
+		module + "/engine/cards",
+		module + "/engine/state",
+		module + "/engine/decision",
+		module + "/engine/events",
+		module + "/engine/effects",
+		module + "/bots/botpolicy",
+		module + "/engine/rules/cost",
+		module + "/engine/rules/chars",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/pay",
+		module + "/engine/rules/trigmatch",
 	} {
 		p, ok := pkgs[from]
 		if !ok {

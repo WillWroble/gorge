@@ -26,9 +26,9 @@ import (
 // To widen it, add the package here with a sentence arguing it sits below
 // L4; rules and its subsystem packages never belong in this list.
 var charsImports = map[string]bool{
-	module + "/cards":   true,
-	module + "/state":   true,
-	module + "/effects": true,
+	module + "/engine/cards":   true,
+	module + "/engine/state":   true,
+	module + "/engine/effects": true,
 }
 
 // TestCharsImportsStayBelowRules pins engine/rules/chars' direct module imports to
@@ -37,7 +37,7 @@ var charsImports = map[string]bool{
 // the L6 resolution kernel and the bot layer. It skips until the package
 // exists.
 func TestCharsImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/chars"
+	const sub = module + "/engine/rules/chars"
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
@@ -58,12 +58,12 @@ func TestCharsImportsStayBelowRules(t *testing.T) {
 			"(internal/archtest/layering_chars_test.go charsImports)", sub, imp, sortedKeys(charsImports))
 	}
 	for _, to := range []string{
-		module + "/rules",
-		module + "/rules/combat",
-		module + "/rules/pay",
-		module + "/rules/trigmatch",
-		module + "/rules/resolve",
-		module + "/botpolicy",
+		module + "/engine/rules",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/pay",
+		module + "/engine/rules/trigmatch",
+		module + "/engine/rules/resolve",
+		module + "/bots/botpolicy",
 	} {
 		if p.deps[to] {
 			t.Errorf("%s depends on %s (transitively); the dependency order forbids it", sub, to)

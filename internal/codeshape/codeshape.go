@@ -34,7 +34,7 @@ const LongFuncLines = 300
 // ScannedDirs are the repo-relative trees measured. Each is walked
 // recursively (testdata and dot/underscore directories excluded), so a later
 // move of code into a engine/rules/* subpackage stays inside the census.
-var ScannedDirs = []string{"rules", "effects"}
+var ScannedDirs = []string{"engine/rules", "engine/effects"}
 
 // CtxConstructorFiles are the designated context-constructor files of the W1c
 // ratchet (rules-engine refactor spec section 5): the only non-test files in
@@ -589,7 +589,7 @@ func Measure(root string) (Metrics, error) {
 			}
 			m.Files++
 			parsed = append(parsed, parsedFile{fset: fset, f: f, rel: rel, dir: dir})
-			inEffectsTop := dir == "effects" && strings.Count(rel, "/") == 1
+			inEffectsTop := dir == "engine/effects" && strings.Count(rel, "/") == 2
 			if !isCtxConstructorFile(rel) {
 				countCtxLiterals(f, inEffectsTop, &m)
 			}
@@ -601,7 +601,7 @@ func Measure(root string) (Metrics, error) {
 					if n := end - start + 1; n > LongFuncLines {
 						m.LongFuncs = append(m.LongFuncs, Func{Name: QualName(d), File: rel, Line: start, Lines: n})
 					}
-					if dir == "rules" && receiverBase(d) == "Engine" {
+					if dir == "engine/rules" && receiverBase(d) == "Engine" {
 						m.EngineMethods++
 					}
 				case *ast.GenDecl:
@@ -648,7 +648,7 @@ func Measure(root string) (Metrics, error) {
 								}
 								m.PayEngineMethods += len(fld.Names)
 							}
-						case dir == "rules" && ts.Name.Name == "resumePoint":
+						case dir == "engine/rules" && ts.Name.Name == "resumePoint":
 							named, embeds, err := structFields(ts, rel)
 							if err != nil {
 								return m, err
@@ -662,7 +662,7 @@ func Measure(root string) (Metrics, error) {
 					}
 				}
 			}
-			inEffects := dir == "effects"
+			inEffects := dir == "engine/effects"
 			m.ChangeZoneLeaks = append(m.ChangeZoneLeaks, paramLeaks(fset, f, rel,
 				TypedParamCompiler{ChangeZoneCompilerFile, ChangeZoneFiles, ChangeZoneOnlyKeys})...)
 			m.ChangeZoneAllLeaks = append(m.ChangeZoneAllLeaks, paramLeaks(fset, f, rel,

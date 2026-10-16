@@ -112,7 +112,7 @@ func TestPayHoldsNoHost(t *testing.T) {
 		}
 		local := ""
 		for _, is := range f.Imports {
-			if p, _ := strconv.Unquote(is.Path.Value); p == module+"/effects" {
+			if p, _ := strconv.Unquote(is.Path.Value); p == module+"/engine/effects" {
 				local = "effects"
 				if is.Name != nil {
 					local = is.Name.Name

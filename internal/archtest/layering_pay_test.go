@@ -25,21 +25,21 @@ import (
 // packages, the resolution kernel and the bot layer would invert the
 // layering.
 var payImports = map[string]bool{
-	module + "/cards":          true,
-	module + "/state":          true,
-	module + "/decision":       true,
-	module + "/events":         true,
-	module + "/rules/cost":     true,
-	module + "/effects/params": true,
-	module + "/rules/chars":    true,
-	module + "/effects":        true,
+	module + "/engine/cards":          true,
+	module + "/engine/state":          true,
+	module + "/engine/decision":       true,
+	module + "/engine/events":         true,
+	module + "/engine/rules/cost":     true,
+	module + "/engine/effects/params": true,
+	module + "/engine/rules/chars":    true,
+	module + "/engine/effects":        true,
 }
 
 // TestPayImportsStayBelowRules pins engine/rules/pay's direct module imports to
 // payImports and forbids the transitive edges the layering rules out. It
 // skips until the package exists.
 func TestPayImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/pay"
+	const sub = module + "/engine/rules/pay"
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
@@ -57,11 +57,11 @@ func TestPayImportsStayBelowRules(t *testing.T) {
 			"(internal/archtest/layering_pay_test.go payImports)", sub, imp, sortedKeys(payImports))
 	}
 	for _, to := range []string{
-		module + "/rules",
-		module + "/rules/combat",
-		module + "/rules/trigmatch",
-		module + "/rules/resolve",
-		module + "/botpolicy",
+		module + "/engine/rules",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/trigmatch",
+		module + "/engine/rules/resolve",
+		module + "/bots/botpolicy",
 	} {
 		if p.deps[to] {
 			t.Errorf("%s depends on %s (transitively); the dependency order forbids it", sub, to)
@@ -77,7 +77,7 @@ var payForbiddenStd = []string{"time", "math/rand", "math/rand/v2", "crypto/rand
 // TestPayStaysDeterministic pins engine/rules/pay off the standard-library packages
 // that would let a payment depend on anything but the game it is handed.
 func TestPayStaysDeterministic(t *testing.T) {
-	const sub = module + "/rules/pay"
+	const sub = module + "/engine/rules/pay"
 	p, ok := packages(t)[sub]
 	if !ok {
 		t.Skip("engine/rules/pay is not built yet")
@@ -97,15 +97,15 @@ func TestPayStaysDeterministic(t *testing.T) {
 // step E7); anything above L1 would put the resolution's Host/Ctx machinery,
 // or the engine, back under the payment layer.
 var paramsImports = map[string]bool{
-	module + "/cards":    true,
-	module + "/state":    true,
-	module + "/decision": true,
+	module + "/engine/cards":    true,
+	module + "/engine/state":    true,
+	module + "/engine/decision": true,
 }
 
 // TestParamsIsALeaf pins engine/effects/params' direct module imports to
 // paramsImports.
 func TestParamsIsALeaf(t *testing.T) {
-	const sub = module + "/effects/params"
+	const sub = module + "/engine/effects/params"
 	p, ok := packages(t)[sub]
 	if !ok {
 		t.Fatal("engine/effects/params is not built")

@@ -102,7 +102,7 @@ func measureSideDoors(files []parsedFile, m *Metrics) {
 func measureEngineSurface(files []parsedFile, m *Metrics) {
 	holders := map[string]bool{} // "<pkg dir> <type>"
 	for _, pf := range files {
-		if pf.dir != "rules" {
+		if pf.dir != "engine/rules" {
 			continue
 		}
 		for _, decl := range pf.f.Decls {
@@ -125,7 +125,7 @@ func measureEngineSurface(files []parsedFile, m *Metrics) {
 		}
 	}
 	for _, pf := range files {
-		if pf.dir != "rules" {
+		if pf.dir != "engine/rules" {
 			continue
 		}
 		for _, decl := range pf.f.Decls {

@@ -250,7 +250,7 @@ func TestDraftEventBo3TwoHumansOverHTTP(t *testing.T) {
 			t.Fatalf("seat %d's pool holds %d cards, want 42", hs.seat, len(pool.Pool))
 		}
 		var saved protocol.DeckCheck
-		if code, e := callJSON(t, "POST", evURL+"/deck", hs.tok, pool.Suggestion, &saved); code != 200 || saved.Rev != 1 {
+		if code, e := callJSON(t, "POST", evURL+"/engine/deck", hs.tok, pool.Suggestion, &saved); code != 200 || saved.Rev != 1 {
 			t.Fatalf("seat %d deck save: %d %s rev=%d", hs.seat, code, e.Code, saved.Rev)
 		}
 		var readied protocol.EventState

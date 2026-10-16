@@ -201,29 +201,29 @@ func set(s string) map[string]bool {
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
-		module + "/host":                 true,
-		module + "/host/httpapi":         true,
+		module + "/server/host":                 true,
+		module + "/server/host/httpapi":         true,
 		module + "/cmd/gorged":           true,
-		module + "/cmd/botbench":         true,
+		module + "/lab/cmd/botbench":         true,
 		module + "/cmd/ledger":           true,
-		module + "/cmd/searchprobe":      true,
-		module + "/cmd/searchteacher":    true,
+		module + "/lab/cmd/searchprobe":      true,
+		module + "/lab/cmd/searchteacher":    true,
 		module + "/cmd/cardfuzz":         true,
-		module + "/cmd/exitloop":         true,
-		module + "/cmd/traindash":        true,
+		module + "/lab/cmd/exitloop":         true,
+		module + "/lab/cmd/traindash":        true,
 		module + "/cmd/paymirror":        true,
-		module + "/cmd/sbv1agent":        true,
-		module + "/cmd/kshadowcheck":     true,
-		module + "/cmd/sbagent":          true,
-		module + "/cmd/sbv2local":        true,
-		module + "/cmd/searchbench":      true,
+		module + "/lab/cmd/sbv1agent":        true,
+		module + "/lab/cmd/kshadowcheck":     true,
+		module + "/lab/cmd/sbagent":          true,
+		module + "/lab/cmd/sbv2local":        true,
+		module + "/lab/cmd/searchbench":      true,
 		module + "/cmd/enginebench":      true,
-		module + "/cmd/dzgorge":          true,
-		module + "/cmd/draftrl":          true,
-		module + "/internal/gamepool":    true,
-		module + "/internal/inferbroker": true,
-		module + "/host/manabrewhttp":    true,
-		module + "/eventhost":            true,
+		module + "/lab/cmd/dzgorge":          true,
+		module + "/lab/cmd/draftrl":          true,
+		module + "/lab/training/gamepool":    true,
+		module + "/lab/training/inferbroker": true,
+		module + "/server/host/manabrewhttp":    true,
+		module + "/lab/draft/eventhost":            true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
@@ -237,18 +237,18 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 func TestDependencyOrderHolds(t *testing.T) {
 	pkgs := packages(t)
 	forbidden := []struct{ from, to string }{
-		{module + "/effects", module + "/rules"},
-		{module + "/view", module + "/rules"},
-		{module + "/botpolicy", module + "/view"},
-		{module + "/botpolicy", module + "/rules"},
-		{module + "/botpolicy", module + "/seat"},
-		{module + "/protocol", module + "/rules"},
-		{module + "/protocol", module + "/bots"},
-		{module + "/host", module + "/internal/testutil"},
-		{module + "/host/httpapi", module + "/internal/testutil"},
+		{module + "/engine/effects", module + "/engine/rules"},
+		{module + "/engine/view", module + "/engine/rules"},
+		{module + "/bots/botpolicy", module + "/engine/view"},
+		{module + "/bots/botpolicy", module + "/engine/rules"},
+		{module + "/bots/botpolicy", module + "/engine/seat"},
+		{module + "/server/protocol", module + "/engine/rules"},
+		{module + "/server/protocol", module + "/bots"},
+		{module + "/server/host", module + "/internal/testutil"},
+		{module + "/server/host/httpapi", module + "/internal/testutil"},
 		{module + "/cmd/gorged", module + "/internal/testutil"},
-		{module + "/cards", module + "/state"},
-		{module + "/deck", module + "/rules"},
+		{module + "/engine/cards", module + "/engine/state"},
+		{module + "/engine/deck", module + "/engine/rules"},
 		// The az search seat's clairvoyant world clones the REAL engine,
 		// hidden zones and future chance included (spec 2026-09-27 §1). It
 		// lives in bots/azmcts/clairvoyant and is bench and training only
@@ -260,29 +260,29 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// a package the host calls and the offline triage tool recomputes
 		// through: it may not depend on the host that calls it, nor on test
 		// scaffolding.
-		{module + "/internal/divergence/shadow", module + "/host"},
-		{module + "/internal/divergence/shadow", module + "/internal/testutil"},
-		{module + "/host", module + "/internal/azmcts/clairvoyant"},
-		{module + "/host/httpapi", module + "/internal/azmcts/clairvoyant"},
-		{module + "/cmd/gorged", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/azmcts", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/spellbench/sbsearch", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/searchseat", module + "/internal/azmcts/clairvoyant"},
+		{module + "/server/divergence/shadow", module + "/server/host"},
+		{module + "/server/divergence/shadow", module + "/internal/testutil"},
+		{module + "/server/host", module + "/bots/azmcts/clairvoyant"},
+		{module + "/server/host/httpapi", module + "/bots/azmcts/clairvoyant"},
+		{module + "/cmd/gorged", module + "/bots/azmcts/clairvoyant"},
+		{module + "/bots/azmcts", module + "/bots/azmcts/clairvoyant"},
+		{module + "/bots/spellbench/sbsearch", module + "/bots/azmcts/clairvoyant"},
+		{module + "/bots/searchseat", module + "/bots/azmcts/clairvoyant"},
 		// The lasagna layering (spec 2026-10-03 §3): engine/rules/cost is the L2
 		// cost vocabulary leaf. It sits below effects and below every rules
 		// subsystem package, so none of them -- and never rules itself -- may
 		// be reachable from it. TestCostVocabularyIsALeaf pins its whole
 		// direct import set; these rows name the edges the layering forbids.
-		{module + "/rules/cost", module + "/rules"},
-		{module + "/rules/cost", module + "/effects"},
-		{module + "/rules/cost", module + "/events"},
-		{module + "/rules/cost", module + "/decision"},
-		{module + "/rules/cost", module + "/botpolicy"},
-		{module + "/rules/cost", module + "/rules/pay"},
-		{module + "/rules/cost", module + "/rules/chars"},
-		{module + "/rules/cost", module + "/rules/trigmatch"},
-		{module + "/rules/cost", module + "/rules/combat"},
-		{module + "/rules/cost", module + "/rules/resolve"},
+		{module + "/engine/rules/cost", module + "/engine/rules"},
+		{module + "/engine/rules/cost", module + "/engine/effects"},
+		{module + "/engine/rules/cost", module + "/engine/events"},
+		{module + "/engine/rules/cost", module + "/engine/decision"},
+		{module + "/engine/rules/cost", module + "/bots/botpolicy"},
+		{module + "/engine/rules/cost", module + "/engine/rules/pay"},
+		{module + "/engine/rules/cost", module + "/engine/rules/chars"},
+		{module + "/engine/rules/cost", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/cost", module + "/engine/rules/combat"},
+		{module + "/engine/rules/cost", module + "/engine/rules/resolve"},
 		// engine/rules/combat is an L5 subsystem package (W5 step E5): attack and
 		// block legality behind combat.Board. It never reaches back into
 		// rules (Go forbids the direct cycle once rules imports it; these
@@ -292,41 +292,41 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// is not a transitive row; TestCombatImportsStayBelowRules pins the
 		// direct import set, which keeps decision -- and with it the asks
 		// and validators of the declaration flow -- out of the package.)
-		{module + "/rules/combat", module + "/rules"},
-		{module + "/rules/combat", module + "/rules/pay"},
-		{module + "/rules/combat", module + "/rules/trigmatch"},
-		{module + "/rules/combat", module + "/rules/resolve"},
-		{module + "/rules/combat", module + "/botpolicy"},
+		{module + "/engine/rules/combat", module + "/engine/rules"},
+		{module + "/engine/rules/combat", module + "/engine/rules/pay"},
+		{module + "/engine/rules/combat", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/combat", module + "/engine/rules/resolve"},
+		{module + "/engine/rules/combat", module + "/bots/botpolicy"},
 		// engine/rules/trigmatch (W5 E3) is an L5 subsystem package: the trigger
 		// matchers read the engine through trigmatch.Board, never through
 		// *rules.Engine, so it may not reach rules, its sibling L5 packages
 		// (pay, combat) or the L6 resolution kernel. It may sit on engine/rules/chars
 		// (L4) and engine/rules/cost (L2). TestTrigmatchImportsStayBelowL5 pins its
 		// direct import set.
-		{module + "/rules/trigmatch", module + "/rules"},
-		{module + "/rules/trigmatch", module + "/rules/pay"},
-		{module + "/rules/trigmatch", module + "/rules/combat"},
-		{module + "/rules/trigmatch", module + "/rules/resolve"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/pay"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/combat"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/resolve"},
 		// engine/rules/scriptfacts is the pure card-fact leaf of the rules-split plan
 		// (2026-10-06): facts a card's printed text and compiled script imply,
 		// with no *rules.Engine and no game state. It sits below every rules
 		// subsystem, so it may never reach rules or any package above it.
 		// TestScriptFactsImportsStayBelowRules pins its whole direct import set;
 		// these rows name the edges the layering forbids transitively.
-		{module + "/rules/scriptfacts", module + "/rules"},
-		{module + "/rules/scriptfacts", module + "/effects"},
-		{module + "/rules/scriptfacts", module + "/events"},
-		{module + "/rules/scriptfacts", module + "/decision"},
-		{module + "/rules/scriptfacts", module + "/botpolicy"},
-		{module + "/rules/scriptfacts", module + "/rules/pay"},
-		{module + "/rules/scriptfacts", module + "/rules/chars"},
-		{module + "/rules/scriptfacts", module + "/rules/trigmatch"},
-		{module + "/rules/scriptfacts", module + "/rules/combat"},
-		{module + "/rules/scriptfacts", module + "/rules/resolve"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/effects"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/events"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/decision"},
+		{module + "/engine/rules/scriptfacts", module + "/bots/botpolicy"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/pay"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/chars"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/combat"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/resolve"},
 	}
 	for path, p := range pkgs {
 		if strings.HasPrefix(path, module+"/bots") {
-			for _, target := range []string{module + "/host", module + "/internal/testutil", module + "/internal/azmcts/clairvoyant"} {
+			for _, target := range []string{module + "/server/host", module + "/internal/testutil", module + "/bots/azmcts/clairvoyant"} {
 				if p.deps[target] {
 					t.Errorf("%s depends on %s (transitively); bots packages may not", path, target)
 				}
@@ -368,17 +368,17 @@ func TestDependencyOrderHolds(t *testing.T) {
 // The returned slice is sorted so the helper is deterministic.
 func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 	forbiddenManaBrewDirect := []struct{ from, to string }{
-		{module + "/internal/manabrew", module + "/rules"},
-		{module + "/internal/manabrew", module + "/effects"},
-		{module + "/internal/manabrew", module + "/events"},
-		{module + "/internal/manabrew", module + "/host"},
-		{module + "/internal/manabrew", module + "/host/httpapi"},
-		{module + "/internal/manabrew", module + "/internal/azmcts"},
-		{module + "/internal/manabrew", module + "/internal/testutil"},
-		{module + "/host/manabrewhttp", module + "/rules"},
-		{module + "/host/manabrewhttp", module + "/effects"},
-		{module + "/host/manabrewhttp", module + "/internal/testutil"},
-		{module + "/host/manabrewhttp", module + "/internal/azmcts"},
+		{module + "/server/manabrew", module + "/engine/rules"},
+		{module + "/server/manabrew", module + "/engine/effects"},
+		{module + "/server/manabrew", module + "/engine/events"},
+		{module + "/server/manabrew", module + "/server/host"},
+		{module + "/server/manabrew", module + "/server/host/httpapi"},
+		{module + "/server/manabrew", module + "/bots/azmcts"},
+		{module + "/server/manabrew", module + "/internal/testutil"},
+		{module + "/server/host/manabrewhttp", module + "/engine/rules"},
+		{module + "/server/host/manabrewhttp", module + "/engine/effects"},
+		{module + "/server/host/manabrewhttp", module + "/internal/testutil"},
+		{module + "/server/host/manabrewhttp", module + "/bots/azmcts"},
 	}
 	var msgs []string
 	for _, f := range forbiddenManaBrewDirect {
@@ -392,8 +392,8 @@ func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 	}
 	var forbiddenManaBrewReverse []struct{ from, to string }
 	for _, from := range []string{
-		"cards", "state", "decision", "events", "effects", "botpolicy",
-		"rules", "view", "seat", "replay", "protocol", "host", "server/host/httpapi",
+		"engine/cards", "engine/state", "engine/decision", "engine/events", "engine/effects", "bots/botpolicy",
+		"engine/rules", "engine/view", "engine/seat", "engine/replay", "server/protocol", "server/host", "server/host/httpapi",
 	} {
 		for _, to := range []string{"server/protocol/manabrew", "server/manabrew", "server/host/manabrewhttp"} {
 			forbiddenManaBrewReverse = append(forbiddenManaBrewReverse, struct{ from, to string }{module + "/" + from, module + "/" + to})
@@ -416,7 +416,7 @@ func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 // gorge package dependencies. The row is in place before server/protocol/manabrew
 // exists and starts enforcing the boundary as soon as it is added.
 func TestManaBrewWireIsStdlibOnly(t *testing.T) {
-	const wire = module + "/protocol/manabrew"
+	const wire = module + "/server/protocol/manabrew"
 	p, ok := packages(t)[wire]
 	if !ok {
 		t.Skip("server/protocol/manabrew is not built yet")
@@ -464,7 +464,7 @@ func TestNoExportLeaksAnEngineGame(t *testing.T) {
 		regexp.MustCompile(`\bstate\.Game\b`),
 		regexp.MustCompile(`\brules\.Engine\b`),
 	}
-	for _, pkg := range []string{module + "/host", module + "/host/httpapi"} {
+	for _, pkg := range []string{module + "/server/host", module + "/server/host/httpapi"} {
 		out, err := exec.Command("go", "doc", "-all", pkg).CombinedOutput()
 		if err != nil {
 			t.Fatalf("go doc -all %s: %v", pkg, err)

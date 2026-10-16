@@ -22,7 +22,7 @@ import (
 // To widen it, add the package here with a sentence arguing it is at or below
 // L1 (cards, state); a package above L2 never belongs in this list.
 var costVocabularyImports = map[string]bool{
-	module + "/state": true,
+	module + "/engine/state": true,
 }
 
 // TestCostVocabularyIsALeaf pins engine/rules/cost's direct module imports to
@@ -30,7 +30,7 @@ var costVocabularyImports = map[string]bool{
 // before the package (spec §9: "archtest rows for the new package land
 // first").
 func TestCostVocabularyIsALeaf(t *testing.T) {
-	const leaf = module + "/rules/cost"
+	const leaf = module + "/engine/rules/cost"
 	p, ok := packages(t)[leaf]
 	if !ok {
 		t.Skip("engine/rules/cost is not built yet")
@@ -63,17 +63,17 @@ func TestCostVocabularyIsALeaf(t *testing.T) {
 // engine/rules/chars at most). rules, a sibling L5 package (pay, combat) or the L6
 // resolution kernel never belongs here.
 var trigmatchImports = map[string]bool{
-	module + "/cards":      true,
-	module + "/state":      true,
-	module + "/events":     true,
-	module + "/effects":    true,
-	module + "/rules/cost": true,
+	module + "/engine/cards":      true,
+	module + "/engine/state":      true,
+	module + "/engine/events":     true,
+	module + "/engine/effects":    true,
+	module + "/engine/rules/cost": true,
 }
 
 // TestTrigmatchImportsStayBelowL5 pins engine/rules/trigmatch's direct module
 // imports to trigmatchImports.
 func TestTrigmatchImportsStayBelowL5(t *testing.T) {
-	const pkg = module + "/rules/trigmatch"
+	const pkg = module + "/engine/rules/trigmatch"
 	p, ok := packages(t)[pkg]
 	if !ok {
 		t.Skip("engine/rules/trigmatch is not built yet")
@@ -106,15 +106,15 @@ func TestTrigmatchImportsStayBelowL5(t *testing.T) {
 // To widen it, add the package here with a sentence arguing it is at or below
 // L2; a package above L2 never belongs in this list.
 var scriptfactsImports = map[string]bool{
-	module + "/cards":      true,
-	module + "/state":      true,
-	module + "/rules/cost": true,
+	module + "/engine/cards":      true,
+	module + "/engine/state":      true,
+	module + "/engine/rules/cost": true,
 }
 
 // TestScriptFactsImportsStayBelowRules pins engine/rules/scriptfacts' direct module
 // imports to scriptfactsImports.
 func TestScriptFactsImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/scriptfacts"
+	const sub = module + "/engine/rules/scriptfacts"
 	p, ok := packages(t)[sub]
 	if !ok {
 		t.Skip("engine/rules/scriptfacts is not built yet")
@@ -155,16 +155,16 @@ func sortedKeys(m map[string]bool) []string {
 // To widen it, add the package here with a sentence arguing it sits below
 // L5; rules and its other subsystem packages never belong in this list.
 var combatImports = map[string]bool{
-	module + "/cards":   true,
-	module + "/state":   true,
-	module + "/events":  true,
-	module + "/effects": true,
+	module + "/engine/cards":   true,
+	module + "/engine/state":   true,
+	module + "/engine/events":  true,
+	module + "/engine/effects": true,
 }
 
 // TestCombatImportsStayBelowRules pins engine/rules/combat's direct module imports
 // to combatImports. It skips until the package exists.
 func TestCombatImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/combat"
+	const sub = module + "/engine/rules/combat"
 	p, ok := packages(t)[sub]
 	if !ok {
 		t.Skip("engine/rules/combat is not built yet")

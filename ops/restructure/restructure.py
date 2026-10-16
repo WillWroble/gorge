@@ -333,6 +333,21 @@ def rewrite_tokens(src, path, report):
     return src
 
 
+# module + "/rules" style fragments (archtest builds package paths this way).
+FRAG_RE = re.compile(r'(\+\s*)"/([\w.-]+(?:/[\w.-]+)*)(/?)"')
+
+
+def frag(m, f, report):
+    p = m.group(2)
+    if p not in OLD_DIRS:
+        return m.group(0)
+    q = map_path(p)
+    if q == p:
+        return m.group(0)
+    report.append(f"{f}: /{p} -> /{q}")
+    return m.group(1) + '"/' + q + m.group(3) + '"'
+
+
 def rewrite_all(new_to_old):
     report = []
     touched_go = []
@@ -347,6 +362,7 @@ def rewrite_all(new_to_old):
         old = new_to_old.get(f, f)
         if f.endswith(".go"):
             new = rewrite_go_rel(new, os.path.dirname(old), os.path.dirname(f), f, report)
+            new = FRAG_RE.sub(lambda m: frag(m, f, report), new)
         if os.path.basename(f) == "go.mod":
             new = re.sub(r"(=>\s*)(\.\.[./]*)", lambda m: m.group(1) + (
                 "/".join(relocate(os.path.dirname(old), os.path.dirname(f), m.group(2).split("/")) or m.group(2).split("/"))), new)
