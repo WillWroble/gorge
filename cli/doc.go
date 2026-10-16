@@ -20,11 +20,13 @@
 // Config file: --config <path> (or GORGE_<ROOT>_CONFIG) names a JSON object.
 // Top-level keys are the root command's flags; a key naming a subcommand
 // holds an object of that subcommand's flags, recursively, so one file can
-// configure several subcommands. A "$schema" key, when present, must be
-// ConfigSchema ("gorge-cli-config/1"); a file without it is read as the
-// current version, so a hand-written file need not carry it. An unknown key
-// or a value of the wrong JSON type is an error naming the file and the key.
-// Every section is checked, not only the invoked command's.
+// configure several subcommands. A "$schema" key, when present, must be the
+// root's ConfigSchema (the program's config contract and major, for example
+// "dzgorge-config-1"; ConfigSchema, "gorge-cli-config-1", when the root sets
+// none); a file without it is read as the current version, so a hand-written
+// file need not carry it. An unknown key or a value of the wrong JSON type is
+// an error naming the file and the key. Every section is checked, not only
+// the invoked command's.
 //
 // --print-config prints the invoked command's effective configuration in that
 // same format (with "$schema") and exits 0; feeding it back with --config

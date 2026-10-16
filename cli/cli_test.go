@@ -316,7 +316,7 @@ func TestPrecedence(t *testing.T) {
 
 func TestConfigValues(t *testing.T) {
 	cfg := writeFile(t, "c.json", `{
-  "$schema": "gorge-cli-config/1",
+  "$schema": "gorge-cli-config-1",
   "shared": "fromfile",
   "run": {"games": 3, "a": "az:sims=5", "big": -9, "seed": 18446744073709551615, "tol": 0.5,
           "single": true, "tag": ["x"], "word": "hello"},
@@ -356,9 +356,9 @@ func TestConfigErrors(t *testing.T) {
 		{"custom-not-string", `{"run": {"word": 3}}`, `key "run.word": want a string (the flag's word text form), got a number`},
 		{"custom-set-fails", `{"run": {"word": "bad"}}`, `key "run.word": bad upper`},
 		{"section-not-object", `{"run": 3}`, `key "run" (the run command's section): want a JSON object`},
-		{"schema-version", `{"$schema": "gorge-cli-config/2"}`, `key "$schema": "gorge-cli-config/2", this build reads "gorge-cli-config/1"`},
+		{"schema-version", `{"$schema": "gorge-cli-config-2"}`, `key "$schema": "gorge-cli-config-2", this build reads "gorge-cli-config-1"`},
 		{"schema-type", `{"$schema": 1}`, `key "$schema": 1, this build reads`},
-		{"schema-nested", `{"run": {"$schema": "gorge-cli-config/1"}}`, `key "run.$schema": $schema belongs at the top level only`},
+		{"schema-nested", `{"run": {"$schema": "gorge-cli-config-1"}}`, `key "run.$schema": $schema belongs at the top level only`},
 		{"duplicate", `{"run": {"games": 1, "games": 2}}`, `duplicate key "games"`},
 		{"not-object", `[1]`, `want a JSON object`},
 		{"trailing", `{} {}`, `data after the top-level object`},
@@ -397,8 +397,29 @@ func TestPrintConfigRoundTrip(t *testing.T) {
 	}
 	// The root's own configuration.
 	r4 := run(t, nil, "--print-config")
-	if r4.code != 0 || r4.stdout != "{\n  \"$schema\": \"gorge-cli-config/1\",\n  \"shared\": \"s0\"\n}\n" {
+	if r4.code != 0 || r4.stdout != "{\n  \"$schema\": \"gorge-cli-config-1\",\n  \"shared\": \"s0\"\n}\n" {
 		t.Fatalf("root print-config: %d %q", r4.code, r4.stdout)
+	}
+}
+
+// TestCustomSchema: a root's ConfigSchema is the tag printed and required.
+func TestCustomSchema(t *testing.T) {
+	o := &opts{}
+	root := testTree(o)
+	root.ConfigSchema = "tool-config-3"
+	var out, errb bytes.Buffer
+	if code := Execute(root, []string{"--print-config"}, nil, &out, &errb); code != 0 || !strings.Contains(out.String(), `"$schema": "tool-config-3"`) {
+		t.Fatalf("exit %d %q", code, out.String())
+	}
+	p := writeFile(t, "s.json", `{"$schema": "gorge-cli-config-1"}`)
+	errb.Reset()
+	if code := Execute(testTree(o), []string{"run", "--config", p}, nil, &out, &errb); code != 0 {
+		t.Fatalf("default schema refused: %s", errb.String())
+	}
+	root = testTree(o)
+	root.ConfigSchema = "tool-config-3"
+	if code := Execute(root, []string{"run", "--config", p}, nil, &out, &errb); code != 2 || !strings.Contains(errb.String(), `this build reads "tool-config-3"`) {
+		t.Fatalf("another program's tag accepted: exit %d %q", code, errb.String())
 	}
 }
 

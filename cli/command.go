@@ -33,6 +33,18 @@ type Command struct {
 	ValidArgs func(args []string) error
 	// Sub are its subcommands.
 	Sub []*Command
+	// ConfigSchema (root only) is the "$schema" tag of this program's config
+	// file: the name and major of its config contract, for example
+	// "dzgorge-config-1". Empty means the generic ConfigSchema.
+	ConfigSchema string
+}
+
+// schema is the root's config tag.
+func schemaOf(root *Command) string {
+	if root.ConfigSchema != "" {
+		return root.ConfigSchema
+	}
+	return ConfigSchema
 }
 
 // NoArgs refuses any positional argument.

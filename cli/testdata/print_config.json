@@ -1,5 +1,5 @@
 {
-  "$schema": "gorge-cli-config/1",
+  "$schema": "gorge-cli-config-1",
   "run": {
     "a": "x<y&z",
     "big": -3,

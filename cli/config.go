@@ -10,10 +10,11 @@ import (
 	"strings"
 )
 
-// ConfigSchema is the config file format's version tag, the value of its
-// optional "$schema" key. A file naming any other version is refused; a file
-// without the key is read as this version.
-const ConfigSchema = "gorge-cli-config/1"
+// ConfigSchema is the default config file version tag, the value of its
+// optional "$schema" key, for a root Command that sets no ConfigSchema of its
+// own. A file naming any other tag is refused; a file without the key is read
+// as the current version.
+const ConfigSchema = "gorge-cli-config-1"
 
 // SchemaKey is the config key holding ConfigSchema.
 const SchemaKey = "$schema"
@@ -110,8 +111,8 @@ func (r *runner) checkSection(cf *configFile, path []*Command, ms []member) erro
 				return fmt.Errorf("key %q: %s belongs at the top level only", key, SchemaKey)
 			}
 			var tag string
-			if err := json.Unmarshal(m.raw, &tag); err != nil || tag != ConfigSchema {
-				return fmt.Errorf("key %q: %s, this build reads %q", key, strings.TrimSpace(string(m.raw)), ConfigSchema)
+			if want := schemaOf(r.root); json.Unmarshal(m.raw, &tag) != nil || tag != want {
+				return fmt.Errorf("key %q: %s, this build reads %q", key, strings.TrimSpace(string(m.raw)), want)
 			}
 			continue
 		}
@@ -197,7 +198,7 @@ func jsonOf(f *Flag) any {
 // configOf is the effective configuration of the flags in fs for the command
 // at path, as --print-config writes it.
 func configOf(fs *FlagSet, path []*Command) map[string]any {
-	top := map[string]any{SchemaKey: ConfigSchema}
+	top := map[string]any{SchemaKey: schemaOf(path[0])}
 	sections := []map[string]any{top}
 	for i := 1; i < len(path); i++ {
 		m := map[string]any{}
