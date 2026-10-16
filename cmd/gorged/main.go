@@ -27,7 +27,6 @@ import (
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/lab/draft/eventhost"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/host/httpapi"
 )
@@ -575,7 +574,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	// through the same gate resolution the rest of the server uses, and the
 	// eventhost must exist before NewHandler mounts /api/events. A server
 	// with -events off leaves evh nil and the surface byte-identical.
-	var evh *eventhost.Host
+	var evh eventRuntime
 	if c.events {
 		if gate == nil {
 			gate = &seatGate{tokenToClaim: map[string]httpapi.SeatClaim{}, claimTokens: map[httpapi.SeatClaim]string{}}

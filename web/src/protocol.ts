@@ -142,7 +142,7 @@ export interface SeatInfo {
   human?: boolean;
   /**
    * DeckID is the exact deck id this seat plays — the TableConfig.Decks
-   * entry the match loaded (host/match.go's deckNames), NOT the deck's
+   * entry the match loaded (server/host/match.go's deckNames), NOT the deck's
    * display Name. The two can differ: cmd/gorged's catalogue falls back to
    * the file stem only when a deck file has no Name. A client that restarts
    * the game must post this id back as human_deck/bot_deck; posting the
@@ -228,7 +228,7 @@ export interface Printing {
    * carry it without importing a package to its right. It is derived from the
    * face's own abilities -- never from land subtypes. A face with several mana
    * abilities lists their possible production here; rules selects exactly one
-   * when a shared tap cost is paid (rules/mana_activation.go).
+   * when a shared tap cost is paid (engine/rules/mana_activation.go).
    *
    * Colour is indexed the same way state.Mana is (W, U, B, R, G, then
    * colourless), so a caller that also imports state can translate an index
@@ -354,7 +354,7 @@ export interface CardView {
    * Controller and Owner can differ (a stolen permanent, a stack object
    * created for someone else's turn); a client needs both. Battlefield
    * zone lists are keyed by controller, every hidden/graveyard/exile list
-   * by owner (events/apply.go's zoneOwner), so a CardView carries both
+   * by owner (engine/events/apply.go's zoneOwner), so a CardView carries both
    * regardless of which zone list it came from.
    */
   controller: number;
@@ -453,7 +453,7 @@ export interface PoolRestrictionView {
   /**
    * PotentialAction is one action a seat COULD take if it first floated every
    * mana its untapped sources could produce: the engine's own legal-offer walk
-   * (rules/legal.go) priced against a hypothetical pool instead of the floating
+   * (engine/rules/legal.go) priced against a hypothetical pool instead of the floating
    * one. It is the server-side answer to the float-then-cast payment model --
    * the engine prices a cast against the FLOATING pool only, so the priority
    * window carries no cast option yet, and a client that re-derives
@@ -942,7 +942,7 @@ export interface Option {
    * -- an AlternativeCost static's cost instead -- so a client can show
    * which of several costs the option pays. An "ability" option uses the
    * same field for the same purpose: 0 is the ability's printed Cost$, 1 is
-   * its own AlternateCost$ rider (rules/activate.go's abilityAlternateCost,
+   * its own AlternateCost$ rider (engine/rules/activate.go's abilityAlternateCost,
    * the K:Equip expansion's fourth colon field), so an equip offering its
    * alternate cost is distinguishable from the printed-cost option without
    * parsing the label. omitempty mirrors Obj: an
@@ -1007,7 +1007,7 @@ export interface Option {
   mode?: string;
   /**
    * Amount is the X value an "x" choose option represents. The option's
-   * Index is its position in the list, not its value (see rules/cast.go's
+   * Index is its position in the list, not its value (see engine/rules/cast.go's
    * xAsk), so without this field a client could not tell "X = 4" from
    * "X = 1" without rereading the label. omitempty: only x options carry
    * it, and on an x option a missing field is exactly X = 0 (the one value
@@ -1025,7 +1025,7 @@ export interface Option {
    */
   ability?: number;
   /**
-   * SVar anchors a "granted" option (rules/speed.go, the kw:Start your
+   * SVar anchors a "granted" option (engine/rules/speed.go, the kw:Start your
    * engines max-speed static's AddAbility$): the SVar name on the source
    * face whose AB the activation resolves through. A granted ability is
    * not a Face().Abilities index (the ordinary "ability" anchor), so it
@@ -1050,7 +1050,7 @@ export interface Option {
   /**
    * Cost is the activation cost of a priority-window "activate" option whose
    * mana ability costs MORE than a bare tap, in the same whitespace-delimited
-   * Forge notation AbilityCosts uses (rules/mana.go's formatCost over
+   * Forge notation AbilityCosts uses (engine/rules/mana.go's formatCost over
    * ParseCost of the ability's Cost$ param) — "T Sac<1/Lion's Eye Diamond>"
    * for Lion's Eye Diamond, "T PayLife<1>" for Mana Confluence. It is the
    * wire marker the client's empty-priority-window floor and auto-pass need
@@ -1573,7 +1573,7 @@ export interface Snapshot {
   head: number;
   /**
    * Seats is the live match's seat list, the same []SeatInfo MatchStart
-   * carries. A focus subscriber (host/session.go's Subscribe) receives a
+   * carries. A focus subscriber (server/host/session.go's Subscribe) receives a
    * snapshot but not the match's match_start frame — that went out before
    * it connected — so without this the table route has no way to learn the
    * seats for the current match (ui16). Always populated for a live match;
@@ -1649,7 +1649,7 @@ export interface TableHaltedBody {
    * E3-fx2 chose a new frame over reusing an existing one: the widget frame
    * carries a State field but is only built from a live match (host/widgetFrame
    * reads the engine), and a series table between games has no match at all
-   * (host/registry.go retires it before the hook plans the next), so no widget
+   * (server/host/registry.go retires it before the hook plans the next), so no widget
    * can be built in exactly the state this signal must report.
    */
 export interface TableStateBody {

@@ -201,29 +201,29 @@ func set(s string) map[string]bool {
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
-		module + "/server/host":                 true,
-		module + "/server/host/httpapi":         true,
-		module + "/cmd/gorged":           true,
+		module + "/server/host":              true,
+		module + "/server/host/httpapi":      true,
+		module + "/cmd/gorged":               true,
 		module + "/lab/cmd/botbench":         true,
-		module + "/cmd/ledger":           true,
+		module + "/cmd/ledger":               true,
 		module + "/lab/cmd/searchprobe":      true,
 		module + "/lab/cmd/searchteacher":    true,
-		module + "/cmd/cardfuzz":         true,
+		module + "/cmd/cardfuzz":             true,
 		module + "/lab/cmd/exitloop":         true,
 		module + "/lab/cmd/traindash":        true,
-		module + "/cmd/paymirror":        true,
+		module + "/cmd/paymirror":            true,
 		module + "/lab/cmd/sbv1agent":        true,
 		module + "/lab/cmd/kshadowcheck":     true,
 		module + "/lab/cmd/sbagent":          true,
 		module + "/lab/cmd/sbv2local":        true,
 		module + "/lab/cmd/searchbench":      true,
-		module + "/cmd/enginebench":      true,
+		module + "/cmd/enginebench":          true,
 		module + "/lab/cmd/dzgorge":          true,
 		module + "/lab/cmd/draftrl":          true,
 		module + "/lab/training/gamepool":    true,
 		module + "/lab/training/inferbroker": true,
-		module + "/server/host/manabrewhttp":    true,
-		module + "/lab/draft/eventhost":            true,
+		module + "/server/host/manabrewhttp": true,
+		module + "/lab/draft/eventhost":      true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {

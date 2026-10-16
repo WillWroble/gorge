@@ -15,6 +15,13 @@ skip='^(TestHeads)$'
 # Opt-in exhaustive audits that the lean per-ticket gate leaves out
 # (db57ab8e6 made the oraclegen target audit opt-in); the full suite runs them.
 export GORGE_ORACLEGEN_FULL_TARGET_AUDIT=1
+# The platform build links no lab/ code (docs/decisions/0001-repo-layout.md):
+# prove it builds and that gorged refuses -events there, then run everything
+# else with -tags lab so the draft-event wiring (cmd/gorged events.go, the
+# httpapi event e2e tests) stays covered exactly as before the fence.
+go build ./...
+go test -run '^TestEventsNeedLabBuild$' ./cmd/gorged
+export GOFLAGS="-tags=lab${GOFLAGS:+ $GOFLAGS}"
 go vet -p=8 ./...
 # Per-test budget (operator, 2026-10-05, doubled 2026-10-09): every test fits 4 GB RSS, 4 vCPU,
 # 1 min wall. `go test -exec "testbudget exec"` runs every test binary and

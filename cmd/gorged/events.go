@@ -1,3 +1,5 @@
+//go:build lab
+
 package main
 
 import (
@@ -14,7 +16,13 @@ import (
 
 // eventhost.Host already satisfies the /api/events backend interface; the
 // assertion keeps the two packages' shapes in step when either changes.
-var _ httpapi.EventService = (*eventhost.Host)(nil)
+var _ eventRuntime = (*eventhost.Host)(nil)
+
+// eventRuntime: see events_nolab.go for the platform build's copy.
+type eventRuntime interface {
+	httpapi.EventService
+	Close() error
+}
 
 // eventsWiring is what serve builds before host.New (the store whose deck
 // loader the registry needs, the OnMatchEnd relay and the lazy series
@@ -68,7 +76,11 @@ func (w eventsWiring) hook(o *host.Options) {
 // -bot-policies set minus decklist readers (an Env policy never seats in a
 // draft event), and the default is -bot-policy unless it reads decklists,
 // else bots.Default. Returns nil when -events is off.
-func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registry, gate *seatGate) (*eventhost.Host, error) {
+//
+// This file builds only with -tags lab: draft events are a lab extension
+// (docs/decisions/0001-repo-layout.md), and events_nolab.go is the
+// platform build's stand-in.
+func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registry, gate *seatGate) (eventRuntime, error) {
 	if w.store == nil {
 		return nil, nil
 	}

@@ -196,7 +196,7 @@ traindash:
 # precisely the change a demo exists to show.
 deploy-demo: web
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -o $(BIN_DIR)/gorged ./cmd/gorged
+	CGO_ENABLED=0 go build -tags lab -o $(BIN_DIR)/gorged ./cmd/gorged
 	ops/scripts/deploy-demo.sh
 
 # The durable card-art cache deploy-demo fills before it starts any server

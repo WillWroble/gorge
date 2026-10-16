@@ -1,3 +1,5 @@
+//go:build lab
+
 package main
 
 import (

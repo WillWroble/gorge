@@ -1,3 +1,5 @@
+//go:build lab
+
 package httpapi
 
 import (
@@ -380,7 +382,7 @@ func TestDraftEventEndToEndOverHTTP(t *testing.T) {
 		t.Fatalf("deck/check of the suggestion: %d %s valid=%v err=%q", code, e.Code, check.Valid, check.Error)
 	}
 	var saved protocol.DeckCheck
-	code, e = callJSON(t, "POST", evURL+"/engine/deck", tok0, pool.Suggestion, &saved)
+	code, e = callJSON(t, "POST", evURL+"/deck", tok0, pool.Suggestion, &saved)
 	if code != 200 || saved.Rev != 1 {
 		t.Fatalf("deck save: %d %s rev=%d", code, e.Code, saved.Rev)
 	}

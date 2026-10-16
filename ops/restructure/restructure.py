@@ -367,7 +367,7 @@ def rewrite_tokens(src, path, report):
 
 
 # module + "/rules" style fragments (archtest builds package paths this way).
-FRAG_RE = re.compile(r'(\+\s*)"/([\w.-]+(?:/[\w.-]+)*)(/?)"')
+FRAG_RE = re.compile(r'(\bmodule\s*\+\s*)"/([\w.-]+(?:/[\w.-]+)*)(/?)"')  # only module + "/pkg": URL paths share the shape
 
 
 def frag(m, f, report):

@@ -20,6 +20,10 @@
 # module suite on main after landings, and a red there is bisected and fixed
 # at once (main red is never pre-existing).
 set -euo pipefail
+# Test with the lab extensions linked (docs/decisions/0001-repo-layout.md):
+# the draft-event wiring in cmd/gorged and its e2e tests build only with
+# -tags lab; postmerge_full.sh covers the platform (untagged) build.
+export GOFLAGS="-tags=lab${GOFLAGS:+ $GOFLAGS}"
 
 # Default-build packages in a list of candidate directories, one per line.
 #
