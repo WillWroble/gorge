@@ -924,6 +924,12 @@ func (e *canonEncoder) encview_CardView(v *view.CardView) error {
 	}
 	e.buf = binary.AppendVarint(e.buf, int64(v.Power))
 	e.buf = binary.AppendVarint(e.buf, int64(v.Toughness))
+	if len(v.PrintedPT) == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.appendString(string(v.PrintedPT))
+	}
 	e.buf = binary.AppendVarint(e.buf, int64(v.Damage))
 	if v.Attacking {
 		e.buf = append(e.buf, 1)

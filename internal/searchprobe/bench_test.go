@@ -166,14 +166,20 @@ func TestSampleRealDeckGolden(t *testing.T) {
 		// fields (json:"-"): the old digests return byte-for-byte. Measured
 		// after: frames 120, attempts 64, accepted 12, worlds 8, ESS 12
 		// (land exclusion: accepted 31, ESS 31).
-		{"pre-optimisation sampler", true, "562e4bc9161c5d80d949dd3d24b6333ebf492bdccaedd8f28be91c90f734ba72"},
+		// Re-measured for the token-art printed-P/T field (token-art-pt-key):
+		// CardView gained printed_pt, so the captured frames marshal one more
+		// key per token and the sampled worlds move. Attributed by hiding only
+		// that field (json:"-"): the old digests return byte-for-byte.
+		// Measured after: frames 120, attempts 64, accepted 10, worlds 8,
+		// ESS 10 (land exclusion: accepted 29, ESS 29).
+		{"pre-optimisation sampler", true, "fec727353b53b1e71bb40f6bd5d7da6eec6b5a5c231894e394e98e5640fb651a"},
 		// With the declined-land-drop exclusion: different proposals (so
 		// different worlds for a seed), same target distribution -- see
 		// TestLandExclusionRemovesOnlyRejectedWorlds. Re-measured for the
 		// Mausoleum Wanderer unless-cost ask label (see the test comment) and
 		// again for the damage-provenance fact (see above); see the
 		// pre-optimisation entry for the archetype-posterior re-measure.
-		{"land exclusion", false, "0d451c3516646c4f309164854d8596bbb3fd1f1d4641caa877908b46463f2221"},
+		{"land exclusion", false, "1cda502289afa8cb2b8f799a2605db91939e40d614f911e931427a02d8ad7f81"},
 	} {
 		opts := benchSampleOptions()
 		opts.MinESS = 1 // resample worlds from the thin pool so the digest covers them
@@ -357,7 +363,15 @@ func TestTeacherChoiceRealDeckGolden(t *testing.T) {
 	// Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8 TerminalByCandidate
 	// split as measured. Attributed by forcing rules/genesis.go's
 	// paidManaCensus to false: the old digest returns byte-for-byte.
-	const want = "05962e526c4fe336cd78dd10365d6b9b792fd919765d303bfba3361e039d4c12"
+	// Re-measured for the token-art printed-P/T field (token-art-pt-key):
+	// CardView gained printed_pt, so the captured frames that seed these
+	// worlds marshal one more key per token and the sampled worlds (and hence
+	// the rollouts) move. Attributed by hiding only that field (json:"-"): the
+	// old digest returns byte-for-byte. Measured after: Index 0, Values
+	// [1,0.5,1,1], Rollouts 32, Submits 6288, Terminal 32, Capped 0,
+	// WinsByCandidate [8,4,8,8], TerminalByCandidate [8,8,8,8],
+	// WinsOverBaseline [0,0,0,0], LossesToBaseline [0,4,0,0].
+	const want = "707beb02b9cf745a476585c3695073d8cd001be15840545b610c1244e728fb08"
 	for _, parallelism := range []int{0, 4} {
 		res, err := TeacherChoice(worlds, cands, TeacherOptions{Seed: 99, MaxSubmits: 5000, Parallelism: parallelism})
 		if err != nil {
