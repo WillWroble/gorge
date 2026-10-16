@@ -9,6 +9,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -102,7 +103,7 @@ func TestTurnBeginTriggerFiresOnTurnChange(t *testing.T) {
 
 func TestOrdinaryEventTriggerModeCarrierCensus(t *testing.T) {
 	t.Parallel()
-	root := "../.cards/cardsfolder"
+	root := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	files := map[string]string{}
 	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

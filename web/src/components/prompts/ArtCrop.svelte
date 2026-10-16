@@ -18,7 +18,14 @@
     let cancelled = false;
     url = null;
     if (n === null) return;
-    images.url(n).then((u) => {
+    images
+      .url(
+        n,
+        card?.is_token
+          ? { isToken: true, types: card.types, pt: `${card.power}/${card.toughness}`, printedPt: card.printed_pt }
+          : undefined,
+      )
+      .then((u) => {
       if (!cancelled) url = u;
     });
     return () => {

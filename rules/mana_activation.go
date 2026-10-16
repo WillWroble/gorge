@@ -8,6 +8,7 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/effects/params"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
@@ -658,6 +659,9 @@ func (e *Engine) appendAvailableManaAbilitiesGate(out []*cards.SA, statics *acti
 					claimed[candidates[i]] = true
 				}
 			}
+		}
+		if len(cost.Sac) > 0 && effects.ManaReflectedReadsSacrificed(ma) {
+			return manaReflectedSacrificeLive(e, asPayer(e), p, id, cost, &c, ma)
 		}
 		return len(effects.ManaReflectedCandidates(e, &c, ma)) > 0
 	}
@@ -1592,6 +1596,12 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 			ctx.Remembered = append(ctx.Remembered, state.Target{Obj: id})
 		}
 		cols := effects.ManaReflectedCandidates(e, ctx, ma)
+		if len(produced) == 1 && slices.Contains(cols, produced) {
+			// A payment plan's step names its colour (pay.AlternativeExec's
+			// one-letter Produced$): resolve it as the answered ask would.
+			e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
+			return
+		}
 		switch len(cols) {
 		case 0:
 			e.emit(events.Event{Kind: events.Note, Obj: source, Text: "ManaReflected found no mana to reflect"})
@@ -1605,6 +1615,12 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 	if pay.CostHasDynamicXTap(e.costRef(ma.ParamStr(cards.PKCost))) && mp.AmountTrim == "0" {
 		// X=0 produces no mana and therefore has no meaningful colour
 		// allocation decision.
+		e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
+		return
+	}
+	if mp.Each.Present && e.manaEachCount(p, source, ma, sacs, gained) <= 0 {
+		// Each$ 0 (Brigid, Doun's Mind with no other creatures) adds no mana,
+		// so there is no colour to allocate; effMana adds nothing.
 		e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
 		return
 	}
@@ -1785,6 +1801,25 @@ func (e *Engine) askManaColor(p state.PlayerID, source state.ObjID, ma *cards.SA
 	// never offers a bare "Add B" that hides the life (fb-bbe4fd8f); a
 	// multi-ability wheel's prefix is repeated here for the same reason.
 	prefix := pay.ManaAbilityCostPrefix(ma)
+	// CR 601.2b/601.2g: inside a cast or ability payment window the added
+	// mana exists only to pay the announced composition, so a colour no
+	// remaining component of that composition can absorb is withheld. Every
+	// component of the cost is announced before the window opens (CR
+	// 601.2b), so the clamp knows the faces: an unfilled announced pip keeps
+	// its colour, an unannounced flexible pip keeps all of its faces, and a
+	// positive generic remainder keeps everything (the engine-side over-
+	// approximations -- a restriction-blind pool, an unfolded convoke, an
+	// unfolded Delve floor of zero -- all push toward keeping colours, so
+	// the clamp only ever withholds a colour that provably pays nothing).
+	// Without it a bot answering the deterministic first option can add a
+	// useless colour (Fiend Artisan's {B}{B} faces fed a {W} from an
+	// any-colour druid), strand the exact payment, and reverse the cast
+	// (CR 601.2g).
+	if cast && e.cast != nil {
+		if useful, decided := e.paymentUsefulColours(e.cast, p, colours); decided && len(useful) > 0 {
+			colours = useful
+		}
+	}
 	for unit := 0; unit < max; unit++ {
 		for _, color := range colours {
 			d.Options = append(d.Options, decision.Option{Index: len(d.Options), Kind: "mana", Obj: source, Label: prefix + "Add " + color, ManaSymbol: color})
@@ -1792,6 +1827,149 @@ func (e *Engine) askManaColor(p state.PlayerID, source state.ObjID, ma *cards.SA
 	}
 	e.manaColorActivation = &manaColorActivation{player: p, source: source, ability: ma, cast: cast, cumulative: cumulative, triggers: triggers, gained: gained, sacs: append([]state.ObjID(nil), sacs...), allocation: allocation}
 	windowAsk(e, d, chooseManaColor)
+}
+
+// paymentUsefulColours filters a mana-production colour choice to the
+// colours the pending payment can still absorb, and reports whether the
+// verdict is DECIDED: a false second return means "uncertain" (a flexible
+// pip or an unsettled generic remainder could still absorb anything), and
+// the caller keeps the unclamped choice then. A decided EMPTY result means
+// the composition has no mana left to absorb any colour.
+func (e *Engine) paymentUsefulColours(pc *pendingCast, p state.PlayerID, colours []string) ([]string, bool) {
+	comp := e.manaToPay(pc)
+	// Delve credit is the charge's own subtraction (payCast takes it off the
+	// generic); fold it here so a delve-cast's generic remainder is not
+	// overestimated into keeping every colour.
+	if !pc.isAbility() {
+		if n := int64(len(pc.delve)); n > 0 {
+			comp.Generic -= int32(n)
+			if comp.Generic < 0 {
+				comp.Generic = 0
+			}
+		}
+	}
+	av := pay.AvailableFor(asPayer(e), p, paymentForCast(pc, comp))
+	pool := av.Pool
+	if pool == (state.Mana{}) && e.G.Players[p].Pool == (state.Mana{}) &&
+		comp.Colored.Total() == 0 && comp.Generic == 0 &&
+		len(comp.Hybrid) == 0 && len(comp.Phyrexian) == 0 && len(comp.Twobrid) == 0 && len(comp.HybridPhyrexian) == 0 {
+		return nil, true
+	}
+	// Fixed pip demand unfilled by the restriction-adjusted pool. The
+	// colourless slot (index MC) is included: a {C} pip takes colourless
+	// mana exactly as a {W} pip takes white.
+	demand := [len(state.Mana{})]int32{}
+	for i := 0; i < len(state.Mana{}); i++ {
+		if comp.Colored[i] > pool[i] {
+			demand[i] = comp.Colored[i] - pool[i]
+		}
+	}
+	// Unannounced flexible pips keep all of their mana faces (an announced
+	// one's face already sits in comp.Colored).
+	flexFaces := [state.MC]bool{}
+	for _, h := range comp.Hybrid {
+		for _, f := range [2]byte{h.A, h.B} {
+			if i := state.ManaIndex(f); i < state.MC {
+				flexFaces[i] = true
+			}
+		}
+	}
+	for _, t := range comp.Twobrid {
+		if i := state.ManaIndex(t.Col); i < state.MC {
+			flexFaces[i] = true
+		}
+	}
+	for _, f := range comp.Phyrexian {
+		if i := state.ManaIndex(f); i < state.MC {
+			flexFaces[i] = true
+		}
+	}
+	for _, h := range comp.HybridPhyrexian {
+		for _, f := range [2]byte{h.A, h.B} {
+			if i := state.ManaIndex(f); i < state.MC {
+				flexFaces[i] = true
+			}
+		}
+	}
+	// Surplus pool mana that survives the fixed pips can settle generic (and
+	// could settle a flexible pip's face, but that pip already keeps its
+	// faces above). A flexible pip existing at all makes the remainder
+	// uncertain, so the clamp refuses to withhold anything then.
+	surplus := int64(0)
+	for i := 0; i < len(state.Mana{}); i++ {
+		if pool[i] > comp.Colored[i] {
+			surplus += int64(pool[i] - comp.Colored[i])
+		}
+	}
+	flexUncertain := false
+	for i := 0; i < state.MC; i++ {
+		if flexFaces[i] {
+			flexUncertain = true
+			break
+		}
+	}
+	if flexUncertain || surplus < int64(comp.Generic) {
+		return nil, false
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, c := range colours {
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		i := state.ManaIndex(c[0])
+		if demand[i] > 0 {
+			out = append(out, c)
+		}
+	}
+	return out, true
+}
+
+// paymentSourceUseful reports whether source id can still add a colour the
+// pending payment absorbs, for the payment window's per-source option list.
+// A production the clamp cannot price -- AnnouncedAbilityColours returned
+// nothing (an exotic or planner-tier shape) and no literal colour letters
+// sit in Produced -- fails OPEN: the source stays offered, exactly as an
+// uncertain clamp verdict does.
+func (e *Engine) paymentSourceUseful(pc *pendingCast, p state.PlayerID, id state.ObjID) bool {
+	chosen := pay.ChosenProducedColour(e.G, id)
+	for _, ma := range e.availableManaAbilitiesForWindow(p, id, false) {
+		cols := pay.AnnouncedAbilityColours(asPayer(e), p, id, ma, chosen)
+		if len(cols) == 0 {
+			cols = fixedProductionColours(ma)
+		}
+		if len(cols) == 0 {
+			return true
+		}
+		if useful, decided := e.paymentUsefulColours(pc, p, cols); !decided || len(useful) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// fixedProductionColours reads the literal colour letters of a mana
+// ability's Produced string ("GG" -> G, "1G" -> G, "C" -> C); the
+// Any/Combo/Chosen shapes AnnouncedAbilityColours prices return nothing
+// here by construction (no bare colour letters).
+func fixedProductionColours(ma *cards.SA) []string {
+	if ma == nil || ma.API != "Mana" {
+		return nil
+	}
+	raw := params.ManaOf(ma).Produced
+	for _, r := range raw {
+		if r != ' ' && (r < '0' || r > '9') && !strings.ContainsRune("WUBRGC", r) {
+			return nil // an exotic shape: fail open
+		}
+	}
+	var out []string
+	for _, c := range []string{"W", "U", "B", "R", "G", "C"} {
+		if strings.Contains(raw, c) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // manaEffectAmount resolves the production amount in the same source and
@@ -1812,6 +1990,21 @@ func (e *Engine) manaEffectAmount(p state.PlayerID, source state.ObjID, ma *card
 		return 0
 	}
 	return amount
+}
+
+// manaEachCount resolves the Each$ multiplier in the same context
+// manaEffectAmount uses, so the pre-ask gate agrees with effMana.
+func (e *Engine) manaEachCount(p state.PlayerID, source state.ObjID, ma *cards.SA, sacs []state.ObjID, gained pay.GainedManaRef) int32 {
+	o := e.G.Obj(source)
+	if o == nil || o.Face() == nil {
+		return 0
+	}
+	ctx := e.manaAmountCtx(p, source)
+	for _, id := range sacs {
+		ctx.Sacrificed = append(ctx.Sacrificed, effects.SacrificedLKI(e, id))
+	}
+	effects.SetSVars(ctx, gained.SVars(o.Face().SVars))
+	return effects.ManaEachNum(effects.ManaOf(ma), e, ctx, 1)
 }
 
 func (e *Engine) resolveManaEffectColor(p state.PlayerID, source state.ObjID, ma *cards.SA, produced string, gained pay.GainedManaRef, sacs []state.ObjID) {

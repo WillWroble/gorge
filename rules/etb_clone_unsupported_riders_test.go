@@ -1,61 +1,165 @@
 package rules
 
 import (
-	"slices"
 	"testing"
 
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
 
-// Flesh Duplicate's conditional rider remains outside the ETB whitelist.
-// Drive the entry boundary directly: a non-cast entry must keep its loud
-// fallback rather than silently install a partial copy.
+// Flesh Duplicate's conditional-keyword rider (AddKeywords$ IfNew
+// Vanishing:3 -- "vanishing 3 if that creature doesn't have vanishing",
+// CR 707.9b) is inside the ETB clone whitelist: the inner keyword is a
+// single-word head cards expands on the copy basis face, so the election is
+// posed and the grant rides the ClonePermanent event's "ifnew " payload.
 
-// TestFleshDuplicateETBWithheld pins the conditional-keyword case. Flesh
-// Duplicate's rider is AddKeywords$ IfNew Vanishing:3 ("vanishing 3 if that
-// creature doesn't have vanishing"). effClone installs an AddKeywords$ member
-// verbatim as a layer-6 grant and this build implements no IfNew conditional,
-// so cards.KeywordHead would read the head as "IfNew Vanishing": no
-// conditional test, no vanishing ability and no entry time counters. The
-// carrier is withheld rather than offering a copy that silently drops it.
-func TestFleshDuplicateETBWithheld(t *testing.T) {
-	t.Parallel()
+func fleshDuplicateEntry(t *testing.T, templateName string) (*Engine, state.ObjID, state.ObjID) {
+	t.Helper()
 	e := handEngine(t, corpusAlternativeCard(t, "Flesh Duplicate"))
-	dread := e.G.AddObject(corpusAlternativeCard(t, "Colossal Dreadmaw"), 1)
-	dread.Zone = state.ZBattlefield
-	e.G.SetZone(state.ZBattlefield, 1, []state.ObjID{dread.ID})
+	var tplID state.ObjID
+	if templateName != "" {
+		tpl := e.G.AddObject(corpusAlternativeCard(t, templateName), 1)
+		tpl.Zone = state.ZBattlefield
+		e.G.SetZone(state.ZBattlefield, 1, []state.ObjID{tpl.ID})
+		tplID = tpl.ID
+	}
 	id := e.G.Zone(state.ZHand, 0)[0]
-
 	e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: state.ZHand, To: state.ZBattlefield})
-	if d := e.Pending(); d != nil {
-		t.Fatalf("withheld carrier posed an entry decision: %+v", d)
+	return e, id, tplID
+}
+
+func etbElectionOption(t *testing.T, d *decision.Decision, tplID state.ObjID) int {
+	t.Helper()
+	if d == nil || d.Kind != decision.KChoose || d.ResumeKind != "etb" {
+		t.Fatalf("copy election = %+v", d)
 	}
-	if hasEvent(e, events.ClonePermanent, id) {
-		t.Fatal("withheld carrier must not copy")
-	}
-	if !hasNote(e, "unimplemented API Clone") {
-		t.Fatal("loud Clone fallback note missing from the log")
-	}
-	// It entered as ITSELF: still the printed 0/0 Flesh Duplicate, not the
-	// 6/6 template. Nothing granted the IfNew rider.
-	o := e.G.Obj(id)
-	if o == nil || o.Zone != state.ZBattlefield || o.Face().Name != "Flesh Duplicate" {
-		t.Fatalf("flesh duplicate did not enter as itself: %+v", o)
-	}
-	if der := e.Derived(id); der.Power != 0 || der.Toughness != 0 {
-		t.Fatalf("self-entry is %d/%d, want the printed 0/0", der.Power, der.Toughness)
-	}
-	for _, ev := range e.L.Events {
-		if ev.Kind == events.CounterChange && ev.Obj == id {
-			t.Fatalf("withheld carrier placed counters: %+v", ev)
+	for _, o := range d.Options {
+		if tplID == 0 && o.Kind == "clone" && o.Obj == 0 && o.Label == "Enter as itself" {
+			return o.Index
+		}
+		if o.Obj == tplID {
+			return o.Index
 		}
 	}
-	for _, o := range []state.ObjID{id, dread.ID} {
-		if der := e.Derived(o); slices.ContainsFunc(der.Keywords, func(k string) bool {
-			return k == "Vanishing:3" || k == "IfNew Vanishing:3"
-		}) {
-			t.Fatalf("object %d keywords leaked the unimplemented rider: %v", o, der.Keywords)
+	t.Fatalf("template %d absent from election: %+v", tplID, d.Options)
+	return -1
+}
+
+// TestFleshDuplicateETBGrantedVanishing pins the grant itself: taking the
+// copy of a vanishing-less creature enters the copy with the granted
+// vanishing's three time counters (its printed-shaped entry machinery), the
+// upkeep trigger removes one, and the last-counter trigger sacrifices.
+func TestFleshDuplicateETBGrantedVanishing(t *testing.T) {
+	t.Parallel()
+	e, id, tplID := fleshDuplicateEntry(t, "Colossal Dreadmaw")
+	idx := etbElectionOption(t, e.Pending(), tplID)
+	submitChoices(t, e, idx)
+	o := e.G.Obj(id)
+	if o == nil || o.Zone != state.ZBattlefield || o.Face().Name != "Colossal Dreadmaw" {
+		t.Fatalf("entry = %+v, want a Colossal Dreadmaw copy", o)
+	}
+	if got := o.Counter("TIME"); got != 3 {
+		t.Fatalf("granted vanishing entered with %d TIME counters, want 3", got)
+	}
+	if !hasEvent(e, events.ClonePermanent, id) {
+		t.Fatal("election was taken but Clone handler never ran")
+	}
+	// The rider must not leak onto the template.
+	if tpl := e.G.Obj(tplID); tpl != nil && tpl.Counter("TIME") != 0 {
+		t.Fatalf("template gained %d TIME counters, want none", tpl.Counter("TIME"))
+	}
+	// The granted vanishing is live: controller's upkeep removes a counter
+	// through the ordinary Phase trigger.
+	e.pendingTriggers = nil
+	e.G.Active, e.G.Priority = 0, 0
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepUpkeep})
+	e.putTriggersOnStack()
+	if len(e.G.Stack) != 1 {
+		t.Fatalf("upkeep put %d stack objects, want one vanishing trigger", len(e.G.Stack))
+	}
+	e.resolveTop()
+	if got := o.Counter("TIME"); got != 2 {
+		t.Fatalf("after upkeep removal TIME = %d, want 2", got)
+	}
+	// Seed the last two removals through the event log and check the
+	// last-counter sacrifice.
+	e.emit(events.Event{Kind: events.CounterChange, Obj: id, Counter: "TIME", Amount: -2})
+	e.putTriggersOnStack()
+	if len(e.G.Stack) != 1 {
+		t.Fatalf("last-counter removal put %d stack objects, want one sacrifice trigger", len(e.G.Stack))
+	}
+	e.resolveTop()
+	if got := e.G.Obj(id); got == nil || got.Zone != state.ZGraveyard {
+		t.Fatalf("after last-counter sacrifice zone = %+v, want graveyard", got)
+	}
+}
+
+// TestFleshDuplicateConditionalSilentOnVanishingTemplate pins the
+// conditional's negative arm: the copied template already carries vanishing,
+// so the rider is silent -- the copy basis face carries exactly ONE
+// Vanishing:3 line, the template's own. The engine's standing clone entry
+// gap keeps the copy from its own counters (the copy face swap lands after
+// the entry move folds, so the template's printed ETB counter repl is
+// never collected for THIS entry -- the same 0 a plain Clone copying the
+// Hermit enters with, see the report's follow-up); the condition comparison
+// still ran, which is what keeps the granted counters from ALSO being
+// placed -- six -- and the single upkeep queue shows one vanishing, not two.
+func TestFleshDuplicateConditionalSilentOnVanishingTemplate(t *testing.T) {
+	t.Parallel()
+	e, id, tplID := fleshDuplicateEntry(t, "Deep Forest Hermit")
+	idx := etbElectionOption(t, e.Pending(), tplID)
+	submitChoices(t, e, idx)
+	o := e.G.Obj(id)
+	if o == nil || o.Zone != state.ZBattlefield || o.Face().Name != "Deep Forest Hermit" {
+		t.Fatalf("entry = %+v, want a Deep Forest Hermit copy", o)
+	}
+	if got := o.Counter("TIME"); got != 0 {
+		t.Fatalf("copy of a vanishing creature entered with %d TIME counters, want 0 (standing clone gap)", got)
+	}
+	vanishing := 0
+	for _, kw := range o.Face().Keywords {
+		if cards.KeywordHead(kw) == "Vanishing" {
+			vanishing++
+		}
+	}
+	if vanishing != 1 {
+		t.Fatalf("copy carries %d vanishing lines, want exactly the template's one", vanishing)
+	}
+	// One vanishing's machinery, no rider duplication: with the counters the
+	// standing gap withholds, the upkeep step queues nothing (the removal
+	// trigger's IsPresent$ counters_GE1_TIME gate reads zero). The copy
+	// entered with the template's own ETB trigger on the stack (CR 707.9);
+	// resolve it first so only the upkeep step is under test.
+	e.resolveTop()
+	e.pendingTriggers = nil
+	e.G.Active, e.G.Priority = 0, 0
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepUpkeep})
+	e.putTriggersOnStack()
+	if len(e.G.Stack) != 0 {
+		t.Fatalf("upkeep put %d stack objects, want none: one vanishing with no counters", len(e.G.Stack))
+	}
+}
+
+// TestFleshDuplicateETBDeclineEntersAsItself pins the decline arm and the
+// SBA consequence: entering as itself is the printed 0/0 Flesh Duplicate
+// with no vanishing, which dies to the creature-toughness check.
+func TestFleshDuplicateETBDeclineEntersAsItself(t *testing.T) {
+	t.Parallel()
+	e, id, _ := fleshDuplicateEntry(t, "Colossal Dreadmaw")
+	idx := etbElectionOption(t, e.Pending(), 0)
+	submitChoices(t, e, idx)
+	o := e.G.Obj(id)
+	if o == nil || o.Zone != state.ZGraveyard || o.Face().Name != "Flesh Duplicate" {
+		t.Fatalf("declined entry = %+v, want the printed 0/0 in the graveyard", o)
+	}
+	if hasEvent(e, events.ClonePermanent, id) {
+		t.Fatal("declined election still copied")
+	}
+	for _, ev := range e.L.Events {
+		if ev.Kind == events.CounterChange && ev.Obj == id && ev.Counter == "TIME" {
+			t.Fatalf("declined entry placed counters: %+v", ev)
 		}
 	}
 }

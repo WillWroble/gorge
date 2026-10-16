@@ -38,6 +38,19 @@ type cand struct {
 	// scoreSet marks score as set (a payment candidate); otherwise
 	// in.Choices is scored.
 	scoreSet bool
+	// set marks a fuller kind's candidate (Kinds.Modes and friends), a set
+	// of options: its key encodes its choices in decision order (keyIntent),
+	// whatever order c.in lists them in.
+	set bool
+}
+
+// keyIntent is the intent c's key encodes: c.in, with a set's choices
+// sorted (sortedChoices), so the same set has one key in every world.
+func (c cand) keyIntent() decision.Intent {
+	if c.set {
+		return sortedChoices(c.in)
+	}
+	return c.in
 }
 
 // scoreChoices is the option-index list a network prior scores c by.
@@ -60,7 +73,9 @@ func (c cand) scoreChoices() ([]int, bool) {
 //   - priority: searchprobe.Candidates over d's observed options -- the bot's
 //     action, then pass, then the other cast/ability options. Land plays and
 //     mana activations are never candidates, so a priority the bot answers
-//     with one is not searched.
+//     with one is not searched;
+//   - multitarget, modes, optional, choose (the fuller kinds, Kinds.Modes and
+//     friends): subsetCandidates, every legal set of options.
 //
 // It does not reuse searchseat.Eligible/candidates: that gate's priority arm
 // is ">= 2 distinct castable objects" (searchseat.go:250), not the spec's
@@ -157,20 +172,41 @@ func enumerateCutInto(obs *searchprobe.Collector, e *rules.Engine, d *decision.D
 	return cands, kind, why, ok, false
 }
 
-func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision, bot decision.Intent, kinds Kinds, limit int, autoPayment bool, scratch *boardScratch) ([]cand, string, SkipReason, bool) {
-	var kind string
+// kindOf names the kind of decision d that kinds searches, "" when it searches
+// none: the one predicate enumerateLimit and Kinds.Searches share, so a driver
+// that asks "would the seat search this?" cannot disagree with the seat.
+func kindOf(d *decision.Decision, kinds Kinds) string {
 	switch {
 	case d == nil:
-		return nil, "", 0, false
+		return ""
 	case d.Kind == decision.KAttackers && kinds.Attackers:
-		kind = "attackers"
+		return "attackers"
 	case d.Kind == decision.KBlockers && kinds.Blockers:
-		kind = "blockers"
+		return "blockers"
 	case kinds.Target && searchprobe.SingleTarget(d):
-		kind = "target"
+		return "target"
 	case d.Kind == decision.KPriority && kinds.Priority:
-		kind = "priority"
-	default:
+		return "priority"
+	case d.Kind == decision.KTarget && kinds.MultiTarget && multiTarget(d):
+		return "multitarget"
+	case d.Kind == decision.KModes && kinds.Modes:
+		return "modes"
+	case d.Kind == decision.KTriggerOptional && kinds.Optional:
+		return "optional"
+	case d.Kind == decision.KChoose && kinds.Choose && smallChoose(d, kinds.chooseLimit()):
+		return "choose"
+	}
+	return ""
+}
+
+// Searches reports whether a seat with these kinds searches decision d: the
+// predicate the seat itself applies before it enumerates candidates. A host
+// that builds an honest root only for decisions the seat will search asks it.
+func (k Kinds) Searches(d *decision.Decision) bool { return kindOf(d, k) != "" }
+
+func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision, bot decision.Intent, kinds Kinds, limit int, autoPayment bool, scratch *boardScratch) ([]cand, string, SkipReason, bool) {
+	kind := kindOf(d, kinds)
+	if kind == "" {
 		return nil, "", 0, false
 	}
 	// Payment actions are atomic engine-provided cast witnesses. They are not
@@ -198,6 +234,8 @@ func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Dec
 		ins = searchprobe.BlockCandidates(d, bot, limit, legal)
 	case "target":
 		ins = searchprobe.TargetCandidates(d, bot, limit)
+	case "multitarget", "modes", "optional", "choose":
+		ins = subsetCandidates(d, bot, limit)
 	case "priority":
 		var one [1]searchprobe.Action
 		base, err := obs.AppendIntentActions(one[:0], d, bot)
@@ -216,14 +254,141 @@ func enumerateLimit(obs *searchprobe.Collector, e *rules.Engine, d *decision.Dec
 		return nil, kind, SkipFewCandidates, false
 	}
 	out := make([]cand, 0, len(ins))
+	set := extraIndex(kind) >= 0
 	for _, in := range ins {
-		key, err := obs.IntentKey(d, in)
+		// A set's key is its options in decision order, whatever order the
+		// bot listed them in: the same set has one key in every world.
+		c := cand{in: in, set: set}
+		key, err := obs.IntentKey(d, c.keyIntent())
 		if err != nil {
 			return nil, kind, SkipTranslate, false
 		}
-		out = append(out, cand{key: Key(key), in: in})
+		c.key = Key(key)
+		out = append(out, c)
 	}
 	return out, kind, 0, true
+}
+
+// multiTarget reports whether d is a KTarget shape the single-target
+// enumerator refuses (searchprobe.SingleTarget) that a set enumeration can
+// answer: up to N targets, an optional target (Min 0), a budgeted pick.
+func multiTarget(d *decision.Decision) bool {
+	return d.Kind == decision.KTarget && !searchprobe.SingleTarget(d) && d.Max >= 1 && len(d.Options) >= 1
+}
+
+// chooseLimit is the largest KChoose option list Choose searches.
+func (k Kinds) chooseLimit() int {
+	if k.chooseMax > 0 {
+		return k.chooseMax
+	}
+	return DefaultOptions().Limit
+}
+
+// smallChoose reports whether KChoose decision d is one Kinds.Choose
+// searches: one to max options, none of them a mana-payment window's
+// ("activate", "mana", "done": the manual payment of a cost, which the
+// priority vocabulary never searches either).
+func smallChoose(d *decision.Decision, max int) bool {
+	if len(d.Options) == 0 || len(d.Options) > max || d.ManaPayment != nil {
+		return false
+	}
+	for i := range d.Options {
+		switch d.Options[i].Kind {
+		case "activate", "mana", "done":
+			return false
+		}
+	}
+	return true
+}
+
+// subsetTries bounds the option sets subsetCandidates examines, so a long
+// option list with few legal sets cannot stall a walk.
+const subsetTries = 4096
+
+// subsetCandidates enumerates the answers of a pick-a-set decision (the
+// fuller kinds: modes, optional, choose, multitarget): the bot's own answer
+// first (index 0, the tie-winner), then every set of Min..Max options
+// (0..Max under AllowNone) that d.Validate accepts, in size order and, within
+// a size, lexicographic in option position, each listing its options in
+// decision order; the set the bot chose is not repeated. Capped at limit and
+// at subsetTries sets examined -- prefix-stable, as enumerateCut needs. nil
+// when d repeats options (Repeatable), the bot's answer is not a plain valid
+// choice list, or fewer than two candidates survive.
+func subsetCandidates(d *decision.Decision, bot decision.Intent, limit int) []decision.Intent {
+	if d == nil || d.Repeatable || limit < 2 || bot.Payment != nil || bot.Announce != nil || len(bot.Rest) > 0 {
+		return nil
+	}
+	first := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: append([]int{}, bot.Choices...)}
+	if d.Validate(first) != nil {
+		return nil
+	}
+	botSet := sortedChoices(first).Choices
+	n := len(d.Options)
+	lo, hi := max(d.Min, 0), min(d.Max, n)
+	if d.AllowNone {
+		lo = 0
+	}
+	out := []decision.Intent{first}
+	comb := make([]int, 0, max(hi, 0))
+	tries := 0
+	for k := lo; k <= hi && len(out) < limit && tries < subsetTries; k++ {
+		comb = comb[:0]
+		for i := 0; i < k; i++ {
+			comb = append(comb, i)
+		}
+		for len(out) < limit && tries < subsetTries {
+			tries++
+			choices := make([]int, k)
+			for i, p := range comb {
+				choices[i] = d.Options[p].Index
+			}
+			if !sameInts(choices, botSet) {
+				in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: choices}
+				if d.Validate(in) == nil {
+					out = append(out, in)
+				}
+			}
+			// The next k-subset of n positions, lexicographic.
+			i := k - 1
+			for i >= 0 && comb[i] == n-k+i {
+				i--
+			}
+			if i < 0 {
+				break
+			}
+			comb[i]++
+			for j := i + 1; j < k; j++ {
+				comb[j] = comb[j-1] + 1
+			}
+		}
+	}
+	if len(out) < 2 {
+		return nil
+	}
+	return out
+}
+
+// sortedChoices is in with its Choices ascending (a copy when they were
+// not).
+func sortedChoices(in decision.Intent) decision.Intent {
+	if sort.IntsAreSorted(in.Choices) {
+		return in
+	}
+	in.Choices = append([]int(nil), in.Choices...)
+	sort.Ints(in.Choices)
+	return in
+}
+
+func sameInts(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // payKeyPrefix marks a payment candidate's key: "pay:" then the semantic
@@ -240,6 +405,11 @@ func paymentActs(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decisi
 	one := *d
 	one.Min, one.Max = 1, 1
 	one.Options = []decision.Option{{Index: 0, Kind: "cast", Obj: a.Cast.Object, Player: d.Player, Label: a.Label}}
+	if a.Cast.Origin == decision.OriginFlashback {
+		// A planned flashback is the flashback cast, not a plain one: name
+		// its mode so its key differs from any other cast of the card.
+		one.Options[0].Mode = "flashback"
+	}
 	one.PaymentActions = nil
 	// The cast's object is a hand card no legacy option may name yet (no
 	// mana floats): introduce it, as ObserveDecision does for d's own.
@@ -279,12 +449,15 @@ func nameKeys(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision,
 	}
 	seen := make(map[Key]bool, len(cands)) // membership only -- never ranged.
 	for _, c := range cands {
+		// The intent c's key encodes: a set's choices in decision order
+		// (keyIntent), so its actions and their options line up as keyed.
+		in := c.keyIntent()
 		srcActs := c.acts
-		if srcActs == nil && c.in.Payment == nil {
+		if srcActs == nil && in.Payment == nil {
 			// The ordinary path keyed this candidate without building its
 			// actions (Collector.IntentKey); rebuild them, exactly the
 			// actions its key encodes.
-			if a, err := obs.Actions(d, c.in); err == nil {
+			if a, err := obs.Actions(d, in); err == nil {
 				srcActs = a
 			}
 		}
@@ -293,14 +466,14 @@ func nameKeys(obs *searchprobe.Collector, e *rules.Engine, d *decision.Decision,
 		for k := range srcActs {
 			src, obj, atk := d.Source, state.ObjID(0), state.ObjID(0)
 			switch {
-			case c.in.Payment != nil:
+			case in.Payment != nil:
 				for _, a := range d.PaymentActions {
-					if a.ID == c.in.Payment.ActionID {
+					if a.ID == in.Payment.ActionID {
 						obj = a.Cast.Object
 					}
 				}
-			case k < len(c.in.Choices) && c.in.Choices[k] >= 0 && c.in.Choices[k] < len(d.Options):
-				o := d.Options[c.in.Choices[k]]
+			case k < len(in.Choices) && in.Choices[k] >= 0 && in.Choices[k] < len(d.Options):
+				o := d.Options[in.Choices[k]]
 				obj, atk = o.Obj, o.Attacker
 			}
 			ls, lo, la := late(srcActs[k].Source, src), late(srcActs[k].Obj, obj), late(srcActs[k].Attacker, atk)
@@ -396,6 +569,7 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 	havePass := false
 	covered := make(map[state.ObjID]bool, len(payments)) // membership only -- never ranged.
 	payAt := make(map[state.ObjID]int, len(payments))    // lookup only -- never ranged.
+	var coveredMode map[state.ObjID]string               // lookup only -- never ranged; nil until a flashback plan.
 	for _, a := range payments {
 		if len(a.Plans) == 0 || covered[a.Cast.Object] {
 			continue
@@ -410,6 +584,14 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 			c.score = []int{*a.BaseOptionIndex}
 		}
 		covered[a.Cast.Object] = true
+		if a.Cast.Origin == decision.OriginFlashback {
+			// The legacy flashback cast this plan stands for is skipped
+			// below, as the ordinary cast is for a hand plan.
+			if coveredMode == nil {
+				coveredMode = make(map[state.ObjID]string, 1)
+			}
+			coveredMode[a.Cast.Object] = "flashback"
+		}
 		payAt[a.Cast.Object] = len(pays)
 		pays = append(pays, c)
 	}
@@ -430,7 +612,7 @@ func paymentVocabulary(obs *searchprobe.Collector, e *rules.Engine, d *decision.
 				continue
 			}
 		}
-		if o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0 && covered[o.Obj] {
+		if o.Kind == "cast" && o.AltCostIndex == 0 && o.Cost == "" && covered[o.Obj] && o.Mode == coveredMode[o.Obj] {
 			continue
 		}
 		in := decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{i}}
@@ -719,7 +901,8 @@ func payActionsKey(acts []searchprobe.Action) Key {
 // otherwise a softmax, across candidates, of policynet.CandidateScore over
 // the head's option scores on the deciding seat's redacted view -- the
 // subset log-likelihood for attackers and blockers, the single option's
-// score for priority and target. The bot's options are marked (BotPick) as a
+// score for priority and target, the sum of its options' scores for the
+// fuller kinds (Kinds.Modes and friends). The bot's options are marked (BotPick) as a
 // residual checkpoint was trained. fellBack reports a network prior that
 // could not be formed (every candidate -Inf or NaN) and fell back to uniform.
 // The view is projected into pv (view.ProjectInto), a fresh one when nil.
@@ -743,9 +926,12 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 	if pv == nil {
 		pv = new(view.View)
 	}
-	view.ProjectInto(pv, e.G, e, d.Player, d)
-	v := *pv
-	st := policynet.EncodeStateWith(net.Features, v, d.Player, nil)
+	// Only the parts the network's encoders read are projected.
+	view.ProjectLeanInto(pv, e.G, e, d.Player, d, net.Features.ViewOmit())
+	// The state is encoded into pooled storage: it is read only by Score.
+	sb := policynet.AcquireStateBuf()
+	defer policynet.ReleaseStateBuf(sb)
+	st := policynet.EncodeStateWithInto(sb, net.Features, pv, d.Player, nil)
 	opts := d.Options
 	// synth[i] is the index in opts of candidate i's synthetic cast option,
 	// -1 for none; nil when no candidate has one.
@@ -768,10 +954,7 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 			opts = append(opts, o)
 		}
 	}
-	enc := make([]policynet.Option, len(opts))
-	for i := range opts {
-		enc[i] = policynet.EncodeOptionWith(net.Features, v, d.Player, d.Kind, opts[i], i, len(opts))
-	}
+	enc := policynet.EncodeOptionsWith(net.Features, pv, d.Player, d.Kind, opts, nil)
 	seat.MarkBotPicks(d, enc[:len(d.Options)], bot)
 	if payCasts && bot.Payment != nil {
 		for i, c := range cands {
@@ -791,6 +974,9 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 	}
 	scores := net.Score(st, enc)
 	subset := kind == "attackers" || kind == "blockers"
+	// A fuller kind's candidate is a set of options: its logit is the sum
+	// of their scores (0 for the empty set), the trainer's candidate logit.
+	sum := extraIndex(kind) >= 0
 	logits := make([]float64, len(cands))
 	for i, c := range cands {
 		choices, ok := c.scoreChoices()
@@ -801,6 +987,10 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 			// A payment cast with no legacy option has no option score.
 			return uniform(len(cands)), true
 		}
+		if sum {
+			logits[i] = sumScore(scores, choices)
+			continue
+		}
 		logits[i] = policynet.CandidateScore(subset, scores, choices)
 	}
 	p, ok := softmax(logits)
@@ -808,6 +998,19 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 		return uniform(len(cands)), true
 	}
 	return p, false
+}
+
+// sumScore is the sum of the chosen options' scores, -Inf when a choice is
+// out of range.
+func sumScore(scores []float32, choices []int) float64 {
+	s := 0.0
+	for _, c := range choices {
+		if c < 0 || c >= len(scores) {
+			return math.Inf(-1)
+		}
+		s += float64(scores[c])
+	}
+	return s
 }
 
 // payCastOption is the option a network scores payment candidate c by when

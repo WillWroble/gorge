@@ -414,6 +414,13 @@ func costAnnouncesXRef(c *Cost) bool {
 			return true
 		}
 	}
+	// An X-bound group exile part (Fabrication Foundry's withTotalCMCEQX)
+	// announces X from the totals its election can reach (groupAnnounceXAsk).
+	for _, part := range c.Exile {
+		if part.AtLeast && part.Group.Var != "" {
+			return true
+		}
+	}
 	// An announced Blight<X> part binds the cast's X exactly like Sac<X/Spec>
 	// (Blighted Nightmare's `Blight<X> Return<1/CARDNAME>` ability): the
 	// payment settles the announced count, so the X was announced even when
@@ -463,6 +470,9 @@ func (e *Engine) abilityTargetsAvailable(p state.PlayerID, id state.ObjID, ab *c
 	var excludeSelf state.ObjID
 	if ab != nil && ab.API == "Attach" {
 		excludeSelf = id
+	}
+	if !e.abilityTargetBoundAvailable(p, id, excludeSelf, ab) {
+		return false
 	}
 	if !targetsReadXPending(ab) {
 		// xPending is never read for this shape (targetsReadXPending).

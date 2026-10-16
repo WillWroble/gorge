@@ -244,9 +244,14 @@ func (e *Engine) payCast() {
 		// found it, but a From read from the object keeps a graveyard
 		// self-exile honest about where it moved from.
 		craftMaterials := craftExiledMaterials(e, pc)
+		groupLinked := costLinksGroupExiles(pc.cost)
 		for _, id := range pc.Exiles {
 			if o := e.G.Obj(id); o != nil {
-				e.emit(costExileEvent(o, craftMaterials, pc.card))
+				mv := costExileEvent(o, craftMaterials, pc.card)
+				if groupLinked {
+					mv.IDs = []state.ObjID{pc.card}
+				}
+				e.emit(mv)
 			}
 		}
 		rememberCraftMaterials(e, pc.card, craftMaterials)
@@ -521,6 +526,9 @@ func (e *Engine) payCast() {
 	// keeps one record per spent unit, so a cast that spent ordinary (or only
 	// restricted) mana emits no rider event and stays byte-identical.
 	pc.addsCounterGrants = append([]state.ManaAddsCounterGrant(nil), e.ManaSpentAddsCounters...)
+	// The spent mana's producing sources, from the same capture (it is
+	// consumed by fireManaSpentTriggers below, so it is read here).
+	e.captureManaSources(pc)
 	if pc.PayLife != 0 {
 		e.emit(events.Event{Kind: events.LifeChange, Player: pc.player, Amount: -pc.PayLife, Text: "paylife proposal"})
 	}
@@ -862,6 +870,9 @@ func (e *Engine) payCast() {
 		cvFlags := events.FlagsString(events.FlagsFrom(flags) | state.FlagConvoked)
 		e.emit(events.Event{Kind: events.CastInfo, Obj: pc.card, Amount: int32(len(ids)), Counter: cvFlags, IDs: ids})
 	}
+	if ev, ok := manaSourcesCastInfo(pc, flags); ok {
+		e.emit(ev)
+	}
 	// AddsCounters$ (task opalp): the producing abilities' rider grants this
 	// cast earned ride their own TRAILING pay-time CastInfo's Text payload --
 	// the flag (NOT ORed into the accumulating flags, the Conspired/Convoked
@@ -1087,9 +1098,23 @@ func (e *Engine) abortCast(pc *pendingCast, text string, suppress bool) {
 			e.emit(events.Event{Kind: events.MoveZone, Obj: pc.stackObj, From: state.ZStack, To: pc.from, Text: "reversed"})
 		}
 	}
+	// CR 733.1: a pushed spell's PutOnStack stays in the append-only log, so
+	// the spell-cast turn watcher it folded (state.Player.SpellsCastThisTurn)
+	// is undone by a companion reversal event. An ability's AbilityPush folds
+	// no such watcher, so only a spell reverses one.
+	if pc.pushed && !pc.isAbility() {
+		e.emit(events.Event{Kind: events.SpellCastReversed, Player: pc.player})
+	}
 	if pc.faceBefore != nil {
 		if o := e.G.Obj(pc.card); o != nil && o.FaceIdx != *pc.faceBefore {
 			e.emit(events.Event{Kind: events.FlipFace, Obj: pc.card, Amount: int32(*pc.faceBefore)})
+		}
+	}
+	// CR 733.1: a creature type chosen as a cost (ChooseCreatureType<N>) is
+	// undone with the proposal.
+	if pc.chooseTypeDone {
+		if o := e.G.Obj(pc.card); o != nil && o.ChosenType != pc.preChosenType {
+			e.emit(events.Event{Kind: events.Choose, Obj: pc.card, Counter: "type", Text: pc.preChosenType})
 		}
 	}
 	// CR 733.1 applies identically to a mode announced during the proposal.
@@ -1108,6 +1133,7 @@ func (e *Engine) abortCast(pc *pendingCast, text string, suppress bool) {
 	e.deferredPush = nil
 	e.deferredPushLKI = nil
 	e.cast, e.choosing = nil, chooseNone
+	e.AbortTally = tallyNote(e.AbortTally, text, noteAttribution(e.G.Obj(pc.card), pc.isAbility()))
 	e.emit(events.Event{Kind: events.Note, Player: pc.player, Text: text})
 	e.suppressedCast = saved
 	e.castAborts = savedAborts

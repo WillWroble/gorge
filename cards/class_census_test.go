@@ -12,10 +12,7 @@ import (
 // TestClassCorpusCensus pins every Class carrier and ClassLevel$ reader at FORGE_REF.
 // Paths include rebalanced variants; additions cannot silently escape this mechanic.
 func TestClassCorpusCensus(t *testing.T) {
-	root := filepath.Join("..", ".cards", "cardsfolder")
-	if _, err := os.Stat(root); err != nil {
-		t.Skipf("corpus absent: %v", err)
-	}
+	root := corpusDir(t) // Skips when the corpus is absent
 	var types, reads []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

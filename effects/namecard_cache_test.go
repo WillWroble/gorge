@@ -90,3 +90,33 @@ func TestNameChoicesCacheConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestInternNameUniverseNamesSharesEqualLists pins the identity a replayed
+// match's genesis gets for its persisted name list. A host rebuilds an
+// archived match from its sidecar, which decodes a fresh copy of the list
+// every time; before interning, each copy missed every identity-keyed memo
+// and the demo held gigabytes of duplicate option slices.
+func TestInternNameUniverseNamesSharesEqualLists(t *testing.T) {
+	universe := cards.UniverseOf(namecardUniverse(t))
+	live := NameUniverseNames(universe)
+	if got := InternNameUniverseNames(universe, nil); &got[0] != &live[0] {
+		t.Fatal("empty pin did not take the universe's own list")
+	}
+	if got := InternNameUniverseNames(universe, slices.Clone(live)); &got[0] != &live[0] {
+		t.Fatal("a decoded copy of the current list did not intern to the universe's list")
+	}
+	// A list pinned under an older corpus differs from the live universe, so
+	// every rebuild of such a match shares one pinned copy instead.
+	old := []string{"Bear", "Forest", "Grizzly Bears"}
+	first := InternNameUniverseNames(universe, slices.Clone(old))
+	second := InternNameUniverseNames(universe, slices.Clone(old))
+	if !slices.Equal(first, old) || &first[0] != &second[0] {
+		t.Fatalf("pinned copies not shared: %v %p vs %p", first, &first[0], &second[0])
+	}
+	if a, b := NameOptions(first, 1), NameOptions(second, 1); &a[0] != &b[0] {
+		t.Fatal("options for two rebuilds of one pinned list were not memoised once")
+	}
+	if got := InternNameUniverseNames(nil, nil); got != nil {
+		t.Fatalf("no universe and no pin = %v, want nil", got)
+	}
+}

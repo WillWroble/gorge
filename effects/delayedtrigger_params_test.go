@@ -11,7 +11,7 @@ import (
 // table.
 func TestDelayedTriggerKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(delayedTriggerKnownKeys[:]) || len(slices.Compact(slices.Clone(delayedTriggerKnownKeys[:]))) != len(delayedTriggerKnownKeys) {
-		t.Fatal("delayedTriggerKnownKeys must be sorted and duplicate-free")
+		t.Fatal("delayedTriggerKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 
@@ -29,7 +29,7 @@ func TestCompileDelayedTrigger(t *testing.T) {
 		!p.RememberChainFalse || p.RememberObjects != "Targeted" || !p.ThisTurn || p.Static != "True" {
 		t.Fatalf("scalars = %+v", p)
 	}
-	if want := "End of Turn|VP=You|IP=Card.IsTriggerRemembered|PZ=Exile|PC=EQ1"; p.PhaseText != want {
+	if want := "End of Turn|VP=You|IP=Card.IsTriggerRemembered|PZ=Exile|PC=EQ1|ST"; p.PhaseText != want {
 		t.Fatalf("PhaseText = %q, want %q", p.PhaseText, want)
 	}
 	if want := "Phase:Mode$ Phase | ValidPlayer$ You | ThisTurn$ True | Static$ True | IsPresent$ Card.IsTriggerRemembered | PresentCompare$ EQ1 | PresentZone$ Exile"; p.EventText != want {

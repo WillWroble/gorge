@@ -196,14 +196,20 @@ func dungeonRoomName(face *cards.Face, key string) string {
 // CardView's object id and a PlayerView's seat number indistinguishable by
 // key name alone.
 type PlayerView struct {
-	ID            state.PlayerID `json:"seat"`
-	Name          string         `json:"name"`
-	Life          int32          `json:"life"`
-	Lost          bool           `json:"lost"`
-	LibrarySize   int            `json:"library_size"`
-	HandSize      int            `json:"hand_size"`
-	PlanarDeck    []CardView     `json:"planar_deck,omitempty"`
-	GraveyardSize int            `json:"graveyard_size"`
+	ID   state.PlayerID `json:"seat"`
+	Name string         `json:"name"`
+	Life int32          `json:"life"`
+	Lost bool           `json:"lost"`
+	// Per-turn watchers (state.Player's *ThisTurn tallies): public counts
+	// for this seat since the last turn change, for every viewer.
+	SpellsCastThisTurn    int32      `json:"spells_cast_this_turn"`
+	LifeGainedThisTurn    int32      `json:"life_gained_this_turn"`
+	LifeLostThisTurn      int32      `json:"life_lost_this_turn"`
+	TokensCreatedThisTurn int32      `json:"tokens_created_this_turn"`
+	LibrarySize           int        `json:"library_size"`
+	HandSize              int        `json:"hand_size"`
+	PlanarDeck            []CardView `json:"planar_deck,omitempty"`
+	GraveyardSize         int        `json:"graveyard_size"`
 	// LibraryTop is the player's own library's top card, revealed only when
 	// a live Continuous MayLookAt grant covers it (Oracle of Mul Daya's
 	// "play with the top card of your library revealed") and only to that
@@ -634,6 +640,8 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 		}
 		*pv = PlayerView{
 			ID: p.ID, Name: displayName(p), Life: p.Life, Lost: p.Lost,
+			SpellsCastThisTurn: p.SpellsCastThisTurn, LifeGainedThisTurn: p.LifeGainedThisTurn,
+			LifeLostThisTurn: p.LifeLostThisTurn, TokensCreatedThisTurn: p.TokensCreatedThisTurn,
 			LibrarySize:       len(g.Zone(state.ZLibrary, p.ID)),
 			HandSize:          len(g.Zone(state.ZHand, p.ID)),
 			PlanarDeck:        pr.listViews(noLists, prev.PlanarDeck, g.Zone(state.ZPlanarDeck, p.ID), false, p.ID, &m.alsoVisible),
@@ -728,15 +736,28 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 			// included, without the seat-only ability costs.
 			pv.Hand = pr.cardViews(prev.Hand, g.Zone(state.ZHand, p.ID), false, p.ID, true, &noSeats)
 		case ownSeat && !noLists:
-			pv.Hand = pr.cardViews(prev.Hand, g.Zone(state.ZHand, p.ID), seatCosts, p.ID, false, &m.alsoVisible)
+			if pr.hideHand {
+				// CR 103.5: while the CR 103.1 play/draw choice is
+				// unresolved no player may see any hand. The viewer's own
+				// Hand stays non-nil (Ruling T23-u: a real seat's own Hand
+				// is "[]", never the null another seat's hidden hand
+				// marshals) and so reads as empty-for-now, with the count
+				// still carried by HandSize; every other seat's Hand stays
+				// nil. The omniscient spectator above is untouched.
+				pv.Hand = pr.cardViews(prev.Hand, nil, seatCosts, p.ID, false, &m.alsoVisible)
+			} else {
+				pv.Hand = pr.cardViews(prev.Hand, g.Zone(state.ZHand, p.ID), seatCosts, p.ID, false, &m.alsoVisible)
+			}
 		}
 		// The library CONTENTS are the viewer's own seat only (CR 400.2),
 		// and only in a real seat's own projection (ownLibrary): a spectator
 		// mode -- Public or Omniscient -- never lists a library, preserving
 		// D12's "library order is hidden" for every spectator. unorderedLibrary
 		// canonicalises the order, so even the own seat learns the contents
-		// and never the secret draw order.
-		if ownSeat && m.ownLibrary && !suppressesOwnLibrary(ch) {
+		// and never the secret draw order. While the CR 103.1 choice is
+		// pending, pr.hideHand suppresses it too (CR 103.5): the library is
+		// the complement of the hidden hand and would reveal it.
+		if ownSeat && m.ownLibrary && !suppressesOwnLibrary(ch) && !pr.hideHand {
 			pv.Library = pr.unorderedLibrary(prev.Library, g.Zone(state.ZLibrary, p.ID), p.ID, &m.alsoVisible)
 		}
 		// PotentialActions is the "what could I still do after tapping out"
@@ -750,7 +771,10 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 		// not belong to carries no field at all (nil), and a spectator
 		// (viewer naming no real seat) never matches the gate above. A nil
 		// ch degrades to an empty projection like every other derived fact.
-		if ownSeat && ch != nil && m.omit&OmitPotential == 0 {
+		// While the CR 103.1 choice is pending, pr.hideHand suppresses it
+		// (CR 103.5): the walk reads the seat's hand and its offers carry
+		// hand-card ObjIDs, so it is a hand side channel.
+		if ownSeat && ch != nil && m.omit&OmitPotential == 0 && !pr.hideHand {
 			pv.PotentialActions = ch.PotentialActions(p.ID)
 			for i := range pv.PotentialActions {
 				pv.PotentialActions[i].Label = pr.text.labelText(pv.PotentialActions[i].Label)

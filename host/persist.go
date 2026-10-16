@@ -61,6 +61,13 @@ type sidecar struct {
 	Format       Format  `json:"format,omitempty"`
 	StartingLife int32   `json:"starting_life,omitempty"`
 	Commanders   [][]int `json:"commanders,omitempty"`
+	// StartChooser is the configured starting-player chooser the match's
+	// rules.Config ran with (E3-2): the seat posed CR 103.1's choice in
+	// place of the toss winner. A replay rebuilt without it would replay the
+	// toss instead and diverge at the genesis Note, so matchForLog restores
+	// it the way it restores Mulligans. Absent = the toss, which every match
+	// before E3 used, so nothing migrates (R-E5-2).
+	StartChooser *int `json:"start_chooser,omitempty"`
 	// NameUniverse records whether the live match was played with a card-name
 	// universe. A missing field is a pre-feature no-universe match, whose ETB
 	// and mid-resolution fallbacks replay unchanged.
@@ -70,7 +77,17 @@ type sidecar struct {
 	// corpus addition, removal or rename from changing a recorded numeric name
 	// choice's label on replay.
 	NameUniverseNames []string `json:"name_universe_names,omitempty"`
-	BotPolicy         string   `json:"bot_policy"`
+	// PaidManaCensus records whether the live match ran with the widened
+	// paid-cost mana census (rules.Config.DisablePaidManaCensus false). It is
+	// a match MODE, like NameUniverse: the census changes which sources the
+	// attack-tax budget, the unless-cost windows, AvailableMana and the
+	// pool-short ability offer count, so a replay rebuilt without the bit
+	// takes a different offer list and diverges at the first census-sensitive
+	// decision. A missing field is a pre-flip capture, whose engine ran the
+	// narrow census, so it reads back as census OFF — the value those matches
+	// played with — and nothing is migrated or versioned (R-E5-2).
+	PaidManaCensus bool   `json:"paid_mana_census,omitempty"`
+	BotPolicy      string `json:"bot_policy"`
 	// Refusals and Fallbacks are BP-06 ladder diagnostics: how many Submits
 	// the engine refused and how many times the fallback rungs ran. They are
 	// counters only and never reach an event, so a sidecar written without

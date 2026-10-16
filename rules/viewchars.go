@@ -11,10 +11,15 @@ import "github.com/adams-shaun/gorge/state"
 // 7a basis are the ones derivedCompute passes. Keywords aliases Engine
 // scratch storage exactly as Derived does: copy it before the next
 // characteristics query.
-func (e *Engine) ViewCharacteristics(id state.ObjID) (name string, keywords []string, power, toughness int32) {
+//
+// nameSet is effects.Chars.NameSet: the name is BOUND, so the empty string is
+// a real name (a both-locked Room, CR 709.5) and the caller must not fall
+// back to the printed face. The printed fast path answers only printed names,
+// so it reports false.
+func (e *Engine) ViewCharacteristics(id state.ObjID) (name string, nameSet bool, keywords []string, power, toughness int32) {
 	if name, keywords, power, toughness, ok := e.printedViewCharacteristics(id); ok {
-		return name, keywords, power, toughness
+		return name, false, keywords, power, toughness
 	}
 	d := e.Derived(id)
-	return d.Name, d.Keywords, d.Power, d.Toughness
+	return d.Name, d.NameSet, d.Keywords, d.Power, d.Toughness
 }

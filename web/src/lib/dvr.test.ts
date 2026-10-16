@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { behindLive, dvrReducer, eventAt, initialDvr, turnOf, type DvrState } from './dvr';
+import { behindLive, dvrReducer, eventAt, initialDvr, LIVE_KEEP, railEvents, turnOf, type DvrState } from './dvr';
 import type { EventBody } from '../protocol';
 
 const ev = (seq: number, kind = 'tap'): EventBody => ({ event: { seq, kind, player: 0 }, line: `${kind} ${seq}` });
@@ -138,5 +138,36 @@ describe('dvr reducer', () => {
   it('turnOf returns -1 when turnStarts is empty', () => {
     const s = dvrReducer(initialDvr, { type: 'snapshot', match: 't5/1', head: 10, turnStarts: [] });
     expect(turnOf(s, 5)).toBe(-1);
+  });
+});
+
+describe('dvr live window (LIVE_KEEP)', () => {
+  const body = (seq: number, kind = 'step', player = -1, text?: string) =>
+    ({ event: { seq, kind, player, ...(text ? { text } : {}) }, line: `e${seq}` }) as unknown as EventBody;
+  const feed = (s: DvrState, from: number, to: number, lostAt = -1) => {
+    for (let q = from; q <= to; q++) s = dvrReducer(s, { type: 'event', body: q === lostAt ? body(q, 'player_lost', 2, 'life 0') : body(q) });
+    return s;
+  };
+
+  it('keeps at most LIVE_KEEP plus slack while live, newest last, and keeps trimmed losses', () => {
+    let s = dvrReducer(initialDvr, { type: 'snapshot', match: 't/1', head: 0, turnStarts: [] });
+    s = feed(s, 1, 10000, 5);
+    expect(s.events.length).toBeLessThanOrEqual(LIVE_KEEP + 500);
+    expect(s.events.length).toBeGreaterThanOrEqual(LIVE_KEEP);
+    expect(s.events[s.events.length - 1].event.seq).toBe(10000);
+    expect(s.head).toBe(10000);
+    const rail = railEvents(s);
+    expect(rail[0].event.kind).toBe('player_lost');
+    expect(rail.length).toBe(s.events.length + 1);
+  });
+
+  it('never trims a paused DVR, and a new match drops the kept losses', () => {
+    let s = dvrReducer(initialDvr, { type: 'snapshot', match: 't/1', head: 0, turnStarts: [] });
+    s = dvrReducer(s, { type: 'pause' });
+    s = feed(s, 1, 5000);
+    expect(s.events.length).toBe(5000);
+    s = dvrReducer(dvrReducer(s, { type: 'live' }), { type: 'snapshot', match: 't/2', head: 0, turnStarts: [] });
+    expect(s.losses).toBeUndefined();
+    expect(railEvents(s)).toEqual([]);
   });
 });

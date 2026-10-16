@@ -6,6 +6,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // The control/ownership `Player.NotedFor<label>` referent census: every corpus
@@ -35,10 +38,7 @@ import (
 // The corpus is gitignored (GPL-3.0): the test Skips when it is absent so a
 // clean clone still passes.
 func TestPlayerNotedForControlReferentCensus(t *testing.T) {
-	dir := "../.cards/cardsfolder"
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("corpus not fetched; run `make fetch-cards`")
-	}
+	dir := cards.CorpusDir(testutil.CorpusDirOrSkip(t))
 	got := map[string]bool{}
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".txt") {

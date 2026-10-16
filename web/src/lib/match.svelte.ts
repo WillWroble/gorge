@@ -15,19 +15,40 @@ function frameSeq(f: Frame): number | null {
   return b?.event?.seq ?? null;
 }
 
+/**
+ * SPECTATOR_VIEW_MIN_MS is the least time between a spectator's live board
+ * repaints. A 50ms-paced bot table poses ~20 decisions a second and each
+ * repaint re-lays-out the whole board, whose cost grows with it: a late
+ * commander board kept a spectator tab near a full core. Five repaints a
+ * second is more than a person watching can follow; the transcript still
+ * streams every event.
+ */
+const SPECTATOR_VIEW_MIN_MS = 200;
+
 /** MatchState is everything the focused view renders for one table. A seat context (M2e-4) is additive: when present, views and events are fetched seat-scoped (ViewAtSeat/EventsSeat) so the rendered board and log are the seat's own redacted truth, and the spectator-frame bodies are never rendered; when absent, every fetch and render is byte-identical to the spectator path. */
 export class MatchState implements ClientModelSource {
   match = $state<number | null>(null);
-  view = $state<View | null>(null);
+  // Raw for the same reason as dvr below: every write replaces the whole
+  // view (setRenderedView), and a deep proxy re-wrapped each fetched board.
+  view = $state.raw<View | null>(null);
   /** Sequence of the view actually assigned to the rendered board. */
   renderedSeq = $state<number | null>(null);
   seats = $state<SeatInfo[]>([]);
-  dvr = $state<DvrState>(initialDvr);
+  // Raw, not deep: dvrReducer never mutates, it returns a fresh state with a
+  // fresh events array on every event. A deep $state re-proxied that whole
+  // log per event, so every derived reading it (transcript, tail follow, seat
+  // table, step transitions) re-walked and re-subscribed to every event --
+  // O(events) per event, which outran a 50ms-paced commander game and froze
+  // the spectator tab. Reassignment is the only write, so raw is exact.
+  dvr = $state.raw<DvrState>(initialDvr);
   decision = $state<DecisionBody | null>(null);
   halted = $state<string | null>(null);
   loadError = $state<string | null>(null);
   private inflight = false;
   private again = false;
+  // Spectator board repaint floor (see SPECTATOR_VIEW_MIN_MS).
+  private lastLiveFetch = -Infinity;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   // Invalidates live view/transcript requests started before a match change
   // or rewind; those responses describe a seq space the client discarded.
   private liveEpoch = 0;
@@ -279,7 +300,19 @@ export class MatchState implements ClientModelSource {
   async refreshLive() {
     if (this.match === null) return;
     if (this.inflight) { this.again = true; return; }
+    // A spectator repaints the board at most every SPECTATOR_VIEW_MIN_MS; the
+    // pending timer fetches whatever the head is when it fires. A seat is
+    // never delayed: its decision prompt rides this fetch.
+    if (this.refreshTimer !== null) return;
+    if (!this.seat) {
+      const wait = this.lastLiveFetch + SPECTATOR_VIEW_MIN_MS - Date.now();
+      if (wait > 0) {
+        this.refreshTimer = setTimeout(() => { this.refreshTimer = null; void this.refreshLive(); }, wait);
+        return;
+      }
+    }
     this.inflight = true;
+    this.lastLiveFetch = Date.now();
     const epoch = this.liveEpoch;
     const seq = this.dvr.head;
     try {

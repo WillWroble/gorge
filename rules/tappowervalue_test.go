@@ -87,6 +87,7 @@ func tpvRunStation(t *testing.T, reg *cards.Registry, carrierName string, payer 
 	if !e.G.Obj(payerID).Tapped {
 		t.Fatal("precondition: Station did not tap the payer (handler did not run)")
 	}
+	passUntilStackEmpty(t, e, 20) // CR 702.184a: Station uses the stack.
 	return e.G.Obj(hearth).Counter("CHARGE")
 }
 

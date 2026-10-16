@@ -120,7 +120,10 @@ func FormatCost(c Cost) string {
 		if part.Announced {
 			n = "X"
 		}
-		add(head + "<" + n + "/" + part.Spec + ">")
+		if part.AtLeast {
+			n += "+"
+		}
+		add(head + "<" + n + "/" + FormatGroupSpec(part) + ">")
 	}
 	for _, part := range c.ExileFromTop {
 		add("ExileFromTop<" + strconv.FormatInt(int64(part.N), 10) + "/" + part.Spec + ">")
@@ -150,6 +153,9 @@ func FormatCost(c Cost) string {
 		} else {
 			add("RevealChosen<" + part.Spec + "/" + part.Desc + ">")
 		}
+	}
+	for i := int32(0); i < c.ChooseType; i++ {
+		add("ChooseCreatureType<1>")
 	}
 	appendCostParts("Behold", c.Behold)
 	appendCostParts("ExiledMoveToGrave", c.MoveToGrave)

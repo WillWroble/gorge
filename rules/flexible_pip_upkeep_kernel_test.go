@@ -43,23 +43,13 @@ func TestCumulativeUpkeepFlexiblePipPayment(t *testing.T) {
 	}
 	submitChoices(t, e, 1) // elect blue
 
-	// Drain the mana window: tap the Island, then re-open to the election.
+	// Pay first (respay.go): the election follows the announcement, and its
+	// plain pay funds the elected blue face through the planner -- the
+	// Island, since the Forest cannot pay it -- with no mana window.
 	d := e.Pending()
 	if d == nil || d.Kind != decision.KChoose || d.Source != bear ||
-		len(d.Options) == 0 || d.Options[0].Kind != "activate" {
-		t.Fatalf("expected the mana-ability window after the announcement, got %+v", d)
-	}
-	submitChoices(t, e, 0)
-	d = e.Pending()
-	if d == nil || d.Kind != decision.KChoose || d.Source != bear {
-		t.Fatalf("expected the cumulative election, got %+v", d)
-	}
-	if len(d.Options) < 2 || d.Options[0].Kind != "cumulative_pay" {
-		t.Fatalf("hybrid cumulative election = %+v, want a pay option once blue is in the pool", d.Options)
-	}
-	poolBefore := e.G.Players[0].Pool
-	if poolBefore[state.MU] != 1 || poolBefore[state.MW] != 0 {
-		t.Fatalf("precondition: pool before payment = %+v, want exactly one blue", poolBefore)
+		len(d.Options) == 0 || d.Options[0].Kind != "cumulative_pay" {
+		t.Fatalf("expected the cumulative election after the announcement, got %+v", d)
 	}
 	submitChoices(t, e, 0) // pay
 

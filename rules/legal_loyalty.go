@@ -354,8 +354,13 @@ func (e *Engine) activationUsedCount(id state.ObjID, ability int, svar string, t
 // additionalActivationLimit returns the largest finite MinLimit$ supplied by
 // an applicable Activations static, or baseline when none applies. Forge's
 // MinLimit is an absolute ceiling (e.g. 2 means twice, not baseline + 2).
-// Negative/unparseable limits are deliberately ignored: they represent a
-// different unbounded/conditional rule and must not disable a finite cap.
+// MinLimit$ -1 is Forge's "as though they haven't been activated" (Elvish
+// Refueler: "During your turn, as long as you haven't activated an exhaust
+// ability this turn, you may activate exhaust abilities as though they
+// haven't been activated"): while every gate of such a static holds -- its
+// PlayerTurn$ and the CheckSVar$ that counts this turn's exhaust activations
+// -- the result is unboundedActivationLimit and the cap does not apply.
+// Any other negative or unparseable limit is ignored.
 func (e *Engine) additionalActivationLimit(id state.ObjID, actor state.PlayerID, ab *cards.SA, baseline int) int {
 	limit := baseline
 	for _, sv := range e.activeStatics("Activations") {
@@ -395,12 +400,20 @@ func (e *Engine) additionalActivationLimit(id state.ObjID, actor state.PlayerID,
 			continue
 		}
 		min, err := strconv.Atoi(strings.TrimSpace(sv.ParamStr(cards.PKMinLimit)))
+		if err == nil && min == unboundedActivationLimit {
+			return unboundedActivationLimit
+		}
 		if err == nil && min > limit {
 			limit = min
 		}
 	}
 	return limit
 }
+
+// unboundedActivationLimit is additionalActivationLimit's "no cap" result
+// (an applying MinLimit$ -1 static); every caller reads a negative limit as
+// unbounded.
+const unboundedActivationLimit = -1
 
 // activationLimitBlocked is the ONE gate every activation offer site calls
 // for ActivationLimit$ (this turn), GameActivationLimit$ (the whole game),
@@ -429,7 +442,7 @@ func (e *Engine) activationLimitBlocked(p state.PlayerID, id state.ObjID, sa *ca
 	if raw, ok := sa.Param(cards.PKGameActivationLimit); ok {
 		if limit, ok := e.resolveActivationLimitAt(id, p, raw, merged); ok && limit >= 0 {
 			limit = e.additionalActivationLimit(id, p, sa, limit)
-			if e.activationUsedCount(id, ability, svar, false) >= limit {
+			if limit >= 0 && e.activationUsedCount(id, ability, svar, false) >= limit {
 				return true
 			}
 		}

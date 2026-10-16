@@ -118,11 +118,15 @@ func objectBaseToughness(o *state.Object) int {
 }
 
 // objectManaValue is the one mana-value read the extreme-CMC classifier
-// shares with the rest of the engine: the compiled face's CMC, the same
-// Face().Cmc() read manaValueOf, cascade and the Count$ walkers use. It is
-// the analogue of objectPower for greatestCMC/lowerCMC, so the two extreme
-// classifiers cannot drift on what a card's mana value is.
+// shares with the rest of the engine: a battlefield Room's CR 709.5 value
+// (the sum of its unlocked doors'), otherwise the compiled face's CMC -- the
+// same Face().Cmc() read manaValueOf, cascade and the Count$ walkers use. It
+// is the analogue of objectPower for greatestCMC/lowerCMC, so the two
+// extreme classifiers cannot drift on what a card's mana value is.
 func objectManaValue(o *state.Object) int {
+	if mv, room := roomManaValue(o); room {
+		return mv
+	}
 	f := o.Face()
 	if f == nil {
 		return 0
@@ -153,12 +157,12 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		if g == nil || o == nil {
 			return false, true
 		}
-		source := g.Obj(sc.Source)
-		if source == nil || (source.ChosenType != "odd" && source.ChosenType != "even") {
+		chosen, _ := sourceChosen(g, sc)
+		if chosen != "odd" && chosen != "even" {
 			return false, true
 		}
 		odd := objectManaValue(o)%2 == 1
-		return (source.ChosenType == "odd") == odd, true
+		return (chosen == "odd") == odd, true
 	}
 	resolve := sc.Resolve
 	if resolve == nil {
@@ -326,6 +330,9 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		// disagree.
 		if lhs, lhsOK := fieldValue(field); lhsOK {
 			if rhs, rhsOK := fieldValue(numStr); rhsOK {
+				if lacksPT(o, sc) {
+					return false, true
+				}
 				return applyCmp(cmp, lhs, rhs)
 			}
 		}
@@ -339,6 +346,9 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 		}
 		f := o.Face()
 		if f == nil {
+			return false, true
+		}
+		if field != "cmc" && lacksPT(o, sc) {
 			return false, true
 		}
 		var have int
@@ -360,6 +370,12 @@ func numericPred(name string, g *state.Game, o *state.Object, sc SpecContext) (r
 			// 601.3a check must.
 			if sc.HasManaValue {
 				have = int(sc.ManaValue)
+			} else if mv, room := roomManaValue(o); room {
+				// CR 709.5: a battlefield Room's mana value is its unlocked
+				// doors' sum. parseCMC stays the fallback: a face copy with a
+				// rewritten ManaCost must be priced from the current text
+				// (Face.Cmc is the load-time value and reports unbound).
+				have = mv
 			} else {
 				have = int(parseCMC(f.ManaCost))
 			}
@@ -538,3 +554,34 @@ var numericFieldCodes = state.NewStrCodes(
 	state.StrEntry[numericFieldCode]{Key: "baseToughness", Val: numericFieldBaseToughness},
 	state.StrEntry[numericFieldCode]{Key: "cmc", Val: numericFieldCmc},
 )
+
+// lacksPT reports an object that has no power or toughness characteristic at
+// all (CR 208.3: only creatures and objects with a printed or defined P/T have
+// one), so no power/toughness comparison can hold: a noncreature spell is not
+// "power equal to the chosen number 0" (Talion, the Kindly Lord). The rules
+// seam binds DerivedPower/Toughness for every P/T-reading spec (0 for a
+// P/T-less object), so the bound flags cannot answer this; the object's own
+// characteristics do: no printed/defined P/T and, through layer 4, not a
+// creature (an animated land or crewed Vehicle has one).
+func lacksPT(o *state.Object, sc SpecContext) bool {
+	f := o.Face()
+	if f == nil || f.PT != "" {
+		return false
+	}
+	if sc.ExtraTypesOwner == o.ID && sc.ExtraTypes != nil {
+		return !typeWordsHave(sc.ExtraTypes, "Creature")
+	}
+	if types, ok := derivedTypesForPtr(o, &sc); ok {
+		return !typeWordsHave(types, "Creature")
+	}
+	return !o.EffectiveIsCreature()
+}
+
+func typeWordsHave(types []string, want string) bool {
+	for _, t := range types {
+		if t == want {
+			return true
+		}
+	}
+	return false
+}

@@ -48,7 +48,7 @@ var conditionSupportedDefined = newConditionNames(
 	"Imprinted", "Discarded", "Targeted", "Returned", "ChosenCard",
 	"TriggeredSourceLKICopy", "RememberedLKI", "ParentTarget", "Sacrificed",
 	"ThisTargetedCard", "TriggeredSpellAbility",
-	"Collected", "CastSA>Collected",
+	"Collected", "CastSA>Collected", "TriggeredTargetLKICopy",
 )
 
 // conditionUnmodelledDefined is every ConditionDefined$ group the corpus
@@ -59,7 +59,6 @@ var conditionUnmodelledDefined = newConditionNames(
 	"DelayTriggerRememberedLKI", // 6
 	"Equipped",                  // 5
 	"DelayTriggerRemembered",    // 5
-	"TriggeredTargetLKICopy",    // 4
 	"TriggeredNewCardLKICopy",   // 4
 	"ReplacedSource",            // 3
 	"TopOfLibrary",              // 2
@@ -75,13 +74,14 @@ var conditionUnmodelledDefined = newConditionNames(
 // evaluates (the case-insensitive switch in its bare branch).
 var conditionSupportedBare = newConditionNames(
 	"Kicked", "Bargain", "Foretold", "Revolt", "Delirium", "Metalcraft", "Blessing",
+	"OptionalCost",
 )
 
 // conditionUnmodelledBare is every bare Condition$ value the corpus carries
 // that conditionMetCore does not evaluate. Counts measured 2026-10-04.
 var conditionUnmodelledBare = newConditionNames(
 	"PlayerTurn", "Threshold", "MaxSpeed", "NotPlayerTurn", "Hellbent",
-	"OptionalCost", "EnduringStory", "NoOpponentHasMoreLifeThanAttacked",
+	"EnduringStory", "NoOpponentHasMoreLifeThanAttacked",
 	"Monarch", "FatefulHour", "Evolve", "Surge", "Sacrificed", "Night",
 	"LifePaid", "Ferocious", "ExtraTurn", "AttackerHasUnattackedOpp",
 	"AttackedPlayerWithMostLife", "Add",
@@ -93,7 +93,6 @@ var conditionUnmodelledBare = newConditionNames(
 // 2026-10-04.
 var conditionUnmodelledKeys = newConditionNames(
 	"ConditionManaSpent",            // 34
-	"ConditionOptionalPaid",         // 10
 	"ConditionPlayerDefined",        // 9
 	"ConditionPlayerContains",       // 9
 	"ConditionManaNotSpent",         // 5

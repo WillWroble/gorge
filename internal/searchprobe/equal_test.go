@@ -52,7 +52,9 @@ func TestEqualMatchesDeepEqual(t *testing.T) {
 		func(d *ObservedDecision) { d.Options = nil },
 		func(d *ObservedDecision) { d.Options = []ObservedOption{} },
 		func(d *ObservedDecision) { d.Options = []ObservedOption{{Action: Action{Kind: "x", Obj: 4}, Group: 1}} },
-		func(d *ObservedDecision) { d.Options = []ObservedOption{{Action: Action{Kind: "x", Obj: 4, Value: "v"}, Group: 1, Required: true}} },
+		func(d *ObservedDecision) {
+			d.Options = []ObservedOption{{Action: Action{Kind: "x", Obj: 4, Value: "v"}, Group: 1, Required: true}}
+		},
 		func(d *ObservedDecision) { d.EffectAPI = "" },
 		func(d *ObservedDecision) { d.DamageKnown = false },
 		func(d *ObservedDecision) { d.Damage = 0 },

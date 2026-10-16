@@ -11,9 +11,9 @@ import (
 
 // Sparring Dummy's "you may put a land from your graveyard or exile into
 // your hand": gorge declined the hidden pick, and XMage poses the optional
-// ask on its target queue only — so the script must be the lone
-// [target_skip], not the declined pair whose "no" boolean has no chooseUse
-// to answer ("Found wrong choice command").
+// ask through choose(Cards, TargetCard), its choice queue — so the script
+// must be the lone [choice_skip], not the declined pair whose "no" boolean
+// has no chooseUse to answer ("Found wrong choice command").
 func TestActivateDeclinedHiddenPickIsTargetSkipOnly(t *testing.T) {
 	reg := corpusReg(t)
 	c, ok := reg.Lookup("Sparring Dummy")
@@ -47,10 +47,10 @@ func TestActivateDeclinedHiddenPickIsTargetSkipOnly(t *testing.T) {
 			continue
 		}
 		declined++
-		want := oraclegen.XAnswer{Seat: 0, Kind: "target", Value: "[target_skip]"}
+		want := oraclegen.XAnswer{Seat: 0, Kind: "choice", Value: "[choice_skip]"}
 		got := it.XAnswers[d.Step]
 		if len(got) != 1 || got[0] != want {
-			t.Fatalf("hidden-pick step %d answers %+v, want the lone target skip", d.Step, got)
+			t.Fatalf("hidden-pick step %d answers %+v, want the lone choice skip", d.Step, got)
 		}
 	}
 	if declined == 0 {

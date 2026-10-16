@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
       # ~25 MB sparse checkout of FORGE_REPO (gorge's fork of Card-Forge/forge) at the Makefile's FORGE_REF.
       - name: Fetch the Forge corpus
@@ -63,4 +63,7 @@ jobs:
         with:
           name: card-coverage
           path: .coverage/
+          # upload-artifact v4.4+ skips dot-paths by default, and .coverage/ is
+          # one: without this every run failed "No files were found".
+          include-hidden-files: true
           if-no-files-found: error

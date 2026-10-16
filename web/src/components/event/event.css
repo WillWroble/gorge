@@ -1,0 +1,233 @@
+/*
+ * Shared chrome for the draft-event screens (E2): /events/new and /e/{id}.
+ * Every rule is namespaced under .ev so nothing leaks into the table pages.
+ * The registers are the client's own (docs/superpowers/specs/2026-09-06-
+ * client-design-system.md): FELT for the cards the player handles — the
+ * pack, the pool, the deck — and INSTRUMENT for the rails that report the
+ * pod, the counts and the server's verdicts. Gilt is "you / the primary
+ * action", verdigris a legal or ready state, ember a loss or an error.
+ */
+
+.ev {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--felt);
+  color: var(--ink);
+  /* the page never scrolls sideways, at any width */
+  overflow-x: hidden;
+}
+
+.ev-topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--instrument);
+  border-bottom: 1px solid var(--edge-inst);
+  color: var(--ink-inst);
+  font-size: var(--t-14);
+}
+.ev-topbar .brand {
+  font: 600 1.15rem var(--font-serif);
+  color: var(--ink);
+  text-decoration: none;
+}
+.ev-topbar .crumbs {
+  font-family: var(--font-data);
+  font-size: var(--t-12);
+  color: var(--ink-dim);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ev-topbar .sp {
+  flex: 1;
+}
+
+.ev-btn {
+  font: 500 var(--t-14) var(--font-ui);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--edge-inst);
+  background: var(--instrument-raised);
+  color: var(--ink-inst);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+.ev-btn:hover:not([disabled]) {
+  border-color: var(--ink-faint);
+  color: var(--ink);
+}
+.ev-btn.primary {
+  background: var(--gilt);
+  border-color: var(--gilt);
+  color: var(--felt-sunk);
+}
+.ev-btn.primary:hover:not([disabled]) {
+  filter: brightness(1.07);
+  color: var(--felt-sunk);
+}
+.ev-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ev-btn.sm {
+  padding: 0.2rem 0.55rem;
+  font-size: var(--t-12);
+}
+
+/* The two-column screen: felt main, instrument rail. It folds to one column
+   on a phone, rail under the work. */
+.ev-split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  min-height: 0;
+}
+.ev-main {
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.ev-rail {
+  background: var(--instrument);
+  border-left: 1px solid var(--edge-inst);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  color: var(--ink-inst);
+  min-width: 0;
+  /* keep the rail's last control clear of the fixed Feedback button */
+  padding-bottom: var(--feedback-clear);
+}
+.ev-h5 {
+  margin: 0;
+  font: 500 var(--t-11) var(--font-data);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+@media (max-width: 760px) {
+  .ev-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ev-rail {
+    border-left: 0;
+    border-top: 1px solid var(--edge-inst);
+  }
+}
+
+.ev-error {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--ember);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  font-size: var(--t-14);
+}
+.ev-notice {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--edge-inst);
+  border-radius: var(--radius);
+  color: var(--ink-inst);
+  background: var(--instrument-raised);
+  font-size: var(--t-12);
+}
+
+/* Mana pips for a colour letter (chips, steppers, legends). */
+.ev-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  font: 600 0.6rem var(--font-data);
+  color: var(--felt-sunk);
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+.ev-pip.W { background: var(--mana-w); }
+.ev-pip.U { background: var(--mana-u); color: #fff; }
+.ev-pip.B { background: var(--mana-b); color: #fff; }
+.ev-pip.R { background: var(--mana-r); color: #fff; }
+.ev-pip.G { background: var(--mana-g); color: #fff; }
+
+/* Card colour as a custom property: --cc tints strips and selection rims. */
+.ev-tint-W { --cc: var(--mana-w); }
+.ev-tint-U { --cc: var(--mana-u); }
+.ev-tint-B { --cc: var(--mana-b); }
+.ev-tint-R { --cc: var(--mana-r); }
+.ev-tint-G { --cc: var(--mana-g); }
+.ev-tint-M { --cc: var(--gilt); }
+.ev-tint-C { --cc: var(--mana-c); }
+
+/* Rarity dots: grey common, silver uncommon, gold rare, red mythic. */
+.ev-rar {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  background: var(--ink-faint);
+}
+.ev-rar.U { background: #b9c4cc; }
+.ev-rar.R { background: var(--gilt); }
+.ev-rar.M { background: var(--ember); }
+
+/* The phase rail: Draft · Build · Round 1..3 · Results. */
+.ev-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--edge-felt);
+  margin: 0;
+  list-style: none;
+}
+
+.ev-chip {
+  font: 500 var(--t-11) var(--font-data);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--edge-felt);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.ev-chip.on {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+  background: var(--felt-raised);
+}
+
+.ev-foot {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4) var(--feedback-clear);
+  font-size: var(--t-11);
+  color: var(--ink-faint);
+}
+.ev-foot a {
+  color: var(--ink-dim);
+}
+
+.ev select,
+.ev input[type='text'] {
+  background: var(--instrument);
+  border: 1px solid var(--edge-inst);
+  border-radius: var(--radius);
+  color: var(--ink);
+  padding: 0.4rem 0.55rem;
+  font: var(--t-14) var(--font-ui);
+  max-width: 100%;
+}

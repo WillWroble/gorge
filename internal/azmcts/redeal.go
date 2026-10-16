@@ -19,6 +19,13 @@ const (
 	// WorldRedeal is the honest source (NewRedeal): every world keeps what
 	// the searching seat can see and re-deals everything it cannot.
 	WorldRedeal = "redeal"
+	// WorldRedealClosed is the honest source with the opponents' deck lists
+	// closed (SeatConfig.Belief): the seat's own list is known, as in
+	// WorldRedeal, but every opponent's unknown hand and library cards are
+	// re-identified in each world from a list drawn from the belief
+	// (searchprobe.PublicGame.Closed), so neither the opponent's real list
+	// nor its real hidden cards reach a world.
+	WorldRedealClosed = "redeal-closed"
 )
 
 // RedealInput is everything the honest source reads, all of it the

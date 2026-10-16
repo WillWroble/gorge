@@ -147,9 +147,10 @@ func drainCopyGrants(t *testing.T, e *Engine, limit int, acceptOptional, pay boo
 }
 
 // TestGrantedStaticSpellCopyPaysCost is the static AddTrigger$ route on
-// Mendicant Core's verbatim lines: the granted OptionalDecider$ ask must pose
-// (the trigger IS a trigger), the {1} pay ask must pose, and paying must charge
-// the pool and copy. Pre-fix neither ask posed and the copy resolved for free.
+// Mendicant Core's verbatim lines: the granted trigger's OptionalDecider$ You
+// folds into its {1} pay election (optionalFoldsIntoCost -- one ask, not a
+// yes/no in front of it), the pay ask must pose, and paying must charge the
+// pool and copy. Pre-fix neither ask posed and the copy resolved for free.
 func TestGrantedStaticSpellCopyPaysCost(t *testing.T) {
 	t.Parallel()
 	e, cfg, _ := newFixtureDeck(t, 902, mendicantCoreSrc, artifactSpellSrc, plainSifterSrc)
@@ -165,8 +166,8 @@ func TestGrantedStaticSpellCopyPaysCost(t *testing.T) {
 	}
 	poolBefore := poolTotal(e.G.Players[0].Pool)
 	sawOptional, sawPay := drainCopyGrants(t, e, 40, true, true)
-	if !sawOptional {
-		t.Fatalf("granted trigger's OptionalDecider$ ask never posed -- the AddTrigger$ grant is invisible to findTriggerForAbility")
+	if sawOptional {
+		t.Fatalf("granted trigger's OptionalDecider$ was asked separately from its Cost$ election")
 	}
 	if !sawPay {
 		t.Fatalf("granted trigger's {{1}} Cost$ pay ask never posed")
@@ -180,8 +181,9 @@ func TestGrantedStaticSpellCopyPaysCost(t *testing.T) {
 	replayCheck(t, e, cfg)
 }
 
-// TestGrantedStaticSpellCopyDeclinesOptional leaves the optional ask a NO: no
-// copy, no charge -- the control that makes the paid leaf meaningful.
+// TestGrantedStaticSpellCopyDeclinesOptional declines the folded election
+// (the optional's NO is the pay ask's decline): no copy, no charge -- the
+// control that makes the paid leaf meaningful.
 func TestGrantedStaticSpellCopyDeclinesOptional(t *testing.T) {
 	t.Parallel()
 	e, cfg, _ := newFixtureDeck(t, 903, mendicantCoreSrc, artifactSpellSrc, plainSifterSrc)
@@ -192,11 +194,11 @@ func TestGrantedStaticSpellCopyDeclinesOptional(t *testing.T) {
 	spell := spellOnStack(t, e, "Test Trinket Spell")
 	poolBefore := poolTotal(e.G.Players[0].Pool)
 	sawOptional, sawPay := drainCopyGrants(t, e, 40, false, false)
-	if !sawOptional {
-		t.Fatalf("granted trigger's OptionalDecider$ ask never posed")
+	if sawOptional {
+		t.Fatalf("granted trigger's OptionalDecider$ was asked separately from its Cost$ election")
 	}
-	if sawPay {
-		t.Fatalf("a declined optional trigger still posed its {{1}} pay ask")
+	if !sawPay {
+		t.Fatalf("granted trigger's {{1}} Cost$ election never posed")
 	}
 	if got := copyCount(e, spell); got != 0 {
 		t.Fatalf("declined optional still copied: %d events %v", got, allStackCopies(e))

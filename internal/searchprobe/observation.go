@@ -127,6 +127,19 @@ func (c noPotentialChars) PotentialActions(p state.PlayerID) []decision.Potentia
 
 func (noPotentialChars) OwnDeck(state.PlayerID) *deck.Manifest { return nil }
 
+// StartingChoicePending forwards the engine's CR 103.5 pending-answer
+// capability (rules.Engine.StartingChoicePending) through the wrapper: it
+// embeds the view.Chars INTERFACE, so the projector's and
+// botpolicy.BoardFromGameInto's capability assertions would silently see
+// "not pending" and leave the hand visible without it (the same hazard the
+// ViewCharacteristics and BeginDerivedReads forwardings cover).
+func (c noPotentialChars) StartingChoicePending() bool {
+	if s, ok := c.Chars.(interface{ StartingChoicePending() bool }); ok {
+		return s.StartingChoicePending()
+	}
+	return false
+}
+
 // BeginDerivedReads/EndDerivedReads pass the engine's pure-read memo scope
 // through the wrapper (view.projectInto opens it), which the embedded
 // view.Chars interface would otherwise hide.
@@ -143,9 +156,10 @@ func (c noPotentialChars) EndDerivedReads() {
 }
 
 // viewCharacteristics is view's optional one-call characteristics read
-// (rules.Engine.ViewCharacteristics).
+// (rules.Engine.ViewCharacteristics). The second return is the name's bound
+// flag (effects.Chars.NameSet).
 type viewCharacteristics interface {
-	ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+	ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 }
 
 // ViewCharacteristics forwards the projection's one-call read of a card's
@@ -156,16 +170,16 @@ type viewCharacteristics interface {
 // what is declared here: without this method the engine's own
 // ViewCharacteristics was silently dropped.
 //
-// The name is withheld (""), so the projector keeps the printed name: this
-// wrapper has never forwarded the engine's Name either (the observation
+// The name is withheld ("", false), so the projector keeps the printed name:
+// this wrapper has never forwarded the engine's Name either (the observation
 // projects printed names, and every frame and probe compares under that
-// rule).
-func (c noPotentialChars) ViewCharacteristics(id state.ObjID) (string, []string, int32, int32) {
+// rule), and an unbound name is exactly the "no override" reading.
+func (c noPotentialChars) ViewCharacteristics(id state.ObjID) (string, bool, []string, int32, int32) {
 	if vc, ok := c.Chars.(viewCharacteristics); ok {
-		_, kw, p, t := vc.ViewCharacteristics(id)
-		return "", kw, p, t
+		_, _, kw, p, t := vc.ViewCharacteristics(id)
+		return "", false, kw, p, t
 	}
-	return "", c.Chars.Keywords(id), c.Chars.Power(id), c.Chars.Toughness(id)
+	return "", false, c.Chars.Keywords(id), c.Chars.Power(id), c.Chars.Toughness(id)
 }
 
 // SuppressOwnLibrary tells view.Project not to build the own-library CONTENTS
@@ -484,6 +498,10 @@ func (c *Collector) observe(e *rules.Engine, burst []events.Event, withPotential
 	// them byte-identical.
 	c.noPot.Chars = e
 	c.noPot.keepPotential = withPotential
+	// The wrapper is per-capture scratch: drop the engine when the capture
+	// ends, so a collector (and every feed and clone holding one) never keeps
+	// a reference to the live engine it observed.
+	defer func() { c.noPot = noPotentialChars{} }()
 	var chars view.Chars = &c.noPot
 	if c.view.Decision == nil {
 		c.view.Decision = c.viewDec
@@ -635,8 +653,17 @@ func (c *Collector) remap(v *view.View) {
 		// a sampled world whose hidden objects were allocated different IDs
 		// can never serialize the same board, and every world is rejected at
 		// its first frame. Map them through the same observation refs.
+		//
+		// Payable is dropped: rules.PotentialActions reads it from the
+		// pending decision's lazily built payment actions only, so it says
+		// whether someone has called EnsurePaymentActions yet, not anything
+		// about the board. Kept, the same position observed before and after
+		// that build (the driver's capture, then the az root's payment
+		// vocabulary) encoded two boards, and every redeal from the root
+		// refused "base engine is not at the observed boundary".
 		for j := range p.PotentialActions {
 			p.PotentialActions[j].Obj = state.ObjID(c.ref(p.PotentialActions[j].Obj))
+			p.PotentialActions[j].Payable = nil
 		}
 	}
 	for i := range v.Stack {

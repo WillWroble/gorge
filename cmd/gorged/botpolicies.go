@@ -10,22 +10,34 @@ import (
 )
 
 // defaultBotPoliciesRaw is -bot-policies' default: the empty string means
-// "every registered entry", resolved against the registry at startup rather
-// than frozen into a literal list that would go stale as entries land.
+// "every registered entry that does not read opponents' decklists"
+// (bots.ReadsDecklists, operator ruling 2026-10-13), resolved against the
+// registry at startup rather than frozen into a literal list that would go
+// stale as entries land. A decklist-reading policy can never be offered:
+// the offered set feeds POST /api/games, and a vs-bot table always seats a
+// human.
 const defaultBotPoliciesRaw = ""
 
 // botPolicyOffered parses a -bot-policies comma list into the offered set.
-// The empty string means every registered entry, in the registry's display
-// order (production first, then experimental, then by name — bots.Entries).
-// A non-empty list is returned in that same registry order, not the order
-// the operator typed, so the listing is stable regardless of spelling; a
-// name the registry does not know is an error naming it. Duplicates are
+// The empty string means every registered entry whose policy is not a
+// decklist reader, in the registry's display order (production first, then
+// experimental, then by name — bots.Entries). A non-empty list is returned
+// in that same registry order, not the order the operator typed, so the
+// listing is stable regardless of spelling; a name the registry does not
+// know is an error naming it, and a name that DOES read opponents'
+// decklists is an error naming the policy and the reason. Duplicates are
 // rejected rather than silently collapsed: "bot,bot" is a typo, not a
 // one-element set.
 func botPolicyOffered(raw string) ([]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return bots.Names(), nil
+		var out []string
+		for _, name := range bots.Names() {
+			if !bots.ReadsDecklists(name) {
+				out = append(out, name)
+			}
+		}
+		return out, nil
 	}
 	seen := map[string]bool{}
 	requested := map[string]bool{}
@@ -36,6 +48,9 @@ func botPolicyOffered(raw string) ([]string, error) {
 		}
 		if _, ok := bots.Lookup(name); !ok {
 			return nil, fmt.Errorf("-bot-policies: unknown bot policy %q (known: %s)", name, strings.Join(bots.Names(), ", "))
+		}
+		if bots.ReadsDecklists(name) {
+			return nil, fmt.Errorf("-bot-policies: bot policy %q reads opponents' decklists and cannot be offered: POST /api/games always seats a human", name)
 		}
 		if seen[name] {
 			return nil, fmt.Errorf("-bot-policies %q: duplicate bot policy %q", raw, name)
@@ -60,12 +75,16 @@ func botPolicyOffered(raw string) ([]string, error) {
 // is normalized here ("" -> bots.Default) so a config built without the flag
 // still names a policy on the wire listing.
 //
-//   - -bot-policies: every name registered (botPolicyOffered), no
-//     duplicates (also there), and it must contain -bot-policy.
+//   - -bot-policies: every registered entry that does not read opponents'
+//     decklists (botPolicyOffered), no duplicates (also there), and it must
+//     contain -bot-policy.
 //   - -bot-policy: the ordinary default for a vs-bot request that omits
 //     bot_policy. It must be registered, offered, support BOTH formats and
 //     seat at least 2, because a default that lacks a format would let an
-//     omitted-field request reach a policy that then refuses it.
+//     omitted-field request reach a policy that then refuses it. A
+//     decklist-reading policy is refused as a default too: the default is
+//     what an omitted-field request plays against, and that request always
+//     seats a human.
 func validateBotPolicyFlags(def, offeredRaw string) (string, []string, error) {
 	offered, err := botPolicyOffered(offeredRaw)
 	if err != nil {
@@ -77,6 +96,9 @@ func validateBotPolicyFlags(def, offeredRaw string) (string, []string, error) {
 	entry, ok := bots.Lookup(def)
 	if !ok {
 		return "", nil, fmt.Errorf("-bot-policy: unknown bot policy %q (known: %s)", def, strings.Join(bots.Names(), ", "))
+	}
+	if entry.ReadsDecklists() {
+		return "", nil, fmt.Errorf("-bot-policy %q reads opponents' decklists and cannot be the default: a vs-bot request always seats a human", def)
 	}
 	if !containsString(offered, def) {
 		return "", nil, fmt.Errorf("-bot-policy %q is not in -bot-policies (offered: %s)", def, strings.Join(offered, ", "))

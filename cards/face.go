@@ -285,6 +285,25 @@ func (f *Face) textualManaReflectedAbilities() []*SA {
 	return out
 }
 
+// ReadsSpentManaSource reports whether a trigger of this face reads the
+// producing source of the mana a cast spent: a ValidSA$ naming the
+// Spell.ManaFromCard property ("whenever you cast a ... spell using mana
+// produced by CARDNAME": Tecutlan, the Searing Rift; The Myriad Pools;
+// Barracks of the Thousand). A producer whose face answers yes keeps its
+// mana's source identity in the pool (effects.ManaSourceObserved). A walk
+// over the face's own trigger lines; nil-safe and allocation-free.
+func (f *Face) ReadsSpentManaSource() bool {
+	if f == nil {
+		return false
+	}
+	for i := range f.Triggers {
+		if v, ok := f.Triggers[i].Param(PKValidSA); ok && strings.Contains(v, "ManaFromCard") {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Face) Power() int     { return int(f.power) }
 func (f *Face) Toughness() int { return int(f.toughness) }
 
@@ -622,18 +641,18 @@ func isAlphaNum(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z'
 }
 
-// manaColours scans s for colour-contributing mana symbols and returns their
-// bitmask. A symbol is a run of isManaCh characters bounded on both sides by
-// a non-alphanumeric, so neither the tail of a word nor an uppercase initial
-// inside one ("White", "Swamp", the "CARD" in CARDNAME) is misread as a pip.
-// Only the WUBRG letters contribute: C (colourless), S (snow), P (Phyrexian),
-// numerics and slashes never add a colour, matching CR. Hybrid (WU, W/U) and
-// Phyrexian (WP, UP, RP) forms contribute their colour letters and nothing
-// else. The same scanner runs over the ManaCost and every rules-text field so
-// a pip counts wherever it appears — in the cost, in a Cost$, in a Produced$,
-// in a trigger, in an SVar.
-func manaColours(s string) uint8 {
-	var m uint8
+// forEachManaSymbol scans s for colour-contributing mana symbols and calls f
+// with each symbol's colour bitmask. A symbol is a run of isManaCh characters
+// bounded on both sides by a non-alphanumeric, so neither the tail of a word
+// nor an uppercase initial inside one ("White", "Swamp", the "CARD" in
+// CARDNAME) is misread as a pip. Only the WUBRG letters contribute to the
+// mask: C (colourless), S (snow), P (Phyrexian), numerics and slashes never
+// add a colour, matching CR. Hybrid (WU, W/U) and Phyrexian (WP, UP, RP)
+// forms contribute their colour letters and nothing else. The same scanner
+// runs over the ManaCost and every rules-text field so a pip counts wherever
+// it appears — in the cost, in a Cost$, in a Produced$, in a trigger, in an
+// SVar.
+func forEachManaSymbol(s string, f func(cm uint8)) {
 	n := len(s)
 	i := 0
 	for i < n {
@@ -665,10 +684,16 @@ func manaColours(s string) uint8 {
 		// The run must also be a whole token, not the head of a longer prose
 		// word ("White"): require a non-alphanumeric (or end) right after it.
 		if j >= n || !isAlphaNum(s[j]) {
-			m |= cm
+			f(cm)
 		}
 		i = j
 	}
+}
+
+// manaColours is the OR of every mana symbol's colour mask in s.
+func manaColours(s string) uint8 {
+	var m uint8
+	forEachManaSymbol(s, func(cm uint8) { m |= cm })
 	return m
 }
 
@@ -679,6 +704,26 @@ func manaColours(s string) uint8 {
 // component colours" alike -- and nothing else, so effects' filter
 // vocabulary can test a printed cost without a second implementation.
 func ManaCostColours(s string) uint8 { return manaColours(s) }
+
+// ManaCostChroma counts the mana symbols in printed mana-cost string s whose
+// component colours intersect colour -- the ChromaSource count head's
+// per-symbol read, Forge's CardLists.getTotalChroma: one count per symbol
+// (ManaCostShard) whose colour bits include any of the query's. A hybrid
+// ("WU", "W/U"), mono-hybrid ("2/W") or Phyrexian ("WP") symbol counts ONCE
+// for a query naming either of its colours and once for the all-colours
+// query; a colourless ("C"), snow ("S"), generic or {X} symbol counts for no
+// query. The shared scanner's whole-token guard is tuned for rules text, and
+// a printed mana cost is exactly the space-separated pip tokens it reads
+// (measured: zero brace-form costs at the current pin).
+func ManaCostChroma(s string, colour uint8) int32 {
+	var n int32
+	forEachManaSymbol(s, func(cm uint8) {
+		if cm&colour != 0 {
+			n++
+		}
+	})
+	return n
+}
 
 // parsePT splits a printed P/T ("2/2") into power and toughness. A face with
 // no P/T yields 0,0 and flag false; a face whose P/T carries a

@@ -4,9 +4,13 @@
   import { versionWatch } from './lib/versioncheck.svelte';
   import { installConsoleBreadcrumbs } from './lib/breadcrumbs';
   import { getSeat } from './lib/seat';
+  // Imported for its side effect: applies the saved/`?fx=` visual-effects mode to <html> at load.
+  import './lib/visualfx.svelte';
   import FeedbackButton from './components/FeedbackButton.svelte';
   import Overview from './routes/Overview.svelte';
   import Table from './routes/Table.svelte';
+  import Event from './routes/Event.svelte';
+  import NewEvent from './routes/NewEvent.svelte';
 
   let route: Route = $state(parseRoute(location.pathname));
   onMount(() => {
@@ -57,6 +61,13 @@
 {:else if route.kind === 'match'}
   {#key `${route.table}/${route.match}`}
     <Table table={route.table} match={route.match} />
+  {/key}
+{:else if route.kind === 'newEvent'}
+  <NewEvent />
+{:else if route.kind === 'event'}
+  <!-- keyed by event: the page binds its seat and stream subscription once at mount -->
+  {#key route.event}
+    <Event event={route.event} />
   {/key}
 {:else}
   <main class="notfound"><h1>Not found</h1><a href="/">Overview</a></main>

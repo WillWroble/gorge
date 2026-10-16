@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/host"
@@ -26,12 +27,62 @@ type DeckInfo struct {
 	Format    string `json:"format"`
 	Archetype string `json:"archetype"`
 	Commander string `json:"commander,omitempty"`
+	// Pool names the bot policy this deck is reserved for ("" for an ordinary
+	// deck). A reserved deck is dealt only to games against that policy, and
+	// that policy deals nothing else (cmd/gorged/azc3.go). A deck reserved
+	// for several policies (az-c3 and az-c4 sharing one deck directory,
+	// cmd/gorged/azclosed.go) names them all, comma-separated (JoinPools).
+	Pool string `json:"pool,omitempty"`
 }
 
+// JoinPools adds policy to a DeckInfo.Pool value.
+func JoinPools(pool, policy string) string {
+	if pool == "" {
+		return policy
+	}
+	if PoolHas(pool, policy) {
+		return pool
+	}
+	return pool + "," + policy
+}
+
+// PoolHas reports whether a DeckInfo.Pool value names policy.
+func PoolHas(pool, policy string) bool {
+	for _, p := range strings.Split(pool, ",") {
+		if p == policy && p != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// decks serves GET /api/decks: every deck, so a client that knows nothing of
+// reserved pools offers them all (a deck reserved for a bot policy is dealt
+// against that policy: see cmd/gorged/azc3.go). ?policy=NAME narrows the list
+// to what a game against that policy may use: the decks reserved for it when
+// it has a pool, the unreserved decks otherwise.
 func (h *handler) decks(w http.ResponseWriter, r *http.Request) {
-	decks := h.opts.Decks
-	if decks == nil {
-		decks = []DeckInfo{}
+	all := h.opts.Decks
+	policy := r.URL.Query().Get("policy")
+	if policy == "" {
+		if all == nil {
+			all = []DeckInfo{}
+		}
+		writeJSON(w, http.StatusOK, all)
+		return
+	}
+	reserved := false
+	for _, d := range all {
+		if PoolHas(d.Pool, policy) {
+			reserved = true
+			break
+		}
+	}
+	decks := []DeckInfo{}
+	for _, d := range all {
+		if (reserved && PoolHas(d.Pool, policy)) || (!reserved && d.Pool == "") {
+			decks = append(decks, d)
+		}
 	}
 	writeJSON(w, http.StatusOK, decks)
 }
@@ -269,6 +320,12 @@ func (h *handler) pending(w http.ResponseWriter, r *http.Request) {
 // can never answer a decision asked of another seat. Every rejection becomes
 // an HTTP status plus the registry's reason body (audit item 17); a 204 means
 // the intent was accepted and the parked seat is free.
+//
+// The ?auto=1 query flag (HD-2, docs/superpowers/specs/2026-10-10-human-divergence-design.md
+// §5.2) marks the answer as produced by the client's autopilot rather than a
+// deliberate human choice: the handler forwards it as a boolean into
+// SubmitIntentFrom, which records it in the match's provenance ledger. It
+// never enters the intent body or the log.
 func (h *handler) intent(w http.ResponseWriter, r *http.Request) {
 	t, k, ok := matchKey(w, r)
 	if !ok {
@@ -282,7 +339,8 @@ func (h *handler) intent(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	if err := h.reg.SubmitIntent(t, k, claim.Seat, in); err != nil {
+	auto := r.URL.Query().Get("auto") == "1"
+	if err := h.reg.SubmitIntentFrom(t, k, claim.Seat, in, auto); err != nil {
 		writeSeatError(w, err)
 		return
 	}

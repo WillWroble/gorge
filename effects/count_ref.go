@@ -117,7 +117,9 @@ func evalTriggerCountOK(c *Ctx, body string, max bool) (int32, bool) {
 // evalSacrificed resolves a "Sacrificed$<Property>[/Op]" body against the
 // LKI snapshots this resolving spell/ability captured when it sacrificed
 // each object (Ctx.Sacrificed). Property is the corpus head after the
-// Sacrificed$ prefix: CardPower, CardToughness, CardManaCost, or Amount (the
+// Sacrificed$ prefix: CardPower, CardToughness, CardManaCost, ChromaSource
+// (the printed cost's coloured mana symbols of the named colour, per symbol),
+// or Amount (the
 // count of objects sacrificed). For a numeric property over more than one
 // sacrificed object the values are summed -- corpus Sac costs are almost
 // always exactly one candidate, so summing agrees with the single-value
@@ -129,22 +131,51 @@ func evalTriggerCountOK(c *Ctx, body string, max bool) (int32, bool) {
 // after the base value, exactly as applyCountOp does for Count$.
 func evalSacrificedOK(c *Ctx, body string) (int32, bool) {
 	body, op, hasOp := strings.Cut(body, "/")
+	trimmed := strings.TrimSpace(body)
 	var n int32
-	switch evalSacrificedOKCodes.Code(string(strings.TrimSpace(body))) {
-	case evalSacrificedOKCardPower:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Power })
-	case evalSacrificedOKCardToughness:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Toughness })
-	case evalSacrificedOKCardManaCost:
-		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
-	case evalSacrificedOKAmount:
-		n = int32(len(c.Sacrificed))
-	default:
-		// An out-of-scope head (Valid, CardTypes, ChromaSource, CardNumColors,
-		// CardCounters) degrades to zero, exactly as before the fix -- the
-		// conservative same-as-before no-op the brief scopes out. NOT
-		// evaluated: a gate over one of these fails open.
-		return 0, false
+	// ChromaSource[.<Colour>] (task lb-chroma) is the dotted spelling the
+	// exact-string enum below cannot hold, so it is claimed first: the
+	// sacrificed objects' coloured mana symbols, read off the LKI capture
+	// (Forge's CostSacrifice.getPaidListName "Sacrificed" feeding the
+	// ChromaSource count). Fiery Bombardment's Sacrificed$ChromaSource.Red
+	// is the corpus carrier. A face-down sacrifice contributed no mana cost
+	// (CR 708.5), and an unreadable colour fails closed.
+	if rest, ok := strings.CutPrefix(trimmed, "ChromaSource"); ok {
+		mask, okm := chromaSourceMask(rest)
+		if !okm {
+			return 0, false
+		}
+		n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return chromaSacrificedCount(s, mask) })
+	} else {
+		switch evalSacrificedOKCodes.Code(trimmed) {
+		case evalSacrificedOKCardPower:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Power })
+		case evalSacrificedOKCardToughness:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.Toughness })
+		case evalSacrificedOKCardManaCost:
+			n = sacrificedNumeric(c, func(s state.SacrificedInfo) int32 { return s.ManaValue })
+		case evalSacrificedOKAmount:
+			n = int32(len(c.Sacrificed))
+		case evalSacrificedOKCardTypes:
+			// Distinct card types among the sacrificed objects' snapshots
+			// (Baba Lysaga's "three or more card types among the sacrificed
+			// permanents"); a set read through len, never ranged into an event.
+			seen := map[string]bool{}
+			for _, s := range c.Sacrificed {
+				for _, typ := range s.Types {
+					if cardTypeWords[typ] {
+						seen[typ] = true
+					}
+				}
+			}
+			n = int32(len(seen))
+		default:
+			// An out-of-scope head (Valid, CardNumColors, CardCounters)
+			// degrades to zero, exactly as before the fix -- the conservative
+			// same-as-before no-op the brief scopes out. NOT evaluated: a gate
+			// over one of these fails open.
+			return 0, false
+		}
 	}
 	if hasOp {
 		n = applyCountOp(n, op)
@@ -212,16 +243,23 @@ func rememberedExcludingCapture(h Host, c *Ctx) []state.Target {
 	if len(c.Captured) == 0 {
 		return c.Remembered
 	}
+	return excludeCaptureOccurrences(c.Remembered, c.Captured)
+}
+
+// excludeCaptureOccurrences is rememberedExcludingCapture over plain slices,
+// shared with selectRemembered so the capture-occurrence rule has one home.
+// The result is freshly allocated (nil when nothing remains).
+func excludeCaptureOccurrences(remembered, captured []state.Target) []state.Target {
 	// Remove only the seeded occurrence(s), not every equal target. A body
 	// can explicitly remember the captured object again (e.g. RememberSacrificed
 	// on a death trigger); that later occurrence is real memory even though its
 	// identity equals the capture.
-	remaining := make(map[state.Target]int, len(c.Captured))
-	for _, t := range c.Captured {
+	remaining := make(map[state.Target]int, len(captured))
+	for _, t := range captured {
 		remaining[t]++
 	}
 	var out []state.Target
-	for _, t := range c.Remembered {
+	for _, t := range remembered {
 		if remaining[t] > 0 {
 			remaining[t]--
 			continue
@@ -422,6 +460,24 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 			return []state.Target{{Obj: c.Source}}, true
 		}
 		return nil, false
+	case refTargetsCollected:
+		// The cards the cast collected as evidence (CR 701.59a), the count
+		// spelling of the ConditionDefined$ Collected group: Behind the
+		// Mask's Z:Collected$Amount (read while the spell resolves) and the
+		// CastSA>Collected$Amount ETB gates (Vitu-Ghazi Inspector, Spotlight
+		// Falcon). The same activation-window read collectedGroup makes, so
+		// the count and the condition cannot disagree. An intervening-if
+		// CheckSVar$ evaluated as the trigger fires has no resolving wrapper
+		// yet; its window is anchored on the source itself, the permanent the
+		// cast spell became (the stack->battlefield move keeps its id, so the
+		// scan crosses that cast's own PutOnStack exactly as it does from the
+		// trigger wrapper).
+		if c.ResolvingObj == 0 && c.Source != 0 {
+			sc := *c
+			sc.ResolvingObj = c.Source
+			return collectedGroup(h, &sc), true
+		}
+		return collectedGroup(h, c), true
 	case refTargetsRemembered:
 		// Forge's plain Remembered$ form reads the executing ability's shared
 		// host-card remembered list: the ctx walk's set UNIONED with the
@@ -454,20 +510,26 @@ func refTargets(h Host, c *Ctx, ref string) ([]state.Target, bool) {
 		// same set the body's own Defined$ ExiledWith resolves. Without it
 		// the ref fails closed and the gate is never evaluated, so those
 		// triggers stay silent even when the exile count meets the gate.
-		var out []state.Target
-		g := h.Game()
-		for _, id := range g.Zone(state.ZExile, c.Controller) {
-			if o := g.Obj(id); o != nil && o.ExiledWith == c.Source {
-				out = append(out, state.Target{Obj: id})
-			}
-		}
-		return out, true
+		//
+		// The read is exiledWithSet -- the ONE reader Defined$ ExiledWith and
+		// Card.ExiledWithSource share -- so it counts the source's FORWARD
+		// link (Object.ExiledCards, the association every ChangeZone exile
+		// records) as well as the reverse scalar, over EVERY seat's exile
+		// (CR 406.6 / 607.2a: "cards exiled with" the object are the cards
+		// its linked exile put there, wherever their owners' exile zones
+		// are). Veteran Survivor exiles a card from ANY graveyard and names
+		// no ExiledWithSource, so its moves stamp only the forward link and
+		// an opponent's card lands in that opponent's exile: the old
+		// controller-exile, reverse-only scan counted zero. A card that
+		// leaves exile drops out of both links inside events.Apply's Move
+		// fold (a new object, CR 400.7), so the count never sees it again.
+		return exiledWithSet(h.Game(), c), true
 	case refTargetsExiled:
 		// Forge's cast-cost PAID lists (AbilityUtils.getPaidCards ->
 		// SpellAbility.getPaidList): the cards this cast's own cost removed --
 		// CostExile's row is keyed "Exiled" (HashLKIListKey),
-		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Exiled /
-		// Ctx.Revealed, bound from the engine's per-stack-object capture at
+		// CostReveal.doPayment's is "Revealed". The cards ride Ctx.Paid.Exiled /
+		// Ctx.Paid.Revealed, bound from the engine's per-stack-object capture at
 		// payment, so a body such as Draconic Intervention's
 		// `SVar:X:Exiled$CardManaCost` reads the card the ExileFromGrave cost
 		// actually exiled rather than the source or a remembered set. An
@@ -704,6 +766,7 @@ const (
 	evalSacrificedOKCardToughness
 	evalSacrificedOKCardManaCost
 	evalSacrificedOKAmount
+	evalSacrificedOKCardTypes
 )
 
 var evalSacrificedOKCodes = state.NewStrCodes(
@@ -711,6 +774,7 @@ var evalSacrificedOKCodes = state.NewStrCodes(
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardToughness", Val: evalSacrificedOKCardToughness},
 	state.StrEntry[evalSacrificedOKCode]{Key: "CardManaCost", Val: evalSacrificedOKCardManaCost},
 	state.StrEntry[evalSacrificedOKCode]{Key: "Amount", Val: evalSacrificedOKAmount},
+	state.StrEntry[evalSacrificedOKCode]{Key: "CardTypes", Val: evalSacrificedOKCardTypes},
 )
 
 type refTargetsCode uint16
@@ -736,6 +800,7 @@ const (
 	refTargetsTargetedObjects
 	refTargetsSpellTargeted
 	refTargetsTriggerObjectsAttackers
+	refTargetsCollected
 )
 
 var refTargetsCodes = state.NewStrCodes(
@@ -774,6 +839,8 @@ var refTargetsCodes = state.NewStrCodes(
 	state.StrEntry[refTargetsCode]{Key: "TargetedObjectsDistinct", Val: refTargetsTargetedObjects},
 	state.StrEntry[refTargetsCode]{Key: "SpellTargeted", Val: refTargetsSpellTargeted},
 	state.StrEntry[refTargetsCode]{Key: "TriggerObjectsAttackers", Val: refTargetsTriggerObjectsAttackers},
+	state.StrEntry[refTargetsCode]{Key: "Collected", Val: refTargetsCollected},
+	state.StrEntry[refTargetsCode]{Key: "CastSA>Collected", Val: refTargetsCollected},
 )
 
 type countRefTagCode uint16

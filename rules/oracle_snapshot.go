@@ -8,6 +8,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/rules/chars"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -48,6 +49,10 @@ type OracleSnapPlayer struct {
 	LibraryCount int              `json:"library_count"`
 	LibraryTop   []string         `json:"library_top"` // top first, at most oracleLibraryTopN
 	Pool         string           `json:"pool"`        // WUBRGC letters
+	// Lost marks a seat that has lost the game (CR 104.3). Only a game of
+	// three or more seats goes on past it (CR 800.4a), so it is false in
+	// every two-seat checkpoint but a game-over one.
+	Lost bool `json:"lost,omitempty"`
 }
 
 // OracleSnapPerm is one battlefield permanent. Ref is the object's scenario
@@ -149,6 +154,16 @@ type OracleDecision struct {
 	// unchanged for them.
 	PerPlayer bool `json:"per_player,omitempty"`
 	SeatCount int  `json:"seat_count,omitempty"`
+	// Retarget marks a ChangeTargets redirect pick (CR 115.7): a choose ask
+	// whose options are the legal NEW targets. XMage poses it as a
+	// chooseTarget on the target queue, not a makeChoose dialog, so the
+	// generator answers it as a target. False for every other choose ask.
+	Retarget bool `json:"retarget,omitempty"`
+	// XMulti marks an X announcement of a cost naming X more than once
+	// (Gogo's "XMin1 X X", {X}{X}): XMage's unscripted announce does not pay
+	// the repeated X even when the pool leaves one legal value, so it must be
+	// scripted.
+	XMulti bool `json:"x_multi,omitempty"`
 	// PerOpponent marks a per-player target ask whose filter admits only
 	// opponents' objects: XMage asks no target for the controller's seat.
 	PerOpponent bool `json:"per_opponent,omitempty"`
@@ -167,11 +182,25 @@ type OracleDecision struct {
 	// root slot with no candidate, or a leading link). XMage asks them first,
 	// so the generator closes each with a target skip ahead of the picks.
 	LeadingUnposed int `json:"leading_unposed,omitempty"`
+	// CopyInherited counts the inherited targets of the declaration a
+	// "copy_targets" ask (CR 707.10c) is retargeting. XMage poses one
+	// "Change this N of M target?" chooseUse per inherited target before the
+	// new-target pick, so the generator needs the count to emit the booleans;
+	// gorge offers those slots as the ask's leading keep-current options, so a
+	// pick index below the count keeps that slot. Omitted (zero) for every
+	// other decision, leaving its JSON byte-identical.
+	CopyInherited int `json:"copy_inherited,omitempty"`
 	// AltPayable counts the options of an AlternateAdditionalCost either-or
 	// ask (option kind "altaddcost") the cast could pay. XMage's OrCost poses
 	// its chooseUse only when two or more of its costs can be paid, so the
 	// generator scripts the boolean only for AltPayable >= 2.
 	AltPayable int `json:"alt_payable,omitempty"`
+	// TriggerCostMana marks a triggered "you may pay <cost>" ask whose cost
+	// is mana only. XMage's DoIfCostPaid poses its chooseUse for a mana cost
+	// even when it cannot be paid (gorge then offers only the decline), but
+	// not for an unpayable non-mana cost (a forage, a sacrifice), so the
+	// generator scripts a decline-only ask's "no" only when this is set.
+	TriggerCostMana bool `json:"trigger_cost_mana,omitempty"`
 	// ManaColours is the offered colour set of a mana ask whose XMage side is
 	// an AddManaInAnyCombinationEffect dialog (the engine's Produced$ "Combo
 	// <colours>"): one multi-amount message per colour, in the set's own
@@ -181,6 +210,29 @@ type OracleDecision struct {
 	// Nil for every other ask, including a produced-Any one, so the
 	// generator's existing routing is untouched.
 	ManaColours []string `json:"mana_colours,omitempty"`
+	// CostPosed marks a triggered optional cost's decline-only ask (option
+	// kind "trigger_cost_decline" alone: gorge could not pay) whose cost XMage
+	// still asks about. XMage's DoIfCostPaid skips its chooseUse only when the
+	// cost's canPay is false, and a mana cost ("it's true all the time") or a
+	// discard-your-hand cost always passes, so its AI answers yes and pays
+	// what gorge declined. A decline-only ask over any other cost stays
+	// unmarked: XMage's canPay is false there too and it poses nothing.
+	CostPosed bool `json:"cost_posed,omitempty"`
+}
+
+// OracleFlip is one canonical coin-flip result the run's seeded RNG produced,
+// read off the engine log's flip Note (effects.FlipNoteResult), in log order.
+// Step is the scenario step whose window the flip fell in; -1 is the setup
+// drive's window (a flip the drive walked into before the first gameplay
+// step, e.g. Mana Crypt's turn-1 upkeep trigger). Turn is the turn the
+// runner was on when the window's scan ran; Seat the flipper; Win the side
+// (heads wins). The generator scripts each flip for XMage's choice queue, so
+// the two engines do not each flip on their own seed.
+type OracleFlip struct {
+	Turn int  `json:"turn"`
+	Step int  `json:"step"`
+	Seat int  `json:"seat"`
+	Win  bool `json:"win"`
 }
 
 const oracleLibraryTopN = 5
@@ -250,6 +302,7 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			Hand: r.zoneNames(state.ZHand, p, true), Graveyard: r.zoneNames(state.ZGraveyard, p, false),
 			Exile: r.zoneNames(state.ZExile, p, true), Command: r.zoneNames(state.ZCommand, p, true),
 			LibraryCount: len(lib), LibraryTop: top, Pool: poolString(g.Players[i].Pool),
+			Lost: g.Players[i].Lost,
 		})
 	}
 	var field []state.ObjID
@@ -275,7 +328,7 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			Token: o.IsToken, Tapped: o.Tapped, FaceDown: o.FaceDown, Damage: o.Damage,
 			Counters: r.snapCounters(o.Counters), Types: types, AllCreatureTypes: derived.AllCreatureTypes,
 			Colors: e.Colors(id), Keywords: kws,
-			Attacking: o.IsAttacking, Blocking: blocking[id],
+			Attacking: o.IsAttacking, Blocking: blocking[id] || o.IsBlocking,
 		}
 		if oracleHasFold(types, "Creature") {
 			p.PT = fmt.Sprintf("%d/%d", e.Power(id), e.Toughness(id))
@@ -314,6 +367,15 @@ func (r *oracleRun) snapshot(checkpoint string) OracleSnapshot {
 			it.Trigger = stackTriggerSlot(src, o.Ability)
 		}
 		it.Source = stackSourceRef(r.objRef(src), src)
+		if o.Ability != nil && src != nil && src.Zone == state.ZBattlefield && src.FaceDown {
+			// An ability whose source is a face-down permanent (a granted
+			// one: Etrata's turn-face-up grant) names no source card: the
+			// face-down permanent has no name (CR 708.2a), as its own
+			// snapshot line shows, so the ref keeps only its seat.
+			if i := strings.IndexByte(it.Source, ':'); i >= 0 {
+				it.Source = it.Source[:i+1]
+			}
+		}
 		s.Stack = append(s.Stack, it)
 	}
 	return s
@@ -337,8 +399,23 @@ func stackTriggerSlot(src *state.Object, sa *cards.SA) string {
 // face's name under its setup ref's seat prefix and "#n" ordinal: the setup
 // ref names the front face, but the ability on the stack is the back face's
 // (a "back_face" setup permanent), exactly as the XMage driver names it.
+//
+// A Room spell on the stack is the same case (CR 709.5, 601.2): it has only
+// the characteristics of the door it was cast as, so the setup ref's whole
+// "Left // Right" name is replaced by the cast door's name, whichever door
+// that is (FaceIdx 0 included).
+//
+// An Adventure spell on the stack is the same case (CR 715.3b, 715.4): the
+// card was cast as its Adventure face and has only that face's
+// characteristics, so XMage names the stack object by the Adventure's own
+// name ("Stomp"), not the card's.
 func stackSourceRef(ref string, o *state.Object) string {
-	if o == nil || o.Zone != state.ZBattlefield || o.FaceIdx == 0 || o.CopyFace != nil || o.Face() == nil {
+	if o == nil || o.CopyFace != nil || o.Face() == nil {
+		return ref
+	}
+	onStackRoom := o.Zone == state.ZStack && o.Ability == nil &&
+		(chars.IsRoomCard(o) || adventureSpellFace(o) == o.Face())
+	if !onStackRoom && (o.Zone != state.ZBattlefield || o.FaceIdx == 0) {
 		return ref
 	}
 	seat, nth := "", ""

@@ -338,6 +338,25 @@ func (f *Face) CompiledTriggerInterests() (TriggerInterest, bool) {
 	return f.compiledTriggerInterests, true
 }
 
+// ForgetCompiled drops a synthetic face's corpus catalog binding. A runtime
+// mutation that changes a copy basis face's characteristics away from the
+// copied source's compiled row -- the ETB clone's conditional-keyword rider
+// folded by events.foldClonePermanent mints triggers on a face whose source
+// may carry none -- leaves the stale binding misreporting the face (the
+// copied row's trigger interests gate the trigger scan, so the minted
+// triggers would never queue). The face then takes the computed paths a
+// token face takes. Only synthetic faces (a SetCopyFace value copy) need
+// this; corpus faces keep their binding for the hot prefilters.
+func (f *Face) ForgetCompiled() {
+	if f == nil {
+		return
+	}
+	f.compiledCatalog = nil
+	f.compiledID = 0
+	f.compiledTriggerInterests = 0
+	f.compiledTypeMask = 0
+}
+
 func (s *SA) CompiledKind() SAKind {
 	if s == nil || s.compiledCatalog == nil {
 		return SAKindUnknown

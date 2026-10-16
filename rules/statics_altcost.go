@@ -38,9 +38,22 @@ type altCostView struct {
 func (e *Engine) alternativeCosts(p state.PlayerID, id state.ObjID) []altCostView {
 	var out []altCostView
 	for _, sv := range e.activeStatics("AlternativeCost") {
-		if !e.matchesSpec(sv.ParamStr(cards.PKValidCard), id, e.staticSpecCtx(sv)) {
+		if spec := sv.ParamStr(cards.PKValidCard); spec != "" {
+			if !e.matchesSpec(spec, id, e.staticSpecCtx(sv)) {
+				continue
+			}
+		} else if sv.Source == id {
+			// A ValidCard$-less static on the card being cast is the
+			// self-carried free-cast shape the face walk below prices; it
+			// must not be offered twice.
 			continue
 		}
+		// A ValidCard$-less grant (Leyline of Mutation's "ValidSA$ Spell |
+		// ValidPlayer$ You": "You may pay {W}{U}{B}{R}{G} rather than pay the
+		// mana cost for spells that you cast") is scoped by its ValidSA$ and
+		// ValidPlayer$ riders alone (alternativeCostScopeOK) -- the bare
+		// matcher reads an empty spec as matching nothing, which withheld the
+		// grant from every spell.
 		if !e.alternativeCostScopeOK(sv.Params, id, sv.Source, p, sv.Controller) {
 			continue
 		}
@@ -106,8 +119,8 @@ func (e *Engine) alternativeCosts(p state.PlayerID, id state.ObjID) []altCostVie
 	// A MayPlay static's MayPlayAltManaCost$ (Darksteel Monolith) is the same
 	// "pay THIS instead of the mana cost" shape delivered by the may-play
 	// family; the family root carries its own gates and limit.
-	for _, c := range e.mayPlayAltCosts(p, id) {
-		out = append(out, altCostView{cost: c})
+	for _, v := range e.mayPlayAltCosts(p, id) {
+		out = append(out, altCostView{cost: v.cost})
 	}
 	return out
 }

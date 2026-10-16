@@ -34,7 +34,11 @@ func costProbeItem(reg *cards.Registry, f *cards.Face, name string, req levelb.R
 	p0.Exile = appendUnique(p0.Exile, p.exile...)
 	p0.Hand = append(p0.Hand, p.hand...)
 	if p.activate == nil {
-		if p.castFrom != "" {
+		if p.castFrom != "" && p.opponent {
+			// An opponent's graveyard cast (Aven Interrupter's raise): the
+			// spell sits in p1's graveyard and p1 casts it from there.
+			p1.Graveyard = appendUnique(p1.Graveyard, p.spell)
+		} else if p.castFrom != "" {
 			// The provenance probe casts from the zone its spell sits in, so
 			// the spell is seeded there and nowhere else: a hand copy would
 			// leave the cast step's ref ambiguous between two objects.
@@ -69,7 +73,7 @@ func costProbeItem(reg *cards.Registry, f *cards.Face, name string, req levelb.R
 	setupBackFace(&p0, name, req)
 	sc := oraclegen.Scenario{
 		Setup:        map[string]oraclegen.Seat{"p0": p0, "p1": p1},
-		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), p.setupAnswers...),
+		SetupAnswers: append(append(oraclegen.OpeningHandAnswers(f), faceKeepAnswers(f)...), p.setupAnswers...),
 	}
 	sc.Steps = append(sc.Steps, fx.CombatSteps()...)
 	sc.Steps = append(sc.Steps, fx.Prelude()...)

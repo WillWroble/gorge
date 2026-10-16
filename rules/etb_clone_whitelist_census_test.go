@@ -20,11 +20,11 @@ import (
 // deliberate re-measure, so the supported boundary cannot widen (a new
 // parameter accepted into etbCloneWhitelist) or narrow silently.
 var etbCloneCleanNames = []string{
-	"Clever Impersonator", "Clone", "Copy Artifact", "Copy Enchantment", "Copy Land",
-	"Dack's Duplicate", "Deceptive Frostkite", "Glasspool Mimic",
+	"Altered Ego", "Callidus Assassin", "Clever Impersonator", "Clone", "Copy Artifact", "Copy Enchantment", "Copy Land",
+	"Copycrook", "Dack's Duplicate", "Deceptive Frostkite", "Flesh Duplicate", "Glasspool Mimic",
 	"Jwari Shapeshifter", "Malleable Impostor", "Masterwork of Ingenuity", "Mirror Image",
 	"Mirrormade", "Mocking Doppelganger", "Mockingbird", "Naga Fleshcrafter", "Omni-Changeling",
-	"Phyrexian Metamorph", "Sakashima of a Thousand Faces", "Sakashima's Protege", "Sakashima's Student", "Sculpting Steel",
+	"Phantasmal Image", "Phyrexian Metamorph", "Pirated Copy", "Progenitor Mimic", "Sakashima of a Thousand Faces", "Sakashima's Protege", "Sakashima's Student", "Sculpting Steel",
 	"Stunt Double", "Synth Infiltrator", "Vesuva", "Visage Bandit", "Waxen Shapethief",
 }
 
@@ -81,9 +81,11 @@ func TestETBCloneWhitelistRegressionCarriers(t *testing.T) {
 		// so despite its plain Choices$ selector it is out of scope.
 		{"Moritte of the Frost", false},
 		// Mockingbird's cast-spend Y selector is supported; Flesh Duplicate's
-		// AddKeywords$ IfNew Vanishing:3 is still an unimplemented conditional.
+		// AddKeywords$ IfNew Vanishing:3 is the conditional-keyword rider
+		// (CR 707.9b), supported since its inner keyword is a single-word
+		// head cards expands on the copy basis face (the ifnew payload).
 		{"Mockingbird", true},
-		{"Flesh Duplicate", false},
+		{"Flesh Duplicate", true},
 		// staticgoad1: Mocking Doppelganger's AddStaticAbilities$ FamilyTease
 		// is a readable Goad$ static, so its ETB copy is offered and the
 		// granted goad registers (rules/goad_granted_test.go pins it end to

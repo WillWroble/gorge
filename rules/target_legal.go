@@ -88,6 +88,9 @@ func (e *Engine) targetBoundCtx(p state.PlayerID, source state.ObjID) (*effects.
 		// mode was settled when the cast OPTION was picked, before this ask.
 		ctx.Kicker.PendingKicked = modeIsKicked(pc.mode)
 		ctx.Kicker.PendingTeamwork = castAnswerCodes.Code(pc.mode) == castAnswerTeamworkMode
+		// The same pre-payment gap for the optional additional cost's
+		// election (a TargetMax$ over Count$OptionalGenericCostPaid).
+		ctx.Num.OptionalCostElected = castModeCodes.Code(pc.mode) == castModeOptionalcost
 	}
 	if f := o.Face(); f != nil {
 		ctx.Source = source
@@ -985,7 +988,8 @@ func (e *Engine) candidatesForLimitInto(dst []targetCandidate, p state.PlayerID,
 		// so the census must not stop at limit before the whole search space
 		// (battlefield included) has been walked and filtered.
 		tp.Has(effects.TgtPlayerControlsSet) ||
-		tp.SharedCardType != "") {
+		tp.SharedCardType != "" ||
+		tp.RelatedProperty != "") {
 		limit = 0
 	}
 	spec := tp.ValidTgts
@@ -1150,6 +1154,7 @@ zoneLoop:
 	out = e.filterTargetsWithDefinedController(out, sa, sc)
 	out = e.filterTargetControllerProperty(out, sa)
 	out = e.filterTargetsWithSharedCardType(out, sa, source, sc)
+	out = e.filterTargetsWithRelatedProperty(out, sa, source, sc)
 	out = e.filterTargetValidTargeting(out, sa, sc)
 	if targeting {
 		// tpc1: TargetingPlayerControls$ True -- the answering seat's

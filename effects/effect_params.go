@@ -84,7 +84,7 @@ var effectKnownKeys = [...]string{
 	"ChoiceZone", "Choices", "ChooseFromList", "ClassBand", "ClearImprinted",
 	"Condition", "ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn",
 	"ConditionPresent", "ConditionPresent2", "ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc",
 	"Defined", "DefinedCards", "DefinedTarget", "Description", "Duration",
 	"EffectOwner", "EffectZone", "Exclude", "Execute", "Exhaust", "ExileOnMoved",
@@ -93,7 +93,7 @@ var effectKnownKeys = [...]string{
 	"ImprintOnHost", "ImprintPlayed", "InstantSpeed", "IsCurse",
 	"IsPresent", "KW", "Keyword", "KeywordLine", "MaxTotalTargetCMC",
 	"MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity", "Name",
-	"NewController", "NumDmg", "OneOff", "OpponentTurn", "OptionalDecider", "Phase",
+	"NewController", "NoShuffle", "OneOff", "OpponentTurn", "OptionalDecider", "Phase",
 	"Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "ReduceAmount", "ReduceCost",
 	"RememberAnimated", "RememberCostMana", "RememberLKI", "RememberObjects", "RememberTargets", "ReplaceColor",
@@ -107,7 +107,7 @@ var effectKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "ThisTurn", "TokenScript",
 	"TriggerDescription", "Triggers", "Type", "Ultimate",
@@ -169,6 +169,13 @@ func compileEffect(sa *cards.SA) *EffectParams {
 	p.RememberLKI = strings.TrimSpace(sa.ParamStr(cards.PKRememberLKI))
 	p.SetChosenNumber = strings.TrimSpace(sa.ParamStr(cards.PKSetChosenNumber))
 	p.EffectOwner = strings.TrimSpace(sa.ParamStr(cards.PKEffectOwner))
+	// NoShuffle$ is the opt-out twopiles' noShuffleBody forces onto EVERY pile
+	// body (a pile split is not a search, so the shared library-origin tail's
+	// CR 701.23d shuffle must be suppressed). An Effect body has no library
+	// movement to suppress, so the key is meaningless here; the recognition
+	// read documents it so the census never flags it unread (Fight or Flight's
+	// ChosenPile$ DBEffect is the carrier).
+	_ = sa.ParamStr(cards.PKNoShuffle)
 	p.Unread = unreadKeys(sa, effectKnownKeys[:])
 	return p
 }
@@ -186,6 +193,13 @@ type effectTriggerLine struct {
 	// Phase is Phase$ as written; ValidPlayer$ trimmed.
 	Phase       string
 	ValidPlayer string
+	// IsPresent$ / PresentZone$ / PresentCompare$, trimmed: a Phase
+	// registration's presence condition, carried into the registration Text
+	// as the |IP=/|PZ=/|PC= suffixes rules' delayed scan decodes (Scars of
+	// the Veteran's IsPresent$ Creature.IsRemembered).
+	IsPresent      string
+	PresentZone    string
+	PresentCompare string
 }
 
 // readEffectTriggerLine reads one parsed Triggers$ body's parameters.
@@ -198,6 +212,9 @@ func readEffectTriggerLine(tr *cards.Trigger) effectTriggerLine {
 		Static:          strings.TrimSpace(tr.ParamStr(cards.PKStatic)) != "",
 		Phase:           tr.ParamStr(cards.PKPhase),
 		ValidPlayer:     strings.TrimSpace(tr.ParamStr(cards.PKValidPlayer)),
+		IsPresent:       strings.TrimSpace(tr.ParamStr(cards.PKIsPresent)),
+		PresentZone:     strings.TrimSpace(tr.ParamStr(cards.PKPresentZone)),
+		PresentCompare:  strings.TrimSpace(tr.ParamStr(cards.PKPresentCompare)),
 	}
 }
 

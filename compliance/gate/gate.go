@@ -2,7 +2,7 @@
 // declared set, every manifest card must be fully supported and covered by
 // a passing verdict whose frozen expectation gorge still meets at this head
 // -- or by a hand-authored oracle scenario. The CI test
-// (TestDeclaredSetsCompliant) and `oraclediff status` share it.
+// (TestDeclaredSetsCompliantChunkNN) and `oraclediff status` share it.
 package gate
 
 import (
@@ -41,6 +41,36 @@ func LevelMeaning(level string) string {
 type Problem struct {
 	Card   string `json:"card"`
 	Reason string `json:"reason"`
+}
+
+// StaleVerdictReason is the reason prefix rowOK reports for a verdict recorded
+// for a different scenario (a moved scenario sha). Only a host XMage replay
+// (scripts/compliance-pass.sh) clears it, so it is not a defect a ticket can
+// fix; adopt.Bucket classifies it as BucketStale and the per-ticket gate
+// (scripts/gate_affected.sh) treats a stale-only certification failure as a
+// non-charging requeue instead of a fix round.
+const StaleVerdictReason = "verdict is for an older scenario"
+
+// Stale reports whether p is a stale-verdict problem: a verdict recorded for
+// an older scenario, which a host XMage replay clears.
+func Stale(p Problem) bool { return strings.HasPrefix(p.Reason, StaleVerdictReason) }
+
+// CertVerdict classifies a certification check's problems for the per-ticket
+// gate's stale-only classifier (scripts/gate_affected.sh, which reads the
+// GORGE-CERT-RESULT line the chunk tests log): "clean" (no problems),
+// "stale-only" (every problem is a stale verdict, so the failure is a host
+// replay's to clear, not a defect), or "mixed" (at least one non-stale
+// problem, a real regression the gate must still fail).
+func CertVerdict(probs []Problem) string {
+	for _, p := range probs {
+		if !Stale(p) {
+			return "mixed"
+		}
+	}
+	if len(probs) == 0 {
+		return "clean"
+	}
+	return "stale-only"
 }
 
 // Hash is the sha256 hex of b.

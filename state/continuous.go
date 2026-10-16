@@ -165,13 +165,14 @@ type ContinuousEffect struct {
 	// timestamp order). With it false AddColors extends.
 	OverwriteColors bool
 	// RemoveCreatureTypes is Forge's Animate RemoveCreatureTypes$ True: while
-	// this effect applies, the affected object loses every creature-type
-	// SUBTYPE (its face's types that are neither card types nor supertypes)
-	// BEFORE this same effect's AddTypes apply -- so an animated creature's
-	// own new creature type lands on a stripped base, and the printed types
-	// return the moment the animation expires because Derived recomputes from
-	// the face. A printed planeswalker's name-subtype ("Sarkhan") is stripped
-	// with the rest while the walker is animated as a creature.
+	// this effect applies, the affected object loses every CREATURE subtype
+	// (the CR 205.3m vocabulary) BEFORE this same effect's AddTypes apply --
+	// so an animated creature's own new creature type lands on a stripped
+	// base, and the printed types return the moment the animation expires
+	// because Derived recomputes from the face. Subtypes of the object's
+	// other card types (Equipment, a land type, a planeswalker's "Sarkhan")
+	// stay, since setting creature types replaces only creature types
+	// (CR 205.1a).
 	RemoveCreatureTypes bool
 	// RemoveSubTypes strips every subtype (creature, land and other kinds)
 	// before this effect's AddTypes are applied.
@@ -509,6 +510,17 @@ type ContinuousEffect struct {
 	// granted-Dethrone precedent); it contributes no CR 613 characteristic
 	// and the layer sorter ignores it. Nil on every effect that grants none.
 	AddTrigger *cards.Trigger
+	// AddRepl is a static-grant's replacement effect (AddReplacementEffect$ on
+	// a Mode$ Continuous static, e.g. DFT Far Fortune, End Boss' max-speed
+	// "a source you control ... deals that much damage plus 1 instead"):
+	// the SVar-parsed replacement (cards.ParseReplacementLine off the
+	// granting face's own SVar table, its ReplaceWith$ body resolved there
+	// too) the objects the static's Affected$ matches gain while the static
+	// is live. Written only by rules/layers.go's static scan and collected by
+	// rules/replacement_granted.go's scan; like AddTrigger it contributes no
+	// CR 613 characteristic and the layer sorter ignores it. Nil on every
+	// effect that grants none.
+	AddRepl *cards.Repl
 	// TriggerGrantor is the object whose SVar table resolves an AddTrigger
 	// grant's Execute$ body when that is NOT the effect's own Source: the
 	// Animate route (effects/combatfx.go) registers the grant with Source =

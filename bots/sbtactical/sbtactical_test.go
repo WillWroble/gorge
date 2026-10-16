@@ -17,6 +17,7 @@ package sbtactical
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/adams-shaun/gorge/botpolicy"
@@ -351,4 +352,88 @@ func TestSBTacticalPlannerIsReadAtPriorityOnly(t *testing.T) {
 		}
 		t.Logf("seat %d planner reads by kind: %v (asks by kind: %v)", i, counters[i].calls, kindAsks[i])
 	}
+}
+
+func TestCommonSenseWrapsTacticalAndKeepsEnvSurfaces(t *testing.T) {
+	reg := sampleRegistry(t)
+	plain, err := bots.New(Policy, testOptions(1, reg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := plain.(*hostedSeat); !ok {
+		t.Fatalf("plain = %T, want *hostedSeat", plain)
+	}
+	o := testOptions(1, reg)
+	o.CommonSense = true
+	s, err := bots.New(Policy, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, ok := s.(interface{ UnwrapSeat() seat.Seat })
+	if !ok {
+		t.Fatalf("%T is not wrapped", s)
+	}
+	if _, ok := u.UnwrapSeat().(*hostedSeat); !ok {
+		t.Fatalf("inner = %T", u.UnwrapSeat())
+	}
+	if _, ok := s.(bots.EnvSeat); !ok {
+		t.Fatal("wrapper lost EnvSeat")
+	}
+	if _, ok := s.(bots.RefusalAnswerer); !ok {
+		t.Fatal("wrapper lost RefusalAnswerer")
+	}
+	if c, ok := s.(seat.TargetHintConsumer); !ok || !c.WantsTargetHints() {
+		t.Fatal("wrapper does not request target hints")
+	}
+}
+
+// TestCommonSenseMulliganMatchesGameBoardRule drives real London rounds
+// (Mulligans: 2, sample decks) and checks that the guarded sb-tactical seat's
+// view-path answer to every keep/mulligan and bottoming ask equals the rule
+// evaluated on the engine-side Board (the two halves of the Board agree) and
+// is accepted by the engine.
+func TestCommonSenseMulliganMatchesGameBoardRule(t *testing.T) {
+	reg := sampleRegistry(t)
+	o := testOptions(3, reg)
+	o.CommonSense = true
+	guarded, err := bots.New(Policy, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	asks, mulls := 0, 0
+	var board botpolicy.Board
+	for seed := uint64(1); seed <= 12; seed++ {
+		cfg := smokeConfig(t, seed)
+		cfg.Mulligans = 2
+		e := rules.New(cfg)
+		for step := 0; step < 400; step++ {
+			e.Advance()
+			d := e.Pending()
+			if d == nil || d.Kind != decision.KMulligan {
+				break
+			}
+			v := view.Project(e.G, e, d.Player, d)
+			got, err := guarded.Decide(ctx, v, *d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
+			want, ok := botpolicy.MulliganAnswer(b, botpolicy.MulliganConstructed, d)
+			if !ok || !slices.Equal(got.Choices, want) {
+				t.Fatalf("seed %d: guarded answer %v, game-board rule %v (ok %v)", seed, got.Choices, want, ok)
+			}
+			asks++
+			if len(d.Options) > 0 && d.Options[got.Choices[0]].Kind == "mulligan" {
+				mulls++
+			}
+			if err := e.Submit(got); err != nil {
+				t.Fatalf("seed %d: engine refused the guarded answer: %v", seed, err)
+			}
+		}
+	}
+	if asks == 0 {
+		t.Fatal("no mulligan asks were posed")
+	}
+	t.Logf("%d mulligan asks, %d mulligans", asks, mulls)
 }

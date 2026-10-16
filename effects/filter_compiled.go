@@ -139,7 +139,7 @@ type compiledPred struct {
 
 	hasKP bool
 	kp    keywordPredicate
-	named bool // p == "NamedCard" (namePredicate)
+	named bool // p == "NamedCard" or "noName" (namePredicate)
 	fn    predFn
 	num   bool // numericPred recognises the shape (its ok is textual)
 	nonOK bool
@@ -205,7 +205,7 @@ func compilePred(raw string) compiledPred {
 		return c
 	}
 	c.kp, c.hasKP = keywordPredicateFor(p)
-	c.named = p == "NamedCard"
+	c.named = p == "NamedCard" || p == "noName"
 	c.fn = predicates[p]
 	_, c.num = numericPred(p, nil, &state.Object{}, NewSpecContext(0, 0))
 	c.nonK, c.nonV, c.nonOK = nonPredicate(p)
@@ -256,8 +256,7 @@ func compiledPositive(c *compiledPred, g *state.Game, o *state.Object, sc *SpecC
 			return false, false
 		}
 		if kind == wordChosenColor {
-			src := g.Obj(sc.Source)
-			if src == nil || colourLetter(src.ChosenColor) == 0 {
+			if _, col := sourceChosen(g, *sc); colourLetter(col) == 0 {
 				return false, false
 			}
 		}
@@ -678,6 +677,7 @@ var specialPositiveTokenSet = state.NewNameSet(
 	"TriggeredCards",
 	"TriggeredTarget",
 	"NotDefinedTriggeredTarget",
+	"NotDefinedTriggeredCard",
 	"blockingTriggeredAttacker",
 	"EffectSource",
 	"IsGoaded",

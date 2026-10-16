@@ -706,12 +706,13 @@ func playGame(reg *cards.Registry, decks []genDeck, seed uint64, maxTurns, maxIn
 		return f
 	}
 	switch {
-	case o.StallOn == "livelock" && strings.HasPrefix(o.Livelock, objectCapAbortPrefix):
+	case (o.StallOn == "livelock" || o.StallOn == "bigboard") && strings.HasPrefix(o.Livelock, objectCapAbortPrefix):
 		// The engine's own per-event watchdog fired the mid-resolution object
-		// cap: the object arena crossed -max-objects during a resolution. The
-		// game is a bigboard record, not an engine-bug livelock, and it keeps
-		// the boundary record's kind and diagnostic vocabulary so triage
-		// reads one kind either way; the tail context survives, because the
+		// cap: the object arena crossed the budget during a resolution. The
+		// drive loop already records the volume reason as a bigboard stall
+		// (CV-8), and this arm keeps cardfuzz's own diagnostic vocabulary --
+		// the -max-objects wording and the tail context -- so triage reads
+		// one kind either way; the tail context survives, because the
 		// resolution the abort fired inside is what a triager wants to see.
 		return withCtx("bigboard", objectCapDiag(e, maxObjects, boardCount(e), o.Livelock)), gc
 	case gbench.IsAbort(o.StallOn):
@@ -793,8 +794,11 @@ var planFailures = true
 // boundaries: once the live (non-ceased) object count exceeds max, the game
 // ends as a "bigboard" stall. The arena length bounds the live count from
 // above, so a game that never grows past max never pays the scan.
-// max <= 0 disables it -- and then no mid-resolution cap is armed either
-// (objectCapGuard), so "0 disables" means the whole budget is off.
+// max <= 0 disarms THIS boundary guard -- and arms no explicit
+// mid-resolution cap either (objectCapGuard) -- but since CV-8 the shared
+// drive loop still arms the default volume budget (rules.DefaultMaxObjs) on
+// the nil guard, so "0 disables" means "the harness's own scan is off" and
+// never "the whole budget is off".
 func boardGuard(max int) func(*rules.Engine) (string, string) {
 	if max <= 0 {
 		return nil
@@ -811,12 +815,12 @@ func boardGuard(max int) func(*rules.Engine) (string, string) {
 	}
 }
 
-// objectCapReason is rules.LivelockError's Reason for the mid-resolution
-// object-cap abort (rules/livelock.go). It is the string both the abort's
-// own rendering and the re-classification below key on, so the two cannot
-// drift apart silently: rules/livelock_objectcap_test.go pins the rendering
-// and cmd/cardfuzz's boardcap test pins the classification.
-const objectCapReason = "object cap"
+// objectCapReason is rules.ObjectCapReason, rules.LivelockError's Reason for
+// the mid-resolution object-cap abort (rules/livelock.go). It is the string
+// both the abort's own rendering and the re-classification below key on, so
+// the two cannot drift apart silently: rules/livelock_objectcap_test.go pins
+// the rendering and cmd/cardfuzz's boardcap test pins the classification.
+const objectCapReason = rules.ObjectCapReason
 
 // objectCapAbortPrefix is the head of the rendered abort diagnostic for the
 // mid-resolution object cap. It is what survives into an Outcome (the
@@ -834,7 +838,11 @@ const objectCapAbortPrefix = "livelock detected (object cap"
 // length with one O(1) comparison, so the abort fires within one event of
 // the crossing. The game is then classified as its own "bigboard" stall --
 // never as an engine-bug livelock -- by the prefix check in playGame.
-// max <= 0 arms nothing (the zero value is "off", never a default).
+// max <= 0 arms no EXPLICIT budget here (the zero value is "unset"), but the
+// shared drive loop still arms rules.DefaultMaxObjs on the returned nil
+// guard, so a 0 no longer plays fully unchecked: a storm ends as a bigboard
+// record at the default budget instead of growing until the box OOMs. A
+// fully disarmed run is a Disabled guard, and cardfuzz has no flag for one.
 func objectCapGuard(max int) *rules.LoopGuard {
 	if max <= 0 {
 		return nil
@@ -881,7 +889,13 @@ func objectCapDiag(e *rules.Engine, max, count int, abort string) string {
 	if e != nil {
 		turn = e.G.Turn
 	}
-	fmt.Fprintf(&b, "arena object count %d exceeds -max-objects %d at turn %d", count, max, turn)
+	// max <= 0 names the default budget the drive loop armed (CV-8), not an
+	// off switch: a trip recorded under 0 crossed rules.DefaultMaxObjs.
+	label := fmt.Sprintf("-max-objects %d", max)
+	if max <= 0 {
+		label = fmt.Sprintf("the default object cap (%d)", rules.DefaultMaxObjs)
+	}
+	fmt.Fprintf(&b, "arena object count %d exceeds %s at turn %d", count, label, turn)
 	if e != nil {
 		fmt.Fprintf(&b, " (live %d)", boardCount(e))
 		b.WriteString(battlefieldCensusTable(e))

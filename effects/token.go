@@ -691,6 +691,10 @@ func auraTokenWithheld(g *state.Game, job *TokenJob, key string) bool {
 // ImprintTokens$/AtEOT$ work over every object the loop minted.
 func runTokenMints(h Host, c *Ctx, sa *cards.SA, tp *TokenParams, job *TokenJob) {
 	g := h.Game()
+	// CR 603.2c: one Token resolution's creations arrive together, so a
+	// "whenever one or more tokens enter" trigger fires once for the batch.
+	h.BeginZoneBatch()
+	defer h.EndZoneBatch()
 	var minted []state.ObjID
 	for _, key := range tp.Scripts {
 		if _, ok := g.Tokens[key]; !ok {

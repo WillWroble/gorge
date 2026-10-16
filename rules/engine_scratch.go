@@ -51,6 +51,9 @@ type engineScratch struct {
 	derivedMemoStack derivedMemoTable `clone:"reset,pool=memoStack,release=.release"`
 	derivedMemoDepth int              `clone:"reset"`
 	derivedMemoGen   uint64           `clone:"reset"`
+	// targetHintsSeq is d.Seq+1 of the pending decision EnsureTargetHints last
+	// filled (rules/target_hints.go); a clone starts unbuilt.
+	targetHintsSeq uint64 `clone:"reset"`
 	// derivedMemoTail / derivedMemoAlias* carry the priority walk's memo
 	// across the decision boundary into a BeginDerivedReads scope
 	// (rules/derivedmemo.go). Validated on every use; Clone copies none.
@@ -143,9 +146,13 @@ type engineScratch struct {
 	// decArena backs posed priority decisions for an engine whose decisions
 	// all die with it (SetDecisionArena, decision_arena.go); nil or off
 	// everywhere else.
-	decArena      *decisionArena `clone:"reset"`
-	lookBackOwner *Engine        `clone:"reset"`
-	lookBackBusy  bool           `clone:"reset"`
+	decArena *decisionArena `clone:"reset"`
+	// arenaHeapAsks counts the priority decisions e posed on the heap
+	// because it had no arena yet (activeArena's lazy-creation deferral,
+	// decision_arena.go); a clone starts it at zero.
+	arenaHeapAsks uint16  `clone:"reset"`
+	lookBackOwner *Engine `clone:"reset"`
+	lookBackBusy  bool    `clone:"reset"`
 	// preview is entryPreview's reusable preview Engine struct, owned and
 	// guarded exactly like lookBack (previewOwner, previewBusy): a preview
 	// lives for one entry's plan and is zeroed when released

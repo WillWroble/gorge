@@ -49,26 +49,32 @@ import (
 // end-to-end tests replay a snapshot host actually produced, which is what
 // catches drift.
 type matchJSON struct {
-	Table        string            `json:"table"`
-	Match        int               `json:"match"`
-	Seed         uint64            `json:"seed"`
-	Names        []string          `json:"names"`
-	PlayerNames  []string          `json:"player_names,omitempty"`
-	Decks        []string          `json:"decks"`
-	DeckCards    [][]string        `json:"deck_cards"`
-	Sideboards   [][]string        `json:"sideboards,omitempty"`
-	Spectator    string            `json:"spectator"`
-	State        string            `json:"state"`
-	Result       string            `json:"result,omitempty"`
-	Winner       *uint8            `json:"winner"`
-	Head         string            `json:"head,omitempty"`
-	Events       int               `json:"events"`
-	Turns        int32             `json:"turns"`
-	Reason       string            `json:"reason,omitempty"`
-	Mulligans    int               `json:"mulligans,omitempty"`
-	Format       string            `json:"format,omitempty"`
-	StartingLife int32             `json:"starting_life,omitempty"`
-	Commanders   [][]int           `json:"commanders,omitempty"`
+	Table        string     `json:"table"`
+	Match        int        `json:"match"`
+	Seed         uint64     `json:"seed"`
+	Names        []string   `json:"names"`
+	PlayerNames  []string   `json:"player_names,omitempty"`
+	Decks        []string   `json:"decks"`
+	DeckCards    [][]string `json:"deck_cards"`
+	Sideboards   [][]string `json:"sideboards,omitempty"`
+	Spectator    string     `json:"spectator"`
+	State        string     `json:"state"`
+	Result       string     `json:"result,omitempty"`
+	Winner       *uint8     `json:"winner"`
+	Head         string     `json:"head,omitempty"`
+	Events       int        `json:"events"`
+	Turns        int32      `json:"turns"`
+	Reason       string     `json:"reason,omitempty"`
+	Mulligans    int        `json:"mulligans,omitempty"`
+	Format       string     `json:"format,omitempty"`
+	StartingLife int32      `json:"starting_life,omitempty"`
+	Commanders   [][]int    `json:"commanders,omitempty"`
+	// StartChooser is the configured starting-player chooser the live match
+	// ran with (E3-2): the seat posed CR 103.1's choice in place of the toss
+	// winner. config() must restore it or the rebuilt engine replays the
+	// toss instead and diverges at the genesis Note. Absent = the toss,
+	// which every match before E3 used.
+	StartChooser *int              `json:"start_chooser,omitempty"`
 	Tokens       map[string]string `json:"tokens,omitempty"`
 	TokensUnread []string          `json:"tokens_unread,omitempty"`
 	// NameUniverse is the match MODE bit: true when the live match was
@@ -84,6 +90,14 @@ type matchJSON struct {
 	// recorded name choice exactly as long as the corpus pin has not moved
 	// (the documented DIVERGED cause, see AGENTS.md).
 	NameUniverseNames []string `json:"name_universe_names,omitempty"`
+	// PaidManaCensus is the match MODE bit for the widened paid-cost mana
+	// census: true when the live match ran with it (rules.Config.
+	// DisablePaidManaCensus false). config() must restore it or the rebuilt
+	// engine takes the other census, whose offer list differs, and every
+	// recorded intent from the first census-sensitive decision misaligns.
+	// Absent (a pre-flip capture) is the narrow census, the value those
+	// matches played with, so nothing migrates.
+	PaidManaCensus bool `json:"paid_mana_census,omitempty"`
 }
 
 // logJSON is log.json's shape, mirroring host.FeedbackLog: the embedded
@@ -275,6 +289,13 @@ func config(m matchJSON, reg *cards.Registry, tokens map[string]*cards.Card) (ru
 		cfg.StartingLife = m.StartingLife
 		cfg.Commanders = m.Commanders
 	}
+	// E3-2: the configured starting-player chooser is genesis replay input
+	// like Mulligans — the genesis Note names it — so a copy rides the
+	// rebuilt Config; absent (a pre-E3 capture) is the toss, unchanged.
+	if m.StartChooser != nil {
+		chooser := *m.StartChooser
+		cfg.StartChooser = &chooser
+	}
 	// The name-card universe is a match MODE, restored the way host's own
 	// matchForLog restores it (host/viewat.go): only a capture that records
 	// the mode replays with one, so a pre-feature snapshot still takes the
@@ -288,6 +309,10 @@ func config(m matchJSON, reg *cards.Registry, tokens map[string]*cards.Card) (ru
 		cfg.NameUniverse = reg.Universe()
 		cfg.NameUniverseNames = append([]string(nil), m.NameUniverseNames...)
 	}
+	// The paid-cost census is the other match MODE: a capture made with it
+	// records the bit, and a pre-flip capture carries none, which reads back
+	// as the narrow census those matches ran.
+	cfg.DisablePaidManaCensus = !m.PaidManaCensus
 	return cfg, nil
 }
 

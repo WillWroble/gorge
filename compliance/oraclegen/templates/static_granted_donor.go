@@ -17,6 +17,7 @@ package templates
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/adams-shaun/gorge/cards"
@@ -73,6 +74,11 @@ func staticDonorItem(reg *cards.Registry, f *cards.Face, name string, req levelb
 	// placement above carries no association, so the engine's
 	// Card.ExiledWithSource filter excludes it (static_fixture_exile.go).
 	if it, ok := staticExileDonorItem(reg, f, name, req, st); ok {
+		return it, true
+	}
+	// A donor the source's own ChooseCard activation chose (Koh's
+	// Card.ChosenCard) needs the cast, ETB exile and activation as a prelude.
+	if it, ok := staticChosenDonorItem(reg, f, name, req, st); ok {
 		return it, true
 	}
 	return oraclegen.Item{}, false
@@ -162,4 +168,129 @@ func donorScenario(f *cards.Face, name, donor string, zone state.Zone, label str
 	}
 	sc.Setup["p0"] = p0
 	return sc
+}
+
+// staticChosenDonorItem serves a has-all-abilities-of static whose donor is a
+// card the source's own ChooseCard activation recorded (GainsAbilitiesOf=
+// Card.ChosenCard, GainsAbilitiesOfZones=Exile; Koh, the Face Stealer). The
+// binding is event-backed, so no setup placement can stand in for it: the
+// source is cast, its ETB exiles the donor (the same exiled-with move
+// staticExileDonorItem runs), its ChooseCard activation is activated and the
+// pick is answered, and the source is then offered the donor's activation
+// labelled "<source>: <ability text>".
+//
+// The donor is Wellwisher, whose only ability costs {T}. The source was cast
+// this turn and is summoning-sick, so the granted {T} ability is not offered
+// until a turn boundary passes (CR 302.6); the prelude crosses one before the
+// assertion. Only the activated half of the grant is observed: Wellwisher has
+// no triggered ability, so GainsTriggerAbsOf$ stays unobserved.
+func staticChosenDonorItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, st cards.Static) (oraclegen.Item, bool) {
+	if !strings.Contains(st.ParamStr(cards.PKGainsAbilitiesOf), "ChosenCard") {
+		return oraclegen.Item{}, false
+	}
+	zones, all, ok := donorZones(st)
+	if !ok || (!all && !containsZone(zones, state.ZExile)) {
+		return oraclegen.Item{}, false
+	}
+	idx, ok := chooseCardAbilityIndex(f)
+	if !ok {
+		return oraclegen.Item{}, false
+	}
+	prefixes, why := oraclegen.XMageAbility(f)
+	if why != "" {
+		return oraclegen.Item{}, false
+	}
+	prefix, ok := prefixes[idx]
+	if !ok {
+		return oraclegen.Item{}, false
+	}
+	mana, why := oraclegen.PoolFor(f.ManaCost)
+	if why != "" {
+		return oraclegen.Item{}, false
+	}
+	for _, donor := range donorProbeNames {
+		c, ok := reg.Lookup(donor)
+		if !ok || len(c.Faces) == 0 {
+			continue
+		}
+		desc, ok := donorActivationText(c.Faces[0])
+		if !ok {
+			continue
+		}
+		if it, ok := chosenDonorScenario(reg, f, name, req, donor, name+": "+desc, mana, idx, prefix); ok {
+			return it, true
+		}
+	}
+	return oraclegen.Item{}, false
+}
+
+// chooseCardAbilityIndex is the face's first plain ChooseCard activation whose
+// cost needs no input the prelude cannot pay: pure generic mana or PayLife.
+func chooseCardAbilityIndex(f *cards.Face) (int, bool) {
+	for i, ab := range f.Abilities {
+		if ab == nil || ab.Kind != "AB" || ab.API != "ChooseCard" {
+			continue
+		}
+		payable := true
+		for _, tok := range strings.Fields(ab.ParamStr(cards.PKCost)) {
+			if _, err := strconv.Atoi(tok); err != nil && !strings.HasPrefix(tok, "PayLife<") {
+				payable = false
+			}
+		}
+		if payable {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// chosenDonorSteps is the prelude of one Koh-shaped candidate: cast the source
+// (its ETB exiles the donor), activate its ChooseCard ability and answer the
+// pick, cross a turn boundary so the source is no longer summoning-sick, and
+// assert the donor's activation at p0's priority. chosen false drops the
+// activation, so the donor is exiled with the source but never chosen.
+func chosenDonorSteps(name, donor, mana string, idx int, label string, chosen, want bool) []oraclegen.Step {
+	var steps []oraclegen.Step
+	steps = append(steps,
+		oraclegen.Step{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: mana},
+		oraclegen.Step{Op: "resolve", Targets: []string{"p0:" + donor}})
+	if chosen {
+		steps = append(steps,
+			oraclegen.Step{Op: "activate", Seat: 0, Card: "p0:" + name, AbilityIndex: intPtr(idx)},
+			oraclegen.Step{Op: "resolve", Answers: []oraclegen.Answer{{Kind: "choose", Pick: []string{"p0:" + donor}}}})
+	}
+	return append(steps,
+		oraclegen.Step{Op: "pass_to", Seat: 0, Step: "main1", Active: "p1"},
+		oraclegen.Step{Op: "pass_to", Seat: 0, Step: "main1", Active: "p0"},
+		oraclegen.Step{Op: "pass_to", Seat: 0, Decision: "priority", Expect: []oraclegen.Expect{{
+			Offered: &oraclegen.Offered{Seat: 0, Kind: "activate", Card: "p0:" + name, Label: label},
+			Want:    boolPtr(want),
+		}}})
+}
+
+// chosenDonorScenario replays one donor candidate and its two controls. The
+// observation has the donor on p0's battlefield for the ETB to exile and the
+// pick answered; control one has no donor, so nothing is exiled or chosen;
+// control two exiles the donor but never activates ChooseCard, so the donor is
+// exiled with the source yet not chosen -- the offer is the ChosenCard
+// binding's doing and not ExiledWithSource's.
+func chosenDonorScenario(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, donor, label, mana string, idx int, prefix string) (oraclegen.Item, bool) {
+	sc := staticScenario(f, name, []string{donor}, []string{name}, chosenDonorSteps(name, donor, mana, idx, label, true, true))
+	res, ok := runStatic(reg, sc)
+	if !ok || len(res.Fails) != 0 {
+		return oraclegen.Item{}, false
+	}
+	noDonor := staticScenario(f, name, nil, []string{name}, chosenDonorSteps(name, donor, mana, idx, label, false, false))
+	noDonor.Steps[1].Targets = nil
+	unchosen := staticScenario(f, name, []string{donor}, []string{name}, chosenDonorSteps(name, donor, mana, idx, label, false, false))
+	for _, control := range []oraclegen.Scenario{noDonor, unchosen} {
+		if cres, cok := runStatic(reg, control); !cok || len(cres.Fails) != 0 {
+			return oraclegen.Item{}, false
+		}
+	}
+	it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"611.3", "613"}, sc)
+	it.XAnswers = oraclegen.XAnswersForScenario(res, sc, oraclegen.ModeNumbers(f), nil)
+	it.XAbility = growXAbility(it.XAbility, len(it.Steps))
+	it.XAbility[2] = prefix
+	return it, true
 }

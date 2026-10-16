@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -72,6 +73,49 @@ var creatureTypeWordList = func() []string {
 // CreatureTypeWordList returns every creature subtype word the filter
 // grammar knows, sorted (deterministic; the caller must not mutate it).
 func CreatureTypeWordList() []string { return creatureTypeWordList }
+
+// CreatureTypeSet is a bitset over CreatureTypeWordList's indices: the
+// map-free, allocation-free way a hot reader asks which vocabulary words a
+// type list already carries (rules' layer-4 all-creature-types grant, and
+// TypeMatchWords below). The init check below holds the vocabulary to the
+// array's capacity.
+type CreatureTypeSet [8]uint64
+
+func init() {
+	if len(creatureTypeWordList) > 64*len(CreatureTypeSet{}) {
+		panic("effects: creature-type vocabulary outgrew CreatureTypeSet")
+	}
+}
+
+// Has reports whether vocabulary word i is in the set.
+func (s *CreatureTypeSet) Has(i int) bool { return s[i>>6]&(1<<(i&63)) != 0 }
+
+// AddWords adds every word of types that is a creature subtype word, with
+// exactly CreatureTypeWords' (case-sensitive) membership, and reports how
+// many distinct vocabulary words the set then holds that it did not before.
+// A list that carries a materialised all-creature-types run (the vocabulary
+// in its own sorted order, the same string headers) is matched word by word
+// against the vocabulary cursor with a cheap equality; every other word
+// costs one binary search over the sorted vocabulary.
+func (s *CreatureTypeSet) AddWords(types []string) int {
+	vocab := creatureTypeWordList
+	added, k := 0, 0
+	for _, t := range types {
+		i, ok := k, k < len(vocab) && t == vocab[k]
+		if !ok {
+			i, ok = slices.BinarySearch(vocab, t)
+		}
+		if !ok {
+			continue
+		}
+		k = i + 1
+		if w, b := i>>6, uint64(1)<<(i&63); s[w]&b == 0 {
+			s[w] |= b
+			added++
+		}
+	}
+	return added
+}
 
 // cardTypeWords is the CR 205.1 card-type vocabulary (including the retired
 // Tribal and Vanguard), the set Count$Valid...$CardTypes counts distinct

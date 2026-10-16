@@ -2,7 +2,9 @@ package host
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,6 +60,9 @@ func (r *Registry) load() error {
 			if _, present := shape.Tables[i].Config["bot_auto_pay_mana"]; !present {
 				rec.Config.BotAutoPayMana = r.opts.DefaultBotAutoPayMana
 			}
+			if _, present := shape.Tables[i].Config["bot_common_sense"]; !present {
+				rec.Config.BotCommonSense = r.opts.DefaultBotCommonSense
+			}
 		}
 		// Browser-created games have process-local credentials. A restart
 		// cannot safely revive them (and historically aborts live games
@@ -69,11 +74,24 @@ func (r *Registry) load() error {
 			continue
 		}
 		cfg, err := rec.Config.validated(r.opts.LoadDeck)
-		if err != nil {
+		if err != nil && errors.Is(err, errDecklistBotRefusal) {
+			// A table written by an older binary can fail the decklist
+			// ruling the new process enforces — e.g. a decklist-reading
+			// bot policy (bots.Info.Env) persisted before the
+			// allow_decklist_bots opt-in existed. Skipping it (and
+			// rewriting the file below, with the rest of the dropped
+			// tables) beats failing the whole start over one stale
+			// table. Every other validation error still fails the
+			// start: TestBotPolicyPersistsItsNormalizedDefaultAndRejectsUnknownRestore
+			// pins that an unknown policy name is a hard error.
+			log.Printf("host: restart: skipping table %s: %v", rec.Config.ID, err)
+			dropped = true
+			continue
+		} else if err != nil {
 			return err
 		}
 		rec.Config = cfg
-		t := newTable(cfg)
+		t := newTable(r, cfg)
 		t.k = rec.Match
 		scs, err := readSidecars(r.opts.Dir, cfg.ID)
 		if err != nil {

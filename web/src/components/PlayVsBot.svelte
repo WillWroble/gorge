@@ -1,25 +1,50 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchDecks, type DeckInfo } from '../lib/api';
+  import { fetchBotPolicies, fetchDecks, type DeckInfo } from '../lib/api';
+  import type { BotPolicyInfo } from '../protocol';
   import ProtocolSetting from './ProtocolSetting.svelte';
   import { VS_BOT_FORMATS, VS_BOT_MULLIGANS, startPlayVsBot, type VsBotFormat, type VsBotMulligans } from '../lib/playvsbot';
 
   // The landing-page entry point that sits the player down 1v1 against a bot.
   // Deck ids come only from the server catalogue; empty values deliberately
-  // stay the original random-assignment path.
+  // stay the original random-assignment path. The opponent picker lists the
+  // server's offered policies for the chosen format; empty keeps its default.
   let format: VsBotFormat = $state('constructed');
   let humanDeck = $state('');
   let botDeck = $state('');
+  let botPolicy = $state('');
+  let policies = $state<BotPolicyInfo[]>([]);
+  let defaultPolicy = $state('');
   let mulligans: VsBotMulligans = $state(6);
   let decks = $state<DeckInfo[]>([]);
   let loadingDecks = $state(true);
   let busy = $state(false);
   let error = $state<string | null>(null);
   const formatDecks = $derived(decks.filter((d) => d.format === format));
+  const formatPolicies = $derived(policies.filter((p) => p.formats.includes(format)));
+  const defaultLabel = $derived(policies.find((p) => p.name === defaultPolicy)?.label ?? defaultPolicy);
+  const chosenPolicy = $derived(policies.find((p) => p.name === (botPolicy || defaultPolicy)));
 
   onMount(() => {
     void loadDecks();
+    void loadPolicies();
   });
+
+  // A failed fetch leaves the picker at the server default: the game still
+  // starts with the server's own policy.
+  async function loadPolicies() {
+    try {
+      const list = await fetchBotPolicies();
+      policies = list.policies;
+      defaultPolicy = list.default;
+    } catch {
+      policies = [];
+    }
+  }
+
+  function policyLabel(p: BotPolicyInfo): string {
+    return p.tier && p.tier !== 'production' ? `${p.label} (${p.tier})` : p.label;
+  }
 
   async function loadDecks() {
     try {
@@ -35,6 +60,7 @@
     format = next;
     humanDeck = '';
     botDeck = '';
+    if (botPolicy && !formatPolicies.some((p) => p.name === botPolicy)) botPolicy = '';
   }
 
   function deckLabel(d: DeckInfo): string {
@@ -46,7 +72,7 @@
     busy = true;
     error = null;
     try {
-      const join = await startPlayVsBot(format, humanDeck, botDeck, mulligans);
+      const join = await startPlayVsBot(format, humanDeck, botDeck, mulligans, botPolicy);
       window.location.href = join;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -93,6 +119,16 @@
           <option value={d.id}>{deckLabel(d)}</option>
         {/each}
       </select>
+    </label>
+    <label class="picker">
+      <span>Bot</span>
+      <select aria-label="Bot" bind:value={botPolicy} data-testid="bot-policy">
+        <option value="">{defaultLabel ? `Server default (${defaultLabel})` : 'Server default'}</option>
+        {#each formatPolicies as p (p.name)}
+          <option value={p.name}>{policyLabel(p)}</option>
+        {/each}
+      </select>
+      {#if chosenPolicy?.description}<span class="policy-hint">{chosenPolicy.description}</span>{/if}
     </label>
   </div>
   <ProtocolSetting />
@@ -162,6 +198,9 @@
     display: grid;
     gap: var(--sp-1);
     font-size: var(--t-12);
+    color: var(--ink-dim);
+  }
+  .policy-hint {
     color: var(--ink-dim);
   }
   select {

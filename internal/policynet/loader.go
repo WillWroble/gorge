@@ -76,6 +76,11 @@ type labelRecord struct {
 	// Absent in a schema 1 record, where they decode as zero/false.
 	Outcome      float64 `json:"outcome"`
 	OutcomeKnown bool    `json:"outcome_known"`
+	// Explore marks a decision whose played answer coverage-directed
+	// exploration forced (internal/corpuscov.ExploreSeat), not the teacher's
+	// choice. Omitted by the writer when false, so a corpus without
+	// exploration is unchanged and decodes as false.
+	Explore bool `json:"explore,omitempty"`
 }
 
 // labelCandidate mirrors cmd/searchteacher/labels.go's LabelCandidate.
@@ -141,6 +146,10 @@ type Stats struct {
 	// WithOutcome is the loaded (not skipped) examples whose HasOutcome is
 	// true.
 	WithOutcome int
+	// Explored is the records dropped because they carry explore:true (the
+	// played answer was forced exploration, not the teacher's choice) and the
+	// load did not ask to keep them. They count in Records, not Skipped.
+	Explored int
 }
 
 // Load streams a label corpus (plain or gzip-compressed JSONL, detected by
@@ -150,7 +159,10 @@ type Stats struct {
 // A record whose record_type is not LabelRecordType or whose schema_version
 // is not in AcceptedLabelSchemaVersions is a hard error (a wrong-shape corpus must not train anything).
 // A record whose candidates list is empty is skipped and counted in
-// Stats.Skipped.
+// Stats.Skipped. A record flagged explore:true is dropped and counted in
+// Stats.Explored: Load feeds policy imitation, and a forced answer is not
+// the teacher's choice (LoadOptions.KeepExplore keeps them for value and
+// outcome learning).
 func Load(path string) ([]Example, Stats, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -186,6 +198,10 @@ func Load(path string) ([]Example, Stats, error) {
 		}
 		if !LabelSchemaAccepted(rec.SchemaVersion) {
 			return nil, stats, fmt.Errorf("label corpus record %d: unsupported schema_version %d, want one of %v", stats.Records, rec.SchemaVersion, AcceptedLabelSchemaVersions)
+		}
+		if rec.Explore {
+			stats.Explored++
+			continue
 		}
 		if len(rec.Candidates) == 0 {
 			stats.Skipped++

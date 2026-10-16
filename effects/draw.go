@@ -194,6 +194,16 @@ func effDraw(h Host, c *Ctx, sa *cards.SA) {
 				}
 			}
 			for c.Draw.Done < c.Draw.UptoCount {
+				// The chosen count is this target's batch: offer it to the
+				// DrawCards replacement class before the first card moves
+				// (the same boundary the mandatory loop takes).
+				if c.Draw.Done == 0 && proposeDrawBatch(h, c.Source, p, c.Draw.UptoCount) {
+					c.Draw.Done = c.Draw.UptoCount
+					if h.Suspended() {
+						return
+					}
+					break
+				}
 				var lib []state.ObjID
 				if remember {
 					lib = zoneOf(h.Game(), state.ZLibrary, p)
@@ -222,6 +232,19 @@ func effDraw(h Host, c *Ctx, sa *cards.SA) {
 	}
 	for c.Draw.Done < total {
 		p := targets[c.Draw.Done/n]
+		// The batch boundary (Forge's drawCards(n) DrawCards pass): the whole
+		// multi-card batch is offered to the DrawCards replacement class
+		// before any card moves, so Alms Collector's "would draw two or more
+		// cards" replaces a Thought Reflection draw-two as ONE event. A
+		// consumed batch drew through its replacement's body already; the
+		// cursor moves past it and nothing is drawn here.
+		if c.Draw.Done%n == 0 && proposeDrawBatch(h, c.Source, p, n) {
+			c.Draw.Done += n
+			if h.Suspended() {
+				return
+			}
+			continue
+		}
 		var lib []state.ObjID
 		if remember {
 			lib = zoneOf(h.Game(), state.ZLibrary, p)
@@ -244,4 +267,22 @@ func effDraw(h Host, c *Ctx, sa *cards.SA) {
 	}
 	// The draw cursor is scoped to this primitive.
 	c.Draw.Done = 0
+}
+
+// proposeDrawBatch offers one draw instruction's whole batch to the
+// DrawCards replacement class before any card moves (Forge's Player.
+// drawCards(n) DrawCards pass; XMage's DRAW_TWO_OR_MORE_CARDS). handled
+// reports the batch was consumed -- a replacement's body already drew in
+// this instruction's place, which the host's held-proposal seam reports as
+// Amount 0 -- so the caller draws nothing for the batch. The proposal is
+// held, never logged, and the host's own replacement registry decides it.
+func proposeDrawBatch(h Host, source state.ObjID, p state.PlayerID, n int32) bool {
+	if n <= 0 {
+		return false
+	}
+	got := h.CountReplacementProposed(events.Event{Kind: events.DrawBatchProposal,
+		Player: p, Obj: source, Amount: n})
+	// A surviving batch keeps its positive count (or a body's rewrite of it);
+	// a consumed one reports 0, whatever event shape the consumption took.
+	return got.Amount == 0
 }

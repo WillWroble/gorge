@@ -26,6 +26,7 @@ import (
 	"fmt"
 
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/sanity"
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
 	"github.com/adams-shaun/gorge/seat"
@@ -82,7 +83,11 @@ func New(o bots.Options, w builtins.TacticalWeights) (seat.Seat, error) {
 		return nil, fmt.Errorf("%s: Deps.Cards is nil: the sb-tactical heuristic reads printed card facts from the served card registry", Policy)
 	}
 	lookup := builtins.NewRegistryLookup(o.Deps.Cards)
-	return &hostedSeat{bot: builtins.NewTactical(builtins.AutoPay, o.Seed, lookup, w)}, nil
+	hs := &hostedSeat{bot: builtins.NewTactical(builtins.AutoPay, o.Seed, lookup, w)}
+	if o.CommonSense {
+		return sanity.Wrap(hs), nil
+	}
+	return hs, nil
 }
 
 // newSBTactical is the registry factory: Hosted() with no overlay.

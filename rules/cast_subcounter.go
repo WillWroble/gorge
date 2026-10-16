@@ -68,6 +68,11 @@ func (e *Engine) xAsk() bool {
 		e.ask(d)
 		return true
 	}
+	// An X bound by a group exile part's withTotal*EQX (Fabrication
+	// Foundry) is announced from the totals the election can reach.
+	if e.groupAnnounceXAsk(pc) {
+		return true
+	}
 	// A PayEnergy<X> part announces the same X the cast pays with (CR
 	// 107.3i's ability X), so its presence triggers this ask exactly like a
 	// printed {X} mana symbol does. A Sac<X/Spec> part announces the count of
@@ -495,7 +500,7 @@ func (e *Engine) delveAsk() bool {
 		return false
 	}
 	pc.delveDone = true
-	if !e.hasKeywordH(pc.card, kwhDelve) {
+	if !e.hasCastDelve(pc.card) {
 		return false
 	}
 	gy := e.G.Zone(state.ZGraveyard, pc.player)
@@ -814,6 +819,11 @@ func (e *Engine) sacAsk() bool {
 	pc := e.cast
 	for pc.SacPart < len(pc.cost.Sac) {
 		part := pc.cost.Sac[pc.SacPart]
+		// A target-bound part (cost_target_bound.go) is paid after the
+		// targets are chosen; postTargetAsks poses it.
+		if e.costPartDeferred(pc, part.Spec) {
+			return false
+		}
 		var candidates []state.ObjID
 		for _, oid := range pay.SacrificeCostCandidates(asPayer(e), pc.player, pc.card, part, pc.isAbility()) {
 			already := false
@@ -951,6 +961,10 @@ func (e *Engine) discardAsk() bool {
 	pc := e.cast
 	for pc.DiscardPart < len(pc.cost.Discard) {
 		part := pc.cost.Discard[pc.DiscardPart]
+		// A target-bound part is paid after the targets (cost_target_bound.go).
+		if e.costPartDeferred(pc, part.Spec) {
+			return false
+		}
 		reserved := make(map[state.ObjID]bool, len(pc.Discards))
 		for _, id := range pc.Discards {
 			reserved[id] = true

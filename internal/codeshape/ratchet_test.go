@@ -57,7 +57,9 @@ const (
 	// grouped the LKI snapshot set, the replacement context, clone-as-enters,
 	// mana, kicker and the per-primitive cursors (effects/ctx_groups.go): 121 -> 73.
 	// W3 dead removed write-only/never-set fields: 73 -> 68.
-	ctxFieldCount = 68
+	// lb-copyperm-sel grouped the cost-paid lists (Exiled, Revealed and the
+	// new CounterPut) into Ctx.Paid: 68 -> 67.
+	ctxFieldCount = 67
 	ctxEmbedCount = 1
 	// resumePointFieldCount is the number of fields in rules' resumePoint.
 	resumePointFieldCount = 5
@@ -304,7 +306,7 @@ var longFuncCeilings = map[string]int{
 	"effects applyLibrarySearch":                            326,
 	"effects definedSpec":                                   939,
 	"effects effAttach":                                     465,
-	"effects effChangeZone":                                 613,
+	"effects effChangeZone":                                 605,
 	"effects effClone":                                      593,
 	"effects effCopyPermanent":                              786,
 	"effects effDig":                                        521,
@@ -315,7 +317,7 @@ var longFuncCeilings = map[string]int{
 	"effects effPlay":                                       332,
 	"effects effPutCounter":                                 373,
 	"effects effReveal":                                     430,
-	"effects effSacrifice":                                  343,
+	"effects effSacrifice":                                  342,
 	"effects effSearchLibrary":                              477,
 	"effects effToken":                                      307,
 	"effects evalCountBodyDotted":                           301,

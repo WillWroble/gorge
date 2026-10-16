@@ -18,7 +18,7 @@ rebuildable outputs go there. That means the XMage build
 
 Seats cannot run XMage. A behavioural fix that moves a card's result leaves
 `compliance/adopt` TestCertificationRatchet and/or `compliance/gate`
-TestDeclaredSetsCompliant red; the seat commits the fix, lists the cards under
+TestDeclaredSetsCompliantChunkNN red; the seat commits the fix, lists the cards under
 `## Stale compliance records` in its report and finishes DONE_WITH_CONCERNS
 (rule in .superpowers/ds4/gorge-context.md). The module gate still fails, so
 the ticket parks at human_needed. No controller step refreshes the records

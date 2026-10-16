@@ -54,6 +54,9 @@ func TestHandListedProbesAreKnownToXMage(t *testing.T) {
 		"lifegainProbes": lifegainProbes,
 		"drawProbes":     drawProbes,
 		"singles":        {powerProbe, menaceProbe},
+		// lb4-g12's tail causes (trigger_recipes_tail.go).
+		"tail": {auraTailBearer, boltProbe, affinityProbe, landReturnProbe, flickerProbe, flickerTarget,
+			oraclegenQuietEquipment, modalProbes[0].name, modalProbes[1].name, "Ornithopter"},
 	}
 	for _, tb := range typedBoardProbes {
 		lists["typedBoardProbes/"+tb.word] = tb.probes

@@ -182,6 +182,10 @@ func (e *canonEncoder) encview_PlayerView(v *view.PlayerView) error {
 	} else {
 		e.buf = append(e.buf, 0)
 	}
+	e.buf = binary.AppendVarint(e.buf, int64(v.SpellsCastThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.LifeGainedThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.LifeLostThisTurn))
+	e.buf = binary.AppendVarint(e.buf, int64(v.TokensCreatedThisTurn))
 	e.buf = binary.AppendVarint(e.buf, int64(v.LibrarySize))
 	e.buf = binary.AppendVarint(e.buf, int64(v.HandSize))
 	if len(v.PlanarDeck) == 0 {
@@ -920,6 +924,12 @@ func (e *canonEncoder) encview_CardView(v *view.CardView) error {
 	}
 	e.buf = binary.AppendVarint(e.buf, int64(v.Power))
 	e.buf = binary.AppendVarint(e.buf, int64(v.Toughness))
+	if len(v.PrintedPT) == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.appendString(string(v.PrintedPT))
+	}
 	e.buf = binary.AppendVarint(e.buf, int64(v.Damage))
 	if v.Attacking {
 		e.buf = append(e.buf, 1)
@@ -1341,6 +1351,12 @@ func (e *canonEncoder) encdecision_Option(v *decision.Option) error {
 		e.buf = append(e.buf, 1)
 		e.buf = binary.AppendVarint(e.buf, int64(v.Value2))
 	}
+	if v.TargetHints == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.buf = binary.AppendUvarint(e.buf, uint64(v.TargetHints))
+	}
 	return nil
 }
 
@@ -1378,6 +1394,12 @@ func (e *canonEncoder) encdecision_PaymentAction(v *decision.PaymentAction) erro
 				return err
 			}
 		}
+	}
+	if v.TargetHints == 0 {
+		e.buf = append(e.buf, 0)
+	} else {
+		e.buf = append(e.buf, 1)
+		e.buf = binary.AppendUvarint(e.buf, uint64(v.TargetHints))
 	}
 	return nil
 }

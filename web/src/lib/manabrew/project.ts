@@ -139,7 +139,7 @@ export function projectView(gv: GameViewDto, opts: ProjectOptions): View {
     const listed = hand !== undefined && hand.cards.length === hand.count && (s === opts.viewer || hand.count > 0);
     const out: PlayerView = {
       seat: s, name: p.name, life: p.life, lost: p.status === 'lost',
-      library_size: library?.count ?? 0,
+      spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: library?.count ?? 0,
       hand_size: hand?.count ?? 0,
       graveyard_size: zone('graveyard', p.id)?.count ?? graveyard.length,
       hand: listed ? zoneCards(hand, s, blockedBy) : (null as unknown as CardView[]),

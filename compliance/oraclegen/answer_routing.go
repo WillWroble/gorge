@@ -332,6 +332,19 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return nil, true
 	case soleAltCost(d):
 		return as, true
+	case r.triggerCostWindow(i):
+		// The mana-activation window of a triggered "you may pay <cost>. If
+		// you do, ..." (rules' paymentManaAskClass): XMage's DoIfCostPaid
+		// asks only its chooseUse and pays the mana itself, so the taps
+		// (and their colour asks) have no XMage ask to answer.
+		return nil, true
+	case triggerCostAnswer(d) != "":
+		// The pay/decline ask of that triggered cost is XMage's chooseUse
+		// ("Pay {W} and transform Brigid?"), which it poses even when gorge
+		// offers only the decline (an unpayable mana cost): a boolean
+		// answer, never the gorge label (measured strict miss: "Missing
+		// CHOICE def ... Pay {B} and transform Grub, Notorious Auntie?").
+		return append(as, XAnswer{d.Seat, "choice", triggerCostAnswer(d)}), true
 	case waterbendHelperDeclined(d):
 		// The waterbend tap-helpers ask: XMage pays the ability's waterbend
 		// generic from the prefilled mana pool and never poses the ask, so
@@ -361,8 +374,12 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 	case digExileComplement(d) != "":
 		// XMage's Dig dialog for the exile-second-destination family selects
 		// the card to EXILE, the opposite of gorge's pick (the card to hand),
-		// so the scripted answer is the other offered option.
-		return append(as, XAnswer{d.Seat, "choice", digExileComplement(d)}), true
+		// so the scripted answer is the other offered option. The dialog is
+		// LookLibraryAndPickControllerEffect's chooseTarget over a TargetCard,
+		// the TARGET queue (measured 2026-10-13: "Missing TARGET def ...
+		// TargetCard", the choice-queue answer left unused and the AI
+		// exiling the card gorge kept).
+		return append(as, XAnswer{d.Seat, "target", digExileComplement(d)}), true
 	case d.Resume == "taporuntap" && len(d.Picks) == 1:
 		// TapOrUntap's election is XMage's chooseUse, not a labelled choice:
 		// the pick's option index maps to the boolean (option 0, the
@@ -377,18 +394,46 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return perControllerTargetAnswers(d), true
 	case d.Resume == "hidden_pick" && len(d.Picks) == 0 && d.Min == 0 && d.Max > 0:
 		// A declined "you may put it into your hand" hidden pick (Sparring
-		// Dummy's milled land): XMage poses the optional ask on its target
-		// queue only, so the skip token declines it there. The declined
-		// pair's "no" boolean has no chooseUse to answer (measured driver
-		// error: "Found wrong choice command").
-		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
+		// Dummy's milled land): XMage's player.choose(Outcome, Cards,
+		// TargetCard) is TestPlayer.makeChoose, the CHOICE queue (measured
+		// 2026-10-13: "Missing CHOICE def ... TargetCard", with the earlier
+		// target-queue skip left unused and the AI taking the land), so the
+		// choice skip token declines it. The declined pair's "no" boolean has
+		// no chooseUse to answer (measured driver error: "Found wrong choice
+		// command").
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}), true
+	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && !r.lookedFirst(i) &&
+		d.Max > 1 && distinctRefs(d.OptionRefs) > 1:
+		// A declined "you may cast up to N of them" Play over several cards
+		// (Baron Helmut Zemo's "cast up to three of the copies"): XMage's
+		// CardUtil.castMultipleWithAttributeForFree first asks WHICH card
+		// through a TargetCard(0, 1) player.choose -- TestPlayer's CHOICE
+		// queue -- so the decline is the choice skip token (measured: a
+		// chooseUse "no" there is "Found wrong choice command ... Select up
+		// to one card to cast"). A skipped pick is a cast that did not
+		// happen, after which a human player is asked "Continue casting?"
+		// (chooseUse): "no" ends the loop, or the unanswered ask lets the
+		// AI cast the copies.
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}, XAnswer{d.Seat, "choice", "no"}), true
 	case d.Kind == "mode" && d.Resume == "play" && len(d.Picks) == 0 && r.lookedFirst(i):
 		// A declined optional Play after a hidden-zone look (Cosmic Cube's
-		// "you may play one of these"): XMage poses the "cast from among
-		// them" ask on the target queue only, so the skip token declines
-		// it. The plain Play carriers (Discover, Cascade) have no look and
-		// stay with the measured chooseUse "no" below.
-		return append(as, XAnswer{d.Seat, "target", "[target_skip]"}), true
+		// "you may cast a spell from among them"). XMage's
+		// CardUtil.castSpellWithAttributes asks a TargetCard(0, 1) "which
+		// card" pick only when MORE THAN ONE card is castable, and asks it
+		// through player.choose(outcome, cards, target, ...): TestPlayer
+		// serves that from the CHOICE queue (makeChoose), never the target
+		// queue, so the decline is the choice skip token, legal on an up-to
+		// target (measured: a [target_skip] there was left unused, strict
+		// mode reported "Missing CHOICE def" and the AI cast Grizzly Bears --
+		// Cosmic Cube trigger#0.0, xmage library 37, gorge 38). With exactly
+		// one castable card it goes straight to chooseUse "Cast spell ...?",
+		// so the decline is the "no". The plain Play carriers (Discover,
+		// Cascade) have no look and stay with the measured chooseUse "no"
+		// below.
+		if distinctRefs(d.OptionRefs) == 1 {
+			return append(as, XAnswer{d.Seat, "choice", "no"}), true
+		}
+		return append(as, XAnswer{d.Seat, "choice", "[choice_skip]"}), true
 	case declinedChoice(d) && !r.lookedFirst(i):
 		// One makeChoose "up to" ask however many type slots gorge posed; its
 		// own skip token ends it. (A boolean "no" is not an answer to it.)
@@ -398,6 +443,72 @@ func (r *answerRouting) route(i int) (as []XAnswer, owned bool) {
 		return []XAnswer{{d.Seat, "choice", "[choice_skip]"}}, true
 	}
 	return nil, false
+}
+
+// triggerCostAnswer is XMage's chooseUse answer to the pay/decline ask of a
+// triggered MANA cost ("you may pay {W}. If you do, ..."): "yes" for the pay
+// pick, "no" for the decline, "" for any other decision. XMage's
+// DoIfCostPaid poses that chooseUse for a mana cost even when it cannot be
+// paid (gorge then offers only the decline). A non-mana cost keeps the
+// generic routing: XMage checks canPay first (an unpayable forage is never
+// asked) and a blight goes straight to its creature target (measured:
+// Scuzzback Scrounger's "yes" met "Select a creature you control").
+func triggerCostAnswer(d rules.OracleDecision) string {
+	if d.Kind != "choose_n" || len(d.Picks) != 1 || !d.TriggerCostMana {
+		return ""
+	}
+	switch pickKind(d, 0) {
+	case "trigger_cost_pay", "trigger_cost_pay_manual":
+		return "yes"
+	case "trigger_cost_decline":
+		return "no"
+	}
+	return ""
+}
+
+// triggerCostWindow reports a mana-window decision (an "activate" source tap,
+// its "done", or the tapped source's colour pick) that belongs to a
+// triggered cost: the run of such decisions by the same asker ends at that
+// cost's pay/decline ask.
+func (r *answerRouting) triggerCostWindow(i int) bool {
+	if !manaWindowPick(r.ds[i]) {
+		return false
+	}
+	for j := i + 1; j < len(r.ds) && sameAsker(r.ds[i], r.ds[j]); j++ {
+		if triggerCostAnswer(r.ds[j]) != "" {
+			return true
+		}
+		if !manaWindowPick(r.ds[j]) {
+			return false
+		}
+	}
+	return false
+}
+
+// manaWindowPick is one answered step of a payment window: a source tap or
+// "done" (option kinds activate/done), or the colour ask a tapped source poses.
+func manaWindowPick(d rules.OracleDecision) bool {
+	if d.Kind != "choose_n" {
+		return false
+	}
+	if d.Resume == "mana_color" {
+		return true
+	}
+	if len(d.Picks) != 1 {
+		return false
+	}
+	k := pickKind(d, 0)
+	return k == "activate" || k == "done"
+}
+
+// distinctRefs is the number of different object refs among refs: the
+// castable-card count of a Play ask (one option per card or per ability).
+func distinctRefs(refs []string) int {
+	seen := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		seen[ref] = struct{}{}
+	}
+	return len(seen)
 }
 
 // lookedFirst reports a look_ack by the same seat earlier in decision i's

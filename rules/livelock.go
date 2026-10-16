@@ -58,6 +58,37 @@ const (
 	// never-false-positive, not tight: the runaway diagnostic still names
 	// the span and the last event, which is where a debugger looks.
 	defaultRunawayEvents = 50000
+	// RunawayBigBoardObjs is the arena population at which a runaway
+	// trip is a board too large to finish, not a stuck resolution: one
+	// combat damage step or token storm over a Krenko, Mob Boss board
+	// (a player who cannot lose, Herald of Eternal Dawn, keeps it going)
+	// legitimately emits more events than defaultRunawayEvents with no
+	// decision. A real repeating cycle never reaches this branch: the
+	// exact-period detector fires first and reports "repeating cycle".
+	RunawayBigBoardObjs = 10000
+	// RunawayBigBoardReason is LivelockError.Reason for that trip; the
+	// harness records it as a "bigboard" stall, never an engine abort.
+	RunawayBigBoardReason = "runaway resolution on a large board"
+	// ObjectCapReason is LivelockError.Reason for the armed object cap
+	// (LoopGuard.MaxObjs). The harnesses re-classify a game that tripped it
+	// through IsVolumeReason, so the string lives here and nowhere else.
+	ObjectCapReason = "object cap"
+	// DefaultMaxObjs is the object-arena population the shared harness and
+	// host paths arm LoopGuard.MaxObjs with when the caller set no explicit
+	// budget (rules.WithDefaultObjectCap). It is a VOLUME bound, not a
+	// bug detector: measured over 2100 ordinary games (1200 FDN-Limited
+	// pairs, 600 constructed repo-deck pairs, 300 4-seat Commander repo-deck
+	// games, CV-8 probe) the arena's end-of-game high-water (it is monotone,
+	// so end-of-game length IS the high-water) was 554 objects (Commander,
+	// 4 seats); the widest legitimate token board on record is cardfuzz
+	// batch8's 1790 Goblins. 10000 sits ~18x above the measured ordinary
+	// maximum, equals RunawayBigBoardObjs (the same "this is volume, not a
+	// stuck resolution" population CV-2 fixed the runaway reason at), and
+	// bounds a Krenko, Mob Boss storm well under the GB-scale RSS an
+	// unbounded one reaches (CV-8's measured 7.2 GB and climbing at 25127
+	// objects) while an ordinary game never comes within an order of
+	// magnitude of it.
+	DefaultMaxObjs = RunawayBigBoardObjs
 )
 
 // progressKinds are the events that prove the game is still moving: a
@@ -112,6 +143,39 @@ type LoopGuard struct {
 	Disabled      bool
 }
 
+// WithDefaultObjectCap arms a harness or host config's object cap at
+// DefaultMaxObjs: the caller's own guard is copied and its MaxObjs filled
+// when it set none, a nil guard gets the default, an EXPLICIT MaxObjs (a
+// caller's own budget, cmd/cardfuzz's -max-objects) wins unchanged, and a
+// Disabled guard -- the embedder's supervised-infinite-loop opt-out the
+// host propagates from MaxDecisionsPerTurn == 0 -- is returned unchanged
+// (an opted-out game is supervised by whoever disabled the watcher, and a
+// default volume bound must not resurrect a protection the embedder
+// explicitly turned off).
+func WithDefaultObjectCap(g *LoopGuard) *LoopGuard {
+	if g == nil {
+		return &LoopGuard{MaxObjs: DefaultMaxObjs}
+	}
+	if g.Disabled || g.MaxObjs > 0 {
+		return g
+	}
+	out := *g
+	out.MaxObjs = DefaultMaxObjs
+	return &out
+}
+
+// IsVolumeReason reports whether a LivelockError's Reason is degenerate
+// VOLUME -- a game whose board (or creation plan) grew past a deliberate
+// budget -- rather than a stuck resolution. The harnesses (internal/bench's
+// drive loop, the host's play recover) record a game that tripped a volume
+// reason as a stalled game under the cardfuzz "bigboard" vocabulary, never
+// as an engine-bug abort (Ruling CV-2). "token plan" is deliberately NOT
+// volume here: it predates the classification and its callers classify it
+// themselves.
+func IsVolumeReason(reason string) bool {
+	return reason == ObjectCapReason || reason == RunawayBigBoardReason
+}
+
 func (g *LoopGuard) filled() LoopGuard {
 	out := LoopGuard{CycleEvents: defaultCycleEvents, MaxPeriod: defaultMaxPeriod, RunawayEvents: defaultRunawayEvents}
 	if g != nil {
@@ -138,8 +202,15 @@ func (g *LoopGuard) filled() LoopGuard {
 // a string) so a harness can record the pieces (object, kind, repeat
 // count, cycle length) structurally as well as render the text.
 type LivelockError struct {
-	// Reason is "repeating cycle" or "runaway resolution" -- which of the
-	// two triggers fired.
+	// Reason is "repeating cycle", "runaway resolution", "object cap",
+	// "token plan" or "runaway resolution on a large board" -- which
+	// trigger fired. The first four are the watcher's and the CreateToken
+	// replacement plan driver's: "token plan" is raised when a creation's
+	// honest answer exceeds tokenPlanMintCap mints (a doubler stack whose
+	// exponential plan cannot be represented), under the same abort
+	// contract; "runaway resolution on a large board" is a runaway trip
+	// on a board past RunawayBigBoardObjs, recorded as a bigboard stall
+	// rather than an engine abort.
 	Reason string
 	// Kind and Object identify the repeating event shape: for a cycle, the
 	// first event of one period; for a runaway, the last event emitted.
@@ -171,6 +242,10 @@ func (e *LivelockError) Error() string {
 		fmt.Fprintf(&b, "cycle of %d event(s) repeated %d time(s), events %d-%d", e.CycleLen, e.Repeats, e.FirstSeq, e.LastSeq)
 	case livelockReasonObjectCap:
 		fmt.Fprintf(&b, "the object arena holds %d object(s), cap %d", e.Count, e.Cap)
+	case livelockReasonTokenPlan:
+		fmt.Fprintf(&b, "the token-creation plan would hold %d mint(s), cap %d", e.Count, e.Cap)
+	case livelockReasonBigBoard:
+		fmt.Fprintf(&b, "%d event(s) with no decision, step or turn change, events %d-%d, the object arena holds %d object(s)", e.QuietEvents, e.FirstSeq, e.LastSeq, e.Count)
 	default:
 		fmt.Fprintf(&b, "%d event(s) with no decision, step or turn change, events %d-%d", e.QuietEvents, e.FirstSeq, e.LastSeq)
 	}
@@ -337,7 +412,7 @@ func (w *livelockWatcher) observeFrom(ev *events.Event, damageSource state.ObjID
 	// hundreds of thousands of expensive events later.
 	if w.guard.MaxObjs > 0 && nObjs > w.guard.MaxObjs {
 		panic(&LivelockError{
-			Reason: "object cap",
+			Reason: ObjectCapReason,
 			Kind:   ev.Kind,
 			Object: ev.Obj,
 			Count:  nObjs,
@@ -360,8 +435,13 @@ func (w *livelockWatcher) observeFrom(ev *events.Event, damageSource state.ObjID
 		w.quiet++
 	}
 	if w.quiet > w.guard.RunawayEvents {
+		reason := "runaway resolution"
+		if nObjs >= RunawayBigBoardObjs {
+			reason = RunawayBigBoardReason
+		}
 		panic(&LivelockError{
-			Reason:      "runaway resolution",
+			Reason:      reason,
+			Count:       nObjs,
 			Kind:        ev.Kind,
 			Object:      ev.Obj,
 			FirstSeq:    w.quietSince,
@@ -803,9 +883,13 @@ type livelockReasonCode uint16
 const (
 	livelockReasonRepeatingCycle livelockReasonCode = iota + 1
 	livelockReasonObjectCap
+	livelockReasonTokenPlan
+	livelockReasonBigBoard
 )
 
 var livelockReasonCodes = state.NewStrCodes(
 	state.StrEntry[livelockReasonCode]{Key: "repeating cycle", Val: livelockReasonRepeatingCycle},
 	state.StrEntry[livelockReasonCode]{Key: "object cap", Val: livelockReasonObjectCap},
+	state.StrEntry[livelockReasonCode]{Key: "token plan", Val: livelockReasonTokenPlan},
+	state.StrEntry[livelockReasonCode]{Key: RunawayBigBoardReason, Val: livelockReasonBigBoard},
 )

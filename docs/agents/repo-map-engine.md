@@ -18,7 +18,7 @@ The import direction is one-way. `internal/archtest`'s
 | `decision` | `Decision` / `Option` / `Intent`, and the closed set of `decision.Kind`s (`decision.Kinds`). The whole engine↔seat contract. |
 | `deck` | `{name, count}` deck-list JSON resolved against a `cards.Registry`. |
 | `botpolicy` | The one heuristic bot policy (`botpolicy.Decide`), in one copy, shared by `seat` and rules' own fuzz driver. Reads a `Board`, never a view or an engine. Cast profiles in `botpolicy/profiles/`. |
-| `bots` | Registry of hosted bot policies (`bots/registry.go`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. |
+| `bots` | Registry of hosted bot policies (`bots/registry.go`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. The hosted az policies `bots/azc3`, `bots/azc4` and `bots/azc5` register only when gorged's `-az-c*-net` flags enable them (`cmd/gorged/azc3.go`, `cmd/gorged/azclosed.go`). |
 | `events` | The event union, `events.Apply` (the only state mutator), the log, the sha256 hash chain. `events.Kind` is append-only. |
 | `effects` | `api:` primitive implementations, filter/count/value evaluators. Talks to the engine only through the small `effects.Host` interface; never imports `rules`. |
 | `rules` | The engine: turn structure, priority, stack, combat, SBAs, layers, casting and payment, and the `kw:`/`trig:`/`stat:`/`repl:` primitives. `rules.New`, `Pending`, `Submit`, `Advance`, `Clone`. `rules.NewStaged` (`staging.go`) builds a hypothetical engine at a described position. Also holds the coverage ratchets (`rules/*_test.go`) and the golden heads (`rules/testdata/heads/`, pinned by `TestHeads`). |
@@ -31,3 +31,24 @@ The import direction is one-way. `internal/archtest`'s
 | `protocol` | Versioned wire types for host↔client. Types only; never imports `rules`. |
 | `host` | Tables (one goroutine each), sessions, snapshots, persistence, undo, the hosted bot-policy vocabulary (`host/bot_policy.go`). Its only clock is an injected sleep. |
 | `host/httpapi` | `net/http` JSON + SSE + the embedded web client. Every seat route goes through `claimForTable`. |
+| `eventhost` | Hosted draft events inside gorged: event store (`event.json` + `log.jsonl`), lobby/join, draft with synchronous bots, per-event SSE frames; build and games in later E1 tickets. |
+
+## The draft stack
+
+E0's headless limited lab: a draft pod's own event stream, below (not
+inside) the engine chain. Everything here is pure or nearly so — the only
+package that touches the engine is `cmd/draftsim` (see
+[repo-map-paths.md](repo-map-paths.md#cmd)). Design:
+`docs/superpowers/specs/2026-10-13-draft-events-design.md`.
+
+| Package | What it owns |
+|---|---|
+| `limited` | The draft stack's shared vocabulary: `CardRef`, `Rarity`, the pool/receipt types every `limited/` package speaks. No behaviour; embeddable in logs and wire payloads. |
+| `limited/setdata` | The embedded set specs (`FDN`, `BLB` as go:generate-refreshed JSON) and `Load`/`Codes`/`Support` over them. |
+| `limited/booster` | Seeded Play-Booster opening: slot-ordered fills, weighted wildcards, colour balance; `OpenPod` opens a whole pod's packs from one seed. |
+| `limited/draft` | The pure N-seat (2..8; hosted 4) booster-draft state machine (left/right pack flow, FIFO pack queues); interleaving-independent. |
+| `limited/build` | Pool → engine-loadable 40-card deck: validation, coloured-pip land split, `deck.File` output (`ToDeckFile`). |
+| `limited/pickbot` | The pick decision and pool→deck build policies a drafting bot is made of: `RatingColour` (Drafter), `Best23` (Builder), the shared registry with `Lookup`/`Names`. Registry entries are shared pointers — construct fresh instances with a `CardLookup` injected. |
+| `event` | The draft event: a LOBBY→DRAFT→BUILD→ROUNDn→COMPLETE state machine over an append-only, hash-chained log (`Apply`, `ReplayLog`, `MarshalLog`), the per-seat draft view (`Next`/`Pool`/`SavedDeck`), round-robin pairings, sealed supply, Swiss pairings (logged `RoundPaired`), standings and the CSV draft log. Owns the replay-from-log contract `cmd/draftsim -verify` asserts. |
+| `draftlab` | The headless limited lab over the corpus: sealed pools, deck builders and player policies resolved by ref, games and gauntlets as pure functions of (entrants, seed), whole draft/sealed events (`RunEvent`) with per-seat draft ids, manifests, and the 17Lands-shaped `draft_data`/`game_data`/`decks.json` exports (`csv.go`, E5-c4). |
+| `draftlab/extern` | Out-of-process agents for draftlab (E5-d): the adapters (`Drafter`/`Builder`/`Player`), the process-wide batching hub, the `gorge-agent/1` wire (`draftlab/extern/wire`) and the reference agent (`refagent`, plus `cmd/extagent`). Dials one agent over a child's stdio or a Unix socket and exposes it where a built-in agent would sit. The protocol of record is the E5-d plan §4. |

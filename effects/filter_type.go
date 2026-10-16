@@ -145,11 +145,11 @@ func typePredicate(p string, g *state.Game, o *state.Object, sc SpecContext) (bo
 	case typePredicateNonBasic:
 		return !hasTypeCtx(o, "Basic", sc), true
 	case typePredicateChosenType:
-		s := g.Obj(sc.Source)
-		return s != nil && s.ChosenType != "" && hasTypeCtx(o, s.ChosenType, sc), true
+		t, _ := sourceChosen(g, sc)
+		return t != "" && hasTypeCtx(o, t, sc), true
 	case typePredicateIsNotChosenType:
-		s := g.Obj(sc.Source)
-		return s != nil && s.ChosenType != "" && !hasTypeCtx(o, s.ChosenType, sc), true
+		t, _ := sourceChosen(g, sc)
+		return t != "" && !hasTypeCtx(o, t, sc), true
 	case typePredicateChosenCtrl:
 		return chosenCtrlMatches(g, o, sc.Source), true
 	}
@@ -312,8 +312,20 @@ func IntrinsicAllCreatureTypes(o *state.Object) bool {
 // TypeMatchWords binds a compact layer-4 type list and its semantic all-types
 // marker as an authoritative predicate list. The returned slice is read-only.
 // A non-nil empty list means "no types", not "read the printed face".
+//
+// Every reader of the result tests membership (hasTypeCtx, typeWordsHave,
+// lockedLayer4Types' filter), so a list that already carries every
+// vocabulary word -- the layer-4 walk's list once an all-creature-types
+// grant has materialised the vocabulary into it -- is returned as is: the
+// appended copy would hold exactly the same words, each a second time, and
+// building it on every layer-4 applicability probe of an animated manland
+// was a 330-string allocation per probe.
 func TypeMatchWords(types []string, all bool) []string {
 	if all {
+		var have CreatureTypeSet
+		if have.AddWords(types) == len(creatureTypeWordList) {
+			return types
+		}
 		return append(append([]string(nil), types...), CreatureTypeWordList()...)
 	}
 	if types == nil {

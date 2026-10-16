@@ -3,10 +3,9 @@ package policynet
 import (
 	"fmt"
 	"math/rand/v2"
-	"sort"
 	"strings"
+	"sync"
 
-	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
 )
@@ -92,6 +91,10 @@ const (
 var entityTypes = [...]string{"Creature", "Land", "Artifact", "Enchantment", "Planeswalker",
 	"Instant", "Sorcery", "Battle", "Legendary", "Basic"}
 
+// entityTypeMasks is entityTypes as cardTypeBits masks (typeMasks).
+var entityTypeMasks = [len(entityTypes)]uint16{tbCreature, tbLand, tbArtifact, tbEnchantment, tbPlaneswalker,
+	tbInstant, tbSorcery, tbBattle, tbLegendary, tbBasic}
+
 // entityHashSuffix is the entity contract's part of EncoderHashFor.
 func entityHashSuffix() string {
 	return fmt.Sprintf("\x1fentity-format=1\x1fgroups=%d\x1fraw=%d\x1fsum=%g\x1ftypes=%s\x1fpins=%d",
@@ -109,25 +112,127 @@ type EntityCard struct {
 // Order: my battlefield, every other battlefield (seat order), my hand, the
 // stack (top first, as the view lists it).
 func entityCards(v view.View, seat state.PlayerID) ([]EntityCard, map[state.ObjID]int) {
+	out := entityCardList(nil, &v, seat)
+	idx := make(map[state.ObjID]int, len(out))
+	n := 0
+	walkEntityOrder(&v, seat, func(cv *view.CardView, _ uint8, _ int) {
+		if _, dup := idx[cv.ID]; !dup {
+			idx[cv.ID] = n
+			n++
+		}
+	})
+	return out, idx
+}
+
+// walkEntityOrder visits the entity order's cards, duplicates included:
+// my battlefield, every other battlefield (seat order), my hand, the stack.
+func walkEntityOrder(v *view.View, seat state.PlayerID, f func(cv *view.CardView, group uint8, zone int)) {
 	var me *view.PlayerView
 	for i := range v.Players {
 		if v.Players[i].ID == seat {
 			me = &v.Players[i]
 		}
 	}
-	// Board facts every permanent's vector reads: who blocks, who hosts
-	// attachments, who controls the host.
-	blocking := map[state.ObjID]bool{}
-	hosts := map[state.ObjID]int{}
-	ctrl := map[state.ObjID]state.PlayerID{}
+	if me != nil {
+		for i := range me.Battlefield {
+			f(&me.Battlefield[i], entGroupBfMe, entZoneBf)
+		}
+	}
 	for i := range v.Players {
-		for _, cv := range v.Players[i].Battlefield {
-			ctrl[cv.ID] = cv.Controller
-			for _, b := range cv.BlockedBy {
-				blocking[b] = true
+		if v.Players[i].ID == seat {
+			continue
+		}
+		for j := range v.Players[i].Battlefield {
+			f(&v.Players[i].Battlefield[j], entGroupBfOpp, entZoneBf)
+		}
+	}
+	if me != nil {
+		for i := range me.Hand {
+			f(&me.Hand[i], entGroupHand, entZoneHand)
+		}
+	}
+	for i := range v.Stack {
+		if sv := &v.Stack[i]; sv.Card != nil {
+			f(sv.Card, entGroupStack, entZoneStack)
+		}
+	}
+}
+
+// entityScratch is entityCardList's dedup table: seen[id] == gen marks an
+// id already listed in this call, so the table is never cleared.
+type entityScratch struct {
+	seen []uint32
+	gen  uint32
+	huge []state.ObjID // ids >= maxDenseObjID marked this call
+}
+
+var entityScratches = sync.Pool{New: func() any { return new(entityScratch) }}
+
+// entityBoard is the board facts every permanent's vector reads, read off
+// the battlefields without a map: who blocks (any BlockedBy entry), how
+// many attachments a permanent hosts, and a host's controller (the LAST
+// battlefield entry with its id, as the old map's last write left it).
+type entityBoard struct {
+	v        *view.View
+	blockers []state.ObjID
+	attached []state.ObjID
+}
+
+func (b *entityBoard) blocking(id state.ObjID) bool {
+	for _, x := range b.blockers {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *entityBoard) hosts(id state.ObjID) int {
+	n := 0
+	for _, x := range b.attached {
+		if x == id {
+			n++
+		}
+	}
+	return n
+}
+
+func (b *entityBoard) controller(id state.ObjID) (state.PlayerID, bool) {
+	for i := len(b.v.Players) - 1; i >= 0; i-- {
+		bf := b.v.Players[i].Battlefield
+		for j := len(bf) - 1; j >= 0; j-- {
+			if bf[j].ID == id {
+				return bf[j].Controller, true
 			}
+		}
+	}
+	return 0, false
+}
+
+// entityCardList is entityCards' card list. Every card's Raw and Rows are
+// carved out of one slab each (capacity-capped, so an append never reaches
+// a neighbour).
+func entityCardList(buf *StateBuf, v *view.View, seat state.PlayerID) []EntityCard {
+	var me *view.PlayerView
+	for i := range v.Players {
+		if v.Players[i].ID == seat {
+			me = &v.Players[i]
+		}
+	}
+	var blkBuf, attBuf [16]state.ObjID
+	b := entityBoard{v: v, blockers: blkBuf[:0], attached: attBuf[:0]}
+	total := len(v.Stack)
+	for i := range v.Players {
+		pv := &v.Players[i]
+		total += len(pv.Battlefield)
+		if pv.ID == seat {
+			total += len(pv.Hand)
+		}
+		for j := range pv.Battlefield {
+			cv := &pv.Battlefield[j]
+			b.blockers = append(b.blockers, cv.BlockedBy...)
 			if cv.AttachedTo != 0 {
-				hosts[cv.AttachedTo]++
+				b.attached = append(b.attached, cv.AttachedTo)
 			}
 		}
 	}
@@ -135,54 +240,64 @@ func entityCards(v view.View, seat state.PlayerID) ([]EntityCard, map[state.ObjI
 	if me != nil {
 		avail = seatAvailable(me)
 	}
-	var out []EntityCard
-	idx := map[state.ObjID]int{}
-	add := func(cv view.CardView, group uint8, zone int) {
-		if _, dup := idx[cv.ID]; dup {
+	sc := entityScratches.Get().(*entityScratch)
+	sc.gen++
+	sc.huge = sc.huge[:0]
+	if sc.gen == 0 { // wrapped: start the stamps over
+		clear(sc.seen)
+		sc.gen = 1
+	}
+	out, raw, rows := buf.entitySlabs(total)
+	walkEntityOrder(v, seat, func(cv *view.CardView, group uint8, zone int) {
+		if !sc.markNew(cv.ID) {
 			return
 		}
-		idx[cv.ID] = len(out)
-		out = append(out, entityCard(cv, group, zone, seat, avail, blocking[cv.ID], hosts[cv.ID], ctrl))
-	}
-	if me != nil {
-		for _, cv := range me.Battlefield {
-			add(cv, entGroupBfMe, entZoneBf)
+		k := len(out)
+		r := raw[k*EntityRawWidth : (k+1)*EntityRawWidth : (k+1)*EntityRawWidth]
+		start := len(rows)
+		rows = entityCard(r, rows, cv, zone, seat, avail, b.blocking(cv.ID), b.hosts(cv.ID), &b)
+		var cr []Feature
+		if len(rows) > start {
+			cr = rows[start:len(rows):len(rows)]
 		}
+		out = append(out, EntityCard{Group: group, Raw: r, Rows: cr})
+	})
+	entityScratches.Put(sc)
+	buf.keepEntity(out, rows)
+	if len(out) == 0 {
+		return nil // as the append-built list was
 	}
-	for i := range v.Players {
-		if v.Players[i].ID == seat {
-			continue
-		}
-		for _, cv := range v.Players[i].Battlefield {
-			add(cv, entGroupBfOpp, entZoneBf)
-		}
-	}
-	if me != nil {
-		for _, cv := range me.Hand {
-			add(cv, entGroupHand, entZoneHand)
-		}
-	}
-	for i := range v.Stack {
-		if sv := &v.Stack[i]; sv.Card != nil {
-			add(*sv.Card, entGroupStack, entZoneStack)
-		}
-	}
-	return out, idx
+	return out
 }
 
-func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, avail int32, blocking bool, hosts int, ctrl map[state.ObjID]state.PlayerID) EntityCard {
-	raw := make([]float32, EntityRawWidth)
+// markNew reports whether id is not yet listed this call (and marks it).
+func (sc *entityScratch) markNew(id state.ObjID) bool {
+	if int(id) >= maxDenseObjID {
+		// Never seen in a real game: fall back to the slow exact check.
+		return !sc.seenSlow(id)
+	}
+	if int(id) >= len(sc.seen) {
+		sc.seen = append(sc.seen, make([]uint32, int(id)+1-len(sc.seen))...)
+	}
+	if sc.seen[id] == sc.gen {
+		return false
+	}
+	sc.seen[id] = sc.gen
+	return true
+}
+
+// entityCard writes cv's raw vector into raw (EntityRawWidth zeros) and
+// appends its identity rows to rows.
+func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat state.PlayerID, avail int32, blocking bool, hosts int, b *entityBoard) []Feature {
 	set := func(i int, v float32) { raw[i] = v }
-	types := strings.Fields(cv.Types)
-	for i, t := range entityTypes {
-		for _, w := range types {
-			if w == t {
-				set(entTypeOff+i, 1)
-			}
+	fold, exact := typeMasks(cv.Types)
+	for i, m := range entityTypeMasks {
+		if exact&m != 0 {
+			set(entTypeOff+i, 1)
 		}
 	}
-	creature := hasTypeWord(cv.Types, "Creature")
-	if creature || hasTypeWord(cv.Types, "Planeswalker") || zone == entZoneHand {
+	creature := fold&tbCreature != 0
+	if creature || fold&tbPlaneswalker != 0 || zone == entZoneHand {
 		set(entPower, float32(cv.Power)/4)
 		set(entToughness, float32(cv.Toughness-cv.Damage)/4)
 	}
@@ -226,27 +341,24 @@ func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, av
 		if len(cv.BlockedBy) > 0 {
 			set(entBlocked, 1)
 		}
-		keys := make([]string, 0, len(cv.Counters))
-		for k := range cv.Counters {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			n := float32(cv.Counters[k])
-			switch strings.ToUpper(k) {
-			case "P1P1", "+1/+1":
-				raw[entCtrPlus] += n / 2
-			case "M1M1", "-1/-1":
-				raw[entCtrMinus] += n / 2
-			case "LOYALTY":
-				raw[entCtrLoyalty] += n / 4
-			default:
-				raw[entCtrOther] += n / 2
-			}
+		if len(cv.Counters) > 0 {
+			eachCounterSorted(cv.Counters, func(k string, c int32) {
+				n := float32(c)
+				switch strings.ToUpper(k) {
+				case "P1P1", "+1/+1":
+					raw[entCtrPlus] += n / 2
+				case "M1M1", "-1/-1":
+					raw[entCtrMinus] += n / 2
+				case "LOYALTY":
+					raw[entCtrLoyalty] += n / 4
+				default:
+					raw[entCtrOther] += n / 2
+				}
+			})
 		}
 		if cv.AttachedTo != 0 {
 			set(entAttached, 1)
-			if c, ok := ctrl[cv.AttachedTo]; ok && c == seat {
+			if c, ok := b.controller(cv.AttachedTo); ok && c == seat {
 				set(entAttachMine, 1)
 			}
 		}
@@ -267,44 +379,23 @@ func entityCard(cv view.CardView, group uint8, zone int, seat state.PlayerID, av
 	}
 	mv := int32(mvOf(cv.ManaCost))
 	set(entManaValue, float32(mv)/5)
-	if hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash") {
+	if fold&tbInstant != 0 || hasKeyword(cv, "Flash") {
 		set(entInstant, 1)
 	}
-	if zone == entZoneHand && !hasTypeWord(cv.Types, "Land") && mv <= avail {
+	if zone == entZoneHand && fold&tbLand == 0 && mv <= avail {
 		set(entCastable, 1)
 	}
 	if cv.FaceDown {
 		set(entFaceDown, 1)
 	}
 	set(entOne, 1)
-	var rows []Feature
 	if cv.Name != "" && !cv.FaceDown {
-		rows = append(rows, Feature{Row: hashID("ent|name|" + cv.Name), Value: 1})
+		rows = append(rows, Feature{Row: fnvRow(fnvAdd(fnvAdd(fnvOffset, "ent|name|"), cv.Name)), Value: 1})
 	}
 	if cv.SpellAPI != "" {
-		rows = append(rows, Feature{Row: hashID("ent|api|" + cv.SpellAPI), Value: 1})
+		rows = append(rows, Feature{Row: fnvRow(fnvAdd(fnvAdd(fnvOffset, "ent|api|"), cv.SpellAPI)), Value: 1})
 	}
-	return EntityCard{Group: group, Raw: raw, Rows: rows}
-}
-
-// entityOptionRefs resolves an option's entity references (Option.EntA/B):
-// its own card and its related card, as 1 + State.Cards index (0 = none).
-func entityOptionRefs(v view.View, seat state.PlayerID, o decision.Option) (int32, int32) {
-	_, idx := entityCards(v, seat)
-	ref := func(id state.ObjID) int32 {
-		if id == 0 {
-			return 0
-		}
-		if i, ok := idx[id]; ok {
-			return int32(i + 1)
-		}
-		return 0
-	}
-	rel := o.Attacker
-	if rel == 0 {
-		rel = o.Battle
-	}
-	return ref(o.Obj), ref(rel)
+	return rows
 }
 
 // ---- model half --------------------------------------------------------
@@ -522,4 +613,16 @@ func UpgradeEntity(m *Model, k int, rng *rand.Rand) error {
 	fillUniform(m.EntW, glorot(m.entInW(), k), rng)
 	m.Features = FeaturesEntity
 	return nil
+}
+
+// seenSlow is markNew for an id past the dense table: a short list of the
+// huge ids marked this generation.
+func (sc *entityScratch) seenSlow(id state.ObjID) bool {
+	for _, x := range sc.huge {
+		if x == id {
+			return true
+		}
+	}
+	sc.huge = append(sc.huge, id)
+	return false
 }

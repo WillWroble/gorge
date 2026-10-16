@@ -1,0 +1,266 @@
+package protocol
+
+import "encoding/json"
+
+// Draft-event frame kinds (eventhost; spec 2026-10-13 §5 E1). Their frames
+// carry no table, match or seq: NewFrame(t, "", 0, 0, body).
+const (
+	TEventState   FrameType = "event_state"
+	TDraftPack    FrameType = "draft_pack"
+	TPodProgress  FrameType = "pod_progress"
+	TSeriesUpdate FrameType = "series_update"
+)
+
+// DraftCard is one card as a draft client sees it: the server-minted
+// instance ID to answer a pick with, plus the printed facts it renders.
+// Rarity is one letter: C U R M (mythic) L (special) S.
+type DraftCard struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Set       string `json:"set"`
+	Number    string `json:"number"`
+	Rarity    string `json:"rarity"`              // one letter: C U R M L S
+	ManaCost  string `json:"mana_cost,omitempty"` // printed cost; "" when the card has none
+	ManaValue int    `json:"mana_value,omitempty"`
+	Colors    string `json:"colors,omitempty"`    // subset of "WUBRG", in WUBRG order
+	TypeLine  string `json:"type_line,omitempty"` // face types, space-joined
+}
+
+// EventSeat is one entrant of a draft event. Kind is "human" or "bot";
+// Policy and Drafter name a bot seat's game policy and pickbot persona.
+// Picks is the public count of cards drafted so far, never the cards.
+type EventSeat struct {
+	Seat    int    `json:"seat"`
+	Kind    string `json:"kind"`              // "human" | "bot"
+	Name    string `json:"name"`              // "" until a human joins
+	Policy  string `json:"policy,omitempty"`  // bot: game policy (bots registry name)
+	Drafter string `json:"drafter,omitempty"` // bot: pickbot persona name
+	Joined  bool   `json:"joined"`
+	Picks   int    `json:"picks"` // cards drafted so far (a public count)
+	Ready   bool   `json:"ready"`
+}
+
+// EventSeries is one pairing of an event round. State is "pending", "live",
+// "between" or "ended" — "between" names the sideboarding step between two
+// games of a series (E3-3). Table names the live (or last) game's host
+// table, so a spectator can watch at /t/{table}; Attempt is the game
+// attempt in flight. Game is the live game, or the next one while between.
+// Games is the winner seat per played game (-1 for a draw); Chooser names
+// the event seat choosing play/draw for Game; Waiting lists the seats
+// still to submit their deck while between. Winner is nil while the series
+// is not ended and for a drawn series. Join appears only in the viewer's
+// own state: the seat-tokenised spectate URL for that seat's side of the
+// live game.
+type EventSeries struct {
+	Round   int    `json:"round"`
+	A       int    `json:"a"`
+	B       int    `json:"b"`
+	BestOf  int    `json:"best_of"`
+	State   string `json:"state"`             // "pending" | "live" | "between" | "ended"
+	Table   string `json:"table,omitempty"`   // the live (or last) game's table: spectate at /t/{table}
+	Attempt int    `json:"attempt,omitempty"` // the live game's attempt number
+	Game    int    `json:"game,omitempty"`    // the live game, or the next one while between
+	Games   []int  `json:"games,omitempty"`   // winner seat per played game (-1 draw)
+	Chooser *int   `json:"chooser,omitempty"` // the event seat choosing play/draw for Game
+	Waiting []int  `json:"waiting,omitempty"` // seats still to submit their deck while between
+	Score   [2]int `json:"score"`
+	Winner  *int   `json:"winner"`         // nil while not ended, and for a drawn series
+	Join    string `json:"join,omitempty"` // only in the viewer's own state: /t/{table}?seat=N&token=T
+}
+
+// EventStanding is one row of the event standings: MTR Appendix C points
+// and match/game win percentages.
+type EventStanding struct {
+	Seat   int     `json:"seat"`
+	Points int     `json:"points"`
+	MW     float64 `json:"mw"`
+	OMW    float64 `json:"omw"`
+	GW     float64 `json:"gw"`
+	OGW    float64 `json:"ogw"`
+}
+
+// EventState is the full public draft-event state, the event_state body.
+// You is the viewer's seat when a valid seat token was presented, nil for a
+// spectator. Series lists every pairing of rounds 1..3 in round then
+// pairing order. Error carries a human-readable problem with the event's
+// progress (a crashed game attempt that could not be rescheduled), never a
+// request-validation message.
+type EventState struct {
+	Event     string          `json:"event"`
+	Set       string          `json:"set"`
+	Phase     string          `json:"phase"` // LOBBY DRAFT BUILD ROUND1 ROUND2 ROUND3 COMPLETE
+	Round     int             `json:"round"`
+	BestOf    int             `json:"best_of"` // the event's series format (1 or 3)
+	PickTimer string          `json:"pick_timer,omitempty"`
+	Seats     []EventSeat     `json:"seats"`
+	You       *int            `json:"you"`    // the viewer's seat when a valid seat token was presented
+	Series    []EventSeries   `json:"series"` // every pairing of rounds 1..3, round then pairing order
+	Standings []EventStanding `json:"standings"`
+	Error     string          `json:"error,omitempty"`
+}
+
+// DraftPack is the draft_pack body: the pack waiting at a seat's queue head
+// and the pool it has drafted so far. Waiting means no pack is queued for
+// this seat right now, so Pack and Pool carry their last-known (or empty)
+// contents.
+type DraftPack struct {
+	Event       string      `json:"event"`
+	Seat        int         `json:"seat"`
+	Waiting     bool        `json:"waiting"` // no pack queued for this seat right now
+	Round       int         `json:"round"`
+	PickNo      int         `json:"pick_no"`
+	TimeLimitMS int64       `json:"time_limit_ms,omitempty"` // 0 = no pick timer
+	RemainingMS int64       `json:"remaining_ms,omitempty"`
+	Pack        []DraftCard `json:"pack"`
+	Pool        []DraftCard `json:"pool"`
+}
+
+// PodProgress is the pod_progress body: how far every seat is through the
+// current draft round, as public counts.
+type PodProgress struct {
+	Event  string `json:"event"`
+	Round  int    `json:"round"`
+	Picks  []int  `json:"picks"`  // per seat
+	Queued []int  `json:"queued"` // per seat
+}
+
+// SeriesUpdate is the series_update body: one series' row changed.
+type SeriesUpdate struct {
+	Event  string      `json:"event"`
+	Series EventSeries `json:"series"`
+}
+
+// CreateEventSeat is one seat of a CreateEventRequest. Kind is "human" or
+// "bot"; Policy names the bot's game policy ("" = server default) and
+// Drafter the pickbot persona ("" = "rating-colour").
+type CreateEventSeat struct {
+	Kind    string `json:"kind"`              // "human" | "bot"
+	Policy  string `json:"policy,omitempty"`  // bot game policy; "" = server default
+	Drafter string `json:"drafter,omitempty"` // pickbot name; "" = "rating-colour"
+}
+
+// CreateEventRequest is the POST /api/events body: the drafted set, the
+// series format and the four seats. BestOf is 1 or 3 (0 = 1). PickTimer is
+// "", "off", "standard" or "relaxed". The seed is always minted by the
+// server; no client field may choose it.
+type CreateEventRequest struct {
+	Set       string            `json:"set"`
+	BestOf    int               `json:"best_of,omitempty"`    // 0 = 1; 1 or 3
+	PickTimer string            `json:"pick_timer,omitempty"` // "", "off", "standard", "relaxed"
+	Seats     []CreateEventSeat `json:"seats"`                // exactly 4
+}
+
+// SideboardRequest is the POST /api/events/{id}/sideboard body: the seat's
+// deck for game Game of its current series. Keep re-submits the deck it
+// played last game; otherwise Deck is the new list (pool CardRef ids plus
+// basics), saved as a new revision. Exactly one of Keep and Deck is set.
+// Game is compared with the server's next game; a stale one is a 409.
+type SideboardRequest struct {
+	Game int          `json:"game"`
+	Keep bool         `json:"keep,omitempty"`
+	Deck *DeckRequest `json:"deck,omitempty"`
+}
+
+// EventInvite is one seat's join token in a CreateEventResponse. Join is the
+// tokenised event URL /e/{event}?seat=N&token=T.
+type EventInvite struct {
+	Seat  int    `json:"seat"`
+	Token string `json:"token"`
+	Join  string `json:"join"` // /e/{event}?seat=N&token=T
+}
+
+// CreateEventResponse is the POST /api/events reply: the event id, one
+// invite per seat and the event's initial state.
+type CreateEventResponse struct {
+	Event   string        `json:"event"`
+	Invites []EventInvite `json:"invites"`
+	State   EventState    `json:"state"`
+}
+
+// EventSetInfo is one draftable set as GET /api/events/sets reports it.
+// Ratings is the rating source the pickbot uses for it: "17lands" when a
+// ratings manifest exists, "heuristic" otherwise.
+type EventSetInfo struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	PackSize int    `json:"pack_size"`
+	Ratings  string `json:"ratings"` // "17lands" | "heuristic"
+}
+
+// EventPersonas is the GET /api/events/personas reply: the registered
+// pickbot persona names, offered to a create body's Drafter fields.
+type EventPersonas struct {
+	Drafters []string `json:"drafters"`
+	Builders []string `json:"builders"`
+}
+
+// JoinEventRequest is the POST /api/events/{id}/join body: the joining
+// human's display name.
+type JoinEventRequest struct {
+	Name string `json:"name"`
+}
+
+// PickRequest is the POST /api/events/{id}/pick body: which card instance
+// the seat takes from the pack at its queue head. Round and PickNo are
+// compared against server state; a stale answer is a 409.
+type PickRequest struct {
+	Round  int    `json:"round"`
+	PickNo int    `json:"pick_no"`
+	ID     string `json:"id"`
+}
+
+// DeckRequest is a seat's deck list: maindeck CardRef IDs from its own pool
+// plus basic-land counts (W U B R G). It is also DeckPool's saved-deck and
+// suggestion shape.
+type DeckRequest struct {
+	Main   []string `json:"main"`   // CardRef ids from the seat's pool
+	Basics [5]int   `json:"basics"` // W U B R G
+}
+
+// DeckCheck is the deck-check reply: whether the submitted (or suggested)
+// deck is legal, its total card count, the auto-land counts the builder
+// would add to this main, and the revision a successful save produced.
+type DeckCheck struct {
+	Valid     bool   `json:"valid"`
+	Total     int    `json:"total"`
+	Error     string `json:"error,omitempty"`
+	AutoLands [5]int `json:"auto_lands"`    // basics AutoLands would add to this main
+	Rev       int    `json:"rev,omitempty"` // set by a successful save
+}
+
+// EventPool is the GET /api/events/{id}/pool body: the seat's drafted cards,
+// its latest saved deck revision (nil before the first save), whether the
+// seat has readied, and the bot builder's suggested deck for this pool.
+// Playing is, in a round, the deck the seat plays or last played in its
+// series, with PlayingRev naming its revision.
+type EventPool struct {
+	Event      string       `json:"event"`
+	Seat       int          `json:"seat"`
+	Pool       []DraftCard  `json:"pool"`
+	Deck       *DeckRequest `json:"deck"` // latest saved revision, nil before the first save
+	Rev        int          `json:"rev"`
+	Ready      bool         `json:"ready"`
+	Playing    *DeckRequest `json:"playing,omitempty"` // the deck the seat plays or last played in its series
+	PlayingRev int          `json:"playing_rev,omitempty"`
+	Suggestion DeckRequest  `json:"suggestion"` // the bot builder's deck for this pool
+}
+
+// ReadyRequest is the POST /api/events/{id}/ready body: the deck revision
+// the seat is readying; a stale revision is a 409.
+type ReadyRequest struct {
+	Rev int `json:"rev"`
+}
+
+// EventLog is the GET /api/events/{id}/log body: the event's log entries.
+// Entries stay redacted until the event is COMPLETE (see event.LogFor).
+type EventLog struct {
+	Event    string            `json:"event"`
+	Complete bool              `json:"complete"`
+	Entries  []json.RawMessage `json:"entries"` // event.Entry JSON, redacted until COMPLETE
+}
+
+// EventSubscribe is the POST /api/events/{id}/subscribe body: the session id
+// the client echoes, opening its event SSE stream.
+type EventSubscribe struct {
+	Session string `json:"session"`
+}

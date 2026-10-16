@@ -122,11 +122,9 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/bots/azredeal"
-	"github.com/adams-shaun/gorge/bots/sbfirst"
-	"github.com/adams-shaun/gorge/bots/sbheuristic"
+	"github.com/adams-shaun/gorge/bots/sbbuiltin"
 	hostedsbsearch "github.com/adams-shaun/gorge/bots/sbsearch"
 	"github.com/adams-shaun/gorge/bots/sbtactical"
-	"github.com/adams-shaun/gorge/bots/sbuniform"
 	"github.com/adams-shaun/gorge/bots/search"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
@@ -383,9 +381,9 @@ func setTacticalRegistry(reg *cards.Registry) {
 // set, so hostedPolicy sets it for exactly these names. The explicit Manual
 // arms stay available as the separate sb-*-manual registry entries.
 var benchAutoPayHosted = map[string]bool{
-	sbuniform.Policy:   true,
-	sbfirst.Policy:     true,
-	sbheuristic.Policy: true,
+	sbbuiltin.UniformPolicy:   true,
+	sbbuiltin.FirstPolicy:     true,
+	sbbuiltin.HeuristicPolicy: true,
 }
 
 // hostedPolicy resolves a hosted name through bots.New, preserving the bench
@@ -463,6 +461,7 @@ func init() {
 		}
 		return s
 	}
+	registerSanityPolicies()
 }
 
 // castProfileOverride is the weights -profile names: nil (the zero value)
@@ -693,6 +692,7 @@ func writePaymentStats(w io.Writer) error {
 }
 
 func isAutoPayPolicy(name string) bool {
+	name = basePolicyName(name)
 	return name == "bot-auto-pay" || name == "cast-profile-auto-pay" || name == "attack-sim-auto-pay"
 }
 
@@ -2543,7 +2543,11 @@ func main() {
 	memprofile := flag.String("memprofile", "", "write a heap profile to this pprof file after the last game finishes (pprof reads both alloc_space and inuse_space from it; empty = off)")
 	registerAZFlags(flag.CommandLine)
 	registerSpellbenchFlags(flag.CommandLine)
+	commonSense := flag.Bool("common-sense", false, "play the plain bot, bot-auto-pay and sb-tactical policies behind the bots/sanity guard (drops hostile removal that can only hit the seat's own side, via the engine's target hints, and answers the London mulligan with the land-window rule instead of the 1/3 coin); default off. A per-side alternative is the policy name bot+sanity / bot-auto-pay+sanity / sb-tactical+sanity")
 	flag.Parse()
+	if *commonSense {
+		applyCommonSense()
+	}
 	applyGCFlags()
 	startPprof()
 	flag.Visit(func(f *flag.Flag) {

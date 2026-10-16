@@ -273,9 +273,9 @@ func bp10WaitQueued(t *testing.T, r *Registry, want int) {
 func bp10Tables(policy string) []TableConfig {
 	return []TableConfig{
 		{ID: "s1", Name: "bp10 s1", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260928,
-			Pace: 0, Spectator: view.Public, BotPolicy: policy},
+			Pace: 0, Spectator: view.Public, BotPolicy: policy, AllowDecklistBots: true},
 		{ID: "s2", Name: "bp10 s2", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260929,
-			Pace: 0, Spectator: view.Public, BotPolicy: policy},
+			Pace: 0, Spectator: view.Public, BotPolicy: policy, AllowDecklistBots: true},
 	}
 }
 
@@ -547,7 +547,7 @@ func TestMaxSearchTablesRefusesAtCreate(t *testing.T) {
 	defer r.Close()
 
 	g1 := TableConfig{ID: "g1", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260928,
-		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy}
+		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy, AllowDecklistBots: true}
 	if err := r.AddTable(g1); err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +561,7 @@ func TestMaxSearchTablesRefusesAtCreate(t *testing.T) {
 
 	// At the limit: refused, with the refusal that names the alternative.
 	err = r.AddTable(TableConfig{ID: "g2", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260929,
-		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy})
+		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy, AllowDecklistBots: true})
 	if err == nil || !strings.Contains(err.Error(), "search bots are at capacity; choose a non-search policy") {
 		t.Fatalf("second on-demand search table error = %v, want the capacity refusal", err)
 	}
@@ -578,7 +578,7 @@ func TestMaxSearchTablesRefusesAtCreate(t *testing.T) {
 		t.Fatalf("non-search on-demand table refused by the search limit: %v", err)
 	}
 	if err := r.AddTable(TableConfig{ID: "g4", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260931,
-		Pace: 0, Spectator: view.Public, BotPolicy: bp10SpyPolicy}); err != nil {
+		Pace: 0, Spectator: view.Public, BotPolicy: bp10SpyPolicy, AllowDecklistBots: true}); err != nil {
 		t.Fatalf("durable search table refused by the on-demand limit: %v", err)
 	}
 
@@ -589,7 +589,7 @@ func TestMaxSearchTablesRefusesAtCreate(t *testing.T) {
 	r.Wait("g1")
 	bp10WaitTableState(t, r, "g1", protocol.TableIdle)
 	if err := r.AddTable(TableConfig{ID: "g5", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260932,
-		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy}); err != nil {
+		Pace: 0, Spectator: view.Public, OnDemand: true, BotPolicy: bp10SpyPolicy, AllowDecklistBots: true}); err != nil {
 		t.Fatalf("on-demand search table refused after g1 finished: %v", err)
 	}
 }
@@ -631,7 +631,7 @@ func TestSearchSlotPassesBotSearchParallelismToBotsOptions(t *testing.T) {
 	}
 	defer r.Close()
 	cfg := TableConfig{ID: "p1", Seats: 2, Decks: []string{"a", "b"}, Seed: 20260933,
-		Pace: 0, Spectator: view.Public, BotPolicy: bp10SpyPolicy}
+		Pace: 0, Spectator: view.Public, BotPolicy: bp10SpyPolicy, AllowDecklistBots: true}
 	if err := r.AddTable(cfg); err != nil {
 		t.Fatal(err)
 	}

@@ -102,6 +102,77 @@ type CostPart struct {
 	// Spec matches relative to the payer (which for Player.Other/* is exactly
 	// the oracle), with or without the marker.
 	Each bool
+	// AtLeast marks Forge's open-ended "N+" count on an Exile part
+	// (Exile<1+/...>, ExileFromGrave<1+/...>): the payer exiles N OR MORE
+	// matching objects -- "exile one or more other artifacts you control"
+	// (Fabrication Foundry), "exile any number of black cards from your
+	// graveyard" (Baron Helmut Zemo; Forge writes "any number" with a
+	// set-level floor as 1+, since an empty set cannot reach the floor).
+	// N is the minimum. The count binds nothing: the elected set's size is
+	// the player's choice, bounded only by Group.
+	AtLeast bool
+	// Group is the SET-level constraint a withTotal<Prop><Cmp><Rhs> group
+	// predicate places on an AtLeast part's elected set (the sum of the
+	// elected objects' mana values, or of their mana symbols of one colour).
+	// Like MinPower it is moved out of the spec at parse time -- a
+	// per-object matcher cannot evaluate a property of the whole set -- and
+	// the offer gate, the X announcement and the election (Decision.MinSum/
+	// MaxSum over Option.Value) enforce it. The zero value is no constraint.
+	Group GroupTotal
+}
+
+// GroupTotal is one parsed withTotal<Prop><Cmp><Rhs> group predicate (see
+// CostPart.Group): Prop names the summed per-object quantity, Cmp the
+// comparison against the right-hand side, which is the literal N or -- when
+// Var is set -- the announced value of that name (Fabrication Foundry's
+// withTotalCMCEQX with Announce$ X). Raw is the predicate's own spelling,
+// kept for FormatCost so a formatted cost re-parses to the same part.
+type GroupTotal struct {
+	Prop  GroupProp
+	Color byte // the WUBRG letter a GroupManaSymbols sum counts
+	Cmp   GroupCmp
+	N     int32
+	Var   string
+	Raw   string
+}
+
+// GroupProp is the per-object quantity a GroupTotal sums.
+type GroupProp uint8
+
+const (
+	// GroupNone is the zero GroupTotal: no set-level constraint.
+	GroupNone GroupProp = iota
+	// GroupCMC sums mana values (withTotalCMC...).
+	GroupCMC
+	// GroupManaSymbols sums the mana symbols of one colour among the
+	// objects' mana costs (withTotalManaSymbols_<Color>_...): a hybrid or
+	// Phyrexian symbol of that colour counts as one (CR 107.4e/f, 202.2a).
+	GroupManaSymbols
+)
+
+// GroupCmp is a GroupTotal's comparison.
+type GroupCmp uint8
+
+const (
+	// GroupEQ: the total equals the right-hand side.
+	GroupEQ GroupCmp = iota + 1
+	// GroupGE: the total is at least the right-hand side.
+	GroupGE
+)
+
+// Active reports whether g carries a constraint.
+func (g GroupTotal) Active() bool { return g.Prop != GroupNone }
+
+// Holds reports whether total satisfies g against the resolved right-hand
+// side rhs (the literal N, or the announced value Var names).
+func (g GroupTotal) Holds(total, rhs int32) bool {
+	switch g.Cmp {
+	case GroupEQ:
+		return total == rhs
+	case GroupGE:
+		return total >= rhs
+	}
+	return false
 }
 
 // ManaPair is one two-face hybrid symbol: each face is a WUBRGC mana symbol,
@@ -209,6 +280,15 @@ type Cost struct {
 	// the ability's source, and the payment is one public Note. Spec is
 	// "Player" or "Type".
 	RevealChosen []CostPart
+	// ChooseType counts ChooseCreatureType<N> parts: "as an additional cost
+	// to cast this spell, choose a creature type" (Caller of the Hunt, and
+	// Celestial Reunion's optional cost). The choice is a payment with no
+	// resource (CR 601.2h); the cast flow asks it (chooseTypeCostAsk) before
+	// any part that reads Card.ChosenType, and records it on the spell
+	// through the existing Choose "type" event, which the permanent the spell
+	// becomes keeps (events.Apply's Move keeps Chosen* across stack ->
+	// battlefield).
+	ChooseType   int32
 	Behold       []CostPart
 	TapPermanent []CostPart
 	// UntapPermanent carries untapYType<N/Spec> parts -- untapping N
@@ -507,6 +587,7 @@ func (c Cost) Plus(d Cost) Cost {
 	if len(d.RevealChosen) > 0 {
 		c.RevealChosen = append(append([]CostPart(nil), c.RevealChosen...), d.RevealChosen...)
 	}
+	c.ChooseType = AddClampedGeneric(c.ChooseType, int64(d.ChooseType))
 	if len(d.Behold) > 0 {
 		c.Behold = append(append([]CostPart(nil), c.Behold...), d.Behold...)
 	}
@@ -638,7 +719,7 @@ func CostAnnouncesCastX(c Cost) bool {
 // even though it takes no payment), so a caller using this to skip the
 // cast-flow stages is told the truth.
 func (c Cost) HasNonMana() bool {
-	return c.Life > 0 || c.Tap || c.Untap || len(c.Sac) > 0 || len(c.Discard) > 0 || len(c.SubCounter) > 0 || len(c.AddCounter) > 0 || len(c.Exile) > 0 || len(c.ExileFromTop) > 0 || len(c.Reveal) > 0 || len(c.RevealChosen) > 0 || len(c.Behold) > 0 || len(c.TapPermanent) > 0 || len(c.UntapPermanent) > 0 || len(c.Blight) > 0 || c.Forage || len(c.Energy) > 0 || len(c.Return) > 0 || len(c.PutToLib) > 0 || len(c.Draw) > 0 || len(c.LifeX) > 0 || len(c.DamageYou) > 0 || len(c.GainLife) > 0 || len(c.MoveToGrave) > 0 || len(c.Mill) > 0 || len(c.Exert) > 0
+	return c.Life > 0 || c.Tap || c.Untap || len(c.Sac) > 0 || len(c.Discard) > 0 || len(c.SubCounter) > 0 || len(c.AddCounter) > 0 || len(c.Exile) > 0 || len(c.ExileFromTop) > 0 || len(c.Reveal) > 0 || len(c.RevealChosen) > 0 || len(c.Behold) > 0 || len(c.TapPermanent) > 0 || len(c.UntapPermanent) > 0 || len(c.Blight) > 0 || c.Forage || len(c.Energy) > 0 || len(c.Return) > 0 || len(c.PutToLib) > 0 || len(c.Draw) > 0 || len(c.LifeX) > 0 || len(c.DamageYou) > 0 || len(c.GainLife) > 0 || len(c.MoveToGrave) > 0 || len(c.Mill) > 0 || len(c.Exert) > 0 || c.ChooseType > 0
 }
 
 // Priceable reports whether payMana can actually charge every part of this

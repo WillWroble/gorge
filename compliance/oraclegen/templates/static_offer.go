@@ -111,6 +111,12 @@ type offerTry struct {
 	// for "if a creature died this turn"); extraHand is the cards it casts.
 	prelude   []oraclegen.Step
 	extraHand []string
+	// attack is the self-attack prelude a "Card.Self+attackedThisTurn" gate
+	// needs (a Vehicle's crew, its attack, then main 2) and attackXAbility
+	// the XMage rule-text prefix parallel to it. The control omits it: the
+	// source it names is removed.
+	attack         []oraclegen.Step
+	attackXAbility []string
 	// extraBF and extraGY are p0 cards a cost-reduction grant needs to
 	// reduce with (an artifact to affinity or improvise, a graveyard card to
 	// delve): the reduction is exactly one short of what mana pays for.
@@ -132,6 +138,13 @@ type offerTry struct {
 	// a granted loyalty ability whose cost exceeds the probe's printed
 	// starting loyalty (Avatar of Burgeoning Echoes' [-10]) is still payable.
 	probeLoyalty int32
+	// backFace places the setup source on its back face (setupBackFace): a
+	// back-face permission (Hades, Sorcerer of Eld, Emet-Selch, Unsundered's
+	// back face: "During your turn, you may play cards from your graveyard")
+	// exists only there. Set only on the retry staticOfferItem makes after
+	// every front-face candidate failed, so a row served on the front face
+	// keeps its scenario bytes.
+	backFace bool
 }
 
 // staticOfferItem serves a play-permission or granted-Flashback static as an
@@ -165,7 +178,21 @@ func staticOfferItem(reg *cards.Registry, c *cards.Card, f *cards.Face, name str
 	// the probe must be exiled by the source's own move, which the setup
 	// placement above cannot fake (static_fixture_exile.go). Last, so a row
 	// an existing candidate already serves keeps its scenario bytes.
+	if req.Face > 0 {
+		for _, t := range tries {
+			if t.self {
+				continue
+			}
+			t.backFace = true
+			if it, ok := offerItem(reg, f, name, req, t, nil); ok {
+				return it, true
+			}
+		}
+	}
 	if it, ok := staticExileOfferItem(reg, f, name, req, st); ok {
+		return it, true
+	}
+	if it, ok := staticExileOpponentOfferItem(reg, f, name, req, st); ok {
 		return it, true
 	}
 	return oraclegen.Item{}, false
@@ -200,6 +227,14 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 				return nil
 			}
 		}
+		var attack []oraclegen.Step
+		var attackXab, attackBF []string
+		if staticNeedsSelfAttack(st) {
+			var ok bool
+			if attack, attackXab, attackBF, ok = selfAttackPrelude(f, name); !ok {
+				return nil
+			}
+		}
 		probes := offerProbeNames
 		if self {
 			probes = []string{name}
@@ -207,7 +242,15 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 		for _, z := range zones {
 			for _, p := range probes {
 				if t, ok := offerTryFor(reg, p, z, free, self); ok {
+					// A land is played, never cast (CR 305.1), so a
+					// ValidAfterStack$ spell qualifier does not gate it: it
+					// would be offered whatever the qualifier says and
+					// observe nothing of the gate. Probe with a spell.
+					if t.kind != offerKindCast && st.Params["ValidAfterStack"] != "" {
+						continue
+					}
 					t.extraGY, t.prelude, t.extraHand = evidence, died, diedHand
+					t.attack, t.attackXAbility, t.extraBF = attack, attackXab, attackBF
 					tries = append(tries, t)
 				}
 			}
@@ -233,6 +276,8 @@ func offerTries(reg *cards.Registry, f *cards.Face, name string, st cards.Static
 			}
 			tries = append(tries, t)
 		}
+	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Mayhem") && !self:
+		tries = mayhemTries(reg)
 	case strings.HasPrefix(st.ParamStr(cards.PKAddKeyword), "Plot"):
 		// Plot is a special action offered from the zone the card sits in,
 		// for the card's own mana cost.
@@ -380,6 +425,9 @@ func offerScenario(f *cards.Face, name string, t offerTry, want bool, base *orac
 		if !(t.self && control) {
 			steps = append(steps, t.prelude...)
 		}
+		if !control {
+			steps = append(steps, t.attack...)
+		}
 		sc = staticScenario(f, name, bf, nil, append(steps, tail...))
 	}
 	setup := make(map[string]oraclegen.Seat, len(sc.Setup))
@@ -412,6 +460,9 @@ func offerScenario(f *cards.Face, name string, t offerTry, want bool, base *orac
 	if t.probeLoyalty > 0 {
 		p0 = oraclegen.WithCounters(p0, t.probe, "LOYALTY", t.probeLoyalty)
 	}
+	if t.backFace && !control && base == nil {
+		p0.BackFace = appendFixtureUnique(append([]string(nil), p0.BackFace...), name)
+	}
 	setup["p0"] = p0
 	sc.Setup = setup
 	return sc
@@ -432,8 +483,45 @@ func offerItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requi
 		}
 	}
 	it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"601.3"}, sc)
+	if len(t.attackXAbility) > 0 && base == nil {
+		// XAbility is parallel to Steps: the main-1 pass is step 0, the
+		// self-attack prelude follows it (after any creature-death prelude).
+		it.XAbility = make([]string, len(sc.Steps))
+		copy(it.XAbility[1+len(t.prelude):], t.attackXAbility)
+	}
 	it.XAnswers = oraclegen.XAnswersForScenario(res, sc, oraclegen.ModeNumbers(f), nil)
 	return it, true
+}
+
+// staticNeedsSelfAttack reports whether st's IsPresent$ gate reads that its
+// own source attacked this turn (The Lunar Whale's "As long as CARDNAME
+// attacked this turn, you may play the top card of your library").
+func staticNeedsSelfAttack(st cards.Static) bool {
+	return strings.Contains(strings.ToLower(st.ParamStr(cards.PKIsPresent)), "card.self+attackedthisturn")
+}
+
+// selfAttackPrelude is the steps that make the source attack: a Vehicle is
+// crewed first (the crew cost's catalogue taps are returned for the caller to
+// place), then attacks, and the scenario moves to main 2 where a play
+// permission is observable. xab is parallel to the returned steps.
+func selfAttackPrelude(f *cards.Face, name string) (steps []oraclegen.Step, xab, taps []string, ok bool) {
+	if crewAbilityIndex(f) >= 0 {
+		var cs []oraclegen.Step
+		var cx []string
+		var cok bool
+		cs, cx, taps, _, cok = crewPrelude(f, name)
+		if !cok {
+			return nil, nil, nil, false
+		}
+		steps, xab = cs, cx
+	} else if !f.IsCreature() {
+		return nil, nil, nil, false
+	}
+	steps = append(steps,
+		oraclegen.Step{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + name}},
+		oraclegen.Step{Op: "pass_to", Step: "main2"})
+	xab = append(xab, "", "")
+	return steps, xab, taps, true
 }
 
 // removeFixtureOnce returns xs without its first name.
@@ -502,4 +590,41 @@ func creatureDeathPrelude(reg *cards.Registry) ([]oraclegen.Step, []string) {
 		{Op: "cast", Seat: 0, Card: "p0:Shock", Mana: "R", Targets: []string{"p0:" + staticProbe}},
 		{Op: "resolve"},
 	}, []string{"Shock"}
+}
+
+// mayhemDiscarder is the spell p0 casts at itself so the probe is discarded
+// this turn: Mind Rot ("Target player discards two cards") with the probe the
+// only other card in hand, so the discard poses no choice.
+const mayhemDiscarder = "Mind Rot"
+
+// mayhemTries are the candidates for a granted Mayhem (Green Goblin, Norman
+// Osborn's back face: "Each nonland card in your graveyard has mayhem ... You
+// may cast a card from your graveyard for its mayhem cost if you discarded it
+// this turn"). The probe starts in hand and the prelude discards it with
+// mayhemDiscarder, so the observation is the graveyard cast labelled
+// "(mayhem)"; the control, the source removed, offers no such cast.
+func mayhemTries(reg *cards.Registry) []offerTry {
+	c, ok := reg.Lookup(mayhemDiscarder)
+	if !ok || len(c.Faces) == 0 || !oraclegen.XMageKnown(mayhemDiscarder) {
+		return nil
+	}
+	pool, why := oraclegen.PoolFor(c.Faces[0].ManaCost)
+	if why != "" {
+		return nil
+	}
+	prelude := []oraclegen.Step{
+		{Op: "cast", Seat: 0, Card: "p0:" + mayhemDiscarder, Mana: pool, Targets: []string{"p0"}},
+		{Op: "resolve"},
+	}
+	var tries []offerTry
+	for _, p := range offerProbeNames {
+		t, ok := offerTryFor(reg, p, offerHand, false, false)
+		if !ok || t.kind != offerKindCast || t.mana == "" {
+			continue
+		}
+		t.label = "(mayhem)"
+		t.prelude, t.extraHand = prelude, []string{mayhemDiscarder}
+		tries = append(tries, t)
+	}
+	return tries
 }

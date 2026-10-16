@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // The S0 front-end parity test (P§3.9): both front ends run over the same
 // gorge-engine transcript, and the resulting entity tables — and the two
 // candidate encodings' pointer resolutions — must agree. The transcript is
@@ -16,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/policynet/v2front"
 	"github.com/adams-shaun/gorge/internal/spellbench"
 	"github.com/adams-shaun/gorge/internal/spellbench/v2agent"
 )
@@ -75,7 +78,7 @@ func TestS0FrontEndParity(t *testing.T) {
 			if err := json.Unmarshal(obsRaw, &obsDec); err != nil {
 				t.Fatal(err)
 			}
-			vt2 := policynet.V2TableFromObservation(&obsDec, sd["acting_seat"].(string))
+			vt2 := v2front.V2TableFromObservation(&obsDec, sd["acting_seat"].(string))
 			if !policynet.V2Equal(pair.GTable.Table, pair.VTable.Table) {
 				t.Fatalf("front ends diverge at %s decision %d (%s): digest G %s V %s",
 					pair.Kind, n, id, policynet.V2TableDigest(pair.GTable.Table), policynet.V2TableDigest(pair.VTable.Table))

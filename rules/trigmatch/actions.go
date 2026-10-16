@@ -165,10 +165,10 @@ func flippedCoinMatches(e Board, t cards.Trigger, source state.ObjID, ev events.
 // object (Siona's Aura.YouCtrl, Enormous Energy Blade's Card.Self) and
 // ValidTarget$ names the BEARER (Brood Keeper's Card.Self reads Self as the
 // trigger's source through the same specCtx becomesTargetMatches uses).
-// A trigger with NO ValidTarget$ never fires: Eriette's line names only
-// TargetRelativeToSource$, a parameter this build does not read anywhere,
-// so firing without the bearer restriction would over-fire on every Aura
-// attach. The Static$ True guard keeps Forge's "static effect expressed as
+// A trigger with NO ValidTarget$ fires only through Eriette's measured
+// TargetRelativeToSource$ bearer filter (attachedRelativeBearerSpec); any
+// other bearer-less line would over-fire on every Aura attach, so it never
+// fires. The Static$ True guard keeps Forge's "static effect expressed as
 // a trigger" lines (Metamorphic Alteration, Paleontologist's Pick-Axe --
 // Execute$ DBClone continuous shapes with no static-trigger machinery here)
 // from firing a clone on every attach.
@@ -188,7 +188,31 @@ func attachedMatches(e Board, t cards.Trigger, source state.ObjID, ev events.Eve
 	if v, ok := t.Param(cards.PKValidTarget); ok {
 		return e.MatchesSpec(v, ev.IDs[0], source, ctrl, SpecOpts{})
 	}
+	if spec, ok := attachedRelativeBearerSpec(e, t, source, ev); ok {
+		return e.MatchesSpec(spec, ev.IDs[0], source, ctrl, SpecOpts{})
+	}
 	return false
+}
+
+// attachedRelativeBearerSpec reads Eriette, the Beguiler's
+// TargetRelativeToSource$ bearer filter ("a nonland permanent an opponent
+// controls with mana value less than or equal to that Aura's mana value":
+// Permanent.nonLand+OppCtrl+cmcLEX with SVar:X:Count$CardManaCost). The X
+// is the ATTACHING object's mana value (CR 202.3), so the comparison is
+// bound to that number before the ordinary filter reads the bearer. Only
+// that measured shape is read; any other TargetRelativeToSource$ value
+// fails closed as before.
+func attachedRelativeBearerSpec(e Board, t cards.Trigger, source state.ObjID, ev events.Event) (string, bool) {
+	v, ok := t.Params["TargetRelativeToSource"]
+	if !ok {
+		return "", false
+	}
+	src, att := e.Game().Obj(source), e.Game().Obj(ev.Obj)
+	if src == nil || src.Face() == nil || att == nil || att.Face() == nil ||
+		strings.TrimSpace(src.Face().SVars["X"]) != "Count$CardManaCost" || !strings.HasSuffix(v, "+cmcLEX") {
+		return "", false
+	}
+	return strings.TrimSuffix(v, "X") + strconv.Itoa(int(att.Face().ManaValue())), true
 }
 
 // ringTemptsMatches implements Mode$ RingTemptsYou (CR 701.54d): the trigger
@@ -235,6 +259,7 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 	if ev.Kind != events.TargetsChosen {
 		return false
 	}
+	firstTime := strings.EqualFold(t.ParamStr(cards.PKFirstTime), "True")
 	if v, ok := t.Param(cards.PKValidSource); ok {
 		// ValidSource$ names the spell or ability doing the targeting: the
 		// TargetsChosen event's Obj, the stack object whose target decision
@@ -266,6 +291,11 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 					(ev.Obj == 0 || e.ControllerOf(ev.Obj) == e.ControllerOf(source)) {
 					return false
 				}
+				if firstTime && !firstTimeTargetedThisTurn(e, ev, id, false) {
+					// "for the first time each turn" is per matched object: a
+					// later target of this same event may still be its first.
+					continue
+				}
 				return true
 			}
 		}
@@ -279,7 +309,7 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 		// only say for it.
 		if (ev.Amount == 1 || ev.Amount == 3) &&
 			effects.MatchesPlayerSpecCtx(e.Game(), v, ev.Player, e.ControllerOf(source), e.PlayerSpecCtx(source)) {
-			return true
+			return !firstTime || firstTimeTargetedThisTurn(e, ev, 0, true)
 		}
 		return false
 	}
@@ -303,7 +333,42 @@ func becomesTargetMatches(e Board, t cards.Trigger, source state.ObjID, ev event
 		// own controller.
 		return false
 	}
-	return targeted
+	return targeted && (!firstTime || firstTimeTargetedThisTurn(e, ev, source, false))
+}
+
+// firstTimeTargetedThisTurn answers FirstTime$ True on Mode$ BecomesTarget
+// ("becomes the target of a spell or ability for the first time each turn",
+// Glyph Keeper, Kira, the Glasskites, Valiant creatures): true when no EARLIER
+// TargetsChosen event this turn named the same object (or player). Same
+// replay-stable backwards log scan as firstDamageToThisTurn -- no new event
+// kind, no engine field, survives Clone -- stopping at TurnChange.
+//
+// Events recorded for the same stack object ev.Obj are the SAME targeting
+// (a spell's later target groups, the event itself when the log already holds
+// it) and never count as an earlier time. A TargetsChosen with no stack
+// object is a hand-built fixture emit and counts like any other.
+func firstTimeTargetedThisTurn(e Board, ev events.Event, id state.ObjID, player bool) bool {
+	for i := len(e.Log().Events) - 1; i >= 0; i-- {
+		le := e.Log().Events[i]
+		if le.Kind == events.TurnChange {
+			return true
+		}
+		if le.Kind != events.TargetsChosen || (ev.Obj != 0 && le.Obj == ev.Obj) {
+			continue
+		}
+		if player {
+			if (le.Amount == 1 || le.Amount == 3) && le.Player == ev.Player {
+				return false
+			}
+			continue
+		}
+		for _, t := range le.IDs {
+			if t == id {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // becomesTargetOnceMatches implements Mode$ BecomesTargetOnce (Forge's
@@ -461,8 +526,26 @@ func abilitySourceQualifiersHold(quals []string, o *state.Object, you state.Play
 // event legal.go's "play_land" case also emits, which carries only a Player
 // (no Obj), and so has nothing ValidCard$ could ever match against.
 func landPlayedMatches(e Board, t cards.Trigger, source state.ObjID, ev events.Event) bool {
-	if ev.Kind != events.MoveZone || ev.From != state.ZHand || ev.To != state.ZBattlefield {
+	if ev.Kind != events.MoveZone || ev.To != state.ZBattlefield {
 		return false
+	}
+	// A hand-to-battlefield entry is read as a play, as before. From any
+	// other zone the move counts only when it IS the land-play special
+	// action (CR 305.1 under a play permission: Crucible of Worlds' graveyard,
+	// Light Up the Stage's exile), never a land merely put onto the
+	// battlefield from there (a reanimated land is not played).
+	if ev.From != state.ZHand && (ev.Obj == 0 || e.Facts().PlayingLand != ev.Obj) {
+		return false
+	}
+	// Origin$ scopes the zone the land was played from ("play a land from
+	// exile", "from anywhere other than your hand"): a play from a zone the
+	// list does not name is not this trigger's event. The list is a
+	// whitelist, so a word naming a zone the engine never plays from (Shadow
+	// of the Goblin's Ante) only drops that zone; it does not void the list.
+	if o, ok := t.ParamCode(cards.PKOrigin); ok {
+		if zl := effects.ZoneList(o); !zl.All() && !zl.Has(ev.From) {
+			return false
+		}
 	}
 	obj := e.Game().Obj(ev.Obj)
 	if obj == nil || obj.Face() == nil || !obj.Face().IsLand() {

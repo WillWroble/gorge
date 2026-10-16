@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/state"
@@ -59,6 +60,21 @@ type redealPlan struct {
 	// sorting by name (redealPlayer).
 	canon     []state.ObjID
 	unknownAt []int32
+	// closed marks a player whose list the seat does not know
+	// (PublicGame.Belief): every Deal re-identifies its unknown cards from
+	// the belief (Redealer.reidentify) before dealing them, and unknown is
+	// in object order, never name order, so nothing of the base's hidden
+	// names orders the deal. seen is the player's accounted-for cards (seen
+	// outside the hidden zones, or pinned) as ascending belief ordinals, and
+	// seenMask their colour identity.
+	closed   bool
+	seen     []int32
+	seenMask uint8
+	// side is a closed player's sideboard (a hidden zone the hand and
+	// library deal never touches), in object order: every Deal re-identifies
+	// it from the belief too (Redealer.reidentifySide), after every other
+	// deal, so its draws never shift the hand and library deal.
+	side []state.ObjID
 }
 
 func redealWorlds(setup PublicGame, h History, known KnownCards, base *RedealBase, n int, seed func(int) [2]uint64) ([]World, string) {
@@ -106,7 +122,18 @@ type Redealer struct {
 	scratch     dealScratch
 	// blind is observationBlind at the base boundary: no world can change
 	// the seat's observation, so Deal skips the probe (redeal_blind.go).
+	// A closed deal keeps the skip only when every card it dealt is blind
+	// too (Belief.blind).
 	blind bool
+	// belief is the setup's Belief (nil: every list is open), and ords the
+	// re-identification scratch.
+	belief *Belief
+	ords   []int32
+	// manifests is the base's genesis manifest table closed to the actor's
+	// own list (rules.Engine.ClosedDeckManifests), installed on every world
+	// of a closed setup so no world's OwnDeck names an opponent's real list.
+	// Nil for an open setup: the world keeps the base's table.
+	manifests []deck.Manifest
 }
 
 // NewRedealer prepares the redeal of base.Engine for the seat whose History
@@ -137,6 +164,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 	if sha256.Sum256(nowBoard) != last.Board.Sum || !ObservedDecisionEqual(nowDec, last.Decision) {
 		return nil, "base engine is not at the observed boundary"
 	}
+	known = known.withDecisionCards(h, e, base.Observer)
 	if err := known.holds(e, base.Observer); err != nil {
 		return nil, "projection does not hold in the base engine: " + err.Error()
 	}
@@ -174,14 +202,39 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 	}
 	for _, ref := range referenced {
 		id := base.Observer.object(ref)
-		if o := e.G.Obj(id); o != nil && o.Zone.Hidden() && !pinned[id] {
+		// A token is never a hidden card (CR 111.8: one that would be in a
+		// hidden zone ceases to exist). A token still being created --
+		// staged for an "as it enters" question, such as a token copy of an
+		// Aura choosing what it enchants (CR 303.4f) -- is in no zone yet,
+		// and its Zone field reads the zero value, ZLibrary; it is not a
+		// library card and nothing about it is hidden.
+		if o := e.G.Obj(id); o != nil && o.Zone.Hidden() && !o.IsToken && !pinned[id] {
 			return nil, "observed frame refers to an unpinned hidden card"
 		}
 	}
 	// The seat-derivable pool: deck list minus cards seen outside hidden
 	// zones minus known hidden cards.
 	public := make(map[state.PlayerID]map[string]int)
-	take := func(owner state.PlayerID, name string) {
+	closed := func(p state.PlayerID) bool { return setup.Belief != nil && p != h.Actor }
+	// A closed player's accounted-for cards: every deck card seen of it
+	// (the belief, not a list, says which are its), with their colours.
+	closedSeen := make(map[state.PlayerID][]int32)
+	closedMask := make(map[state.PlayerID]uint8)
+	// ref is the observer's reference of the object the name was seen on:
+	// the seen card's colours condition a closed player's belief whether or
+	// not the belief's corpus holds it (read off the object only when its
+	// card IS the seen name, so a face-down object's identity never leaks
+	// in).
+	take := func(owner state.PlayerID, name string, ref uint32) {
+		if closed(owner) {
+			if o, ok := setup.Belief.Ord(name); ok {
+				closedSeen[owner] = append(closedSeen[owner], o)
+				closedMask[owner] |= beliefColours(setup.Belief.Cards().Card(int(o)))
+			} else if o := e.G.Obj(base.Observer.object(ref)); o != nil && primaryName(o.Card) == name {
+				closedMask[owner] |= beliefColours(o.Card)
+			}
+			return
+		}
 		if int(owner) >= len(setup.Decks) || !deckHas(setup.Decks[owner], name) {
 			// A token (or anything else no deck-list card could be) is not
 			// part of the owner's pool.
@@ -203,7 +256,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 		for _, zone := range [][]BoardCard{p.Battlefield, p.Graveyard, p.Exile, p.Command} {
 			for _, c := range zone {
 				if identity, ok := names[c.ID]; ok && !minted(c.ID) {
-					take(identity.Owner, identity.Name)
+					take(identity.Owner, identity.Name, c.ID)
 				}
 			}
 		}
@@ -211,7 +264,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 	for _, s := range board.Stack {
 		if o := e.G.Obj(base.Observer.object(s.ID)); o != nil && o.Card != nil && !o.IsToken && !o.IsCopy {
 			if identity, ok := names[s.ID]; ok {
-				take(identity.Owner, identity.Name)
+				take(identity.Owner, identity.Name, s.ID)
 			}
 		}
 	}
@@ -227,7 +280,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 			if hand.Player == p {
 				for _, c := range hand.Cards {
 					pinHand[base.Observer.object(c.ID)] = true
-					take(p, c.Name)
+					take(p, c.Name, c.ID)
 				}
 			}
 		}
@@ -247,7 +300,7 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 			for _, c := range l.Members {
 				id := base.Observer.object(c.ID)
 				pinLib[id] = true
-				take(p, c.Name)
+				take(p, c.Name, c.ID)
 				if !positioned[id] {
 					plan.loose = append(plan.loose, id)
 				}
@@ -258,16 +311,29 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 				plan.unknown = append(plan.unknown, id)
 			}
 		}
-		sortByName(e, plan.unknown)
 		plan.handFree = len(plan.hand) - len(pinHand)
 		for id := range pinHand {
 			plan.pins = append(plan.pins, id)
 		}
 		slices.Sort(plan.pins)
-		plan.index(e)
 		if pi >= len(setup.Decks) {
 			return nil, "seat outside the public deck lists"
 		}
+		if closed(p) {
+			// Nothing of the real list is checked or kept: every unknown
+			// card is re-identified at each Deal.
+			slices.Sort(plan.unknown)
+			plan.closed, plan.seenMask = true, closedMask[p]
+			plan.seen = closedSeen[p]
+			plan.side = append([]state.ObjID(nil), e.G.Zone(state.ZSideboard, p)...)
+			slices.Sort(plan.side)
+			slices.Sort(plan.seen)
+			plan.indexClosed(e)
+			plans = append(plans, plan)
+			continue
+		}
+		sortByName(e, plan.unknown)
+		plan.index(e)
 		derivable := make(map[string]int)
 		for _, c := range setup.Decks[pi] {
 			derivable[c.Faces[0].Name]++
@@ -302,8 +368,12 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 		}
 		plans = append(plans, plan)
 	}
-	return &Redealer{e: e, known: known, obs: base.Observer, probe: probe, nowBoard: nowBoard, nowDecision: nowDec, plans: plans,
-		blind: observationBlind(e, h.Actor, plans)}, ""
+	r := &Redealer{e: e, known: known, obs: base.Observer, probe: probe, nowBoard: nowBoard, nowDecision: nowDec, plans: plans,
+		blind: observationBlind(e, h.Actor, plans), belief: setup.Belief}
+	if setup.Belief != nil {
+		r.manifests = e.ClosedDeckManifests(h.Actor)
+	}
+	return r, ""
 }
 
 // Deal builds one redealt world from seed: a hypothetical clone of the base
@@ -318,21 +388,43 @@ func NewRedealer(setup PublicGame, h History, known KnownCards, base RedealBase)
 func (r *Redealer) Deal(seed [2]uint64, sp *rules.Spare) (*rules.Engine, string) {
 	rng := rand.New(rand.NewPCG(seed[0], seed[1]))
 	w := r.e.CloneHypotheticalInto(seed[1], sp)
+	if r.manifests != nil {
+		if err := w.UseDeckManifests(r.manifests); err != nil {
+			return nil, "closed manifests: " + err.Error()
+		}
+	}
+	blind := r.blind
 	for i := range r.plans {
+		if r.plans[i].closed {
+			reason, dealtBlind := r.reidentify(w, &r.plans[i], rng)
+			if reason != "" {
+				return nil, reason
+			}
+			blind = blind && dealtBlind
+		}
 		if reason := redealPlayer(w, &r.plans[i], rng, &r.scratch); reason != "" {
 			return nil, reason
+		}
+	}
+	for i := range r.plans {
+		if r.plans[i].closed && len(r.plans[i].side) > 0 {
+			reason, dealtBlind := r.reidentifySide(w, &r.plans[i], rng)
+			if reason != "" {
+				return nil, reason
+			}
+			blind = blind && dealtBlind
 		}
 	}
 	if err := r.known.holds(w, r.obs); err != nil {
 		return nil, "redealt world breaks the projection: " + err.Error()
 	}
-	if r.blind && !redealProbeVerify {
+	if blind && !redealProbeVerify {
 		// No world can change the observation (observationBlind).
 		return w, ""
 	}
 	board, dec, err := r.probe.probeBoundary(w)
 	if err != nil || !bytes.Equal(board, r.nowBoard) || !ObservedDecisionEqual(dec, r.nowDecision) {
-		if r.blind {
+		if blind {
 			panic(fmt.Sprintf("searchprobe: a hidden-blind redeal (seed %v) changed the observation (err %v)", seed, err))
 		}
 		return nil, "redealt world changes the observation"
@@ -353,6 +445,64 @@ func (plan *redealPlan) index(e *rules.Engine) {
 	for i, id := range plan.unknown {
 		plan.unknownAt[i] = at[id]
 	}
+}
+
+// indexClosed is index for a closed player: unknown stays in object order
+// (its names are about to be replaced, so they must not order anything),
+// followed by the position-less known members in (name, object) order --
+// pinned cards, whose names the seat knows.
+func (plan *redealPlan) indexClosed(e *rules.Engine) {
+	loose := append([]state.ObjID(nil), plan.loose...)
+	sortByName(e, loose)
+	plan.canon = append(append([]state.ObjID(nil), plan.unknown...), loose...)
+	plan.unknownAt = make([]int32, len(plan.unknown))
+	for i := range plan.unknown {
+		plan.unknownAt[i] = int32(i)
+	}
+}
+
+// reidentify gives a closed player's unknown hidden cards this world's
+// identities: a list drawn from the belief by the player's seen colours,
+// minus its accounted-for cards, trimmed or padded to the unknown count
+// (Belief.closedDeal), dealt onto the unknown objects in object order
+// through rules.ReidentifyHidden (Secret HiddenIdentity events on the
+// world's log). What it deals is a function of the plan -- the seat's
+// observation -- and r alone. dealtBlind reports whether every card dealt
+// is observation-blind.
+func (r *Redealer) reidentify(w *rules.Engine, plan *redealPlan, rng *rand.Rand) (reason string, dealtBlind bool) {
+	r.ords = r.belief.closedDeal(plan.seenMask, plan.seen, len(plan.unknown), rng, r.ords)
+	if err := rules.ReidentifyHidden(w, r.belief.Cards(), plan.unknown, r.ords); err != nil {
+		return fmt.Sprintf("player %d closed redeal: %v", plan.player, err), false
+	}
+	dealtBlind = true
+	for _, o := range r.ords {
+		if !r.belief.blind[o] {
+			dealtBlind = false
+			break
+		}
+	}
+	return "", dealtBlind
+}
+
+// reidentifySide gives a closed player's sideboard this world's identities:
+// a fresh list drawn from the belief by the player's seen colours, trimmed
+// or padded to the sideboard's size (Belief.closedDeal with nothing
+// accounted for). The real sideboard is as private as the real list, so it
+// never reaches a world either; what it deals is a function of the plan and
+// r alone.
+func (r *Redealer) reidentifySide(w *rules.Engine, plan *redealPlan, rng *rand.Rand) (reason string, dealtBlind bool) {
+	r.ords = r.belief.closedDeal(plan.seenMask, nil, len(plan.side), rng, r.ords)
+	if err := rules.ReidentifyHidden(w, r.belief.Cards(), plan.side, r.ords); err != nil {
+		return fmt.Sprintf("player %d closed sideboard: %v", plan.player, err), false
+	}
+	dealtBlind = true
+	for _, o := range r.ords {
+		if !r.belief.blind[o] {
+			dealtBlind = false
+			break
+		}
+	}
+	return "", dealtBlind
 }
 
 // redealPlayer deals one player's unknown hidden cards uniformly: into the
@@ -480,4 +630,91 @@ func sortByName(e *rules.Engine, ids []state.ObjID) {
 		}
 		return ids[i] < ids[j]
 	})
+}
+
+// withDecisionCards is k plus every hidden card the seat's own pending
+// decision (h's last frame) offers it by name: a library search's or a
+// look-at-the-top pile split's options, the cards of a looked-at hand. The
+// seat is looking at those cards right now -- the frame introduced their
+// identities -- so a redeal must keep each exactly where it is; re-dealing
+// one would change what the decision offers. Their zone is the decision's
+// own public fact (the library searched, the hand looked at), read from the
+// base engine only for cards whose identity the seat already holds. A card
+// the seat holds no identity for is left out, and NewRedealer's
+// unpinned-reference check still refuses it.
+func (k KnownCards) withDecisionCards(h History, e *rules.Engine, c *Collector) KnownCards {
+	d := h.Frames[len(h.Frames)-1].Decision
+	if d == nil || d.Player != h.Actor {
+		return k
+	}
+	names := make(map[uint32]Identity)
+	for _, frame := range h.Frames {
+		for _, identity := range frame.Identities {
+			names[identity.ID] = identity
+		}
+	}
+	known := make(map[uint32]bool, k.Count())
+	for _, hand := range k.Hands {
+		for _, card := range hand.Cards {
+			known[card.ID] = true
+		}
+	}
+	for _, lib := range k.Libraries {
+		for _, card := range lib.Members {
+			known[card.ID] = true
+		}
+	}
+	var add []Identity
+	for _, o := range d.Options {
+		ref := o.Action.Obj
+		if ref == 0 || known[ref] {
+			continue
+		}
+		identity, ok := names[ref]
+		obj := e.G.Obj(c.object(ref))
+		if !ok || obj == nil || obj.Owner != identity.Owner || (obj.Zone != state.ZHand && obj.Zone != state.ZLibrary) {
+			continue
+		}
+		known[ref] = true
+		add = append(add, identity)
+	}
+	if len(add) == 0 {
+		return k
+	}
+	out := KnownCards{Actor: k.Actor, Hands: slices.Clone(k.Hands), Libraries: slices.Clone(k.Libraries)}
+	for _, identity := range add {
+		if e.G.Obj(c.object(identity.ID)).Zone == state.ZHand {
+			i := slices.IndexFunc(out.Hands, func(x KnownHand) bool { return x.Player == identity.Owner })
+			if i < 0 {
+				out.Hands = append(out.Hands, KnownHand{Player: identity.Owner})
+				i = len(out.Hands) - 1
+			}
+			out.Hands[i].Cards = insertIdentity(out.Hands[i].Cards, identity)
+			continue
+		}
+		i := slices.IndexFunc(out.Libraries, func(x KnownLibrary) bool { return x.Player == identity.Owner })
+		if i < 0 {
+			out.Libraries = append(out.Libraries, KnownLibrary{Player: identity.Owner})
+			i = len(out.Libraries) - 1
+		}
+		out.Libraries[i].Members = insertIdentity(out.Libraries[i].Members, identity)
+	}
+	sort.Slice(out.Hands, func(i, j int) bool { return out.Hands[i].Player < out.Hands[j].Player })
+	sort.Slice(out.Libraries, func(i, j int) bool { return out.Libraries[i].Player < out.Libraries[j].Player })
+	return out
+}
+
+// insertIdentity is list (sorted by reference, never written) with identity
+// added in reference order.
+func insertIdentity(list []Identity, identity Identity) []Identity {
+	i, _ := slices.BinarySearchFunc(list, identity.ID, func(x Identity, id uint32) int {
+		switch {
+		case x.ID < id:
+			return -1
+		case x.ID > id:
+			return 1
+		}
+		return 0
+	})
+	return slices.Insert(slices.Clone(list), i, identity)
 }

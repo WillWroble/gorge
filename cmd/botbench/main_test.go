@@ -3,9 +3,6 @@ package main
 import (
 	"bytes"
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,40 +10,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
 	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/rules"
 )
-
-// corpusDirOrSkip resolves the repo root the way testutil.CorpusRegistry and
-// cmd/mtgsim do -- `git rev-parse --show-toplevel`, never a hard-coded
-// relative path -- and Skips when .cards/ is absent, so this package still
-// passes on a clean checkout with nothing fetched. The bench drives real
-// repo decks through the same engine path a served match uses, so its tests
-// need the real corpus; everything else in this package is pure functions
-// and needs none.
-func corpusDirOrSkip(t *testing.T) string {
-	t.Helper()
-	// Run the child git with cards.GitEnv(): a test binary's cwd is this
-	// package directory, not the repo root, and git exports GIT_INDEX_FILE --
-	// and in a linked worktree GIT_DIR -- to every hook it runs, as a path
-	// that names the enclosing repository. An inherited relative GIT_* would
-	// redirect "-C ." at a .git that does not resolve from here, so rev-parse
-	// fails and the corpus is never found (the gitiso hazard; see
-	// cards/gitenv.go and internal/testutil/decks.go).
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("could not resolve git repo root: %v", err)
-	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("no .cards/ corpus present -- run `make fetch-cards compile-cards`")
-	}
-	return dir
-}
 
 // TestBenchIsDeterministic pins invariant 2: the same (base seed, policies,
 // games) twice produces byte-identical output. Nothing in the path --
@@ -55,7 +22,7 @@ func corpusDirOrSkip(t *testing.T) string {
 // 2-seat engine path (rules.New, per-seat bota, view.Project), so the
 // byte-equality covers the whole chain, not just the report formatting.
 func TestBenchIsDeterministic(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var b1, b2 bytes.Buffer
 	for _, buf := range []*bytes.Buffer{&b1, &b2} {
 		// maxTurns=0 keeps this an uncapped determinism run, exactly today's
@@ -271,7 +238,7 @@ func TestTheSummaryReportsSeatWins(t *testing.T) {
 // that rate, the seat split partitions the non-draw wins, and the mean
 // turns is over the same denominator.
 func TestShortEndToEndRun(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var buf bytes.Buffer
 	if err := run(0, 2, 2, 0, 0, "bot", "bot", dir, 200, 0, false, &buf); err != nil {
 		t.Fatalf("run: %v", err)
@@ -603,7 +570,7 @@ func TestMatrixDeterministicUnderWorkers(t *testing.T) {
 // repeats and contains a row per pair -- the smallest possible matrix is
 // still a real two-pair measurement, not a formatting exercise.
 func TestMatrixEndToEnd(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	pairs, err := parsePairs("death-n-taxes:dimir-tempo,mono-red-goblins:tron", testutil.RepoDeckNames())
 	if err != nil {
 		t.Fatalf("parsePairs: %v", err)
@@ -656,7 +623,7 @@ var winRe = regexp.MustCompile(`winner=([^\s]+)`)
 // is added, so the pair is re-derived here and the pinned number is
 // re-measured against the real run when the pair moves.
 func TestConstructedDefaultIsByteIdentical(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 
 	// buildGameConfig with commander=false leaves the zero value untouched.
 	con := buildGameConfig(0, []string{testutil.RepoDeckNames()[0], testutil.RepoDeckNames()[1]}, nil, nil, false)
@@ -767,9 +734,18 @@ func TestConstructedDefaultIsByteIdentical(t *testing.T) {
 	// avengers-assemble:boros-moxite-burn, which measures 7/13. Removing only
 	// the deck fixture restores 6/14, attributing the movement to adding the
 	// deck to the default pool.
-	const wantSeat0, wantSeat1 = 7, 13
+	// The paid-cost mana census flip (cli-20261012T170859Z) then re-measured
+	// 7/13 to 6/14: the census is now ON by default, so an activated ability
+	// whose mana the floating pool cannot pay but the untapped sources can is
+	// offered at priority (rules/legal_walk_autopay.go) and auto-paid, and the
+	// attack-tax/unless-cost/tap-list readers count payable paid-cost sources
+	// (Treasure, Lotus Petal). The bot activates abilities it never saw (Boros
+	// Moxite Burn's Melded Moxite, avengers-assemble's Ragged Short Spear,
+	// Blood Token, Patriot, Hero's Blade ...). Measured: setting only
+	// Config.DisablePaidManaCensus restores 7/13.
+	const wantSeat0, wantSeat1 = 6, 14
 	if seat0, seat1 := atoi(m[8]), atoi(m[9]); seat0 != wantSeat0 || seat1 != wantSeat1 {
-		t.Errorf("constructed default split = %d/%d, want %d/%d after the Boros Moxite Burn deck import (%s vs %s at seed 0, games 20)", seat0, seat1, wantSeat0, wantSeat1, testutil.RepoDeckNames()[0], testutil.RepoDeckNames()[1])
+		t.Errorf("constructed default split = %d/%d, want %d/%d after the paid-cost census defaulted ON (%s vs %s at seed 0, games 20)", seat0, seat1, wantSeat0, wantSeat1, testutil.RepoDeckNames()[0], testutil.RepoDeckNames()[1])
 	}
 	if strings.Contains(buf.String(), "STALLED") {
 		t.Errorf("constructed default (no stalls) must not print a stall line")
@@ -930,7 +906,7 @@ func TestRotateIsValidated(t *testing.T) {
 // winner per game. It is the end-to-end companion of the pure-function test
 // above: it proves the rotation reaches the games, not just the helper.
 func TestCommanderRunRotateSeatsTheRotatedOrder(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var buf bytes.Buffer
 	if err := run(1, 2, 4, 1, 0, "bot", "bot", dir, 200, 0, true, &buf); err != nil {
 		t.Fatalf("run(rotate=1): %v", err)
@@ -1040,7 +1016,7 @@ func TestCommanderNamedNonCommanderIsError(t *testing.T) {
 // forces the watchdog to fire immediately, and the per-game line must say
 // winner=stalled while the summary reports it as a stall.
 func TestTurnWatchdogEndsGameAtMaxTurns(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var buf bytes.Buffer
 	if err := run(0, 1, 2, 0, 0, "bot", "bot", dir, 2, 0, false, &buf); err != nil {
 		t.Fatalf("run(maxTurns=2): %v", err)
@@ -1097,7 +1073,7 @@ func TestStalledExcludedFromWinRate(t *testing.T) {
 // foundations-keen-engineering -- the deck whose pathological games hang the
 // bench (op2's lane); the set of pairs is part of the determinism input.
 func TestCommanderMatrixJSONReproducible(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	cmdNames, err := commanderDeckNames()
 	if err != nil {
 		t.Fatalf("commanderDeckNames: %v", err)
@@ -1131,7 +1107,7 @@ func TestCommanderMatrixJSONReproducible(t *testing.T) {
 // as a stall -- the synthetic-shaped loop the fix exists for, without
 // depending on any specific pathological deck.
 func TestMaxIntentsEndsNonTerminatingGameAsStall(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	var buf bytes.Buffer
 	if err := run(0, 1, 2, 0, 0, "bot", "bot", dir, 0, 5, false, &buf); err != nil {
 		t.Fatalf("run(maxIntents=5): %v", err)

@@ -375,10 +375,9 @@ func exiledWithSet(g *state.Game, c *Ctx) []state.Target {
 // hostCard.exiledCards, written by exiledWithAssociation). `Defined$
 // ExiledWith` (via exiledWithSet) and the `Card.ExiledWithSource` filter
 // family both consume it so those two spellings cannot disagree, as does the
-// ManaReflected "Defined.ExiledWith" scan (mana_reflected.go). A few narrower
-// consumers of the same association still read only the reverse scalar
-// (count_ref.go's `ExiledWith$`, type_choices.go's SharedTypeLabels); routing
-// them here too is a follow-up, not part of this fix.
+// ManaReflected "Defined.ExiledWith" scan (mana_reflected.go), the
+// `ExiledWith$` count head (count_ref.go, via exiledWithSet) and
+// type_choices.go's SharedTypeLabels.
 func exiledBySource(g *state.Game, o *state.Object, src state.ObjID) bool {
 	if o == nil || src == 0 {
 		return false
@@ -407,9 +406,9 @@ func exiledBySource(g *state.Game, o *state.Object, src state.ObjID) bool {
 // CostExile row key, HashLKIListKey) or "Revealed" (CostReveal.doPayment);
 // an absent binding is an empty list -- a legitimate zero, never a fallback.
 func paidCostTargets(c *Ctx, ref string) []state.Target {
-	ids := c.Exiled
+	ids := c.Paid.Exiled
 	if ref == "Revealed" {
-		ids = c.Revealed
+		ids = c.Paid.Revealed
 	}
 	out := make([]state.Target, 0, len(ids))
 	for _, id := range ids {
@@ -480,6 +479,18 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 			}
 		}
 		return out, true
+	}
+	// The DOTTED `<Triggered-card referent> <qualifier>` selector (Aunt May's
+	// `Defined$ TriggeredCardLKICopy.Spider` -- "if it's a Spider, put a
+	// +1/+1 counter on it"): the subset of the referent's objects the
+	// qualifier admits, through the same dotted-qualifier grammar
+	// Targeted./ExiledWith. use. Before this the whole value missed the code
+	// table and the caller's source default put the counter on Aunt May
+	// herself. Any base the table maps to the Triggered-card family takes the
+	// qualifier, so the next spelling of that family is covered too; a
+	// non-matching object is known-empty (fail closed to nobody, never Self).
+	if ts, ok := triggeredCardQualified(h, c, spec); ok {
+		return ts, true
 	}
 	switch definedSpecCodes.Code(string(spec)) {
 	case definedSpecEmpty:
@@ -607,7 +618,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// selector was unknown and Defined's plain-Remembered drop left it
 		// charging NOBODY. An empty remembered-player pool is the known-empty
 		// set (ok=true), never a fallback to the source.
-		return playersOf(resolvedRemembered(h, c)), true
+		return playersOf(hostRemembered(h, c)), true
 	case definedSpecExiled:
 		// Forge's cast-cost PAID lists: the cards this cast's/activation's own
 		// cost exiled or revealed (see paidCostTargets -- the one shared home
@@ -617,6 +628,12 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// the chosen targets. This is NOT Object.ExiledWith: an ExileFromGrave
 		// cost emits a plain MoveZone with no ExiledWith marker.
 		return paidCostTargets(c, spec), true
+	case definedSpecCounterPutCards:
+		// Forge's "CounterPut" paid list: the creatures this ability's own
+		// Blight<N> cost put -1/-1 counters on (Grub, Notorious Auntie's
+		// "a copy of the blighted creature"). An unpaid list is the
+		// known-empty pool, never a fallback to the source.
+		return objTargets(c.Paid.CounterPut), true
 	case definedSpecImprintedLKI:
 		// Forge's LKI spelling of the imprint pile, distinct from the bare
 		// "Imprinted" case below: the SOURCE's persistent imprint association,
@@ -740,14 +757,14 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return nil, true
 	case definedSpecRememberedController:
-		return controllersOf(g, resolvedRemembered(h, c)), true // persistent-aware, as plain Remembered
+		return rememberedControllersLKI(h, c), true
 	case definedSpecNonRememberedController:
 		// These selectors name living players other than the controller of a
 		// remembered CARD. A remembered player is not a card anchor, and an
 		// absent remembered card fails closed to nobody.
 		var excluded state.PlayerID
 		found := false
-		for _, t := range c.Remembered {
+		for _, t := range hostRemembered(h, c) {
 			if t.IsPlayer || t.Obj == 0 {
 				continue
 			}
@@ -768,7 +785,7 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		}
 		return out, true
 	case definedSpecRememberedOwner:
-		return ownersOf(g, c.Remembered), true
+		return ownersOf(g, hostRemembered(h, c)), true
 	case definedSpecTargetedController:
 		return controllersOf(g, c.Targets), true
 	case definedSpecTargetedPlayer:
@@ -988,28 +1005,26 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// (Leyline of Combustion's 2 damage and Ashenmoor Liege's 4 life are
 		// paid to the targeting spell's controller, never the Leyline's or
 		// the Liege's); the trigger captures that source in TriggerSource,
-		// so it resolves through the identical read. The role is preferred
-		// when the trigger captured one (a DamageDone trigger's Remembered
-		// is the DAMAGED object, whose controller is exactly wrong for the
-		// source form); the fallback -- Remembered[0]'s controller -- is
-		// deciderFromSpec's convention for the same spellings on
-		// OptionalDecider$ lines, so both reads of one spelling agree
-		// wherever the role is absent.
-		ref := c.TriggerSource
+		// so it resolves through the identical read. The source spellings
+		// share TriggeredSourceController -- the same resolver the
+		// OptionalDecider$ consumer reads (rules/trigger_queue.go
+		// deciderFromSpec) -- so both reads of one spelling agree wherever
+		// the role is absent.
 		if spec == "TriggeredTargetController" {
-			if c.TriggerTarget.Obj != 0 || c.TriggerTarget.IsPlayer {
-				if c.TriggerTarget.IsPlayer {
-					return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
-				}
-				ref = c.TriggerTarget.Obj
-			} else if len(c.Remembered) > 0 {
+			if c.TriggerTarget.IsPlayer {
+				return []state.Target{{Player: c.TriggerTarget.Player, IsPlayer: true}}, true
+			}
+			ref := c.TriggerTarget.Obj
+			if ref == 0 && len(c.Remembered) > 0 {
 				ref = c.Remembered[0].Obj
 			}
-		} else if ref == 0 && len(c.Remembered) > 0 {
-			ref = c.Remembered[0].Obj
+			if o := g.Obj(ref); o != nil {
+				return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+			}
+			return nil, true
 		}
-		if o := g.Obj(ref); o != nil {
-			return []state.Target{{Player: o.Controller, IsPlayer: true}}, true
+		if p, ok := TriggeredSourceController(g, c.TriggerContext, c.Remembered); ok {
+			return []state.Target{{Player: p, IsPlayer: true}}, true
 		}
 		return nil, true
 	case definedSpecTriggeredTargets:
@@ -1237,8 +1252,23 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// The corpus spells this three ways depending on whether the source
 		// is Equipment, an Aura, or a generic script; all three name the
 		// same field (Task 14 wires its producer).
-		if o := g.Obj(c.Source); o != nil && o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
-			return []state.Target{{Obj: o.AttachedTo}}, true
+		if o := g.Obj(c.Source); o != nil {
+			if o.AttachedTo != 0 && g.Obj(o.AttachedTo) != nil {
+				return []state.Target{{Obj: o.AttachedTo}}, true
+			}
+			// The source left the battlefield as a cost ("{5}, Sacrifice
+			// this Aura: Exile enchanted creature"): the move fold cleared
+			// AttachedTo but kept the pre-clear bearer as LastBearer, which
+			// is the last-known-information read CR 608.2h asks for. The
+			// fallback is only for a source that is OFF the battlefield: a
+			// source still on the battlefield that is merely unattached (a
+			// bearer that died, an Equipment returned unattached) has no
+			// "enchanted/equipped creature" and must resolve to nothing,
+			// never to a stale LastBearer (CR 400.7: the returned permanent
+			// is a new object).
+			if o.Zone != state.ZBattlefield && o.LastBearer != 0 && g.Obj(o.LastBearer) != nil {
+				return []state.Target{{Obj: o.LastBearer}}, true
+			}
 		}
 		return nil, true
 	case definedSpecOpponent:
@@ -1359,10 +1389,12 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 }
 
 // definedZoneValidTargets resolves a zone-qualified Valid selector. Forge's
-// graveyard form ranges over every living player's graveyard; ownership and
-// control predicates decide which cards qualify from the resolving
-// controller's perspective (Supper for Spiders' OppOwn). Other zone-qualified
-// forms retain their controller-owned zone scope.
+// graveyard and library forms range over every living player's zone (Forge's
+// game.getCardsIn of the zone); ownership and control predicates decide which
+// cards qualify from the resolving controller's perspective (Supper for
+// Spiders' OppOwn, Etrata, Deadly Fugitive's TopLibrary+OwnedBy
+// TriggeredTarget cloaking the DAMAGED player's top card). Other
+// zone-qualified forms retain their controller-owned zone scope.
 func definedZoneValidTargets(h Host, g *state.Game, c *Ctx, spec string) ([]state.Target, bool) {
 	for _, zf := range zoneValidPrefixes {
 		filt, ok := strings.CutPrefix(spec, zf.prefix)
@@ -1374,7 +1406,7 @@ func definedZoneValidTargets(h Host, g *state.Game, c *Ctx, spec string) ([]stat
 		sc.DerivedPTs = append(sc.DerivedPTs, GreatestPowerDerivedPTs(g, filt, h)...)
 		var out []state.Target
 		players := []state.PlayerID{c.Controller}
-		if zf.zone == state.ZGraveyard {
+		if zf.zone == state.ZGraveyard || zf.zone == state.ZLibrary {
 			players = g.AliveFrom(c.Controller)
 		}
 		for _, player := range players {
@@ -1540,6 +1572,39 @@ func lkiControllerFor(c *Ctx, id state.ObjID) (state.PlayerID, bool) {
 		}
 	}
 	return 0, false
+}
+
+// rememberedControllersLKI is the controller read of a Remembered$ group,
+// with CR 608.2h look-back: a remembered object that is no longer on the
+// battlefield answers with the controller RememberLKI$ captured before its
+// departure (events.Apply's Move resets the live controller to the owner),
+// falling back to the live controller when no capture exists.
+//
+// When the resolution carries a ChangeZone capture, its own body wrote the
+// memory, so the group is the capture-excluded one (rememberedWithSource,
+// the set ConditionDefined$ Remembered gates read): the trigger's seeded
+// referent -- Unyielding Gatekeeper itself, in Ctx.Remembered because
+// resolvedRemembered returns an ordinary trigger's context unchanged -- is
+// not remembered by that body, and counting its controller made the Token
+// line mint a second Detective for the Gatekeeper's controller.
+func rememberedControllersLKI(h Host, c *Ctx) []state.Target {
+	g := h.Game()
+	if c == nil || len(c.Snap.ChangeZone) == 0 {
+		return controllersOf(g, hostRemembered(h, c)) // persistent-aware, capture-excluded
+	}
+	ts := rememberedWithSource(h, c)
+	rewritten := make([]state.Target, 0, len(ts))
+	for _, t := range ts {
+		if !t.IsPlayer {
+			if o := g.Obj(t.Obj); o != nil && o.Zone != state.ZBattlefield {
+				if p, ok := lkiControllerFor(c, t.Obj); ok {
+					t = state.Target{Player: p, IsPlayer: true}
+				}
+			}
+		}
+		rewritten = append(rewritten, t)
+	}
+	return controllersOf(g, rewritten)
 }
 
 // objectsOf returns Remembered's object entries (IsPlayer false) as a fresh
@@ -1944,32 +2009,89 @@ func copyTargets(s []state.Target) []state.Target {
 //     (rules/trigger_delayed.go), so it is filtered like an ordinary written
 //     list -- the firing referent is not a card-list read even when the source
 //     has written nothing else.
+//
+// The capture is a FALLBACK referent, never memory added to what the body
+// itself wrote (task lb-rempollute, CR 603.7). In the second shape, once the
+// resolution has remembered something of its own (Avatar Destiny's
+// RememberMilled$ before its `ChangeType$ Creature.IsRemembered` return) the
+// seeded capture occurrence is dropped: Forge's host list holds the milled
+// cards only, never the creature whose death fired the trigger. Only a
+// context holding nothing but the capture keeps it.
 func resolvedRemembered(h Host, c *Ctx) []state.Target {
-	if len(c.Captured) == 0 {
+	return selectRemembered(c.Remembered, c.Captured, c.DelayedRemembered, sourceRemembered(h, c))
+}
+
+// selectRemembered is resolvedRemembered over plain slices -- the ONE home of
+// the selection rule, shared with the Card.IsRemembered filter predicate
+// (filter.go), which reads a SpecContext rather than a Ctx. remembered is the
+// resolution's set, captured its fire-time seed, delayedRemembered a delayed
+// registration's saved set, persistent the source object's event-backed list.
+// The result never aliases remembered or persistent.
+func selectRemembered(remembered, captured, delayedRemembered, persistent []state.Target) []state.Target {
+	if len(captured) > 0 && len(delayedRemembered) == 0 && len(persistent) == 0 {
+		// The ordinary trigger whose source wrote nothing (the second shape
+		// above): the capture is a fallback, kept only when the resolution
+		// wrote nothing of its own.
+		if written := excludeCaptureOccurrences(remembered, captured); len(written) > 0 {
+			return written
+		}
+		return copyTargets(remembered)
+	}
+	return filterCapturedRemembered(remembered, captured, delayedRemembered, persistent)
+}
+
+// hostRemembered is Forge's host remembered list: resolvedRemembered
+// WITHOUT its ordinary-trigger fallback, so a firing-event capture the
+// source never wrote is dropped even when the source wrote nothing at all.
+// It is the set every Remembered* PLAYER derivation reads (RememberedOwner,
+// RememberedController, NonRememberedController, RememberedPlayer): those
+// name the player tied to a card the ability remembered, and Forge's
+// getDefinedPlayers never consults the triggered object for them. Unidentified
+// Hovership is the measured case (CR 608.2b): its leave trigger is
+// `DefinedPlayer$ RememberedOwner`, the trigger's capture is the Hovership
+// itself, and an ETB that exiled nothing left the source's list empty -- the
+// fallback made the Hovership's owner manifest dread instead of nobody.
+// A RepeatEach iteration binds its subject as Remembered and keeps it even
+// when it equals the capture (Bomb Squad's state trigger captures itself and
+// its RepeatCards$ loop may visit itself), the guard
+// rememberedWrittenByResolution applies for the same reason.
+func hostRemembered(h Host, c *Ctx) []state.Target {
+	if c.RepeatSubject != (state.Target{}) {
 		return copyTargets(c.Remembered)
 	}
-	delayed := len(c.DelayedRemembered) > 0
-	if delayed && sameTargets(c.Captured, c.DelayedRemembered) {
-		return copyTargets(c.Remembered)
+	return filterCapturedRemembered(c.Remembered, c.Captured, c.DelayedRemembered, sourceRemembered(h, c))
+}
+
+// filterCapturedRemembered is the shared tail of selectRemembered and
+// hostRemembered: the capture entries the source's written list does not
+// hold are dropped (the first and third shapes above).
+func filterCapturedRemembered(remembered, captured, delayedRemembered, persistent []state.Target) []state.Target {
+	if len(captured) == 0 {
+		return copyTargets(remembered)
 	}
-	var persistent []state.Target
-	if src := h.Game().Obj(c.Source); src != nil {
-		persistent = src.Remembered
+	if len(delayedRemembered) > 0 && sameTargets(captured, delayedRemembered) {
+		return copyTargets(remembered)
 	}
-	if !delayed && len(persistent) == 0 {
-		return copyTargets(c.Remembered)
-	}
-	if sameTargets(c.Remembered, c.Captured) && len(persistent) > 0 {
+	if sameTargets(remembered, captured) && len(persistent) > 0 {
 		return copyTargets(persistent)
 	}
-	out := make([]state.Target, 0, len(c.Remembered))
-	for _, t := range c.Remembered {
-		if containsTarget(c.Captured, t) && !containsTarget(persistent, t) {
+	out := make([]state.Target, 0, len(remembered))
+	for _, t := range remembered {
+		if containsTarget(captured, t) && !containsTarget(persistent, t) {
 			continue
 		}
 		out = append(out, t)
 	}
 	return out
+}
+
+// sourceRemembered is the resolving source's persistent, event-backed
+// Remembered list (nil for a departed source).
+func sourceRemembered(h Host, c *Ctx) []state.Target {
+	if src := h.Game().Obj(c.Source); src != nil {
+		return src.Remembered
+	}
+	return nil
 }
 
 func sameTargets(a, b []state.Target) bool {
@@ -2019,10 +2141,12 @@ func exileProvenanceNeeded(c *Ctx) bool {
 		}
 	}
 	// The A: spelling (Mimeoplasm, Revered One's `ValidTgts$
-	// Creature.ExiledWithSource`) names it on the source face's own ability
-	// lines, which no SVar carries. Ctx.Host is bound by effects.Resolve; a
-	// Ctx that never entered Resolve has no host and keeps the SVar-only read.
-	return c.Host != nil && faceAbilitiesNameExiledWithSource(c.Host, c.Source)
+	// Creature.ExiledWithSource`) and the S: spelling (Maralen, Fae
+	// Ascendant's MayPlay `Affected$ ...ExiledWithSource`, exiled by a Dig)
+	// name it on the source face's own ability or static lines, which no SVar
+	// carries. Ctx.Host is bound by effects.Resolve; a Ctx that never entered
+	// Resolve has no host and keeps the SVar-only read.
+	return c.Host != nil && faceNamesExiledWithSource(c.Host, c.Source)
 }
 
 // faceAbilitiesNameExiledWithSource reports whether the source CARD's own
@@ -2300,6 +2424,7 @@ const (
 	definedSpecRemembered
 	definedSpecRememberedPlayer
 	definedSpecExiled
+	definedSpecCounterPutCards
 	definedSpecImprintedLKI
 	definedSpecImprinted
 	definedSpecRememberedCard
@@ -2379,6 +2504,7 @@ var definedSpecCodes = state.NewStrCodes(
 	state.StrEntry[definedSpecCode]{Key: "RememberedPlayers", Val: definedSpecRememberedPlayer},
 	state.StrEntry[definedSpecCode]{Key: "Exiled", Val: definedSpecExiled},
 	state.StrEntry[definedSpecCode]{Key: "Revealed", Val: definedSpecExiled},
+	state.StrEntry[definedSpecCode]{Key: "CounterPutCards", Val: definedSpecCounterPutCards},
 	state.StrEntry[definedSpecCode]{Key: "ImprintedLKI", Val: definedSpecImprintedLKI},
 	state.StrEntry[definedSpecCode]{Key: "Imprinted", Val: definedSpecImprinted},
 	state.StrEntry[definedSpecCode]{Key: "ImprintedController", Val: definedSpecImprinted},
@@ -2500,4 +2626,32 @@ var exiledWithSourceKeyCodes = state.NewStrCodes(
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Affected", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "AffectedZone", Val: exiledWithSourceKeyFilterOrText},
 	state.StrEntry[exiledWithSourceKeyCode]{Key: "Description", Val: exiledWithSourceKeyFilterOrText},
+	// The card-filter keys the other static modes name the exiled set by:
+	// Agatha's Soul Cauldron's GainsAbilitiesOf$, Circu, Dimir Lobotomist's
+	// CantBeCast ValidCard$, Ashiok's Erasure's SharedRestrictions$.
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsAbilitiesOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "GainsTriggerAbsOf", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "SharedRestrictions", Val: exiledWithSourceKeyFilterOrText},
+	state.StrEntry[exiledWithSourceKeyCode]{Key: "ValidCard", Val: exiledWithSourceKeyFilterOrText},
 )
+
+// triggeredCardQualified resolves `<base>.<qualifier>` when base is one of the
+// Triggered-card family spellings (definedSpecTriggeredCard): the base's
+// objects filtered by definedCardQualifierMatches. A compound (" & ") value
+// is not this shape and is left to the callers that split it.
+func triggeredCardQualified(h Host, c *Ctx, spec string) ([]state.Target, bool) {
+	base, qual, dotted := strings.Cut(spec, ".")
+	if !dotted || strings.Contains(spec, " & ") || definedSpecCodes.Code(base) != definedSpecTriggeredCard {
+		return nil, false
+	}
+	ts, _ := definedSpec(h, c, base)
+	g := h.Game()
+	qual = strings.TrimSpace(qual)
+	var out []state.Target
+	for _, t := range ts {
+		if o := g.Obj(t.Obj); o != nil && definedCardQualifierMatches(h, g, c, qual, o) {
+			out = append(out, t)
+		}
+	}
+	return out, true
+}

@@ -331,7 +331,7 @@ func TestManaVaultDrawStepDamageScopedToSelf(t *testing.T) {
 
 // driveToDrawStep2 drives from wherever the test is to seat 0's turn-2 draw
 // step, answering only what the drive itself crosses: priority passes and
-// Mana Vault's upkeep "you may pay {4}" offer (declined).
+// Mana Vault's upkeep "you may pay {4}" election (declined).
 func driveToDrawStep2(t *testing.T, e *Engine) {
 	t.Helper()
 	for i := 0; i < 2000; i++ {
@@ -360,10 +360,13 @@ func driveToDrawStep2(t *testing.T, e *Engine) {
 			if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{idx}}); err != nil {
 				t.Fatalf("submit: %v", err)
 			}
-		case decision.KTriggerOptional:
+		case decision.KTriggerOptional, decision.KChoose:
+			// The vault's OptionalDecider$ folds into its Cost$ election
+			// (optionalFoldsIntoCost), so the offer is a trigger_cost_decline
+			// choose; a "no" is kept for any other optional trigger.
 			idx := -1
 			for _, o := range d.Options {
-				if o.Kind == "no" {
+				if o.Kind == "no" || o.Kind == "trigger_cost_decline" {
 					idx = o.Index
 				}
 			}

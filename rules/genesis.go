@@ -7,7 +7,6 @@ import (
 	"github.com/adams-shaun/gorge/effects"
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/rules/chars"
-	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -284,6 +283,7 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 		landTypeWords:     chars.CorpusLandTypeWords(nameUniverseOrCorpus(cfg)),
 		mulligans:         cfg.Mulligans,
 		windowDiagnostics: cfg.WindowDiagnostics,
+		paidManaCensus:    !cfg.DisablePaidManaCensus,
 		startingLife:      life,
 	}
 	// The embedded turn ledger's per-turn slices (engine_turnledger.go).
@@ -325,13 +325,11 @@ func newEngineShell(cfg Config, random *rng) *Engine {
 	}
 	e.G.Tokens = cfg.Tokens
 	e.setNameInPool, e.layer4InPool, e.controlStaticInPool = poolGates(cfg)
-	e.trigGrant.free = true // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.free = true     // held per object as they appear (trigger_grantfree.go)
+	e.trigGrant.replFree = true // the granted-replacement proof (trigger_grantfree.go)
 	e.G.NameUniverse = cfg.NameUniverse
 	e.G.NamedCorpus = cfg.NamedCorpus
-	e.G.NameUniverseNames = append([]string(nil), cfg.NameUniverseNames...)
-	if len(e.G.NameUniverseNames) == 0 && cfg.NameUniverse.Len() > 0 {
-		e.G.NameUniverseNames = effects.NameUniverseNames(cfg.NameUniverse)
-	}
+	e.G.NameUniverseNames = effects.InternNameUniverseNames(cfg.NameUniverse, cfg.NameUniverseNames)
 	e.manaExpendedTurn = e.G.Turn
 	e.format = cfg.Format
 	for i := range e.G.Players {
@@ -370,8 +368,9 @@ func (e *Engine) genesisDeal(cfg Config, tossAsk bool) *Engine {
 	// renders this one Note through player(), so a seated human still reads
 	// their own name.
 	if toss >= 0 {
-		e.emit(events.Event{Kind: events.Note, Player: state.PlayerID(toss),
-			Text: pay.SeatName(e.G, state.PlayerID(toss)) + " won the toss"})
+		seat, note, _ := e.tossOutcome(cfg, toss)
+		e.emit(events.Event{Kind: events.Note, Player: state.PlayerID(seat), Text: note})
+		toss = seat
 	}
 	// Match-wide dense commander indexing for Player.CmdDamage (assigned at
 	// genesis): a commander's dense index is the sum of (valid commanders in
@@ -531,7 +530,8 @@ func (e *Engine) genesisDeal(cfg Config, tossAsk bool) *Engine {
 	choicePending := tossAsk && !e.G.Over && len(alive) > 1 && toss >= 0 && toss < len(e.G.Players) &&
 		!e.G.Players[toss].Lost
 	if choicePending {
-		e.tossChoice = tossChoice{active: true, winner: start}
+		_, _, configured := e.tossOutcome(cfg, toss)
+		e.tossChoice = tossChoice{active: true, winner: start, configured: configured}
 	}
 	// The resolved toss is authoritative genesis state, not merely a Note or
 	// the later TurnChange: opening-hand effects and Count$StartingPlayer run
@@ -643,18 +643,20 @@ func (e *Engine) resolveToss(toss int, alive []state.PlayerID, seats int) (state
 }
 
 // nameUniverseOrCorpus is the compiled corpus the derived-characteristic
-// vocabularies (rules/chars' land-type words) build from: the NameUniverse
-// when the game has one, else NamedCorpus. Both are compiled from the same
-// registry, so the derived list is identical either way; reading NamedCorpus
-// matters because the oracle-compliance harness deliberately supplies it
-// WITHOUT setting NameUniverse (Config's comment: the harness must not gain
-// NameCard asks its recorded verdicts predate) -- the pre-fallback read gave
-// that harness a nil universe and an empty vocabulary, so RemoveLandTypes$
-// statics (Zhao, the Moon Slayer; Ultima's BlightStatic) stripped no land
-// type in every generated scenario.
+// vocabularies (rules/chars' land-type words) build from: NamedCorpus when
+// the game has one, else the NameUniverse. The vocabulary is a property of
+// the WHOLE corpus. The oracle-compliance harness is the one embedder that
+// sets NamedCorpus (the full registry), and it sets NameUniverse only to a
+// SCENARIO-scoped universe for a scenario that seats a card-name choice
+// (rules/oracle_name_universe.go), whose land types would be a fraction of
+// the corpus's; every other embedder sets NameUniverse alone, to the full
+// registry. Before NamedCorpus was read here the harness had a nil universe
+// and an empty vocabulary, so RemoveLandTypes$ statics (Zhao, the Moon
+// Slayer; Ultima's BlightStatic) stripped no land type in every generated
+// scenario.
 func nameUniverseOrCorpus(cfg Config) *cards.Universe {
-	if cfg.NameUniverse != nil {
-		return cfg.NameUniverse
+	if cfg.NamedCorpus != nil {
+		return cfg.NamedCorpus
 	}
-	return cfg.NamedCorpus
+	return cfg.NameUniverse
 }

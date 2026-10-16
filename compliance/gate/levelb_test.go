@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/compliance"
 	"github.com/adams-shaun/gorge/compliance/adopt"
 	"github.com/adams-shaun/gorge/compliance/gate"
 	"github.com/adams-shaun/gorge/compliance/levelb"
@@ -12,19 +13,20 @@ import (
 )
 
 // TestLevelBProblemsBucketLikeA checks the level-B gate's reasons reuse the
-// level-A wording: every FRA problem classifies into one of the level-A
-// buckets, and none is the "level not built" stub that Check returned for any
+// level-A wording: every ECL problem classifies into one of the level-A
+// buckets (ECL keeps Swat Away's explained harness row outstanding; FRA, the
+// earlier set, has had no level-B problem since lb5-driver served Codie), and none is the "level not built" stub that Check returned for any
 // level but A before this ticket.
 func TestLevelBProblemsBucketLikeA(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join("..", "..")
 	reg := testutil.CorpusRegistry(t)
-	probs, err := gate.Check(reg, root, "FRA", "B")
+	probs, err := gate.Check(reg, root, "ECL", "B")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(probs) == 0 {
-		t.Fatal("FRA at level B reported no problems; the claim is not empty, so the walk did nothing")
+		t.Fatal("ECL at level B reported no problems; the claim is not empty, so the walk did nothing")
 	}
 	known := map[string]bool{}
 	for _, b := range adopt.Buckets {
@@ -43,8 +45,31 @@ func TestLevelBProblemsBucketLikeA(t *testing.T) {
 			activate++
 		}
 	}
+	// The bucket walk above must have seen an activate# problem only while one
+	// is outstanding: a driver batch that settles every activate# row of the set
+	// (2026-10-12 18:34 post-replay gates red) legitimately leaves none. So the
+	// precondition is that ECL still HAS activate# requirements to be judged,
+	// and a problem naming one is bucketed like any other once present.
 	if activate == 0 {
-		t.Error("no FRA level-B problem names an activate# requirement key")
+		var reqs int
+		printed, err := compliance.LoadPrinted(filepath.Join(root, "compliance", "printed"), "ECL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range printed.Cards {
+			c, ok := reg.Lookup(name)
+			if !ok {
+				continue
+			}
+			for _, r := range levelb.Requirements(c) {
+				if strings.HasPrefix(r.Key, "activate#") {
+					reqs++
+				}
+			}
+		}
+		if reqs == 0 {
+			t.Error("no ECL card has an activate# level-B requirement; the activate bucket is not exercised")
+		}
 	}
 }
 

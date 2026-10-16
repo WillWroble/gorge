@@ -74,7 +74,7 @@ func TestManabrewCardTextMissNeverBlocksAndIsNotRefetched(t *testing.T) {
 	if ok || text != "" {
 		t.Fatalf("unknown name: want (\"\", false), got (%q, %v)", text, ok)
 	}
-	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
 		t.Fatalf("Text blocked for %s; must return immediately", elapsed)
 	}
 

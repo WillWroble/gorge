@@ -52,7 +52,8 @@ func ashlingOrder(step int) rules.OracleDecision {
 func ashlingDecline(step int) rules.OracleDecision {
 	return rules.OracleDecision{Step: step, Seat: 0, Kind: "choose_n", Options: 1,
 		Picks: []string{"Do not pay"}, PickIdx: []int{0}, PickRefs: []string{"p0:Ashling, Rekindled"},
-		PickKinds: []string{"trigger_cost_decline"}, Via: "answer", GorgeKind: "choose", Min: 1, Max: 1}
+		PickKinds: []string{"trigger_cost_decline"}, Via: "answer", GorgeKind: "choose", Min: 1, Max: 1,
+		TriggerCostMana: true}
 }
 
 // TestOptionalManaTriggerBooleanDropsAheadOfColourPick: the yesno whose
@@ -112,17 +113,21 @@ func TestManaColourPickLeadsTriggerOrderSpan(t *testing.T) {
 	if manaHoistAnswer(col) == "" {
 		t.Fatalf("fixture lost its mana colour pick: %+v", col)
 	}
+	// The transform's decline is XMage's DoIfCostPaid chooseUse, asked when
+	// that trigger resolves after the mana trigger's colour dialog: "no"
+	// follows the hoisted colour (trigger_cost_routing_test.go).
 	got := XAnswers([]rules.OracleDecision{order, decline, col}, 3, nil)
-	want := [][]XAnswer{nil, nil, {{0, "choice", "White"}}}
+	want := [][]XAnswer{nil, nil, {{0, "choice", "White"}, {0, "choice", "no"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("XAnswers = %#v, want %#v (colour leads, inert texts dropped)", got, want)
 	}
 
-	// Without the colour ask the step keeps the measured inert text form.
+	// Without the colour ask the span keys its first pick in XMage's
+	// rule-text form, which the order ask consumes (trigger_order_text.go).
 	got = XAnswers([]rules.OracleDecision{order, decline}, 3, nil)
-	want = [][]XAnswer{nil, nil, triggerOrderTextAnswers(order)}
+	want = [][]XAnswer{nil, nil, {{0, "choice", "Whenever this creature transforms into {this} and at the beginning of your first main phase, add two mana of any one color."}, {0, "choice", "no"}}}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("span alone = %#v, want the inert texts %#v", got, want)
+		t.Fatalf("span alone = %#v, want the rule-text key %#v", got, want)
 	}
 
 	// A distinct-source span is not hoisted: its step keeps the shared-step
@@ -134,7 +139,7 @@ func TestManaColourPickLeadsTriggerOrderSpan(t *testing.T) {
 		t.Fatal("fixture must have distinct source names")
 	}
 	got = XAnswers([]rules.OracleDecision{distinct, decline, col}, 3, nil)
-	want = [][]XAnswer{nil, nil, append(triggerOrderTextAnswers(distinct), XAnswer{0, "choice", "White"})}
+	want = [][]XAnswer{nil, nil, append(triggerOrderTextAnswers(distinct), XAnswer{0, "choice", "no"}, XAnswer{0, "choice", "White"})}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("distinct-source span = %#v, want %#v", got, want)
 	}

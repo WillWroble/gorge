@@ -51,6 +51,12 @@ type CloneParams struct {
 	ChoiceTitle    string
 	// CloneTarget is CloneTarget$, the become operand.
 	CloneTarget string
+	// ChoicesTargetBecome reports Forge CloneEffect's become arm for a
+	// Choices$ source on a targeting ability with no CloneTarget$: the SA's
+	// own target becomes the copy ("choose a creature; target creature
+	// becomes a copy of it" -- Cytoshape, Kaya, Spirits' Justice), never the
+	// resolving source.
+	ChoicesTargetBecome bool
 	// ExcludeChosen is ExcludeChosen$ True.
 	ExcludeChosen bool
 	// CloneZone is CloneZone$, the copy source's required zone.
@@ -76,10 +82,16 @@ type CloneParams struct {
 	AddTriggers  []string
 	StaticNames  []string
 	// AddKeywords and PumpKeywords are the keyword lists; PumpDuration is
-	// PumpDuration$.
+	// PumpDuration$. IfNew are AddKeywords$'s "IfNew <keyword>" conditional
+	// riders, split out at compile: each member is the INNER keyword line
+	// ("Vanishing:3") the copy gains only when the copied template's printed
+	// face does not already carry that keyword's head (CR 707.9b; Flesh
+	// Duplicate is the corpus's only instance). AddKeywords keeps the
+	// unconditional members, which ride the ordinary layer-6 grant.
 	AddKeywords  []string
 	PumpKeywords []string
 	PumpDuration string
+	IfNew        []string
 	// NewName is NewName$; GainThisAbility is GainThisAbility$ True.
 	NewName         string
 	GainThisAbility bool
@@ -90,6 +102,10 @@ type CloneParams struct {
 	SetColor   string
 	SetColors  []string
 	SetColorOK bool
+	// AddColors is AddColors$ (additive, CR 707.9b); AddColorsOK its parse.
+	AddColors   string
+	AddColorsL  []string
+	AddColorsOK bool
 	// IntoPlayTapped is IntoPlayTapped$ as the script spells it (the
 	// no-entry Note quotes it); IntoPlayTappedSet reports a non-blank value
 	// and IntoPlayTappedTrue the exact True spelling.
@@ -123,7 +139,7 @@ type CloneParams struct {
 var cloneKnownKeys = [...]string{
 	"AILifeThreshold", "AILogic", "AINoRecursiveCheck", "AIPhyrexianPayment", "AITgts",
 	"Activation", "ActivationAfterBlockers", "ActivationFirstCombat", "ActivationGameTypes",
-	"ActivationLimit", "ActivationPhases", "ActivationZone", "Activator", "AddAbilities",
+	"ActivationLimit", "ActivationPhases", "ActivationZone", "Activator", "AddAbilities", "AddColors",
 	"AddKeywords", "AddSVars", "AddStaticAbilities", "AddTriggers", "AddType", "AddTypes",
 	"AdditionalDesc", "AdditionalDescription", "Affected", "AlternateCost",
 	"AlternativeCost", "Announce", "AnnounceTitle", "AttachedTo", "Boast", "ChangeTypeDesc",
@@ -131,14 +147,14 @@ var cloneKnownKeys = [...]string{
 	"Choices", "ChooseFromList", "ClassBand", "ClearImprinted", "CloneTarget", "CloneZone",
 	"Condition", "ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
 	"ConditionSVarCompare", "ConditionZone", "CopyCard", "CopyFromChosenName", "Cost", "CostDesc", "Defined",
 	"DefinedCards", "DefinedTarget", "Description", "Duration", "Exclude", "ExcludeChosen",
 	"Execute", "Exhaust", "FaceDown", "ForgetOtherTargets", "GainThisAbility", "GameActivationLimit", "Image",
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IntoPlayTapped", "IsCurse",
 	"IsPresent", "KW", "KeepFacedown", "Keyword", "KeywordLine", "MaxTotalTargetCMC",
 	"MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity", "NewController", "NewName",
-	"NonLegendary", "NumDmg", "OpponentTurn", "Optional", "Planeswalker", "PlayCost",
+	"NonLegendary", "OpponentTurn", "Optional", "Planeswalker", "PlayCost",
 	"PlayerTurn", "PowerUp", "PrecostDesc", "PresentCompare", "PresentDefined",
 	"PresentZone", "PumpDuration", "PumpKeywords", "RandomNumTargets", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberCostMana", "RememberObjects", "RememberTargets", "RemoveCardTypes",
@@ -150,7 +166,7 @@ var cloneKnownKeys = [...]string{
 	"TargetValidTargeting", "TargetingPlayer", "TargetingPlayerControls", "TargetsAtRandom",
 	"TargetsForEachPlayer", "TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
-	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithDifferentNames", "TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript", "TriggerDescription",
 	"Type", "Ultimate", "UnlessAI", "UnlessCost", "UnlessPayer", "UnlessResolveSubs",
@@ -202,6 +218,7 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.ChoiceOptional = isTrue(sa.ParamStr(cards.PKChoiceOptional))
 	p.ChoiceTitle = strings.TrimSpace(sa.ParamStr(cards.PKChoiceTitle))
 	p.CloneTarget = strings.TrimSpace(rawParamText(sa, "CloneTarget").Text)
+	p.ChoicesTargetBecome = p.Choices != "" && p.CloneTarget == "" && TargetsOf(sa).Targeted()
 	p.ExcludeChosen = isTrue(rawParamText(sa, "ExcludeChosen").Text)
 	p.CloneZone = strings.TrimSpace(rawParamText(sa, "CloneZone").Text)
 	p.Optional = isTrue(sa.ParamStr(cards.PKOptional))
@@ -221,7 +238,7 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.StaticNames = strings.FieldsFunc(sa.ParamStr(cards.PKAddStaticAbilities), func(r rune) bool {
 		return r == ',' || r == ' ' || r == '\t' || r == '\n'
 	})
-	p.AddKeywords = cards.SplitKeywordList(sa.ParamStr(cards.PKAddKeywords))
+	p.AddKeywords, p.IfNew = cloneSplitIfNew(cards.SplitKeywordList(sa.ParamStr(cards.PKAddKeywords)))
 	p.PumpKeywords = cards.SplitKeywordList(sa.ParamStr(cards.PKPumpKeywords))
 	p.PumpDuration = strings.TrimSpace(sa.ParamStr(cards.PKPumpDuration))
 	p.NewName = strings.TrimSpace(rawParamText(sa, "NewName").Text)
@@ -233,6 +250,10 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	p.SetColor = strings.TrimSpace(sa.ParamStr(cards.PKSetColor))
 	if p.SetColor != "" {
 		p.SetColors, p.SetColorOK = colorLetters(p.SetColor)
+	}
+	p.AddColors = strings.TrimSpace(sa.ParamStr(cards.PKAddColors))
+	if p.AddColors != "" {
+		p.AddColorsL, p.AddColorsOK = colorLetters(p.AddColors)
 	}
 	p.IntoPlayTapped = sa.ParamStr(cards.PKIntoPlayTapped)
 	p.IntoPlayTappedSet = strings.TrimSpace(p.IntoPlayTapped) != ""
@@ -247,9 +268,19 @@ func compileClone(sa *cards.SA, dr *DefinedParams) *CloneParams {
 	return p
 }
 
+// CloneIfNew returns the conditional keyword riders of an api:Clone body,
+// each already trimmed of Forge's "IfNew " prefix (Flesh Duplicate's
+// `AddKeywords$ IfNew Vanishing:3`). The entry-counter machinery reads them
+// at the entry's body scan (rules/entry_counters.go): the clone body applies
+// the copy basis face only after the move folds, so a rider's counters are
+// derived from the rider itself, its condition compared against the chosen
+// template's printed face.
+func CloneIfNew(sa *cards.SA) []string { return CloneOf(sa).IfNew }
+
 // cloneETBShapeOK is ETBShapeOK's computation: rules' etbCloneWhitelist's
 // POSITIVE key whitelist (Choices$, AddKeywords$, AddTypes$,
-// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$) plus its
+// SpellDescription$, AddStaticAbilities$, IntoPlayTapped$, AddTriggers$,
+// AddSVars$) plus its
 // text-only value checks. The key scan only answers a boolean, so the map's
 // iteration order cannot reach an event.
 func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
@@ -266,17 +297,65 @@ func cloneETBShapeOK(sa *cards.SA, p *CloneParams) bool {
 			return false
 		}
 	}
+	for _, kw := range p.IfNew {
+		// The conditional rider's inner keyword must be a single-word head
+		// the fold-time expansion can mint on the copy basis face
+		// (cards.ApplyKeywordExpansion), and its entry-counter grants must be
+		// fully derivable from the line AND nonempty (cards.
+		// KeywordEntryCounters) -- the counters are folded into the move's
+		// Pairs payload from the rider, before the basis face exists, so a
+		// rider that names no counters or names them underivably fails
+		// closed. The body stays withheld and the carrier keeps its loud
+		// fallback, the same boundary every out-of-scope ETB rider lives
+		// behind.
+		if strings.ContainsAny(cards.KeywordHead(kw), " \t") ||
+			!cards.KeywordExpandable(cards.KeywordHead(kw)) {
+			return false
+		}
+		cs, complete := cards.KeywordEntryCounters(kw)
+		if !complete || len(cs) == 0 {
+			return false
+		}
+	}
+	// The rider rides the ClonePermanent event's variant payload, whose
+	// Counter is already taken by the gain-this-ability provenance and whose
+	// basis face is resolved from the name universe on the chosen-name
+	// route (where the conditional's template face is not the copied face).
+	// A rider next to either is out of scope and fails closed.
+	if len(p.IfNew) > 0 && (p.GainThisAbility || p.CopyFromChosenName) {
+		return false
+	}
 	if _, ok := sa.Param(cards.PKIntoPlayTapped); ok && !p.IntoPlayTappedTrue {
 		return false
 	}
 	return true
 }
 
+// cloneSplitIfNew moves every "IfNew <keyword>" member of a Clone's
+// AddKeywords$ list into the conditional rider list and returns the
+// unconditional remainder. The prefix is Forge's spelling (Flesh Duplicate's
+// `AddKeywords$ IfNew Vanishing:3`); an "IfNew" member with no keyword after
+// it is not a rider this build can read, so it is dropped from the remainder
+// and kept as a rider with an empty keyword -- whose head check in
+// cloneETBShapeOK then fails closed.
+func cloneSplitIfNew(kws []string) (rest, ifNew []string) {
+	for _, kw := range kws {
+		if inner, ok := strings.CutPrefix(kw, "IfNew "); ok {
+			ifNew = append(ifNew, strings.TrimSpace(inner))
+			continue
+		}
+		rest = append(rest, kw)
+	}
+	return rest, ifNew
+}
+
 // CloneKnownKeys is a copy of cloneKnownKeys, for the census check.
 func CloneKnownKeys() []string { return slices.Clone(cloneKnownKeys[:]) }
 
 // cloneETBShapeKeys are the keys the implemented as-enters Clone shape carries.
+// SubAbility$ is admitted as a key only; its chain's shape is
+// CloneETBSubChainOK's (the "enters with additional counters" rider).
 var cloneETBShapeKeys = state.NewNameSet(
 	"Choices", "AddKeywords", "AddTypes", "SpellDescription",
-	"AddStaticAbilities", "IntoPlayTapped",
+	"AddStaticAbilities", "IntoPlayTapped", "AddTriggers", "AddSVars", "SubAbility",
 )

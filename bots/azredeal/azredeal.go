@@ -26,6 +26,7 @@ import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	"github.com/adams-shaun/gorge/internal/policynet"
+	"github.com/adams-shaun/gorge/internal/searchprobe"
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/seat"
 	"github.com/adams-shaun/gorge/view"
@@ -89,10 +90,18 @@ func newAZRedeal(o bots.Options) (seat.Seat, error) {
 // New builds the adapter over an explicit config overlay. It is botbench's
 // entry point (spec §4.3): botbench overlays its -az-* flags on Hosted() and
 // calls this; the host goes through the registry factory above. net is
-// always nil here — the hosted entry is generation 0 (heuristic leaf,
-// uniform prior); a checkpoint would be a different bot.
+// nil here — the az-redeal entry is generation 0 (heuristic leaf, uniform
+// prior); a checkpoint is a different bot, built with NewWithModel.
 func New(o bots.Options, cfg azmcts.SeatConfig) (seat.Seat, error) {
-	s, err := azmcts.NewSeat(o.Seed, nil, cfg)
+	return NewWithModel(o, cfg, nil)
+}
+
+// NewWithModel is New with the search's network: its prior ranks the
+// candidates and its value head scores the leaves, as cfg says. The model is
+// shared and read-only (a gonet network is one per path across every game in
+// the process), so one model serves every seat the factory builds.
+func NewWithModel(o bots.Options, cfg azmcts.SeatConfig, model *policynet.Model) (seat.Seat, error) {
+	s, err := azmcts.NewSeat(o.Seed, model, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +125,21 @@ func (s *hostedSeat) DecisionBudgetMS() int { return s.budgetMS }
 // Search's ctx bail-out, which plays the wrapped bot's answer -- this
 // policy's non-searched fallback. Zero -- bench and training -- is
 // unbounded.
+// DecideRootRefused forwards the driver's live-feed refused-root fallback
+// (bench's search branch) to the wrapped seat, or plays DecideBoard.
+func (s *hostedSeat) DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error) {
+	if rr, ok := s.bot.(rootRefuser); ok {
+		return rr.DecideRootRefused(ctx, b, d, reason)
+	}
+	return s.bot.DecideBoard(ctx, b, d)
+}
+
+// rootRefuser is the wrapped seat's root-refused fallback (*azmcts.Seat's
+// DecideRootRefused); a delegate without it plays DecideBoard.
+type rootRefuser interface {
+	DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error)
+}
+
 type hostedSeat struct {
 	bot      searchseat.SearchSeat
 	cfg      azmcts.SeatConfig
@@ -123,10 +147,12 @@ type hostedSeat struct {
 }
 
 var (
-	_ bots.EnvSeat          = (*hostedSeat)(nil)
-	_ bots.BudgetedSeat     = (*hostedSeat)(nil)
-	_ seat.BoardSeat        = (*hostedSeat)(nil)
-	_ searchseat.SearchSeat = (*hostedSeat)(nil)
+	_ bots.EnvSeat              = (*hostedSeat)(nil)
+	_ bots.BudgetedSeat         = (*hostedSeat)(nil)
+	_ seat.BoardSeat            = (*hostedSeat)(nil)
+	_ seat.PaymentPlanConsumer  = (*hostedSeat)(nil)
+	_ searchseat.SearchSeat     = (*hostedSeat)(nil)
+	_ searchseat.ClosedListSeat = (*hostedSeat)(nil)
 )
 
 // Decide is the plain Seat half: the wrapped bot. Decisions where WantsEnv is
@@ -146,6 +172,27 @@ func (s *hostedSeat) SetRecorder(fn func(policynet.VisitRecord)) {
 	}); ok {
 		recorder.SetRecorder(fn)
 	}
+}
+
+// SearchBelief forwards the wrapped seat's closed-list belief
+// (searchseat.ClosedListSeat): the host and the bench close this seat's
+// public game, and so the honest root they build for it, with it. Nil for
+// the open-list config.
+func (s *hostedSeat) SearchBelief() *searchprobe.Belief {
+	if c, ok := s.bot.(searchseat.ClosedListSeat); ok {
+		return c.SearchBelief()
+	}
+	return nil
+}
+
+// WantsPaymentActions forwards the wrapped seat's payment-plan opt-in
+// (seat.PaymentPlanConsumer). A delegate without one is a consumer: bots
+// default to receiving plans (seat.PaymentPlanConsumer's contract).
+func (s *hostedSeat) WantsPaymentActions() bool {
+	if c, ok := s.bot.(seat.PaymentPlanConsumer); ok {
+		return c.WantsPaymentActions()
+	}
+	return true
 }
 
 // DecideSearch keeps this adapter usable by botbench's engine-owning driver.
@@ -175,9 +222,12 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 	case decision.KBlockers:
 		return k.Blockers
 	case decision.KTarget:
-		return k.Target
+		return k.Target || k.Searches(d)
 	default:
-		return false
+		// The fuller kinds (modes, optional triggers, small choices) when the
+		// config enables them; the four-kind default config enables none, so
+		// az-redeal's answer is unchanged.
+		return k.Searches(d)
 	}
 }
 
@@ -193,6 +243,13 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 func (s *hostedSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
 	if env.Search.Engine != nil && env.Search.Feed != nil && env.Search.Feed.Live() {
 		return s.bot.DecideSearch(ctx, env.Search, d)
+	}
+	if env.Search.Feed != nil && env.Search.Feed.Live() {
+		// A live feed whose honest root refused: counted apart from a true
+		// feed stop (azmcts.Stats.RootRefused), with the builder's reason.
+		if rr, ok := s.bot.(rootRefuser); ok {
+			return rr.DecideRootRefused(ctx, env.Board, d, env.RootRefused)
+		}
 	}
 	return s.bot.DecideBoard(ctx, env.Board, d)
 }

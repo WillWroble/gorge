@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"slices"
 	"strings"
 	"sync"
 
@@ -100,6 +101,58 @@ func NameUniverseNames(universe *cards.Universe) []string {
 	rememberSharedLocked(out)
 	nameCache.mu.Unlock()
 	return out
+}
+
+// pinnedNameLimit bounds the persisted name lists InternNameUniverseNames
+// keeps beyond the live universe's own: one per corpus pin a host still
+// replays matches from.
+const pinnedNameLimit = 8
+
+// pinnedNames holds those lists. It has its own lock rather than
+// nameCache.mu so a cache reset never strands an interned identity.
+var pinnedNames struct {
+	mu    sync.Mutex
+	lists [][]string
+}
+
+// InternNameUniverseNames returns the one shared list equal to names, the
+// snapshot a genesis pins as state.Game.NameUniverseNames: the universe's
+// memoised list when names is empty or equal to it, else a pinned copy kept
+// per distinct content. Every memo here keys on the list's IDENTITY, so a
+// fresh copy per replayed match (a host rebuilding archived matches from
+// their sidecars for spectators) missed every one and refilled them with
+// ~13 MB option slices until the 256-entry reset -- gigabytes on the demo.
+// The result is SHARED and read-only.
+func InternNameUniverseNames(universe *cards.Universe, names []string) []string {
+	if universe.Len() > 0 {
+		if u := NameUniverseNames(universe); len(names) == 0 || slices.Equal(u, names) {
+			return u
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	pinnedNames.mu.Lock()
+	defer pinnedNames.mu.Unlock()
+	for _, l := range pinnedNames.lists {
+		if slices.Equal(l, names) {
+			markShared(l)
+			return l
+		}
+	}
+	out := slices.Clip(slices.Clone(names))
+	if len(pinnedNames.lists) >= pinnedNameLimit {
+		pinnedNames.lists = append([][]string(nil), pinnedNames.lists[1:]...)
+	}
+	pinnedNames.lists = append(pinnedNames.lists, out)
+	markShared(out)
+	return out
+}
+
+func markShared(names []string) {
+	nameCache.mu.Lock()
+	rememberSharedLocked(names)
+	nameCache.mu.Unlock()
 }
 
 // cachedNameChoices returns the memoised filter result for key, computing it

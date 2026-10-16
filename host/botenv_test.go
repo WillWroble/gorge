@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"weak"
 
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
@@ -32,17 +33,31 @@ type spyEnvSeat struct {
 	*seat.Bot
 	decided int
 	envs    []envRecord
+	// retainRoots keeps each record's root engine strongly reachable
+	// (envRecord.engine), for the one test that compares two roots'
+	// hidden worlds after the fact. Every other spy records only the
+	// roots' identities (envRecord.engineID/gID): a whole-match spy that
+	// retained every root held hundreds of full engines live until the
+	// test ended -- 2.7 GB peak RSS for a single test, the bulk of the
+	// host package's 7 GB peak.
+	retainRoots bool
 }
 
 // envRecord is what one DecideEnv call was handed and answered.
 type envRecord struct {
-	seq       uint64
-	rootRef   string        // env.RootRefused (empty when the root built)
-	engine    *rules.Engine // env.Search.Engine; nil when the root was refused
-	g         *state.Game   // the root's own game; never the live engine's
+	seq     uint64
+	rootRef string // env.RootRefused (empty when the root built)
+	// engineID and gID are the root engine's and its game's identities
+	// (zero when the root was refused). A weak pointer compares equal only
+	// to one made from the same live object, even after that object is
+	// reclaimed, so identity checks (never the live engine, never reused)
+	// hold without keeping the root alive.
+	engineID  weak.Pointer[rules.Engine]
+	gID       weak.Pointer[state.Game]
+	engine    *rules.Engine // env.Search.Engine, only under retainRoots (envSpySeat/envViewSpySeat always set it)
+	g         *state.Game   // the root's own game; never the live engine's (same retention rule)
 	feed      *searchseat.Feed
-	board     botpolicy.Board
-	view      view.View
+	viewRound int32    // env.View.Round
 	actorHand []string // the ROOT's hand for the deciding seat (slot 0)
 	oppHand   []string // the ROOT's hand for the opponent (slot 1)
 	actorLib  []string // the ROOT's library for slot 0, in order
@@ -56,10 +71,13 @@ func (s *spyEnvSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.Dec
 	s.decided++
 	rec := envRecord{
 		seq: d.Seq, rootRef: env.RootRefused, feed: env.Search.Feed,
-		board: env.Board, view: env.View,
+		viewRound: env.View.Round,
 	}
 	if e := env.Search.Engine; e != nil {
-		rec.engine, rec.g = e, e.G
+		rec.engineID, rec.gID = weak.Make(e), weak.Make(e.G)
+		if s.retainRoots {
+			rec.engine, rec.g = e, e.G
+		}
 		rec.actorHand = zoneNames(e.G.Zone(state.ZHand, 0), e)
 		rec.oppHand = zoneNames(e.G.Zone(state.ZHand, 1), e)
 		rec.actorLib = zoneNames(e.G.Zone(state.ZLibrary, 0), e)
@@ -403,7 +421,13 @@ func swapOpponentHidden(t *testing.T, e *rules.Engine, feed *searchseat.Feed) in
 // boundary at least once, which is what proves a REDEAL happened (a plain
 // clone of the live engine would pass every pointer check and still leak).
 // The deciding seat's own hand, which the seat is entitled to, must match the
-// live hand at every boundary: the redeal keeps what the seat knows.
+// live hand at every boundary: the redeal keeps what the seat knows. The one
+// exception is the boundary where the CR 103.1 winner-chooses choice is still
+// pending (E3-fx1): CR 103.5 hides every hand from every player there -- the
+// deciding seat's own included -- so the seat's own frame shows no hand and
+// its honest root deals its hand from the derivable pool like any other
+// hidden card. A root that held the LIVE hand at that boundary would be the
+// leak, not the redeal, so the pending boundary asserts the opposite.
 func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 	t.Parallel()
 	var spy *spyEnvSeat
@@ -447,29 +471,29 @@ func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 		t.Fatal("the EnvSeat has no feed; newMatchFeeds is not wired")
 	}
 
-	seen := map[*rules.Engine]bool{}
+	seen := map[weak.Pointer[rules.Engine]]bool{}
 	roots := 0
 	for _, rec := range spy.envs {
-		if rec.engine == nil {
+		if rec.engineID == (weak.Pointer[rules.Engine]{}) {
 			t.Fatalf("env decision seq %d built no root (refused %q); the honest path failed on these decks", rec.seq, rec.rootRef)
 		}
 		if rec.rootRef != "" {
 			t.Fatalf("env decision seq %d: root built but RootRefused %q", rec.seq, rec.rootRef)
 		}
-		if rec.engine == engine {
+		if rec.engineID == weak.Make(engine) {
 			t.Fatalf("env decision seq %d: the host handed the EnvSeat the LIVE engine", rec.seq)
 		}
-		if rec.g == engine.G {
+		if rec.gID == weak.Make(engine.G) {
 			t.Fatalf("env decision seq %d: the root's game aliases the live engine's", rec.seq)
 		}
-		if seen[rec.engine] {
+		if seen[rec.engineID] {
 			t.Fatalf("env decision seq %d: a root was REUSED after an earlier DecideEnv returned", rec.seq)
 		}
-		seen[rec.engine] = true
+		seen[rec.engineID] = true
 		if rec.feed != feeds.bySlot[0] {
 			t.Fatalf("env decision seq %d: Search.Feed is not the actor's own feed", rec.seq)
 		}
-		if rec.view.Round == 0 {
+		if rec.viewRound == 0 {
 			t.Fatalf("env decision seq %d: env.View carries no Round", rec.seq)
 		}
 		roots++
@@ -479,19 +503,24 @@ func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 	}
 
 	// The live opponent hand at every slot-0 decision boundary, rebuilt by
-	// deterministic replay of the finished log.
+	// deterministic replay of the finished log, plus which of those
+	// boundaries still hold the pending CR 103.1 winner-chooses choice
+	// (E3-fx1: CR 103.5 hides the deciding seat's own hand there, so the
+	// honest root redeals it -- see the test's doc comment).
 	liveOpp, liveActor := map[uint64][]string{}, map[uint64][]string{}
+	choicePending := map[uint64]bool{}
 	if _, err := replay.Walk(engine.L, m.cfg, len(engine.L.Intents), func(e *rules.Engine, i int) error {
 		if d := e.Pending(); d != nil && d.Player == 0 {
 			liveOpp[d.Seq] = zoneNames(e.G.Zone(state.ZHand, 1), e)
 			liveActor[d.Seq] = zoneNames(e.G.Zone(state.ZHand, 0), e)
+			choicePending[d.Seq] = e.StartingChoicePending()
 		}
 		return nil
 	}); err != nil {
 		t.Fatalf("replay walk: %v", err)
 	}
 
-	same, diff := 0, 0
+	same, diff, blind := 0, 0, 0
 	for _, rec := range spy.envs {
 		live, ok := liveOpp[rec.seq]
 		if !ok {
@@ -502,10 +531,27 @@ func TestHostedEnvSeatsNeverSeeTheLiveEngine(t *testing.T) {
 		} else {
 			diff++
 		}
+		if choicePending[rec.seq] {
+			// CR 103.5: while the CR 103.1 choice is pending the seat may
+			// not see its own hand either, so its root must NOT hold the
+			// live hand -- the redeal is the honest world. (A uniform redeal
+			// from the derivable pool could theoretically deal the live hand
+			// by chance; the probability is ~1/C(60,7), the same order of
+			// exposure the opponent-hand redeal check below already carries.)
+			if sortedEqual(rec.actorHand, liveActor[rec.seq]) {
+				t.Fatalf("env decision seq %d: the root held the deciding seat's own hand while the starting-player choice was pending (%v); the CR 103.5 blind did not reach the root",
+					rec.seq, rec.actorHand)
+			}
+			blind++
+			continue
+		}
 		if !sortedEqual(rec.actorHand, liveActor[rec.seq]) {
 			t.Fatalf("env decision seq %d: the root redealt the deciding seat's OWN hand (%v, live %v)",
 				rec.seq, rec.actorHand, liveActor[rec.seq])
 		}
+	}
+	if blind == 0 {
+		t.Fatalf("no Env decision fell in the pending starting-player window; the blind-boundary branch never ran")
 	}
 	if diff == 0 {
 		t.Fatalf("the root's opponent hand equalled the live opponent hand at all %d Env decisions; no redeal happened", len(spy.envs))
@@ -541,7 +587,7 @@ func TestHostedEnvSeatsIgnoreTheRealHiddenCards(t *testing.T) {
 	r.mu.RUnlock()
 
 	build := func() (*match, *spyEnvSeat, []seat.Seat) {
-		spy := &spyEnvSeat{Bot: seat.NewBot(seed ^ 1)}
+		spy := &spyEnvSeat{Bot: seat.NewBot(seed ^ 1), retainRoots: true}
 		seats := []seat.Seat{spy, seat.NewBot(seed ^ 2)}
 		m, err := r.newMatch(tbl, 0)
 		if err != nil {

@@ -15,10 +15,10 @@ func TestEncodeStateMZContentDerived(t *testing.T) {
 		Decision: decision.Decision{Kind: decision.KPriority}}
 	a := make([]float32, 2048)
 	b := make([]float32, 2048)
-	encodeStateMZ(r, a)
-	encodeStateMZ(r, b)
+	EncodeStateMZ(r, a)
+	EncodeStateMZ(r, b)
 	if !reflect.DeepEqual(a, b) {
-		t.Fatal("encodeStateMZ not deterministic")
+		t.Fatal("EncodeStateMZ not deterministic")
 	}
 	hot := 0
 	for _, x := range a {
@@ -32,7 +32,7 @@ func TestEncodeStateMZContentDerived(t *testing.T) {
 	r2 := &Request{View: view.View{Viewer: 0, Step: "combat_declare_attackers", Phase: "combat"},
 		Decision: decision.Decision{Kind: decision.KPriority}}
 	c := make([]float32, 2048)
-	encodeStateMZ(r2, c)
+	EncodeStateMZ(r2, c)
 	if reflect.DeepEqual(a, c) {
 		t.Fatal("different steps encoded identically")
 	}

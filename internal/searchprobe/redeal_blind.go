@@ -94,8 +94,28 @@ func observationBlind(e *rules.Engine, actor state.PlayerID, plans []redealPlan)
 			return false
 		}
 	}
+	// A closed player's unknown cards never reach a world (every Deal
+	// re-identifies them, and checks the cards it dealt instead), so their
+	// real faces do not count.
+	var replaced map[state.ObjID]bool
+	for i := range plans {
+		if plans[i].closed {
+			if replaced == nil {
+				replaced = make(map[state.ObjID]bool)
+			}
+			for _, id := range plans[i].unknown {
+				replaced[id] = true
+			}
+			for _, id := range plans[i].side {
+				replaced[id] = true
+			}
+		}
+	}
 	for i := range e.G.Objs {
 		o := &e.G.Objs[i]
+		if replaced[o.ID] {
+			continue
+		}
 		if o.CopyFace != nil && !faceBlind(o.CopyFace) {
 			return false
 		}

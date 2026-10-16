@@ -75,7 +75,11 @@ func charmSlotSets(f *cards.Face, sa *cards.SA) [][]oraclegen.Slot {
 // source's forward exile list (the record the reflect scan reads), then the
 // land untaps for the {T} ability. The source moves from the battlefield to
 // the hand (the auraSourceAttach shape), the play step carries the graveyard
-// card the ETB exiles, and two pass_to steps reach the land's untapped turn.
+// card the ETB exiles, and two pass_to steps reach the land's untapped turn:
+// p0's next upkeep, then the SAME turn's main phase. The second step names no
+// active seat: the XMage driver reads every pass_to naming the active seat as
+// "that seat's NEXT turn", so a second "Active: p0" stop skipped a whole
+// round (LCI Pit of Offerings activate#0.1: xmage turn 5, gorge turn 3).
 // ok is false for every other ability.
 func manaReflectedPlayPrelude(sa *cards.SA, name string, p0 *oraclegen.Seat) ([]oraclegen.Step, bool) {
 	if effects.ManaReflectedOf(sa).Valid != "Defined.ExiledWith" {
@@ -94,7 +98,7 @@ func manaReflectedPlayPrelude(sa *cards.SA, name string, p0 *oraclegen.Seat) ([]
 		{Op: "play", Seat: 0, Card: "p0:" + name, Targets: []string{"p0:" + material}},
 		{Op: "resolve"},
 		{Op: "pass_to", Step: "upkeep", Active: "p0"},
-		{Op: "pass_to", Step: "main1", Active: "p0"},
+		{Op: "pass_to", Step: "main1"},
 	}, true
 }
 

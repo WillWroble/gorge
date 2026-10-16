@@ -145,7 +145,12 @@ var baseBuckets = map[string]bucket{
 	// read for OptionalDecider$ (the resolution-time optional gate) and
 	// ResolvedLimit$ (the per-turn resolution cap's increment eligibility).
 	"rt": bTrig,
-	"s":  bStat, "st": bStat, "sv": bStat,
+	// pt.Trigger is the pendingTrigger's own line -- a granted (AddTrigger$)
+	// or gained trigger carries its cards.Trigger on the queue entry -- read
+	// by staticTriggerLine for Static$ True: the same parameter map t/tr
+	// cover.
+	"pt.Trigger": bTrig,
+	"s":          bStat, "st": bStat, "sv": bStat,
 	// carrier is offBattlefieldGrantedWalk's element of
 	// actionStaticSource.addAbilityContinuous(): a staticView like s/st/sv,
 	// whose Params (Condition$/Affected$/AddAbility$) the offer walk reads.
@@ -1469,6 +1474,9 @@ var stringMapParams = map[string]string{
 	// value; not a card Params map.
 	"rules:staticModesFromSVars:svars":       "SVars table lookup by StaticAbilities$ name, not a card Params map",
 	"effects:CloneStaticGrantReadable:svars": "SVars table lookup by named Clone static, not a card Params map",
+	// effects/clone.go CloneNamedGrantsReadable: the face SVar table read by
+	// the AddSVars$/AddTriggers$ grant names, not card Params.
+	"effects:CloneNamedGrantsReadable:svars": "SVars table lookup by named Clone AddSVars$/AddTriggers$ grant, not a card Params map",
 	// effects/clone_etb_selector.go CloneETBSpendSelector reads the source
 	// face's SVar table by the fixed spend variable name, not card Params.
 	"effects:CloneETBSpendSelector:svars": "source-face SVars lookup for the ETB cast-spend selector, not a card Params map",
@@ -1614,9 +1622,11 @@ var stringMapParams = map[string]string{
 	// Effect's ReplaceWith$ SVar body and its SubAbility$ line, svars the
 	// face's SVar table the SubAbility$ name is looked up in -- recognitions
 	// of the Effect-created "exile it instead" redirect, not card Params maps.
-	"effects:redirectExileBody:body":  "keys of a replacementBodyParams-built ReplaceWith$ SVar body, not a card Params map",
-	"effects:redirectExileBody:svars": "SVars table lookup by SubAbility$ name, not a card Params map",
-	"effects:selfExileIdiom:sub":      "keys of a replacementBodyParams-built SubAbility$ SVar body, not a card Params map"}
+	"effects:redirectExileBody:body":        "keys of a replacementBodyParams-built ReplaceWith$ SVar body, not a card Params map",
+	"effects:redirectExileBody:svars":       "SVars table lookup by SubAbility$ name, not a card Params map",
+	"effects:redirectSubName:body":          "keys of a replacementBodyParams-built SubAbility$ SVar body, not a card Params map",
+	"effects:redirectRiderChain:svars":      "SVars table lookup by SubAbility$ name, not a card Params map",
+	"effects:redirectLineRemembered:params": "parseReplacementLine-built ReplaceWith$ line map, not a card Params map"}
 
 // propagateKeyReads resolves two indirect read shapes:
 //
@@ -1792,6 +1802,10 @@ var handEffectsRoots = []string{
 	// predicates in effects/filter.go registers this predicate as a function
 	// value; its Cost$ reads inspect a candidate card's printed spell cost.
 	"noAbilitiesPermanent",
+	// rules/cast_etbchoice.go calls this directly to admit an as-enters Clone
+	// body's SubAbility$ rider chain; it scans the rider links' own keys to
+	// fail closed on any key outside the implemented shape.
+	"CloneETBSubChainOK",
 }
 
 // apiSpecificRulesSA names the rules functions whose SA (bSA) reads execute
@@ -1975,6 +1989,13 @@ var apiSpecificRulesStat = map[string]string{
 	// so its read is family-attributed like the grant path's, never in the
 	// generic Continuous union.
 	"Engine.mayPlayAltCosts": "Continuous.MayPlay",
+	// The printed-cost permission read (rules/mayplay.go's
+	// mayPlayPlainGrant, called from the may-play spell walk and beginCast):
+	// it runs mayPlayStatic over the same two static sources and reads
+	// MayPlayAltManaCost$ to tell a permission that prices its own cast
+	// (Valgavoth, Terror Eater) from a printed-cost one, so its reads are
+	// family-attributed exactly like the grant path's.
+	"Engine.mayPlayPlainGrant": "Continuous.MayPlay",
 	// The ValidSA$ classifier (rules/mayplay.go's mayPlayKinds, called from
 	// legal.go's may-play spell walk): it reads MayPlay statics' ValidSA$
 	// live -- Brokkos, Apex of Forever's `ValidSA$ Spell.Mutate` permits
@@ -2182,8 +2203,10 @@ var handRoots = struct {
 		// The generated-scenario runner (oracle_run.go) drops the
 		// enters-the-battlefield triggers its setup placements queued -- XMage's
 		// addCard never fires them -- by reading Mode$ and Destination$ of each
-		// pending trigger, mode-shared, outside the dispatch walk.
-		"oracleRun.build"},
+		// pending trigger, mode-shared, outside the dispatch walk. The read
+		// lives in placeSetupCard, which oracleRun.build calls; the scanner
+		// does not infer that method edge, so name the reader itself.
+		"oracleRun.placeSetupCard"},
 	// applyReplacements is the replacement pipeline's root beside
 	// replacementMatches, whose `r.Event != "Moved"` early return scopes every
 	// r.Params read in it to repl:Moved. handleReplacement is the
@@ -2192,7 +2215,15 @@ var handRoots = struct {
 	// through the decision resume path rather than the pipeline. The optional
 	// phase resume callback is passed as a function value, so the scanner cannot
 	// infer this edge from handleReplacement; declare its read root explicitly.
-	repl: []string{"Engine.applyReplacements", "Engine.handleReplacement", "Engine.resumeParkedPhase"},
+	repl: []string{"Engine.applyReplacements", "Engine.handleReplacement", "Engine.resumeParkedPhase",
+		// The entry-counter body scan (entryBodyCounterGrants, from
+		// foldEntryMove) reads the as-enters clone repl's Keyword$ directly --
+		// the same direct-scan shape mustAttackRequired has for statics: the
+		// ETB clone rider's counters are derived from the repl at the entry
+		// fold, outside the replacement pipeline (the copy basis face is
+		// applied after the move folds). Its reads are gated on
+		// Event$ Moved, so the bucket stays repl:Moved.
+		"Engine.entryBodyCounterGrants"},
 }
 
 // derivedReads is the per-primitive read set the scan attributes.

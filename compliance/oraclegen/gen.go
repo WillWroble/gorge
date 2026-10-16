@@ -210,13 +210,23 @@ type Answer struct {
 	Pick []string `json:"pick"`
 }
 
+// ThreeSeats is Scenario.Players for a multiplayer scenario: p0 and two
+// opponents, so one opponent can lose the game while it goes on (CR 800.4a).
+const ThreeSeats = 3
+
 // Scenario is one generated scenario in the runner's schema.
 type Scenario struct {
-	Name  string          `json:"name"`
-	Turn  int             `json:"turn,omitempty"`
-	CR    []string        `json:"cr"`
-	Why   string          `json:"why"`
-	Setup map[string]Seat `json:"setup"`
+	Name string   `json:"name"`
+	Turn int      `json:"turn,omitempty"`
+	CR   []string `json:"cr"`
+	Why  string   `json:"why"`
+	// Players is the seat count (the runner's and the XMage driver's
+	// "players"): 0 keeps the two-seat game, and omitempty keeps every
+	// two-seat item's bytes, and so its scenario sha, unchanged. A scenario
+	// whose observation needs a player to lose while the game goes on (CR
+	// 800.4a) seats ThreeSeats.
+	Players int             `json:"players,omitempty"`
+	Setup   map[string]Seat `json:"setup"`
 	// SetupAnswers answer decisions posed while the runner drives from
 	// genesis to turn 1 (a permanent's "may begin the game" ask).
 	SetupAnswers []Answer `json:"setup_answers,omitempty"`
@@ -308,6 +318,17 @@ func mayYes(sc Scenario, ds []rules.OracleDecision) (Scenario, bool) {
 		if len(d.Picks) == 0 && tapPaymentAsk(d.First) {
 			continue
 		}
+		if len(d.Picks) > 0 && (d.Picks[0] != d.First || (len(d.PickIdx) > 0 && d.PickIdx[0] != 0)) {
+			// The runner's fallback deliberately answered past option 0
+			// (the "done" it takes for an optional triggered cost's mana
+			// window no potential mana can pay, Esoteric Duplicator):
+			// pinning option 0 would tap the source it declined to tap.
+			// Option 0 can share the pick's label (a CR 704.5j keep among
+			// same-named legends, where the runner keeps the member that
+			// survives the batch: Grub, Notorious Auntie's token), so the
+			// index decides, not the label.
+			continue
+		}
 		st := out.Steps[d.Step]
 		st.Answers = append(append([]Answer(nil), st.Answers...), Answer{Kind: d.GorgeKind, Pick: []string{d.First}})
 		out.Steps[d.Step] = st
@@ -384,6 +405,17 @@ func searchPicks(sc Scenario, ds []rules.OracleDecision, look bool) (Scenario, b
 			// Experiment shape the measured declined pair answers, so it is
 			// excluded here.
 			pick = d.OptionRefs[0]
+		case look && declinedLookedOnePick(d) && lookedAck(ds, i):
+			// A declined one-card chooser after a hidden-zone look the served
+			// trigger chain proves (Whiskervale Forerunner's "You may reveal a
+			// creature card ... from among them"): XMage's ask is
+			// player.choose(cards, TargetCardInLibrary(filter)) -- a
+			// mandatory 1..1 makeChoose that rejects the skip token -- so
+			// gorge must take the lone eligible card too. The pick stays on
+			// XMage's choice queue (no RetargetForcedLookPicks: that is the
+			// two-option exile form), and the chooseUse that follows the
+			// pick is scripted from the rerun's own decisions.
+			pick = d.OptionRefs[0]
 		default:
 			continue
 		}
@@ -401,6 +433,14 @@ func searchPicks(sc Scenario, ds []rules.OracleDecision, look bool) (Scenario, b
 func declinedLookPick(d rules.OracleDecision) bool {
 	return d.Resume == "choice" && d.Options == 2 && d.Min == 0 && d.Max == 1 &&
 		len(d.OptionRefs) == 2 && d.First == ""
+}
+
+// declinedLookedOnePick is the declined shape of a one-card look chooser:
+// "choose a card" over exactly one looked-at eligible object, up to one,
+// nothing picked, no option label (the option is the object).
+func declinedLookedOnePick(d rules.OracleDecision) bool {
+	return d.Resume == "choice" && d.Options == 1 && d.Min == 0 && d.Max == 1 &&
+		len(d.OptionRefs) == 1 && d.First == ""
 }
 
 // lookedAck reports a look_ack by the same seat in decision i's step earlier
@@ -483,6 +523,30 @@ type CharmCombination struct {
 // CharmCombinations enumerates legal combinations from the minimum pick count
 // upward, in Choices$ order within each size. Ordinary charms default to one
 // pick, preserving their historical ordering.
+// optionalCostCharmNum reads a CharmNum$ that names an SVar of the form
+// Count$OptionalGenericCostPaid.<paid>.<unpaid> with literal branches, and
+// returns the two counts in ascending order.
+func optionalCostCharmNum(f *cards.Face, charmNum string) (int, int, bool) {
+	body, ok := f.SVars[strings.TrimSpace(charmNum)]
+	if !ok {
+		return 0, 0, false
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(body), "Count$OptionalGenericCostPaid.")
+	if !ok {
+		return 0, 0, false
+	}
+	parts := strings.Split(rest, ".")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	a, errA := strconv.Atoi(parts[0])
+	b, errB := strconv.Atoi(parts[1])
+	if errA != nil || errB != nil || a <= 0 || b <= 0 {
+		return 0, 0, false
+	}
+	return min(a, b), max(a, b), true
+}
+
 func CharmCombinations(f *cards.Face) []CharmCombination {
 	modes := charmModes(f)
 	if len(modes) == 0 {
@@ -500,6 +564,14 @@ func CharmCombinations(f *cards.Face) []CharmCombination {
 			minCount = n
 		} else if strings.TrimSpace(sa.Params["MinCharmNum"]) == "" {
 			minCount = pickCount
+		}
+		if lo, hi, ok := optionalCostCharmNum(f, sa.Params["CharmNum"]); ok {
+			// The count depends on the cast's optional-cost election (Pyrrhic
+			// Strike's "if this spell's additional cost was paid, choose both
+			// instead"): offer both counts, the smaller first, so a declined
+			// cast keeps its historical first plan and a paid one finds a
+			// plan of its own size.
+			minCount, pickCount = lo, hi
 		}
 		repeat = strings.EqualFold(strings.TrimSpace(sa.Params["CanRepeatModes"]), "True")
 		break
@@ -941,6 +1013,12 @@ func chooseTargets(sc Scenario, ds []rules.OracleDecision) (Scenario, map[int]bo
 		if d.Via != "target" || d.Step < 0 || d.Step >= len(out.Steps) || !carriesTargets(out.Steps[d.Step].Op) {
 			continue
 		}
+		// A copy's CR 707.10c new-target election is never a cast step's own
+		// targets: XMage poses it as per-slot chooseUse dialogs, not through
+		// castSpell, so it must not be folded into the step's fixture targets.
+		if d.Resume == "copy_targets" {
+			continue
+		}
 		chosen[d.Step] = append(chosen[d.Step], d.PickRefs...)
 		castSteps[d.Step] = true
 	}
@@ -971,8 +1049,11 @@ func arrangeEmptyGraveyard(d rules.OracleDecision) bool {
 // answers, grouped by the step that posed them. setup is the scenario's setup
 // (nil when the caller has none): it lets a trigger-order decision recorded
 // before step zero be retimed as setup_choice when its sources are the
-// setup-placed permanents (triggerOrderSetupPosed).
-func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, castSteps map[int]bool, setup map[string]Seat) [][]XAnswer {
+// setup-placed permanents (triggerOrderSetupPosed). flips are the run's
+// recorded coin-flip results (rules.OracleResult.Flips): a drive-window flip
+// (step < 0) queues on the setup family, a step flip leads its own step's
+// answer stream, each as the XMage flip token the choice queue consumes.
+func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, castSteps map[int]bool, setup map[string]Seat, flips []rules.OracleFlip) [][]XAnswer {
 	out := make([][]XAnswer, steps)
 	any := false
 	// A step whose card name is then searched for (Ancient Vendetta's "choose
@@ -982,6 +1063,21 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	for _, d := range ds {
 		if pickKind(d, 0) == "search" {
 			namedSearch[d.Step] = true
+		}
+	}
+	// A step holding a lone cost_posed decline (loneTriggerCostDecline) is the
+	// one shape where gorge scripts a "no" XMage can consume on an EARLIER
+	// trigger-cost pay chooseUse: XMage asks every optional triggered cost in
+	// resolution order, so Smuggler's Copter's may-draw chooseUse comes before
+	// Balthier and Fran's {1}{R}{G} one, and with the Copter's pay left
+	// unscripted the "no" shifted onto it (XMage never looted what gorge
+	// looted). Script each trigger-cost pay in such a step so the queue stays
+	// aligned. A step with no cost_posed decline keeps the pay unscripted:
+	// XMage's own AI answers it, which the measured rows already agree with.
+	costPosedDeclineStep := map[int]bool{}
+	for _, d := range ds {
+		if loneTriggerCostDecline(d) {
+			costPosedDeclineStep[d.Step] = true
 		}
 	}
 	routing := newAnswerRouting(ds)
@@ -1009,11 +1105,41 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	// dialogs during build(), the ordering ask at the first priority, and
 	// these asks as the setup drive reaches their trigger.
 	var setupAsks []XAnswer
+	// Drive-window coin flips (Mana Crypt's turn-1 upkeep) queue after the
+	// as-enters choices: the placement dialogs are consumed during build()
+	// and the flip while the drive walks to the target turn. A flip that
+	// shares the drive with a setup ask (setupAsks) has no recorded
+	// interleaving against it — the flips are read off the log after the
+	// drive — so the queue order between the two is the drive's phase order
+	// only where the scenario poses no setup ask (the measured flip rows:
+	// Mana Crypt trigger/activate pose none).
+	var setupFlips []XAnswer
+	// Gameplay-window flips, per step, in log order; prepended ahead of the
+	// step's decision answers once the decisions are placed (a gameplay
+	// flip resolves before the step's scripted dialogs re-read the queue;
+	// the measured rows script nothing else on the flip's step).
+	stepFlips := make([][]XAnswer, steps)
+	for _, f := range flips {
+		v := map[bool]string{true: "win", false: "lose"}[f.Win]
+		if f.Step < 0 {
+			setupFlips = append(setupFlips, XAnswer{f.Seat, "setup_flip", v})
+			any = true
+			continue
+		}
+		if f.Step < steps {
+			stepFlips[f.Step] = append(stepFlips[f.Step], XAnswer{f.Seat, "flip", v})
+			any = true
+		}
+	}
 	for i, d := range ds {
 		if d.Step < 0 {
 			switch {
 			case IsSetupChoice(d):
 				setupAnswers = append(setupAnswers, XAnswer{d.Seat, "setup_choice", d.Picks[0]})
+				any = true
+			case isSetupNumber(d):
+				a, _ := SetupNumberChoice(d)
+				setupAnswers = append(setupAnswers, a)
 				any = true
 			case IsSetupTargetDecline(d):
 				// The driver queues a target skip before build() so XMage
@@ -1024,8 +1150,8 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 				// The last pick is never consumed: XMage asks only while more
 				// than one ability is pending and pushes the last without an
 				// ask (same drop as the gameplay name form below).
-				for k := 0; k+1 < len(d.Picks); k++ {
-					setupTrigAnswers = append(setupTrigAnswers, XAnswer{d.Seat, "setup_choice", triggerOrderChoice(d, k)})
+				for _, key := range setupTriggerOrderKeys(d) {
+					setupTrigAnswers = append(setupTrigAnswers, XAnswer{d.Seat, "setup_choice", key})
 				}
 				any = true
 			default:
@@ -1036,9 +1162,11 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			}
 			continue
 		}
-		if d.Step >= steps || (d.Via == "target" && castSteps[d.Step]) {
+		if d.Step >= steps || (d.Via == "target" && d.Resume != "copy_targets" && castSteps[d.Step]) {
 			// A cast step's own targets reach XMage through castSpell; a
-			// target decision posed at a resolve step is scripted below.
+			// target decision posed at a resolve step is scripted below. A
+			// copy's new-target election is never a cast step's targets even
+			// if it shares the step, so it is scripted below regardless.
 			continue
 		}
 		if as, owned := routing.route(i); owned {
@@ -1053,7 +1181,7 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			any = true
 			continue
 		}
-		if forcedSingleOption(d) && !forcedChoicePosed(ds, i) {
+		if forcedSingleOption(d) && !forcedChoicePosed(ds, i) && !announcesSacrificeX(ds, i) {
 			// A forced one-option ask: XMage does not pose it. A forced
 			// target-kind pick is the exception -- one legal opponent is still
 			// a chooseTarget XMage asks for -- and so is a mode ask, which
@@ -1172,6 +1300,17 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 				as = damageSplitAnswers(d)
 				break
 			}
+			if d.Resume == "twopiles_pick" && len(d.Picks) == 1 {
+				// The pile pick (Curator of Destinies, Fact or Fiction) is
+				// XMage's opponent.chooseUse("Face-down", "Face-up"), a
+				// boolean choice, never gorge's "First pile"/"Second pile"
+				// label (measured 2026-10-14: the label is "Found wrong
+				// choice command"). Taking pile A -- the separator's pile,
+				// the face-down pile XMage's TargetCard selected -- is the
+				// boolean true.
+				as = append(as, XAnswer{d.Seat, "choice", twoPilesPileAnswer(d)})
+				break
+			}
 			if d.Resume == "mana_color" && len(d.ManaColours) > 1 {
 				// A Produced$ "Combo <colours>" ask whose offered span
 				// exceeds one colour is XMage's AddManaInAnyCombinationEffect
@@ -1225,6 +1364,15 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 			}
 			if yn, ok := yesNo(d); ok {
 				as = append(as, XAnswer{d.Seat, "choice", yn})
+				break
+			}
+			if pickKind(d, 0) == "trigger_cost_pay" && len(d.Picks) == 1 && costPosedDeclineStep[d.Step] {
+				// The pay side of a triggered optional cost XMage poses as a
+				// chooseUse, in a step that also scripts a cost_posed decline's
+				// "no" (see costPosedDeclineStep). Gorge elected the cost, so
+				// answer XMage's chooseUse yes and let the decline's "no" land
+				// on its own ask instead of this one.
+				as = append(as, XAnswer{d.Seat, "choice", "yes"})
 				break
 			}
 			if d.Resume == "sacrifice" && d.Min == 0 && len(d.Picks) > 0 {
@@ -1328,6 +1476,15 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 						as = append(as, ans)
 						break
 					}
+					// XMage's rule-text form steers the ask and is consumed
+					// by it (xmageTriggerOrderKeys); picks it cannot key
+					// apart keep the inert text form.
+					if keys, ok := xmageTriggerOrderKeys(d); ok {
+						for _, key := range keys {
+							as = append(as, XAnswer{d.Seat, "choice", key})
+						}
+						break
+					}
 					as = append(as, triggerOrderTextAnswers(d)...)
 					break
 				}
@@ -1398,15 +1555,28 @@ func xanswersSetup(ds []rules.OracleDecision, steps int, modes map[string]int, c
 	if !any {
 		return nil
 	}
+	// Gameplay flips lead their steps: prepend in log order, which the
+	// per-step slices accumulated, ahead of every decision answer the loop
+	// appended. AFTER demoteTriggerOrderSpans, whose span start/count were
+	// recorded against the loop's pre-prepend indices (gen.go above): a
+	// prepend first would shift them onto the step's other answers and splice
+	// the inert text over them (dropping the scripted answers). Demoting on
+	// the unshifted list keeps the flips leading either way.
 	demoteTriggerOrderSpans(out, trigSpans)
-	if len(setupAnswers) > 0 || len(setupTrigAnswers) > 0 || len(setupAsks) > 0 {
+	for st, fs := range stepFlips {
+		if len(fs) > 0 {
+			out[st] = append(fs, out[st]...)
+		}
+	}
+	if len(setupAnswers) > 0 || len(setupTrigAnswers) > 0 || len(setupAsks) > 0 || len(setupFlips) > 0 {
 		// Setup answers are read from xmage_answers[0] before build(), even
 		// when the scenario has no gameplay steps.
 		if len(out) == 0 {
 			out = append(out, nil)
 		}
-		lead := make([]XAnswer, 0, len(setupAnswers)+len(setupTrigAnswers)+len(setupAsks))
+		lead := make([]XAnswer, 0, len(setupAnswers)+len(setupTrigAnswers)+len(setupAsks)+len(setupFlips))
 		lead = append(lead, setupAnswers...)
+		lead = append(lead, setupFlips...)
 		lead = append(lead, setupTrigAnswers...)
 		lead = append(lead, setupAsks...)
 		out[0] = append(lead, out[0]...)
@@ -1430,10 +1600,70 @@ func forcedSingleOption(d rules.OracleDecision) bool {
 	if d.Kind == "target" || d.Kind == "order" || d.Kind == "mode" {
 		return false
 	}
+	if loneTriggerCostDecline(d) {
+		// A triggered optional cost gorge could not pay (a "may discard your
+		// hand" over an empty hand, a "may pay {2}" over an empty pool) is
+		// offered decline-only, but XMage's DoIfCostPaid still poses its
+		// chooseUse and its AI answers yes, paying the cost gorge declined
+		// (Byway Barterer, Esoteric Duplicator). The decline is a real ask.
+		return false
+	}
 	if hasTargetPick(d) {
 		return false
 	}
+	if announcesX(d) {
+		// An X announcement is always posed (XMage's announceXMana), even
+		// when the available mana leaves one legal value: an "{X}{X}, {T}"
+		// activation (Gogo, Master of Mimicry) with CC offers only X = 1,
+		// and an unscripted announce left the cost unpaid.
+		return false
+	}
 	return d.Options == 1 && d.Min == 1 && d.Max == 1
+}
+
+// announcesX reports whether d is the single positive "X = <n>" announcement
+// of a cost that names X more than once ({X}{X}, the runner's XMulti mark).
+// XMage's unscripted announce does not pay the repeated X when the pool leaves
+// one legal value (Gogo's unspent CC), so it is scripted. A forced announce of
+// a single-X cost stays unscripted: XMage's default agrees there and the
+// committed rows (Saheeli's Lattice, The Enigma Jewel) would re-hash for
+// nothing. A forced announce that sizes a sacrifice cost is the exception
+// (announcesSacrificeX).
+func announcesX(d rules.OracleDecision) bool {
+	if !d.XMulti || len(d.Picks) != 1 || pickKind(d, 0) != "x" {
+		return false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(d.Picks[0], "X = "))
+	return err == nil && n > 0 && strings.HasPrefix(d.Picks[0], "X = ")
+}
+
+// announcesSacrificeX reports a forced positive "X = <n>" announcement that
+// sizes a Sac<X/...> additional cost: the same seat's next decision in the
+// step picks exactly n objects to sacrifice (Rottenmouth Viper's "sacrifice
+// any number of nonland permanents", X = the count). Gorge offers only the X
+// the pool can then afford, but XMage's announce ranges over every
+// sacrificeable count and its AI picks its own (measured: X = 0, the cost
+// paid with Sol Ring's mana and nothing sacrificed), leaving the scripted
+// sacrifice unused. Such an announce is scripted.
+func announcesSacrificeX(ds []rules.OracleDecision, i int) bool {
+	d := ds[i]
+	if len(d.Picks) != 1 || pickKind(d, 0) != "x" || !strings.HasPrefix(d.Picks[0], "X = ") {
+		return false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(d.Picks[0], "X = "))
+	if err != nil || n <= 0 || i+1 >= len(ds) {
+		return false
+	}
+	next := ds[i+1]
+	if next.Step != d.Step || next.Seat != d.Seat || len(next.Picks) != n {
+		return false
+	}
+	for k := range next.Picks {
+		if pickKind(next, k) != "sacrifice" {
+			return false
+		}
+	}
+	return true
 }
 
 // forcedChoicePosed reports whether a forced one-option choose_n ask is still
@@ -1499,6 +1729,9 @@ func modeNumberFor(d rules.OracleDecision, k int, modes map[string]int) (int, bo
 // choice queue (makeChoose). A decision with a target or skipped pick is not
 // one makeChoose dialog and must not be joined with '^'.
 func allChoiceQueue(d rules.OracleDecision) bool {
+	if d.Retarget {
+		return false
+	}
 	for k, label := range d.Picks {
 		if xmQueue(pickKind(d, k), label) != "choice" {
 			return false
@@ -1578,6 +1811,13 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 	d := r.ds[i]
 	as := leadingUnposedSkips(d)
 	switch {
+	case d.Resume == "copy_targets" && d.Divided == 0 && !d.PerPlayer:
+		// A copy's CR 707.10c new-target election: XMage asks one chooseUse
+		// per inherited target before the pick, so this is not one target
+		// dialog and never takes the trailing "up to N" skip below. A divided
+		// (TargetAmount) or per-player copy keeps its existing branch: the
+		// per-slot replace stream for those is unproven, so it is left alone.
+		as = append(as, copyTargetAnswers(d)...)
 	case d.PerPlayer:
 		// TargetsForEachPlayer$ (CR 601.2c): XMage asks one target
 		// per player, in seat order starting at seat 0. Answer each
@@ -1590,30 +1830,8 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 		// completes when the allocation is answered.
 		as = append(as, dividedTargetAnswers(r, i)...)
 	default:
-		for k, ref := range d.PickRefs {
-			if isSeat(ref) {
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			// XMage's chooseTarget parses the same copy marker as
-			// makeChoose and filters on isCopy(), so a target that shares its
-			// name with another offered object needs the discriminator here
-			// too (a token copy of a card, Extravagant Replication). An alias
-			// pick keeps its full ref, which the driver's targetName maps to
-			// the object's @alias.
-			if p := ClassifySameName(d, k); p.Alias != "" {
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			if currentFaceTargetRef(d, k) {
-				// The option label names a different object than the ref --
-				// the permanent's current face (a transformed DFC, a face-down
-				// card). The ref's identity alias selects the live object.
-				as = append(as, XAnswer{d.Seat, "target", ref})
-				continue
-			}
-			_, marker := SameNameAmbiguity(d, k)
-			as = append(as, XAnswer{d.Seat, "target", oraclediffRefName(ref) + marker})
+		for k := range d.PickRefs {
+			as = append(as, singleTargetAnswer(d, k))
 		}
 		if len(d.PickRefs) < d.Max {
 			// Fewer picks than the "up to N" ask allows: XMage keeps
@@ -1626,6 +1844,38 @@ func targetDecisionAnswers(r *answerRouting, i int) []XAnswer {
 		as = append(as, XAnswer{d.Seat, "target", "[target_skip]"})
 	}
 	return as
+}
+
+// singleTargetAnswer is the TARGET-queue answer for one pick: a seat ref, an
+// exact identity ref (a same-name alias, a permanent's current face), or the
+// ref's name with a same-name marker. It is the one home for that spelling,
+// shared by the ordinary target ask and a copy's per-slot replacement, so the
+// two cannot drift.
+func singleTargetAnswer(d rules.OracleDecision, k int) XAnswer {
+	ref := d.PickRefs[k]
+	if isSeat(ref) {
+		return XAnswer{d.Seat, "target", ref}
+	}
+	// XMage's chooseTarget parses the same copy marker as makeChoose and
+	// filters on isCopy(), so a target that shares its name with another
+	// offered object needs the discriminator here too (a token copy of a
+	// card, Extravagant Replication). An alias pick keeps its full ref, which
+	// the driver's targetName maps to the object's @alias.
+	if p := ClassifySameName(d, k); p.Alias != "" {
+		return XAnswer{d.Seat, "target", ref}
+	}
+	if currentFaceTargetRef(d, k) {
+		// The option label names a different object than the ref -- the
+		// permanent's current face (a transformed DFC, a face-down card). Its
+		// current name selects the live object when no other option shares
+		// it; else the ref's identity alias.
+		if name, ok := uniqueCurrentFaceName(d, k); ok {
+			return XAnswer{d.Seat, "target", name}
+		}
+		return XAnswer{d.Seat, "target", ref}
+	}
+	_, marker := SameNameAmbiguity(d, k)
+	return XAnswer{d.Seat, "target", oraclediffRefName(ref) + marker}
 }
 
 // dividedTargetAnswers answers a divided target ask with each pick's share of
@@ -1728,6 +1978,26 @@ func allocationColour(d rules.OracleDecision, k int) (byte, bool) {
 	return 0, false
 }
 
+// tokenChoiceNames returns a GenericChoice's Choices$ names when there are at
+// least two and every one names a DB$ Token body on the face, else nil.
+func tokenChoiceNames(f *cards.Face, choices string) []string {
+	var names []string
+	for _, name := range strings.Split(choices, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if svarParams(f.SVars[name])["DB"] != "Token" {
+			return nil
+		}
+		names = append(names, name)
+	}
+	if len(names) < 2 {
+		return nil
+	}
+	return names
+}
+
 // yesNo recognises a bare two-way boolean choice. The engine's option kind
 // and exact label/ref identity must both agree; composed choices such as
 
@@ -1762,7 +2032,18 @@ const (
 // so the face shape is the authority.
 func modeNumbers(f *cards.Face) map[string]int {
 	out := map[string]int{}
-	addCharm := func(choices string) {
+	// A ChoiceRestriction$ Charm (Zuko, Conflicted's "choose one that hasn't
+	// been chosen") is offered WITHOUT the modes already used, by gorge and
+	// by XMage alike, and XMage's scripted mode number indexes the modes still
+	// on offer, not Choices$: Zuko's second ask offers three modes and XMage
+	// resolved the scripted absolute "2" as the second REMAINING mode (Add
+	// {R}), not the second printed one. Such a charm's labels stay out of the
+	// map, so the answer falls to the pick's 1-based position in the offered
+	// list -- the number XMage's chooseMode reads.
+	addCharm := func(choices, restriction string) {
+		if restriction != "" {
+			return
+		}
 		for i, name := range strings.Split(choices, ",") {
 			name = strings.TrimSpace(name)
 			if name == "" {
@@ -1788,6 +2069,45 @@ func modeNumbers(f *cards.Face) map[string]int {
 			out[effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)] = sentinel
 		}
 	}
+	// "Create your choice of a <token> or a <token>" (a DB$ GenericChoice
+	// whose every Choices$ entry is a DB$ Token body, no SetChosenMode$ and
+	// no AILogic$ Timetwister): XMage writes the card's own OneShotEffect,
+	// never a modal ability. Measured over the 20 Standard sets' four
+	// carriers: the two-token form is player.chooseUse with the first token
+	// as the yes label (Tireless Provisioner, Ant-Man's Army: "Food" /
+	// "Treasure"), the three-token form a ChoiceImpl over the token names
+	// (Transmutation Font's Blood/Clue/Food, The Third Doctor's
+	// Clue/Food/Treasure), whose labels are the bodies' SpellDescription$.
+	// The choice is an activated ability's own body (Transmutation Font's
+	// AB$ GenericChoice) or a trigger's DB$ SVar body (Tireless Provisioner).
+	var tokenChoices []map[string]string
+	for _, sa := range f.Abilities {
+		if sa.API == "GenericChoice" {
+			tokenChoices = append(tokenChoices, sa.Params)
+		}
+	}
+	for _, body := range f.SVars {
+		if p := svarParams(body); p["DB"] == "GenericChoice" {
+			tokenChoices = append(tokenChoices, p)
+		}
+	}
+	for _, p := range tokenChoices {
+		if p["SetChosenMode"] != "" || strings.EqualFold(p["AILogic"], "Timetwister") {
+			continue
+		}
+		names := tokenChoiceNames(f, p["Choices"])
+		for i, name := range names {
+			label := effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)
+			switch {
+			case len(names) > 2:
+				out[label] = ModeChoiceQueue
+			case i == 0:
+				out[label] = ModeYesQueue
+			default:
+				out[label] = ModeNoQueue
+			}
+		}
+	}
 	// The SetChosenMode labels first, so a real Charm mode of the same
 	// label (a corpus impossibility) would keep its numeric position below.
 	for _, body := range f.SVars {
@@ -1803,15 +2123,22 @@ func modeNumbers(f *cards.Face) map[string]int {
 			out[effects.CharmModeLabel(cards.ResolveSVar(f.SVars, name), name)] = ModeChoiceQueue
 		}
 	}
+	// A plain GenericChoice XMage poses as a Choice dialog over the labels
+	// (choice_dialog.go): the choice queue, by label, like SetChosenMode.
+	for _, label := range choiceDialogLabels(f) {
+		if _, taken := out[label]; !taken {
+			out[label] = ModeChoiceQueue
+		}
+	}
 	for _, sa := range f.Abilities {
 		if sa.API == "Charm" {
-			addCharm(sa.Params["Choices"])
+			addCharm(sa.Params["Choices"], sa.Params["ChoiceRestriction"])
 		}
 	}
 	for _, body := range f.SVars {
 		if strings.Contains(body, "Charm") {
 			if c := svarParams(body)["Choices"]; c != "" {
-				addCharm(c)
+				addCharm(c, svarParams(body)["ChoiceRestriction"])
 			}
 		}
 	}
@@ -1823,15 +2150,27 @@ func modeNumbers(f *cards.Face) map[string]int {
 // "Yes — discard" are ordinary makeChoose picks, not boolean answers. Older
 // snapshots without PickKinds use the same exact-label/ref rule.
 func yesNo(d rules.OracleDecision) (string, bool) {
-	if d.Options != 2 || len(d.Picks) != 1 || len(d.PickRefs) != 1 {
+	if (d.Options != 2 && !loneTriggerCostDecline(d)) || len(d.Picks) != 1 || len(d.PickRefs) != 1 {
 		return "", false
 	}
 	switch kind := pickKind(d, 0); kind {
+	case "trigger_cost_decline":
+		// The "do not pay" side of a triggered optional cost is XMage's
+		// DoIfCostPaid chooseUse answered no; its AI defaults to yes and
+		// would pay what gorge declined.
+		return "no", true
 	case "yes", "no":
 		// The engine's own boolean option ("Yes — shuffle", a may
 		// trigger): XMage's chooseUse.
 		return kind, true
-	case "altaddcost", "gift_decline", "gift_promise", "primary":
+	case "gift_promise":
+		// The promise side is chooseUse yes whichever option index the
+		// engine listed it at (Jolly Gerbils' Blooming Blast offers "Don't
+		// promise a gift" first, so the promise is option 1).
+		return "yes", true
+	case "gift_decline":
+		return "no", true
+	case "altaddcost", "primary":
 		// An optional additional cost, a gift promise and a two-way
 		// primary/secondary pick are chooseUse asks in XMage too
 		// (measured: Silence the Echo, Kitnap, Lost in Space agree only
@@ -1854,6 +2193,16 @@ func yesNo(d rules.OracleDecision) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// loneTriggerCostDecline is a triggered-cost ask offered with only its
+// decline option (rules/cumulative.go: the cost is unpayable for gorge),
+// answered with it, over a cost XMage's DoIfCostPaid asks about regardless
+// (rules.OracleDecision.CostPosed). A decline-only ask over any other cost is
+// not posed by XMage and stays forced away.
+func loneTriggerCostDecline(d rules.OracleDecision) bool {
+	return d.CostPosed && d.Kind == "choose_n" && d.Options == 1 && len(d.Picks) == 1 &&
+		len(d.PickKinds) == 1 && d.PickKinds[0] == "trigger_cost_decline"
 }
 
 // hasTargetPick reports whether any picked option reaches XMage's target
@@ -1901,7 +2250,7 @@ func xmQueue(kind, label string) string {
 		// Nature's Rhythm, Solemn Simulacrum, ...) and Feed the Cycle /
 		// Soaring Stoneglider agree only with a target answer.
 		return "target"
-	case "trigger_cost_pay":
+	case "trigger_cost_pay", "trigger_cost_pay_manual":
 		return "skip"
 	case "mana":
 		if _, ok := manaColourLabel(label); ok {
@@ -2460,11 +2809,28 @@ func openingHandAnswers(f *cards.Face) []Answer {
 	return nil
 }
 
+// twoPilesPileAnswer maps gorge's pile pick to XMage's boolean chooseUse
+// answer: pile A ("First pile", the separator's face-down pile) is "yes",
+// pile B ("Second pile", the face-up pile) is "no".
+func twoPilesPileAnswer(d rules.OracleDecision) string {
+	if len(d.PickKinds) == 1 && d.PickKinds[0] == "pile-b" {
+		return "no"
+	}
+	return "yes"
+}
+
 // pickQueue is xmQueue for the k-th pick, except that a search of ANOTHER
 // player's library (Ancient Vendetta's "search target opponent's ... library")
 // reaches XMage's choice queue: only a search of your own library is the
 // TargetCardInLibrary target ask (measured on the std pass).
 func pickQueue(d rules.OracleDecision, k int, label string) string {
+	if d.Retarget {
+		// A ChangeTargets redirect (Bolt Bend) is XMage's chooseTarget:
+		// the new target rides the target queue even though gorge poses it
+		// as a choose ask, so a "choice" answer is never consumed and the
+		// original target survives.
+		return "target"
+	}
 	q := xmQueue(pickKind(d, k), label)
 	if q == "target" && pickKind(d, k) == "search" && k < len(d.PickRefs) {
 		if s, ok := refSeat(d.PickRefs[k]); ok && s != d.Seat {

@@ -67,9 +67,15 @@ type ChangeZoneAllParams struct {
 	DefinedPresent    bool
 	DefinedText       string
 
-	// The library tail: LibraryPosition$ and Shuffle$ True.
+	// The library tail: LibraryPosition$, Shuffle$ True and NoShuffle$ True.
 	LibraryPosition string
 	ShuffleTrue     bool
+	// NoShuffle$ is the opt-out a TwoPiles pile body forces (noShuffleBody):
+	// ChangeZoneAll has no default search shuffle to suppress, but the key
+	// must still be consumed so the forced flag is not reported unread.
+	// noShuffleBody forces it only on a body that named neither Shuffle$ nor
+	// NoShuffle$, so an explicit Shuffle$ True is never paired with it.
+	NoShuffle bool
 
 	// Flags.
 	RandomOrder     bool
@@ -95,29 +101,29 @@ var changeZoneAllKnownKeys = [...]string{
 	"AITgts", "Activation", "ActivationAfterBlockers", "ActivationFirstCombat",
 	"ActivationGameTypes", "ActivationLimit", "ActivationPhases", "ActivationZone",
 	"Activator", "AddType", "AddTypes",
-	"AdditionalDesc", "AdditionalDescription", "Affected", "AlternateCost",
+	"AdditionalDesc", "AdditionalDescription", "Affected", "AffectedZone", "AlternateCost",
 	"AlternativeCost", "Announce", "AnnounceTitle", "AtEOT", "Attacking", "Boast",
 	"ChangeNum", "ChangeType", "ChangeTypeDesc", "CharacteristicDefining",
 	"CheckSVar", "ChoiceTitle", "ChoiceZone", "Choices", "ChooseFromList",
 	"ClassBand", "ClearImprinted", "Condition", "ConditionActivationLimit",
 	"ConditionCheckSVar", "ConditionCompare", "ConditionCompare2", "ConditionDefined",
-	"ConditionDescription", "ConditionFirstCombat", "ConditionNotPresent",
+	"ConditionDescription", "ConditionFirstCombat", "ConditionNotPresent", "ConditionOptionalPaid",
 	"ConditionPhases", "ConditionPlayerTurn", "ConditionPresent", "ConditionPresent2",
 	"ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc",
 	"Defined", "DefinedCards", "DefinedTarget", "Description", "Destination",
 	"Duration", "Exclude", "Exhaust", "ExileFaceDown", "FaceDown",
 	"FaceDownPower", "FaceDownSetType", "FaceDownToughness", "Foretold",
-	"ForgetOtherRemembered", "ForgetOtherTargets", "GainControl", "GameActivationLimit", "Image",
+	"ForgetOtherRemembered", "ForgetOtherTargets", "GainControl", "GainsAbilitiesOf", "GainsTriggerAbsOf", "GameActivationLimit", "Image",
 	"ImprintCards", "ImprintPlayed", "InstantSpeed", "IsCurse",
 	"IsPresent", "KW", "Keyword", "KeywordLine", "LibraryPosition",
 	"MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor", "ModeCost", "Monstrosity",
-	"NewController", "NumDmg", "OpponentTurn",
+	"NewController", "NoShuffle", "OpponentTurn",
 	"Origin", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "RandomOrder", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberChanged", "RememberCostMana", "RememberLKI",
 	"RememberObjects", "RememberTargets", "ReplaceColor", "ReplaceGraveyard", "ReplaceGraveyardValid",
 	"ReplaceMana", "ReplaceOnly", "ReplaceType", "SVarCompare",
-	"SelectPrompt", "SetChosenMode", "SetColor", "ShowCards", "Shuffle",
+	"SelectPrompt", "SetChosenMode", "SetColor", "SharedRestrictions", "ShowCards", "Shuffle",
 	"SorcerySpeed", "SpellDescription", "StackDescription",
 	"StaticEffect", "StaticEffectCheckSVar", "StaticEffectSVarCompare", "SubAbility",
 	"Tapped", "TargetMax", "TargetMin", "TargetType", "TargetUnique",
@@ -125,7 +131,7 @@ var changeZoneAllKnownKeys = [...]string{
 	"TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType",
 	"TargetsWithSharedCardType", "TargetsWithSharedTypes", "TgtPrompt", "TgtZone",
 	"TokenScript", "Transformed", "TriggerDescription", "Type", "TypeLimit",
@@ -205,6 +211,7 @@ func compileChangeZoneAll(sa *cards.SA, tp *TargetParams, dp *DefinedParams) *Ch
 
 	p.LibraryPosition = strings.TrimSpace(sa.ParamStr(cards.PKLibraryPosition))
 	p.ShuffleTrue = strings.EqualFold(sa.ParamStr(cards.PKShuffle), "True")
+	p.NoShuffle = isTrue(sa.ParamStr(cards.PKNoShuffle))
 
 	p.RandomOrder = compileChangeZoneRandomOrder(sa)
 	p.RememberLKI = isTrue(sa.ParamStr(cards.PKRememberLKI))

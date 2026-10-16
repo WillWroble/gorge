@@ -83,6 +83,9 @@ type pendingTrigger struct {
 	// Execute is the Execute$ SVar name (which events.Apply's DelayedPush case
 	// resolves from the source's SVar table).
 	Delayed bool
+	// DelayedStatic marks a Delayed registration that carried Static$ True:
+	// resolveStaticTriggers runs its body off the stack (Gideon Jura).
+	DelayedStatic bool
 	// Chapter marks a Saga chapter ability: it is a triggered ability even
 	// though its delayed-shape stack object has no T: line to record.
 	Chapter   bool
@@ -196,6 +199,10 @@ type pendingTrigger struct {
 	// with the cast spell riding IDs as Remembered. Idx and SA are unset
 	// for it.
 	Demonstrate bool
+	// Storm is a GRANTED storm keyword (a layer-6 AddKeyword$ Storm --
+	// Prismari, the Inspiration's instant/sorcery grant): the Demonstrate
+	// shape, pushed with the __kwStorm: payload (rules/storm_granted.go).
+	Storm bool
 	// Cipher is the combat-damage-to-player trigger a creature's ENCODED
 	// card grants (CR 702.99b: "Whenever that creature deals combat damage
 	// to a player, its controller may cast a copy of the encoded card
@@ -349,9 +356,13 @@ type damageBatchKey struct {
 // TriggeredPlayersTargets$Amount count and the Defined$ TriggeredTargets /
 // TriggeredSourcesController plural selectors read at resolution.
 type damageBatchEntry struct {
-	key     damageBatchKey
-	idx     int
-	amount  int32
+	key    damageBatchKey
+	idx    int
+	amount int32
+	// gate is the trigger line when it carries DamageAmount$: closeDamageBatch
+	// drops the queued trigger when the batch TOTAL fails the comparison.
+	gate    *cards.Trigger
+	gateSrc state.ObjID
 	sources []state.ObjID
 	targets []state.Target
 }
@@ -448,7 +459,10 @@ type combatFires struct {
 // trigger every time (72 lines over 68 scripts at the FORGE_REF pin) --
 // Exemplar of Light drew on every counter. The entry
 // comments below that cite ActivationLimit$ as a membership reason predate
-// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half.
+// that and now explain only the PlayerTurn$/CheckDefinedPlayer$ half. The
+// CheckDefinedPlayer$ half is no longer scoped either: an unreadable
+// predicate fails closed on every mode (checkDefinedPlayerHolds, lb-crime),
+// so the entries citing it now explain only PlayerTurn$.
 var actionTriggerModes = map[string]bool{
 	// Clashed joins them for the same reason: it is an event mode registered
 	// with its own marker Kind (events.Clash, task clash1), so the
@@ -1247,6 +1261,7 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 				case events.PutOnStack:
 					e.checkGrantedConspireTriggers(observer, id, o, f, *ev, objLKI)
 					e.checkGrantedDemonstrateTriggers(observer, id, o, f, *ev, objLKI)
+					e.checkGrantedStormTriggers(observer, id, o, f, *ev, objLKI)
 				case events.MoveZone:
 					e.checkGrantedExploitTriggers(observer, id, o, f, *ev, objLKI)
 					e.checkGrantedOffspringTriggers(observer, id, o, f, *ev, objLKI)
@@ -1506,6 +1521,9 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 							ent := damageBatchEntry{
 								key: bk, idx: len(e.pendingTriggers), amount: damageAmount,
 							}
+							if _, ok := t.Param(cards.PKDamageAmount); ok {
+								ent.gate, ent.gateSrc = &fc.face.Triggers[ti], id
+							}
 							if bk.all {
 								ent.sources = batchAppendSource(ent.sources, allSrc)
 								ent.targets = batchAppendTarget(ent.targets, allTgt)
@@ -1515,6 +1533,10 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 							// in the stream it queued at before this gate was
 							// batch-scoped; closeDamageBatch patches its referent
 							// amount to the batch total.
+						} else if !trigmatch.DamageAmountMatches(boardOf(e), t, id, ev.Obj, damageAmount) {
+							// No batch open: this event is its own batch, so
+							// DamageAmount$ reads its amount now.
+							continue
 						}
 					}
 				}
@@ -1814,6 +1836,8 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 		// carrying a Demonstrate grant) -- the same both-paths rule Conspire
 		// follows.
 		e.checkGrantedDemonstrateTriggers(observer, id, o, f, *ev, objLKI)
+		// A granted Storm follows the same both-paths rule.
+		e.checkGrantedStormTriggers(observer, id, o, f, *ev, objLKI)
 		// A granted Exploit must fire when its creature enters even when the
 		// object's own printed triggers are live for this event -- the same
 		// both-paths rule Afflict and Conspire follow.
@@ -2042,15 +2066,39 @@ func (e *Engine) closeDamageBatch() {
 		return
 	}
 	e.damageBatchOpen = false
-	for _, ent := range e.damageBatchLog {
+	var dead []bool
+	for li, ent := range e.damageBatchLog {
 		if ent.idx >= len(e.pendingTriggers) {
+			continue
+		}
+		// end bounds this entry's own slots: entries are appended in queue
+		// order, so the next entry's idx starts the next referent's slots.
+		// Without it a failing per-referent entry would kill (or patch) the
+		// adjacent slots of a later entry of the same trigger line.
+		end := len(e.pendingTriggers)
+		if li+1 < len(e.damageBatchLog) && e.damageBatchLog[li+1].idx < end {
+			end = e.damageBatchLog[li+1].idx
+		}
+		// DamageAmount$ on a batch mode compares the accumulated TOTAL: a
+		// queued entry whose total fails it never triggered (CR 603.2).
+		if ent.gate != nil && !trigmatch.DamageAmountMatches(boardOf(e), *ent.gate, ent.gateSrc, 0, ent.amount) {
+			if dead == nil {
+				dead = make([]bool, len(e.pendingTriggers))
+			}
+			for i := ent.idx; i < end; i++ {
+				pt := &e.pendingTriggers[i]
+				if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
+					break
+				}
+				dead[i] = true
+			}
 			continue
 		}
 		// Every queued copy of this (trigger, referent) entry is patched: the
 		// Panharmonicon echo copies appended right after the original share
 		// the queue slot sequence and would otherwise resolve a partial
 		// amount and no batch sets.
-		for i := ent.idx; i < len(e.pendingTriggers); i++ {
+		for i := ent.idx; i < end; i++ {
 			pt := &e.pendingTriggers[i]
 			if pt.Source != ent.key.Source || pt.Idx != ent.key.Idx {
 				break
@@ -2065,6 +2113,15 @@ func (e *Engine) closeDamageBatch() {
 				}
 			}
 		}
+	}
+	if dead != nil {
+		kept := e.pendingTriggers[:0]
+		for i, pt := range e.pendingTriggers {
+			if !dead[i] {
+				kept = append(kept, pt)
+			}
+		}
+		e.pendingTriggers = kept
 	}
 	e.damageBatchIdx = nil
 	e.damageBatchLog = nil
@@ -2282,6 +2339,9 @@ func (e *Engine) closeZoneBatch() {
 			if len(ent.moved) > 0 {
 				pt.Ctx.Remembered = append([]state.Target(nil), ent.moved...)
 				pt.Ctx.Captured = append([]state.Target(nil), ent.moved...)
+				// TriggerCount$Amount of a batch zone mode is the number of
+				// objects the batch moved ("put that many counters").
+				pt.Ctx.TriggerContext.TriggerAmount = int32(len(ent.moved))
 			}
 		}
 	}
@@ -2409,6 +2469,25 @@ func (e *Engine) resolvingRemembered(o *state.Object) []state.Target {
 		return nil
 	}
 	return append([]state.Target(nil), src.Remembered...)
+}
+
+// resolvingCaptured is the capture set a resolving ability object's chain
+// excludes from its Remembered reads (effects' rememberedExcludingCapture):
+// the object's own capture, except where resolvingRemembered dropped it. A
+// printed Mode$ Phase trigger's self capture is the step change's fallback
+// object, never seeded into the chain's Remembered, so keeping it as Captured
+// excluded a REAL memory of the source instead: Aang, Master of Elements'
+// "you may transform Aang. If you do, you gain 4 life, draw four cards ..."
+// (SetState RememberChanged$ True, then ConditionDefined$ Remembered gates)
+// transformed and then did nothing, its RememberChanged entry -- the source
+// itself -- cancelled against the capture (CR 603.12, 608.2c).
+func (e *Engine) resolvingCaptured(o *state.Object) []state.Target {
+	if o.Card == nil && o.Ability != nil && len(o.Remembered) == 1 && !o.Remembered[0].IsPlayer && o.Remembered[0].Obj == o.Source {
+		if t, _, ok := e.findTriggerForAbilityFace(o.Source, o.Ability); ok && t.Mode == "Phase" {
+			return nil
+		}
+	}
+	return o.Remembered
 }
 
 // stateTriggerRemembered is a CR 603.8 state trigger's (Mode$ Always)

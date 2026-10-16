@@ -33,6 +33,9 @@ func GenerateB(reg *cards.Registry, name string, req levelb.Requirement) (item o
 		// driver; a slot a family builder left empty is filled here from the
 		// step's own card (activate_xability_fill.go, cluster C5).
 		fillActivateXAbility(reg, &item)
+		// A pass_to the driver would place in the wrong step names where
+		// gorge stopped (passto_pin.go).
+		pinPassToSteps(reg, &item)
 		c, ok := reg.Lookup(name)
 		if !ok || req.Face < 0 || req.Face >= len(c.Faces) {
 			return
@@ -61,10 +64,21 @@ func GenerateB(reg *cards.Registry, name string, req levelb.Requirement) (item o
 		// zones uniform so the drawn hand is the same whatever the order; only
 		// a setup holding several distinct shuffled names compares the hand by
 		// size instead.
+		// A shuffle-then-manifest/mill sends cards off the top of the
+		// shuffled library to the graveyard, and which ones is the order
+		// XMage randomises: compare the graveyard's size, not its names.
+		if oraclegen.ShufflesThenReadsLibrary(c.Faces[req.Face]) && !hasCompareOption(item.Compare, oraclegen.CompareGraveyardCount) {
+			item.Compare = append(item.Compare, oraclegen.CompareGraveyardCount)
+		}
 		if oraclegen.ShufflesThenDraws(c.Faces[req.Face]) {
 			if !oraclegen.UniformShuffledZones(&item.Scenario, name) && !hasCompareOption(item.Compare, oraclegen.CompareHandCount) {
 				item.Compare = append(item.Compare, oraclegen.CompareHandCount)
 			}
+		}
+		// A permanent shuffled back from the battlefield before a draw can be
+		// drawn again in XMage's random order: compare the hand's size.
+		if oraclegen.ShufflesPermanentThenDraws(c.Faces[req.Face]) && !hasCompareOption(item.Compare, oraclegen.CompareHandCount) {
+			item.Compare = append(item.Compare, oraclegen.CompareHandCount)
 		}
 	}()
 	if req.Gap != "" {

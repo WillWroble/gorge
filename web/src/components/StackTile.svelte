@@ -34,7 +34,7 @@
    *
    * HOVER (Task 2b): a stack card could not be inspected the way a
    * battlefield card can — no hover at all was wired. Wired here to the same
-   * HoverCard dwell/focus/CardDetail mechanism CardTile and HandList use.
+   * HoverCard dwell/focus/CardDetail mechanism CardTile and the hand fans use.
    * `hover.supervise` is the lifecycle half of that contract (carddetail.
    * svelte.ts): it takes the object id the panel is CURRENTLY showing and an
    * INDEPENDENT list of the objects still present, and closes the panel when

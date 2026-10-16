@@ -106,14 +106,20 @@
     reach: 'RC', hexproof: 'HX', indestructible: 'ID', haste: 'HA',
     protection: 'PRO', ward: 'WD',
   };
-  const marks = $derived(
-    (card.keywords ?? [])
-      .map((k) => {
-        const lower = k.toLowerCase();
-        return MARKS[lower] ?? MARKS[lower.split(' ')[0]];
-      })
-      .filter((m): m is string => m !== undefined),
-  );
+  // Deduped: two keywords can share a mark ("Protection from red" and
+  // "Protection from blue" are both PRO, or a keyword granted twice), and the
+  // marks are a keyed each, so a repeat threw each_key_duplicate on every
+  // re-render of the tile. The full list stays one hover away (allMarks).
+  const marks = $derived([
+    ...new Set(
+      (card.keywords ?? [])
+        .map((k) => {
+          const lower = k.toLowerCase();
+          return MARKS[lower] ?? MARKS[lower.split(' ')[0]];
+        })
+        .filter((m): m is string => m !== undefined),
+    ),
+  ]);
   // Three marks is what fits across a 90px face at a countable size. Past
   // that the tile says how many more there are and the inspector spells them
   // all out; six unreadable codes stacked over the art help nobody.
@@ -185,7 +191,7 @@
   // is now rendering and HoverCard closes a panel opened for another object
   // or re-points an armed dwell. superviseRendering is the rendering half of
   // the contract; supervise ("the object left the visible set") still serves
-  // HandList, whose triggers are keyed per card and never re-used.
+  // the hand fans, whose triggers are keyed per card and never re-used.
   $effect(() => {
     hover.superviseRendering(card.id);
   });

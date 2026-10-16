@@ -12,6 +12,7 @@ import (
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/state"
 	"github.com/adams-shaun/gorge/view"
 )
 
@@ -54,6 +55,9 @@ type SeatConfig struct {
 	// Worlds is the redeal source's K (RedealSource): 0 deals a fresh world
 	// per simulation. Ignored by the clairvoyant source.
 	Worlds int
+	// Belief is WorldRedealClosed's model of the opponents' lists, required
+	// by that world and ignored by the others. Shared and read-only.
+	Belief *searchprobe.Belief
 	// Mulligan is the London-mulligan rule of the seat's own bot (seat.Bot.
 	// WithMulligan), which answers every KMulligan ask (the round is never
 	// searched). The zero value is the default bot's 1/3 coin.
@@ -68,7 +72,7 @@ func DefaultSeatConfig() SeatConfig {
 // Diag is one decision of a searched kind as the cost report sees it.
 type Diag struct {
 	Turn       int32
-	Kind       string // priority, attackers, blockers, target; "" for a FeedStopped record
+	Kind       string // priority, attackers, blockers, target (or a fuller kind, ExtraKindNames); "" for a FeedStopped record
 	Searched   bool   // a tree was built
 	Candidates int
 	Choice     int
@@ -78,6 +82,11 @@ type Diag struct {
 	// it prepared (or the source is clairvoyant); DealFailed its first
 	// per-world deal failure (those simulations counted in Stats.NoWorld).
 	Refused, DealFailed string
+	// Seed and Seq locate the decision: the seat's seed (NewSeat's) and the
+	// decision's sequence number, so a driver can name the game a failure
+	// came from. Diagnostic only.
+	Seed uint64
+	Seq  uint64
 }
 
 // Millis is the monotonic elapsed-milliseconds clock the driving command
@@ -147,12 +156,16 @@ func newSeat(seed uint64, net *policynet.Model, cfg SeatConfig) (*Seat, error) {
 	}
 	switch cfg.World {
 	case WorldRedeal:
+	case WorldRedealClosed:
+		if cfg.Belief == nil {
+			return nil, errors.New("azmcts: the closed redeal world needs a belief (SeatConfig.Belief)")
+		}
 	case "", WorldClairvoyant:
 		if cfg.Source == nil {
 			return nil, errors.New("azmcts: the clairvoyant world is not linked (internal/azmcts/clairvoyant)")
 		}
 	default:
-		return nil, fmt.Errorf("azmcts: world source %q: want %s or %s", cfg.World, WorldClairvoyant, WorldRedeal)
+		return nil, fmt.Errorf("azmcts: world source %q: want %s, %s or %s", cfg.World, WorldClairvoyant, WorldRedeal, WorldRedealClosed)
 	}
 	def := seat.NewBot(seed)
 	if cfg.Search.AutoPayment {
@@ -174,7 +187,18 @@ func (s *Seat) Decide(ctx context.Context, v view.View, d decision.Decision) (de
 // stopped: the wrapped bot, counted (FeedStopped) so it is never silent.
 func (s *Seat) DecideBoard(ctx context.Context, b botpolicy.Board, d decision.Decision) (decision.Intent, error) {
 	if Watch != nil {
-		Watch(Diag{Stats: Stats{FeedStopped: 1}})
+		Watch(Diag{Stats: Stats{FeedStopped: 1}, Seed: s.seed, Seq: d.Seq})
+	}
+	return s.def.DecideBoard(ctx, b, d)
+}
+
+// DecideRootRefused is DecideBoard for a decision whose feed is live but
+// whose honest root refused to build (reason is the builder's): the wrapped
+// bot, counted as FeedStopped (its historical meaning: the driver routed
+// around the search) and as RootRefused, with the reason in Diag.Refused.
+func (s *Seat) DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error) {
+	if Watch != nil {
+		Watch(Diag{Stats: Stats{FeedStopped: 1, RootRefused: 1}, Refused: reason, Seed: s.seed, Seq: d.Seq})
 	}
 	return s.def.DecideBoard(ctx, b, d)
 }
@@ -207,8 +231,8 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 	opts.Seed = DecisionSeed(s.seed, d.Seq)
 	var src WorldSource
 	var redeal *RedealSource
-	if s.cfg.World == WorldRedeal {
-		rs, err := s.redealSource(env, obs, opts.Seed)
+	if s.redeals() {
+		rs, err := s.redealSource(env, obs, opts.Seed, d.Player)
 		if err != nil {
 			return decision.Intent{}, err
 		}
@@ -226,7 +250,21 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 		opts.Noise = !s.cfg.NoNoise
 		opts.Sample = env.Engine.G.Turn <= s.cfg.ExploreTurns
 	}
-	res, err := Search(ctx, Root{Engine: env.Engine, Decision: &d, Bot: botIn, Observer: obs}, src, s.net, opts)
+	root := Root{Engine: env.Engine, Decision: &d, Bot: botIn, Observer: obs}
+	// The tap backstop: under AutoPayment a bot answer that taps mana by hand
+	// is outside the payment vocabulary, and the ordinary root would skip the
+	// decision (SkipFewCandidates) and play the tap unsearched -- the
+	// counterspell windows az never learned. Search the full vocabulary with
+	// no bot candidate instead (Root.NoBot); every failure path still plays
+	// the bot's tap. Stats.BotTapRerooted counts it.
+	tapReroot := opts.AutoPayment && d.Kind == decision.KPriority && priorityBase(&d, botIn) == BaseActivate
+	if tapReroot {
+		root.NoBot = true
+	}
+	res, err := Search(ctx, root, src, s.net, opts)
+	if tapReroot && res.Stats.Searched == 1 {
+		res.Stats.BotTapRerooted = 1
+	}
 	if redeal != nil {
 		s.spare = redeal.reclaim()
 	}
@@ -247,6 +285,7 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 		dg := Diag{
 			Turn: env.Engine.G.Turn, Kind: res.Kind, Searched: res.Stats.Searched == 1,
 			Candidates: len(res.Candidates), Choice: res.Choice, Stats: res.Stats, Refused: refused, DealFailed: dealFailed,
+			Seed: s.seed, Seq: d.Seq,
 		}
 		if Millis != nil {
 			dg.MS = Millis() - t0
@@ -255,6 +294,14 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 	}
 	return res.Intent, nil
 }
+
+// WantsPaymentActions reports whether the driver must build the decision's
+// payment plans for this seat (seat.PaymentPlanConsumer): exactly when the
+// search runs over the auto-payment vocabulary (SeatConfig.Search.AutoPayment).
+// Without plans the wrapped auto-pay bot answers with a manual mana tap, which
+// is outside that vocabulary, so the decision would go unsearched. A seat
+// without AutoPayment searches the manual options and opts out.
+func (s *Seat) WantsPaymentActions() bool { return s.cfg.Search.AutoPayment }
 
 // DigestFree reports that the seat never samples from its feed's history
 // (searchseat.DigestFree): both world sources -- the injected clairvoyant
@@ -298,8 +345,8 @@ func (s *Seat) decidePrior(ctx context.Context, env searchseat.Env, d decision.D
 // incrementally across the game) and the feed's collector. A feed that has
 // no frames, or a known-card fold that failed, is a refusal -- counted, and
 // the bot's answer is played -- never a clairvoyant fallback.
-func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed uint64) (*RedealSource, error) {
-	in := RedealInput{Setup: env.Setup}
+func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed uint64, actor state.PlayerID) (*RedealSource, error) {
+	in := RedealInput{Setup: searchseat.SeatSetup(env.Setup, s, actor)}
 	if env.Feed != nil && env.Feed.Live() && env.Feed.Frames() > 0 {
 		in.History = env.Feed.History()
 		in.Base = searchprobe.RedealBase{Engine: env.Engine, Observer: env.Feed.Collector()}
@@ -311,6 +358,22 @@ func (s *Seat) redealSource(env searchseat.Env, obs *searchprobe.Collector, seed
 		in.Known = known
 	}
 	return NewRedeal(in, obs, seed, s.cfg.Worlds)
+}
+
+// redeals reports whether the seat searches honest redeal worlds (open or
+// closed lists).
+func (s *Seat) redeals() bool {
+	return s.cfg.World == WorldRedeal || s.cfg.World == WorldRedealClosed
+}
+
+// SearchBelief is the belief a closed-list seat draws its opponents' lists
+// from (searchseat.ClosedListSeat), nil for every other world: a driver
+// closes the seat's public game (and so its honest root) with it.
+func (s *Seat) SearchBelief() *searchprobe.Belief {
+	if s.cfg.World == WorldRedealClosed {
+		return s.cfg.Belief
+	}
+	return nil
 }
 
 // worldName is the record's world source name.

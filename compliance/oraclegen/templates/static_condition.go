@@ -702,6 +702,14 @@ func staticFixtures(reg *cards.Registry, c *cards.Card, f *cards.Face, name stri
 	if fx, ok := staticCraftFixture(reg, c, f, name, st); ok {
 		out = append(out, fx)
 	}
+	if fx, ok := staticCrewCDAFixture(f, name, st); ok {
+		out = append(out, fx)
+	}
+	// Unlocked Room doors (static_unlocked_doors.go), last for the same
+	// reason.
+	if fx, ok := staticUnlockedDoorsFixture(reg, f, st); ok {
+		out = append(out, fx)
+	}
 	return staticAvoidProbeCollision(reg, out)
 }
 
@@ -746,10 +754,11 @@ func staticConditionGap(f *cards.Face, st cards.Static) string {
 	case has("maxspeed"):
 		return "needs max speed (setup has no speed knob)"
 	case has("attackedthisturn"):
-		// The object predicate is absent from the filter grammar (only
-		// attackedThisCombat exists), so a Card.Self+attackedThisTurn gate
-		// fails closed and stays false after the source attacks.
-		return "gate reads the attackedThisTurn filter predicate, which the engine does not evaluate"
+		// The filter grammar evaluates attackedThisTurn (effects/filter.go);
+		// what is missing is a fixture that makes the source attack. The
+		// play-permission observation serves a Card.Self gate itself
+		// (staticNeedsSelfAttack); a gate it cannot serve lands here.
+		return "gate needs the source to have attacked this turn (no self-attack fixture serves this shape)"
 	}
 	return ""
 }

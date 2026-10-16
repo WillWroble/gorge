@@ -11,7 +11,7 @@ import (
 // table.
 func TestManaReflectedKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(manaReflectedKnownKeys[:]) || len(slices.Compact(slices.Clone(manaReflectedKnownKeys[:]))) != len(manaReflectedKnownKeys) {
-		t.Fatal("manaReflectedKnownKeys must be sorted and duplicate-free")
+		t.Fatal("manaReflectedKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

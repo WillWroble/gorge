@@ -108,6 +108,9 @@ func (e *Engine) putTriggersOnStack() bool {
 			return false
 		}
 		e.dropDepartedTriggers()
+		if e.setupEntryDrops != nil {
+			e.dropSetupEntryTriggers()
+		}
 		if len(e.pendingTriggers) == 0 {
 			// Keep the drained queue's array for the next batch, zeroed so
 			// the shifted-out tail pins nothing (removeTriggerAt shifts in
@@ -122,6 +125,12 @@ func (e *Engine) putTriggersOnStack() bool {
 			e.trigQueueStale = 0
 			e.pendingTriggers, e.orderedTriggers = e.pendingTriggers[:0], 0
 			return false
+		}
+		if e.resolveStaticTriggers() {
+			// Static$ True triggers resolve off the stack (static_trigger.go)
+			// and are never part of the CR 603.3b order choice; their events
+			// can have queued more triggers, so the batch is re-scanned.
+			continue
 		}
 		if e.orderedTriggers == 0 {
 			n := e.sortPendingTriggers()
@@ -665,6 +674,10 @@ func (e *Engine) pushTrigger(pt pendingTrigger) {
 	// TriggeredSpellAbility reads the triggering spell off it. The trailing
 	// colon keeps the payload from aliasing the "__kwDemonstrate" SVar a
 	// printed bare K:Demonstrate line mints.
+	if pt.Storm {
+		e.pushGrantedStorm(pt)
+		return
+	}
 	if pt.Demonstrate {
 		if int(pt.Controller) >= len(e.G.Players) || e.G.Players[pt.Controller].Lost {
 			return
@@ -1432,24 +1445,36 @@ func (e *Engine) faceOwningTrigger(source state.ObjID, t cards.Trigger) *cards.F
 //
 // So the answer to "is the decider ever someone other than the controller" is
 // yes, and it is honoured for the two forms this engine can actually resolve:
-// TriggeredCardController and TriggeredSourceController both read the
-// controller of the object the trigger remembered, which is the object the
-// triggering event was about (triggerRemembered, above) -- the same object
-// Forge means by both names in every T: line in the corpus that uses them.
+// TriggeredCardController reads the triggering card (its last-known
+// controller when it left the battlefield, else Remembered[0]'s object), and
+// TriggeredSourceController reads the source the causing event captured
+// (effects.TriggeredSourceController), falling back to Remembered[0] only
+// when the trigger captured no source role. The fallback is what the corpus's
+// five TriggeredSourceController T: lines all hit before B8: each is a
+// DamageDone combat-damage trigger, whose Remembered is the DAMAGED object
+// (triggerRemembered, above) -- a player-damage event's fallback names the
+// trigger's own source instead -- so the decider was the trigger source's
+// controller, not the damage dealer's. All five (Brood Sliver, Edric Spymaster
+// of Trest, Undercity Reaches, Gix Yawgmoth Praetor, Synapse Sliver) now read
+// the captured damage source, one root cause per card.
 //
-// CAVEAT (Task 6, fix round 1): that equivalence assumes Remembered[0] is
-// the object the FIRING trigger's own T: line is on, which triggerRemembered
-// no longer guarantees for a DeclareAttackers-driven Attacks trigger --
-// Remembered there is every attacker declared against one defending player
-// (handleAttackers emits one event per defender since Task m34), in event
-// order, so Remembered[0] is whichever creature attacking that defender was
-// declared first, not necessarily pt.Source. No repo-deck T: line combines
-// Mode$ Attacks with OptionalDecider$ TriggeredCardController/
-// TriggeredSourceController today (measured against the same corpus the
-// table above was), so this is a latent gap, not a live one -- but a future
-// card that did would have this read the wrong creature's controller
-// whenever it attacks alongside another creature that happened to be
-// declared first.
+// CAVEAT (Task 6, fix round 1; B8 kept the shape): the Remembered[0] fallback
+// assumes it is the object the FIRING trigger's own T: line is on, which
+// triggerRemembered no longer guarantees for a DeclareAttackers-driven Attacks
+// trigger -- Remembered there is every attacker declared against one defending
+// player (handleAttackers emits one event per defender since Task m34), in
+// event order, so Remembered[0] is whichever creature attacking that defender
+// was declared first, not necessarily pt.Source. For TriggeredSourceController
+// the captured role now wins whenever the Attacks capture bound one (the
+// single-matching-attacker case, rules/trigger_referents.go sets
+// c.TriggerSource = c.TriggerCard); the multi-attacker case leaves the role
+// absent and still reads Remembered[0]. No repo-deck T: line combines Mode$
+// Attacks with OptionalDecider$ TriggeredCardController/
+// TriggeredSourceController today (measured against the same corpus the table
+// above was), so this is a latent gap, not a live one -- but a future card
+// that did would have TriggeredCardController read the wrong creature's
+// controller whenever it attacks alongside another creature that happened to
+// be declared first.
 //
 // LIMITATION, stated rather than assumed: the remaining ten T: lines
 // (TriggeredPlayer, EnchantedController, TriggeredAttackingPlayer,
@@ -1518,10 +1543,15 @@ func (e *Engine) deciderFromSpec(spec string, controller state.PlayerID, remembe
 			who = p
 		}
 	case deciderFromSpecTriggeredSourceController:
-		if len(remembered) > 0 {
-			if o := e.G.Obj(remembered[0].Obj); o != nil {
-				who = o.Controller
-			}
+		// The shared resolver (effects.TriggeredSourceController): the
+		// source the causing event recorded, else Remembered[0]. For a
+		// DamageDone trigger Remembered holds the DAMAGED object, so the
+		// old Remembered[0]-only read asked the wrong seat whenever the
+		// damage source and the trigger's own source had different
+		// controllers (B8: Brood Sliver's may belongs to the controller of
+		// the Sliver that dealt the damage, not Brood Sliver's controller).
+		if p, ok := effects.TriggeredSourceController(e.G, tc, remembered); ok {
+			who = p
 		}
 	}
 	if int(who) >= len(e.G.Players) || e.G.Players[who].Lost {
@@ -1695,6 +1725,15 @@ func (e *Engine) triggerLabel(pt pendingTrigger) string {
 			}
 		}
 		return name + ": demonstrate copy trigger"
+	}
+	if pt.Storm {
+		name := "a spell"
+		if o := e.G.Obj(pt.Source); o != nil {
+			if f := o.Face(); f != nil && f.Name != "" {
+				name = f.Name
+			}
+		}
+		return name + ": storm copy trigger"
 	}
 	if pt.Gift {
 		name := "it"
@@ -1881,11 +1920,17 @@ func (e *Engine) askTriggerModes(p state.PlayerID, obj state.ObjID, sa *cards.SA
 	// game"): a later instance of the same triggered Charm on the same source
 	// must not offer a mode an earlier instance already chose, so the eligible
 	// list is filtered before the bounds clamp and the options are built. With
-	// every mode exhausted, the min-over-modes guard below leaves the trigger
-	// doing nothing -- the oracle's own outcome.
+	// every mode exhausted, the min-over-modes guard below removes the
+	// trigger. CR 700.2a: a mode whose mandatory targets have no legal
+	// candidate can't be chosen either, so it is filtered the same way. With
+	// no mode left at all the trigger is removed even when its minimum is 0
+	// (Optional$): CR 603.3c, no mode chosen, and a zero-option ask is never
+	// posted.
 	eligible := effects.CharmEligibleModes(e, source, sa, choices)
+	eligible = triggerModesWithTargets(e, p, obj, svars, eligible)
 	min, max, repeat := effects.CharmModeBounds(e, ctx, sa, len(eligible))
-	if min > len(eligible) && !repeat {
+	if len(eligible) == 0 || (min > len(eligible) && !repeat) {
+		removeModelessTrigger(e, obj)
 		return true
 	}
 	e.ask(modeDecisionForChoices(p, source, sa, svars, eligible, min, max, repeat))
@@ -2023,26 +2068,61 @@ func (e *Engine) askOptionalAtResolution(who state.PlayerID, o *state.Object, sa
 	// complete the resolution and log its priority grant, so handlePriority
 	// must not log a second one (tapeGranted).
 	in := tapeServe(e, d)
-	rp := &resumePoint{kind: "optional", obj: o.ID, sa: sa}
 	chosen := d.Chosen(in)
 	if len(chosen) == 1 && chosen[0].Kind == "yes" {
-		// ResolvedLimit$: an ACCEPTED optional trigger is one the effect runs
-		// for, so it consumes the per-turn resolution count (a decline never
-		// does). The check is on the resolved line's own param, never the
-		// source's other lines (Tidus's non-RL BeginCombat line).
-		if t, ok := e.triggerForAbilityObject(o.ID, o); ok {
-			if _, limited := resolvedLimitValue(t); limited {
-				e.noteTriggerResolved(o.Source)
-			}
-		}
-		e.resumeResolution(rp, chosen)
-	} else {
-		e.finishResumption(rp.obj)
-		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+		e.acceptOptionalAtResolution(o, sa, chosen)
+		return
 	}
+	e.finishResumption(o.ID)
+	e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
 	if !e.Suspended() {
 		e.tapeGranted = true
 	}
+}
+
+// acceptOptionalAtResolution is the CR 603.5 "yes" continuation: the effect
+// is applied (resumeResolution's "optional" arm). It serves both an answered
+// yes and the folded ask (optionalFoldsIntoCost), where the trigger's own
+// "you may pay" election is the only question posed.
+func (e *Engine) acceptOptionalAtResolution(o *state.Object, sa *cards.SA, chosen []decision.Option) {
+	// ResolvedLimit$: an ACCEPTED optional trigger is one the effect runs
+	// for, so it consumes the per-turn resolution count (a decline never
+	// does). The check is on the resolved line's own param, never the
+	// source's other lines (Tidus's non-RL BeginCombat line).
+	if t, ok := e.triggerForAbilityObject(o.ID, o); ok {
+		if _, limited := resolvedLimitValue(t); limited {
+			e.noteTriggerResolved(o.Source)
+		}
+	}
+	e.resumeResolution(&resumePoint{kind: "optional", obj: o.ID, sa: sa}, chosen)
+	if !e.Suspended() {
+		e.tapeGranted = true
+	}
+}
+
+// optionalFoldsIntoCost reports whether an optional trigger's CR 603.5 yes/no
+// is the same question as its body's optional Cost$ election ("you may pay
+// {R}. If you do, ..."): the body enters the triggered-cost window on a yes
+// (resumeResolution's armed gate), its cost is not a `Mandatory` one (whose
+// payment is owed once the effect is applied, so the yes/no is the only
+// "may"), and the decider is the payer -- the window asks the ability's
+// controller. Declining the cost then leaves the ability unexecuted exactly
+// as a "no" did, so the yes/no is not posed and the pay/decline ask alone
+// carries the choice. A decider other than the controller keeps both asks.
+func (e *Engine) optionalFoldsIntoCost(who state.PlayerID, o *state.Object) bool {
+	sa := o.Ability
+	if sa == nil || who != o.Controller {
+		return false
+	}
+	raw := sa.ParamStr(cards.PKCost)
+	if raw == "" || strings.HasPrefix(raw, "Mandatory") {
+		return false
+	}
+	if e.triggerBodyNeedsCostWindow(sa) {
+		return true
+	}
+	tc := e.triggerContexts[o.ID]
+	return sa.API == "CopySpellAbility" && (tc.TriggerAbility != 0 || tc.TriggerCard != 0)
 }
 
 // optionalAtResolutionDecision is CR 603.5's yes/no at resolution.

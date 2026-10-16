@@ -412,6 +412,14 @@ type Option struct {
 	// the engine's own derived-keyword facts and the stack -- a human
 	// client never sees it, so it is never on the wire.
 	Grant *Grant `json:"-"`
+	// Loyalty is server-side only (json:"-") and present only on an
+	// "ability" option whose ability is a planeswalker loyalty ability. A
+	// loyalty ability's label carries no digits (the cost is in Cost, as
+	// prose), so the bot's cost-from-label ranking tied every one of a
+	// walker's abilities and only the first was ever chosen. The fact
+	// carries what the ranking needs, read from the compiled cost and the
+	// printed ability; a human client never sees it.
+	Loyalty *Loyalty `json:"-"`
 	// Attach is server-side only (json:"-"), set on a printed, gained or
 	// granted "ability" option whose ability is an AB$ Attach -- K:Equip, Reconfigure and
 	// Fortify expand to one (cards/keywords.go). It is what scopes the bot
@@ -493,6 +501,32 @@ type Option struct {
 	// Value2 is the option's price under the decision's second cumulative
 	// budget (Decision.MaxSum2).
 	Value2 int `json:"value2,omitempty"`
+	// TargetHints is the engine's opt-in hint for a cast or activation whose
+	// first targeting step is a hostile effect: own and opponent legal-target
+	// counts (see TargetHints). Information only; built by
+	// Engine.EnsureTargetHints for seats that ask. omitempty: absent for every
+	// option otherwise, so existing option lists serialise byte-identically.
+	TargetHints TargetHints `json:"target_hints,omitempty"`
+}
+
+// Loyalty describes one planeswalker loyalty ability option
+// (decision.Option.Loyalty, server-side only).
+type Loyalty struct {
+	// Delta is the net loyalty change the cost settles: +N for [+N], -N for
+	// [-N], 0 for [0]. Unset (0) for an announced [-X], which sets X.
+	Delta int32
+	// X marks a variable [-X] cost.
+	X bool
+	// Ultimate is the ability's Ultimate$ True marker.
+	Ultimate bool
+	// Removal marks an effect chain that destroys, damages, sacrifices,
+	// fights or moves a permanent off the battlefield.
+	Removal bool
+	// Dies is true when paying the cost leaves the walker with no loyalty.
+	Dies bool
+	// Restart marks a RestartGame effect (Karn Liberated's ultimate). The
+	// engine ends such a game as a draw, so the bot never takes it.
+	Restart bool
 }
 
 // Grant describes the idempotent keyword grant of one "ability" option
@@ -607,6 +641,20 @@ type Decision struct {
 	// data, not part of the wire, and is clone-copied by Decision.CloneInto
 	// (decision/payment_plan.go).
 	PotentialUnpayableCasts []state.ObjID `json:"-"`
+	// PotentialCasts is the same build's cast census: every object the
+	// offer builder's PotentialMana walk offers at least one cast of (any
+	// mode, any castable zone), in walk order without repeats. The walk is
+	// an OVER-bound (timing, targets, restrictions and non-mana costs are the
+	// engine's own gates; the hypothetical pool is every untapped source), so
+	// an object absent from it is not castable this window however much mana
+	// is floated. PotentialCastsKnown says the build ran the walk: false on an
+	// unbuilt extension and on a pool the planner declines before walking
+	// (pay.PlanPoolOK), where the census says nothing. The auto-pay bot's tap
+	// gate reads both (botpolicy.Board.tapTarget) so it never floats mana
+	// toward a card the engine already knows it cannot cast. Engine cache
+	// data like PotentialUnpayableCasts: not wire, clone-copied by CloneInto.
+	PotentialCasts      []state.ObjID `json:"-"`
+	PotentialCastsKnown bool          `json:"-"`
 	// Redirected marks a decision whose answering seat (Player) was moved
 	// off the seat it is asked OF by a CR 722 control redirect: a controlled
 	// player's turn (api:ControlPlayer -- Mindslaver) or an opponent's

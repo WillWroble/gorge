@@ -8,7 +8,20 @@
 # per pass instead of one per ticket:
 #
 #   1. select every ticket whose History carries the park line of that gate
-#      (status human_needed, oldest park first);
+#      (status human_needed, oldest park first); or a ticket parked past its
+#      gate's requeue_max on gate_affected.sh's stale-only certification exit
+#      76: the park line "... exited <codes> (requeue) <n> times in a row,
+#      past requeue_max = <cap>: parking for a human" (agentctl ladder.py
+#      requeue_gate_failure) whose NEWEST gate log -- agentctl writes the full
+#      gate output to .ds4/orchestrator/gates/<id>/<tag>/go-test-affected.log,
+#      while the History line only carries r.output[-3000:][:2000] and cuts
+#      the marker off -- ends with gate_affected's "Requeuing (exit 76)".
+#      Such a park means the branch's own engine change moved the scenario
+#      shas the committed XMage verdicts hash; the batch's full replay below
+#      regenerates the scenarios AND the verdict rows and the landing commits
+#      them exactly like a drift-refresh landing. A row that regresses (a real
+#      disagreement, not a moved sha) still blocks the ticket through steps
+#      4-5 below, exactly as a driver regression would;
 #   2. merge their branches onto ONE integration branch wt/driver-batch-<stamp>
 #      (a branch that conflicts is skipped and stays parked; never resolved here);
 #   3. run the capped build/tests, then ONE forced full replay
@@ -134,11 +147,14 @@ checks() {
     cd "$wt" || exit 1
     if [ -n "${DRB_CHECK_CMD:-}" ]; then $DRB_CHECK_CMD "$1"; exit; fi
     if [ "$1" = pre ]; then capped go build ./... || exit 1; fi
-    capped go test -timeout 2m ./compliance/oraclegen ./compliance/oraclegen/templates ./cmd/oraclediff || exit 1
-    if [ "$1" = post ]; then capped go test -timeout 2m ./compliance/adopt ./compliance/gate ./compliance || exit 1; fi
+    # -timeout is the PACKAGE wall, not the 1-minute per-test budget: oraclegen/
+    # templates takes 120-170 s even on a quiet box and lb-roomspell was parked
+    # "red alone" on a 2m timeout at load 76 (2026-10-12), so give it 10m.
+    capped go test -timeout 10m ./compliance/oraclegen ./compliance/oraclegen/templates ./cmd/oraclediff || exit 1
+    if [ "$1" = post ]; then capped go test -timeout 10m ./compliance/adopt ./compliance/gate ./compliance || exit 1; fi
     # Census guards too: a driver/runner branch that edits rules/ trips the
     # param census (50a74c19c went red on oracleRun.build). ~10s, 0.9 GB.
-    capped go test -timeout 2m -run 'Oracle|Census' ./rules || exit 1
+    capped go test -timeout 10m -run 'Oracle|Census' ./rules || exit 1
   ) >"$2" 2>&1
 }
 
@@ -179,8 +195,29 @@ def leaves(x, p=""):
         yield p, x
 
 cmd, args = sys.argv[1], sys.argv[2:]
+STAMP = r"^- \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z "
+
+def stale76(issues_dir, iid):
+    """0-source: the ticket's NEWEST gate log carries gate_affected's
+    stale-only marker. agentctl writes every gate result's full OUTPUT_TAIL
+    to .ds4/orchestrator/gates/<id>/<tag>/<slug>.log; the History line's
+    embedded tail (r.output[-3000:][:2000]) truncates the marker away, so
+    the log file is the only reliable "last gate log"."""
+    base = os.path.join(os.path.dirname(os.path.abspath(issues_dir)), "orchestrator", "gates")
+    cands = glob.glob(os.path.join(base, iid, "*", "go-test-affected.log"))
+    cands += glob.glob(os.path.join(base, "train-" + iid, "*", "go-test-affected.log"))
+    if not cands:
+        return False
+    try:
+        with open(max(cands, key=os.path.getmtime), errors="replace") as fh:
+            return "Requeuing (exit 76)" in fh.read()
+    except OSError:
+        return False
+
 if cmd == "parked":
-    # parked ISSUES_DIR -> TSV: parkstamp id branch heldmain heldbranch
+    # parked ISSUES_DIR -> TSV: parkstamp id branch heldmain heldbranch kind
+    # kind is "driver" (the on_fail="park" XMage-driver gate) or "stale76"
+    # (requeue_max exhausted on gate_affected's stale-only exit 76).
     rows = []
     for f in glob.glob(os.path.join(args[0], "*.md")):
         txt = open(f).read()
@@ -191,18 +228,38 @@ if cmd == "parked":
         fm = dict(x.groups() for x in re.finditer(r"^(\w+):[ \t]*(.*)$", m.group(1), re.M)) if m else {}
         if fm.get("status") != "human_needed":
             continue
+        iid = fm["id"]
         park = None
+        kind = ""
         held = ("", "")
-        for line in hist.split("\n"):
+        lines = hist.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            i += 1
             m = re.match(r"^- (\S+) gate .*xmage driver needs host replay.* failed and is marked on_fail", line)
             if m:
-                park, held = m.group(1), ("", "")
+                park, kind, held = m.group(1), "driver", ("", "")
+                continue
+            m = re.match(r"^- (\S+) gate .+ exited \S+ \(requeue\) \d+ times in a row, past requeue_max", line)
+            if m:
+                # The gate-output tail is embedded in the SAME History entry;
+                # skip it so its lines cannot match the patterns below. A
+                # requeue park that is not stale-only (exit 75, another gate,
+                # a later run) clears the park: the LAST gate log rules.
+                while i < len(lines) and not re.match(STAMP, lines[i]):
+                    i += 1
+                kind = "stale76" if stale76(args[0], iid) else ""
+                park, held = (m.group(1), ("", "")) if kind else (None, ("", ""))
                 continue
             m = re.match(r"^- \S+ driver_replay_batch: HELD .* main=(\S+) branch=(\S+)", line)
             if m and park:
                 held = (m.group(1), m.group(2))
         if park:
-            rows.append((park, fm["id"], fm.get("branch", ""), held[0], held[1]))
+            # bash `read` collapses consecutive IFS tabs, so an EMPTY held
+            # field is "-" (select_parked only compares hm/hb, never treats
+            # "-" as a value that could match a branch sha).
+            rows.append((park, iid, fm.get("branch", ""), held[0] or "-", held[1] or "-", kind))
     for r in sorted(rows):
         print("\t".join(r))
 elif cmd == "regressed":
@@ -674,8 +731,8 @@ infra_fail() { say "ABORT $1 (no ticket changed; retry after ${COOLDOWN}s)"; INF
 PIDS=()
 select_parked() {
   PIDS=()
-  local park id branch hm hb bhead
-  while IFS=$'\t' read -r park id branch hm hb; do
+  local park id branch hm hb kind bhead
+  while IFS=$'\t' read -r park id branch hm hb kind; do
     [ -n "$id" ] || continue
     bhead=$(sha12 "refs/heads/$branch")
     if [ -z "$bhead" ]; then say "SKIP-NOBRANCH $id: branch $branch does not exist"; continue; fi
@@ -683,6 +740,7 @@ select_parked() {
     BR[$id]=$branch
     WT_OF[$id]=$repo/.worktrees/$id
     PIDS+=("$id")
+    [ "$kind" = stale76 ] && say "SELECT-STALE76 $id: parked past requeue_max on exit 76; the newest gate log shows the stale-only requeue"
   done < <(py parked "$ISSUES")
 }
 

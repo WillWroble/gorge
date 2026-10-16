@@ -64,7 +64,7 @@ func TestManaBrewOnRequiresSeatGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	cfg := config{cards: "../../.cards", decks: "../../internal/testutil/decks", tables: 1, seats: 2,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", tables: 1, seats: 2,
 		dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, manabrew: true}
 	err = serve(context.Background(), cfg, ln)
 	if err == nil {

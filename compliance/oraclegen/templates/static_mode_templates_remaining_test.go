@@ -190,11 +190,12 @@ func TestRemainingStaticModeTemplates(t *testing.T) {
 	}
 }
 
-// TestCantBlockUnlessTaxStaysNamedSkip pins the one served-shape row whose
-// scenario grammar reaches no checkpoint: the {1} block tax leaves no
-// affordable block, so the blockers decision is never posed and the template
-// keeps the requirement a named skip rather than pinning a vacuous item.
-func TestCantBlockUnlessTaxStaysNamedSkip(t *testing.T) {
+// TestCantBlockUnlessTaxPaidBlock pins Archangel of Tithes static#0.1 (CR
+// 509.1d): with the card attacking, p1 blocks p0's Grizzly Bears with its own
+// and pays the {1} tax from its one Wastes -- the paid-block checkpoint shows
+// the blocker blocking and the land tapped. The template's control (no land,
+// so no affordable block and no blockers decision) refuses the block.
+func TestCantBlockUnlessTaxPaidBlock(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	c, ok := reg.Lookup("Archangel of Tithes")
 	if !ok {
@@ -207,18 +208,17 @@ func TestCantBlockUnlessTaxStaysNamedSkip(t *testing.T) {
 		if req.Sub != "static.cant-block-unless-tax" {
 			t.Fatalf("precondition: static#0.1 classifies as %q, want static.cant-block-unless-tax", req.Sub)
 		}
-		f := c.Faces[req.Face]
-		if len(f.Statics) == 0 {
-			t.Fatal("precondition: face 0 carries no static abilities")
+		it, sk := templates.GenerateB(reg, "Archangel of Tithes", req)
+		if sk != nil {
+			t.Fatalf("static#0.1 skipped: %s", sk.Reason)
 		}
-		_, sk := templates.GenerateB(reg, "Archangel of Tithes", req)
-		if sk == nil {
-			t.Fatal("static#0.1 generated an item; want the named paid-block-checkpoint skip")
+		if n := len(it.Steps); n != 2 || it.Steps[0].Op != "attack" || it.Steps[1].Op != "block" {
+			t.Fatalf("steps = %+v, want the attack and the paid block", it.Steps)
 		}
-		if !strings.Contains(sk.Reason, "blockers decision is not posed") {
-			t.Fatalf("skip reason %q does not name the missing checkpoint", sk.Reason)
+		if !strings.Contains(strings.Join(it.Setup["p1"].Battlefield, ","), "Wastes") {
+			t.Fatalf("p1 setup %v carries no land to pay the tax", it.Setup["p1"].Battlefield)
 		}
 		return
 	}
-	t.Fatal("precondition: Archangel of Tithes has no requirement static#0.1")
+	t.Fatal("precondition: Archangel of Tithes has no static#0.1")
 }

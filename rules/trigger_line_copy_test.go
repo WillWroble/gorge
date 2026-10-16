@@ -69,9 +69,11 @@ func TestCopiedGrantedTriggerKeepsItsLineAcrossStackCopyAndClone(t *testing.T) {
 		t.Fatal("cloned trigger line lost its parameter map")
 	}
 
+	// The line's OptionalDecider$ You folds into the Cost$ election
+	// (optionalFoldsIntoCost), so the copy poses the pay ask alone.
 	sawOptional, sawPay := drainCopyGrants(t, clone, 40, true, true)
-	if !sawOptional || !sawPay {
-		t.Fatalf("copied granted trigger asks: Optional=%v Cost=%v, want both", sawOptional, sawPay)
+	if sawOptional || !sawPay {
+		t.Fatalf("copied granted trigger asks: Optional=%v Cost=%v, want the pay ask alone", sawOptional, sawPay)
 	}
 	if got := copyCount(clone, spell); got != 1 {
 		t.Fatalf("copied granted trigger made %d spell copies, want 1", got)

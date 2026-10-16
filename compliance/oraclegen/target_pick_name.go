@@ -7,9 +7,11 @@
 // printed name of a face-down permanent. When a permanent's current face has
 // a different name (Jill, Shiva's Dominant transformed into Shiva, Warden of
 // Ice; Inverted Iceberg's back face Iceberg Titan), the front name no longer
-// matches any XMage object and the queued answer is left unused. The ref's
-// identity alias does match (the permanent keeps its object id through a
-// transform), so those picks are answered by their exact ref.
+// matches any XMage object and the queued answer is left unused. Those picks
+// are answered by the current face's name when no other option shares it:
+// the ref's identity alias binds the setup object, which a permanent that was
+// exiled and returned transformed (Jill's "exile, then return it
+// transformed") no longer is. A shared current name falls back to the alias.
 package oraclegen
 
 import (
@@ -65,4 +67,31 @@ func tapOrUntapChoice(d rules.OracleDecision) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// uniqueCurrentFaceName is the name part of target pick k's label (the
+// object's current face, "Shiva, Warden of Ice" of "Shiva, Warden of Ice (a)")
+// when no other option ref names it and the pick's ref is offered once.
+func uniqueCurrentFaceName(d rules.OracleDecision, k int) (string, bool) {
+	if k < 0 || k >= len(d.Picks) || k >= len(d.PickRefs) {
+		return "", false
+	}
+	name := d.Picks[k]
+	if i := strings.LastIndex(name, " ("); i > 0 && strings.HasSuffix(name, ")") {
+		name = name[:i]
+	}
+	if name == "" || strings.ContainsAny(name, ":@^$") {
+		return "", false
+	}
+	seen := 0
+	for _, ref := range d.OptionRefs {
+		if ref == d.PickRefs[k] {
+			seen++
+			continue
+		}
+		if strings.EqualFold(oraclediffRefName(ref), name) {
+			return "", false
+		}
+	}
+	return name, seen == 1
 }

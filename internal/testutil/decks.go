@@ -4,9 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -209,15 +207,18 @@ func (c *corpusRegistryCache) get(load func() corpusRegistryResult) corpusRegist
 var repoCorpusRegistry corpusRegistryCache
 
 func loadRepoCorpusRegistry() corpusRegistryResult {
-	cmd := exec.Command("git", "-C", ".", "rev-parse", "--show-toplevel")
-	cmd.Env = cards.GitEnv()
-	out, err := cmd.Output()
-	if err != nil {
-		return corpusRegistryResult{err: fmt.Errorf("testutil: could not resolve git repo root: %v", err)}
+	// The main checkout's corpus, not this worktree's symlink to it: the
+	// opened path is part of `go test`'s result-cache key (SharedCorpusDir).
+	dir, ok := SharedCorpusDir(".")
+	if !ok {
+		return corpusRegistryResult{err: fmt.Errorf("testutil: could not resolve git repo root")}
 	}
-	dir := filepath.Join(strings.TrimSpace(string(out)), ".cards")
-	if _, err := os.Stat(dir); err != nil {
-		return corpusRegistryResult{dir: dir, missing: true}
+	// cardsfolder first: .cards' own mtime moves with every new IR cache file
+	// and would un-cache this test (see SharedCorpusDir).
+	if _, err := os.Stat(cards.CorpusDir(dir)); err != nil {
+		if _, err := os.Stat(dir); err != nil {
+			return corpusRegistryResult{dir: dir, missing: true}
+		}
 	}
 	r, err := OpenCorpusRegistry(dir)
 	if err != nil {

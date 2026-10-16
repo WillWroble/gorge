@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -246,6 +247,95 @@ func TestDecksReturnsConfiguredCatalogue(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK || len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("status %d decks %+v, want %+v", resp.StatusCode, got, want)
+	}
+}
+
+// GET /api/decks lists every deck, reserved ones included (DeckInfo.Pool tags
+// them), so a client with no notion of pools offers the whole catalogue;
+// ?policy=NAME lists what a game against NAME may use.
+func TestDecksFiltersReservedPoolsByPolicy(t *testing.T) {
+	r, err := host.New(host.Options{LoadDeck: loader(t), Sleep: func(time.Duration, <-chan struct{}) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	catalogue := []DeckInfo{
+		{ID: "burn", Name: "Burn", Format: "constructed"},
+		{ID: "fdn1", Name: "FDN 1", Format: "constructed", Pool: "az-c3"},
+		{ID: "fdn2", Name: "FDN 2", Format: "constructed", Pool: "az-c3"},
+		{ID: "tron", Name: "Tron", Format: "constructed"},
+	}
+	srv := httptest.NewServer(NewHandler(r, Options{Decks: catalogue}))
+	t.Cleanup(srv.Close)
+	ids := func(query string) []string {
+		resp, err := http.Get(srv.URL + "/api/decks" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var got []DeckInfo
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		out := []string{}
+		for _, d := range got {
+			out = append(out, d.ID)
+		}
+		return out
+	}
+	for query, want := range map[string][]string{
+		"":                        {"burn", "fdn1", "fdn2", "tron"},
+		"?policy=bot":             {"burn", "tron"},
+		"?policy=az-c3":           {"fdn1", "fdn2"},
+		"?policy=lethal-pressure": {"burn", "tron"},
+	} {
+		if got := ids(query); !reflect.DeepEqual(got, want) {
+			t.Errorf("GET /api/decks%s = %v, want %v", query, got, want)
+		}
+	}
+}
+
+// A deck reserved for two policies (az-c3 and az-c4 sharing one directory)
+// is listed for both.
+func TestDecksListsASharedPoolForEachOwner(t *testing.T) {
+	r, err := host.New(host.Options{LoadDeck: loader(t), Sleep: func(time.Duration, <-chan struct{}) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	shared := JoinPools(JoinPools("", "az-c3"), "az-c4")
+	if shared != "az-c3,az-c4" || JoinPools(shared, "az-c4") != shared || PoolHas(shared, "az-c") || PoolHas("", "") {
+		t.Fatalf("JoinPools/PoolHas: %q", shared)
+	}
+	catalogue := []DeckInfo{
+		{ID: "burn", Name: "Burn", Format: "constructed"},
+		{ID: "fdn1", Name: "FDN 1", Format: "constructed", Pool: shared},
+		{ID: "fdn2", Name: "FDN 2", Format: "constructed", Pool: "az-c4"},
+	}
+	srv := httptest.NewServer(NewHandler(r, Options{Decks: catalogue}))
+	t.Cleanup(srv.Close)
+	for query, want := range map[string][]string{
+		"?policy=bot":   {"burn"},
+		"?policy=az-c3": {"fdn1"},
+		"?policy=az-c4": {"fdn1", "fdn2"},
+	} {
+		resp, err := http.Get(srv.URL + "/api/decks" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []DeckInfo
+		err = json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := []string{}
+		for _, d := range got {
+			ids = append(ids, d.ID)
+		}
+		if !reflect.DeepEqual(ids, want) {
+			t.Errorf("GET /api/decks%s = %v, want %v", query, ids, want)
+		}
 	}
 }
 

@@ -121,6 +121,11 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 	// and the appends -- runs on the owned copy, never on the face's array.
 	ty := base
 	owned := false
+	// full records that ty is KNOWN to carry every creature-type vocabulary
+	// word (an all-creature-types grant materialised it and nothing has
+	// shrunk the list since): the grant's dedup and the match list then
+	// have nothing to look up. false is always safe -- it only means "scan".
+	full := false
 	lo, hi := typeGroup(act)
 	suppress305 := false
 	for i := lo; i < hi; i++ {
@@ -129,11 +134,11 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 			break
 		}
 	}
-	applies := func(ce *state.ContinuousEffect, ty []string, all bool) bool {
+	applies := func(ce *state.ContinuousEffect, ty []string, all, full bool) bool {
 		if suppress305 && landTypesSetOnSource(b, act[lo:hi], ce) {
 			return false
 		}
-		if !matchesWithTypes(b, ce, id, effects.TypeMatchWords(ty, all), atStack) {
+		if !matchesWithTypes(b, ce, id, typeMatchWordsKnown(ty, all, full), atStack) {
 			return false
 		}
 		if ce.AffectedZone != "" && !ce.MayPlay {
@@ -148,11 +153,11 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 			ty = append([]string(nil), ty...)
 			owned = true
 		}
-		ty, allCreatureTypes = applyTypeEffect(b, ce, ty, allCreatureTypes)
+		ty, allCreatureTypes, full = applyTypeEffect(b, ce, ty, allCreatureTypes, full)
 	}
 	if hi-lo < 2 {
 		for i := lo; i < hi; i++ {
-			if ce := &act[i]; applies(ce, ty, allCreatureTypes) {
+			if ce := &act[i]; applies(ce, ty, allCreatureTypes, full) {
 				apply(ce)
 			}
 		}
@@ -185,14 +190,14 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 		var sim []string
 		// reach simulates applying effect j (then the closure of remaining
 		// effects it enables, never skip) to the current list.
-		reach := func(j, skip int) ([]string, bool, bool) {
+		reach := func(j, skip int) ([]string, bool, bool, bool) {
 			sim = append(sim[:0], ty...)
-			all := allCreatureTypes
-			if !applies(&act[lo+j], sim, all) {
-				return nil, false, false
+			all, simFull := allCreatureTypes, full
+			if !applies(&act[lo+j], sim, all, simFull) {
+				return nil, false, false, false
 			}
 			clear(applied)
-			sim, all = applyTypeEffect(b, &act[lo+j], sim, all)
+			sim, all, simFull = applyTypeEffect(b, &act[lo+j], sim, all, simFull)
 			applied[j] = true
 			for grew := true; grew; {
 				grew = false
@@ -200,22 +205,22 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 					if applied[k] || done[k] || k == skip {
 						continue
 					}
-					if applies(&act[lo+k], sim, all) {
-						sim, all = applyTypeEffect(b, &act[lo+k], sim, all)
+					if applies(&act[lo+k], sim, all, simFull) {
+						sim, all, simFull = applyTypeEffect(b, &act[lo+k], sim, all, simFull)
 						applied[k] = true
 						grew = true
 					}
 				}
 			}
-			return sim, all, true
+			return sim, all, simFull, true
 		}
 		independent := func(i int) bool {
-			base := applies(&act[lo+i], ty, allCreatureTypes)
+			base := applies(&act[lo+i], ty, allCreatureTypes, full)
 			for j := range done {
 				if j == i || done[j] {
 					continue
 				}
-				if after, all, ok := reach(j, i); ok && applies(&act[lo+i], after, all) != base {
+				if after, all, afterFull, ok := reach(j, i); ok && applies(&act[lo+i], after, all, afterFull) != base {
 					return false
 				}
 			}
@@ -238,7 +243,7 @@ func TypesAndAllCreatureTypes(b Board, act []state.ContinuousEffect, id state.Ob
 				}
 			}
 			done[picked] = true
-			if ce := &act[lo+picked]; applies(ce, ty, allCreatureTypes) {
+			if ce := &act[lo+picked]; applies(ce, ty, allCreatureTypes, full) {
 				apply(ce)
 			}
 		}
@@ -340,25 +345,32 @@ func appendTypeOnce(types []string, word string) []string {
 // sorted (deterministic) order. A word the printed face or an earlier effect
 // already carries is skipped (CR 205.1b, the appendTypeOnce rule): the
 // vocabulary itself has no repeats, so only the creature subtypes present
-// BEFORE this grant need checking, and those are gathered once up front --
-// the common case (a printed Thopter, a granted Elf) compares each
-// vocabulary word against one or two words, not the whole growing list.
+// BEFORE this grant need checking. They are gathered once up front into a
+// bitset over the vocabulary's indices, so the cost is linear in the list
+// plus the vocabulary. It used to compare every vocabulary word against
+// every creature subtype already present, which is quadratic in the
+// vocabulary once an EARLIER all-types grant has materialised it: a manland
+// animated twice in one turn (Soulstone Sanctuary under search) re-paid
+// ~10^5 EqualFolds on every layer-4 read. A present word is always an
+// exact vocabulary member (CreatureTypeWords is case-sensitive) and no two
+// vocabulary words fold to each other (TestCreatureTypeVocabularyFoldDistinct),
+// so an index match is exactly the EqualFold match it replaces; a list that
+// already holds every word is returned unchanged.
 // The effects filter's type predicates (hasTypeCtx) answer every
 // creature-subtype predicate and base from this list through ExtraTypes,
 // exactly as Changeling's intrinsic CDA is answered through hasType.
 func appendAllCreatureTypes(types []string) []string {
-	var buf [8]string
-	had := buf[:0]
-	for _, t := range types {
-		if effects.CreatureTypeWords(t) {
-			had = append(had, t)
-		}
+	vocab := effects.CreatureTypeWordList()
+	var had effects.CreatureTypeSet
+	present := had.AddWords(types)
+	if present == len(vocab) {
+		return types
 	}
-	for _, w := range effects.CreatureTypeWordList() {
-		if len(had) > 0 && slices.ContainsFunc(had, func(t string) bool { return strings.EqualFold(t, w) }) {
-			continue
+	types = slices.Grow(types, len(vocab)-present)
+	for i, w := range vocab {
+		if !had.Has(i) {
+			types = append(types, w)
 		}
-		types = append(types, w)
 	}
 	return types
 }
@@ -564,8 +576,12 @@ func landTypesSetOnSource(b Board, group []state.ContinuousEffect, ce *state.Con
 
 // applyTypeEffect applies one matching layer-4 effect to the walk's OWNED
 // type list (it filters and appends in place) and its all-creature-types
-// marker.
-func applyTypeEffect(b Board, ce *state.ContinuousEffect, ty []string, allCreatureTypes bool) ([]string, bool) {
+// marker. full is the walk's "ty carries the whole creature-type
+// vocabulary" knowledge (see TypesAndAllCreatureTypes): every strip that
+// shortens the list clears it, the all-creature-types grant sets it, and an
+// append keeps it.
+func applyTypeEffect(b Board, ce *state.ContinuousEffect, ty []string, allCreatureTypes, full bool) ([]string, bool, bool) {
+	n := len(ty)
 	if ce.RemoveCardTypes {
 		// RemoveCardTypes$ keeps only the SUPERTYPES: a subtype is tied to
 		// its card type (CR 205.2-family), so losing the card type loses
@@ -593,11 +609,12 @@ func applyTypeEffect(b Board, ce *state.ContinuousEffect, ty []string, allCreatu
 				if IsCardType(t) || IsSupertype(t) {
 					kept = append(kept, t)
 				}
-			} else if ce.SetCreatureTypes {
-				if !effects.CreatureTypeWords(t) {
-					kept = append(kept, t)
-				}
-			} else if !IsCreatureSubtype(t) {
+			} else if !effects.CreatureTypeWords(t) {
+				// SetCreatureTypes and RemoveCreatureTypes$ strip only the
+				// CREATURE subtypes: an artifact, land or planeswalker
+				// subtype stays while its card type does (CR 205.1a), so an
+				// animated Equipment (Iron Man Armor's "becomes a 0/0
+				// Construct Hero artifact creature") is still an Equipment.
 				kept = append(kept, t)
 			}
 		}
@@ -647,10 +664,28 @@ func applyTypeEffect(b Board, ce *state.ContinuousEffect, ty []string, allCreatu
 		}
 		ty = kept
 	}
+	if len(ty) < n {
+		full = false
+	}
 	ty = appendLandTypes(ty, ce.AddTypes, b.LandTypeWords())
 	if ce.AddAllCreatureTypes {
-		ty = appendAllCreatureTypes(ty)
+		if !full {
+			// A list already known to hold the vocabulary is exactly what
+			// appendAllCreatureTypes would return unchanged.
+			ty = appendAllCreatureTypes(ty)
+			full = true
+		}
 		allCreatureTypes = true
 	}
-	return ty, allCreatureTypes
+	return ty, allCreatureTypes, full
+}
+
+// typeMatchWordsKnown is effects.TypeMatchWords with the walk's full
+// knowledge: a list known to carry every vocabulary word is the list
+// TypeMatchWords itself returns for it, without re-checking.
+func typeMatchWordsKnown(ty []string, all, full bool) []string {
+	if all && full {
+		return ty
+	}
+	return effects.TypeMatchWords(ty, all)
 }

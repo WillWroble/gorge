@@ -27,7 +27,7 @@ func visitRecord(e *rules.Engine, d *decision.Decision, res Result, fs policynet
 		EncoderHash: fmt.Sprintf("%016x", policynet.EncoderHashFor(fs)),
 		World:       world, Sims: sims,
 		Seat: int(d.Player), Kind: d.Kind, Turn: e.G.Turn, Sequence: d.Seq,
-		Subset: res.Kind == "attackers" || res.Kind == "blockers",
+		Subset: res.Kind == "attackers" || res.Kind == "blockers" || (extraIndex(res.Kind) >= 0 && severalChoices(res.Candidates)),
 		State:  policynet.EncodeOnPolicyState(st),
 		Visits: append([]int(nil), res.Visits...), Prior: append([]float64(nil), res.Prior...),
 		Q: append([]float64(nil), res.Q...), RootValue: res.RootValue, Choice: res.Choice,
@@ -88,10 +88,7 @@ func visitRecord(e *rules.Engine, d *decision.Decision, res Result, fs policynet
 		}
 	}
 	bot := res.Candidates[0]
-	enc := make([]policynet.Option, len(opts))
-	for i := range opts {
-		enc[i] = policynet.EncodeOptionWith(fs, v, d.Player, d.Kind, opts[i], i, len(opts))
-	}
+	enc := policynet.EncodeOptionsWith(fs, &v, d.Player, d.Kind, opts, nil)
 	seat.MarkBotPicks(d, enc[:len(d.Options)], bot)
 	if payChoice[0] >= 0 {
 		enc[payChoice[0]].BotPick = true
@@ -117,4 +114,17 @@ func visitRecord(e *rules.Engine, d *decision.Decision, res Result, fs policynet
 		}
 	}
 	return rec
+}
+
+// severalChoices reports whether a candidate picks more than one option: a
+// fuller kind's record is a subset record (VisitRecord.Subset) only then, so
+// a one-option-per-candidate decision (a may trigger's yes or no, an X
+// value, one mode) records as a single choice, like a target.
+func severalChoices(cands []decision.Intent) bool {
+	for _, in := range cands {
+		if len(in.Choices) > 1 {
+			return true
+		}
+	}
+	return false
 }

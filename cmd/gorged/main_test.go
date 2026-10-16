@@ -31,7 +31,7 @@ func TestServesTablesOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config{cards: "../../.cards", decks: "../../internal/testutil/decks", tables: 1, seats: 2, pace: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", tables: 1, seats: 2, pace: 0,
 		cooldown: 0, dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, vsbot: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -124,6 +124,92 @@ func TestServesTablesOverHTTP(t *testing.T) {
 	}
 }
 
+// TestPprofIsOptIn drives a real server on a loopback listener: without
+// -pprof /debug/pprof/ is not mounted, with it the goroutine profile is
+// served from topMux.
+func TestPprofIsOptIn(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		pprof     bool
+		available bool
+	}{
+		{name: "off"},
+		{name: "on", pprof: true, available: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			url, cancel, done := startServe(t, config{tables: 1, seats: 2, pace: 0, pprof: tc.pprof})
+			defer cancel()
+			waitTables(t, url, 1)
+			resp, err := http.Get(url + "/debug/pprof/goroutine?debug=1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := resp.StatusCode == http.StatusOK && strings.HasPrefix(string(body), "goroutine profile:"); got != tc.available {
+				t.Fatalf("pprof availability = %t (status %d), want %t", got, resp.StatusCode, tc.available)
+			}
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+		})
+	}
+}
+
+// TestPprofRefusesNonLoopbackListener: serve fails up front, before any
+// table is built, when -pprof meets a wildcard bind.
+func TestPprofRefusesNonLoopbackListener(t *testing.T) {
+	ln := &fakeListener{addr: &net.TCPAddr{IP: net.IPv4zero, Port: 1}}
+	err := serve(context.Background(), config{pprof: true}, ln)
+	if err == nil || !strings.Contains(err.Error(), "-pprof requires a loopback listener") {
+		t.Fatalf("serve = %v, want the loopback refusal", err)
+	}
+}
+
+func TestServeFlagPprofDefaultsOff(t *testing.T) {
+	fs, c := serveFlags()
+	if c.pprof {
+		t.Fatal("-pprof default enabled")
+	}
+	if err := fs.Parse([]string{"-pprof"}); err != nil {
+		t.Fatal(err)
+	}
+	if !c.pprof {
+		t.Fatal("-pprof did not enable runtime profiles")
+	}
+}
+
+func TestPprofRequiresLoopbackListener(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ip   net.IP
+		want bool
+	}{
+		{name: "IPv4 loopback", ip: net.IPv4(127, 0, 0, 1), want: true},
+		{name: "IPv6 loopback", ip: net.IPv6loopback, want: true},
+		{name: "wildcard", ip: net.IPv4zero},
+		{name: "public", ip: net.IPv4(192, 0, 2, 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ln := &fakeListener{addr: &net.TCPAddr{IP: tc.ip}}
+			if got := isLoopbackListener(ln); got != tc.want {
+				t.Fatalf("isLoopbackListener(%v) = %t, want %t", tc.ip, got, tc.want)
+			}
+		})
+	}
+}
+
+type fakeListener struct{ addr net.Addr }
+
+func (l *fakeListener) Accept() (net.Conn, error) { return nil, nil }
+func (l *fakeListener) Close() error              { return nil }
+func (l *fakeListener) Addr() net.Addr            { return l.addr }
+
 // TestHostThreadsCorpusTokens is the FL-40 required proof that gorged
 // populates host.Options.Tokens from the opened corpus. A hosted table that
 // does not get the token corpus mints no tokens and every token card is
@@ -131,7 +217,7 @@ func TestServesTablesOverHTTP(t *testing.T) {
 // floor is exactly the failure this test is meant to catch.
 func TestHostThreadsCorpusTokens(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	cfg := config{cards: "../../.cards", decks: "../../internal/testutil/decks", dir: t.TempDir()}
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", dir: t.TempDir()}
 	opts := cfg.hostOptions(reg, deckLoader(reg, cfg.decks))
 	if len(opts.Tokens) == 0 {
 		t.Fatalf("host.Options.Tokens empty: token corpus not threaded from %s", cfg.cards)
@@ -200,7 +286,7 @@ func startServe(t *testing.T, c config) (string, context.CancelFunc, <-chan erro
 		t.Fatal(err)
 	}
 	if c.cards == "" {
-		c.cards = "../../.cards"
+		c.cards = testutil.CorpusDirOrSkip(t)
 	}
 	if c.decks == "" {
 		c.decks = "../../internal/testutil/decks"
@@ -828,6 +914,18 @@ func TestFormatFlagParsing(t *testing.T) {
 		t.Fatalf("constructed table decks %v, want the constructed pool", cfgs[1].Decks)
 	}
 
+	// -commander-seats seats commander tables apart from -seats (the demo's
+	// 2-seat constructed table beside a 4-seat pod); zero leaves -seats.
+	c.seats = 2
+	for _, tc := range []struct{ cmdSeats, wantCmd int }{{0, 2}, {4, 4}} {
+		c.commanderSeats = tc.cmdSeats
+		cfgs = c.tableConfigs(nil, nil, view.Omniscient)
+		if cfgs[0].Seats != tc.wantCmd || cfgs[1].Seats != 2 {
+			t.Fatalf("-commander-seats %d: commander %d constructed %d seats, want %d and 2",
+				tc.cmdSeats, cfgs[0].Seats, cfgs[1].Seats, tc.wantCmd)
+		}
+	}
+
 	// A junk name fails at apply time, naming the value.
 	c = config{formatsRaw: "constructed,commander,blitz"}
 	if err := c.applyFormats(); err == nil || !strings.Contains(err.Error(), "blitz") {
@@ -955,7 +1053,7 @@ func TestCommanderTableDealtAnInvalidDeckFailsAtStartup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	cfg := config{cards: "../../.cards", decks: dir, tables: 1, seats: 2, pace: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: dir, tables: 1, seats: 2, pace: 0,
 		cooldown: 0, dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, formatsRaw: "commander"}
 	// serve is driven on a cancellable context so a neutralised validation
 	// — the very failure this test exists to catch — fails the test by

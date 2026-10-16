@@ -29,6 +29,9 @@ import (
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
+	"github.com/adams-shaun/gorge/bots/azc3"
+	"github.com/adams-shaun/gorge/bots/azc4"
+	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/bots/sbtactical"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/decision"
@@ -90,6 +93,17 @@ func TestEveryHostedPolicyIsDeterministic(t *testing.T) {
 			// (host/slots_test.go); it is a harness, not a hosted policy.
 			continue
 		}
+		if e.Name == azc3.Policy {
+			// az-c3 registers only on Enable, over a synthetic network, and
+			// needs a table with automatic mana payment; its own row is
+			// TestHostedAZC3IsDeterministic (hosted_azc3_test.go).
+			continue
+		}
+		if e.Name == azc4.Policy || e.Name == azc5.Policy {
+			// az-c4 and az-c5 likewise; their row is
+			// TestHostedAZC4IsDeterministic (hosted_azc4_test.go).
+			continue
+		}
 		played = true
 		e := e
 		t.Run(e.Name, func(t *testing.T) {
@@ -128,7 +142,9 @@ func TestEveryHostedPolicyIsDeterministic(t *testing.T) {
 				}
 				defer r.Close()
 				cfg := TableConfig{ID: "t1", Name: "det" + tag, Seats: 2, Decks: []string{"a", "b"},
-					Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: e.Name}
+					Seed: seed, Pace: 0, Spectator: view.Public, BotPolicy: e.Name,
+					// A decklist-reading policy (Info.Env) seats only on a bot-only table that opted in.
+					AllowDecklistBots: e.Env}
 				if err := r.AddTable(cfg); err != nil {
 					t.Fatalf("%q: AddTable: %v", e.Name, err)
 				}
@@ -606,13 +622,23 @@ func sbSearchFirstSearched(t *testing.T, policyNew func(actor uint64) seat.Seat)
 // lives in botenv_test.go.
 func TestHostedEnvSeatsIgnoreTheRealHiddenCardsAZRedeal(t *testing.T) {
 	t.Parallel()
-	swapSeq, pre := azFirstSearched(t, func(actor uint64) seat.Seat {
+	azLeakRow(t, azRedealPolicy, func(actor uint64) seat.Seat {
 		s, err := bots.New(azRedealPolicy, bots.Options{Seed: actor})
 		if err != nil {
 			t.Fatalf("the az-redeal policy is not linked into this binary: %v", err)
 		}
 		return s
 	})
+}
+
+// azLeakRow is the az leak row's body, shared by every hosted az entry (the
+// az-c3 row is in hosted_azc3_test.go). It owns the package-level
+// azmcts.Watch hook while it runs, so a caller must not run two at once:
+// az-redeal's is in the parallel set, az-c3's is sequential and finishes
+// before the parallel set resumes.
+func azLeakRow(t *testing.T, policy string, newSeat func(actor uint64) seat.Seat) {
+	t.Helper()
+	swapSeq, pre := azFirstSearched(t, newSeat)
 	var mu sync.Mutex
 	var diags []azmcts.Diag
 	// searched[m][seq] holds the Diag of the decision seq that match m's az
@@ -654,13 +680,7 @@ func TestHostedEnvSeatsIgnoreTheRealHiddenCardsAZRedeal(t *testing.T) {
 			return boundary
 		},
 	}
-	hostedEnvLeakRow(t, azRedealPolicy, func(actor uint64) seat.Seat {
-		s, err := bots.New(azRedealPolicy, bots.Options{Seed: actor})
-		if err != nil {
-			t.Fatalf("the az-redeal policy is not linked into this binary: %v", err)
-		}
-		return s
-	}, probe)
+	hostedEnvLeakRow(t, policy, newSeat, probe)
 	// The asserted boundary is a decision the seat actually SEARCHED in both
 	// matches. The pre-pass picked it under the same seed and seats, and the
 	// drive is deterministic — but that is a claim, not a proof: a regression

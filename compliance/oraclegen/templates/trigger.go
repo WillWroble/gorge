@@ -37,8 +37,9 @@ func triggerSubs(sub string) bool {
 		"trigger.searched-library", "trigger.discarded-opponent", "trigger.changes-controller", "trigger.exiled-craft",
 		levelb.UnlockDoorSub, levelb.FullyUnlockSub, stateSelfCountersSub, levelb.CounterAddedSub,
 		levelb.TurnedFaceUpSub, levelb.TurnedFaceUpOtherSub, levelb.SacrificeSub, levelb.DamageSub,
-		levelb.ManaExpendSub, levelb.TapsForManaSub,
-		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub:
+		levelb.ManaExpendSub, levelb.TapsForManaSub, levelb.MayPlayRiderSub, levelb.LandPlayedZoneSub,
+		levelb.CrewedSub, levelb.SaddledSub, levelb.AttacksCrewedVehicleSub, levelb.LosesGameSub, levelb.TeamworkTappedSub,
+		levelb.BookkeepingSub:
 		return true
 	case "trigger.forage", "trigger.give-gift", "trigger.explores", "trigger.collect-evidence",
 		"trigger.manifest-dread", "trigger.discover", "trigger.elemental-bend",
@@ -60,6 +61,9 @@ func PassToSteps() []string {
 		"end",
 		"end-combat",
 		"main1@p0",
+		// The bookkeeping template's turn advance stops at upkeep@p0, then
+		// main1 in that same turn (trigger_bookkeeping.go bkAdvance).
+		"main1",
 		// The opponent-turn cast cause passes to p1's main phase before p0
 		// casts there.
 		"main1@p1",
@@ -81,6 +85,21 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	if req.CoveredByA {
 		return skip("covered by level A")
 	}
+	if req.Sub == levelb.MayPlayRiderSub {
+		// A Static$ True rider never reaches the stack: it is observed on the
+		// permanent the permitted cast puts onto the battlefield.
+		return mayPlayRiderFires(reg, f, name, req)
+	}
+	if req.Sub == levelb.LosesGameSub {
+		// A loss is observable only in a game that goes on past it: the
+		// recipe seats three (trigger_recipes_loses_game.go).
+		return losesGameFires(reg, f, name, req)
+	}
+	if req.Sub == levelb.BookkeepingSub {
+		// A Static$ True bookkeeping line is observed through its consumer
+		// (trigger_bookkeeping.go).
+		return bookkeepingFires(reg, f, name, req)
+	}
 	if req.Sub == levelb.TapsForManaSub {
 		// A triggered mana ability resolves off the stack, so it needs its own
 		// pool-based fire check rather than the abilityOnStack probe below.
@@ -89,7 +108,7 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	causes, why, room := roomTriggerCauses(reg, name, req)
 	if !room {
 		causes, why = triggerRecipe(reg, f, name, &f.Triggers[idx], req.Sub)
-		causes = roomSecondDoorCauses(reg, name, req, causes)
+		causes = roomDoorCauses(reg, name, req, causes)
 	}
 	if why != "" {
 		return skip("no recipe: " + why)
@@ -124,6 +143,27 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	if !fired && len(f.Triggers) > 1 {
 		for _, c := range causes {
 			it, ok, didFire := triggerWithLong(reg, f, name, req, c, fxs)
+			fired = fired || didFire
+			if ok {
+				return it, nil
+			}
+		}
+	}
+	// The class-G12 tail (trigger_recipes_tail.go): causes built for the
+	// filter or condition the recipe's own causes miss. They run only after
+	// every cause above failed, so no item an earlier cause serves moves.
+	for _, c := range tailTriggerCauses(reg, f, name, &f.Triggers[idx], req, causes) {
+		it, ok, didFire := triggerWith(reg, f, name, req, c, fxs)
+		fired = fired || didFire
+		if ok {
+			return it, nil
+		}
+	}
+	// A modal trigger's targets live on its mode SVars (charmTriggerFixtures):
+	// tried last, so every item an earlier pass serves keeps its bytes.
+	if charmFxs := charmTriggerFixtures(reg, f, &f.Triggers[idx]); len(charmFxs) > 0 {
+		for _, c := range causes {
+			it, ok, didFire := triggerWith(reg, f, name, req, c, charmFxs)
 			fired = fired || didFire
 			if ok {
 				return it, nil
@@ -166,6 +206,9 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 				return skip(reason)
 			}
 		}
+		if reason := zeroToughnessTargetSkip(f, req.Sub); reason != "" {
+			return skip(reason)
+		}
 		if triggerFromGraveyard(f, req) {
 			// The card sat in the graveyard, where the trigger functions,
 			// and its own condition (a threshold, an event count) still
@@ -175,6 +218,22 @@ func triggerFires(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 		return skip("did not fire")
 	}
 	return skip("no fixture gorge can play")
+}
+
+// zeroToughnessTargetSkip names the reason a "becomes the target of" trigger
+// (Ward on Famished Worldsire, a 0/0 with Devour) never fires in a generated
+// scenario: the source is a printed x/0 creature that enters with no counters,
+// so it is put into the graveyard as a state-based action (CR 704.5f) before
+// anything can target it. Only a Devour/counter fixture, which the generator
+// does not build, keeps it on the battlefield.
+func zeroToughnessTargetSkip(f *cards.Face, sub string) string {
+	if sub != "trigger.becomes-target" || !f.IsCreature() || strings.Contains(f.PT, "*") {
+		return ""
+	}
+	if _, toughness, ok := strings.Cut(f.PT, "/"); ok && strings.TrimSpace(toughness) == "0" {
+		return "creature enters with toughness 0 and dies before it can be targeted"
+	}
+	return ""
 }
 
 func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requirement, steps []oraclegen.Step, fx *oraclegen.Fixture) oraclegen.Scenario {
@@ -208,6 +267,9 @@ func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requ
 		}
 	}
 	p0.Battlefield = appendFixtureCounts(p0.Battlefield, c.battlefield)
+	if c.auraBearer != "" {
+		p0.Battlefield = appendFixtureUnique(p0.Battlefield, c.auraBearer)
+	}
 	p0.Graveyard = appendFixtureCounts(p0.Graveyard, c.graveyard)
 	p1.Hand = appendFixtureCounts(p1.Hand, c.opponentHand)
 	p1.Graveyard = appendFixtureCounts(p1.Graveyard, c.opponentGraveyard)
@@ -261,7 +323,7 @@ func triggerScenario(f *cards.Face, name string, c triggerCause, req levelb.Requ
 	}
 	sc := oraclegen.Scenario{
 		Setup:        map[string]oraclegen.Seat{"p0": p0, "p1": p1},
-		SetupAnswers: oraclegen.OpeningHandAnswers(f),
+		SetupAnswers: append(oraclegen.OpeningHandAnswers(f), c.setupAnswers...),
 		Steps:        scenarioSteps,
 	}
 	if c.castSelfX {
@@ -415,6 +477,9 @@ func triggerServe(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 	// A declined one-card pick after the chain's hidden-zone look: XMage
 	// poses it without a chooseUse (trigger_declines.go).
 	it.XAnswers = scriptLookedPickDecline(it.XAnswers, eff, res.Decisions)
+	if c.choicesAsTargets {
+		it.XAnswers = choicesAsTargetAnswers(it.XAnswers, res.Decisions)
+	}
 	// Ward is caused by targeting; decline its unless-pay mode so the probe
 	// does not depend on the opponent's ability to pay the ward cost.
 	for _, d := range res.Decisions {
@@ -435,6 +500,11 @@ func triggerServe(reg *cards.Registry, f *cards.Face, name string, req levelb.Re
 			copy(it.XAbility[offset:], c.xability)
 		}
 	}
+	// A target fixture's own prelude can activate a probe's ability (the
+	// donated-permanent prelude's Humble Defector, candidates_donated.go):
+	// its slot is filled from the probe's ability index, as GenerateB's
+	// finalisation fills every served row's.
+	fillActivateXAbility(reg, &it)
 	// Every step the XMage driver reads a rule text for must carry it at its
 	// own index, and no other step may carry any: the driver throws on an
 	// activate step with an empty xmage_ability (ScenarioReplay's "activate")

@@ -47,12 +47,22 @@ func classifyTapCombatTrigger(f *cards.Face, t *cards.Trigger) (sub string, ok b
 		}
 	case cards.TriggerAttached:
 		// The engine's Attached matcher reads ValidSource$ (the attaching
-		// object) and ValidTarget$ (the bearer). A line with no ValidTarget$
-		// (Eriette's TargetRelativeToSource$) cannot fire and stays a gap.
+		// object) and ValidTarget$ (the bearer), or Eriette's
+		// TargetRelativeToSource$ bearer filter. Any other line with no
+		// ValidTarget$ cannot fire and stays a gap.
 		// Three source shapes are servable: the card itself (an
 		// Equipment/Reconfigure), an Aura you control, and an Aura (any)
 		// attaching to the source.
 		if strings.TrimSpace(t.ParamStr(cards.PKValidTarget)) == "" {
+			// Eriette's bearer filter is TargetRelativeToSource$ ("a
+			// nonland permanent an opponent controls with mana value <=
+			// that Aura's"), which the engine's matcher reads with X bound
+			// to the attaching Aura's mana value; the cause casts an Aura of
+			// p0's on p1's creature.
+			if strings.HasPrefix(t.Params["TargetRelativeToSource"], "Permanent.nonLand+OppCtrl") &&
+				strings.EqualFold(t.ParamStr(cards.PKValidSource), "Aura.YouCtrl") {
+				return "trigger.attached", true
+			}
 			break
 		}
 		switch {

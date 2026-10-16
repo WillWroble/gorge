@@ -36,7 +36,15 @@ type Chars struct {
 	// the materialized subtype vocabulary in Types.
 	AllCreatureTypes bool
 	// Name is the current layer-3 name. SetName$ overwrites the printed name.
-	Name string
+	// NameSet records that Name is BOUND: the layer walk decided it, so the
+	// empty string is a real answer (CR 709.5: a Room permanent with every
+	// door locked has no name), not the "no name override, read the printed
+	// face" sentinel readers historically read into "". It is true when a
+	// layer-3 SetName$ effect applied or the CR 709.5 Room rule named the
+	// permanent; false on a printed name (PrintedChars, and Compute for every
+	// other object). A reader that treats "" as unbound must consult NameSet.
+	Name    string
+	NameSet bool
 	// Text is the object's current CR 613.1d text: its printed Oracle text
 	// ("" while a battlefield object is face down, CR 708.5) after every
 	// applicable layer-3 effect in timestamp order -- a TextSet outright

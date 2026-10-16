@@ -103,9 +103,9 @@ func EncodeDiagRows(fs FeatureSet, v view.View, seat state.PlayerID, diag *Diag)
 	if !fs.Diagnostic() || diag == nil {
 		return nil
 	}
-	var extra []Feature
-	mzDiag(v, seat, fs, diag, func(s string, val float32) { extra = append(extra, Feature{Row: hashID(s), Value: val}) })
-	return extra
+	sk := &sink{}
+	mzDiag(v, seat, fs, diag, sk)
+	return sk.fs
 }
 
 // VisitLabel selects which policy target LoadVisits builds.

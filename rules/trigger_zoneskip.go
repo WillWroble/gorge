@@ -34,7 +34,7 @@ import (
 //   - an unlocked Room's other face or a mutated pile's under-cards: any
 //     Unlocked or merged object counts as live;
 //   - the granted keyword walks (Ward, Dethrone, Training, Mentor, Afflict,
-//     Conspire, Demonstrate, Exploit, Offspring), each gated on the object
+//     Conspire, Demonstrate, Storm, Exploit, Offspring), each gated on the object
 //     being ev.Obj, in ev.IDs or in ev.Pairs -- must-visit -- and cumulative
 //     upkeep, gated on o.Zone == Battlefield (never a summarized zone);
 //   - a static-granted trigger (grantedStatics): the skip is off for any

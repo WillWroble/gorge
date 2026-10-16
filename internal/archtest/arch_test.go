@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -18,6 +19,7 @@ const module = "github.com/adams-shaun/gorge"
 
 type pkg struct {
 	path    string
+	dir     string          // absolute package directory (go list .Dir)
 	imports map[string]bool // direct, non-test
 	deps    map[string]bool // transitive, non-test
 }
@@ -25,25 +27,100 @@ type pkg struct {
 // packages lists every package in the module with its direct and transitive
 // non-test imports. Test files are excluded on purpose: tests may import
 // anything (view's tests import rules; cards' tests import time).
+//
+// It also opens every package directory from the test process. go test's
+// result cache tracks only the files the test process itself opens
+// (os.Open/os.Stat, via internal/testlog) — never the files a `go list`/
+// `go doc`/`go build` subprocess reads — and a directory open hashes the
+// directory's entry names and their size/mtime (cmd/go/internal/test/test.go
+// hashOpen). Opening every package dir therefore makes the go-list-based
+// checks cache-correct: adding, removing or editing any module source file
+// invalidates this package's cached test result instead of being served a
+// stale pass. The subprocess checks that do not otherwise need the package
+// map (TestNoExportLeaksAnEngineGame's `go doc`, TestEngineCompilesFor32Bit's
+// `go build`) call openModulePackageDirs for the same side effect.
 func packages(t *testing.T) map[string]pkg {
 	t.Helper()
-	out, err := exec.Command("go", "list", "-f", `{{.ImportPath}}|{{join .Imports " "}}|{{join .Deps " "}}`, module+"/...").Output()
+	out, err := exec.Command("go", "list", "-f", `{{.ImportPath}}|{{join .Imports " "}}|{{join .Deps " "}}|{{.Dir}}`, module+"/...").Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
 	}
 	pkgs := map[string]pkg{}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		parts := strings.SplitN(line, "|", 3)
-		if len(parts) != 3 {
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
 			t.Fatalf("unexpected go list line %q", line)
 		}
-		p := pkg{path: parts[0], imports: set(parts[1]), deps: set(parts[2])}
+		p := pkg{path: parts[0], imports: set(parts[1]), deps: set(parts[2]), dir: parts[3]}
 		pkgs[p.path] = p
 	}
 	if len(pkgs) < 10 {
 		t.Fatalf("go list found only %d packages", len(pkgs))
 	}
+	openModulePackageDirs(t, pkgs)
 	return pkgs
+}
+
+// openModulePackageDirs opens every package directory in pkgs from the test
+// process so go test's result cache tracks the module's source files (see
+// packages' doc comment). The directory's entries and their size/mtime are
+// what hashOpen folds into the cache key, so the open is enough — the files
+// need not be read. It runs once per test binary: the test log is shared by
+// every test in the run, so the first open covers them all, and a test
+// selected with -run still triggers it because it goes through packages().
+// A package with no directory, or a directory that cannot be opened, is
+// fatal: silently skipping it would reintroduce the stale-cache hole this
+// open closes.
+//
+// The number of directories opened is recorded in openModuleDirsN so
+// TestOpenPackageDirsCoversEveryPackage can assert that packages() actually
+// performed the open — removing the openModulePackageDirs call from
+// packages() leaves the count at zero and fails that test, instead of
+// silently reintroducing the stale-cache hole.
+func openModulePackageDirs(t *testing.T, pkgs map[string]pkg) {
+	t.Helper()
+	openModuleDirsOnce.Do(func() {
+		openModuleDirsN, openModuleDirsErr = openPackageDirs(pkgs)
+	})
+	if openModuleDirsErr != nil {
+		t.Fatal(openModuleDirsErr)
+	}
+}
+
+var (
+	openModuleDirsOnce sync.Once
+	openModuleDirsErr  error
+	openModuleDirsN    int // directories openModulePackageDirs opened through packages()
+)
+
+// openPackageDirs opens the directory of every package in pkgs and returns
+// how many it opened. It returns an error instead of calling t.Fatal so the
+// guards can be unit tested (TestOpenPackageDirsCoversEveryPackage): a caller
+// that opens fewer directories than there are packages has silently left the
+// stale-cache hole open. The paths are iterated in sorted order so the first
+// failure reported (and the "opened" count in its message) is stable across
+// runs.
+func openPackageDirs(pkgs map[string]pkg) (int, error) {
+	if len(pkgs) == 0 {
+		return 0, fmt.Errorf("no packages to open; the cache-tracking open would run vacuously")
+	}
+	paths := make([]string, 0, len(pkgs))
+	for path := range pkgs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	opened := 0
+	for _, path := range paths {
+		p := pkgs[path]
+		if p.dir == "" {
+			return opened, fmt.Errorf("go list reported no directory for %s; the cache-tracking open would be skipped", path)
+		}
+		if _, err := os.ReadDir(p.dir); err != nil {
+			return opened, fmt.Errorf("open package dir %s (go test's cache must track it): %w", p.dir, err)
+		}
+		opened++
+	}
+	return opened, nil
 }
 
 func set(s string) map[string]bool {
@@ -81,9 +158,7 @@ func set(s string) map[string]bool {
 // stamp Generated:/last-modified fields and to decide a run's live/stale
 // status from file mtimes; it scans a training output tree and never drives
 // the engine, so no game, event, view or replay depends on its clock.
-// cmd/hindsight (the pn20 branch-mining tool) reads it only to report run and
-// per-decision wall seconds; every sample, rollout and record is a pure
-// function of its seeds. The paymirror A/B harness reads the clock only in
+// The paymirror A/B harness reads the clock only in
 // its cmd/paymirror CLI: the per-game wall-time budget is injected to the
 // library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
 // builds from time.Now, and the CLI's progress line prints per-game elapsed
@@ -108,37 +183,51 @@ func set(s string) map[string]bool {
 // corpus. cmd/enginebench (the docs/015 engine-speed rows) reads it only to
 // report each row's elapsed wall time beside its CPU time; every game and
 // seed is fixed by its flags. host/manabrewhttp uses time only for SSE
-// keep-alive and write deadlines. No game, event, view or
+// keep-alive and write deadlines. cmd/dzgorge (the DraftZero driver) reads
+// it only for its remote-batch flush timer, retry back-off and per-call
+// timing counters; every game is a pure function of its seed.
+// internal/gamepool and internal/inferbroker (both tag-gated schedulers) use
+// timers only to decide WHEN a ready batch is flushed and to report queue and
+// serve nanoseconds; which decisions are answered, and every answer, is a
+// pure function of the games' seeds. eventhost (the draft-event runtime,
+// docs/superpowers/specs/2026-10-13-draft-events-design.md) uses time only
+// for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
+// event package as a logged auto-pick entry, so replaying an event's log
+// never reads the clock. cmd/draftrl (the draft-RL driver) reads it only
+// for rollout's throughput line (stdout, never a record) and for the
+// GORGE_PAUSE_FILE poll's sleep; every pick, deck and game record is a pure
+// function of its seed. No game, event, view or
 // replay reads the clock, and intents reach the engine only through
 // SubmitIntent.
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
-		module + "/host":              true,
-		module + "/host/httpapi":      true,
-		module + "/cmd/gorged":        true,
-		module + "/cmd/botbench":      true,
-		module + "/cmd/ledger":        true,
-		module + "/cmd/searchprobe":   true,
-		module + "/cmd/searchteacher": true,
-		module + "/cmd/cardfuzz":      true,
-		module + "/cmd/exitloop":      true,
-		module + "/cmd/traindash":     true,
-		module + "/cmd/hindsight":     true,
-		module + "/cmd/paymirror":     true,
-		module + "/cmd/sbv1agent":     true,
-		module + "/cmd/kshadowcheck":  true,
-		module + "/cmd/sbagent":       true,
-		module + "/cmd/sbv2local":     true,
-		module + "/cmd/searchbench":   true,
-		module + "/cmd/enginebench":   true,
-		module + "/cmd/dzgorge":       true,
-		module + "/internal/gamepool": true,
-		module + "/internal/broker":   true,
-		module + "/host/manabrewhttp": true,
+		module + "/host":                 true,
+		module + "/host/httpapi":         true,
+		module + "/cmd/gorged":           true,
+		module + "/cmd/botbench":         true,
+		module + "/cmd/ledger":           true,
+		module + "/cmd/searchprobe":      true,
+		module + "/cmd/searchteacher":    true,
+		module + "/cmd/cardfuzz":         true,
+		module + "/cmd/exitloop":         true,
+		module + "/cmd/traindash":        true,
+		module + "/cmd/paymirror":        true,
+		module + "/cmd/sbv1agent":        true,
+		module + "/cmd/kshadowcheck":     true,
+		module + "/cmd/sbagent":          true,
+		module + "/cmd/sbv2local":        true,
+		module + "/cmd/searchbench":      true,
+		module + "/cmd/enginebench":      true,
+		module + "/cmd/dzgorge":          true,
+		module + "/cmd/draftrl":          true,
+		module + "/internal/gamepool":    true,
+		module + "/internal/inferbroker": true,
+		module + "/host/manabrewhttp":    true,
+		module + "/eventhost":            true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
-			t.Errorf("%s imports time; only host, host/httpapi and cmd/gorged may", path)
+			t.Errorf("%s imports time; only the packages in this test's allowed map may (see its doc comment)", path)
 		}
 	}
 }
@@ -167,6 +256,12 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// seats a non-bench opponent may link it. The honest azmcts core
 		// never pulls the clone back in, and neither do the hosted search
 		// packages or any bots/ entry.
+		// The shadow answer (HD-3, human-divergence design §5.4) is computed by
+		// a package the host calls and the offline triage tool recomputes
+		// through: it may not depend on the host that calls it, nor on test
+		// scaffolding.
+		{module + "/internal/divergence/shadow", module + "/host"},
+		{module + "/internal/divergence/shadow", module + "/internal/testutil"},
 		{module + "/host", module + "/internal/azmcts/clairvoyant"},
 		{module + "/host/httpapi", module + "/internal/azmcts/clairvoyant"},
 		{module + "/cmd/gorged", module + "/internal/azmcts/clairvoyant"},
@@ -356,6 +451,11 @@ func TestManaBrewWireIsStdlibOnly(t *testing.T) {
 // of these type names (were state.GameX or rules.EngineY ever to exist)
 // still does not trip it.
 func TestNoExportLeaksAnEngineGame(t *testing.T) {
+	// `go doc` reads host's source through a subprocess, invisible to go
+	// test's result cache. packages() opens every module package directory
+	// so a source change invalidates this test's cached result (see its doc
+	// comment); the returned map is unused here.
+	packages(t)
 	// These exact type names (state.Game, rules.Engine) are what a leak's
 	// signature would carry; a legitimate client-facing type never has an
 	// element in either package. Word boundaries stop the match from
@@ -570,6 +670,11 @@ func mustCwd() string {
 // the `/...` pattern never names them and this build cannot race their
 // cleanup.
 func TestEngineCompilesFor32Bit(t *testing.T) {
+	// `go build` reads the module's source through a subprocess, invisible to
+	// go test's result cache. packages() opens every module package directory
+	// so a source change invalidates this test's cached result (see its doc
+	// comment); the returned map is unused here.
+	packages(t)
 	env := append(os.Environ(), "GOOS=linux", "GOARCH=386", "CGO_ENABLED=0")
 	cmd := exec.Command("go", "build", module+"/...")
 	cmd.Env = env

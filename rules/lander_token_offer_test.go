@@ -100,12 +100,13 @@ func landerActivateIndex(d *decision.Decision, src state.ObjID) int {
 
 // TestLanderTokenAbilityOfferedOnlyWhenPoolFunded is the engine-offer pin
 // (leaf 1): a battlefield token ability whose cost is mana + {T} +
-// Sac<1/CARDNAME> is NOT offered in an empty-pool priority window (the
-// float-then-cast model — the defect the reporter saw is the CLIENT's blind
-// spot, not the engine's), and IS offered once the seat has floated the {2}
-// by tapping its two Mountains. Interleaved at one {R} the {2} is still
-// short, so the ability must stay withheld — the offer gate prices the mana
-// exactly, not "some mana exists".
+// Sac<1/CARDNAME> is offered in an empty-pool priority window while the
+// seat's untapped Mountains can fund the {2} (the autopay offer,
+// legal_walk_autopay.go), still offered once one Mountain is tapped (the
+// pool {R} plus the other Mountain pays), and choosing it from the empty
+// pool taps both Mountains and puts the ability on the stack. The offer is
+// the planner's exact witness, not "some mana exists": with a Mountain
+// tapped away and the pool empty the {2} is short, so it is withheld.
 func TestLanderTokenAbilityOfferedOnlyWhenPoolFunded(t *testing.T) {
 	t.Parallel()
 	e, landers, mounts := landerFixture(t, 1)
@@ -116,14 +117,18 @@ func TestLanderTokenAbilityOfferedOnlyWhenPoolFunded(t *testing.T) {
 	if d == nil {
 		t.Fatal("no priority decision pending at main1")
 	}
-	if o, ok := landerAbilityOption(d, lander); ok {
-		t.Fatalf("empty-pool window offered the Lander ability (label %q) — the float-then-cast offer gate must withhold it", o.Label)
-	}
 	if n := len(landers); n != 1 {
 		t.Fatalf("fixture minted %d lander tokens, want 1", n)
 	}
+	o, ok := landerAbilityOption(d, lander)
+	if !ok {
+		t.Fatalf("empty-pool window withheld the Lander ability though two untapped Mountains fund {2}; options=%+v", d.Options)
+	}
+	if o.Ability != 0 {
+		t.Errorf("offered ability index %d, want 0 (the token's ChangeZone is its only AB)", o.Ability)
+	}
 
-	// First tap: pool {R}. Still one short of the {2}.
+	// First tap: pool {R}; the other Mountain still funds the second {1}.
 	a1 := landerActivateIndex(d, m1)
 	if a1 < 0 {
 		t.Fatalf("no activate option for Mountain %d; options=%+v", m1, d.Options)
@@ -133,26 +138,17 @@ func TestLanderTokenAbilityOfferedOnlyWhenPoolFunded(t *testing.T) {
 	if d == nil {
 		t.Fatal("no priority decision after the first tap")
 	}
-	if o, ok := landerAbilityOption(d, lander); ok {
-		t.Fatalf("pool {R} alone offered the Lander ability (label %q); the {2} needs two", o.Label)
+	if _, ok := landerAbilityOption(d, lander); !ok {
+		t.Fatalf("pool {R} plus an untapped Mountain must fund the Lander ability; options=%+v", d.Options)
 	}
 
-	// Second tap: pool {R}{R}. The ability is now offered, naming the token.
-	a2 := landerActivateIndex(d, m2)
-	if a2 < 0 {
-		t.Fatalf("no activate option for Mountain %d; options=%+v", m2, d.Options)
-	}
-	submitChoices(t, e, a2)
-	d = e.Pending()
-	if d == nil {
-		t.Fatal("no priority decision after the second tap")
-	}
-	o, ok := landerAbilityOption(d, lander)
-	if !ok {
-		t.Fatalf("pool {R}{R} must fund the Lander ability; options=%+v", d.Options)
-	}
-	if o.Ability != 0 {
-		t.Errorf("offered ability index %d, want 0 (the token's ChangeZone is its only AB)", o.Ability)
+	// Choosing it pays the rest from the second Mountain.
+	o, _ = landerAbilityOption(d, lander)
+	stack := len(e.G.Stack)
+	submitChoices(t, e, o.Index)
+	if !e.G.Obj(m2).Tapped || len(e.G.Stack) != stack+1 {
+		t.Fatalf("autopay: Mountain %d tapped=%v, stack %d -> %d; want it tapped and the ability on the stack (pending %+v)",
+			m2, e.G.Obj(m2).Tapped, stack, len(e.G.Stack), e.Pending())
 	}
 }
 

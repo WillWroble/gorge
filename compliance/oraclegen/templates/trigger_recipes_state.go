@@ -31,7 +31,8 @@ func stateTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *card
 	}
 	prefixes, xwhy := oraclegen.XMageAbility(f)
 	for idx, sa := range f.Abilities {
-		if !sa.IsActivated() || !selfCounterActivation(sa, kind) {
+		doubles := selfCounterDoubling(sa, kind)
+		if !sa.IsActivated() || (!selfCounterActivation(sa, kind) && !doubles) {
 			continue
 		}
 		if zone := sa.ParamStr(cards.PKActivationZone); zone != "" && !strings.EqualFold(zone, "Battlefield") {
@@ -60,7 +61,12 @@ func stateTriggerRecipe(reg *cards.Registry, f *cards.Face, name string, t *card
 			xability:     []string{prefix},
 			activateCost: cost,
 		}
-		if n > 1 {
+		switch {
+		case doubles:
+			// The Millennium Calendar's "Double the number of time counters":
+			// half the gate (rounded up) doubles onto it.
+			c.counters = map[string]map[string]int{"__SOURCE__": {kind: (n + 1) / 2}}
+		case n > 1:
 			c.counters = map[string]map[string]int{"__SOURCE__": {kind: n - 1}}
 		}
 		causes = append(causes, c)
@@ -92,6 +98,22 @@ func selfCounterActivation(sa *cards.SA, kind string) bool {
 		return false
 	}
 	if num := strings.TrimSpace(sa.Params["CounterNum"]); num != "" && num != "1" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(sa.Params["CounterType"]), kind)
+}
+
+// selfCounterDoubling reports an untargeted activated MultiplyCounter of
+// kind on its own source with the default doubling (The Millennium
+// Calendar's "{2}, {T}: Double the number of time counters on CARDNAME").
+func selfCounterDoubling(sa *cards.SA, kind string) bool {
+	if !strings.EqualFold(sa.API, "MultiplyCounter") || sa.Params["ValidTgts"] != "" {
+		return false
+	}
+	if d := strings.TrimSpace(sa.Params["Defined"]); d != "" && !strings.EqualFold(d, "Self") {
+		return false
+	}
+	if m := strings.TrimSpace(sa.Params["Multiplier"]); m != "" && m != "2" {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(sa.Params["CounterType"]), kind)

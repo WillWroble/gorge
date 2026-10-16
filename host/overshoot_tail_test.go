@@ -31,8 +31,6 @@ package host
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -51,13 +49,19 @@ import (
 const (
 	overshootDeckA = "foundations-wretched-ranks"
 	overshootDeckB = "foundations-reign-of-dragons"
-	overshootSeed  = 8
+	overshootSeed  = 2
 	// cli-20260922T225141Z-e771720d: the hosted game now opens with the CR
 	// 103.1 winner-chooses ask, whose answer is the toss winner naming
 	// itself -- one recorded intent at genesis -- so every later intent
 	// (including the overshoot burst's own) sits one later in the count.
 	// The Menace floor removed one forced-empty blockers ask at intent 194.
-	overshootIntents = 376 // intents recorded when parked on the overshoot burst's pending ask
+	// The paid-cost mana census flip (cli-20261012T170859Z-8fbcbbcf) moved
+	// the live shape again: at the old seed 8 the bot's offer list changed
+	// with the census on, so that game no longer reaches a commander_zone
+	// overshoot burst; the fixture was re-measured across the pure-bot
+	// course to the first seed whose burst carries the shape, seed 2,
+	// parked at intent 526.
+	overshootIntents = 526 // intents recorded when parked on the overshoot burst's pending ask
 )
 
 // gateSeat is a bot behind a test gate: every decision is signalled to the
@@ -647,13 +651,7 @@ const committedCaptureRel = "../cmd/repro/testdata/feedback/20260915T094418Z-e48
 // proves nothing.
 func requireCommittedCapture(t *testing.T) {
 	t.Helper()
-	root, err := feedback.Root()
-	if err != nil {
-		t.Skipf("no repo root: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".cards")); err != nil {
-		t.Skip("no .cards/ corpus present — the committed capture cannot replay")
-	}
+	testutil.CorpusDirOrSkip(t)
 }
 
 // TestCommittedOvershootCaptureReplaysToTheParkedAsk is the committed

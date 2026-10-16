@@ -263,11 +263,25 @@ func Compute(b Board, s *Scratch, id state.ObjID, atStack state.Zone) effects.Ch
 	// 837910f4's type-aware wrapper — a bare SpecContext carries no
 	// ExtraTypes, so MatchesSpecCtx here would regress to printed types only.
 	name := f.Name
+	nameSet := false
 	text := f.Oracle
 	if faceDown {
 		// CR 708.5: a face-down permanent's printed rules text does not exist,
 		// the same way its printed types and colours do not.
 		text = ""
+	} else if o.Zone == state.ZBattlefield {
+		// CR 709.5: a Room permanent's name, mana cost and rules text are
+		// those of its unlocked doors -- no door unlocked: no name and no
+		// text. The rule is a pair of static abilities of the permanent, so
+		// it functions only on the battlefield; a Room card in any other
+		// zone keeps its printed (combined, CR 709.4) characteristics, and a
+		// face-down permanent's printed face does not exist (CR 708.5). The
+		// mana-value half of the rule lives in the effects tier
+		// (objectManaValue), which every mana-value read shares.
+		if rn, ok := RoomName(o); ok {
+			name, nameSet = rn, true
+			text, _ = RoomText(o)
+		}
 	}
 	col := effects.ColorMaskOf(o)
 	if faceDown {
@@ -318,7 +332,7 @@ func Compute(b Board, s *Scratch, id state.ObjID, atStack state.Zone) effects.Ch
 		switch ce.Layer {
 		case state.LText:
 			if ce.SetName != "" {
-				name = ce.SetName
+				name, nameSet = ce.SetName, true
 			}
 			// CR 613.1d / CR 612: a text-changing effect replaces the text.
 			// An outright TextSet (api:ExchangeTextBox's exchanged box, which
@@ -416,22 +430,26 @@ func Compute(b Board, s *Scratch, id state.ObjID, atStack state.Zone) effects.Ch
 	s.ColorsSet, s.ColorsID, s.Colors = prevStashSet, prevStashID, prevStashColors
 	s.Depth--
 	return effects.Chars{Power: power, Toughness: toughness, BasePower: basePower, BaseToughness: baseToughness,
-		Keywords: kw, Types: ty, AllCreatureTypes: allCreatureTypes, Name: name, Text: text, Colors: colors, Controller: b.ControllerOf(id)}
+		Keywords: kw, Types: ty, AllCreatureTypes: allCreatureTypes, Name: name, NameSet: nameSet, Text: text,
+		Colors: colors, Controller: b.ControllerOf(id)}
 }
 
 // Name is Derived(id).Name without the rest of the walk. The name is
-// written only by a layer-3 SetName$ effect, and every layer-3 effect sorts
-// ahead of the layer-6 group abilityDependencyOrder reorders, so when the
-// full walk reaches one its keyword list is still the base list and its type
-// list is Types'. This walk evaluates exactly those effects,
-// with exactly those bindings (nil-ness included) and the same s.Depth
-// framing, in the same order, so it names what Compute names. The
-// keyword/type lists are built only when some SetName$ effect survives the
-// Card.Self early rejection the engine's Board.Matches itself applies first.
-func Name(b Board, s *Scratch, id state.ObjID) string {
+// written by the CR 709.5 Room rule (a battlefield Room) and by a layer-3
+// SetName$ effect, and every layer-3 effect sorts ahead of the layer-6 group
+// abilityDependencyOrder reorders, so when the full walk reaches one its
+// keyword list is still the base list and its type list is Types'. This walk
+// evaluates exactly those effects, with exactly those bindings (nil-ness
+// included) and the same s.Depth framing, in the same order, so it names
+// what Compute names. The keyword/type lists are built only when some
+// SetName$ effect survives the Card.Self early rejection the engine's
+// Board.Matches itself applies first. The second return is the bound flag
+// (effects.Chars.NameSet): the empty string is a real name (a Room with no
+// unlocked door), not the "no override" sentinel.
+func Name(b Board, s *Scratch, id state.ObjID) (string, bool) {
 	o := b.Game().Obj(id)
 	if o == nil || o.Face() == nil {
-		return ""
+		return "", false
 	}
 	f := o.Face()
 	faceDown := o.FaceDown && o.Zone == state.ZBattlefield
@@ -439,6 +457,12 @@ func Name(b Board, s *Scratch, id state.ObjID) string {
 		f = faceDownBasis
 	}
 	name := f.Name
+	nameSet := false
+	if !faceDown && o.Zone == state.ZBattlefield {
+		if rn, ok := RoomName(o); ok {
+			name, nameSet = rn, true
+		}
+	}
 	active := b.Active()
 	var kw, ty []string
 	built := false
@@ -474,7 +498,7 @@ func Name(b Board, s *Scratch, id state.ObjID) string {
 				continue
 			}
 		}
-		name = ce.SetName
+		name, nameSet = ce.SetName, true
 	}
 	if built {
 		if s.Depth == 1 {
@@ -482,7 +506,7 @@ func Name(b Board, s *Scratch, id state.ObjID) string {
 		}
 		s.Depth--
 	}
-	return name
+	return name, nameSet
 }
 
 // BaseKeywords is the keyword list the layer walk starts from --

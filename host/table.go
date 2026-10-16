@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/protocol"
 	"github.com/adams-shaun/gorge/view"
@@ -126,6 +127,20 @@ type TableConfig struct {
 	// offered payment plans rather than manually tapping mana. It is part of
 	// persisted table configuration so a restart preserves bot behaviour.
 	BotAutoPayMana bool `json:"bot_auto_pay_mana"`
+	// BotCommonSense opts every hosted bot and human-seat caretaker into the
+	// bots/sanity CommonSense guard (bots.Options.CommonSense): hostile
+	// removal the engine says can only hit the seat's own permanents or
+	// player is dropped from the option list, and the London mulligan ask is
+	// answered by botpolicy.MulliganConstructed. The guard changes the
+	// intents a seat answers, so it is part of persisted table configuration
+	// exactly like BotAutoPayMana: a table resumed after a restart must
+	// rebuild the same seats or its replay diverges from the recorded log.
+	// Default false, and a false seat is byte-identical to the unwrapped
+	// policy, so a table written before the field existed replays unchanged.
+	// Serialized explicitly (no omitempty) so the restore-time migration can
+	// tell a pre-field file from a deliberate false the same way
+	// bot_auto_pay_mana does.
+	BotCommonSense bool `json:"bot_common_sense"`
 	// AutoMana enables payment-plan publication and the Auto Mana controls for
 	// human seats. Disabled is the legacy human path: plans are never sent to
 	// a human client and only ordinary casts/manual mana are available.
@@ -187,6 +202,36 @@ type TableConfig struct {
 	// rules.Config and on its sidecar, so a replay rebuilds the life the
 	// match actually played with.
 	StartingLife int32 `json:"starting_life,omitempty"`
+	// AllowDecklistBots opts a BOT-ONLY table into a bot policy that reads
+	// every seat's real decklist (operator ruling 2026-10-13). An Env policy
+	// (bots.Info.Env) builds its search root from every seat's true 40/60 —
+	// host/botenv.go's envData hands searchseat.HonestRoot the table's
+	// m.cfg.Decks — so "honest" redeals the hidden cards but the deck LIST
+	// it redeals from is the opponent's real one. Such a policy is refused
+	// at any table with a human, always, even with this opt-in; the bit only
+	// ever matters on a table whose seats are all bots (a test, bench or
+	// spectator game). A table written by an older binary without the field
+	// loads as false, and restart skips a persisted table the new rule
+	// refuses rather than failing the whole process.
+	AllowDecklistBots bool `json:"allow_decklist_bots,omitempty"`
+	// SeatBotPolicies names a bot policy per seat index: seat i of every match
+	// is played by SeatBotPolicies[i] when that entry is non-empty, else by
+	// BotPolicy. Like PlayerNames it never rotates with the decks. An entry
+	// may not name a human seat, and may not name a policy that reads
+	// opponents' decklists (bots.Info.Env). nil — every table before E1 —
+	// builds every bot seat from BotPolicy exactly as before. Human-seat
+	// caretakers always use BotPolicy.
+	SeatBotPolicies []string `json:"seat_bot_policies,omitempty"`
+	// Event names the draft event (eventhost) that owns this table. An event
+	// table must be OnDemand and not Perpetual; it is exempt from
+	// Options.MaxOnDemandTables because eventhost bounds its own events.
+	// "" — every other table — changes nothing.
+	Event string `json:"event,omitempty"`
+	// Series hands the choice of every match's decks and starting-player
+	// chooser to Options.Series; the table plays match after match until the
+	// hook says stop. Requires Event. false — every other table — changes
+	// nothing.
+	Series bool `json:"series,omitempty"`
 }
 
 // autoPayManaEnabled is the effective hosted-bot setting. BotAutoPayMana is
@@ -199,6 +244,17 @@ func (c TableConfig) autoPayManaEnabled() bool {
 
 var ErrNotFound = errors.New("host: not found")
 
+// errDecklistBotRefusal marks the two refusal forms the 2026-10-13
+// decklist ruling adds to validated. It is the ONLY failure restart
+// recovers from: a tables.json written by an older binary can carry an
+// Env policy without the allow_decklist_bots opt-in, and skipping that
+// table beats failing the whole start. Every other validation failure
+// (unknown policy name, bad seats, missing decks) still fails the start,
+// as TestBotPolicyPersistsItsNormalizedDefaultAndRejectsUnknownRestore
+// pins. The sentinel text is phrased to read naturally inside both
+// refusal messages, which are asserted by substring in the tests.
+var errDecklistBotRefusal = errors.New("reads opponents' decklists")
+
 // validated normalizes a table configuration before it is retained by the
 // registry. Keeping normalization beside validation means a name cannot be
 // persisted as an ambiguous empty value or reach a running table unchecked.
@@ -208,6 +264,33 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 		return TableConfig{}, fmt.Errorf("host: table %s: %w", c.ID, err)
 	}
 	c.BotPolicy = policy
+	// A policy with no manual-tap mode (az-c3) cannot be built on a table
+	// without payment plans: the factory refuses, and a refusal at the first
+	// seat would crash the match. Refuse the table instead.
+	if e, ok := bots.Lookup(policy); ok && e.NeedsAutoPay && !c.autoPayManaEnabled() {
+		return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q needs automatic mana payment (auto_mana and bot_auto_pay_mana both on)", c.ID, policy)
+	}
+	// Operator ruling 2026-10-13: a policy that reads every seat's real
+	// decklist (bots.Info.Env; host/botenv.go envData) never seats against a
+	// human, and only runs on a bot-only table that explicitly opted in.
+	// Both refusals wrap errDecklistBotRefusal so restart can tell the one
+	// stale-table case it recovers (a persisted table written by an older
+	// binary without the opt-in) from a validation failure it must still
+	// fail the start over — an unknown policy name, bad seats, missing decks.
+	//
+	// A closed-list policy (bots.Info.ClosedLists, az-c4) is an Env policy
+	// that does not read decklists: it needs no opt-in and may seat against
+	// a human. The declaration alone is not trusted -- at a table with a
+	// human, play checks every built seat at match start and envData
+	// refuses an open root at every decision (host/closedlist.go).
+	if e, ok := bots.Lookup(policy); ok && e.ReadsDecklists() {
+		if len(c.Humans) > 0 {
+			return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q %w; it cannot seat at a table with a human", c.ID, policy, errDecklistBotRefusal)
+		}
+		if !c.AllowDecklistBots {
+			return TableConfig{}, fmt.Errorf("host: table %s: bot policy %q %w and needs allow_decklist_bots on a bot-only table", c.ID, policy, errDecklistBotRefusal)
+		}
+	}
 	switch {
 	case c.ID == "":
 		return TableConfig{}, fmt.Errorf("host: table has no id")
@@ -246,6 +329,9 @@ func (c TableConfig) validated(load func(string) (Deck, error)) (TableConfig, er
 			seen[h] = true
 		}
 	}
+	if c, err = c.validatedSeatPolicies(); err != nil {
+		return TableConfig{}, err
+	}
 	for _, d := range c.Decks {
 		dd, err := load(d)
 		if err != nil {
@@ -283,6 +369,12 @@ const memoryHistoryLimit = 8
 // lastLine below that are a deliberate exception — see their own docs.
 type table struct {
 	cfg TableConfig
+
+	// reg is the registry this table belongs to. setState uses it to tell
+	// subscribers a lifecycle state changed (protocol.TTableState), so the
+	// one home for a table's state transition is also the one home for the
+	// wire signal. nil only for a table built before it is registered.
+	reg *Registry
 
 	// started is guarded by Registry.mu, not mu below. See the struct doc.
 	started bool
@@ -332,8 +424,8 @@ type table struct {
 	lastLine string
 }
 
-func newTable(cfg TableConfig) *table {
-	return &table{cfg: cfg, state: protocol.TableIdle, stop: make(chan struct{}), done: make(chan struct{})}
+func newTable(r *Registry, cfg TableConfig) *table {
+	return &table{reg: r, cfg: cfg, state: protocol.TableIdle, stop: make(chan struct{}), done: make(chan struct{})}
 }
 
 func (t *table) info() protocol.TableInfo {
@@ -341,7 +433,8 @@ func (t *table) info() protocol.TableInfo {
 	defer t.mu.RUnlock()
 	info := protocol.TableInfo{ID: string(t.cfg.ID), Name: t.cfg.Name, Seats: t.cfg.Seats,
 		Spectator: t.cfg.Spectator.String(), State: t.state, Match: t.k, Perpetual: t.cfg.Perpetual,
-		Format: t.cfg.Format.String(), BotPolicy: t.cfg.BotPolicy, Mulligans: t.cfg.Mulligans, AutoMana: t.cfg.AutoMana}
+		Format: t.cfg.Format.String(), BotPolicy: t.cfg.BotPolicy, Mulligans: t.cfg.Mulligans, AutoMana: t.cfg.AutoMana,
+		Series: t.cfg.Series, Event: t.cfg.Event != ""}
 	// SeatNames come from the live match's own seat list — the same
 	// []protocol.SeatInfo that MatchStart carries — so the two can never
 	// drift. cur is guarded by t.mu, which we already hold; reading its
@@ -364,11 +457,62 @@ func (t *table) info() protocol.TableInfo {
 // the intent and stays correct even if the two flags ever disagree (e.g. a
 // hand-edited persisted table).
 func (c TableConfig) singleShot() bool {
+	if c.Series {
+		// E3-2: a series table's end is the hook's decision, not the
+		// match count — ok=false is what stops it.
+		return false
+	}
 	return !c.Perpetual || len(c.Humans) > 0
 }
 
+// setState is the one home for a table's lifecycle state transition: it
+// writes t.state under t.mu and then tells every subscriber the new state
+// (protocol.TTableState), so the wire can never miss a transition. Only a
+// series table emits the frame: an ordinary table's idle/live/cooldown is
+// already carried by match_start/match_end and the overview widget, and
+// emitting it would add an unrequested frame to every non-series stream
+// (E3-fx2 scopes the signal to a series table between games). A halt does
+// not go through here — halt writes TableHalted directly and sends
+// TableHaltedBody instead — so a table_state frame only ever carries idle,
+// live or between_games. The broadcast runs after t.mu is released: it takes
+// the registry lock and each session's, and Subscribe holds t.fanMu then
+// t.mu, so emitting while still holding t.mu would invert that order.
 func (t *table) setState(s string) {
 	t.mu.Lock()
 	t.state = s
 	t.mu.Unlock()
+	if t.reg != nil && t.cfg.Series {
+		t.reg.broadcastTableState(t, s)
+	}
+}
+
+// tableStateName maps an internal table state to the table_state frame's
+// value. Only the between-games cooldown is renamed (TableBetweenGames); idle
+// and live are already the wire spellings. Halted never reaches here.
+func tableStateName(s string) string {
+	if s == protocol.TableCooldown {
+		return protocol.TableBetweenGames
+	}
+	return s
+}
+
+// broadcastTableState pushes one table_state frame to every session watching
+// the table, focus and overview alike — the signal is public table
+// lifecycle, not per-viewer state, so it is not redacted. setState calls it
+// only for a series table (E3-fx2); the frame is not emitted for an ordinary
+// table. It never blocks: push drops a slow client (the session overflows
+// and is unregistered).
+func (r *Registry) broadcastTableState(t *table, s string) {
+	ss, _ := r.sessionsFor(t.cfg.ID)
+	if len(ss) == 0 {
+		return
+	}
+	t.mu.RLock()
+	k := t.k
+	t.mu.RUnlock()
+	f := frame(protocol.TTableState, t, k, 0, protocol.TableStateBody{State: tableStateName(s)})
+	for _, sub := range ss {
+		sub.push(f)
+	}
+	r.dropOverflowed(ss)
 }

@@ -137,6 +137,7 @@ func foldTurnChange(g *state.Game, e *Event) {
 		g.Players[e.Player].LandsPlayed = 0
 		for i := range g.Players {
 			g.Players[i].CoinFlipsThisTurn = 0
+			resetTurnWatchers(&g.Players[i])
 		}
 		// g.Zone(ZBattlefield, e.Player) can only ever hold IDs that Move
 		// already confirmed are real objects, so this nil check is
@@ -165,6 +166,11 @@ func foldTurnChange(g *state.Game, e *Event) {
 			g.Objs[i].ActivatedThisTurn = 0
 			g.Objs[i].AttacksThisTurn = 0
 			g.Objs[i].AttackedTurn, g.Objs[i].AttackedCombat = 0, 0
+			// "Blocked by" is a per-turn fact like "attacked": the history
+			// survives the end-of-combat reset (so an at-end-of-combat
+			// trigger still sees it) but not the turn boundary.
+			g.Objs[i].BlockedByThisTurn = nil
+			g.Objs[i].BlockedThisTurn = nil
 			// CR 702.100a: exerted is a per-turn fact. ExertSkipUntap is
 			// deliberately NOT reset here -- its window spans the turn
 			// boundary and is consumed at the next untap step instead.

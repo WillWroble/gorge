@@ -543,6 +543,9 @@ func Describe(g *state.Game, ev events.Event) string {
 			if ev.Seq == 1 && g != nil && ev.Text == tossNoteText(g, ev.Player) {
 				return player(g, ev.Player) + " won the toss"
 			}
+			if ev.Seq == 1 && g != nil && ev.Text == chooserNoteText(g, ev.Player) {
+				return player(g, ev.Player) + " chooses who takes the first turn"
+			}
 			return ev.Text
 		}
 		if ev.Secret {
@@ -733,6 +736,11 @@ func Describe(g *state.Game, ev events.Event) string {
 		if i := strings.Index(phase, "|VP="); i >= 0 {
 			phase = phase[:i]
 		}
+		for _, sfx := range []string{"|DP=", "|ST"} {
+			if i := strings.Index(phase, sfx); i >= 0 {
+				phase = phase[:i]
+			}
+		}
 		return obj(g, ev.Obj) + " sets up a delayed trigger for " + phase
 	case events.DelayedPush:
 		// The registered phase arrived and the delayed ability went on the
@@ -760,7 +768,12 @@ func Describe(g *state.Game, ev events.Event) string {
 		// A keyword-granted activated ability went on the stack (a layer-6
 		// AddKeyword$ Cycling grant, CR 613.1f): the same "activates"
 		// phrasing the other grant pushes use -- the resolving ability's own
-		// line carries what it does.
+		// line carries what it does. Station's own activation (CR 702.184a)
+		// mints through the same event from the printed K:Station line, so
+		// it is named as what it is rather than as a grant.
+		if strings.HasPrefix(ev.Counter, "Station") {
+			return obj(g, ev.Obj) + " activates Station"
+		}
 		return obj(g, ev.Obj) + " activates (keyword-granted)"
 	case events.GainedTriggerPush:
 		// A has-all-abilities-of triggered ability went on the stack (Forge's
@@ -920,6 +933,21 @@ func tossNoteText(g *state.Game, p state.PlayerID) string {
 		name = "seat " + strconv.Itoa(int(p))
 	}
 	return name + " won the toss"
+}
+
+// chooserNoteText is the deterministic chain text a Config.StartChooser
+// genesis emits for its chooser Note (E3-1). It deliberately follows
+// tossNoteText's deck-name fallback but excludes PlayerName, which is
+// display-only and must not reach the hash chain.
+func chooserNoteText(g *state.Game, p state.PlayerID) string {
+	name := ""
+	if g != nil && int(p) < len(g.Players) {
+		name = g.Players[p].Name
+	}
+	if name == "" {
+		name = "seat " + strconv.Itoa(int(p))
+	}
+	return name + " chooses who takes the first turn"
 }
 
 // life is the seat's life total as of g, or "?" when unresolvable.

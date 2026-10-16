@@ -296,6 +296,11 @@ func (e *Engine) beholdCostAsk() bool {
 	pc := e.cast
 	for pc.BeholdPart < len(pc.cost.Behold) {
 		part := pc.cost.Behold[pc.BeholdPart]
+		// A Behold of a creature type the same cost chooses waits for the
+		// choice (chooseTypeCostAsk, after the X announcement).
+		if !pc.chooseTypeDone && pay.BeholdChosenTypeOpen(asPayer(e), pc.card, &pc.cost, part) {
+			return false
+		}
 		candidates := append(pay.CostCandidates(asPayer(e), pc.player, pc.card, state.ZBattlefield, part.Spec, false, false),
 			pay.CostCandidates(asPayer(e), pc.player, pc.card, state.ZHand, part.Spec, true, false)...)
 		if len(candidates) < int(part.N) {
@@ -691,6 +696,9 @@ func (e *Engine) exAsk() bool {
 				}
 			}
 		}
+		if part.AtLeast {
+			return e.groupExileAsk(pc, part, zones, candidates)
+		}
 		n := int(part.N)
 		if part.Announced {
 			n = int(pc.x)
@@ -950,6 +958,11 @@ func (e *Engine) castModeAsk() bool {
 	// CR 702.194b-c: the mode count is fixed by the declared Teamwork
 	// election at 601.2b, before the optional tap payment is answered.
 	ctx.Kicker.PendingTeamwork = castAnswerCodes.Code(pc.mode) == castAnswerTeamworkMode
+	// CR 601.2b: the optional additional cost is announced with the modes,
+	// so a CharmNum$ over Count$OptionalGenericCostPaid (Pyrrhic Strike's
+	// "if this spell's additional cost was paid, choose both instead") reads
+	// the election, not the hand card's unpaid object flag.
+	ctx.Num.OptionalCostElected = castModeCodes.Code(pc.mode) == castModeOptionalcost
 	effects.SetSVars(ctx, f.SVars)
 	if effects.CharmRandomChosen(e, ctx, sa) {
 		// param:api:Charm.Random: a random Charm's mode announcement is not

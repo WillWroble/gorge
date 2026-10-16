@@ -685,6 +685,12 @@ func TestStationTapsASummoningSickCreatureForChargeCounters(t *testing.T) {
 	if e.G.Obj(bearID).Tapped != true {
 		t.Fatal("the tapped creature was not tapped")
 	}
+	// CR 702.184a: Station is an activated ability, so the counters wait for
+	// it to resolve.
+	if len(e.G.Stack) != 1 || e.G.Obj(brood).Counter("CHARGE") != 0 {
+		t.Fatalf("station did not wait on the stack: stack %v, %d charge counters", e.G.Stack, e.G.Obj(brood).Counter("CHARGE"))
+	}
+	passUntilStackEmpty(t, e, 20)
 	if got := e.G.Obj(brood).Counter("CHARGE"); got != 2 {
 		t.Fatalf("the spacecraft has %d charge counters, want 2 (the Bear's power)", got)
 	}

@@ -10,6 +10,7 @@
 package trigmatch
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -455,7 +456,7 @@ func abilityCastMatches(e Board, t cards.Trigger, source state.ObjID, ev events.
 	if ev.Kind == events.KeywordAbilityPush {
 		// Counter is the replayable derived keyword line used by Apply to
 		// mint the stack body's SA. Amount is not a printed-ability index.
-		ab = cards.GrantedKeywordAbility(ev.Counter)
+		ab = cards.KeywordPushAbility(ev.Counter)
 		if ab == nil {
 			return false
 		}
@@ -697,6 +698,15 @@ func incrementAdmits(e Board, source state.ObjID, ev events.Event) bool {
 	return spent > e.Power(source) || spent > e.Toughness(source)
 }
 
+// validSAManaFromPrefix opens the single-field ValidSA$ mana-provenance spellings.
+const validSAManaFromPrefix = "Spell.ManaFrom"
+
+// validSAManaFromCardSelf is the producing-source provenance spelling: the
+// spell was cast using mana produced by the trigger's own source. Any other
+// Spell.ManaFromCard form (none in the corpus) falls to the CastSa strip,
+// which does not know it, and fails closed.
+const validSAManaFromCardSelf = "Spell.ManaFromCard.StrictlySelf"
+
 // ValidSAMatches evaluates a SpellCast trigger's ValidSA$ clause. The
 // measured grammar is the mana comparison family, "Spell.ManaSpent <OP><N>"
 // (Roiling Vortex's EQ0 -- no mana was spent to cast that spell; Raggadragga
@@ -708,13 +718,57 @@ func incrementAdmits(e Board, source state.ObjID, ev events.Event) bool {
 // otherwise.
 const validSATeamworkClause = "Spell.Teamwork"
 
+// validSAMayPlaySourceClause is the SA-level spelling of the card-level
+// "CastSa Spell.MayPlaySource" provenance (Undead Sprinter's and
+// Hundred-Battle Veteran's "if you cast it this way" riders, Thundermane
+// Dragon's "cast this way" grant): the spell was cast through a may-play
+// permission. It is answered through the same CastSa strip as the
+// Spell.ManaFrom<Tag> spellings, i.e. from the cast's FlagMayPlay -- the
+// identical approximation the card-level token already makes (the flag does
+// not record WHICH permission host granted the cast).
+const validSAMayPlaySourceClause = "Spell.MayPlaySource"
+
 func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.PlayerID, clause string) bool {
+	if validSATargetingList(clause) {
+		// A comma list carrying the spaced `IsTargeting <spec>` alternative
+		// (Danitha, Sword of Hope: "Spell.Equipment,Spell.IsTargeting Valid
+		// Creature.YouCtrl" -- an Equipment spell OR a spell that targets a
+		// creature you control). The object matcher answers both forms at the
+		// alternative level (effects spellIsTargetingAlt), so the whole clause
+		// is one spec filter over the cast spell; splitting it on spaces
+		// below would read the argument's words as separate fields and fail
+		// the cast closed (CR 603.2: the trigger must see the cast).
+		return e.MatchesSpec(strings.TrimSpace(clause), ev.Obj, source, ctrl, SpecOpts{})
+	}
 	fields := strings.Fields(strings.TrimSpace(clause))
 	switch len(fields) {
 	case 1:
 		if fields[0] == validSATeamworkClause {
 			o := e.Game().Obj(ev.Obj)
 			return o != nil && o.CastFlags&state.FlagTeamworkPaid != 0
+		}
+		if fields[0] == validSAManaFromCardSelf {
+			// "a spell using mana produced by CARDNAME" (Tecutlan, The Myriad
+			// Pools, Barracks of the Thousand): the trigger's own source is
+			// one of the producers the cast's payment spent, as recorded by
+			// the pay-time CastInfo (Object.ManaSpentSources; rules'
+			// cast_mana_sources.go). StrictlySelf is this very object, so a
+			// new object of the same card (CR 400.7) never matches.
+			o := e.Game().Obj(ev.Obj)
+			return o != nil && slices.Contains(o.ManaSpentSources, source)
+		}
+		if strings.HasPrefix(fields[0], validSAManaFromPrefix) || fields[0] == validSAMayPlaySourceClause {
+			// Spell.ManaFrom<Tag> (Smaug, Wicked Worm; Mastermind Plum;
+			// Alchemist's Talent) is the SA-level spelling of the card-level
+			// "CastSa Spell.ManaFrom<Tag>" predicate: answer it from the same
+			// spend window through the CastSa provenance strip. A tag the
+			// strip does not know (Spell.ManaFromCard) comes back unchanged
+			// and fails closed.
+			// The strip is exact-token over a base.predicate chain, so the
+			// token rides on a bare "Card" base; a stripped token leaves "Card".
+			spec := "Card.CastSa " + fields[0]
+			rest, ok := e.CastProvenanceAdmits(spec, ev.Obj, ctrl)
+			return ok && rest != spec
 		}
 		return e.MatchesSpec(fields[0], ev.Obj, source, ctrl, SpecOpts{})
 	case 2:
@@ -724,6 +778,12 @@ func ValidSAMatches(e Board, source state.ObjID, ev events.Event, ctrl state.Pla
 		return false
 	}
 	return false
+}
+
+// validSATargetingList reports a ValidSA$ comma list one of whose
+// alternatives is the spaced `IsTargeting <spec>` form.
+func validSATargetingList(clause string) bool {
+	return strings.Contains(clause, ",") && strings.Contains(clause, ".IsTargeting ")
 }
 
 // spellValidSAonCardMatches evaluates a SpellCast trigger's ValidSAonCard$

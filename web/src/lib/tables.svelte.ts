@@ -1,4 +1,4 @@
-import type { Frame, Hello, MatchStart, SeatInfo, TableInfo, Widget } from '../protocol';
+import type { Frame, Hello, MatchStart, SeatInfo, TableInfo, TableStateBody, Widget } from '../protocol';
 import { SEAT_COLOURS } from './colours';
 import { fetchTables } from './api';
 import { session } from './session.svelte';
@@ -11,6 +11,22 @@ export interface TableState { info: TableInfo; widget: Widget | null; seats: Sea
 // (which carries deck+colour) as soon as it arrives.
 function seatsFromInfo(info: TableInfo): SeatInfo[] {
   return (info.seat_names ?? []).map((n, i) => ({ name: n, deck: n, colour: SEAT_COLOURS[i % SEAT_COLOURS.length] }));
+}
+
+// tableStateName maps a table_state frame's value onto the client's own state
+// spelling: the server names a series table's between-games cooldown
+// "between_games" (protocol.TableBetweenGames) while TableInfo.State and this
+// store call it "cooldown". The value set is fail-closed like the rest of the
+// frame handling: only the three states E3-fx2 emits (between_games, live,
+// idle) are accepted, and anything else — including no state — leaves the
+// store alone rather than feeding an unknown string into the idle derivation.
+function tableStateName(state: string | undefined): string | null {
+  switch (state) {
+    case 'between_games': return 'cooldown';
+    case 'live': return 'live';
+    case 'idle': return 'idle';
+    default: return null;
+  }
 }
 
 class Tables {
@@ -62,7 +78,18 @@ class Tables {
       }
       case 'match_end': {
         const t = this.find(f.table ?? '');
-        if (t) t.info = { ...t.info, state: t.info.perpetual ? 'cooldown' : 'idle' };
+        // A series table (E3-2, TableInfo.series) goes on to its next match,
+        // so its match_end is the between-games state, never idle; the
+        // server's table_state frame then says whether the series goes on
+        // (between_games, then live) or is over (idle). A perpetual table
+        // cools down and restarts; only an ordinary table is idle.
+        if (t) t.info = { ...t.info, state: t.info.perpetual || t.info.series === true ? 'cooldown' : 'idle' };
+        break;
+      }
+      case 'table_state': {
+        const t = this.find(f.table ?? '');
+        const state = tableStateName((f.body as Partial<TableStateBody>).state);
+        if (t && state !== null) t.info = { ...t.info, state };
         break;
       }
       case 'table_halted': {

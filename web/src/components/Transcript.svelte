@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DvrState } from '../lib/dvr';
-  import { visibleLog } from '../lib/logfilter';
+  import { visibleLog, visibleTail } from '../lib/logfilter';
   import type { LogSeatIdentity } from '../lib/logcolour';
   import { parseLogLine, type CardOwnerColour } from '../lib/logrender';
   import type { AutoPassLog } from '../lib/autolog';
@@ -11,6 +11,9 @@
   import { pointerRelease } from '../lib/pointer';
   import ManaSymbols from './ManaSymbols.svelte';
   import { moveChip } from '../lib/clientmodel/events';
+
+  /** LIVE_TAIL is how many visible lines a live transcript renders. */
+  const LIVE_TAIL = 150;
 
   /**
    * Transcript is the rules log: one line per event, the cursor's line
@@ -95,16 +98,30 @@
   let revealAll = $state(false);
   let revealSteps = $state(false);
   let openSnapshots = $state<Record<number, boolean>>({});
-  const lines = $derived(visibleLog(dvr.events, revealAll, revealSteps));
+  // While live, only the newest LIVE_TAIL lines render. Every rendered row
+  // re-derives on each event (its line is re-parsed against the new view's
+  // cardColour/identities), so rendering a whole long match made each event
+  // cost O(lines): a 50ms-paced commander game reached ~10k events and the
+  // spectator tab stalled for seconds per event. Live mode already pins the
+  // log to its tail on every event, and pausing (the DVR bar) is the
+  // contract for reading history, so a paused log renders every line.
+  // visibleTail walks back from the newest event, so a live log's cost per
+  // event does not grow with the events the DVR holds.
+  const shownTail = $derived(
+    dvr.live
+      ? visibleTail(dvr.events, revealAll, revealSteps, LIVE_TAIL)
+      : { lines: visibleLog(dvr.events, revealAll, revealSteps), more: false },
+  );
+  const lines = $derived(shownTail.lines);
+  // Earlier lines exist when the window clipped some, or the DVR itself
+  // holds only the newest events (dvr.ts LIVE_KEEP).
+  const clipped = $derived(dvr.live && (shownTail.more || (dvr.events[0]?.event.seq ?? 1) > 1));
   // The live tail-follow's trigger is the seq of the last RENDERED line, as
   // a primitive: a `head` chit re-runs this derived (the dvr var changed)
   // but yields the same number, so the scroll effect below stays put — the
   // log must answer the backfill that appends rows, not the cursor move
   // that announced them.
-  const tailSeq = $derived.by(() => {
-    const shown = visibleLog(dvr.events, revealAll, revealSteps);
-    return shown.length ? shown[shown.length - 1].event.seq : -1;
-  });
+  const tailSeq = $derived(lines.length ? lines[lines.length - 1].event.seq : -1);
 
   // The panel's lifetime follows the objects the transcript currently shows:
   // a card that leaves every visible zone must close a panel opened for it,
@@ -129,6 +146,35 @@
   });
 
   const resolveCard = (id: string): CardView | null => cardById(cards, id);
+
+  // The tail is the last `.line` row: engine lines and auto-pass notes share
+  // the class, and a note renders under every engine line. Walk back from the
+  // container's last child rather than querying every row.
+  let tailFrame: number | null = null;
+  function scrollToTail() {
+    tailFrame = null;
+    let row = container?.lastElementChild ?? null;
+    while (row && !row.classList.contains('line')) row = row.previousElementSibling;
+    row?.scrollIntoView({ block: 'end' });
+  }
+  $effect(() => () => {
+    if (tailFrame !== null) cancelAnimationFrame(tailFrame);
+  });
+
+  // The cursor row's highlight is toggled on the one row it moves between,
+  // not bound per row: the cursor moves on every live event, and a per-row
+  // binding re-ran every rendered row ~100 times a second, so a spectator's
+  // per-event cost grew with the transcript.
+  let currentRow: Element | null = null;
+  $effect(() => {
+    const seq = dvr.cursor;
+    void lines;
+    const next = container?.querySelector(`.line[data-seq="${seq}"]`) ?? null;
+    if (next === currentRow) return;
+    currentRow?.classList.remove('current');
+    next?.classList.add('current');
+    currentRow = next;
+  });
 
   // The scroll effect's memo of the last tail it acted on (untracked plain
   // state: it guards the scroll, it never renders).
@@ -171,10 +217,9 @@
       if (tail === followedTail && noteCount === followedNotes) return;
       followedTail = tail;
       followedNotes = noteCount;
-      // The tail is the last `.line` row: engine lines and auto-pass notes
-      // share the class, and a note renders under every engine line.
-      const rows = container?.querySelectorAll<HTMLElement>('.line');
-      rows?.[rows.length - 1]?.scrollIntoView({ block: 'end' });
+      // At most one scroll per frame: each scrollIntoView forces a layout,
+      // and a live table appends visible lines faster than frames.
+      if (tailFrame === null) tailFrame = requestAnimationFrame(scrollToTail);
     } else {
       followedTail = -1;
       const seq = dvr.cursor;
@@ -206,11 +251,13 @@
       {revealAll ? 'Hide engine noise' : 'Show engine noise'}
     </button>
   </div>
+  {#if clipped}
+    <div class="clipped" data-clipped>Earlier lines hidden while live — pause to see the whole log</div>
+  {/if}
   {#each lines as e (e.event.seq)}
     <button
       type="button"
       class="line"
-      class:current={e.event.seq === dvr.cursor}
       data-seq={e.event.seq}
       use:pointerRelease
       onclick={() => onSeek(e.event.seq)}
@@ -294,6 +341,11 @@
      to the button's own title, where it is one hover away and costs nothing
      when it is not wanted. Two toggles sit here now: the engine-noise one
      and the step-lines one, independent. */
+  .clipped {
+    font-size: var(--t-12);
+    color: var(--ink-dim);
+    padding: 0 var(--sp-2);
+  }
   .bar {
     display: flex;
     align-items: center;
@@ -336,7 +388,9 @@
   /* The cursor line is where the DVR is pointing: marked by a rule in the
      initiative colour, the same device the pending tray uses, rather than by
      a filled band that would fight the log's density. */
-  .line.current {
+  /* :global because the class is toggled by script, not markup (the cursor
+     effect above), so the compiler would otherwise prune it as unused. */
+  .line:global(.current) {
     color: var(--ink);
     background: var(--instrument-raised);
     box-shadow: inset 2px 0 0 var(--initiative);

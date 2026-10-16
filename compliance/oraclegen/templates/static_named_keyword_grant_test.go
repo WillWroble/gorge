@@ -66,17 +66,23 @@ func TestStaticNamedKeywordGrant(t *testing.T) {
 }
 
 // TestStaticNamedKeywordGrantStillSkips pins the other direction: a static
-// granting a keyword outside BOTH vocabularies (Samut's Split second to
-// instant/sorcery spells) keeps the named skip, so widening the set did not
-// swallow every keyword grant.
+// granting a keyword outside BOTH vocabularies keeps the named skip, so
+// widening the set did not swallow every keyword grant. Thrumming Stone
+// grants ripple 4 to the spells its controller casts, a keyword neither
+// snapshot carries. (Raiding Schemes, the previous pin, is served since
+// lb5-driver by electing the granted conspire cost,
+// static_granted_optional_copy.go; Samut, Tyrant of Naktamun, the earlier pin, is served by
+// the split-second observation since lb4-g7, Absolute Virtue by the
+// player-protection observation, and Norman Osborn's Green Goblin mayhem
+// grant by the discard-this-turn offer since lb4w2-diverge.)
 func TestStaticNamedKeywordGrantStillSkips(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	_, skip := GenerateB(reg, "Samut, Tyrant of Naktamun",
-		probeRequirement(t, reg, "Samut, Tyrant of Naktamun", "static#0.0"))
+	_, skip := GenerateB(reg, "Thrumming Stone",
+		probeRequirement(t, reg, "Thrumming Stone", "static#0.0"))
 	if skip == nil {
-		t.Fatal("Samut, Tyrant of Naktamun served, want a keyword skip")
+		t.Fatal("Thrumming Stone static#0.0 served, want a keyword skip")
 	}
 	if !strings.Contains(skip.Reason, "outside the compared") {
-		t.Fatalf("Samut skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
+		t.Fatalf("Thrumming Stone skip = %q, want the outside-the-compared-keyword-set reason", skip.Reason)
 	}
 }

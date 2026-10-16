@@ -581,12 +581,10 @@ func effChooseCard(h Host, c *Ctx, sa *cards.SA) {
 	selection := *c // candidate filters read the pre-clear remembered set
 	initForgetOtherSnapshot(h, c, sa, choosers, 2)
 	forgetOtherRemembered(h, c, sa)
-	if c.Forget.Ready {
-		// The snapshot is authoritative across the asks: a later chooser's
-		// pool must still match the pre-clear candidates (plus anything
-		// re-remembered since) after the first move cleared the live set.
-		selection.Remembered = append(append([]state.Target(nil), selection.Remembered...), c.Forget.Snapshot...)
-	}
+	// The snapshot is authoritative across the asks: a later chooser's
+	// pool must still match the pre-clear candidates (plus anything
+	// re-remembered since) after the first move cleared the live set.
+	armForgetSelection(&selection, c)
 	// Reveal$ True (Planetary Annihilation's "each player chooses six lands
 	// they keep" is public knowledge — CR 701.x's open choice): each chooser's
 	// ANSWERED choice is revealed to every seat with the same ids-Note
@@ -716,9 +714,7 @@ func effChooseCard(h Host, c *Ctx, sa *cards.SA) {
 			// Ctx as it stood at the ask (before this record), then record,
 			// reveal and re-read the bounds.
 			selection = *c
-			if c.Forget.Ready {
-				selection.Remembered = append(append([]state.Target(nil), selection.Remembered...), c.Forget.Snapshot...)
-			}
+			armForgetSelection(&selection, c)
 			answered := ChoiceAnswerTargets(ans)
 			chooseCardRecord(h, c, sa, answered)
 			if reveal {
@@ -1190,6 +1186,13 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 		// attaching object that fired the trigger.
 		base.Aura = c.TriggerSource
 		if base.Aura == 0 {
+			// Mode$ Attached binds the attaching object as the trigger's
+			// card (rules/trigger_referents.go: TriggerCard is the Aura,
+			// TriggerBearer the permanent it became attached to), which
+			// is how Eriette, the Beguiler's own Attached line names it.
+			base.Aura = c.TriggerCard
+		}
+		if base.Aura == 0 {
 			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Text: "GainControl UntilSourceUnattached has no triggering attachment"})
 			return
 		}
@@ -1284,9 +1287,7 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 			// leg ran), which must not suppress the persistent write a later
 			// Remembered$ count/condition reads.
 			tgt := state.Target{Obj: o.ID}
-			if !targetIn(c.Remembered, tgt) {
-				c.Remembered = append(c.Remembered, tgt)
-			}
+			rememberCtxOnce(h, c, tgt)
 			if src := h.Game().Obj(c.Source); src == nil || !targetIn(src.Remembered, tgt) {
 				eventRemember(h, c, o.ID)
 			}
@@ -1859,13 +1860,17 @@ func repeatPlayers(h Host, c *Ctx, spec string) ([]state.PlayerID, bool) {
 		selected[c.Controller] = true
 	case repeatPlayersRemembered:
 		add(c.Remembered)
+	case repeatPlayersRememberedController:
+		// The Remembered* player spellings read the host list, never the
+		// trigger's capture -- the same hostRemembered Defined$ uses.
+		add(hostRemembered(h, c))
 	case repeatPlayersNonTargetedController:
 		add(c.Targets)
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = !selected[p]
 		}
 	case repeatPlayersOppNonRememberedController:
-		add(c.Remembered)
+		add(hostRemembered(h, c))
 		for _, p := range h.Game().AliveFrom(c.Controller) {
 			selected[p] = p != c.Controller && !selected[p]
 		}
@@ -2141,6 +2146,7 @@ const (
 	repeatPlayersTargeted
 	repeatPlayersTargetedAndYou
 	repeatPlayersRemembered
+	repeatPlayersRememberedController
 	repeatPlayersNonTargetedController
 	repeatPlayersOppNonRememberedController
 	repeatPlayersOppNonTriggeredDefender
@@ -2158,7 +2164,7 @@ var repeatPlayersCodes = state.NewStrCodes(
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedController", Val: repeatPlayersTargeted},
 	state.StrEntry[repeatPlayersCode]{Key: "TargetedAndYou", Val: repeatPlayersTargetedAndYou},
 	state.StrEntry[repeatPlayersCode]{Key: "Remembered", Val: repeatPlayersRemembered},
-	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRemembered},
+	state.StrEntry[repeatPlayersCode]{Key: "RememberedController", Val: repeatPlayersRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "NonTargetedController", Val: repeatPlayersNonTargetedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonRememberedController", Val: repeatPlayersOppNonRememberedController},
 	state.StrEntry[repeatPlayersCode]{Key: "OppNonTriggeredDefender", Val: repeatPlayersOppNonTriggeredDefender},

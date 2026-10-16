@@ -205,6 +205,10 @@ func TestDeployStartsTheServersWhenTheArtFillFails(t *testing.T) {
 				t.Errorf("demo server: spectator %q vsbot-spectator %q bot-policy %q pace %v, want omniscient/public/%s/50ms",
 					c.spectator, c.vsbotSpectator, c.botPolicy, c.pace, wantPolicy)
 			}
+			if got, want := fmt.Sprintf("%d/%d/%d", c.tables, c.seats, c.commanderSeats),
+				deployScriptDefault(t, "TABLES")+"/"+deployScriptDefault(t, "SEATS")+"/"+deployScriptDefault(t, "COMMANDER_SEATS"); got != want || !c.vsbot {
+				t.Errorf("demo server: tables/seats/commander-seats %s vsbot %v, want the script's %s with vsbot on", got, c.vsbot, want)
+			}
 		})
 	}
 }

@@ -117,10 +117,11 @@ var wantActivateCensus = map[string]map[string]int{
 	"BIG": {
 		// +1 served: Worldwalker Helm's "target artifact token you control"
 		// gets the Thraben Inspector token prelude (cli-20261009T031408Z-5823e7de).
-		"served:activate.battlefield":        12,
-		"served:activate.hand":               2,
-		"served:activate.mana":               4,
-		"skip:activate cost gap: Sac<token>": 1,
+		// +1 served: Transmutation Font's different-names artifact-token
+		// sacrifice gets three distinct token makers (lb4-gcost).
+		"served:activate.battlefield": 13,
+		"served:activate.hand":        2,
+		"served:activate.mana":        4,
 	},
 	"EOE": {
 		// +1 served at the merge of the tapXType ticket and the setup-counter

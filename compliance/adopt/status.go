@@ -62,7 +62,7 @@ func Bucket(p gate.Problem) string {
 		return BucketHarness
 	case strings.HasPrefix(r, "automatic ruling"):
 		return BucketReview
-	case strings.HasPrefix(r, "verdict is for an older scenario"):
+	case strings.HasPrefix(r, gate.StaleVerdictReason):
 		return BucketStale
 	case strings.HasPrefix(r, "level "):
 		return BucketLevel

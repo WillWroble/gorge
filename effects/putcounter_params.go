@@ -75,6 +75,18 @@ type PutCounterParams struct {
 	ETB bool
 	// EachFromSource$, trimmed (the CounterType$ EachFromSource referent).
 	EachFromSource string
+	// ExistingCounter is CounterType$ ExistingCounter: not a counter kind but
+	// "a kind the recipient already carries" (Animation Module, Powerful
+	// Broker); EachExistingCounter is EachExistingCounter$ True ("for each
+	// kind of counter on ..."), else one existing kind is chosen.
+	ExistingCounter     bool
+	EachExistingCounter bool
+	// PutOnDefined$ (trimmed), PutOnEachOther$ (trimmed spec) and
+	// OnlyNewKind$ True: the recipients and the skip rule of the
+	// ExistingCounter + Choices$ shape (Aven Courier, Contractual Safeguard).
+	PutOnDefined   string
+	PutOnEachOther string
+	OnlyNewKind    bool
 	// CounterTypePerDefined$ True, RandomType$ True, a non-empty
 	// ChooseDifferent$.
 	CounterTypePerDefined bool
@@ -123,18 +135,18 @@ var putCounterKnownKeys = [...]string{
 	"ChooseFromList", "Chooser", "ClassBand", "ClearImprinted", "Condition",
 	"ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn",
 	"ConditionPresent", "ConditionPresent2", "ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc",
 	"CounterNum", "CounterNumPerDefined", "CounterType", "CounterTypePerDefined", "CounterTypes",
 	"Defined", "DefinedCards", "DefinedTarget", "Description", "Divided",
-	"DividedAsYouChoose", "DividedRandomly", "ETB", "EachFromSource", "Exclude",
+	"DividedAsYouChoose", "DividedRandomly", "ETB", "EachExistingCounter", "EachFromSource", "Exclude",
 	"Exhaust", "ForgetOtherTargets", "GameActivationLimit", "Image", "ImprintCards", "ImprintPlayed",
 	"InstantSpeed", "IsCurse", "IsPresent", "KW",
 	"Keyword", "KeywordLine", "MaxTotalTargetCMC", "MaxTotalTargetPower", "Mentor",
 	"MinChoiceAmount", "ModeCost", "Monstrosity", "NewController",
-	"NumDmg", "OpponentTurn", "Optional", "PerDefined",
+	"OnlyNewKind", "OpponentTurn", "Optional", "PerDefined",
 	"Placer", "Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
-	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "RandomType", "ReduceAmount",
+	"PresentCompare", "PresentDefined", "PresentZone", "PutOnDefined", "PutOnEachOther", "RandomNumTargets", "RandomType", "ReduceAmount",
 	"ReduceCost", "RememberAnimated", "RememberCards", "RememberCostMana", "RememberObjects",
 	"RememberPut", "RememberTargets", "Renown", "ReplaceColor", "ReplaceGraveyard",
 	"ReplaceGraveyardValid", "ReplaceMana", "ReplaceOnly", "ReplaceType",
@@ -146,7 +158,7 @@ var putCounterKnownKeys = [...]string{
 	"TargetsWithControllerProperty", "TargetsWithDefinedController",
 	"TargetsWithDifferentCMC", "TargetsWithDifferentControllers",
 	"TargetsWithDifferentNames", "TargetsWithEqualToughness",
-	"TargetsWithSameCardType", "TargetsWithSameController",
+	"TargetsWithRelatedProperty", "TargetsWithSameCardType", "TargetsWithSameController",
 	"TargetsWithSameCreatureType", "TargetsWithSharedCardType",
 	"TargetsWithSharedTypes", "TgtPrompt", "TgtZone", "TokenScript",
 	"TriggerDescription", "Type", "Ultimate",
@@ -207,6 +219,12 @@ func compilePutCounter(sa *cards.SA) *PutCounterParams {
 	// Each key is read by its literal name (the parameter census attributes
 	// a read by the key the call spells).
 	num, numOK := sa.Param(cards.PKCounterNum)
+	if strings.EqualFold(strings.TrimSpace(num), "PreventedDamage") {
+		// A prevention rider's delayed body (Sacred Boon, Scars of the
+		// Veteran): the registration's remembered number is the prevented
+		// amount.
+		num = "Count$TriggerRememberAmount"
+	}
 	p.CounterNum, p.CounterNumSet = paramTextSet(num, numOK)
 	adapt, adaptOK := sa.Param(cards.PKAdapt)
 	p.Adapt, p.AdaptSet = paramTextSet(adapt, adaptOK)
@@ -258,6 +276,11 @@ func compilePutCounter(sa *cards.SA) *PutCounterParams {
 	p.ETB = isTrue(sa.ParamStr(cards.PKETB))
 	eachFrom, eachFromOK := sa.Param(cards.PKEachFromSource)
 	p.EachFromSource = strings.TrimSpace(eachFrom)
+	p.ExistingCounter = strings.EqualFold(strings.TrimSpace(p.Kind), "ExistingCounter")
+	p.EachExistingCounter = isTrue(sa.ParamStr(cards.PKEachExistingCounter))
+	p.PutOnDefined = strings.TrimSpace(rawParamText(sa, "PutOnDefined").Text)
+	p.PutOnEachOther = strings.TrimSpace(rawParamText(sa, "PutOnEachOther").Text)
+	p.OnlyNewKind = isTrue(rawParamText(sa, "OnlyNewKind").Text)
 	perType, perTypeOK := sa.Param(cards.PKCounterTypePerDefined)
 	p.CounterTypePerDefined = isTrue(perType)
 	random, randomOK := sa.Param(cards.PKRandomType)

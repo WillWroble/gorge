@@ -111,6 +111,22 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 		}
 		gatedGrantWhy = why
 	}
+	// A counter-gated self static that also grants a ReplaceDamage prevention
+	// (Hedron-Field Purists' LEVEL bands) is observed by the damage it
+	// prevents BEFORE the generic probe paths: those serve the same row on
+	// its SetPower/SetToughness alone and never exercise the grant. The
+	// snapshot the item compares still carries the card's own P/T.
+	if st.HasParam(cards.PKAddReplacementEffect) {
+		if it, ok := staticGrantedPreventItem(reg, f, name, req, st); ok {
+			return it, nil
+		}
+	}
+	// A grant of the abilities of cards exiled with the source to countered
+	// creatures (Agatha's Soul Cauldron) is made by the source's own
+	// exile-and-counter activation (static_gains_exiled_with.go).
+	if it, ok := gainsExiledWithItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
 	plans := []staticProbePlan{{}}
 	probePlan := staticPlanFor(affected)
 	if !probePlan.empty() {
@@ -146,7 +162,7 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 			return oraclegen.Item{}, false
 		}
 		it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"611.3", "613"}, base.Scenario)
-		it.XAnswers = base.XAnswers
+		it.XAnswers = withStaticSetupChoices(base.XAnswers, res)
 		it.Ignore = base.Ignore
 		it.XAbility = base.XAbility
 		// An evergreen grant keeps the evergreen opt-in; a grant of a named
@@ -217,6 +233,9 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 			if cond.reanswers {
 				base.XAnswers = oraclegen.XAnswersForScenario(res, base.Scenario,
 					oraclegen.ModeNumbers(f), castStepIndices(base.Scenario.Steps))
+				if cond.beholdPick != "" {
+					beholdFromHand(base.XAnswers, base.Scenario.Steps, name, cond.beholdPick)
+				}
 				if cond.activationCost != "" {
 					for i := len(base.Scenario.Steps) - len(cond.afterSteps); i < len(base.Scenario.Steps); i++ {
 						if i < 0 || i >= len(base.Scenario.Steps) || base.Scenario.Steps[i].Op != "activate" {
@@ -303,6 +322,11 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticOfferItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A MayPlay static that prices the cast it permits is observed as the
+	// offered cast and its price (static_offer_altcost.go).
+	if it, ok := staticMayPlayAltCostItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
 	// A has-all-abilities-of static (GainsAbilitiesOf$) is observed by using a
 	// donor card's activated ability on the recipient (static_granted_donor.go).
 	if it, ok := staticDonorItem(reg, f, name, req, st); ok {
@@ -337,6 +361,50 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	if it, ok := staticSpellLifelinkItem(reg, c, f, name, req, st); ok {
 		return it, nil
 	}
+	// A split-second grant is observed by what its caster is no longer
+	// offered while the granted spell is on the stack
+	// (static_granted_split_second.go).
+	if it, ok := staticSplitSecondItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A granted web-slinging alternative cost is observed as the probe's
+	// offered cast (static_granted_webslinging.go).
+	if it, ok := staticWebSlingingGrantItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
+	// Protection from opponents granted to the controller is observed by the
+	// combat damage it prevents (static_player_protection.go).
+	if it, ok := staticPlayerProtectionItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
+	// A colour hexproof-from grant is compared under its own opt-in fold
+	// (static_hexproof_from.go).
+	if it, ok := staticHexproofFromItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A stack-scoped grant of a cast-trigger keyword (storm, cascade) is
+	// observed by the trigger it puts on the stack above a probe spell
+	// (static_granted_spell_trigger.go).
+	if it, ok := staticGrantedSpellTriggerItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A stack-scoped grant of an optional copy cost (conspire, casualty) is
+	// observed by casting a probe that elects the granted cost
+	// (static_granted_optional_copy.go).
+	if it, ok := staticGrantedCopyCostItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A crafted back face that has the abilities of its craft materials is
+	// observed by crafting it and activating a gained ability
+	// (static_crafted_gains.go).
+	if it, ok := staticCraftedGainsItem(reg, c, f, name, req, st); ok {
+		return it, nil
+	}
+	// A grant over face-down creatures is observed by activating the granted
+	// ability on a face-down probe (static_granted_facedown.go).
+	if it, ok := staticGrantFaceDownItem(reg, f, name, req, st); ok {
+		return it, nil
+	}
 	if gap := staticProbeCapGap(probePlan); gap != "" {
 		return skip(gap)
 	}
@@ -359,6 +427,17 @@ func staticContinuous(reg *cards.Registry, f *cards.Face, name string, req level
 	// through to its named gap.
 	if st.HasParam(cards.PKAddStaticAbility) {
 		if it, ok := staticGrantedStaticItem(reg, f, name, req, st); ok {
+			return it, nil
+		}
+	}
+	// A static whose AddReplacementEffect$ grants a REPLACEMENT effect is
+	// observed by causing the event the granted replacement rewrites
+	// (static_granted_replacement.go). Tried after every probe, fixture,
+	// offered, granted-trigger and granted-static path so an already-served
+	// row keeps its scenario bytes; an unserved grant falls through to its
+	// named gap.
+	if st.HasParam(cards.PKAddReplacementEffect) {
+		if it, ok := staticGrantedReplacementItem(reg, f, name, req, st); ok {
 			return it, nil
 		}
 	}

@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/internal/azmcts"
 	gbench "github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/internal/gonet"
 	"github.com/adams-shaun/gorge/internal/policynet"
 	"github.com/adams-shaun/gorge/internal/searchseat"
 	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
@@ -54,8 +56,12 @@ type gameRec struct {
 	// drew or put into its hand from its library (17lands' "game in hand").
 	InHand [2][]string `json:"in_hand"`
 	Mull   [2]int      `json:"mull"`
-	Visits int         `json:"visits,omitempty"` // visit records this game added to -corpus
-	Err    string      `json:"error,omitempty"`
+	// MM is each seat's -mm-stats priority-window counters (mmstats.go).
+	MM     [2]mmStats `json:"mm,omitempty"`
+	Visits int        `json:"visits,omitempty"` // visit records this game added to -corpus
+	Err    string     `json:"error,omitempty"`
+	// Lines is the -lines probe (lines.go): each seat's early action sequence and instant timing.
+	Lines *lineRec `json:"lines,omitempty"`
 }
 
 type job struct {
@@ -70,9 +76,55 @@ type azAgg struct {
 	msX1000                                                            atomic.Int64
 	topKPoints, topKCuts, topKBefore                                   atomic.Int64
 	oppPoints, oppExpanded                                             atomic.Int64
+	// The fuller search (:morekinds, :kinds=): root searches and in-walk points per fuller kind
+	// (azmcts.ExtraKindNames), and the opponent's payment points (:oppnodes:oppfull with :autopay).
+	extraSearched, extraPoints [azmcts.NumExtraKinds]atomic.Int64
+	oppPayPoints               atomic.Int64
 }
 
 var azStats azAgg
+
+// refusals counts redeal refusals and deal failures by reason (-out summary).
+var refusals struct {
+	sync.Mutex
+	m map[string]int
+}
+
+func noteRefusal(refused, failed string) {
+	refusals.Lock()
+	defer refusals.Unlock()
+	if refusals.m == nil {
+		refusals.m = map[string]int{}
+	}
+	if refused != "" {
+		refusals.m["refused: "+reasonKey(refused)]++
+	}
+	if failed != "" {
+		refusals.m["deal failed: "+reasonKey(failed)]++
+	}
+}
+
+// reasonKey is a reason up to its first parenthesis or colon-detail, so counts
+// aggregate over the card names and numbers a reason carries.
+func reasonKey(s string) string {
+	if i := strings.IndexByte(s, '('); i > 0 {
+		s = s[:i]
+	}
+	if len(s) > 120 {
+		s = s[:120]
+	}
+	return strings.TrimSpace(s)
+}
+
+func refusalReasons() map[string]int {
+	refusals.Lock()
+	defer refusals.Unlock()
+	out := make(map[string]int, len(refusals.m))
+	for k, v := range refusals.m {
+		out[k] = v
+	}
+	return out
+}
 
 func runPlay(args []string) int {
 	fs := flag.NewFlagSet("play", flag.ExitOnError)
@@ -96,7 +148,7 @@ func runPlay(args []string) int {
 	// whatever the hand holds (botpolicy/policy.go), and every seat here delegates that ask to it.
 	// -mull-heuristic (or a seat's :mull key) replaces the coin with a land-count rule.
 	mulligans := fs.Int("mulligans", 0, "London mulligans each player may take (0 skips the round)")
-	mullHeur := fs.Bool("mull-heuristic", false, "every bot, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
+	mullHeur := fs.Bool("mull-heuristic", false, "every bot, sbtactical, az and prior seat mulligans by land count (the :mull key) unless its spec says :keep7")
 	progress := fs.Int("progress", 0, "print progress every N games (0 = about 20 times)")
 	fs.IntVar(&recordEvery, "record-every", 1, "write one searched decision in K to -corpus (cheap games for the value)")
 	recFeat := fs.String("record-features", "mz", "encoding of the -corpus records: mz, or entity for dzg's networks (dzgorge pack)")
@@ -104,8 +156,14 @@ func runPlay(args []string) int {
 	fs.IntVar(&remoteBatch, "remote-batch", remoteBatch, "most states in one remote request")
 	fs.DurationVar(&remoteWait, "remote-wait", remoteWait, "how long a remote request waits for more states")
 	fs.IntVar(&remoteCache, "remote-cache", remoteCache, "cached remote evaluations (states)")
-	fs.IntVar(&gonetCache, "gonet-cache", gonetCache, "cached gonet= evaluations (states; 0 = none)")
-	fs.IntVar(&gonetCardCache, "gonet-card-cache", gonetCardCache, "cached gonet= card vectors (0 = none)")
+	fs.IntVar(&gonet.CacheSize, "gonet-cache", gonet.CacheSize, "cached gonet= evaluations (states; 0 = none)")
+	fs.IntVar(&gonet.CardCacheSize, "gonet-card-cache", gonet.CardCacheSize, "cached gonet= card vectors (0 = none)")
+	fs.BoolVar(&noPaidManaCensus, "no-paid-mana-census", false, "Config.DisablePaidManaCensus: turn OFF the (default-on) paid-cost mana census (rules/paid_mana_census.go)")
+	fs.BoolVar(&linesOn, "lines", false, "record each seat's first-turns action sequence and instant timing counters (game record field lines; PL-3)")
+	fs.BoolVar(&mmStatsOn, "mm-stats", false, "per seat and game, count priority windows, option-list sizes and the options the paid-mana census adds (game record field mm)")
+	beliefDecks := fs.String("belief-decks", "", "a :closedlist seat's belief corpus: deck directory (default -decks)")
+	beliefPool := fs.String("belief-pool", "", "a :closedlist seat's belief corpus: pool.tsv (default -pool)")
+	beliefSplit := fs.String("belief-split", "train", "a :closedlist seat's belief corpus: the pool split its decks come from")
 	pprofAddr := fs.String("pprof", "", "serve net/http/pprof at this address (e.g. 127.0.0.1:6060); diagnostic only")
 	fs.Parse(args)
 	tuneGC()
@@ -144,6 +202,32 @@ func runPlay(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	for _, p := range specs {
+		p.setLookup(reg)
+	}
+	if specs[0].Closed || specs[1].Closed {
+		bd, bp := *beliefDecks, *beliefPool
+		if bd == "" {
+			bd = *decksDir
+		}
+		if bp == "" {
+			bp = *poolPath
+		}
+		if *beliefSplit == *split && *split != "train" {
+			fmt.Fprintf(os.Stderr, "play: -belief-split %q is the games' own split: the belief would hold the opponents' real decks\n", *beliefSplit)
+			return 2
+		}
+		tb := time.Now()
+		b, skipped, err := loadBelief(reg, bd, bp, *beliefSplit)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "play:", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "belief: %d %s decks (%d skipped), %d distinct cards, %.1fs\n", b.Decks(), *beliefSplit, skipped, b.Cards().Len(), time.Since(tb).Seconds())
+		for _, p := range specs {
+			p.setBelief(b)
+		}
 	}
 	pool, err := readPool(*poolPath, *split)
 	if err != nil {
@@ -215,6 +299,9 @@ func runPlay(args []string) int {
 		}
 		azStats.asked.Add(1)
 		azStats.refused.Add(int64(d.Stats.RedealRefused))
+		if d.Refused != "" || d.DealFailed != "" {
+			noteRefusal(d.Refused, d.DealFailed)
+		}
 		azStats.noWorld.Add(int64(d.Stats.NoWorld))
 		azStats.allFailed.Add(int64(d.Stats.AllFailed))
 		azStats.priorFallbacks.Add(int64(d.Stats.PriorFallbacks))
@@ -227,6 +314,11 @@ func runPlay(args []string) int {
 			azStats.msX1000.Add(int64(d.MS * 1000))
 			azStats.oppPoints.Add(int64(d.Stats.OppPoints))
 			azStats.oppExpanded.Add(int64(d.Stats.OppExpanded))
+			azStats.oppPayPoints.Add(int64(d.Stats.OppPayPoints))
+			for x := range azStats.extraSearched {
+				azStats.extraSearched[x].Add(int64(d.Stats.ExtraSearched[x]))
+				azStats.extraPoints[x].Add(int64(d.Stats.ExtraPoints[x]))
+			}
 		}
 	}
 	outF, err := os.Create(*out)
@@ -363,12 +455,35 @@ func runPlay(args []string) int {
 			sum["az_opp_points_per_searched"] = float64(op) / float64(n)
 			sum["az_opp_expanded_per_searched"] = float64(oe) / float64(n)
 		}
+		if op := azStats.oppPayPoints.Load(); op > 0 {
+			// :oppnodes:oppfull with :autopay: the opponent's priority points over the payment vocabulary.
+			sum["az_opp_pay_points_per_searched"] = float64(op) / float64(n)
+		}
+		extraS, extraP := map[string]int64{}, map[string]float64{}
+		for x, name := range azmcts.ExtraKindNames {
+			if v := azStats.extraSearched[x].Load(); v > 0 {
+				extraS[name] = v
+			}
+			if v := azStats.extraPoints[x].Load(); v > 0 {
+				extraP[name] = float64(v) / float64(n)
+			}
+		}
+		if len(extraS)+len(extraP) > 0 {
+			// :morekinds / :kinds=: searched decisions of the fuller kinds, and their points inside
+			// simulations per searched decision.
+			sum["az_extra_searched"] = extraS
+			sum["az_extra_points_per_searched"] = extraP
+		}
 	}
 	if azStats.asked.Load() > 0 {
 		sum["az_redeal_refused"] = azStats.refused.Load()
 		sum["az_no_world_sims"] = azStats.noWorld.Load()
 		sum["az_all_failed"] = azStats.allFailed.Load()
 		sum["az_prior_fallbacks"] = azStats.priorFallbacks.Load()
+		if r := refusalReasons(); len(r) > 0 {
+			// Why redeals refused or deals failed, by reason (numbers and names stripped).
+			sum["az_refusal_reasons"] = r
+		}
 	}
 	if n := azStats.topKPoints.Load(); n > 0 {
 		// topk=K: decisions (root and in-simulation) the network ranked, those where it cut, and
@@ -380,7 +495,7 @@ func runPlay(args []string) int {
 	for k, v := range remoteStats() {
 		sum[k] = v
 	}
-	for k, v := range gonetStats() {
+	for k, v := range gonet.Stats() {
 		sum[k] = v
 	}
 	if os.Getenv("GORGE_PRIO_MEMO_STATS") != "" {
@@ -406,6 +521,9 @@ func score(a, b, half int) float64 {
 }
 
 var sparePool sync.Pool
+
+// noPaidManaCensus is play -no-paid-mana-census; mmStatsOn is play -mm-stats.
+var noPaidManaCensus, mmStatsOn bool
 
 func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, maxTurns, maxIntents, mulligans int, record bool) (gameRec, []byte) {
 	rec := gameRec{Game: jb.game, Pair: jb.pair, Leg: jb.leg, Seed: jb.seed, Decks: jb.decks, Winner: -1}
@@ -443,14 +561,25 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 	cfg := rules.Config{
 		Seed: jb.seed, Names: []string{"p0", "p1"}, Decks: [][]*cards.Card{d0, d1},
 		Tokens: reg.Tokens, NameUniverse: reg.Universe(), Mulligans: mulligans,
+		DisablePaidManaCensus: noPaidManaCensus,
 	}
 	spare, _ := sparePool.Get().(*rules.Spare)
 	if spare == nil {
 		spare = new(rules.Spare)
 	}
 	cfg.Spare = spare
+	if linesOn {
+		rec.Lines = &lineRec{}
+	}
+	var eng *rules.Engine
+	var auto [2]bool
+	for s := 0; s < 2; s++ {
+		k := specs[jb.sides[s]]
+		auto[s] = k.AutoPay || k.Kind == "random" || k.Kind == "sbtactical"
+	}
 	hooks := gbench.Hooks{
 		Setup: func(e *rules.Engine) {
+			eng = e
 			// The decision arena recycles decision storage; a search seat reads the live
 			// engine as its root, so a game with one keeps it off (as botbench does).
 			if !search {
@@ -463,6 +592,15 @@ func playOne(jb job, specs []*policySpec, dc *deckCache, reg *cards.Registry, ma
 			}
 		},
 		Decision: func(seatIdx int, d *decision.Decision, in decision.Intent, _ *botpolicy.Board) error {
+			if rec.Lines != nil {
+				rec.Lines.observe(eng, seatIdx, d, in)
+			}
+			if mmStatsOn && eng != nil {
+				if rec.MM[seatIdx] == nil {
+					rec.MM[seatIdx] = mmStats{}
+				}
+				rec.MM[seatIdx].observe(eng, !noPaidManaCensus, auto[seatIdx], d, in)
+			}
 			if d.Kind == decision.KMulligan && len(d.Options) > 0 && d.Options[0].Kind != "bottom" &&
 				len(in.Choices) > 0 && optionKind(d, in.Choices[0]) == "mulligan" {
 				rec.Mull[seatIdx]++
@@ -622,3 +760,7 @@ func tuneGC() {
 		debug.SetMemoryLimit(6 << 30)
 	}
 }
+
+// The in-process network times its evaluations for the run summary; the
+// package itself may not read the clock, so the command injects it.
+func init() { gonet.Clock = func() int64 { return time.Now().UnixNano() } }

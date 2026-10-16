@@ -3,9 +3,9 @@
 // matching template in compliance/oraclegen/templates serves; any other
 // parameter keeps the requirement a named gap, so a shape a template cannot
 // observe never changes class silently. The modes whose engine behaviour is
-// not observed by any template (FlipCoinMod) or whose fixture cannot be set
-// up (a Condition$ EnduringStory gate) keep a named gap here rather than the
-// generic "static mode X" string.
+// not observed by any template (a FlipCoinMod shape other than Edgar's) or
+// whose fixture cannot be set up (a Condition$ EnduringStory gate) keep a
+// named gap here rather than the generic "static mode X" string.
 package levelb
 
 import (
@@ -89,6 +89,9 @@ func serveStaticMode(f *cards.Face, st *cards.Static) (sub, gap string) {
 		if activationsPowerUpShape(st) {
 			return "static.activations-powerup", ""
 		}
+		if activationsExhaustUnboundedShape(st) {
+			return "static.activations-exhaust-unbounded", ""
+		}
 		return gapSub, "Activations ValidSA$ " + st.ParamStr(cards.PKValidSA) + " MinLimit$ " +
 			st.ParamStr(cards.PKMinLimit) + " is not the positive PowerUp ceiling the power-up template observes"
 	case "cantbesuspected":
@@ -128,15 +131,35 @@ func serveStaticMode(f *cards.Face, st *cards.Static) (sub, gap string) {
 		}
 		return gapSub, "CantBlockUnless " + staticUnlessShapeOf(st) + " is not a served unless-tax shape"
 	case "alternativecost":
+		if alternativeCostEquipShape(st) {
+			return "static.alternative-cost-equip", ""
+		}
 		if strings.Contains(strings.ToLower(st.ParamStr(cards.PKCondition)), "enduringstory") {
 			return gapSub, "AlternativeCost Condition$ EnduringStory cannot be set up by any fixture"
+		}
+		if alternativeCostSpellsShape(st) {
+			return "static.alternative-cost-spells", ""
 		}
 		return gapSub, "AlternativeCost Cost$ " + st.ParamStr(cards.PKCost) +
 			" needs an alternative-cost cast option the runner does not select"
 	case "flipcoinmod":
-		return gapSub, "FlipCoinMod is not read by the engine and has no coin-flip probe whose result a snapshot carries"
+		if flipCoinModShape(st) {
+			return "static.flip-coin-mod", ""
+		}
+		return gapSub, "FlipCoinMod is read only in the first-flip-each-turn heads shape (effects.FlipCoinForced); " +
+			"this shape has no coin-flip probe"
 	}
 	return "", ""
+}
+
+// flipCoinModShape reports whether st is Edgar, King of Figaro's Two-Headed
+// Coin exactly as effects.FlipCoinForced reads it: your first coin flips each
+// turn come up heads and win (ValidPlayer$ You, CheckSVar$
+// Count$YouFlipThisTurn, SVarCompare$ EQ0, Result$ True, nothing else).
+func flipCoinModShape(st *cards.Static) bool {
+	return staticParamsOnly(st, "ValidPlayer", "CheckSVar", "SVarCompare", "Result") &&
+		st.ParamStr(cards.PKValidPlayer) == "You" && st.ParamStr(cards.PKCheckSVar) == "Count$YouFlipThisTurn" &&
+		st.ParamStr(cards.PKSVarCompare) == "EQ0" && st.ParamStr(cards.PKResult) == "True"
 }
 
 // staticUnlessShapeOf summarises an unserved unless static's shape for the gap.
@@ -340,13 +363,22 @@ func manaConvertExtraShape(st *cards.Static) (string, bool) {
 	return "", false
 }
 
-// cantAttackUnlessTaxShape reports whether st is Archangel of Tithes's attack
-// tax: creatures can't attack you unless their controller pays {1}, gated on
-// the card itself being untapped. Condition$/CheckSVar$ carriers (Dáin) stay
-// named gaps.
+// cantAttackUnlessTaxShape reports whether st is an attack tax the
+// unless-tax template observes: creatures can't attack you unless their
+// controller pays {N}, gated either on the card itself being untapped
+// (Archangel of Tithes) or on its controller's enduring story (Dáin, Lord of
+// the Iron Hills' Condition$ EnduringStory, set up by the Storied fixture the
+// static-condition template already uses). CheckSVar$ carriers stay named
+// gaps.
 func cantAttackUnlessTaxShape(st *cards.Static) bool {
-	if !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Creature") ||
-		!strings.EqualFold(st.ParamStr(cards.PKIsPresent), "Card.Self+untapped") {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Creature") {
+		return false
+	}
+	if strings.EqualFold(st.ParamStr(cards.PKCondition), "EnduringStory") {
+		if st.ParamStr(cards.PKIsPresent) != "" {
+			return false
+		}
+	} else if !strings.EqualFold(st.ParamStr(cards.PKIsPresent), "Card.Self+untapped") {
 		return false
 	}
 	n, err := strconv.Atoi(strings.TrimSpace(st.ParamStr(cards.PKCost)))
@@ -358,7 +390,7 @@ func cantAttackUnlessTaxShape(st *cards.Static) bool {
 	default:
 		return false
 	}
-	return staticParamsOnly(st, "ValidCard", "Target", "Cost", "IsPresent")
+	return staticParamsOnly(st, "ValidCard", "Target", "Cost", "IsPresent", "Condition")
 }
 
 // cantBlockUnlessTaxShape reports whether st is Archangel of Tithes's block
@@ -374,4 +406,63 @@ func cantBlockUnlessTaxShape(st *cards.Static) bool {
 		return false
 	}
 	return staticParamsOnly(st, "ValidCard", "Cost", "IsPresent")
+}
+
+// alternativeCostSpellsShape reports whether st is a mana-only alternative
+// cost its controller may pay for every spell they cast (Leyline of
+// Mutation's "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for
+// spells that you cast"): ValidSA$ Spell, ValidPlayer$ You, a Cost$ of mana
+// symbols only, and no other scope.
+func alternativeCostSpellsShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Spell") ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") {
+		return false
+	}
+	cost := strings.TrimSpace(st.ParamStr(cards.PKCost))
+	if cost == "" {
+		return false
+	}
+	for _, sym := range strings.Fields(cost) {
+		switch sym {
+		case "W", "U", "B", "R", "G", "C":
+		default:
+			if _, err := strconv.Atoi(sym); err != nil {
+				return false
+			}
+		}
+	}
+	return staticParamsOnly(st, "ValidSA", "ValidPlayer", "Cost")
+}
+
+// alternativeCostEquipShape reports whether st is Kíli the Resourceful's
+// equip alternative: ValidSA$ Activated.Equip, ValidPlayer$ You, a numeric
+// Cost$, gated on Condition$ EnduringStory (the Storied fixture) and the
+// "first equip ability you activate each turn" CheckSVar$ (nothing activated
+// yet in the probe's turn).
+func alternativeCostEquipShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.Equip") ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") ||
+		!strings.EqualFold(st.ParamStr(cards.PKCondition), "EnduringStory") {
+		return false
+	}
+	if _, err := strconv.Atoi(strings.TrimSpace(st.ParamStr(cards.PKCost))); err != nil {
+		return false
+	}
+	return staticParamsOnly(st, "ValidSA", "ValidPlayer", "Cost", "Condition", "CheckSVar", "SVarCompare")
+}
+
+// activationsExhaustUnboundedShape reports whether st is Elvish Refueler's
+// "During your turn, as long as you haven't activated an exhaust ability this
+// turn, you may activate exhaust abilities as though they haven't been
+// activated": ValidSA$ Activated.Exhaust, MinLimit$ -1, ValidPlayer$ and
+// PlayerTurn$ You, and the CheckSVar$ that gates it on this turn's exhaust
+// activations.
+func activationsExhaustUnboundedShape(st *cards.Static) bool {
+	if !strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.Exhaust") ||
+		strings.TrimSpace(st.ParamStr(cards.PKMinLimit)) != "-1" ||
+		!strings.EqualFold(st.ParamStr(cards.PKValidPlayer), "You") ||
+		!strings.EqualFold(st.ParamStr(cards.PKPlayerTurn), "You") {
+		return false
+	}
+	return staticParamsOnly(st, "ValidSA", "MinLimit", "ValidPlayer", "PlayerTurn", "CheckSVar", "SVarCompare")
 }

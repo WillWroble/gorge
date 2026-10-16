@@ -93,11 +93,11 @@ func atSeq(bodies []protocol.EventBody, want uint64) *protocol.EventBody {
 func TestSeatAndSpectatorNeverShareEventBodies(t *testing.T) {
 	g, evs, alice := shareFixture(t)
 
-	seat := eventBodiesFor(0, view.Seat, g, evs)
-	spec := eventBodiesFor(view.NoSeat, view.Public, g, evs)
+	seat := eventBodiesFor(0, view.Seat, g, evs, false)
+	spec := eventBodiesFor(view.NoSeat, view.Public, g, evs, false)
 	// viewer 0 asked through the *spectator* table role must still be a
 	// spectator — Public forces NoSeat regardless of who asks.
-	spec0 := eventBodiesFor(0, view.Public, g, evs)
+	spec0 := eventBodiesFor(0, view.Public, g, evs, false)
 
 	// The seat sees alice's own secret draw with its card.
 	a := atSeq(seat, 0)
@@ -184,7 +184,7 @@ func TestEventBodiesForConcurrentViewersOwnTheirBodies(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < rounds; i++ {
-			b := eventBodiesFor(0, view.Seat, g, evs)
+			b := eventBodiesFor(0, view.Seat, g, evs, false)
 			a := atSeq(b, 0)
 			if a == nil || a.Event.Obj != uint32(alice[0]) {
 				err <- nil
@@ -201,7 +201,7 @@ func TestEventBodiesForConcurrentViewersOwnTheirBodies(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < rounds; i++ {
-			b := eventBodiesFor(view.NoSeat, view.Public, g, evs)
+			b := eventBodiesFor(view.NoSeat, view.Public, g, evs, false)
 			if b0 := atSeq(b, 0); b0 == nil || b0.Event.Obj != 0 {
 				err <- nil
 				return

@@ -1,13 +1,16 @@
 // Command testbudget enforces the per-test budget: every single test fits
-// 2 GB RSS, 2 vCPU and 1 minute wall (operator, 2026-10-05). It replaces the
+// 4 GB RSS, 4 vCPU and 1 minute wall (operator, 2026-10-05; doubled from 2 GB /
+// 2 vCPU on 2026-10-09). It replaces the
 // per-package TEST_HISTORY.md / ALLOC_HISTORY.md budgets, which nothing
 // enforced.
 //
 // It has three subcommands, wired together by scripts/postmerge_full.sh:
 //
-//	testbudget exec <test-binary> [args...]
-//	    An ad-hoc wrapper that runs a binary and records its peak RSS (KiB)
-//	    when GORGE_TESTBUDGET_RSS_DIR is set.
+//	go test -exec "/abs/testbudget exec" ...
+//	    Runs each test binary, records its peak RSS (KiB, from wait4's
+//	    rusage) under GORGE_TESTBUDGET_RSS_DIR when set, and keeps the
+//	    `go test` result cache working (see runExec). This is how every
+//	    package's RSS is measured: no package needs a TestMain for it.
 //
 //	go test -json ... | testbudget tee -events events.json
 //	    Reprints the plain `go test` text (failing tests' output and every
@@ -24,7 +27,7 @@
 // per test BINARY, which is an upper bound on any test inside it; a package
 // over budget is attributed to a test by a capped `-run '^T$'` run and the
 // pinned inventory lives in internal/testutil/testdata/rss_exceptions.txt.
-// CPU is not probed: the 2 vCPU budget is a property of the scope the suite
+// CPU is not probed: the 4 vCPU budget is a property of the scope the suite
 // runs in, not of a single test.
 package main
 

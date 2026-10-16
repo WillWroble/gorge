@@ -103,6 +103,11 @@ func activateRestriction(reg *cards.Registry, f *cards.Face, name string, sa *ca
 			}
 		}
 	}
+	if strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKBoast)), "True") {
+		// Boast (CR 702.142a): "activate only if this creature attacked this
+		// turn" -- the source attacks, then the probe activates in main 2.
+		sources = append(sources, []conditionPrelude{boastPrelude(name)})
+	}
 	out := restrictCandidates(sources)
 	if len(out) == 0 && len(gaps) > 0 {
 		return nil, strings.Join(dedupeStrings(gaps), "; ")
@@ -441,6 +446,9 @@ func selfCounterFloor(group string) (n int, kind string, ok bool) {
 // ok is false when the filter names no such floor or the printed card already
 // clears it.
 func selfPowerFloorPrelude(group string, f *cards.Face) (conditionPrelude, bool) {
+	if f == nil {
+		return conditionPrelude{}, false
+	}
 	needPower, needToughness := 0, 0
 	for _, w := range affectedWords(group) {
 		lower := strings.ToLower(w)

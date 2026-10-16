@@ -27,6 +27,14 @@ func ManaAmountNum(p *ManaParams, h Host, c *Ctx, def int32) int32 {
 	return numText(h, c, p.Amount, def)
 }
 
+// ManaEachNum is effects.Num over p's compiled Each$ (def when absent).
+func ManaEachNum(p *ManaParams, h Host, c *Ctx, def int32) int32 {
+	if !p.Each.Present {
+		return def
+	}
+	return numText(h, c, p.Each, def)
+}
+
 // ManaAmountResolvedStrict is effects.NumResolvedStrict over p's compiled
 // Amount$.
 func ManaAmountResolvedStrict(p *ManaParams, h Host, c *Ctx, def int32) (int32, bool) {

@@ -432,8 +432,8 @@ func (w *legalWalk) battlefieldWalk() {
 						// closed on an unpriceable rider, so no unpayable option is ever
 						// offered, and the ability is withheld only when NEITHER cost is
 						// payable.
-						altCost, hasAlt := e.abilityAlternateCost(ab)
-						printedOK := w.offerCastable(p, id, cost, abilityScope(ab), true)
+						altCost, hasAlt := e.abilityAlternateCostFor(p, ab)
+						printedOK := w.offerCastable(p, id, cost, abilityScope(ab), true) || w.autoPayOffer(p, id, i, cost, ab)
 						altOK := hasAlt && w.offerCastable(p, id, altCost, abilityScope(ab), true)
 						if !printedOK && !altOK {
 							continue
@@ -484,6 +484,7 @@ func (w *legalWalk) battlefieldWalk() {
 								Cost:  e.abilityOfferCost(p, id, ab),
 								Grant: e.abilityGrant(id, ab), Attach: ab.API == "Attach",
 								GrantStatics:  staticModesFromSVars(ab, abFace.SVars),
+								Loyalty:       abilityLoyaltyFact(o, ab, &cost, loyal),
 								SelfSkipTurns: abilitySelfSkipTurns(ab), ForeignSource: o.Controller != p})
 						}
 						if altOK {
@@ -597,11 +598,18 @@ func (w *legalWalk) battlefieldWalk() {
 			}
 			for _, id := range e.G.Zone(state.ZBattlefield, state.PlayerID(zonePlayer)) {
 				o := e.G.Obj(id)
-				if o == nil || o.Face() == nil || e.faceDownPrintedHides(o) {
-					// A face-down permanent is not offered granted abilities: the
-					// offer label reads the printed face name, which CR 708.8 says
-					// does not exist while face down.
+				if o == nil || o.Face() == nil {
 					continue
+				}
+				// A face-down permanent has no printed abilities (CR 708.2a),
+				// but a layer-6 grant still lands on it (CR 613.1f): Etrata,
+				// Deadly Fugitive's "Face-down creatures you control have
+				// '{2}{U}{B}: Turn this creature face up...'". Its offer label
+				// names no printed face (CR 708.8: the name does not exist
+				// while face down), only "Face-down creature".
+				labelName := o.Face().Name
+				if e.faceDownPrintedHides(o) {
+					labelName = faceDownGrantLabel
 				}
 				if !pay.ExistsOnBattlefield(o) {
 					// CR 702.25b: a phased-out permanent is treated as though it does
@@ -701,7 +709,7 @@ func (w *legalWalk) battlefieldWalk() {
 							continue
 						}
 						*out = append(*out, decision.Option{Index: len(*out), Kind: "ability",
-							Label: o.Face().Name + ": " + ab.ParamStr(cards.PKSpellDescription), Obj: id,
+							Label: labelName + ": " + ab.ParamStr(cards.PKSpellDescription), Obj: id,
 							GainedSource: ga.GainedFrom, GainedIdx: ga.GainedIdx, Attach: ab.API == "Attach"})
 						continue
 					}
@@ -741,13 +749,13 @@ func (w *legalWalk) battlefieldWalk() {
 						continue
 					}
 					*out = append(*out, decision.Option{Index: len(*out), Kind: "ability",
-						Label: o.Face().Name + ": " + ab.ParamStr(cards.PKSpellDescription), Obj: id, SVar: ga.SVar,
+						Label: labelName + ": " + ab.ParamStr(cards.PKSpellDescription), Obj: id, SVar: ga.SVar,
 						GrantSource: ga.Source, Attach: ab.API == "Attach"})
 				}
 			}
 		}
 
-		// kw:Station (CR 702.150, rules/station.go): each Spacecraft the player
+		// kw:Station (CR 702.184a, rules/station.go): each Spacecraft the player
 		// controls may be stationed as a sorcery by tapping another creature.
 		// The offer is gated on the sorcery window (Station only as a sorcery)
 		// and on a legal tap candidate existing, so an unpayable station is
@@ -922,3 +930,7 @@ func (w *legalWalk) battlefieldWalk() {
 		}
 	}
 }
+
+// faceDownGrantLabel names a face-down permanent in a granted ability's offer
+// label: the printed name does not exist while it is face down (CR 708.8).
+const faceDownGrantLabel = "Face-down creature"

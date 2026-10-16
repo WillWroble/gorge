@@ -3,6 +3,7 @@ package bot
 import (
 	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/sanity"
 	"github.com/adams-shaun/gorge/seat"
 )
 
@@ -16,8 +17,14 @@ func init() {
 }
 
 func newBot(o bots.Options) (seat.Seat, error) {
+	var s seat.Seat
 	if o.AutoPayMana {
-		return seat.NewAttackSimBot(o.Seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana(), nil
+		s = seat.NewAttackSimBot(o.Seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana()
+	} else {
+		s = seat.NewBot(o.Seed)
 	}
-	return seat.NewBot(o.Seed), nil
+	if o.CommonSense {
+		return sanity.Wrap(s), nil
+	}
+	return s, nil
 }

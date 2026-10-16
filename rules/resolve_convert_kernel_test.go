@@ -357,7 +357,9 @@ func TestKr8ConvertTriggerCost(t *testing.T) {
 	}{
 		{name: "Tape Chalice", cost: "1", body: "GainLife | LifeAmount$ 3 | Defined$ You", mana: "BR", pay: true, served: 1, life: 3},
 		{name: "Tape Chalice Declined", cost: "1", body: "GainLife | LifeAmount$ 3 | Defined$ You", mana: "BR", served: 1},
-		{name: "Tape Vault Window", cost: "2", body: "GainLife | LifeAmount$ 3 | Defined$ You", mana: "B", lands: 3, pay: true, served: 4, life: 3},
+		// Pay first (respay.go): the election is the one ask, and its pay
+		// taps the lands through the planner with no window.
+		{name: "Tape Vault Window", cost: "2", body: "GainLife | LifeAmount$ 3 | Defined$ You", mana: "B", lands: 3, pay: true, served: 1, life: 3},
 		{name: "Tape Discard Fee", cost: "Discard<1/Card>", body: "GainLife | LifeAmount$ 3 | Defined$ You", mana: "B", hand: 2, pay: true, served: 2, life: 3},
 		{name: "Tape Life Fee", cost: "PayLife<2>", body: "Draw | NumCards$ 1 | Defined$ You", mana: "B", pay: true, served: 1, life: -2},
 	}
@@ -397,9 +399,11 @@ func TestKr8ConvertUpkeepWindows(t *testing.T) {
 		served    int64
 		gone      bool
 	}{
-		{name: "Tape Glacier", src: "Name:Tape Glacier\nManaCost:B\nTypes:Enchantment\nK:Cumulative upkeep:1\nOracle:x\n", lands: 2, pay: true, served: 2},
+		// Pay first (respay.go): the election is the one ask; its pay taps
+		// through the planner.
+		{name: "Tape Glacier", src: "Name:Tape Glacier\nManaCost:B\nTypes:Enchantment\nK:Cumulative upkeep:1\nOracle:x\n", lands: 2, pay: true, served: 1},
 		{name: "Tape Glacier Melts", src: "Name:Tape Glacier Melts\nManaCost:B\nTypes:Enchantment\nK:Cumulative upkeep:1\nOracle:x\n", served: 1, gone: true},
-		{name: "Tape Echo Bear", src: "Name:Tape Echo Bear\nManaCost:B\nTypes:Creature Bear\nPT:2/2\nK:Echo:2\nOracle:x\n", lands: 3, pay: true, served: 3},
+		{name: "Tape Echo Bear", src: "Name:Tape Echo Bear\nManaCost:B\nTypes:Creature Bear\nPT:2/2\nK:Echo:2\nOracle:x\n", lands: 3, pay: true, served: 1},
 		{name: "Tape Echo Bear Sac", src: "Name:Tape Echo Bear Sac\nManaCost:B\nTypes:Creature Bear\nPT:2/2\nK:Echo:2\nOracle:x\n", served: 1, gone: true},
 	}
 	for i, tc := range cases {
@@ -530,7 +534,9 @@ func TestKr8ETBThenEntryReplacement(t *testing.T) {
 
 // A window's mana activation of a multi-ability source poses the ability
 // wheel, and an Any source its colour choice: both served from the tape, and
-// the paid trigger gains the life.
+// the paid trigger gains the life. The window is reached through the
+// election's manual route (the auto route's planner names the exact ability
+// and colour, so it poses neither): election, tap, wheel/colour.
 func TestKr8ConvertWindowManaChoices(t *testing.T) {
 	const dual = "Name:Tape Dual\nTypes:Land\nA:AB$ Mana | Cost$ T | Produced$ R | SpellDescription$ r\nA:AB$ Mana | Cost$ T | Produced$ G | SpellDescription$ g\nOracle:x\n"
 	const prism = "Name:Tape Prism\nTypes:Land\nA:AB$ Mana | Cost$ T | Produced$ Any | SpellDescription$ any\nOracle:x\n"
@@ -541,7 +547,7 @@ func TestKr8ConvertWindowManaChoices(t *testing.T) {
 			e, _ := kr8Run(t, 2, 13800+uint64(i), 3, func(t *testing.T, e *Engine) {
 				moveByName(t, e, 0, land, state.ZBattlefield)
 				life = e.G.Players[0].Life
-				tapeUnlessScenario("Tape Fee Bear", "B", 0, tapeWindowPick(true))(t, e)
+				tapeUnlessScenario("Tape Fee Bear", "B", 0, tapeWindowPickManual())(t, e)
 			}, src, dual, prism)
 			if got := e.G.Players[0].Life - life; got != 3 {
 				t.Fatalf("life change %d, want 3 (the window paid)", got)

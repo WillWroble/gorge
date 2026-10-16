@@ -1,64 +1,63 @@
 package paymirror
 
-import (
-	"bufio"
-	"encoding/json"
-	"os"
-	"testing"
+import "testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
-)
-
-// TestRoundNineFindingsMirrorKernel replays the round-9 paymirror finding
+// TestRoundNineFindingsMirrorKernel (TestRoundNineFindingsMirrorKernelChunkNN,
+// sharded per findings_chunks_test.go) replays the round-9 paymirror finding
 // games (testdata/round9.jsonl: repo deck names or random card-name lists,
 // no script text) end to end on the resolution kernel: no cast is a
 // mismatch, the live-vs-clone control is equivalent, and each named cast
 // gets its root-caused verdict (the history of every pin is in the deleted
 // TestRoundNineFindingsMirror's doc, round9_test.go at 19fa2a40d):
 //
-//   - 10860 seq 3239: Worldly Tutor (the Command Tower production fix),
-//     equivalent;
+//   - 10860 seq 4637: Worldly Tutor (the Command Tower production fix),
+//     equivalent (was seq 3239 until eng-turnwatch: an aborted cast now
+//     logs a SpellCastReversed event, shifting every later seq by +7 here;
+//     the card list and verdicts of the game are otherwise identical; then
+//     3246 until botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moved the
+//     bots' trajectory, same card and verdict);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
-//   - 10056 seq 6128: Lagomos, Hand of Hatred, equivalent;
+//   - 10056: Lagomos, Hand of Hatred was equivalent at seq 6750 (the
+//     paid-cost census default-on flip, cli-20261012T170859Z, had moved it
+//     from seq 6128); botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moves the
+//     game so the cast is no longer reached; a clean, control-equivalent
+//     game;
 //   - 8175: the Hideaway ETB timing correction changes this game before the
 //     former Songs of the Damned finding, so that planned cast is no longer
 //     reached (verified against the pre-fix keyword expansion).
-func TestRoundNineFindingsMirrorKernel(t *testing.T) {
+//
+// roundNineWant holds those pins.
+var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
+	10860: {4637: ""},
+	11056: {},
+	10056: {},
+	8175:  {},
+}
+
+const (
+	roundNineFile   = "testdata/round9.jsonl"
+	roundNineChunks = 4
+)
+
+func TestRoundNineFindingsMirrorKernelChunk00(t *testing.T) { runRoundNineChunk(t, 0) }
+func TestRoundNineFindingsMirrorKernelChunk01(t *testing.T) { runRoundNineChunk(t, 1) }
+func TestRoundNineFindingsMirrorKernelChunk02(t *testing.T) { runRoundNineChunk(t, 2) }
+func TestRoundNineFindingsMirrorKernelChunk03(t *testing.T) { runRoundNineChunk(t, 3) }
+
+// TestRoundNineFindingsMirrorKernelChunksPartitionTheSpecs: the chunks play
+// every round-9 spec exactly once (checkFindingPartition).
+func TestRoundNineFindingsMirrorKernelChunksPartitionTheSpecs(t *testing.T) {
+	checkFindingPartition(t, findingSpecs(t, roundNineFile, 4), roundNineChunks, []func(*testing.T){
+		TestRoundNineFindingsMirrorKernelChunk00, TestRoundNineFindingsMirrorKernelChunk01,
+		TestRoundNineFindingsMirrorKernelChunk02, TestRoundNineFindingsMirrorKernelChunk03})
+}
+
+// runRoundNineChunk is one shard of TestRoundNineFindingsMirrorKernel.
+func runRoundNineChunk(t *testing.T, i int) {
 	t.Parallel()
-	reg := testutil.CorpusRegistry(t)
-	d, err := LoadDecks(reg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := os.Open("testdata/round9.jsonl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	var specs []GameSpec
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1<<20), 1<<24)
-	for sc.Scan() {
-		var s GameSpec
-		if err := json.Unmarshal(sc.Bytes(), &s); err != nil {
-			t.Fatal(err)
-		}
-		specs = append(specs, s)
-	}
-	if err := sc.Err(); err != nil {
-		t.Fatal(err)
-	}
-	if len(specs) != 4 {
-		t.Fatalf("testdata holds %d specs, want 4", len(specs))
-	}
-	want := map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-		10860: {3239: ""},
-		11056: {},
-		10056: {6128: ""},
-		8175:  {},
-	}
-	for _, spec := range specs {
+	d := findingDecks(t)
+	for _, spec := range findingChunk(findingSpecs(t, roundNineFile, 4), roundNineChunks, i) {
 		reports := round6Game(t, d, spec)
 		if len(reports) == 0 {
 			t.Errorf("seed %d: no planned-cast reports; clean-game assertions would be vacuous", spec.Seed)
@@ -72,7 +71,7 @@ func TestRoundNineFindingsMirrorKernel(t *testing.T) {
 			if r.Control == nil || r.Control.Status != Equivalent {
 				t.Errorf("seed %d seq %d %q: control %+v", spec.Seed, r.Seq, r.Card, r.Control)
 			}
-			w, ok := want[spec.Seed][r.Seq]
+			w, ok := roundNineWant[spec.Seed][r.Seq]
 			if !ok {
 				continue
 			}
@@ -81,7 +80,7 @@ func TestRoundNineFindingsMirrorKernel(t *testing.T) {
 				t.Errorf("seed %d seq %d %q: verdict %s %q, want %q", spec.Seed, r.Seq, r.Card, st, key, w)
 			}
 		}
-		for seq := range want[spec.Seed] {
+		for seq := range roundNineWant[spec.Seed] {
 			if !seen[seq] {
 				t.Errorf("seed %d: no planned cast at seq %d (the game no longer reaches the finding)", spec.Seed, seq)
 			}

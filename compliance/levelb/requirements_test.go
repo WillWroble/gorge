@@ -519,6 +519,12 @@ func TestRequirementsClassificationTable(t *testing.T) {
 			want: []Requirement{{Key: "static#0.0", Family: "static", Face: 0, Slot: "0", Sub: "static.gap:CantBeCast", Gap: "static CantBeCast attacked-you condition"}},
 		},
 		{
+			name: "Sandswirl Wanderglyph CantBeCast attacked-you this current turn is served",
+			c: cardOf(&cards.Face{Types: []string{"Creature"}, Statics: []cards.Static{stat("CantBeCast", map[string]string{
+				"Caster": "Player.Opponent+attackedYouTheirCurrentTurn,Player.Opponent+attackedYouCtrlTheirCurrentTurn_Planeswalker"})}}),
+			want: []Requirement{{Key: "static#0.0", Family: "static", Face: 0, Slot: "0", Sub: "static.cant-be-cast-attacked-you"}},
+		},
+		{
 			name: "CantBeCast generic shape remains a gap",
 			c:    cardOf(&cards.Face{Types: []string{"Creature"}, Statics: []cards.Static{stat("CantBeCast", map[string]string{"ValidCard": "Card"})}}),
 			want: []Requirement{{Key: "static#0.0", Family: "static", Face: 0, Slot: "0", Sub: "static.gap:CantBeCast", Gap: "static mode CantBeCast"}},

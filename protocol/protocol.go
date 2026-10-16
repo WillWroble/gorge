@@ -28,6 +28,7 @@ const (
 	TDecision    FrameType = "decision"
 	TMatchEnd    FrameType = "match_end"
 	TTableHalted FrameType = "table_halted"
+	TTableState  FrameType = "table_state"
 	TOverflow    FrameType = "overflow"
 	TError       FrameType = "error"
 	TRewind      FrameType = "rewind"
@@ -47,6 +48,13 @@ const (
 	TableCooldown = "cooldown"
 	TableHalted   = "halted"
 )
+
+// TableBetweenGames is the table_state frame's value for a table sideboarding
+// between two games of a series: the internal TableCooldown state, named for
+// what the client shows. It is a table_state body value only — TableInfo.State
+// keeps reporting the underlying TableCooldown, so a client that only reads
+// TableInfo is unaffected.
+const TableBetweenGames = "between_games"
 
 // Match states as recorded in a sidecar and shown in MatchInfo.State.
 const (
@@ -129,6 +137,18 @@ type TableInfo struct {
 	Mulligans int `json:"mulligans"`
 	// AutoMana enables the human payment-plan UI for this table.
 	AutoMana bool `json:"auto_mana"`
+	// Series marks a series table (TableConfig.Series, E3-2): it plays match
+	// after match, its end decided by the series hook rather than a match
+	// count, and between games it sits in the "between_games" table_state
+	// while players sideboard. omitempty: false is the default and the zero
+	// value, so a non-series table is byte-identical to a table before the
+	// field existed.
+	Series bool `json:"series,omitempty"`
+	// Event marks a table owned by a draft event (TableConfig.Event): its
+	// games are the event's to schedule, so the client offers no restart
+	// (a fresh vs-bot game) from it. omitempty, like Series: a non-event
+	// table is byte-identical to a table before the field existed.
+	Event bool `json:"event,omitempty"`
 }
 
 // Widget is the overview cell: enough to draw a 2x2 life grid, a turn
@@ -217,6 +237,21 @@ type MatchEnd struct {
 // TableHaltedBody is spec D15: a crashed table stops and says why.
 type TableHaltedBody struct {
 	Reason string `json:"reason"`
+}
+
+// TableStateBody is the table_state frame: a table's coarse lifecycle state
+// as it changes, so a client need not infer it from match_end. State is
+// TableBetweenGames while a series table sideboards between two games,
+// TableLive while a match is on the table, and TableIdle otherwise. The
+// envelope's Table names the table.
+//
+// E3-fx2 chose a new frame over reusing an existing one: the widget frame
+// carries a State field but is only built from a live match (host/widgetFrame
+// reads the engine), and a series table between games has no match at all
+// (host/registry.go retires it before the hook plans the next), so no widget
+// can be built in exactly the state this signal must report.
+type TableStateBody struct {
+	State string `json:"state"`
 }
 
 // Rewind announces an in-place rollback of the live match it is addressed

@@ -141,20 +141,21 @@ cannot support fails, named together with its missing primitives. A table
 entry the build now supports is stale and fails too. **The test's log line is
 the live count.**
 
-Measured 2026-09-28 on `main` (`go test ./rules/ -run
-'TestEveryRepoDeckIsFullySupported|TestEveryRepoDeckParamsAreRead|TestHeads$'
--v`, `make report`, `make sim`):
+Measured 2026-10-12 on `main` (`go test ./rules/ -run
+'TestEveryRepoDeckIsFullySupported|TestEveryRepoDeckParamsAreRead' -v`,
+`make report`, `rules/testdata/heads/*.txt`). The live, regenerated numbers
+are on the docs site, https://adams-shaun.github.io/gorge/; prefer it over
+this snapshot.
 
-- **Ratchet: 3 of 1110 distinct cards unsupported.** The cards come from the
-  29 deck files in `internal/testutil/decks/*.json`: 14 60-card constructed
-  decks and 15 100-card Commander decks. The three are:
+- **Ratchet: 2 of 1123 distinct cards unsupported.** The cards come from the
+  30 deck files in `internal/testutil/decks/*.json`: 15 60-card constructed
+  decks and 15 100-card Commander decks. The two are:
   - Incinerate (`stat:CantRegenerate`)
   - Vines of Vastwood (`stat:CantTarget`)
-  - Ojer Axonil, Deepest Might (`count:NonCombatDamageThisTurn`)
-- **Param census: 23 of 1110.** `TestEveryRepoDeckParamsAreRead`
+- **Param census: 17 of 1123.** `TestEveryRepoDeckParamsAreRead`
   (`rules/paramcensus_test.go`) is the companion ratchet over the same decks'
-  parameters. Its per-card files in `rules/testdata/paramcensus/` held 23 cards that carry an
-  unread param or an unmodelled cost token: 20 distinct param labels and 1
+  parameters. Its per-card files in `rules/testdata/paramcensus/` hold 17 cards that carry an
+  unread param or an unmodelled cost token: 13 distinct param labels and 1
   cost label.
 - **Golden games.** The 12 pinned Legacy decks (`legacyDeckNames`, which
   deliberately excludes the Commander decks) round-robin across 2/4/6/8 seats
@@ -165,12 +166,13 @@ Measured 2026-09-28 on `main` (`go test ./rules/ -run
 
   | seats | 2 | 4 | 6 | 8 |
   |---|---|---|---|---|
-  | chain head | `a991478b3edb213c` | `d4876057e0477830` | `b4a5d33f302e6bfc` | `b73492c5ccdaadca` |
+  | chain head | `bb7767feee2605c2` | `2c7ebe53e20824f9` | `377baec806442301` | `59cc83bb290c5005` |
 
-- **`make sim`:** 20/20 `replay OK` over 20 verified 4-seat games.
-- **Corpus coverage** at the pin `95f04e8a04c8925fa97cb226fc3341cabcc90a53`
-  (`FORGE_REF`): `make report` prints `cards: 33667  playable: 31005 (92.1%)`
-  and `tokens: 839`, matching the `card coverage` CI job's published summary. Since
+- **`make sim`:** 20/20 `replay OK` over 20 verified 4-seat games (last
+  measured 2026-09-28; not re-run for this snapshot).
+- **Corpus coverage** at the pin `098b055313459c4b36c9e1f1d4e81a2c8aef815e`
+  (`FORGE_REF`): `make report` prints `cards: 34074  playable: 32089 (94.2%)`
+  and `tokens: 854`. Since
   fuzz-cov3 (2026-09-24) the gate also counts the `count:<head>` value heads
   that a card's SVars read (`effects.modelledValueHeads`, held to the
   evaluator by `TestValueHeadRegistryMatchesEvaluator`). `repl:Untap` is out
@@ -240,9 +242,9 @@ not here.
 | Stand-in | Where | Removed by |
 |---|---|---|
 | `RestrictValid$` is carried into the mana pool; only dotted `Spell.<filter>`/`Activated.<filter>` alternatives supported by the matcher are enforced. Unsupported alternatives fail closed, including bare `Spell`/`Activated` (13 raw lines), `CostContainsX`, `CumulativeUpkeep`, `CantCast*`, `Static.*` and `nonSpell`; 41 raw `RestrictValid$` lines across 39 corpus files contain at least one such term, so mixed alternatives can lose only the unsupported branch. | `effects/mana_effect.go` (`effMana`), `rules/mana_payment.go` (`restrictValidMatches`) | M4 (the remaining restriction grammar) |
-| `Effect` registers real continuous effects only for `CantTarget`, `CantRegenerate`, the cost-modifier modes, and `Triggers$ BecomeMonarch` (Palace Jailer). Every other `StaticAbilities$`/`Triggers$` mode stays a bare Note. An absent `Duration$` now correctly expires at cleanup for every source kind, and `UntilYourNextTurn` ends as that turn begins rather than a full turn too long; explicit exotic `Duration$` forms remain incomplete. | `effects/misc.go` (`effEffect`), `effects/restrictions.go` (`effectUntilEOT`, `IsNextTurnDuration`, `IsUntilYourNextTurn`), `rules/layers_restrict.go` (`restrictionApplies`), `rules/layers_effect.go` (`AddContinuous`, `EndOfTurnCleanup`), `state/continuous.go` | M4 (remaining Triggers$ modes, full Duration$ grammar, the other Effect-delivered grant keywords) |
+| `Effect` registers a `StaticAbilities$`/`Triggers$` mode for real via `effects/effect.go`'s switch and `trigmatch.Lookup`; these still Note: statics `AssignCombatDamageAsUnblocked`, `AssignNoCombatDamage`, `AttackVigilance`, `BlockRestrict`, `CanAdapt`, `CantBeActivated`, `CantBeCast`, `CantBecomeMonarch`, `CantBlock`, `CantChangeLife`, `CantLoseLife`, `CantPhaseIn`, `CantPhaseOut`, `IgnoreLegendRule`, `IgnoreShroud`, `MinMaxBlocker`, `UntapOtherPlayer`; triggers `Abandoned`, `Adapt`, `AttackerBlocked`, `AttackerBlockedByCreature`, `AttackerUnblocked`, `Blocks`, `Shuffled`, `VisitAttraction`. | `effects/effect.go` (`effEffect`), `effects/effect_ignorehexproof.go`, `rules/trigmatch` (`Lookup`), `rules/layers_restrict.go`, `state/continuous.go` | M4 (the named modes) |
 | An explicit multi-zone `ChangeZone Origin$` including `Hand` has no origin-aware chooser: the exact-hand and exact-library walkers cannot build one private option list across hand, graveyard, library and battlefield, so a source-default picker emits one replay-visible Note and moves nothing loudly. | `effects/zone.go` (`mixedOriginIncludesHand`), `effects/zone_change.go` (`effChangeZone`) | M4 (origin-aware mixed hidden-zone chooser) |
-| (cloak1) Turn-face-up (CR 708.6) is not implemented: a manifested or cloaked card stays face down forever. Loud-unimplemented: `ManifestDread` (a different API), `RememberManifested$`, `Defined$`-object manifests, the `Choices$` asking forms; for Cloak, the from-hand chooser and `Defined$ ValidLibrary`. Ordinary filters read the printed face, missing a manifested Elf. | `effects/zone_manifest.go` (`effManifest`, `effCloak`), `rules/layers_types.go` (`typeCharacteristics`, `faceDownPrintedHides`), `effects/filter_word.go` (`faceDown`) | M4 (turn-face-up CR 708.6 for both -- the Morph/Megamorph/Disguise ticket owns the shared path; ManifestDread; RememberManifested$) |
+| (cloak1) Turn-face-up (CR 708.6) is not implemented: a manifested or cloaked card stays face down forever. Loud-unimplemented: `ManifestDread` (a different API), `RememberManifested$`, `Defined$`-object manifests, the `Choices$` asking forms; for Cloak, the from-hand chooser. Ordinary filters read the printed face, missing a manifested Elf. | `effects/zone_manifest.go` (`effManifest`, `effCloak`), `rules/layers_types.go` (`typeCharacteristics`, `faceDownPrintedHides`), `effects/filter_word.go` (`faceDown`) | M4 (turn-face-up CR 708.6 for both -- the Morph/Megamorph/Disguise ticket owns the shared path; ManifestDread; RememberManifested$) |
 | (copyperm-grants) `api:CopyPermanent` now grants named `AddTriggers$`/`AddSVars$`/`AddAbilities$` from the resolving source table, supports a named `AttachedTo$` destination and the exact Zndrsplt `Choices$`/`Chooser$` shape. `WithDifferentNames$` remains loud-unimplemented, while `ImprintTokens$ True` still records no copies for delayed exile/sacrifice (Kharasha Foothills, Shredder, Shadow Master); `TokenRemembered$` is real. | `effects/copypermanent.go` (`effCopyPermanent`, unread-parameter Note block) | M4 (`WithDifferentNames$`, `ImprintTokens$`) |
 | (combatrestriction1) Only whitelisted static shapes are enforced; an unwhitelisted parameter means the static is SKIPPED, not enforced blanket — the deliberate permissive direction. `MustAttack$ ChosenPlayer`/`RememberedPlayer` name their defender for real (Territorial Hellkite's ChoosePlayer riders, via `attackRequirementSet`); every OTHER `MustAttack$` player reference stays unread and fails closed, and a NAMED duty whose defender no offered pair reaches releases the creature entirely (CR 508.1d: attacking anyone else obeys zero requirements too), so it is not marked Required. Unread: CantAttack's UnlessDefender$/Condition$/CheckSVar$ family, CantSacrifice's `ForCost$ True`, a `Target$` list's walker half, `stat:MustBlock`. | `rules/layers_restrict.go` (`SacrificeBlocked`), `rules/combat/` (`AttackBlocked`, `AttackRequirements`), `rules/combat.go` (`mustAttackRequired`, `attackDutyDischargeable`), `effects/choose_control.go` (`effChoosePlayer`), `effects/misc.go` (`effEffect`) | M4 (the conditional parameter grammar; ForCost$ True cost provenance; stat:MustBlock; the walker Target$ half) |
 | (ap1) AddPhase loud-degrades (one Note, grant still applied) on an unresolvable `ExtraPhase$`/`AfterPhase$`/`FollowedBy$`/`NumPhases$`/DelTrig value or a multi-step set. Deliberate: a grant whose splice point has passed is dropped silently at TurnChange; a splice mid-range of another active extra phase is untested; a multi-completion takes the LAST entry's resume point. `FirstAttack$` unread. | `effects/addphase.go` (`effAddPhase`, `parseExtraPhaseValue`), `rules/turn.go` (`extraPhaseBoundary`) | M4 (a real per-turn attack history for the unread `FirstAttack$` gate) |

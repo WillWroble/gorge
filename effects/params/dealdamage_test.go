@@ -10,7 +10,7 @@ import (
 // TestDealDamageKnownKeysSorted: the unread lookup binary-searches the table.
 func TestDealDamageKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(dealDamageKnownKeys[:]) || len(slices.Compact(slices.Clone(dealDamageKnownKeys[:]))) != len(dealDamageKnownKeys) {
-		t.Fatal("dealDamageKnownKeys must be sorted and duplicate-free")
+		t.Fatal("dealDamageKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

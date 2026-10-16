@@ -91,7 +91,8 @@ func (e *Engine) zoneGate(t cards.Trigger, source state.ObjID, ev events.Event) 
 	zones := [2]state.Zone{o.Zone, o.Zone}
 	n := 1
 	if source == ev.Obj && ev.Obj != 0 &&
-		(ev.Kind == events.MoveZone || ev.Kind == events.Draw || ev.Kind == events.PutOnStack) {
+		(ev.Kind == events.MoveZone || ev.Kind == events.Draw || ev.Kind == events.PutOnStack) &&
+		!zoneChangeNoLookBack(t) {
 		zones[1] = ev.From
 		n = 2
 	}
@@ -138,4 +139,17 @@ func zoneSpecContains(spec string, want state.Zone) bool {
 		}
 		i += j + 1
 	}
+}
+
+// zoneChangeNoLookBack reports a ChangesZone line that names neither an
+// Origin$ nor a Destination$ (Ghostly Dancers, Bullseye, Death Dealer: "When
+// CARDNAME enters", the corpus's only two such lines at the pin). Such a line
+// does not look back in time -- Forge's Trigger.looksBackInTime admits a
+// ChangesZone line only through its Origin$ or Destination$ -- so its own
+// source counts only from the zone it is in AFTER the move: it fires when
+// the card enters the battlefield (CR 603.6a) and not when it leaves (the
+// CR 603.10a look-back belongs to leaves-the-battlefield abilities, which
+// this line is not).
+func zoneChangeNoLookBack(t cards.Trigger) bool {
+	return t.Mode == "ChangesZone" && !t.HasParam(cards.PKOrigin) && !t.HasParam(cards.PKDestination)
 }

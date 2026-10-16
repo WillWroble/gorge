@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/adams-shaun/gorge/internal/testutil"
 )
 
 // TestProfilerWritesReadableProfiles drives the -cpuprofile / -memprofile
@@ -17,7 +19,7 @@ import (
 // the game output below is asserted non-empty, the same report an
 // unprofiled run writes.
 func TestProfilerWritesReadableProfiles(t *testing.T) {
-	dir := corpusDirOrSkip(t)
+	dir := testutil.CorpusDirOrSkip(t)
 	tmp := t.TempDir()
 	cpuPath := filepath.Join(tmp, "cpu.pprof")
 	heapPath := filepath.Join(tmp, "heap.pprof")

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -19,8 +20,12 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
+	"github.com/adams-shaun/gorge/bots/azc3"
+	"github.com/adams-shaun/gorge/bots/azc4"
+	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/eventhost"
 	"github.com/adams-shaun/gorge/host"
 	"github.com/adams-shaun/gorge/host/httpapi"
 	"github.com/adams-shaun/gorge/state"
@@ -49,6 +54,11 @@ type config struct {
 	// time so a malformed list fails before any table is added (R-E3-1).
 	formatsRaw string
 	formats    []host.Format
+	// commanderSeats is the -commander-seats flag: the seat count of every
+	// commander table, so one server can run 2-seat constructed tables
+	// beside 4-seat commander pods. Zero (the default) means -seats, the
+	// single count every table had before the flag existed.
+	commanderSeats int
 	// humansRaw is the -humans flag: a comma-separated list of table t1's
 	// slot indices that are real people. Empty stays all-bot, identical to
 	// today. applyHumans parses it into humans at serve time so a malformed
@@ -67,6 +77,15 @@ type config struct {
 	// botAutoPayMana is the -bot-auto-mana startup switch. It is copied into
 	// every startup and on-demand vs-bot table, including human caretakers.
 	botAutoPayMana bool
+	// botCommonSense is the -bot-common-sense startup switch: it opts every
+	// hosted bot and human-seat caretaker into the bots/sanity CommonSense
+	// guard (host.TableConfig.BotCommonSense, bots.Options.CommonSense).
+	// OPT-IN, default off — with it unset every seat is exactly the unwrapped
+	// policy, so no served game, head or training run moves. It is copied
+	// into every startup and on-demand vs-bot table like botAutoPayMana, and
+	// into host.Options.DefaultBotCommonSense so a pre-field tables.json is
+	// migrated at restore.
+	botCommonSense bool
 	// autoMana enables payment-plan publication and controls for human seats.
 	autoMana bool
 	// botPolicy is the -bot-policy flag: the default policy a vs-bot request
@@ -115,6 +134,30 @@ type config struct {
 	// A bounded refusal preserves each existing game's credentials, feedback
 	// capture and replay routes; it never evicts a game behind a live URL.
 	maxOnDemandTables int
+	// az3Net and az3Decks are -az-c3-net and -az-c3-decks (azc3.go): the az-c3
+	// bot's network and the only decks it may play. policyPools maps a bot
+	// policy to the deck ids reserved for it; serve fills it from -az-c3-decks.
+	az3Net, az3Decks string
+	az3DemoTable     bool
+	// az3Belief and az3BeliefPool are -az-c3-belief and -az-c3-belief-pool
+	// (azc3.go): the deck corpus az-c3's closed-list search draws its
+	// opponents' lists from. Empty: the open lists (the opponent's real one).
+	az3Belief, az3BeliefPool string
+	// az4 and az5 are the az-c4 and az-c5 flags (azclosed.go): each one's
+	// network, the decks it may play, and the REQUIRED deck corpus its
+	// closed-list search guesses the opponent's list from. Neither ever
+	// reads an opponent's decklist, so both are offered against humans and
+	// need no -allow-decklist-bots.
+	az4, az5    closedAZ
+	policyPools map[string][]string
+	// allowDecklistBots is the -allow-decklist-bots flag (azc3.go): the
+	// operator's explicit opt-in that lets the server's own BOT-ONLY tables
+	// run a policy that reads every seat's real decklist (bots.Info.Env).
+	// Its only effect today is the az-c3 demo table (azc3Table), which needs
+	// it before -az-c3-net is accepted. It never seats such a policy against
+	// a human: the host refuses Env at any table with Humans regardless of
+	// the opt-in, and the offered set (botpolicies.go) never lists one.
+	allowDecklistBots bool
 	// seatToken is the -seat-token flag: a fixed bearer token for the first
 	// human slot instead of a random per-slot one. Tests and local use only
 	// (R-E3-3) — production runs mint random tokens.
@@ -166,6 +209,13 @@ type config struct {
 	// pass once this many names in a row have failed (0 = never). A dead or
 	// erroring Scryfall then costs N requests, not one per deck name.
 	prewarmArtMaxConsecutiveFailures int
+	// pprof is the -pprof flag: serve Go runtime profiles at /debug/pprof/
+	// on the main listener. It is opt-in because the profiles expose process
+	// internals (cmdline, heap, goroutine stacks) and /profile and /trace
+	// burn CPU on demand. serve refuses it on a non-loopback listener; note
+	// that loopback is not private when a reverse proxy or tunnel forwards
+	// public traffic to that port, as the demo's does.
+	pprof bool
 	// manabrew is the -manabrew flag: mount host/manabrewhttp's routes
 	// (manabrew.go). Off by default so an unmounted server is byte-identical
 	// to today (scoping spec §5.4). A non-empty manabrewAddr implies this
@@ -179,6 +229,16 @@ type config struct {
 	// host.Options.ThinkTimeout, applied only while -manabrew is on
 	// (manabrewThinkTimeout) so setting it alone changes nothing.
 	manabrewThink time.Duration
+	// events is the -events flag: host 4-seat draft events under /api/events
+	// (eventhost; persistence under <dir>/events). Off by default so a
+	// server that never turned it on keeps the spectator/bot surface it had
+	// before, byte for byte: every /api/events path stays the JSON 404 the
+	// catch-all answers, and the event store directory is never created.
+	events bool
+	// maxEvents is the -max-events flag: how many draft events not yet
+	// COMPLETE the server serves at once. A new event past the bound is
+	// refused 409 capacity, never queued.
+	maxEvents int
 }
 
 func main() {
@@ -265,6 +325,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.decks, "decks", "internal/testutil/decks", "directory of deck JSON files")
 	fs.IntVar(&c.tables, "tables", 4, "number of tables")
 	fs.IntVar(&c.seats, "seats", 4, "seats per table")
+	fs.IntVar(&c.commanderSeats, "commander-seats", 0, "seats per commander table; 0 = -seats")
 	fs.DurationVar(&c.pace, "pace", 50*time.Millisecond, "sleep after every decision; 0 = as fast as possible")
 	fs.DurationVar(&c.cooldown, "cooldown", 5*time.Second, "pause between matches on a perpetual table")
 	fs.StringVar(&c.dir, "dir", "gorged-data", "persistence directory")
@@ -279,9 +340,10 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.seatToken, "seat-token", "", "fixed bearer token for the first human slot (tests and local use only; default mints a random token per slot)")
 	fs.BoolVar(&c.vsbot, "vsbot", false, "arm the on-demand play-vs-bot flow (landing page seats a human against a bot via POST /api/games)")
 	fs.BoolVar(&c.botAutoPayMana, "bot-auto-mana", true, "have hosted bots and human-seat caretakers cast through offered automatic mana payment plans")
+	fs.BoolVar(&c.botCommonSense, "bot-common-sense", false, "wrap hosted bots and human-seat caretakers in the bots/sanity CommonSense guard (drop hostile self-removal from the option list, answer the London mulligan by the constructed policy); opt-in, default off")
 	fs.BoolVar(&c.autoMana, "auto-mana", true, "enable automatic mana payment plans and controls for human seats (disable with -auto-mana=false for the legacy manual path)")
 	fs.StringVar(&c.botPolicy, "bot-policy", host.LethalPressurePolicy, "default hosted bot policy for a vs-bot request that omits bot_policy; must be registered, offered, and support both formats (bot, lethal-pressure, cast-profile)")
-	fs.StringVar(&c.botPoliciesRaw, "bot-policies", defaultBotPoliciesRaw, "comma-separated set of bot policies this server OFFERS (the /api/bot-policies listing and accepted POST /api/games names); empty offers every registered entry")
+	fs.StringVar(&c.botPoliciesRaw, "bot-policies", defaultBotPoliciesRaw, "comma-separated set of bot policies this server OFFERS (the /api/bot-policies listing and accepted POST /api/games names); empty offers every registered entry that does not read opponents' decklists (a decklist-reading policy can never be offered: vs-bot always seats a human)")
 	fs.IntVar(&c.botSearchSlots, "bot-search-slots", defaultBotSearchSlots(), "maximum concurrent searched bot decisions across the process; decisions queue, never degrade (>= 1; default max(1, GOMAXPROCS/2))")
 	fs.IntVar(&c.botSearchParallelism, "bot-search-parallelism", 1, "goroutines within one searched decision (latency only, never an answer; >= 1)")
 	fs.IntVar(&c.maxSearchTables, "max-search-tables", 8, "maximum live on-demand tables whose policy is a search entry (0 = unlimited)")
@@ -296,9 +358,20 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.BoolVar(&c.prewarmArtOnly, "prewarm-art-only", false, "fill the card-art cache from -decks (into -art-dir) and exit; no server is started. Exits non-zero if any name failed")
 	fs.DurationVar(&c.prewarmArtBudget, "prewarm-art-budget", 0, "with -prewarm-art-only: stop the fill after this much wall-clock time and exit non-zero (0 = no limit)")
 	fs.IntVar(&c.prewarmArtMaxConsecutiveFailures, "prewarm-art-max-consecutive-failures", 0, "with -prewarm-art-only: stop the fill once this many names in a row have failed and exit non-zero (0 = no limit)")
+	fs.BoolVar(&c.pprof, "pprof", false, "serve Go runtime profiles at /debug/pprof/ on the main listener; refused unless -addr is loopback, and anything proxied to that port can reach them")
+	fs.StringVar(&c.az3Net, "az-c3-net", "", "enable the az-c3 bot: the path of its .dzgw network (needs -az-c3-decks, -allow-decklist-bots, -auto-mana and -bot-auto-mana; runs only on its bot-only demo table, never against a human)")
+	fs.BoolVar(&c.az3DemoTable, "az-c3-demo-table", true, "with -az-c3-net: add one two-seat az-c3 vs az-c3 table, dealt from -az-c3-decks, for spectators")
+	fs.StringVar(&c.az3Belief, "az-c3-belief", "", "with -az-c3-net: close the opponents' deck lists -- az-c3 deals each opponent's unknown cards from lists drawn from the decks in this directory (the TRAIN split of its pool), never from the opponent's real list")
+	fs.StringVar(&c.az3BeliefPool, "az-c3-belief-pool", "", "with -az-c3-belief: a pool.tsv naming the belief decks; only its train split is read (default: every deck file in -az-c3-belief)")
+	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
+	c.az4.registerFlags(fs, azc4.Policy, "its .dzgw network")
+	c.az5.registerFlags(fs, azc5.Policy, "its .dzgw network (the C5 net, trained after the payment-plan fixes)")
+	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
 	fs.DurationVar(&c.manabrewThink, "manabrew-think", 0, "override the human-seat think timeout while -manabrew is on (0 = inherit the server default)")
+	fs.BoolVar(&c.events, "events", false, "host 4-seat draft events under /api/events (eventhost; persistence under <dir>/events)")
+	fs.IntVar(&c.maxEvents, "max-events", 4, "maximum draft events not yet COMPLETE")
 	return fs, c
 }
 
@@ -306,6 +379,9 @@ func serveFlags() (*flag.FlagSet, *config) {
 // the server down. Split from main so a test can drive it on a random
 // port.
 func serve(ctx context.Context, c config, ln net.Listener) error {
+	if c.pprof && !isLoopbackListener(ln) {
+		return fmt.Errorf("-pprof requires a loopback listener (got %s)", ln.Addr())
+	}
 	vis, err := view.ParseVisibility(c.spectator)
 	if err != nil {
 		return err
@@ -323,6 +399,24 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if vsbotVis == view.Seat {
 		return fmt.Errorf("-vsbot-spectator must be public or omniscient")
 	}
+	// az-c3 registers only when asked, and the offered set below is resolved
+	// from the registry, so this comes first (azc3.go).
+	if err := c.enableAZC3(); err != nil {
+		return err
+	}
+	if err := c.checkClosedAZFlags(); err != nil {
+		return err
+	}
+	reg, err := cards.SharedCorpus(c.cards)
+	if err != nil {
+		return fmt.Errorf("opening corpus at %s: %w (run make fetch-cards compile-cards)", c.cards, err)
+	}
+	// az-c4 and az-c5 register only when asked, like az-c3, but their
+	// beliefs are read from the corpus, so they register once the corpus is
+	// open and before the offered set is resolved (azclosed.go).
+	if err := c.enableClosedAZ(reg); err != nil {
+		return err
+	}
 	// -bot-policy and -bot-policies are validated together (BP-18, spec
 	// §9.4): a default that is not offered, or an offered set missing a
 	// registered name, must fail before any listener opens.
@@ -331,9 +425,8 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return err
 	}
 	c.botPolicy, c.botPolicies = def, offered
-	reg, err := cards.SharedCorpus(c.cards)
-	if err != nil {
-		return fmt.Errorf("opening corpus at %s: %w (run make fetch-cards compile-cards)", c.cards, err)
+	if err := c.azc3Belief(reg); err != nil {
+		return err
 	}
 	// -humans applies to table t1 alone by configuration. Claims are now
 	// table-bound, so this is no longer a security restriction; parse it now
@@ -343,6 +436,9 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	}
 	if err := c.applyFormats(); err != nil {
 		return err
+	}
+	if c.commanderSeats < 0 {
+		return fmt.Errorf("-commander-seats %d: want 0 (= -seats) or a seat count", c.commanderSeats)
 	}
 	if err := c.applyManaBrew(); err != nil {
 		return err
@@ -370,6 +466,34 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if len(cmdPool)+len(conPool) == 0 {
 		return fmt.Errorf("no deck files in %s", c.decks)
 	}
+	az3Pool, az3Catalogue, err := c.azc3Pool(reg, cmdPool, conPool)
+	if err != nil {
+		return err
+	}
+	// The closed-list policies' pools follow az-c3's; a deck shared with an
+	// earlier pool is reserved for both and catalogued once (azclosed.go).
+	reservedCatalogue := az3Catalogue
+	var reserved []reservedDir
+	if len(az3Pool) > 0 {
+		reserved = append(reserved, reservedDir{policy: azc3.Policy, dir: c.az3Decks, pool: az3Pool})
+	}
+	for _, a := range c.closedAZs() {
+		pool, cat, err := a.loadPool(reg, cmdPool, conPool, reserved, reservedCatalogue)
+		if err != nil {
+			return err
+		}
+		reservedCatalogue = cat
+		if len(pool) > 0 {
+			reserved = append(reserved, reservedDir{policy: a.policy, dir: a.decks, pool: pool})
+		}
+	}
+	deckCatalogue = append(deckCatalogue, reservedCatalogue...)
+	for _, r := range reserved {
+		if c.policyPools == nil {
+			c.policyPools = map[string][]string{}
+		}
+		c.policyPools[r.policy] = r.pool
+	}
 	// A format with no deck to deal is a configuration error, not a table
 	// that fills its seats with the wrong pool: name the gap so a misbuild
 	// is fixed, not guessed.
@@ -380,13 +504,38 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		return fmt.Errorf("-format includes constructed but no deck in %s is a constructed deck", c.decks)
 	}
 
-	load := deckLoader(reg, c.decks)
-	r, err := host.New(c.hostOptions(reg, load))
+	load := deckLoaders(reg, c.decks, c.az3Decks, az3Pool)
+	for _, a := range c.closedAZs() {
+		load = reservedLoader(reg, load, a.decks, c.policyPools[a.policy])
+	}
+	// -events chains the event store's deck loader in front of the ordinary
+	// loaders and hands serve the relay the registry's OnMatchEnd will run
+	// through. Built before host.New because the registry's deck loader must
+	// already answer event deck ids when the eventhost resumes stored
+	// events' in-flight games (events.go).
+	ew, load, err := c.prepareEvents(reg, load)
+	if err != nil {
+		return err
+	}
+	hopts := c.hostOptions(reg, load)
+	ew.hook(&hopts)
+	r, err := host.New(hopts)
 	if err != nil {
 		return err
 	}
 	if len(r.Tables()) == 0 {
-		for _, cfg := range c.tableConfigs(cmdPool, conPool, vis) {
+		cfgs := c.tableConfigs(cmdPool, conPool, vis)
+		if t := c.azc3Table(az3Pool, vis); t != nil {
+			cfgs = append(cfgs, *t)
+		}
+		// The closed-list policies' demo tables follow every other startup
+		// table: az-c4's, then az-c5's.
+		for _, a := range c.closedAZs() {
+			if t := a.table(c, host.TableID(fmt.Sprintf("t%d", len(cfgs)+1)), c.seed+uint64(len(cfgs)), c.policyPools[a.policy], vis); t != nil {
+				cfgs = append(cfgs, *t)
+			}
+		}
+		for _, cfg := range cfgs {
 			if err := r.AddTable(cfg); err != nil {
 				return err
 			}
@@ -422,6 +571,23 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		opts.CreateGame = c.createGame(r, gate, cmdPool, conPool, vsbotVis)
 		opts.Seat = gate.resolve
 	}
+	// Draft events (E1): an event's human seats need game tokens minted
+	// through the same gate resolution the rest of the server uses, and the
+	// eventhost must exist before NewHandler mounts /api/events. A server
+	// with -events off leaves evh nil and the surface byte-identical.
+	var evh *eventhost.Host
+	if c.events {
+		if gate == nil {
+			gate = &seatGate{tokenToClaim: map[string]httpapi.SeatClaim{}, claimTokens: map[httpapi.SeatClaim]string{}}
+		}
+		opts.Seat = gate.resolve
+		if evh, err = c.startEvents(ew, r, reg, gate); err != nil {
+			return err
+		}
+		if evh != nil {
+			opts.Events = evh
+		}
+	}
 	// Card art is cached and served from this server's own origin (art.go)
 	// rather than sending every viewer's browser to Scryfall directly — see
 	// art.go's doc comment. /art/ is routed ahead of httpapi's own mux (which
@@ -444,8 +610,22 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	// is unavailable fails at startup rather than at the first submission.
 	topMux := http.NewServeMux()
 	topMux.HandleFunc("GET /art/named", ac.named)
+	topMux.HandleFunc("GET /art/token", ac.token)
 	topMux.HandleFunc("GET /art/blob/{key}", ac.blob)
 	topMux.HandleFunc("GET /cards/named", ac.text)
+	// net/http/pprof's init registers its handlers on http.DefaultServeMux,
+	// which gorged never serves (both listeners use their own mux), so the
+	// import alone publishes nothing. The routes exist only when -pprof
+	// mounts them on topMux here. scripts/deploy-demo.sh passes it only when
+	// the operator sets PPROF=true for that deploy.
+	if c.pprof {
+		topMux.HandleFunc("GET /debug/pprof/", pprof.Index)
+		topMux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+		topMux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+		topMux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+		topMux.HandleFunc("POST /debug/pprof/symbol", pprof.Symbol)
+		topMux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+	}
 	// An empty -feedback disarms the endpoint entirely, the same opt-in shape
 	// Options.Seat and CreateGame use. That is what a config built in a test
 	// gets (the flag default only applies to the real binary), so a test
@@ -471,7 +651,14 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	srv := &http.Server{Handler: topMux}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
-	fmt.Fprintf(os.Stderr, "gorged: %d tables of %d on %s (dir %s)\n", len(r.Tables()), c.seats, ln.Addr(), c.dir)
+	seatsDesc := fmt.Sprint(c.seats)
+	if c.commanderSeats > 0 && c.commanderSeats != c.seats && c.wantsFormat(host.FormatCommander) {
+		seatsDesc = fmt.Sprintf("%d (commander %d)", c.seats, c.commanderSeats)
+	}
+	fmt.Fprintf(os.Stderr, "gorged: %d tables of %s on %s (dir %s)\n", len(r.Tables()), seatsDesc, ln.Addr(), c.dir)
+	if evh != nil {
+		fmt.Fprintf(os.Stderr, "gorged: draft events on (/api/events, dir %s)\n", filepath.Join(c.dir, "events"))
+	}
 	if gate != nil {
 		for _, s := range c.humans {
 			seat := state.PlayerID(s)
@@ -505,20 +692,33 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 		fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...)
 	}
 	if c.prewarm {
-		go prewarmArt(ctx, ac, c.decks, func(f string, a ...any) {
-			fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...)
-		})
+		logf := func(f string, a ...any) { fmt.Fprintf(os.Stderr, "gorged: "+f+"\n", a...) }
+		go func() {
+			prewarmArt(ctx, ac, c.decks, logf)
+			if c.events {
+				prewarmSetArt(ctx, ac, logf)
+			}
+		}()
+	}
+	// closeAll shuts the eventhost down BEFORE the registry: an event game
+	// that finishes during shutdown reports through OnMatchEnd, and a relay
+	// call into a closed registry must not start another table on it.
+	closeAll := func() {
+		if evh != nil {
+			_ = evh.Close()
+		}
+		_ = r.Close()
 	}
 	select {
 	case err := <-errc:
 		if mbSrv != nil {
 			_ = mbSrv.Close()
 		}
-		r.Close()
+		closeAll()
 		return err
 	case err := <-mbErrc: // nil when -manabrew-addr was not set; a nil channel never fires
 		_ = srv.Close()
-		r.Close()
+		closeAll()
 		return err
 	case <-ctx.Done():
 	}
@@ -528,7 +728,15 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	if mbSrv != nil {
 		_ = mbSrv.Shutdown(shutdown)
 	}
-	return r.Close()
+	closeAll()
+	return nil
+}
+
+// isLoopbackListener reports whether ln is a TCP listener bound to a
+// loopback address. A wildcard bind (0.0.0.0, ::) is not loopback.
+func isLoopbackListener(ln net.Listener) bool {
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	return ok && addr.IP.IsLoopback()
 }
 
 // applyHumans parses the -humans flag into c.humans and rejects the
@@ -688,13 +896,16 @@ func (c config) tableConfigs(cmdPool, conPool []string, vis view.Visibility) []h
 		if len(c.formats) > 0 {
 			format = c.formats[(i-1)%len(c.formats)]
 		}
-		pool := conPool
+		pool, seats := conPool, c.seats
 		if format == host.FormatCommander {
 			pool = cmdPool
+			if c.commanderSeats > 0 {
+				seats = c.commanderSeats
+			}
 		}
-		cfg := host.TableConfig{ID: host.TableID(fmt.Sprintf("t%d", i)), Name: fmt.Sprintf("Table %d", i), Seats: c.seats,
+		cfg := host.TableConfig{ID: host.TableID(fmt.Sprintf("t%d", i)), Name: fmt.Sprintf("Table %d", i), Seats: seats,
 			Decks: pool, Seed: c.seed + uint64(i-1), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
-			Mulligans: c.mulligans, Format: format, BotPolicy: c.botPolicy, BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana}
+			Mulligans: c.mulligans, Format: format, BotPolicy: c.botPolicy, BotAutoPayMana: c.botAutoPayMana, BotCommonSense: c.botCommonSense, AutoMana: c.autoMana}
 		if i == 1 && len(c.humans) > 0 {
 			cfg.Humans = c.humans
 			cfg.Perpetual = false
@@ -725,7 +936,7 @@ func (g config) hostOptions(reg *cards.Registry, load func(string) (host.Deck, e
 	// function of its seed on every machine and every replay, exactly like
 	// the engine and the bots themselves.
 	return host.Options{Dir: g.dir, LoadDeck: load, Tokens: reg.Tokens, NameUniverse: reg.Universe(), Sync: true, Cooldown: g.cooldown,
-		MaxDecisionsPerTurn: host.DefaultMaxDecisionsPerTurn, DefaultBotAutoPayMana: g.botAutoPayMana,
+		MaxDecisionsPerTurn: host.DefaultMaxDecisionsPerTurn, DefaultBotAutoPayMana: g.botAutoPayMana, DefaultBotCommonSense: g.botCommonSense,
 		MaxOnDemandTables: g.maxOnDemandTables, ThinkTimeout: g.manabrewThinkTimeout(),
 		// BP-18 (spec §7): the §9.4 search-CPU flags reach the host here.
 		// SearchSlots bounds concurrent searched decisions registry-wide

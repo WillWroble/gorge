@@ -1172,10 +1172,43 @@ const (
 	// script reads that head, so every other game keeps its chain. Appended
 	// after AbilityTriggered so every earlier ordinal is unchanged.
 	CastBattlefield
+	// DrawBatchProposal is the synthetic pre-action proposal for one draw
+	// instruction's batch: Player is the player about to draw and Amount the
+	// batch's card count. Forge's Player.drawCards(n) runs the DrawCards
+	// replacement class over the whole batch before any card moves (Alms
+	// Collector's "would draw two or more cards"), and the per-card Draw
+	// events are what the log records. It is never logged: the caller holds
+	// it through the replacement registry and draws nothing when a body
+	// consumed it. Appended after CastBattlefield so every earlier ordinal,
+	// hash chain and golden replay is unchanged.
+	DrawBatchProposal
+	// SpellCastReversed reverses the spell-cast turn watcher of one CR 733.1
+	// aborted cast: Player is the caster whose PutOnStack the reversal
+	// undoes. A PutOnStack cannot be removed from the append-only log, so
+	// the tally (state.Player.SpellsCastThisTurn, folded by PutOnStack) is
+	// decremented by this companion event, the way ManaUndo reverses one
+	// mana activation. It is emitted only from rules' abortCast, so no bot
+	// game and no golden replay contains it. Appended after
+	// DrawBatchProposal so every earlier ordinal, hash chain and golden
+	// replay is unaffected.
+	SpellCastReversed
+	// HiddenIdentity re-identifies one hidden card in a HYPOTHETICAL search
+	// world: the closed-decklist redeal (internal/searchprobe) gives an
+	// opponent's unknown hand and library cards identities sampled from a
+	// belief over deck lists instead of permuting the real ones. Obj is the
+	// card (in its owner's hand, library or sideboard), Player its owner, Amount the new
+	// card's ordinal in state.Game.HypotheticalCards and Text that card's
+	// primary-face name; the fold checks the name against the table, so a
+	// stale ordinal changes nothing (and rules.ReidentifyHidden, the only
+	// emitter, fails loudly on it). It is always Secret and is only ever
+	// emitted on a hypothetical engine -- never in a match, a replay or a
+	// golden game. Appended after SpellCastReversed so every earlier ordinal,
+	// hash chain and golden replay is unchanged.
+	HiddenIdentity
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(CastBattlefield) + 1
+	NumKinds = int(HiddenIdentity) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving
@@ -1847,6 +1880,11 @@ var flagNames = [...]struct {
 	// ("prepared_copy") the offer carries, as teamwork_paid matches its
 	// mode. Appended at the end per the table's own ordering rule.
 	{"prepared_copy", state.FlagPreparedCopy},
+	// The mana-producing-source capture: the cast spent mana a producer
+	// carrying a `Spell.ManaFromCard` SpellCast reader made, and the spent
+	// sources ride the same event's IDs into Object.ManaSpentSources.
+	// Appended at the end per the table's own ordering rule.
+	{"manasources", state.FlagManaSourcesSpent},
 }
 
 // FlagsFrom parses a comma-separated flag list (CastInfo.Counter's shape)

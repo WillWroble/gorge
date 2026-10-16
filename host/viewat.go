@@ -127,7 +127,7 @@ func (r *Registry) Events(id TableID, k int, since uint64) ([]protocol.EventBody
 	evs := append([]events.Event(nil), m.e.L.Events[since:]...)
 	vis := t.cfg.Spectator
 	m.mu.RUnlock()
-	return eventBodiesFor(view.NoSeat, vis, g, evs), nil
+	return eventBodiesFor(view.NoSeat, vis, g, evs, false), nil
 }
 
 // EventsSeat is every event from since (inclusive) to the head, redacted
@@ -135,7 +135,10 @@ func (r *Registry) Events(id TableID, k int, since uint64) ([]protocol.EventBody
 // cards, a card that entered any other seat's hidden zone never surfaces.
 // Mirrors Events — the only difference is the redaction mode, Seat instead
 // of the table's spectator visibility, i.e. only the viewer/visibility pair
-// handed to the common eventBodiesFor.
+// handed to the common eventBodiesFor. While the CR 103.1 starting-player
+// choice is pending (E3-fx3, CR 103.5) the seat's own Secret events are
+// redacted to the opponent shape instead: no opening-hand id leaves the
+// server during the window.
 func (r *Registry) EventsSeat(id TableID, k int, since uint64, player state.PlayerID) ([]protocol.EventBody, error) {
 	_, m, err := r.lookup(id, k)
 	if err != nil {
@@ -154,8 +157,18 @@ func (r *Registry) EventsSeat(id TableID, k int, since uint64, player state.Play
 	}
 	g := m.e.G.Clone()
 	evs := append([]events.Event(nil), m.e.L.Events[since:]...)
+	// E3-fx3: while the CR 103.1 starting-player choice is pending, no
+	// player may see any hand (CR 103.5), so the seat's own Secret events
+	// -- the opening-hand deal's Draw events -- are served shape-only,
+	// exactly as an opponent's (card ids dropped, the event's shape kept).
+	// The probe is read under the same lock that clones g and evs; the
+	// redaction below runs against the state at head, so once the choice
+	// resolves the same request serves the hand again, and a client that
+	// cached the blind bodies during the window keeps them redacted (the
+	// view/snapshot catches it up). The recorded log is untouched.
+	blind := m.e.StartingChoicePending()
 	m.mu.RUnlock()
-	return eventBodiesFor(player, view.Seat, g, evs), nil
+	return eventBodiesFor(player, view.Seat, g, evs, blind), nil
 }
 
 // lookup finds a table's live or retained match, loading a finished match
@@ -281,7 +294,16 @@ func (r *Registry) matchForLog(t *table, sc sidecar, l *events.Log) (*match, err
 		sideboards[i] = d.Sideboard
 		archetypes[i] = d.Archetype
 	}
-	cfg := rules.Config{Seed: sc.Seed, Names: sc.Names, PlayerNames: sc.PlayerNames, Decks: decks, Archetypes: archetypes, Sideboards: sideboardConfig(sideboards), Tokens: r.opts.Tokens, Mulligans: sc.Mulligans, WindowDiagnostics: t.cfg.WindowDiagnostics}
+	cfg := rules.Config{Seed: sc.Seed, Names: sc.Names, PlayerNames: sc.PlayerNames, Decks: decks, Archetypes: archetypes, Sideboards: sideboardConfig(sideboards), Tokens: r.opts.Tokens, Mulligans: sc.Mulligans, WindowDiagnostics: t.cfg.WindowDiagnostics, DisablePaidManaCensus: !sc.PaidManaCensus}
+	// E3-2: a configured starting-player chooser (the seat posed CR 103.1's
+	// choice in place of the toss winner) is replay input exactly like
+	// Mulligans — the genesis Note names it, so a replay rebuilt without it
+	// replays the toss instead and diverges. A copied int, so the sidecar's
+	// pointer is never aliased into a rebuilt Config.
+	if sc.StartChooser != nil {
+		chooser := *sc.StartChooser
+		cfg.StartChooser = &chooser
+	}
 	// NameUniverse is a match MODE, not just data, and NameUniverseNames pins
 	// the exact ordered labels it offered. A pre-feature sidecar (no field)
 	// gets neither and therefore takes the legacy no-universe path, so a log

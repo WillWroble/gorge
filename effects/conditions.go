@@ -448,17 +448,23 @@ func conditionMetCore(h Host, c *Ctx, sa *cards.SA) (met bool, resolved bool) {
 	// holding four or more distinct core card types, through
 	// Host.DeliriumHolds (the same census the "Delirium —" activation,
 	// continuous and replacement gates read, so the spellings cannot drift);
-	// the other corpus values (OptionalCost, Threshold, Hellbent,
-	// Surge) are classified unmodelled (conditionUnmodelledBare) and so fail
-	// CLOSED with a Note at the walk, never running their rider. A bare
-	// Condition beside a group key or beside ConditionSVarCompare$ is a
-	// mixed shape no single evaluator covers (~11 corpus SAs).
+	// OptionalCost is the self-spell OptionalCost static's paid provenance,
+	// selected by ConditionOptionalPaid$; the other corpus values
+	// (Threshold, Hellbent, Surge) are classified unmodelled
+	// (conditionUnmodelledBare) and so fail CLOSED with a Note at the walk,
+	// never running their rider. A bare Condition beside a group key or
+	// beside ConditionSVarCompare$ is a mixed shape no single evaluator
+	// covers (~11 corpus SAs), and ConditionOptionalPaid$ means nothing
+	// beside any bare value but OptionalCost.
+	if cp.OptionalPaid != "" && !strings.EqualFold(bare, "OptionalCost") {
+		return false, false
+	}
 	if bare != "" {
 		if defined != "" || present != "" || notPresent != "" || compare != "" || svarCmp != "" ||
 			playerTurn != "" || phases != "" || firstCombat != "" {
 			return false, false
 		}
-		return conditionBareMet(h, c, bare)
+		return conditionBareMet(h, c, bare, cp.OptionalPaid)
 	}
 	if notPresent != "" {
 		// ConditionNotPresent$ (8 corpus lines, two shapes): met when NO object
@@ -634,6 +640,13 @@ func conditionDefinedMet(h Host, c *Ctx, sa *cards.SA, defined, present, compare
 				o = &oc
 			}
 			o = targetedPermanentLKI(c, present, o)
+		}
+		// CR 608.2h: a remembered object that RememberLKI$ moved off the
+		// battlefield is read with the controller it had there (Unyielding
+		// Gatekeeper's `ConditionPresent$ Card.YouCtrl`: the exile reset the
+		// live controller to the owner).
+		if defined == "Remembered" || defined == "RememberedLKI" {
+			o = rememberedControllerLKI(c, o)
 		}
 		if present == "" {
 			count++
@@ -857,6 +870,23 @@ func conditionDefinedGroup(h Host, c *Ctx, sa *cards.SA, defined string) ([]stat
 		}
 		group = []state.Target{{Obj: c.TriggerCard}}
 	}
+	if defined == "TriggeredTargetLKICopy" {
+		// The object (or player) the triggering event happened TO -- the
+		// TriggerContext.TriggerTarget role rules' triggerReferents captures
+		// at fire time (DamageDone/DamageDoneOnce's damaged recipient, the
+		// Attached bearer). The Incredible Hulk's "if he's attacking" and
+		// Snarlfang Vermin's "if that creature is still on the battlefield"
+		// gate on it. Object identity survives a zone change here, so the
+		// member is read live: a recipient that left the battlefield fails
+		// Card.inZoneBattlefield. An ABSENT role (a mode that names no target,
+		// a hand-built context) leaves the gate UNSUPPORTED, this file's
+		// documented fail-open convention.
+		tt := c.TriggerTarget
+		if !tt.IsPlayer && tt.Obj == 0 {
+			return nil, false
+		}
+		group = []state.Target{tt}
+	}
 	if defined == "TriggeredSpellAbility" {
 		// The trigger's spell/ability referent (Shiko and Narset, Unified and
 		// Orvar, the All-Form; 2 corpus carriers) -- the SAME binding the
@@ -888,9 +918,28 @@ func conditionDefinedGroup(h Host, c *Ctx, sa *cards.SA, defined string) ([]stat
 
 // conditionBareMet evaluates cast provenance and controller conditions independently
 // of the presence-group evaluator.
-func conditionBareMet(h Host, c *Ctx, bare string) (bool, bool) {
+func conditionBareMet(h Host, c *Ctx, bare, optionalPaid string) (bool, bool) {
 	g := h.Game()
 	switch {
+	case strings.EqualFold(bare, "OptionalCost"):
+		// CR 601.2b/601.2f: "If this spell's additional cost was paid" (Ruinous
+		// Waterbending's waterbend, the behold Exhales, Undergrowth's {2}{R}).
+		// The election is the self-spell OptionalCost static's pay-time
+		// provenance (state.Object.OptionalCostPaid, folded from the CastInfo's
+		// FlagOptionalCostPaid -- the bit Count$OptionalGenericCostPaid reads),
+		// read off the resolving spell. ConditionOptionalPaid$ selects the
+		// branch: True (every paid rider) or False (Undergrowth's and Secret
+		// of Bloodbending's unpaid half); any other spelling is unresolved.
+		want := true
+		switch {
+		case optionalPaid == "" || strings.EqualFold(optionalPaid, "True"):
+		case strings.EqualFold(optionalPaid, "False"):
+			want = false
+		default:
+			return false, false
+		}
+		o := g.Obj(c.Source)
+		return (o != nil && o.OptionalCostPaid) == want, true
 	case strings.EqualFold(bare, "Kicked"):
 		o := h.Game().Obj(c.Source)
 		return o != nil && o.CastFlags&state.FlagKicked != 0, true
@@ -971,6 +1020,22 @@ func targetedPermanentLKI(c *Ctx, present string, o *state.Object) *state.Object
 			oc.Controller = p
 		}
 	}
+	return &oc
+}
+
+// rememberedControllerLKI returns o carrying the controller RememberLKI$
+// captured for it when it is no longer on the battlefield; every other
+// characteristic stays the live read. Unchanged without a capture.
+func rememberedControllerLKI(c *Ctx, o *state.Object) *state.Object {
+	if c == nil || o == nil || o.Zone == state.ZBattlefield {
+		return o
+	}
+	p, ok := lkiControllerFor(c, o.ID)
+	if !ok || p == o.Controller {
+		return o
+	}
+	oc := *o
+	oc.Controller = p
 	return &oc
 }
 

@@ -61,26 +61,34 @@ func TestAvailableManaSumsAcrossSources(t *testing.T) {
 	}
 }
 
-// TestAvailableManaExcludesPaidCosts is the honesty rule for an ability with
-// a non-mana cost: a mana ability whose activation cost also sacrifices the
-// source, pays life or costs mana is NOT free mana by tapping and must not
-// be counted as available. A permanent whose only mana ability is paid
-// contributes nothing; a permanent mixing one free tap with one paid ability
-// contributes only the free one.
-func TestAvailableManaExcludesPaidCosts(t *testing.T) {
+// TestAvailableManaPaidCostCensus is the honesty rule for a mana ability
+// whose activation cost is more than a bare tap, now that the paid-cost
+// census is on by default (paid_mana_census.go). The census counts a
+// deterministic self-sacrifice (Sac<1/CARDNAME>) and a fixed PayLife<N> that
+// leaves the payer alive; it still excludes a generic mana fee (the
+// activation path prices that one itself) and any cost carrying a choice. A
+// permanent with several abilities -- one free, one paid -- contributes
+// nothing, because state.Mana cannot encode which single ability its one tap
+// selects (the same conservative rule as a multi-ability free source).
+func TestAvailableManaPaidCostCensus(t *testing.T) {
 	t.Parallel()
 	e := layerEngine(t)
-	// A land whose only mana ability sacrifices itself for two black.
+	// A land whose only mana ability sacrifices itself for two black: the
+	// census counts it (a deterministic self-sacrifice).
 	onBoard(t, e, 0, "Name:SacLand\nTypes:Land\nA:AB$ Mana | Cost$ T Sac<1/CARDNAME> | Produced$ B | Amount$ 2 | Oracle:x\n")
-	// A land mixing a free tap-for-white with a paid tap-for-black.
+	// A land whose only mana ability charges a {1} fee: still excluded, so it
+	// contributes nothing.
+	onBoard(t, e, 0, "Name:FeeLand\nTypes:Land\nA:AB$ Mana | Cost$ T 1 | Produced$ B | Amount$ 2 | Oracle:x\n")
+	// A land mixing a free tap-for-white with a paid tap-for-black: two
+	// abilities, so the aggregate reports neither.
 	onBoard(t, e, 0, "Name:MixedLand\nTypes:Land\nA:AB$ Mana | Cost$ T | Produced$ W\nA:AB$ Mana | Cost$ T Sac<1/CARDNAME> | Produced$ B | Amount$ 2\nOracle:x\n")
 
 	got := e.AvailableMana(0)
-	if got[state.MB] != 0 {
-		t.Errorf("available black = %d, want 0 (the only black source is an expensive sac cost)", got[state.MB])
+	if got[state.MB] != 2 {
+		t.Errorf("available black = %d, want 2 (the self-sacrifice source the census counts)", got[state.MB])
 	}
-	if got[state.MW] != 1 {
-		t.Errorf("available white = %d, want 1 (the free tap half of the mixed land)", got[state.MW])
+	if got[state.MW] != 0 {
+		t.Errorf("available white = %d, want 0 (the mixed land's two abilities are a choice the vector cannot encode)", got[state.MW])
 	}
 }
 

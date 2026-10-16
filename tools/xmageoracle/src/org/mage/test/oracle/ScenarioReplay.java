@@ -34,7 +34,9 @@ import mage.constants.Zone;
 import mage.counters.Counter;
 import mage.counters.CounterType;
 import mage.counters.Counters;
+import mage.game.FreeForAll;
 import mage.game.Game;
+import mage.game.GameException;
 import mage.game.PutToBattlefieldInfo;
 import mage.game.events.GameEvent;
 import mage.game.permanent.Permanent;
@@ -46,6 +48,7 @@ import mage.util.RandomUtil;
 import mage.players.Player;
 import mage.filter.FilterCard;
 import mage.target.TargetCard;
+import mage.target.common.TargetCardInGraveyardBattlefieldOrStack;
 import mage.util.CardUtil;
 import mage.watchers.common.PermanentsEnteredBattlefieldWatcher;
 import org.mage.test.player.PlayerAction;
@@ -84,6 +87,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
     private int TURN = 1;
     private int turn = 1;
     private int activeSeat = 0;
+    // The scenario's seat count ("players"; absent = 2). Read before reset(),
+    // whose createNewGameAndPlayers seats a FreeForAll of three for it.
+    private int seats = 2;
     private boolean attackAdvancedTurn = false;
     private static final PhaseStep MAIN = PhaseStep.PRECOMBAT_MAIN;
 
@@ -94,6 +100,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // (blocking) step, so the driver must too.
     private PhaseStep phase = MAIN;
 
+    // The stack object names seen at the last checkpoint, for the empty-stack
+    // diagnostic: what a pass pair expected to resolve and no longer can.
+    private List<String> lastCheckpointStack = new ArrayList<>();
+
     // Whether the scenario scripts a divided-damage split ("<ref>^X=<n>"
     // target answers, oraclegen's damageSplitAnswers). Such a cast queues no
     // target names of its own: the split answers are the targets.
@@ -103,6 +113,43 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // the game. Wrapping createPlayer(Game, ...)'s result instead copies a
     // player the game already holds, so scripted actions go to a player the
     // game never runs and every scenario ends with no snapshots.
+    /** A three-seat scenario (gorge's oracleScenario.Players) is a FreeForAll
+     * of p0 = PlayerA, p1 = PlayerB, p2 = PlayerC; every other scenario keeps
+     * the base class's TwoPlayerDuel. XMage's PlayerList inserts each new
+     * player AHEAD of the previous one (CircularList.add at index 0), so turn
+     * and priority order run from the first player through the others in
+     * reverse creation order: creating A, C, B makes it A -> B -> C, gorge's
+     * p0 -> p1 -> p2. */
+    @Override
+    protected Game createNewGameAndPlayers() throws GameException, java.io.FileNotFoundException {
+        if (seats != 3) {
+            // A previous three-seat scenario left playerC set; the base
+            // class's per-player helpers treat a non-null playerC as seated.
+            playerC = null;
+            return super.createNewGameAndPlayers();
+        }
+        Game game = new FreeForAll(mage.constants.MultiplayerAttackOption.LEFT, mage.constants.RangeOfInfluence.ALL,
+                mage.game.mulligan.MulliganType.GAME_DEFAULT.getMulligan(0), 20, 7);
+        playerA = createPlayer(game, "PlayerA", deckNameA);
+        playerC = createPlayer(game, "PlayerC", deckNameA);
+        playerB = createPlayer(game, "PlayerB", deckNameB);
+        return game;
+    }
+
+    /** The scenario's "players": absent (or 2) is the two-seat game, 3 the
+     * FreeForAll; anything else fails the scenario, as gorge's runner does. */
+    static int scenarioPlayers(JsonObject sc) {
+        JsonElement v = sc.get("players");
+        if (v == null || v.isJsonNull()) {
+            return 2;
+        }
+        int n = v.getAsInt();
+        if (n != 2 && n != 3) {
+            throw new IllegalArgumentException("scenario players " + v + " (want 2 or 3)");
+        }
+        return n;
+    }
+
     @Override
     protected TestPlayer createPlayer(String name, mage.constants.RangeOfInfluence rangeOfInfluence) {
         return new ScriptedChoicePlayer(new org.mage.test.player.TestComputerPlayer(name, rangeOfInfluence), this);
@@ -119,6 +166,28 @@ public class ScenarioReplay extends CardTestPlayerBase {
     // mode's reduction is in force, and the sacrifice it adds is paid from
     // this cast's own recorded choose picks.
     private boolean bargainedCast = false;
+    // A cast step with cast_mode "optionalcost": gorge elected the cast's
+    // optional additional cost (collect evidence, blight, waterbend, behold),
+    // so the generator's leading scripted "Yes" is that cost's ask. On any
+    // other cast a leading Yes belongs to a later ask and is left queued.
+    private boolean optionalCostCast = false;
+    // A cast step with cast_mode "alternative": gorge elected the first
+    // alternative cost (Leyline of Mutation's grant). XMage poses that as its
+    // alternative-cost key menu; the generator's leading "Yes" picks key 1.
+    private boolean alternativeCostCast = false;
+    // A cast step with cast_mode "conspired" or "casualty": gorge elected the
+    // spell's (often granted) copy cost -- Raiding Schemes' conspire,
+    // Silverquill's casualty 1. XMage poses each as its own
+    // OptionalAdditionalSourceCosts yes/no (ConspireAbility, CasualtyAbility);
+    // that ask is paid, and the tap/sacrifice it adds takes the generator's
+    // scripted pick (or the step's choose pick, as Bargain's sacrifice does).
+    // Null on every other cast.
+    private Class<?> copyCostCast = null;
+    // A cast step whose recorded gorge answer promised a Gift (pick
+    // "gift_promise", CR 702.174a): XMage's GiftAbility poses the promise as
+    // an optional additional cost, so the generator's leading "Yes" pays it,
+    // and its PromiseGiftCost then asks which opponent (giftOpponentChoice).
+    private boolean giftPromisedCast = false;
 
     /** TestPlayer normally delegates these library decisions directly to its AI,
      * bypassing the scripted target/choice queues. Route them through this player. */
@@ -144,6 +213,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     frames.anyMatch(f -> f.getMethodName().equals(method) && type.isAssignableFrom(f.getDeclaringClass())));
         }
 
+        /** Like askedBy, for a class the driver cannot name (a package-private
+         * cost class): matched by simple name. */
+        private static boolean askedByName(String simpleName, String method) {
+            return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).walk(frames ->
+                    frames.anyMatch(f -> f.getMethodName().equals(method)
+                            && f.getDeclaringClass().getSimpleName().equals(simpleName)));
+        }
+
+        /** The opponent a promised Gift goes to: in this two-seat harness the
+         * only opponent, named on the choice queue the way makeChoose reads a
+         * player, unless the scenario scripted a pick of its own. Null when
+         * the ask is not a lone-opponent gift promise. */
+        static String giftOpponentChoice(boolean giftAsk, List<String> opponentNames, List<String> choices) {
+            if (!giftAsk || opponentNames.size() != 1
+                    || !choices.isEmpty() && opponentNames.contains(choices.get(0))) {
+                return null;
+            }
+            return opponentNames.get(0);
+        }
+
         private boolean scriptedYesNoNext() {
             return !getChoices().isEmpty() && (getChoices().get(0).equals("Yes") || getChoices().get(0).equals("No"));
         }
@@ -155,8 +244,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
          * the opening-hand Leyline ask (LeylineAbility) is No; every optional
          * additional cost (kicker, offspring, waterbend: the
          * OptionalAdditionalSourceCosts hook; XMage's mana costs always report
-         * canPay, so it asks even when the pool is short) is No, consuming the
-         * generator's own leading "No" when it scripted one; an either-or
+         * canPay, so it asks even when the pool is short) takes the
+         * generator's own leading "No" when it scripted one, and on an
+         * "optionalcost" cast its leading "Yes" -- gorge elected the cost, so
+         * XMage pays it too; an either-or
          * additional cost (OrCost) takes the cost gorge recorded for the step.
          * Every other ask stays with the scripted queue.
          */
@@ -165,8 +256,16 @@ public class ScenarioReplay extends CardTestPlayerBase {
             if (source instanceof LeylineAbility) {
                 return false;
             }
+            if (owner.copyCostCast != null && askedBy(owner.copyCostCast, "addOptionalAdditionalCosts")) {
+                // The step elected this copy cost: pay it (the ask is the
+                // keyword's own, so no other optional cost is answered here).
+                return true;
+            }
             if (askedBy(OptionalAdditionalSourceCosts.class, "addOptionalAdditionalCosts")) {
-                switch (optionalAdditionalCostAnswer(owner.bargainedCast, getChoices())) {
+                switch (optionalAdditionalCostAnswer(owner.bargainedCast,
+                        owner.optionalCostCast || owner.giftPromisedCast
+                                && askedBy(mage.abilities.keyword.GiftAbility.class, "addOptionalAdditionalCosts"),
+                        getChoices())) {
                     case PAY:
                         // The step elected Bargain: pay the cost. This is the
                         // SAME ask every optional additional cost poses
@@ -190,6 +289,30 @@ public class ScenarioReplay extends CardTestPlayerBase {
             return super.chooseUse(outcome, message, secondMessage, trueText, falseText, source, game);
         }
 
+        /** An "alternative" cast's menu: AbilityImpl's alternative-cost key
+         * choice ("You may choose an alternative cost", keys "1".. per
+         * alternative, then "Cast with no alternative cost"). */
+        @Override
+        public boolean choose(Outcome outcome, mage.choices.Choice choice, Game game) {
+            if (owner.alternativeCostCast && choice.isKeyChoice()) {
+                alternativeCostKey(choice.getMessage(), getChoices());
+            }
+            return super.choose(outcome, choice, game);
+        }
+
+        /** Rewrites the generator's leading "Yes" into key "1", the first
+         * alternative cost (gorge's AltCostIndex-1 election), when the menu is
+         * XMage's alternative-cost choice. Returns whether it did. */
+        static boolean alternativeCostKey(String message, List<String> choices) {
+            if (message == null || !message.endsWith("choose an alternative cost")
+                    && !message.equals("Choose an alternative cost")
+                    || choices.isEmpty() || !"Yes".equals(choices.get(0))) {
+                return false;
+            }
+            choices.set(0, "1");
+            return true;
+        }
+
         @Override
         public ScriptedChoicePlayer copy() {
             return new ScriptedChoicePlayer(this);
@@ -211,7 +334,36 @@ public class ScenarioReplay extends CardTestPlayerBase {
             Game previous = choiceGame;
             choiceGame = game;
             try {
-                if (isSacrificeChoice(target)) {
+                if (owner.giftPromisedCast && target.getOriginalTarget() instanceof mage.target.common.TargetOpponent) {
+                    List<String> opponents = new ArrayList<>();
+                    for (UUID id : target.possibleTargets(target.getAffectedAbilityControllerId(this.getId()), source, game)) {
+                        Player opp = game.getPlayer(id);
+                        if (opp != null) {
+                            opponents.add(opp.getName());
+                        }
+                    }
+                    String pick = giftOpponentChoice(askedByName("PromiseGiftCost", "pay"), opponents, getChoices());
+                    if (pick != null) {
+                        getChoices().add(0, pick);
+                    }
+                }
+                if (owner.copyCostCast == mage.abilities.keyword.TeamworkAbility.class
+                        && askedByName("TeamworkCost", "pay") && getChoices().isEmpty()) {
+                    // A "teamworked" cast's tap (TeamworkCost: any number of
+                    // untapped creatures you control, an open-ended
+                    // TargetPermanent(0, MAX)): gorge's forced one-option
+                    // election is not scripted, so name the creatures the
+                    // step's choose answer recorded, then close the ask when
+                    // other candidates remain.
+                    UUID abilityControllerId = target.getAffectedAbilityControllerId(this.getId());
+                    List<UUID> candidates = new ArrayList<>(target.possibleTargets(abilityControllerId, source, game));
+                    getChoices().addAll(teamworkTapChoices(owner.castCostPicks, candidates,
+                            (id, answer) -> hasObjectTargetNameOrAlias(game.getPermanent(id), answer)));
+                }
+                // A copy-cost cast's sacrifice (casualty) is scripted by the
+                // generator from gorge's own ask ("@ref" on the choice queue);
+                // pushing the step's pick too would leave one unconsumed.
+                if (isSacrificeChoice(target) && owner.copyCostCast == null) {
                     UUID abilityControllerId = target.getAffectedAbilityControllerId(this.getId());
                     List<UUID> candidates = new ArrayList<>(target.possibleTargets(abilityControllerId, source, game));
                     for (String pick : owner.castCostPicks) {
@@ -238,11 +390,37 @@ public class ScenarioReplay extends CardTestPlayerBase {
         public boolean choose(Outcome outcome, Cards cards, mage.target.TargetCard target, Ability source, Game game) {
             Game previous = choiceGame;
             choiceGame = game;
+            boolean declined = declinePairToChoiceSkip(target.getMinNumberOfTargets(), getChoices(), getTargets());
             try {
                 return super.choose(outcome, cards, target, source, game);
             } finally {
+                if (declined && !getChoices().isEmpty() && TestPlayer.CHOICE_SKIP.equals(getChoices().get(0))) {
+                    // The dialog returned without reading its queue (no
+                    // candidate): put the pair back for the ask it belongs to.
+                    getChoices().set(0, "No");
+                    getTargets().add(0, TestPlayer.TARGET_SKIP);
+                }
                 choiceGame = previous;
             }
+        }
+
+        /** The generator scripts a declined pick as a pair -- "No" on the
+         * choice queue and "[target_skip]" on the target queue -- because
+         * XMage may pose it as a yes/no or as an "up to" target. An optional
+         * choose(Cards, TargetCard) dialog (Choco's "you may put one of them
+         * into your hand", a look-at-the-top dig) reads only the CHOICE
+         * queue, where the decline is its own skip token: rewrite the pair at
+         * both queue fronts into one "[choice_skip]". Anything else -- a
+         * required dialog, a named pick, a lone "No" -- is left alone.
+         * Returns whether the pair was rewritten. */
+        static boolean declinePairToChoiceSkip(int minTargets, List<String> choices, List<String> targets) {
+            if (minTargets != 0 || choices.isEmpty() || targets.isEmpty()
+                    || !"No".equals(choices.get(0)) || !TestPlayer.TARGET_SKIP.equals(targets.get(0))) {
+                return false;
+            }
+            choices.set(0, TestPlayer.CHOICE_SKIP);
+            targets.remove(0);
+            return true;
         }
 
         @Override
@@ -548,21 +726,69 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     && target.getChooseHint().startsWith("to sacrifice");
         }
 
+        /** A craft cost's material ask: CraftCost.pay's target is a
+         * TargetCardInGraveyardBattlefieldOrStack (CraftAbility.makeTarget)
+         * with a minimum of two or more materials, and pay() calls
+         * chooseTarget exactly ONCE -- unlike every normal multi-target ask,
+         * which the game re-asks until its minimum is met. A census of the
+         * XMage sets shows the only min>1 users of this target class are the
+         * craft abilities, so this is the structural craft marker. */
+        static boolean isCraftMaterialsAsk(mage.target.Target target) {
+            return target != null
+                    && target.getOriginalTarget() instanceof TargetCardInGraveyardBattlefieldOrStack
+                    && target.getMinNumberOfTargets() > 1;
+        }
+
+        /** Whether the craft fill loop must call chooseTarget again: the ask
+         * has fewer materials chosen than its minimum and the scripted queue
+         * still holds an answer for it. An empty queue stops the loop: the
+         * base player would otherwise fall into strict-mode AI auto-pick (or
+         * fail on an unmatched definition), neither of which a scenario
+         * authored. */
+        static boolean craftMaterialsNeedFill(int chosen, int min, boolean queueNonEmpty) {
+            return chosen < min && queueNonEmpty;
+        }
+
         /** The decision a cast-time optional additional cost ask gets,
          * independent of any Game so the contract test can exercise all three
          * outcomes: a bargained cast PAYs it; otherwise the generator's own
-         * leading "No" is CONSUMED by the caller so strict mode sees it used;
-         * every other ask is DECLINEd (gorge casts for the mana cost only). */
+         * leading "No" is CONSUMED by the caller so strict mode sees it used,
+         * and so is a leading "Yes" on an "optionalcost" cast (gorge elected
+         * the cost, so the consumed Yes pays it); every other ask is DECLINEd
+         * (gorge casts for the mana cost only). */
         enum OptionalCostAnswer { PAY, CONSUME, DECLINE }
 
-        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, List<String> choices) {
+        static OptionalCostAnswer optionalAdditionalCostAnswer(boolean bargainedCast, boolean optionalCostCast, List<String> choices) {
             if (bargainedCast) {
                 return OptionalCostAnswer.PAY;
             }
-            if (!choices.isEmpty() && choices.get(0).equals("No")) {
+            if (!choices.isEmpty() && (choices.get(0).equals("No")
+                    || (optionalCostCast && choices.get(0).equals("Yes")))) {
                 return OptionalCostAnswer.CONSUME;
             }
             return OptionalCostAnswer.DECLINE;
+        }
+
+        /** The choice-queue entries that pay a teamwork tap with the
+         * creatures a cast's recorded choose picks name: each matching pick
+         * once, then a [choice_skip] when a candidate is left untapped (the
+         * ask is open-ended, so XMage would otherwise ask for more). An
+         * unmatched pick is left out, so strict mode names the miss. */
+        static List<String> teamworkTapChoices(List<String> picks, List<UUID> candidates,
+                BiPredicate<UUID, String> matches) {
+            List<String> out = new ArrayList<>();
+            List<UUID> left = new ArrayList<>(candidates);
+            for (String pick : picks) {
+                UUID id = costPickChoice(java.util.Collections.singletonList(pick), left, matches);
+                if (id != null) {
+                    out.add(pick);
+                    left.remove(id);
+                }
+            }
+            if (!out.isEmpty() && !left.isEmpty()) {
+                out.add(TestPlayer.CHOICE_SKIP);
+            }
+            return out;
         }
 
         /** The candidate a cost's recorded choose picks name, or null when
@@ -655,6 +881,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     getTargets().remove(0);
                     return true;
                 }
+            }
+            if (isCraftMaterialsAsk(target)) {
+                // CraftCost.pay calls chooseTarget exactly ONCE while
+                // TestPlayer.chooseTarget consumes one queued definition per
+                // call, so without this a craft with two or more materials
+                // would exile only the first and leave the rest of the
+                // scripted queue to fail assertAllCommandsUsed. Fill to the
+                // ask's minimum, one definition per call; the chosen count is
+                // the progress guard, since the base can return true having
+                // only consumed a [target_skip].
+                boolean chosen = super.chooseTarget(outcome, target, source, game);
+                while (chosen && craftMaterialsNeedFill(target.getSize(),
+                        target.getMinNumberOfTargets(), !getTargets().isEmpty())) {
+                    int before = target.getSize();
+                    chosen = super.chooseTarget(outcome, target, source, game);
+                    if (target.getSize() == before) {
+                        break;
+                    }
+                }
+                return chosen;
             }
             return super.chooseTarget(outcome, target, source, game);
         }
@@ -848,6 +1094,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         List<List<String>> targetsA = new ArrayList<>();
         List<List<String>> targetsB = new ArrayList<>();
         try {
+            seats = scenarioPlayers(sc);
             reset();
             skipInitShuffling();
             setStrictChooseMode(strict);
@@ -858,11 +1105,16 @@ public class ScenarioReplay extends CardTestPlayerBase {
             // Reset here so an earlier scenario's Bargain cannot answer this
             // one's optional additional costs.
             bargainedCast = false;
+            optionalCostCast = false;
+            alternativeCostCast = false;
+            copyCostCast = null;
+            giftPromisedCast = false;
             gorgeName = str(sc, "card");
             xmageName = str(sc, "xmage_name");
             endTurnScenario = hasEndTurnEffect(xmageName.isEmpty() ? gorgeName : xmageName);
             cast.clear();
             adjustedCasts.clear();
+            faceDownRefs.clear();
             refAlias.clear();
             phase = MAIN;
             TURN = scenarioTurn(sc);
@@ -909,7 +1161,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 queuePassCommands(i);
                 step(st, op, i);
                 String cp = "step " + i + " (" + op + ")";
-                runCode(cp, turn, phase, playerA, (info, p, g) -> snaps.add(snapshot(info, g)));
+                runCode(cp, turn, phase, checkpointSeat(op, st, i), (info, p, g) -> snaps.add(snapshot(info, g)));
                 queuedA.add(new ArrayList<>(playerA.getActions().subList(beforeA, playerA.getActions().size())));
                 queuedB.add(new ArrayList<>(playerB.getActions().subList(beforeB, playerB.getActions().size())));
                 choicesA.add(new ArrayList<>(playerA.getChoices().subList(beforeChoicesA, playerA.getChoices().size())));
@@ -935,6 +1187,22 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 // Only the actions for skipped steps remain. An unconsumed
                 // action from an earlier step is still a harness error. Record
                 // every skipped label from the post-turn state for alignment.
+                for (int skipped = completedSteps; skipped < stepCount; skipped++) {
+                    String op = str(steps(sc).get(skipped).getAsJsonObject(), "op");
+                    snaps.add(snapshot("step " + skipped + " (" + op + ")", currentGame));
+                }
+                msg = null;
+            }
+            if (msg != null && currentGame != null && currentGame.hasEnded() && isLeftoverAssertion(msg)
+                    && completedSteps >= 0 && completedSteps < stepCount
+                    && leftoverIsQueuedSuffix(completedSteps, queuedA, queuedB, choicesA, choicesB, targetsA, targetsB)) {
+                // The game ended mid-scenario (a player lost: Marina
+                // Vendrell's Grimoire's empty-hand loss, The Millennium
+                // Calendar's 1,000 life). XMage stops there, so the steps
+                // after it never ran; gorge's runner records every remaining
+                // checkpoint at the ended state (over: true). Do the same:
+                // snapshot the final state for each remaining label, and drop
+                // only the leftovers those unreached steps queued.
                 for (int skipped = completedSteps; skipped < stepCount; skipped++) {
                     String op = str(steps(sc).get(skipped).getAsJsonObject(), "op");
                     snaps.add(snapshot("step " + skipped + " (" + op + ")", currentGame));
@@ -975,6 +1243,37 @@ public class ScenarioReplay extends CardTestPlayerBase {
         }
         res.add("snapshots", arr);
         return res;
+    }
+
+    /**
+     * The seat whose code action carries a step's checkpoint. XMage runs one
+     * player's queued actions at a priority before the other player acts, so
+     * a checkpoint queued on the wrong seat sees the wrong side of the step:
+     *
+     *  - pass_to only moves the clock. Its checkpoint belongs to the seat that
+     *    has priority first on the turn it reached, ahead of that step's
+     *    actions; on seat 0 it would run after the opponent's NEXT cast or
+     *    loyalty activation (Found Footage's hand, Ajani's loyalty).
+     *  - resolve by seat 1 waits on seat 1's queue (waitStackResolved), so a
+     *    checkpoint on seat 0 would run while the spell is still on the stack.
+     *
+     * Every other op keeps seat 0, which acts last on the turn it is on.
+     */
+    private TestPlayer checkpointSeat(String op, JsonObject st, int stepIdx) {
+        if (op.equals("pass") && isActiveP1Pair(steps(sc0), stepIdx, activeSeat)
+                && passAction(steps(sc0), stepIdx) == PASS_PAIR_SECOND
+                && !pairEndsMidResolution(steps(sc0), stepIdx)) {
+            // The active seat 1's pair resolves on seat 1's queue, so its
+            // second checkpoint must follow that wait there.
+            return seat(activeSeat);
+        }
+        if (op.equals("pass_to")) {
+            return seat(activeSeat);
+        }
+        if (op.equals("resolve")) {
+            return seat(st.has("seat") ? st.get("seat").getAsInt() : 0);
+        }
+        return playerA;
     }
 
     private boolean skippedActionsMatch(int first, List<List<PlayerAction>> queuedA,
@@ -1027,6 +1326,41 @@ public class ScenarioReplay extends CardTestPlayerBase {
         } catch (NumberFormatException ignored) {
             return -1;
         }
+    }
+
+    /** Whether a failure is assertAllCommandsUsed's: a queued action,
+     * choice or target nothing consumed. */
+    static boolean isLeftoverAssertion(String message) {
+        return message != null && (message.contains("must have 0 actions but found")
+                || message.contains("Count are not equal"));
+    }
+
+    /** At game over: every seat's leftover actions, choices and targets are
+     * a tail of what steps {@code first}.. queued -- the step the game ended
+     * in may have consumed its head -- so nothing an earlier, completed step
+     * queued is hidden by the game-over row. */
+    private boolean leftoverIsQueuedSuffix(int first, List<List<PlayerAction>> queuedA, List<List<PlayerAction>> queuedB,
+                                           List<List<String>> choicesA, List<List<String>> choicesB,
+                                           List<List<String>> targetsA, List<List<String>> targetsB) {
+        TestPlayer actualA = (TestPlayer) currentGame.getPlayer(playerA.getId());
+        TestPlayer actualB = (TestPlayer) currentGame.getPlayer(playerB.getId());
+        return isQueuedSuffix(actualA.getActions(), queuedA, first) && isQueuedSuffix(actualB.getActions(), queuedB, first)
+                && isQueuedSuffix(actualA.getChoices(), choicesA, first) && isQueuedSuffix(actualB.getChoices(), choicesB, first)
+                && isQueuedSuffix(actualA.getTargets(), targetsA, first) && isQueuedSuffix(actualB.getTargets(), targetsB, first);
+    }
+
+    /** Whether {@code actual} is a tail of the concatenation of
+     * {@code queued[first..]}. */
+    static <T> boolean isQueuedSuffix(List<T> actual, List<List<T>> queued, int first) {
+        if (first < 0 || first >= queued.size()) {
+            return false;
+        }
+        List<T> expected = new ArrayList<>();
+        for (int i = first; i < queued.size(); i++) {
+            expected.addAll(queued.get(i));
+        }
+        return actual.size() <= expected.size()
+                && expected.subList(expected.size() - actual.size(), expected.size()).equals(actual);
     }
 
     private static boolean hasEndTurnEffect(String name) {
@@ -1115,7 +1449,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     private TestPlayer seat(int i) {
+        if (i == 2 && seats == 3) {
+            return playerC;
+        }
         return i == 0 ? playerA : playerB;
+    }
+
+    /** The scenario seat index of one of this game's TestPlayers. */
+    private int seatOfPlayer(TestPlayer p) {
+        return p == playerA ? 0 : p == playerB ? 1 : 2;
     }
 
     private void build(JsonObject sc) {
@@ -1132,7 +1474,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             throw new IllegalArgumentException("unsupported format " + format);
         }
         JsonObject setup = sc.has("setup") ? sc.getAsJsonObject("setup") : new JsonObject();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             TestPlayer p = seat(i);
             removeAllCardsFromLibrary(p);
             removeAllCardsFromHand(p);
@@ -1179,7 +1521,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
     private void applySetupState(Game g) {
         JsonObject setup = sc0.has("setup") ? sc0.getAsJsonObject("setup") : new JsonObject();
         boolean changed = false;
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             if (!setup.has("p" + i)) {
                 continue;
             }
@@ -1242,7 +1584,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         // target slots: Push // Pull, Keep Out, Radiant Strike).
         List<String> tapped = zone == Zone.BATTLEFIELD ? names(s, "tapped") : new ArrayList<>();
         List<String> backFace = zone == Zone.BATTLEFIELD ? names(s, "back_face") : new ArrayList<>();
-        int i = p == playerA ? 0 : 1;
+        int i = seatOfPlayer(p);
         for (String n : ns) {
             int k = buildCounts.merge(i + "|" + n, 1, Integer::sum);
             String ref = "p" + i + ":" + n + (k > 1 ? "#" + k : "");
@@ -1311,7 +1653,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         // Scenario refs/counters still name the front, even though snapshots
         // and XMage's attack/block commands must name the current back face.
         setupNames.put(back.getId(), xmageSpelling(name));
-        backFaceNames.put("p" + (p == playerA ? 0 : 1) + ":" + xmageSpelling(name), back.getName());
+        backFaceNames.put("p" + seatOfPlayer(p) + ":" + xmageSpelling(name), back.getName());
     }
 
     /** Maps a gorge counter kind (P1P1, M1M1, LOYALTY, CHARGE, ...) to XMage's
@@ -1346,7 +1688,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * ("p0:Grizzly Bears#2") reaches exactly one of them. Counts follow the
      * zone order build() added them in. */
     private void registerAliases(Game g) {
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             TestPlayer pl = seat(i);
             Map<String, Integer> counts = new HashMap<>();
             Map<String, Integer> scenarioCounts = new HashMap<>();
@@ -1365,7 +1707,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             for (mage.MageObject o : objs) {
                 bindSetupObject(i, setupName(o), gorgeName, xmageName, counts, scenarioCounts,
                         frontCounts, o.getId(), refAlias, (ref, objId) -> {
-                            for (int j = 0; j < 2; j++) {
+                            for (int j = 0; j < seats; j++) {
                                 try {
                                     seat(j).addAlias(ref, objId);
                                 } catch (IllegalArgumentException ignored) {
@@ -1493,7 +1835,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             return;
         }
         refAlias.put(ref, "@" + ref);
-        for (int j = 0; j < 2; j++) {
+        for (int j = 0; j < seats; j++) {
             try {
                 seat(j).addAlias(ref, match.getId());
             } catch (IllegalArgumentException ignored) {
@@ -1648,6 +1990,26 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return null;
     }
 
+    /** The object a `move` step moves: the card found in a
+     * {@link #moveSourceZones()} zone, else the battlefield permanent the ref
+     * names. gorge's runner moves the setup-bound object wherever it is, so a
+     * battlefield ref (The Masamune's "a creature dies" probe moves p0's
+     * Grizzly Bears to the graveyard) is a dies-equivalent zone change, which
+     * XMage's moveCards performs for a Permanent too. The card zones stay
+     * first so every existing hand -> zone move is unchanged. */
+    static <T> T moveSource(T inCardZone, java.util.function.Supplier<? extends T> onBattlefield) {
+        return inCardZone != null ? inCardZone : onBattlefield.get();
+    }
+
+    /** The battlefield permanent a move ref names, or null when none does. */
+    private Permanent battlefieldMoveSource(Game g, String ref) {
+        try {
+            return permanentRef(g, ref);
+        } catch (IllegalArgumentException | StringIndexOutOfBoundsException notThere) {
+            return null;
+        }
+    }
+
     /**
      * Whether a modal spell's first target lives in a later mode: the card's
      * first mode (the one XMage's up-front {@code $target=} check reads, since
@@ -1778,14 +2140,61 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     /** Whether a cast step's cast_mode is one this driver elects: Bargain,
      * "optionalcost", the face-down Disguise/Morph/Megamorph casts and the "plot" special
-     * action are wired ("plot_cast", the later cast of a plotted card, is not), and an absent or empty mode is the ordinary
+     * action and a graveyard "flashback" cast are wired ("plot_cast", the later cast of a plotted card, is not), and an absent or empty mode is the ordinary
      * cast. Any other mode is a scenario the driver cannot replay and must
      * reject loudly rather than cast at face value. */
     static boolean castModeSupported(String mode) {
         return mode == null || mode.isEmpty()
                 || mode.equals("bargained") || mode.equals("optionalcost")
                 || mode.equals("disguised") || mode.equals("morphed") || mode.equals("megamorphed")
-                || mode.equals("plot");
+                || mode.equals("plot") || mode.equals("flashback")
+                // "alternative": an alternative cost another permanent grants
+                // (Leyline of Mutation's {W}{U}{B}{R}{G}). XMage poses it as
+                // its own yes/no while casting, which the generator scripts
+                // from gorge's election, so the step is a plain cast here.
+                || mode.equals("alternative")
+                || mode.equals("prepared_copy")
+                || copyCostKeyword(mode) != null;
+    }
+
+    /** The XMage keyword class whose optional additional cost a copy-cost
+     * cast mode elects: "conspired" is ConspireAbility (CR 702.78a, tap two
+     * untapped creatures that share a colour with the spell), "casualty" is
+     * CasualtyAbility (CR 702.153a, sacrifice a creature with power N or
+     * greater), "teamworked" is TeamworkAbility (CR 702.194a, tap any
+     * number of untapped creatures you control with total power N or
+     * more). Null for every other mode. A plain cast of the spell
+     * otherwise: "prepared_copy" (the copy of a prepared creature's prepare
+     * spell, CR 722.3c) is cast by its spell name like any card. */
+    static Class<?> copyCostKeyword(String mode) {
+        if ("conspired".equals(mode)) {
+            return mage.abilities.keyword.ConspireAbility.class;
+        }
+        if ("casualty".equals(mode)) {
+            return mage.abilities.keyword.CasualtyAbility.class;
+        }
+        if ("teamworked".equals(mode)) {
+            return mage.abilities.keyword.TeamworkAbility.class;
+        }
+        return null;
+    }
+
+    /** The activate command for a card's flashback: TestPlayer's
+     * "@alias ability text" form when setup bound an alias to the card, so the
+     * pick is scoped to that card, else the bare "Flashback" rule prefix.
+     * TestPlayer splits that form at its first space, so the alias is the
+     * space-free twin registerObjectAliases binds (abilityAliasRef). */
+    static String flashbackCommand(String alias) {
+        return alias == null || alias.isEmpty() ? "Flashback" : abilityAliasRef(alias) + " Flashback";
+    }
+
+    /** The space-free spelling of a scenario ref ("p0:Chatter of the
+     * Squirrel" -> "p0:Chatter_of_the_Squirrel"), bound beside the ref
+     * itself: TestPlayer's "@ref ability text" command ends the ref at its
+     * first space, so a multi-word ref can only scope an ability pick
+     * through this twin. No card name holds an underscore. */
+    static String abilityAliasRef(String ref) {
+        return ref.replace(' ', '_');
     }
 
     /** The XMage target string for one scenario target ref: its alias when
@@ -1835,6 +2244,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * another target after the scenario's answers run out (see
      * ScriptedChoicePlayer.chooseTarget). */
     private final Set<String> adjustedCasts = new java.util.HashSet<>();
+    // Scenario refs a cast step put onto the battlefield face down (a
+    // morphed, megamorphed or disguised cast) and no later step turned face
+    // up: XMage's face-down permanent has no name, so a combat command names
+    // it by TestPlayer's face-down test command instead (combatName).
+    private final Set<String> faceDownRefs = new java.util.HashSet<>();
     // Setup objects the scenario can name by ref ("p0:Grizzly Bears#2"): the
     // XMage alias each ref is registered under, so two same-name permanents
     // are told apart. Filled during setup, read by step targeting.
@@ -1990,6 +2404,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         refAlias.put(scenarioRef, "@" + scenarioRef);
         refAlias.putIfAbsent(xmageRef, "@" + scenarioRef);
         bind.bind(scenarioRef, id);
+        if (!abilityAliasRef(scenarioRef).equals(scenarioRef)) {
+            bind.bind(abilityAliasRef(scenarioRef), id);
+        }
         if (!xmageRef.equals(scenarioRef)) {
             bind.bind(xmageRef, id);
         }
@@ -2030,44 +2447,142 @@ public class ScenarioReplay extends CardTestPlayerBase {
         return s != null ? s : xmageSpelling(n);
     }
 
-    /** One snapshot value's spelling rewrite: gorge spells every card object
-     * by its front face, so XMage's whole "A // B" object name for a
-     * split/Room card (the card under test's whole name, a probe's, an MDFC
-     * land's) is rewritten to its front half, and the spell of a face-1 cast
-     * -- which XMage names by the back half's ability -- is rewritten to the
-     * front the way gorge names the spell. The card under test's back half
-     * is the only back half a scenario can name, so it is the only alias. */
+    /** One snapshot value's spelling rewrite for a STACK SPELL's source, for
+     * a card under test that is not known to be a Room (see the four-argument
+     * form). gorge spells a non-Room split or MDFC spell by its setup ref, the
+     * front face, so XMage's whole "A // B" object name reads as the front
+     * half, and the spell of a face-1 cast -- which XMage names by the back
+     * half's ability -- is rewritten to the front. The card under test's back
+     * half is the only back half a scenario can name, so it is the only alias.
+     * The back-half alias is valid ONLY for a spell: a Room permanent whose
+     * back door is unlocked really is named for that back half (CR 709.5),
+     * and gorge reports it so; use gorgeObjectSpellingRule for every other
+     * snapshot string. */
     static String gorgeSpellingRule(String gorgeName, String xmageName, String s) {
-        if (!xmageName.isEmpty()) {
-            if (s.equals(xmageName)) {
-                return gorgeName;
-            }
-            if (xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
-                return gorgeName;
-            }
+        return gorgeSpellingRule(gorgeName, xmageName, false, s);
+    }
+
+    /** The stack-spell rewrite with the card under test's Room-ness known.
+     * A Room spell has only the characteristics of the door it was cast as
+     * (CR 709.3b), so its name is that door's name, whichever door it is
+     * (CR 709.5); gorge names it so (rules/oracle_snapshot.go
+     * stackSourceRef), so a Room's back-door spell keeps its name and only a
+     * non-Room split/MDFC back face takes the front-face alias. */
+    static String gorgeSpellingRule(String gorgeName, String xmageName, boolean room, String s) {
+        if (!room && !xmageName.isEmpty() && xmageName.contains(" // ") && s.equals(backHalf(xmageName))) {
+            return gorgeName;
+        }
+        return gorgeObjectSpellingRule(gorgeName, xmageName, s);
+    }
+
+    /** The spelling rewrite for every snapshot string that is not a stack
+     * spell's source or a permanent's name (hand, graveyard, exile, library,
+     * ability sources, targets): the whole object name reads as the front
+     * half, and a bare back-half name is left alone, because a Room's
+     * unlocked back door is a real name. */
+    static String gorgeObjectSpellingRule(String gorgeName, String xmageName, String s) {
+        if (!xmageName.isEmpty() && s.equals(xmageName)) {
+            return gorgeName;
         }
         return frontHalf(s);
+    }
+
+    /** The spelling rewrite for a battlefield permanent's name (a snapshot
+     * permanent's "name" and "attached_to"). The only permanent XMage names
+     * "A // B" is a Room with both doors unlocked, and that IS its name (CR
+     * 709.5: it has both halves' names, the same "Left // Right" gorge binds,
+     * rules/oracle_run.go fieldName), so it is never collapsed to the front
+     * half -- not even for the card under test, whose scenario spelling is
+     * its front face. Any other name takes the card under test's spelling
+     * alias as gorgeObjectSpellingRule does. */
+    static String gorgePermanentSpellingRule(String gorgeName, String xmageName, String s) {
+        if (s.contains(" // ")) {
+            return s;
+        }
+        return gorgeObjectSpellingRule(gorgeName, xmageName, s);
+    }
+
+    /** Whether the XMage card is a Room (CR 709.3; XMage's RoomCard). Card-
+     * based and package-private so a test can pin it without the card
+     * repository (which needs H2). */
+    static boolean isRoomCard(Card c) {
+        return c instanceof mage.cards.RoomCard;
+    }
+
+    // Room-ness per XMage card name: a card's class never changes within a
+    // run, so one repository lookup per name is enough.
+    private static final Map<String, Boolean> ROOM_NAMES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Whether the named XMage card ("A // B") is a Room. Package-private
+     * and overridable so a no-H2 test double can answer without the card
+     * repository. */
+    boolean cardIsRoom(String xmageCardName) {
+        if (!xmageCardName.contains(" // ")) {
+            return false;
+        }
+        return ROOM_NAMES.computeIfAbsent(xmageCardName, n -> {
+            CardInfo info = CardRepository.instance.findCard(n);
+            return isRoomCard(info == null ? null : info.createCard());
+        });
     }
 
     /** Rewrites XMage's spelling of the card under test back to the scenario's
      * (gorge) spelling throughout a value, so the comparator sees one name. */
     private JsonElement gorgeSpellings(JsonElement e) {
+        return gorgeSpellings(e, Spelling.OBJECT);
+    }
+
+    /** Which rewrite a snapshot string takes: an ordinary object name, a
+     * stack spell's source, or a battlefield permanent's name. PERMANENTS
+     * marks the "permanents" array, whose objects' name fields are
+     * PERMANENT. */
+    private enum Spelling { OBJECT, SPELL, PERMANENT, PERMANENTS }
+
+    private JsonElement gorgeSpellings(JsonElement e, Spelling how) {
         if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
             String s = e.getAsString();
-            String r = gorgeSpellingRule(gorgeName, xmageName, s);
+            String r;
+            switch (how) {
+                case SPELL:
+                    // Only the card under test's back half can take the alias,
+                    // so the repository is asked only then.
+                    boolean room = s.equals(backHalf(xmageName)) && cardIsRoom(xmageName);
+                    r = gorgeSpellingRule(gorgeName, xmageName, room, s);
+                    break;
+                case PERMANENT:
+                    r = gorgePermanentSpellingRule(gorgeName, xmageName, s);
+                    break;
+                default:
+                    r = gorgeObjectSpellingRule(gorgeName, xmageName, s);
+            }
             return r.equals(s) ? e : new JsonPrimitive(r);
         }
         if (e.isJsonArray()) {
             JsonArray a = new JsonArray();
             for (JsonElement x : e.getAsJsonArray()) {
-                a.add(gorgeSpellings(x));
+                a.add(gorgeSpellings(x, how == Spelling.PERMANENTS ? Spelling.PERMANENTS : Spelling.OBJECT));
             }
             return a;
         }
         if (e.isJsonObject()) {
+            JsonObject in = e.getAsJsonObject();
+            // A stack entry {"kind":"spell","source":name}: only its source
+            // is the spell's name and takes the face-1 back-half alias.
+            JsonElement kind = in.get("kind");
+            boolean spell = kind != null && kind.isJsonPrimitive() && "spell".equals(kind.getAsString());
+            boolean permanent = how == Spelling.PERMANENTS;
             JsonObject o = new JsonObject();
-            for (Map.Entry<String, JsonElement> en : e.getAsJsonObject().entrySet()) {
-                o.add(en.getKey(), gorgeSpellings(en.getValue()));
+            for (Map.Entry<String, JsonElement> en : in.entrySet()) {
+                String k = en.getKey();
+                Spelling child = Spelling.OBJECT;
+                if (spell && k.equals("source")) {
+                    child = Spelling.SPELL;
+                } else if (permanent && (k.equals("name") || k.equals("attached_to"))) {
+                    child = Spelling.PERMANENT;
+                } else if (!permanent && k.equals("permanents")) {
+                    child = Spelling.PERMANENTS;
+                }
+                o.add(k, gorgeSpellings(en.getValue(), child));
             }
             return o;
         }
@@ -2272,21 +2787,74 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 return a instanceof ActivatedManaAbilityImpl;
             }
         }
-        return false;
+        // No printed ability carries the text: a GAINED ability (Locus of
+        // Enlightenment's craft materials, CR 613.1f). Its rule text is the
+        // only thing known before the game runs, so a plain "{T}: Add {G}"
+        // tap-for-mana text is activated as the mana ability it is (CR
+        // 605.1a); TestPlayer's activate command never finds a mana ability.
+        return isTapManaText(text);
+    }
+
+    /** A "{T}: Add ..." rule text with no other cost: the mana-ability shape
+     * a gained ability is recognised by when the source prints none. */
+    static boolean isTapManaText(String text) {
+        return text != null && text.matches("\\{T\\}: Add (\\{[WUBRGC]\\})+\\.?");
     }
 
     static final int PASS_PAIR_FIRST = 1;
     static final int PASS_HANDOFF = 2;
     static final int PASS_PAIR_SECOND = 3;
+    /** The active player's own pass on its turn (seat 1 active). XMage's
+     * idle TestPlayer passes without being told, so it queues nothing. */
+    static final int PASS_ACTIVE_OWN = 4;
+    /** The first pass of a p1-first pair: on the active player's turn (seat 0)
+     * seat 1 casts at instant speed, keeps priority (CR 117.3c) and passes,
+     * then seat 0 passes to resolve the top object (CR 117.4). Queues nothing
+     * like PASS_PAIR_FIRST; the pair's second pass is PASS_PAIR_SECOND. */
+    static final int PASS_P1_PAIR_FIRST = 5;
 
     /** The XMage commands a pass step queues on the active player, the seat
      * that carries every checkpoint. */
     static final String CMD_REQUIRE_STACK = "pass pair needs a stack object";
     static final String CMD_WAIT_RESOLVE_ONE = "waitStackResolved:1";
     static final String CMD_YIELD_PRIORITY = "pass handoff to the opponent";
+    static final String CMD_REQUIRE_EMPTY_STACK = "opening pass pair needs an empty stack";
+    static final String CMD_ADVANCE_STEP = "opening pass pair advances the step";
 
     private static boolean isOp(JsonArray steps, int index, String op) {
         return index >= 0 && index < steps.size() && str(steps.get(index).getAsJsonObject(), "op").equals(op);
+    }
+
+    /** The passing seat is the active player and not seat 0, and the pass is
+     * not half of a pair: gorge's pass answers that seat's own priority. */
+    private static boolean isActiveOwnPass(JsonArray steps, int index, int activeSeat) {
+        return activeSeat != 0 && isOp(steps, index, "pass") && seatOfStep(steps, index) == activeSeat
+                && !isOp(steps, index - 1, "pass") && !isOp(steps, index + 1, "pass");
+    }
+
+    /** Whether the pass pair starting at step {@code first} is a p1-first pair:
+     * seat 1 casts at instant speed on the active player's turn, then passes
+     * (CR 117.3c holds priority after casting), and seat 0 passes to resolve
+     * (CR 117.4). A seat-1 cast immediately before the pair is what makes it
+     * this shape; a bare [{pass s1},{pass s0}] stays unsupported. */
+    private static boolean isP1PairFirst(JsonArray steps, int first) {
+        return seatOfStep(steps, first) == 1
+                && isOp(steps, first + 1, "pass") && seatOfStep(steps, first + 1) == 0
+                && !isOp(steps, first - 1, "pass") && !isOp(steps, first + 2, "pass")
+                && isOp(steps, first - 1, "cast") && seatOfStep(steps, first - 1) == 1;
+    }
+
+    /** Whether the pass at {@code index} is half of a p1-first pair on seat
+     * 1's OWN turn: seat 1 casts, holds priority and passes (CR 117.3c), then
+     * seat 0 passes and the top object resolves (CR 117.4). That is the
+     * active player's pair, the mirror of seat 0's p0-then-p1 pair on its
+     * turn, so its commands and its second checkpoint go on the active seat
+     * (Zidane, Wan Shi Tong: an opponent's sorcery on its own turn). */
+    static boolean isActiveP1Pair(JsonArray steps, int index, int activeSeat) {
+        if (activeSeat != 1 || !isOp(steps, index, "pass")) {
+            return false;
+        }
+        return isP1PairFirst(steps, isOp(steps, index - 1, "pass") ? index - 1 : index);
     }
 
     private static int seatOfStep(JsonArray steps, int index) {
@@ -2299,6 +2867,13 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * named seat. Two opposing passes (p0 then p1) resolve the stack's top
      * object, so p0's pass leaves the stack as it was and only p1's pass
      * resolves. A lone p0 pass hands priority to the p1 cast that follows. */
+    static int passAction(JsonArray steps, int index, int activeSeat) {
+        if (isActiveOwnPass(steps, index, activeSeat)) {
+            return PASS_ACTIVE_OWN;
+        }
+        return passAction(steps, index);
+    }
+
     static int passAction(JsonArray steps, int index) {
         if (index < 0 || index >= steps.size()) {
             throw new IllegalArgumentException("pass step index out of range: " + index);
@@ -2308,6 +2883,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         }
         int seat = seatOfStep(steps, index);
         if (isOp(steps, index - 1, "pass")) {
+            if (isP1PairFirst(steps, index - 1)) {
+                return PASS_PAIR_SECOND;
+            }
             if (seatOfStep(steps, index - 1) == 0 && seat == 1
                     && !isOp(steps, index - 2, "pass") && !isOp(steps, index + 1, "pass")) {
                 return PASS_PAIR_SECOND;
@@ -2315,6 +2893,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
             throw new IllegalArgumentException("unsupported pass sequence at step " + index);
         }
         if (isOp(steps, index + 1, "pass")) {
+            if (isP1PairFirst(steps, index)) {
+                return PASS_P1_PAIR_FIRST;
+            }
             if (seat == 0 && seatOfStep(steps, index + 1) == 1 && !isOp(steps, index + 2, "pass")) {
                 return PASS_PAIR_FIRST;
             }
@@ -2334,37 +2915,146 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * spell, as gorge's does); the second queues the one-object resolution
      * ahead of its checkpoint; the step after a lone p0 pass starts by
      * yielding priority, so the opponent's cast is on the stack before that
-     * step's checkpoint. Passes need the active player to be seat 0. */
+     * step's checkpoint. Pairs and handoffs need the active player to be
+     * seat 0; the active seat 1's own lone pass queues nothing. */
     static List<String> passCommands(JsonArray steps, int index, int activeSeat) {
         List<String> cmds = new ArrayList<>();
+        if (isActiveOwnPass(steps, index, activeSeat)) {
+            return cmds;
+        }
         boolean passHere = isOp(steps, index, "pass");
         boolean afterHandoff = isOp(steps, index - 1, "pass")
-                && passAction(steps, index - 1) == PASS_HANDOFF;
-        if ((passHere || afterHandoff) && activeSeat != 0) {
+                && passAction(steps, index - 1, activeSeat) == PASS_HANDOFF;
+        if ((passHere || afterHandoff) && activeSeat != 0 && !isActiveP1Pair(steps, index, activeSeat)) {
             throw new IllegalArgumentException("pass at step " + index + " needs seat 0 to be the active player");
         }
         if (afterHandoff) {
             cmds.add(CMD_YIELD_PRIORITY);
         }
         if (passHere && passAction(steps, index) == PASS_PAIR_SECOND) {
-            cmds.add(CMD_REQUIRE_STACK);
-            cmds.add(CMD_WAIT_RESOLVE_ONE);
+            if (pairOpensScenario(steps, index)) {
+                cmds.add(CMD_REQUIRE_EMPTY_STACK);
+                cmds.add(CMD_ADVANCE_STEP);
+            } else {
+                cmds.add(CMD_REQUIRE_STACK);
+                if (!pairEndsMidResolution(steps, index)) {
+                    cmds.add(CMD_WAIT_RESOLVE_ONE);
+                }
+            }
         }
         return cmds;
     }
 
+    /** Whether the pass pair whose second pass is step {@code second} stops
+     * inside the top object's resolution for gorge: the next step is a
+     * pass_to "priority" that answers a mid-resolution "choose" (Wan Shi
+     * Tong: the opponent's Demonic Tutor resolves to its search). gorge's
+     * pair checkpoint still sees the spell on the stack, so XMage, which
+     * cannot stop inside a resolution, resolves it at that pass_to instead
+     * (passToResolvesTop). */
+    static boolean pairEndsMidResolution(JsonArray steps, int second) {
+        int next = second + 1;
+        if (!isOp(steps, second, "pass") || !isOp(steps, next, "pass_to")) {
+            return false;
+        }
+        JsonObject st = steps.get(next).getAsJsonObject();
+        if (!str(st, "decision").equals("priority") || !st.has("answers") || !st.get("answers").isJsonArray()) {
+            return false;
+        }
+        for (JsonElement e : st.getAsJsonArray("answers")) {
+            if (e.isJsonObject() && str(e.getAsJsonObject(), "kind").equals("choose")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the pass pair whose second pass is step {@code second} is the
+     * scenario's first two steps AND its only steps. Setup then puts nothing
+     * on the stack: the CantBeCast/CantBeActivated opponent-priority probes
+     * (static_cant_be.go) are exactly that pair, so both seats pass in
+     * succession on an empty stack and the game moves to the next step (CR
+     * 500.2), as gorge's does. A pair with any step after it is a prelude to
+     * those steps -- a beginning-of-step trigger is still on the stack there
+     * (Shadow of the Goblin's setupResolvePrelude emits the pair before a
+     * cast) -- so it resolves the top object like any other pair, even though
+     * it is also the scenario's first two steps. */
+    static boolean pairOpensScenario(JsonArray steps, int second) {
+        return second == 1 && steps.size() == 2;
+    }
+
+    /** The step an opening pass pair moves the game to: the step after the
+     * one it was passed in. Only main1, where every scenario starts, is
+     * mapped; anything else fails loudly rather than being guessed at. */
+    static PhaseStep stepAfterEmptyPass(PhaseStep from) {
+        if (from == PhaseStep.PRECOMBAT_MAIN) {
+            return PhaseStep.BEGIN_COMBAT;
+        }
+        throw new IllegalArgumentException("opening pass pair in " + from + " is unsupported");
+    }
+
+    /** A pass_to for decision "priority" that directly follows a pass_to for
+     * decision "choose": gorge posed a mid-resolution ask at the first and
+     * answers it at the second, so XMage must resolve the stack's top object
+     * before this step's checkpoint (planCounterCauses' proliferate recipe).
+     * Likewise the pass_to after a pass pair that stopped mid-resolution
+     * (pairEndsMidResolution). */
+    static boolean passToResolvesTop(JsonArray steps, int index) {
+        if (index < 1 || index >= steps.size()) {
+            return false;
+        }
+        if (pairEndsMidResolution(steps, index - 1) && isOp(steps, index - 2, "pass")) {
+            return true;
+        }
+        JsonObject cur = steps.get(index).getAsJsonObject();
+        JsonObject prev = steps.get(index - 1).getAsJsonObject();
+        return str(cur, "op").equals("pass_to") && str(cur, "decision").equals("priority")
+                && str(prev, "op").equals("pass_to") && str(prev, "decision").equals("choose");
+    }
+
+    /** The stack's object names, top first. */
+    private static List<String> stackNames(Game g) {
+        List<String> names = new ArrayList<>();
+        for (StackObject so : g.getStack()) {
+            names.add(so.getName());
+        }
+        return names;
+    }
+
+    /** The CMD_REQUIRE_STACK failure text. A pass pair that should resolve the
+     * stack's top object found the stack empty; name the turn, step and
+     * priority holder, and the objects that were on the stack at the last
+     * checkpoint and have since left it (the recent departures), so the
+     * mechanism (the object resolved early, or the pair ran at the wrong step)
+     * is visible without a re-run. */
+    static String emptyStackDiagnostic(String cmd, int turn, String step, String priority,
+            List<String> lastStack, List<String> nowStack) {
+        List<String> departed = new ArrayList<>(lastStack);
+        departed.removeAll(nowStack);
+        return cmd + ": the stack is empty (turn " + turn + ", step " + step
+                + ", priority " + priority + "; since the last checkpoint the stack lost " + departed + ")";
+    }
+
     private void queuePassCommands(int stepIdx) {
+        // Every pass command runs on the active seat: seat 0 for every shape
+        // but the active seat 1's own p1-first pair (isActiveP1Pair).
+        TestPlayer active = seat(activeSeat);
         for (String cmd : passCommands(steps(sc0), stepIdx, activeSeat)) {
             switch (cmd) {
                 case CMD_REQUIRE_STACK:
-                    runCode(cmd, turn, phase, playerA, (info, pl, g) -> {
+                    runCode(cmd, turn, phase, active, (info, pl, g) -> {
                         if (g.getStack().isEmpty()) {
-                            throw new IllegalStateException(cmd + ": the stack is empty");
+                            Player prio = g.getPriorityPlayerId() == null ? null
+                                    : g.getPlayer(g.getPriorityPlayerId());
+                            throw new IllegalStateException(emptyStackDiagnostic(cmd, g.getTurnNum(),
+                                    g.getTurnStepType() == null ? "" : g.getTurnStepType().name(),
+                                    prio == null ? "none" : prio.getName(), lastCheckpointStack,
+                                    stackNames(g)));
                         }
                     });
                     break;
                 case CMD_WAIT_RESOLVE_ONE:
-                    waitStackResolved(turn, phase, playerA, true);
+                    waitStackResolved(turn, phase, active, true);
                     // The pair resolves the stack's top object, so a cast
                     // step's spell has left the stack: a later cast that
                     // names it targets its permanent, not a spell that will
@@ -2373,6 +3063,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     break;
                 case CMD_YIELD_PRIORITY:
                     runCode(cmd, turn, phase, playerA, (info, pl, g) -> pl.pass(g));
+                    break;
+                case CMD_REQUIRE_EMPTY_STACK:
+                    runCode(cmd, turn, phase, playerA, (info, pl, g) -> {
+                        if (!g.getStack().isEmpty()) {
+                            throw new IllegalStateException(cmd + ": the stack holds " + g.getStack().size());
+                        }
+                    });
+                    break;
+                case CMD_ADVANCE_STEP:
+                    // Both seats pass on the empty stack, so the pair's
+                    // checkpoint is the next step's first priority.
+                    phase = stepAfterEmptyPass(phase);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown pass command " + cmd);
@@ -2418,8 +3120,17 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     phase = PhaseStep.DECLARE_ATTACKERS;
                     return;
                 }
+                List<String> attackNames = new ArrayList<>();
                 for (String a : attackers) {
-                    attack(turn, p, combatName(a), seat(seatOf(str(st, "defender"))));
+                    attackNames.add(combatName(a));
+                }
+                // A mixed declaration (Ares, God of War beside a Grizzly
+                // Bears): XMage declares the must-attack creature itself
+                // (above), and selectAttackers consumes only the commands of
+                // the others, so a command for the forced one is left over.
+                attackNames = withoutMustAttack(attackNames, ScenarioReplay::isMustAttackName);
+                for (String a : attackCommandOrder(attackNames)) {
+                    attack(turn, p, a, seat(seatOf(str(st, "defender"))));
                 }
                 phase = PhaseStep.DECLARE_ATTACKERS;
                 return;
@@ -2432,6 +3143,18 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 // beginStep before any priority), so this is for completeness.
                 String stepName = str(st, "step");
                 String decision = str(st, "decision");
+                if (passToResolvesTop(steps(sc0), stepIdx)) {
+                    // gorge's two-step "choose" then "priority" reaches a
+                    // mid-resolution ask and answers it; XMage cannot stop
+                    // inside a resolution, so the spell or ability stays on
+                    // its stack until the second step resolves its top object
+                    // (the answers are consumed by that resolution).
+                    // A pair's deferred resolution waits on the active seat,
+                    // the seat that queued the pair (queuePassCommands).
+                    waitStackResolved(turn, phase, isOp(steps(sc0), stepIdx - 1, "pass") ? seat(activeSeat) : p, true);
+                    dropLastCast();
+                    return;
+                }
                 if (st.has("active")) {
                     String active = str(st, "active");
                     int nextActiveSeat = active.equals("p1") ? 1 : active.equals("p0") ? 0 : -1;
@@ -2466,9 +3189,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     phase = PhaseStep.DRAW;
                 } else if (stepName.equals("end")) {
                     phase = PhaseStep.END_TURN;
-                } else if (stepName.equals("main1") || stepName.isEmpty()) {
+                } else if (stepName.equals("main1")) {
                     phase = MAIN;
                 }
+                // An empty step is a checkpoint wherever the scenario already
+                // is: phase is left as the preceding ops set it.
                 return;
             }
             case "block": {
@@ -2488,10 +3213,10 @@ public class ScenarioReplay extends CardTestPlayerBase {
                 String to = str(st, "to");
                 Zone destination = moveDestination(to);
                 runCode("move " + ref + " to " + destination, turn, phase, p, (info, pl, g) -> {
-                    Card moving = findMoveCard(pl, g, name);
+                    Card moving = moveSource(findMoveCard(pl, g, name), () -> battlefieldMoveSource(g, ref));
                     if (moving == null) {
                         throw new IllegalArgumentException("move card " + ref + " is not in "
-                                + pl.getName() + "'s " + moveSourceZones());
+                                + pl.getName() + "'s " + moveSourceZones() + " or on the battlefield");
                     }
                     if (!pl.moveCards(moving, destination, null, g)) {
                         throw new IllegalStateException("move " + ref + " to " + destination + " refused");
@@ -2546,6 +3271,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     throw new IllegalArgumentException("cast_mode " + castMode + " unsupported");
                 }
                 bargainedCast = "bargained".equals(castMode);
+                optionalCostCast = "optionalcost".equals(castMode);
+                alternativeCostCast = "alternative".equals(castMode);
+                copyCostCast = copyCostKeyword(castMode);
                 // "plot" is XMage's Plot special action (PlotAbility is a
                 // SpecialAction: no stack, not a cast), activated from the
                 // hand by its rule text "Plot {cost}" like XMage's own
@@ -2557,6 +3285,24 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         throw new IllegalArgumentException("plot step " + stepIdx + " has no xmage_ability");
                     }
                     activateAbility(turn, phase, p, plotText);
+                    return;
+                }
+                // "flashback" is the cast of a graveyard card for its
+                // flashback cost. XMage offers it as a separate SpellAbility
+                // named "Flashback <cost>" (CastFromGraveyardAbility), picked
+                // like any ability by its rule-text prefix; the card's alias
+                // scopes the pick to this step's card so another flashback
+                // card in the graveyard cannot be chosen. The step's mana was
+                // added above; a reduction (Bilbo) is applied by XMage itself.
+                if ("flashback".equals(castMode)) {
+                    String fbText = flashbackCommand(refAlias.get(str(st, "card")));
+                    if (!sc0.has("xmage_answers")) {
+                        answers(st, p);
+                    }
+                    for (String t : targets(st)) {
+                        queueCastTarget(p, t);
+                    }
+                    activateAbility(turn, phase, p, fbText);
                     return;
                 }
                 // "disguised" casts the card face down for {3}; XMage selects
@@ -2585,6 +3331,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         }
                     }
                 }
+                giftPromisedCast = castCostPicks.contains("gift_promise");
                 // The cast command names the SpellAbility, not the card
                 // object: a split/Room half is cast by its half name while
                 // the hand holds the whole "A // B" card (castSpelling).
@@ -2597,6 +3344,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         ? " using Morph"
                         : "disguised".equals(mode) ? " using Disguise" : "";
                 String card = cardName + castSuffix;
+                if (!castSuffix.isEmpty()) {
+                    faceDownRefs.add(str(st, "card"));
+                }
                 List<String> tg = targets(st);
                 if (hasAlternativeSourceCost(cardName)) {
                     // A plain cast step: gorge paid the mana cost, so decline
@@ -2703,14 +3453,24 @@ public class ScenarioReplay extends CardTestPlayerBase {
                     answers(st, p);
                 }
                 String card = battlefieldName(str(st, "card"));
+                if (turnsFaceUp(text)) {
+                    faceDownRefs.remove(str(st, "card"));
+                }
                 if (isManaAbilityText(card, text)) {
                     activateManaAbility(turn, phase, p, text);
                     return;
                 }
-                for (String t : targets(st)) {
-                    queueCastTarget(p, t);
+                // A divided (TargetAmount) activation's recipients come from
+                // the generator's scripted "<ref>^X=<share>" answers, already
+                // queued for this step; queueing the bare step targets too
+                // would hand chooseTargetAmount an alias it rejects ("Must be
+                // target amount, but found unknown target", The Earth Crystal).
+                if (!stepScriptsTargetAmount(sc0, stepIdx)) {
+                    for (String t : targets(st)) {
+                        queueCastTarget(p, t);
+                    }
                 }
-                activateAbility(turn, phase, p, text);
+                activateAbility(turn, phase, p, boundActivationText(p, str(st, "card"), text, stepIdx));
                 return;
             }
             case "play":
@@ -2719,7 +3479,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
             case "pass":
                 // Validated here; its XMage commands are queued around the
                 // checkpoint by queuePassCommands, which the replay loop runs before this step.
-                passAction(steps(sc0), stepIdx);
+                passAction(steps(sc0), stepIdx, activeSeat);
                 return;
             case "resolve":
                 // gorge's resolve op passes priority until the stack is empty.
@@ -2757,6 +3517,15 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
             TestPlayer p = seat(a.get("seat").getAsInt());
             String value = str(a, "value");
+            if (kind.equals("setup_flip")) {
+                // A coin flip the setup drive walked into before the first
+                // gameplay step (Mana Crypt's turn-1 upkeep trigger): XMage
+                // poses the same flip during the drive, so the result must be
+                // queued ahead of build() or TestPlayer's unscripted
+                // flipCoinResult fails the run (oraclegen emits "win"/"lose").
+                queueFlipResult(p, value);
+                continue;
+            }
             if (kind.equals("setup_mode")) {
                 // A setup-drive modal pick (Zuko, Conflicted's turn-1 charm):
                 // XMage poses chooseMode, or chooseUse for a yes/no
@@ -2784,6 +3553,36 @@ public class ScenarioReplay extends CardTestPlayerBase {
 
     static void queueSetupChoices(TestPlayer player, String value) {
         queueChoice(player, value);
+    }
+
+    /** Queue one scripted coin-flip result on the player's CHOICE queue:
+     * "win" maps to TestPlayer.FLIPCOIN_RESULT_TRUE ("[flipcoin_true]"),
+     * "lose" to FLIPCOIN_RESULT_FALSE — the tokens TestPlayer.flipCoinResult
+     * consumes from the queue head, which unscripted fails the replay with
+     * "Missing FLIP COIN RESULT def". */
+    static void queueFlipResult(TestPlayer p, String value) {
+        p.addChoice(value.equals("win") ? TestPlayer.FLIPCOIN_RESULT_TRUE : TestPlayer.FLIPCOIN_RESULT_FALSE);
+    }
+
+    /** Whether the generator scripted a divided-target share
+     * ("<ref>^X=<share>", oraclegen dividedTargetAnswers) for step i: the
+     * TargetAmount recipients of an activation whose own targets it then
+     * answers in place of the step's bare target list. */
+    static boolean stepScriptsTargetAmount(JsonObject sc, int i) {
+        if (sc == null || !sc.has("xmage_answers") || !sc.get("xmage_answers").isJsonArray()) {
+            return false;
+        }
+        JsonArray xans = sc.getAsJsonArray("xmage_answers");
+        if (i < 0 || i >= xans.size() || !xans.get(i).isJsonArray()) {
+            return false;
+        }
+        for (JsonElement e : xans.get(i).getAsJsonArray()) {
+            JsonObject a = e.getAsJsonObject();
+            if ("target".equals(str(a, "kind")) && str(a, "value").contains("^X=")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Applies the generator's scripted answers (oraclegen.XAnswer). */
@@ -2826,9 +3625,19 @@ public class ScenarioReplay extends CardTestPlayerBase {
                         setModeChoice(p, v);
                     }
                     break;
+                case "flip":
+                    // A coin flip the scenario's runner recorded (Mana
+                    // Crypt's upkeep): XMage poses the same flip while this
+                    // step executes, and TestPlayer's flipCoinResult consumes
+                    // the token from the CHOICE queue head (oraclegen emits
+                    // "win"/"lose"; the drive-window "setup_flip" kind is
+                    // queued before build() and never reaches this switch).
+                    queueFlipResult(p, v);
+                    break;
                 case "setup_choice":
                 case "setup_target":
                 case "setup_mode":
+                case "setup_flip":
                     // Queued before setup placement; never enqueue it again at
                     // the corresponding gameplay step.
                     break;
@@ -3006,6 +3815,104 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * registered before execute()). So bind an alias to the pending
      * ability's id with a code action registered just ahead of the
      * activation or cast, and queue that alias. */
+    /**
+     * XMage matches an activated command by a prefix of the ability's rule
+     * text across every permanent the player controls, so two planeswalkers
+     * that share "+1: ..." text activate whichever XMage lists first (Ajani
+     * Unrelenting beside Ajani Goldmane). The scenario names the card: bind a
+     * space-free alias to that setup object just ahead of the activation and
+     * prefix the command with it ("@ref text from ref object"). A card with no
+     * setup alias (a token, a permanent that entered later) keeps the plain
+     * text.
+     */
+    private String boundActivationText(TestPlayer p, String ref, String text, int stepIdx) {
+        String alias = refAlias.get(ref);
+        if (alias == null || text.startsWith("@")) {
+            return text;
+        }
+        String key = "act" + stepIdx;
+        String name = refName(ref);
+        runCode("bind " + ref, turn, phase, p, (info, pl, g) -> {
+            UUID setupId = p.getAliasByName(alias);
+            UUID id = activationSourceId(p, g, name, text, setupId);
+            if (id == null) {
+                id = setupId;
+            }
+            if (id == null) {
+                throw new IllegalArgumentException("activate " + ref + ": no setup object bound to " + alias);
+            }
+            for (int j = 0; j < seats; j++) {
+                seat(j).addAlias(key, id);
+            }
+        });
+        return "@" + key + " " + text;
+    }
+
+    /**
+     * The source id XMage must match for a named activation: the live
+     * playable ability that carries the scenario's ability text belongs to
+     * the named card. The setup alias binds the object as it was created,
+     * but a card that moved zones (a graveyard activation, a permanent cast
+     * from hand) has a NEW id for its ability's source, so binding the setup
+     * id makes XMage find no ability ("Can't find ability to activate
+     * command: @act0 {3}{B}{B}{R}{R}"). Prefer the setup id itself (a
+     * same-named permanent whose source is the setup object, which keeps
+     * duplicate-name cards exact); otherwise fall back to the first live
+     * ability whose source name is the ref's card. Returns null when no live
+     * ability matches, so the caller keeps the setup alias.
+     */
+    private UUID activationSourceId(TestPlayer p, Game g, String name, String text, UUID setupId) {
+        List<ActivationCandidate> candidates = new ArrayList<>();
+        for (Ability ability : p.getPlayable(g, true)) {
+            mage.MageObject source = g.getObject(ability.getSourceId());
+            candidates.add(new ActivationCandidate(source == null ? null : source.getName(),
+                    ability.toString(), ability.getSourceId()));
+        }
+        return chooseActivationSource(candidates, name, text, setupId);
+    }
+
+    /** One live playable ability considered for a named activation: its
+     * source object's name, the ability text XMage matches, and the source
+     * object id the alias must carry. */
+    static final class ActivationCandidate {
+        final String sourceName;
+        final String text;
+        final UUID sourceId;
+
+        ActivationCandidate(String sourceName, String text, UUID sourceId) {
+            this.sourceName = sourceName;
+            this.text = text;
+            this.sourceId = sourceId;
+        }
+    }
+
+    /**
+     * Picks the source id a named activation's alias must carry. Prefer the
+     * setup id itself when a live ability's source is that exact object (a
+     * same-named permanent whose source is the setup object, which keeps
+     * duplicate-name cards exact); otherwise the first live ability whose
+     * text matches and whose source name is the ref's card. A card that
+     * moved zones (a graveyard activation, a permanent cast from hand) has a
+     * new source id, so the setup id no longer matches and the name picks it
+     * out. Null when no live ability matches, so the caller keeps the setup
+     * alias.
+     */
+    UUID chooseActivationSource(List<ActivationCandidate> candidates, String name, String text, UUID setupId) {
+        UUID nameMatch = null;
+        for (ActivationCandidate c : candidates) {
+            if (!c.text.startsWith(text)) {
+                continue;
+            }
+            if (setupId != null && c.sourceId.equals(setupId)) {
+                return c.sourceId;
+            }
+            if (nameMatch == null && sourceNameIsNamed(c.sourceName, name)) {
+                nameMatch = c.sourceId;
+            }
+        }
+        return nameMatch;
+    }
+
     private void queueAbilityTarget(TestPlayer p, String ref) {
         String key = ref + "~" + (++abilityAliasSeq);
         runCode("bind " + ref, turn, phase, p, (info, pl, g) -> bindPendingAbility(g, ref, key));
@@ -3025,17 +3932,21 @@ public class ScenarioReplay extends CardTestPlayerBase {
         if (found == null) {
             throw new IllegalArgumentException("ability ref " + ref + " is not on the stack");
         }
-        for (int j = 0; j < 2; j++) {
+        for (int j = 0; j < seats; j++) {
             seat(j).addAlias(key, found.getId());
         }
     }
 
     private boolean abilitySourceIsNamed(mage.MageObject source, String name) {
-        if (source == null) {
-            return false;
-        }
-        String live = source.getName();
-        return live.equals(xmageSpelling(name)) || gorgeSpellingRule(gorgeName, xmageName, live).equals(name);
+        return source != null && sourceNameIsNamed(source.getName(), name);
+    }
+
+    /** Whether a live source object's name is the scenario ref's card, under
+     * both spellings the driver carries (the card under test's XMage name,
+     * and a split/Room object's front half). */
+    private boolean sourceNameIsNamed(String live, String name) {
+        return live != null
+                && (live.equals(xmageSpelling(name)) || gorgeSpellingRule(gorgeName, xmageName, live).equals(name));
     }
 
     /** The name form XMage's attack/block command takes. Unlike a cast
@@ -3043,6 +3954,13 @@ public class ScenarioReplay extends CardTestPlayerBase {
      * must be the card name, with the legacy zero-based "<name>:<index>"
      * suffix for a duplicate ("p0:Grizzly Bears#2" -> "Grizzly Bears:1"). */
     private String combatName(String ref) {
+        if (faceDownRefs.contains(ref)) {
+            // Yarus's face-down Abzan Guide: named by the face-down test
+            // command, which TestPlayer's attack/block search maps back to
+            // the empty face-down name (EmptyNames). The scenario's only
+            // face-down creature of that seat is the one it names.
+            return faceDownCombatName();
+        }
         String n = battlefieldName(ref);
         int hash = ref.lastIndexOf('#');
         if (hash >= 0 && ref.substring(hash + 1).matches("[0-9]+")) {
@@ -3052,6 +3970,57 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
         }
         return n;
+    }
+
+    /** TestPlayer's combat command for a face-down creature. */
+    static String faceDownCombatName() {
+        return mage.constants.EmptyNames.FACE_DOWN_CREATURE.getTestCommand();
+    }
+
+    /** Whether an activation's XMage text turns its permanent face up
+     * (Morph/Megamorph/Disguise's special action, "Turn face up"). */
+    static boolean turnsFaceUp(String abilityText) {
+        return abilityText != null && abilityText.toLowerCase(java.util.Locale.ROOT).contains("face up");
+    }
+
+    /** The attack commands in the order XMage can consume them. TestPlayer
+     * finds a "Name:k" attacker as the k-th UNTAPPED creature of that name
+     * (FilterCreatureForCombat), and declaring an attacker taps it at once
+     * (Combat.declareAttacker), so after "Goblin Token" is declared
+     * "Goblin Token:1" names a creature that is no longer there and the
+     * command is left over. Declaring same-name duplicates highest index
+     * first never shifts a lower index, with or without vigilance. Each
+     * name's commands keep the positions that name held; other names are
+     * untouched. */
+    static List<String> attackCommandOrder(List<String> combatNames) {
+        Map<String, List<Integer>> positions = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < combatNames.size(); i++) {
+            positions.computeIfAbsent(combatBaseName(combatNames.get(i)), k -> new ArrayList<>()).add(i);
+        }
+        List<String> out = new ArrayList<>(combatNames);
+        for (List<Integer> at : positions.values()) {
+            List<String> group = new ArrayList<>();
+            for (int i : at) {
+                group.add(combatNames.get(i));
+            }
+            group.sort(java.util.Comparator.comparingInt(ScenarioReplay::combatIndex).reversed());
+            for (int k = 0; k < at.size(); k++) {
+                out.set(at.get(k), group.get(k));
+            }
+        }
+        return out;
+    }
+
+    /** "Goblin Token:1" -> "Goblin Token"; a name with no index unchanged. */
+    static String combatBaseName(String combatName) {
+        int c = combatName.lastIndexOf(':');
+        return c >= 0 && combatName.substring(c + 1).matches("[0-9]+") ? combatName.substring(0, c) : combatName;
+    }
+
+    /** "Goblin Token:1" -> 1; a name with no index is index 0. */
+    static int combatIndex(String combatName) {
+        int c = combatName.lastIndexOf(':');
+        return c >= 0 && combatName.substring(c + 1).matches("[0-9]+") ? Integer.parseInt(combatName.substring(c + 1)) : 0;
     }
 
     /** Whether every named attacker is a card XMage forces to attack (an
@@ -3066,6 +4035,19 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
         }
         return true;
+    }
+
+    /** The attack command names left once every must-attack name is dropped
+     * (XMage's checkAttackRequirements declares those itself). Order is kept;
+     * a duplicate's ":k" index is read through its base name. */
+    static List<String> withoutMustAttack(List<String> combatNames, java.util.function.Predicate<String> mustAttack) {
+        List<String> out = new ArrayList<>();
+        for (String n : combatNames) {
+            if (!mustAttack.test(combatBaseName(n))) {
+                out.add(n);
+            }
+        }
+        return out;
     }
 
     /** Whether the named card carries XMage's AttacksEachCombatStaticAbility.
@@ -3178,6 +4160,9 @@ public class ScenarioReplay extends CardTestPlayerBase {
         if (id == null) {
             return -1;
         }
+        if (seats == 3 && id.equals(playerC.getId())) {
+            return 2;
+        }
         return id.equals(playerA.getId()) ? 0 : id.equals(playerB.getId()) ? 1 : -1;
     }
 
@@ -3211,6 +4196,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
     }
 
     private JsonObject snapshot(String checkpoint, Game g) {
+        lastCheckpointStack = stackNames(g);
         JsonObject s = new JsonObject();
         s.addProperty("checkpoint", checkpoint);
         s.addProperty("turn", g.getTurnNum());
@@ -3219,7 +4205,7 @@ public class ScenarioReplay extends CardTestPlayerBase {
         s.addProperty("priority", seatIndex(g, g.getPriorityPlayerId()));
         s.addProperty("over", g.hasEnded());
         JsonArray players = new JsonArray();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < seats; i++) {
             Player p = g.getPlayer(seat(i).getId());
             JsonObject po = new JsonObject();
             po.addProperty("seat", i);
@@ -3254,6 +4240,11 @@ public class ScenarioReplay extends CardTestPlayerBase {
             }
             po.add("library_top", top);
             po.addProperty("pool", pool(p.getManaPool()));
+            if (seats > 2 && p.hasLost()) {
+                // CR 800.4a: only a multiplayer game goes on past a loss, so
+                // only its snapshots carry the flag (gorge's OracleSnapPlayer.Lost).
+                po.addProperty("lost", true);
+            }
             players.add(po);
         }
         s.add("players", players);
@@ -3321,7 +4312,85 @@ public class ScenarioReplay extends CardTestPlayerBase {
             stack.add(o);
         }
         s.add("stack", stack);
+        if (wantsOffered()) {
+            s.add("offered", offered(g));
+        }
         return (JsonObject) gorgeSpellings(s);
+    }
+
+    /** Whether the scenario opts the "offered" field into the comparison
+     * (Item.Compare). Only then do the snapshots carry it, so every other
+     * scenario's wire bytes stay what they were. */
+    private boolean wantsOffered() {
+        if (sc0 == null || !sc0.has("compare") || !sc0.get("compare").isJsonArray()) {
+            return false;
+        }
+        for (JsonElement e : sc0.getAsJsonArray("compare")) {
+            if (e.isJsonPrimitive() && e.getAsString().equals("offered")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What the player holding priority may play, in gorge's snapshot
+     * vocabulary (rules.OracleSnapOffered): the source's scenario ref, the
+     * kind ("cast", "play" for a land, otherwise "activate" -- mana abilities
+     * included, CR 605.3a: a mana ability is activatable whenever its
+     * controller has priority), and the ability's rule text. The comparer
+     * strips the display prefixes. No priority player (the game ended, or the
+     * checkpoint is a skipped-step label recorded after the turn) offers
+     * nothing.
+     */
+    private JsonArray offered(Game g) {
+        JsonArray out = new JsonArray();
+        UUID holder = g.getPriorityPlayerId();
+        if (holder == null || g.hasEnded()) {
+            return out;
+        }
+        Player pr = g.getPlayer(holder);
+        if (pr == null) {
+            return out;
+        }
+        for (Ability a : pr.getPlayable(g, true)) {
+            mage.MageObject src = g.getObject(a.getSourceId());
+            if (src == null) {
+                continue;
+            }
+            JsonObject o = new JsonObject();
+            o.addProperty("source", offeredRef(g, a, src));
+            String kind = "activate";
+            if (a instanceof mage.abilities.PlayLandAbility) {
+                kind = "play";
+            } else if (a instanceof mage.abilities.SpellAbility) {
+                kind = "cast";
+            }
+            o.addProperty("kind", kind);
+            o.addProperty("label", a.toString());
+            out.add(o);
+        }
+        return out;
+    }
+
+    /** The scenario ref of an offered ability's source: the setup alias of
+     * that object when one exists (duplicate names keep their "#n"), else
+     * "pN:name" by its controller (owner, for a card outside the battlefield). */
+    private String offeredRef(Game g, Ability a, mage.MageObject src) {
+        UUID who = a.getControllerId();
+        if (src instanceof Card && !(src instanceof Permanent) && ((Card) src).getOwnerId() != null) {
+            who = ((Card) src).getOwnerId();
+        }
+        String name = setupName(src);
+        String best = null;
+        for (java.util.Map.Entry<String, UUID> en : seat(0).getAliases().entrySet()) {
+            String key = en.getKey();
+            if (en.getValue().equals(src.getId()) && isScenarioRef(key) && refName(key).equals(name)
+                    && (best == null || key.compareTo(best) < 0)) {
+                best = key;
+            }
+        }
+        return best != null ? best : "p" + seatIndex(g, who) + ":" + name;
     }
 
     private static JsonArray sortedNames(java.util.Collection<Card> cs) {

@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 // Command sbv2shadow is the reverse-adapter shadow-state check: it joins
 // sbv2engine's test-mode truth side channel (-truth) with sbagent's belief
 // log (-belief-out) on (game_id, seat, seat_step) and prints, field by

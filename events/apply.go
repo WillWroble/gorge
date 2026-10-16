@@ -121,6 +121,7 @@ func resetCombat(g *state.Game, only state.ObjID) {
 		o := &g.Objs[i]
 		if only == 0 || o.ID == only {
 			o.IsAttacking = false
+			o.IsBlocking = false
 			o.AttackingBattle = 0
 			o.BlockedBy = nil
 		} else {
@@ -274,6 +275,10 @@ func ApplyPtr(g *state.Game, e *Event) {
 		foldDungeonRemove(g, e)
 	case ManaUndo:
 		foldManaUndo(g, e)
+	case SpellCastReversed:
+		foldSpellCastReversed(g, e)
+	case HiddenIdentity:
+		foldHiddenIdentity(g, e)
 	case ChaosEnsues:
 		// The chaos-ensues marker (CR 901.9, task planar-verbs) is a pure
 		// marker, exactly like PlanarRoll: no state folds. The current plane's
@@ -315,6 +320,9 @@ func ApplyPtr(g *state.Game, e *Event) {
 	case RingEmblemPush:
 		foldRingEmblemPush(g, e)
 	case MoveZone, Draw, PutOnStack:
+		if e.Kind == PutOnStack {
+			tallySpellCast(g, e)
+		}
 		foldMoveZone(g, e)
 	case LifeChange:
 		foldLifeChange(g, e)

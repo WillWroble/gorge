@@ -197,6 +197,12 @@ func cantBlockByBlockerFilterItem(reg *cards.Registry, f *cards.Face, name strin
 			return finishLegalityItem(reg, f, name, mode, req, sc, []string{"509.1b"})
 		}
 	}
+	// A nameless-blocker filter no vanilla pair can split: the face-down
+	// blocker variant (static_legality_nameless.go).
+	st, _ := staticSlotOf(f, req)
+	if it, sk, ok := cantBlockByNamelessItem(reg, f, name, req, st.ParamStr(cards.PKValidBlocker)); ok {
+		return it, sk
+	}
 	return staticSkip(name, mode, "no probe pair splits the blocker filter")
 }
 
@@ -231,6 +237,40 @@ func cantGainLifeItem(reg *cards.Registry, f *cards.Face, name string, req level
 		return staticSkip(name, mode, fmt.Sprintf("life still changes with the card on the battlefield (life %d, %v)", life(res), res.Fails))
 	}
 	return finishLegalityItem(reg, f, name, mode, req, sc, []string{"119.7"})
+}
+
+// cantGainLifeEnchantedItem serves "Enchanted player can't gain life"
+// (Grievous Wound, an Enchant player Aura): the card starts in p0's hand and
+// is cast onto p0 (CR 303.4a: an Aura with enchant player attaches to the
+// player it targeted), then p0 casts the life-gain probe and stays at 20. The
+// control casts the probe with no Aura and gains its life.
+func cantGainLifeEnchantedItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
+	const mode = "CantGainLife"
+	gain, ok := castProbe(reg, lifeGainProbe)
+	if !ok {
+		return staticSkip(name, mode, "life-gain probe has no mana pool")
+	}
+	aura, ok := castProbe(reg, name, "p0")
+	if !ok {
+		return staticSkip(name, mode, "the Aura has no castable mana cost")
+	}
+	life := func(res rules.OracleResult) int32 {
+		if len(res.Snapshots) == 0 || len(res.Snapshots[len(res.Snapshots)-1].Players) == 0 {
+			return -1
+		}
+		return res.Snapshots[len(res.Snapshots)-1].Players[0].Life
+	}
+	control := staticScenario(f, name, nil, []string{lifeGainProbe}, []oraclegen.Step{gain, {Op: "resolve"}})
+	if cres, ok := runStatic(reg, control); !ok || len(cres.Fails) != 0 || life(cres) != 25 {
+		return staticSkip(name, mode, fmt.Sprintf("control does not gain the probe's life (life %d, %v)", life(cres), cres.Fails))
+	}
+	sc := staticScenario(f, name, nil, []string{name, lifeGainProbe},
+		[]oraclegen.Step{aura, {Op: "resolve"}, gain, {Op: "resolve"}})
+	res, ok := runStatic(reg, sc)
+	if !ok || len(res.Fails) != 0 || life(res) != 20 {
+		return staticSkip(name, mode, fmt.Sprintf("life still changes with the Aura on p0 (life %d, %v)", life(res), res.Fails))
+	}
+	return finishLegalityItem(reg, f, name, mode, req, sc, []string{"119.7", "303.4a"})
 }
 
 // manaConvertProbe is a creature spell with a green pip; offColourMana pays
@@ -290,8 +330,10 @@ func lookAtLibraryTopItem(reg *cards.Registry, f *cards.Face, name string, req l
 // (CantBeActivated ValidCard$ Card.NamedCard, the name chosen as it enters):
 // p0 casts the card and names the activated probe, whose ability is offered
 // at the cast's checkpoint (the control) and absent once the card resolves.
-// The probe's name sits on top of p0's library, which is the name gorge's
-// legacy no-universe NameCard picks; XMage is scripted the same name.
+// The resolve step names the probe (the oracle runner's scenario name
+// universe offers every seated card); the probe also stays on top of p0's
+// library, the one name the pre-universe fallback offered. XMage is scripted
+// the same name.
 func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement) (oraclegen.Item, *oraclegen.Skip) {
 	const mode = "CantBeActivated"
 	if req.Face > 0 {
@@ -307,7 +349,9 @@ func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, r
 	}
 	steps := []oraclegen.Step{
 		{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: mana, Expect: offered(true)},
-		{Op: "resolve"},
+		// Spyglass's as-enters chain asks the opponent to look at first (one
+		// option), then the card name.
+		{Op: "resolve", Answers: append([]oraclegen.Answer{{Kind: "choose", Pick: []string{"p1"}}}, namedProbeAnswer(activatedProbe)...)},
 		{Op: "pass_to", Seat: 0, Decision: "priority", Expect: offered(false)},
 	}
 	sc := staticScenario(f, name, []string{activatedProbe}, []string{name}, steps)
@@ -318,15 +362,9 @@ func cantBeActivatedNamedItem(reg *cards.Registry, f *cards.Face, name string, r
 	if skip != nil {
 		return it, skip
 	}
-	// gorge's runner has no name universe, so its NameCard offers one name
-	// (the caster's library top) and the answer generator drops it as a
-	// forced one-option ask; XMage offers every card name, so the chosen
-	// name is scripted at the resolve step that poses it.
+	// XMage offers every card name, so the chosen name is scripted at the
+	// resolve step that poses it (scriptNamedAnswers, once).
 	res, _ := runStatic(reg, sc)
-	for _, d := range res.Decisions {
-		if d.Step >= 0 && d.Step < len(it.XAnswers) && len(d.PickKinds) == 1 && d.PickKinds[0] == "name" && len(d.Picks) == 1 {
-			it.XAnswers[d.Step] = append(it.XAnswers[d.Step], oraclegen.XAnswer{Seat: d.Seat, Kind: "choice", Value: d.Picks[0]})
-		}
-	}
+	scriptNamedAnswers(res, &it)
 	return it, nil
 }

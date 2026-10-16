@@ -15,6 +15,7 @@
   import DvrBar from '../components/DvrBar.svelte';
   import MatchList from '../components/MatchList.svelte';
   import ConcedeControl from '../components/ConcedeControl.svelte';
+  import TableEventOverlay from '../components/event/TableEventOverlay.svelte';
   import RestartControl from '../components/RestartControl.svelte';
   import SeatPanel from '../components/SeatPanel.svelte';
   import HandFan from '../components/HandFan.svelte';
@@ -33,7 +34,7 @@
     toneOf,
   } from '../lib/seatpanel.svelte';
   import { laterByObj, optionsByObj, optionsByPlayer, resolveCardFollowUp, type CardOptions } from '../lib/cardoptions';
-  import { isPlainManualTap, manualManaHidden } from '../lib/manualmana';
+  import { isPlainManualTap, manualManaHidden, paymentRouteHidden } from '../lib/manualmana';
   import { castableActions } from '../lib/announcepay';
   import { rematchDecks, startRematch } from '../lib/playvsbot';
   import { stuckDecision } from '../lib/prompt';
@@ -42,6 +43,7 @@
   import { everyVisibleCard } from '../lib/board';
   import { seatColour } from '../lib/colours';
   import { seatRows } from '../lib/seattable';
+  import { railEvents } from '../lib/dvr';
   import { buildCardOwnerColour } from '../lib/logrender';
   import { href, navigate } from '../lib/router';
   import { getSeat } from '../lib/seat';
@@ -110,7 +112,10 @@
   }
 
   // idle: the table has no live match and none imminent, so the match list
-  // is the whole page rather than a strip under a "waiting" placeholder.
+  // is the whole page rather than a strip under a "waiting" placeholder. A
+  // series table between two of its games is not idle: the table store reads
+  // it as cooldown from TableInfo.series and the server's table_state frame
+  // (E3-fx2), so the finished board stays up until the next game starts.
   const idle = $derived.by(() => {
     if (finished) return false;
     const state = tables.list.find((t) => t.info.id === table)?.info.state;
@@ -179,8 +184,14 @@
   // mid-game. The seat that is the human is seat 0 in createGame's
   // rotation, but the predicate reads the wire flags, not a hard-coded
   // index, so an inverted assignment still finds it.
+  const eventURL = typeof location !== 'undefined' && new URLSearchParams(location.search).has('event');
   const restartable = $derived.by(() => {
     if (!liveSeated || seatCtx === null || m.match === null || mulligan !== null) return false;
+    // A draft-event table (or any series table) belongs to its event: a
+    // restart there would walk the player out of the event into an unrelated
+    // vs-bot game. The server's flags say so once the table list is loaded;
+    // the event's join URL (?event=…) says so from the first render.
+    if (tableInfo?.event === true || tableInfo?.series === true || eventURL) return false;
     if (m.seats.length !== 2) return false;
     // Exactly ONE human seat, and it is the viewer (a two-human table and a
     // viewer sitting in the bot seat both fail here).
@@ -357,6 +368,12 @@
         else if (visible.length !== offered.length) byObj.set(obj, visible);
       }
     }
+    // A pay-first election's source tile carries one pay route, the same
+    // one the option list draws (manualmana.paymentRouteHidden).
+    for (const [obj, offered] of byObj) {
+      const visible = offered.filter((option) => !paymentRouteHidden(d, option, panel.autoPayMana));
+      if (visible.length !== offered.length) byObj.set(obj, visible);
+    }
     return {
       source: d.source,
       byObj,
@@ -466,6 +483,10 @@
 
 <svelte:window onkeydown={closeOptions} onclick={closeOptionsOutside} />
 
+<!-- E3-9: a draft-event series game (join link carries &event=) overlays the
+     between-games panel; it renders nothing for any other table. -->
+{#if liveSeated}<TableEventOverlay {table} />{/if}
+
 {#if idle}
   <main class="matches-page">
     <MatchList {table} />
@@ -564,7 +585,7 @@
           {stuck}
           {onContinue}
           emphasizeTop={seated}
-          events={m.dvr.events}
+          events={railEvents(m.dvr)}
           showLog={showLog}
           onToggleLog={optionsReachable ? null : toggleLog}
           yields={panel?.yields ?? null}

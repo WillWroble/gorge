@@ -9,8 +9,10 @@ import (
 	"github.com/adams-shaun/gorge/state"
 )
 
-// A triggered Charm announces its modes before it asks for targets. Unlike a
-// cast, its mode announcement does not filter out modes without legal targets.
+// A triggered Charm announces its modes before it asks for targets. Like a
+// cast (CR 700.2a), its mode announcement filters out modes without legal
+// targets, so a "choose two" with one targetable mode cannot be announced and
+// the trigger is removed at placement (CR 603.3c).
 func TestTriggeredDistinctCharmWithEmptyModeTargetFizzles(t *testing.T) {
 	t.Parallel()
 	charm := "Name:Infeasible Charm Bearer\nManaCost:1 B\nTypes:Creature Bear\nPT:2/2\n" +
@@ -26,10 +28,10 @@ func TestTriggeredDistinctCharmWithEmptyModeTargetFizzles(t *testing.T) {
 	}
 	e.emit(events.Event{Kind: events.StepChange, Step: state.StepBeginCombat})
 	e.putTriggersOnStack()
-	if len(e.G.Stack) != 1 {
-		t.Fatalf("trigger stack = %v, want one ability", e.G.Stack)
+	if len(e.G.Stack) != 0 {
+		t.Fatalf("trigger stack = %v, want the unannounceable ability removed", e.G.Stack)
 	}
-	id := e.G.Stack[0]
+	id := triggerObjOf(t, e, bearer).ID
 	face := e.G.Obj(bearer).Face()
 	if n := len(e.legalTargetCandidates(0, id, id, cards.ResolveSVar(face.SVars, "PlayerMode"))); n == 0 {
 		t.Fatal("fixture has no legal target for the first mode")
@@ -37,12 +39,10 @@ func TestTriggeredDistinctCharmWithEmptyModeTargetFizzles(t *testing.T) {
 	if n := len(e.legalTargetCandidates(0, id, id, cards.ResolveSVar(face.SVars, "CreatureMode"))); n != 0 {
 		t.Fatalf("fixture has %d legal targets for the second mode, want zero", n)
 	}
-	d := e.Pending()
-	if d == nil || d.Kind != decision.KModes || len(d.Options) != 2 {
-		t.Fatalf("placement = %+v, want two selectable modes", d)
+	if d := e.Pending(); d != nil && d.Kind == decision.KModes {
+		t.Fatalf("placement posed an unannounceable mode ask: %+v", d)
 	}
 	life := e.G.Players[0].Life
-	submitChoices(t, e, 0, 1)
 	if d := e.Pending(); d != nil && d.Kind == decision.KTarget {
 		t.Fatalf("unanswerable target decision: %+v", d)
 	}

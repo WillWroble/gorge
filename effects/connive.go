@@ -130,6 +130,19 @@ func conniveOnce(h Host, c *Ctx, sa *cards.SA, conniver state.ObjID, targetIdx, 
 		return false
 	}
 	base := targetIdx * n
+	// The batch boundary: connive N is ONE "draw N cards" instruction (CR
+	// 702.59a), offered whole to the DrawCards replacement class before any
+	// card moves, so Alms Collector's "would draw two or more cards"
+	// replaces it as one event. A consumed batch drew through its
+	// replacement's body already; the cursor moves past this conniver's
+	// draws (a resumed pass then skips straight to the discard).
+	if done == 0 && n >= 2 && proposeDrawBatch(h, c.Source, ctrl, n) {
+		if h.Suspended() {
+			c.Draw.Done = base + n
+			return true
+		}
+		done = n
+	}
 	for d := done; d < n; d++ {
 		// drawFor (not the bare DrawFor): the cursor and the Connive SA
 		// ride the Dredge ask. A suspension stops the whole walk before the

@@ -78,9 +78,10 @@ describe('the transcript follows the end of the log while live (fb-20260928T0437
     const page = await browser.newPage();
     await goto(page);
     await assertOverflows(page);
-    // Precondition: the initial mount already follows the tail (live DVR).
+    // Precondition: the initial mount already follows the tail (live DVR),
+    // on the next animation frame (the follow scroll runs once per frame).
+    await expect.poll(async () => (await geometry(page)).atEnd).toBe(true);
     let geo = await geometry(page);
-    expect(geo.atEnd).toBe(true);
     expect(geo.lastSeq).toBe('40');
 
     // The player scrolls up to read history while the DVR stays live.
@@ -107,8 +108,9 @@ describe('the transcript follows the end of the log while live (fb-20260928T0437
     await page.evaluate(() => (window as unknown as { __backfillPending: () => void }).__backfillPending());
     geo = await geometry(page);
     expect(geo.lastSeq).toBe('49');
-    expect(await rowVisible(page, '[data-seq="49"]')).toBe(true);
-    expect(geo.atEnd).toBe(true);
+    // The follow scroll runs on the next animation frame (one per frame).
+    await expect.poll(() => rowVisible(page, '[data-seq="49"]')).toBe(true);
+    await expect.poll(async () => (await geometry(page)).atEnd).toBe(true);
     await page.close();
   });
 
@@ -118,13 +120,13 @@ describe('the transcript follows the end of the log while live (fb-20260928T0437
     await assertOverflows(page);
     // Precondition: no notes yet, and the log sits at its end.
     expect(await page.locator('[data-auto-log]').count()).toBe(0);
-    expect((await geometry(page)).atEnd).toBe(true);
+    await expect.poll(async () => (await geometry(page)).atEnd).toBe(true);
 
     await page.evaluate(() => (window as unknown as { __appendNote: () => void }).__appendNote());
     await expect.poll(() => page.locator('[data-auto-log]').count()).toBe(1);
     // The note renders under every engine line and is the tail the log follows.
-    expect(await rowVisible(page, '[data-auto-log]')).toBe(true);
-    expect((await geometry(page)).atEnd).toBe(true);
+    await expect.poll(() => rowVisible(page, '[data-auto-log]')).toBe(true);
+    await expect.poll(async () => (await geometry(page)).atEnd).toBe(true);
     await page.close();
   });
 

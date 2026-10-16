@@ -121,8 +121,9 @@ func (e *Engine) resumeResolution(rp *resumePoint, chosen []decision.Option) {
 	defer e.SetResolutionCtx(prevCtx)
 	// Cost-sacrificed objects are engine-only LKI keyed by the stack object.
 	ctx.Sacrificed = e.sacrificedLKI[rp.obj]
-	ctx.Exiled = e.castExiled[rp.obj]
-	ctx.Revealed = e.castRevealed[rp.obj]
+	ctx.Paid.Exiled = e.castExiled[rp.obj]
+	ctx.Paid.Revealed = e.castRevealed[rp.obj]
+	ctx.Paid.CounterPut = e.castCounterPut[rp.obj]
 	// CR 107.3i: X is the value paid for the object's {X}, preserved on the
 	// stack object by CastInfo; CR 107.3m binds a trigger's X to the causing
 	// event's card.
@@ -153,9 +154,10 @@ func (e *Engine) resumeResolution(rp *resumePoint, chosen []decision.Option) {
 		ctx.Source = o.Source
 		ctx.TriggerContext = e.triggerContexts[rp.obj]
 		ctx.Remembered = e.resolvingRemembered(o)
-		ctx.Captured = o.Remembered
+		ctx.Captured = e.resolvingCaptured(o)
 		ctx.Grantor = o.GrantedBy
 		bindNinjutsuDefender(ctx, o)
+		e.bindStationAmount(ctx, o)
 		if abilityXAnnounced(o) {
 			ctx.XAnnounced = true
 		}

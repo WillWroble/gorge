@@ -272,7 +272,9 @@ func (b *Bot) paymentIntent(brd botpolicy.Board, d *decision.Decision) (decision
 		// such an action is treated as having no plan.
 		if len(a.Plans) != 0 && !brd.CounterIsDead(d.Player, a.Cast.Object) &&
 			!(b.skipLifePlans && paymentPlanPaysLife(a.Plans[0])) {
-			payable[a.Cast.Object] = a
+			if _, dup := payable[a.Cast.Object]; !dup {
+				payable[a.Cast.Object] = a
+			}
 		}
 	}
 	if b.wantsManual(brd, d, payable) {
@@ -319,14 +321,21 @@ func (b *Bot) paymentIntent(brd botpolicy.Board, d *decision.Decision) (decision
 		originalIndex := o.Index
 		o.Index = len(candidate.Options)
 		candidateToOriginal[o.Index] = originalIndex
-		if o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0 {
-			legacyOrdinary[o.Obj] = true
+		if planShaped(o) {
 			// An ordinary legacy cast whose object has a plan is a
 			// plan-backed candidate: choosing it submits the plan, so the
 			// cast scorer prices it against producible mana (C7). A
 			// non-ordinary mode (an evoke, pitch, dash, surge) pays its
-			// own cost by hand and stays false.
-			if _, ok := payable[o.Obj]; ok {
+			// own cost by hand and stays false. A primary flashback cast
+			// is plan-backed only by a flashback-origin action
+			// (decision.OriginFlashback), and only then stands in for the
+			// action's plan-only entry.
+			a, ok := payable[o.Obj]
+			matched := ok && planModeOf(a) == o.Mode
+			if o.Mode == "" || matched {
+				legacyOrdinary[o.Obj] = true
+			}
+			if matched {
 				o.PlanBacked = true
 			}
 		}
@@ -336,9 +345,11 @@ func (b *Bot) paymentIntent(brd botpolicy.Board, d *decision.Decision) (decision
 		if len(a.Plans) == 0 || legacyOrdinary[a.Cast.Object] {
 			continue
 		}
+		// The plan-only entry carries its cast's mode (planModeOf), so a
+		// flashback plan is ranked as the flashback cast it is.
 		candidate.Options = append(candidate.Options, decision.Option{
 			Index: len(candidate.Options), Kind: "cast", Obj: a.Cast.Object, Label: a.Label,
-			PlanBacked: true,
+			Mode: planModeOf(a), PlanBacked: true,
 		})
 	}
 
@@ -362,8 +373,8 @@ func (b *Bot) paymentIntent(brd botpolicy.Board, d *decision.Decision) (decision
 		// alternative mode the policy deliberately chose) reaches the engine
 		// as itself: substituting the ordinary plan would silently replace
 		// the chosen mode.
-		if o.Kind == "cast" && o.Mode == "" && o.AltCostIndex == 0 {
-			if a, ok := payable[o.Obj]; ok {
+		if planShaped(o) {
+			if a, ok := payable[o.Obj]; ok && planModeOf(a) == o.Mode {
 				return decision.Intent{Seq: d.Seq, Player: d.Player, Payment: &decision.PaymentSelection{
 					ActionID: a.ID, Plan: decision.ClonePaymentPlan(a.Plans[0]),
 				}}, true
@@ -379,6 +390,29 @@ func (b *Bot) paymentIntent(brd botpolicy.Board, d *decision.Decision) (decision
 		return decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{original}}, true
 	}
 	return decision.Intent{}, false
+}
+
+// planShaped reports whether a cast option is one a payment plan can stand
+// for: the ordinary cast (no Mode, no alternative cost), or the primary
+// flashback cast (Mode "flashback", no further-instance Cost), whose plan is
+// a decision.OriginFlashback action. Which plan, if any, is planModeOf's
+// match on the option's Mode.
+func planShaped(o decision.Option) bool {
+	if o.Kind != "cast" || o.AltCostIndex != 0 {
+		return false
+	}
+	return o.Mode == "" || (o.Mode == "flashback" && o.Cost == "" && o.MayPlayPerm == "")
+}
+
+// planModeOf is the cast-option Mode a payment action's plan pays for as the
+// bot's candidate list names it: "flashback" for a flashback-origin action,
+// "" for every other (the hand and command-zone plain casts, and the may-play
+// origins, whose plan-only entry has always been ranked as an ordinary cast).
+func planModeOf(a decision.PaymentAction) string {
+	if a.Cast.Origin == decision.OriginFlashback {
+		return "flashback"
+	}
+	return ""
 }
 
 // wantsManual reports whether the auto-pay adapter should answer this

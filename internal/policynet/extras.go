@@ -62,6 +62,11 @@ type LoadOptions struct {
 	// Keep, when non-nil, filters records by (pair, game index) before they
 	// are decoded any further; a record it rejects is not counted as loaded.
 	Keep func(pair string, gameIndex int) bool
+	// KeepExplore keeps records flagged explore:true (forced exploration
+	// answers). The zero value drops them, as Load does: they are not the
+	// teacher's choices, so policy imitation must not learn them. Value and
+	// outcome learning set it, since the outcome label is still valid.
+	KeepExplore bool
 }
 
 // leanRecord is labelRecord without the board snapshot (the encoders never
@@ -84,6 +89,7 @@ type leanRecord struct {
 	Margin        float64           `json:"margin"`
 	Outcome       float64           `json:"outcome"`
 	OutcomeKnown  bool              `json:"outcome_known"`
+	Explore       bool              `json:"explore,omitempty"`
 	Extras        *LabelExtras      `json:"extras"`
 }
 
@@ -126,6 +132,10 @@ func LoadWith(path string, lo LoadOptions) ([]Example, Stats, error) {
 			return nil, stats, fmt.Errorf("label corpus record %d: unsupported schema_version %d, want one of %v", stats.Records, rec.SchemaVersion, AcceptedLabelSchemaVersions)
 		}
 		if lo.Keep != nil && !lo.Keep(rec.Pair, rec.GameIndex) {
+			continue
+		}
+		if rec.Explore && !lo.KeepExplore {
+			stats.Explored++
 			continue
 		}
 		if len(rec.Candidates) == 0 {
@@ -210,7 +220,9 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 		}
 	}
 	played := playedOption(rec)
-	idx := cardIndex(v, rec.Seat)
+	idx := optionEncoders.Get().(*OptionEncoder)
+	idx.Reset(&v, rec.Seat)
+	defer func() { idx.v = nil; clear(idx.refs); optionEncoders.Put(idx) }()
 	var opts []Option
 	var card []int
 	for i, o := range base {
@@ -246,7 +258,7 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 			chosen[0] = true
 		}
 		src := ""
-		if ref, ok := idx[rec.Options[i].Obj]; ok && rec.Options[i].Obj != 0 {
+		if ref, ok := idx.lookup(rec.Options[i].Obj); ok && rec.Options[i].Obj != 0 {
 			src = ref.cv.Name
 		}
 		for k, t := range ft.Targets {
@@ -263,7 +275,7 @@ func expandJoint(v view.View, rec *leanRecord, base []Option) ([]Option, []int) 
 
 // jointTargetFeatures are the hashed rows a joint option adds for its target
 // (appended after the card option's own hashed ids, in this fixed order).
-func jointTargetFeatures(src string, t decision.Option, idx map[state.ObjID]cardRef, seat state.PlayerID) []Feature {
+func jointTargetFeatures(src string, t decision.Option, idx *OptionEncoder, seat state.PlayerID) []Feature {
 	var out []Feature
 	push := func(s string) { out = append(out, Feature{Row: hashID(s), Value: 1}) }
 	push("jt|tkind|" + t.Kind)
@@ -279,7 +291,7 @@ func jointTargetFeatures(src string, t decision.Option, idx map[state.ObjID]card
 		push("jt|" + src + "|player|" + side)
 		return out
 	}
-	ref, ok := idx[t.Obj]
+	ref, ok := idx.lookup(t.Obj)
 	if !ok {
 		push("jt|tgt|unknown")
 		return out

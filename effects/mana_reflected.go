@@ -63,6 +63,20 @@ func ManaReflectedCandidates(h Host, c *Ctx, sa *cards.SA) []string {
 	if property != "Produce" && property != "Is" {
 		return nil
 	}
+	return ManaReflectedFold(h, sa, ManaReflectedObjects(h, c, sa))
+}
+
+// ManaReflectedObjects is the object walk of ManaReflectedCandidates: the
+// objects Valid$ names right now (a Defined.<name> selector through the
+// ordinary Defined machinery, anything else an object spec matched against
+// the battlefield in AliveFrom(0) x zone order). It is the one home of that
+// walk: resolution folds all of them, the payment planner folds the subset no
+// planned step can remove. A Produced property reads no objects.
+func ManaReflectedObjects(h Host, c *Ctx, sa *cards.SA) []state.ObjID {
+	mr := ManaReflectedOf(sa)
+	if mr.ReflectProperty != "Produce" && mr.ReflectProperty != "Is" {
+		return nil
+	}
 	spec := mr.Valid
 	if spec == "" {
 		return nil
@@ -93,7 +107,16 @@ func ManaReflectedCandidates(h Host, c *Ctx, sa *cards.SA) []string {
 			}
 		}
 	}
-	produce := property == "Produce"
+	return objs
+}
+
+// ManaReflectedFold is the symbol fold of ManaReflectedCandidates over objs
+// (what ManaReflectedObjects returned, or a subset of it): the union of what
+// each object's mana abilities could produce ("Produce") or its colours
+// ("Is"), in the fixed manaReflectedOrder order.
+func ManaReflectedFold(h Host, sa *cards.SA, objs []state.ObjID) []string {
+	mr := ManaReflectedOf(sa)
+	produce := mr.ReflectProperty == "Produce"
 	set := map[string]bool{}
 	for _, id := range objs {
 		o := h.Game().Obj(id)
@@ -110,7 +133,7 @@ func ManaReflectedCandidates(h Host, c *Ctx, sa *cards.SA) []string {
 			set[string(r)] = true
 		}
 	}
-	if !widenType {
+	if !mr.WidenType {
 		delete(set, "C")
 	}
 	var out []string
@@ -120,6 +143,20 @@ func ManaReflectedCandidates(h Host, c *Ctx, sa *cards.SA) []string {
 		}
 	}
 	return out
+}
+
+// ManaReflectedReadsSacrificed reports whether sa reflects the permanent its
+// own Sac<...> cost sacrifices (Valid$ Defined.Sacrificed -- Squandered
+// Resources). Nothing has been sacrificed when the ability is merely offered,
+// so rules' offer gate must probe the cost's candidates instead of reading
+// the empty Remembered list.
+func ManaReflectedReadsSacrificed(sa *cards.SA) bool {
+	rest, ok := strings.CutPrefix(ManaReflectedOf(sa).Valid, "Defined.")
+	if !ok {
+		return false
+	}
+	sel, _, _ := strings.Cut(strings.TrimSpace(rest), " ")
+	return reflectedDefinedExtrasCodes.Code(sel) == reflectedDefinedExtrasSacrificed
 }
 
 // producibleSymbols unions the mana symbols one permanent's mana abilities

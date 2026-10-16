@@ -326,9 +326,7 @@ func discardAndRememberEvent(h Host, c *Ctx, r discardRiders, ev events.Event) {
 // absent there is nothing to dedup against and one write is correct.
 func rememberPlayerBothHalves(h Host, c *Ctx, p state.PlayerID) {
 	want := state.Target{Player: p, IsPlayer: true}
-	if !targetIn(c.Remembered, want) {
-		c.Remembered = append(c.Remembered, want)
-	}
+	rememberCtxOnce(h, c, want)
 	if o := h.Game().Obj(c.Source); o != nil && targetIn(o.Remembered, want) {
 		return
 	}
@@ -958,14 +956,16 @@ func moveRestToBottom(h Host, g *state.Game, p state.PlayerID, ids []state.ObjID
 	h.Emit(events.Event{Kind: events.LibraryOrder, Player: p, IDs: newLib, Secret: true})
 }
 
-// manaValueOf is the offered card's own mana value -- the same Face().Cmc()
-// read state.SacrificedInfoOf uses. It is the per-card price under a
-// WithTotalCMC$ cumulative budget (Decision.MaxSum): every budgeted picker
-// (Dig, the hidden pick, the library search, the Play grant) shares this one
-// read so the four cannot drift on what a card's mana value is.
+// manaValueOf is the offered card's own mana value -- the same
+// objectManaValue read the rest of the engine uses (state.SacrificedInfoOf
+// reads the printed face; a budgeted picker's candidate is never a
+// battlefield Room). It is the per-card price under a WithTotalCMC$
+// cumulative budget (Decision.MaxSum): every budgeted picker (Dig, the hidden
+// pick, the library search, the Play grant) shares this one read so the four
+// cannot drift on what a card's mana value is.
 func manaValueOf(g *state.Game, id state.ObjID) int {
-	if o := g.Obj(id); o != nil && o.Face() != nil {
-		return int(o.Face().Cmc())
+	if o := g.Obj(id); o != nil {
+		return objectManaValue(o)
 	}
 	return 0
 }

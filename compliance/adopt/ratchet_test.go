@@ -19,11 +19,9 @@ import (
 // process (see ChildMaxCards for why the gate runs in children).
 const statusChildEnv = "GORGE_ADOPT_STATUS_SETS"
 
-// ratchetChildSem bounds the two ratchet tests' child processes TOGETHER to
-// the four StatusChunked allows one test. The tests run in parallel (they
-// share only the read-only census and their children are separate
-// processes), so without a shared bound a grown level-B claim could put
-// 4+4 children at ~0.6 GiB each on one binary.
+// ratchetChildSem bounds TestCertificationRatchet's child processes to the
+// four StatusChunked allows one test, at ~0.6 GiB each. (The level-B ratchet
+// shared it while it also ran in children; its chunks now run in process.)
 var ratchetChildSem = make(chan struct{}, 4)
 
 func TestStatusChild(t *testing.T) {
@@ -122,6 +120,13 @@ func TestCertificationRatchet(t *testing.T) {
 		t.Fatalf("measured %d of %d sets", len(measured), len(scope))
 	}
 	fails, slack := CheckRatchet(cs.SetCodes(), measured, declared, ratchet)
+	// The per-ticket gate's stale-only classifier reads this line (see
+	// scripts/gate_affected.sh): the ratchet's outstanding count includes stale
+	// verdicts, so a ratchet that only grew on stale problems is a host XMage
+	// replay's to clear, not a defect to fix. Emitted on every run (go test
+	// prints it only for a failing test), so a non-stale problem leaves no
+	// stale-only verdict and the gate fails closed.
+	t.Logf("GORGE-CERT-RESULT %s %s", t.Name(), ratchetVerdict(measured, fails))
 	for _, f := range fails {
 		t.Error(f)
 	}
@@ -133,4 +138,34 @@ func TestCertificationRatchet(t *testing.T) {
 			t.Logf("ratchet: %d sets measured; %s", len(measured), r.Label)
 		}
 	}
+}
+
+// ratchetVerdict classifies TestCertificationRatchet's failure for the
+// per-ticket gate's stale-only classifier (scripts/gate_affected.sh): "clean"
+// (no fail), "stale-only" (every fail is a set's outstanding GROWTH and that
+// set's problems are ALL stale verdicts, a moved scenario sha a host XMage
+// replay clears), or "mixed" (any other fail -- a set no longer committed, a
+// declared level that shrank, a committed set missing from the ratchet, a
+// floor not recorded -- or a growth on a set with a non-stale problem: a real
+// regression the gate must still fail). A structural ratchet fail must never
+// read as stale-only just because the measured sets happen to be stale.
+func ratchetVerdict(measured []SetStatus, fails []string) string {
+	if len(fails) == 0 {
+		return "clean"
+	}
+	bySet := map[string]SetStatus{}
+	for _, s := range measured {
+		bySet[s.Set] = s
+	}
+	for _, f := range fails {
+		set, rest, ok := strings.Cut(f, ": ")
+		if !ok || !strings.Contains(rest, " outstanding, ratchet ") {
+			return "mixed"
+		}
+		s, ok := bySet[set]
+		if !ok || s.Outstanding == 0 || s.Outstanding != s.Buckets[BucketStale] {
+			return "mixed"
+		}
+	}
+	return "stale-only"
 }

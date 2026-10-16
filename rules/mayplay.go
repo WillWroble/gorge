@@ -107,7 +107,7 @@ func (e *Engine) mayPlayGrantScoped(p state.PlayerID, id state.ObjID, board bool
 	// the graveyard carries it exactly as it would on the battlefield).
 	// mayPlayStatic applies one off the battlefield only when it names its
 	// EffectZone$ (CR 113.6).
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}
@@ -164,6 +164,21 @@ func (e *Engine) mayPlayGrantScoped(p state.PlayerID, id state.ObjID, board bool
 	return free, ok
 }
 
+// mayPlayOwnStatics is the card's own face statics a may-play read
+// evaluates as SELF-grants for player p: all of them when p controls the
+// card, none otherwise. A self-grant ("You may cast this card from exile",
+// Misthollow Griffin) is worded for the card's controller -- its owner while
+// it sits in a public zone (CR 108.4a) -- so a walk that visits another
+// seat's exile for a battlefield grant of p's (Azula, Cunning Usurper) must
+// never hand p the owner's permission. The one gate every self-grant arm
+// (grant, typed permissions, RaiseCost$) reads, so they cannot drift.
+func mayPlayOwnStatics(o *state.Object, p state.PlayerID) []cards.Static {
+	if o.Controller != p {
+		return nil
+	}
+	return o.Face().Statics
+}
+
 // mayPlaySpellOffer is one cast offer a may-play permission produces for a
 // card: which card and zone, the permission's identity (key/text -- empty
 // for an untyped grant), and the permission's own free-cast / RaiseCost$
@@ -216,7 +231,7 @@ func (e *Engine) mayPlayPermissions(p state.PlayerID, id state.ObjID, board bool
 		out = append(out, mayPlaySpellOffer{id: id, key: key, text: text,
 			free: free, raise: raise, hasRaise: hasRaise, priced: priced})
 	}
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}
@@ -224,7 +239,7 @@ func (e *Engine) mayPlayPermissions(p state.PlayerID, id state.ObjID, board bool
 		if !applies || !grants {
 			continue
 		}
-		ok(strings.TrimSpace(st.ParamStr(cards.PKMayPlayText)), id, free, raise, hasRaise, priced)
+		ok(mayPlayPermText(st.ParamStr(cards.PKMayPlayText), st.Params), id, free, raise, hasRaise, priced)
 	}
 	if board {
 		for _, sv := range e.activeStatics("Continuous") {
@@ -235,7 +250,7 @@ func (e *Engine) mayPlayPermissions(p state.PlayerID, id state.ObjID, board bool
 			if !applies || !grants {
 				continue
 			}
-			ok(strings.TrimSpace(sv.ParamStr(cards.PKMayPlayText)), sv.Source, free, raise, hasRaise, priced)
+			ok(mayPlayPermText(sv.ParamStr(cards.PKMayPlayText), sv.Params), sv.Source, free, raise, hasRaise, priced)
 		}
 	}
 	if untyped {
@@ -245,6 +260,19 @@ func (e *Engine) mayPlayPermissions(p state.PlayerID, id state.ObjID, board bool
 		out = append([]mayPlaySpellOffer{{id: id}}, out...)
 	}
 	return out
+}
+
+// mayPlayPermText is a permission's MayPlayText$ identity, or "" for an
+// untyped one. A static that prices its own cast (MayPlayAltManaCost$) is
+// always read as untyped: only the untyped offer is priced through
+// mayPlayCastAlts, so a typed offer must never stand in for it at the
+// printed cost (no corpus static carries both keys; this keeps a future one
+// fail-closed rather than under-priced).
+func mayPlayPermText(text string, params map[string]string) string {
+	if _, alt := params["MayPlayAltManaCost"]; alt {
+		return ""
+	}
+	return strings.TrimSpace(text)
 }
 
 // mayPlayPermFreeRaise reports the free-cast and RaiseCost$ composition of a
@@ -318,7 +346,7 @@ func (e *Engine) mayPlayRaiseCost(p state.PlayerID, id state.ObjID) (raise Cost,
 		}
 		raise = raise.Plus(r)
 	}
-	for _, st := range o.Face().Statics {
+	for _, st := range mayPlayOwnStatics(o, p) {
 		if st.Mode != "Continuous" {
 			continue
 		}
@@ -348,11 +376,10 @@ func (e *Engine) mayPlayRaiseCost(p state.PlayerID, id state.ObjID) (raise Cost,
 // continuousGateHolds does for a generic Continuous static), which is what
 // lets Verge Rangers' opponent-ahead gate open its top-of-library permission.
 // MayPlayAltManaCost$ is NOT in this list: it is
-// genuinely consumed, but on a different path -- mayPlayAltCosts delivers it
-// for the ordinary cast walk (alternativeCosts), while the ZONE-permission
-// grant below still refuses a cost-carrying static that would have the
-// may-play cast pay the printed or free cost (the altCostWithholding check
-// in mayPlayStatic). RaiseCost$ left this list: it is now genuinely CONSUMED
+// genuinely consumed: mayPlayAltCosts prices it, for the ordinary hand
+// cast walk (alternativeCosts) and for the may-play spell walk's cast from
+// the granted zone (mayPlayCastAlts), where a granting static's alternative
+// is the ONLY price its permission offers (mayPlayPlainGrant). RaiseCost$ left this list: it is now genuinely CONSUMED
 // -- mayPlayStatic parses it, mayPlayRaiseCost surfaces it, and both cast
 // cost sites compose it -- so it is no longer a recognition but a read.
 // Only a raise ParseCost cannot price still fails the static closed (the
@@ -533,21 +560,18 @@ func (e *Engine) mayPlayStatic(params map[string]string, id state.ObjID, you sta
 		}
 		priced = true
 	}
-	// altCostWithholding: a static that prices the play itself
-	// (MayPlayAltManaCost$) and still OPENS the zone permission would have
-	// the may-play cast pay the printed or free cost -- the widening this
-	// file refuses, because the may-play cast path cannot charge the
-	// alternative. The cost's real delivery is mayPlayAltCosts, which
-	// serves the ordinary cast walk (a hand cast pays the alt cost as its
-	// own cast option); the zone permission stays closed until that cast
-	// path can price it. A MayPlayDontGrantZonePermissions$ static (the
-	// corpus's dominant carrier, Darksteel Monolith) never granted here
-	// anyway, so this only formalises the boundary for a future
-	// grant-and-reprice static.
-	if _, alt := params["MayPlayAltManaCost"]; alt &&
-		!strings.EqualFold(params["MayPlayDontGrantZonePermissions"], "True") {
-		return false, false, false, Cost{}, hasRaise, priced
-	}
+	// MayPlayAltManaCost$ on a static that OPENS the zone permission
+	// (Valgavoth, Terror Eater's "you may play cards exiled with Valgavoth.
+	// If you cast a spell this way, pay life equal to its mana value rather
+	// than pay its mana cost"; Bolas's Citadel's library-top shape) is the
+	// permission's OWN price: the grant opens here exactly like a plain one,
+	// and the may-play spell walk prices a cast through it at that
+	// alternative only (CR 118.9 / 601.2b,f -- mayPlayPlainGrant tells the
+	// walk no printed-cost permission covers the card, mayPlayAltCosts
+	// supplies the priced alternative, beginCast's "mayplay" arm charges the
+	// same entry). A land is played, never cast, so a land drop through such
+	// a static pays nothing, which is the printed rule ("if you CAST a spell
+	// this way").
 	// Condition$ (PlayerTurn -- "during each of your turns", Kess, Dissident
 	// Mage -- and the ability-word family: Threshold -- Null Summoner,
 	// Delirium, Metalcraft, Hellbent, ...): evaluated for the static's
@@ -744,12 +768,18 @@ func (e *Engine) mayPlayTypedLimitReached(source state.ObjID, text string, limit
 // per-card tracking under-enforces (two different colorless spells can each
 // use it once in one turn) -- the same under-enforcement Forge's per-card
 // MayPlayTurn carries; named in the deck import report's Issues.
-func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []Cost {
+//
+// Each entry reports whether its static OPENS the zone permission (grants:
+// MayPlayDontGrantZonePermissions$ absent -- Valgavoth, Terror Eater) or
+// only reprices a cast some other permission makes (Warped Space, Darksteel
+// Monolith). The may-play spell walk (mayPlayCastAlts) reads that split; the
+// hand walk's alternativeCosts takes every entry, as before.
+func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []mayPlayAltView {
 	o := e.G.Obj(id)
 	if o == nil || o.Face() == nil {
 		return nil
 	}
-	var out []Cost
+	var out []mayPlayAltView
 	// The two sources the permission grant walks, scanned in one
 	// deterministic order (battlefield statics first, then the card's own
 	// face statics). Each is ranged in place -- neither list is appended to
@@ -834,8 +864,9 @@ func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []Cost {
 				continue
 			}
 		}
+		grants := !strings.EqualFold(strings.TrimSpace(sv.Params["MayPlayDontGrantZonePermissions"]), "True")
 		if free {
-			out = append(out, Cost{})
+			out = append(out, mayPlayAltView{grants: grants})
 			continue
 		}
 		alt, ok := e.altCostParse(id, raw)
@@ -845,9 +876,87 @@ func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []Cost {
 			// never offered at a wrong price.
 			continue
 		}
-		out = append(out, alt)
+		out = append(out, mayPlayAltView{cost: alt, grants: grants})
 	}
 	return out
+}
+
+// mayPlayAltView is one priced may-play alternative (mayPlayAltCosts):
+// the cost, and whether its static opens the zone permission itself.
+type mayPlayAltView struct {
+	cost   Cost
+	grants bool
+}
+
+// mayPlayCastAlts lists the alternatives a CAST through a may-play
+// permission from a non-hand zone may pay instead of the printed mana cost,
+// in mayPlayAltCosts' deterministic order (the index a "mayplay" option's
+// AltCostIndex names, 1-based). plain reports whether a printed-cost
+// permission covers the card (mayPlayPlainGrant):
+//
+//   - a GRANTING static's alternative (Valgavoth's PayLife<ConvertedManaCost>)
+//     is always listed: it is the price of its own permission (CR 118.9,
+//     "rather than pay its mana cost"), and when it is the only permission
+//     the walk offers nothing else;
+//   - a NON-granting static's alternative (Warped Space's "Once each turn,
+//     you may pay {0} rather than pay the mana cost for a spell you cast
+//     from exile") reprices a cast another permission makes, so it is listed
+//     only when a printed-cost permission exists. Under an alt-only
+//     permission the spell already pays that permission's alternative, and
+//     CR 118.9a allows only one.
+//
+// The offer walk and beginCast both call this over the same board, so the
+// index cannot drift between offer and charge.
+func (e *Engine) mayPlayCastAlts(p state.PlayerID, id state.ObjID, plain bool) []Cost {
+	var out []Cost
+	for _, v := range e.mayPlayAltCosts(p, id) {
+		if v.grants || plain {
+			out = append(out, v.cost)
+		}
+	}
+	return out
+}
+
+// mayPlayPlainGrant reports whether a may-play permission that lets card id
+// be cast at its printed (or free) cost covers it for player p: a granting
+// self or battlefield static WITHOUT MayPlayAltManaCost$, an
+// Effect-delivered grant (plain or free), or a Paradigm exile grant. A card
+// whose only permissions carry their own alternative (Valgavoth) reports
+// false, and the may-play spell walk then offers only those alternatives.
+// The sources and gate chain are mayPlayGrant's own (mayPlayStatic), so the
+// two reads cannot disagree about which statics apply.
+func (e *Engine) mayPlayPlainGrant(p state.PlayerID, id state.ObjID) bool {
+	o := e.G.Obj(id)
+	if o == nil || o.Face() == nil {
+		return false
+	}
+	for _, st := range mayPlayOwnStatics(o, p) {
+		if st.Mode != "Continuous" {
+			continue
+		}
+		if _, alt := st.Params["MayPlayAltManaCost"]; alt {
+			continue
+		}
+		if _, grants, _, _, _, _ := e.mayPlayStatic(st.Params, id, o.Controller, id); grants {
+			return true
+		}
+	}
+	for _, sv := range e.activeStatics("Continuous") {
+		if sv.Controller != p {
+			continue
+		}
+		if _, alt := sv.Params["MayPlayAltManaCost"]; alt {
+			continue
+		}
+		if _, grants, _, _, _, _ := e.mayPlayStatic(sv.Params, id, sv.Controller, sv.Source); grants {
+			return true
+		}
+	}
+	if e.paradigmMayPlay(p, o) || e.mayPlayEffectGrantsCast(p, o) {
+		return true
+	}
+	free, covered := e.mayPlayEffectFree(p, o)
+	return covered && free
 }
 
 // mayPlayKinds classifies the active may-play permissions over card id into the

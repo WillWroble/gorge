@@ -271,6 +271,9 @@ func (r *Registry) rewindToLastIntent(t *table, m *match, seats []seat.Seat, brd
 	e.L.Reserve(defaultExpectedEvents)
 	m.e = e
 	m.intents = n
+	// HD-2's provenance ledger (host/divergence_ledger.go) describes exactly
+	// the intents the log holds: drop every entry the rewind discarded.
+	m.ledgerTruncate(n)
 	m.bounds = append([]uint64(nil), m.bounds[:n+1]...)
 	m.turnStarts = turnStartsBefore(m.turnStarts, uint64(len(e.L.Events)))
 	m.snaps = snapsBefore(m.snaps, n)
@@ -436,7 +439,7 @@ func (r *Registry) pushRewind(t *table, m *match) {
 				// The widget's Last is re-derived over the whole truncated log —
 				// the same full-log scan onMatchStart runs — so an undone line can
 				// never be carried into the rewound overview.
-				bodies := eventBodiesFor(view.NoSeat, t.cfg.Spectator, m.e.G, m.e.L.Events)
+				bodies := eventBodiesFor(view.NoSeat, t.cfg.Spectator, m.e.G, m.e.L.Events, false)
 				t.lastLine = lastLine(bodies, "")
 				widget = r.widgetFrame(t, m, t.lastLine)
 			}

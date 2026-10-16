@@ -10,6 +10,7 @@
   import Digit from './Digit.svelte';
   import ManaSymbols from '../ManaSymbols.svelte';
   import { manaOptionPips } from '../../lib/announcepay';
+  import { startingPlayerLabel } from '../../lib/prompts/startingplayer';
   import PromptFooter, { type FooterButton } from './PromptFooter.svelte';
 
   /**
@@ -35,7 +36,7 @@
     children?: Snippet;
   } = $props();
 
-  const rows = $derived(orderedOptions(decision, { filter: logic.searchFilter }) ?? []);
+  const rows = $derived(orderedOptions(decision, { filter: logic.searchFilter, autoPayMana: logic.autoPayMana }) ?? []);
   const digits = $derived(digitMap(rows.map((o) => o.index)));
   const primary = $derived(primaryOf(decision));
   const multi = $derived(decision.max > 1 || decision.repeatable === true);
@@ -106,7 +107,7 @@
         disabled={logic.busy || (full && at < 0)}
       >
         <Digit n={digits.get(opt.index)} on={at >= 0} />
-        <span class="label">{#if pips !== null}Add <ManaSymbols cost={pips} />{:else}{rowText ? rowText(opt) : opt.label}{/if}</span>
+        <span class="label">{#if pips !== null}Add <ManaSymbols cost={pips} />{:else}{rowText ? rowText(opt) : (startingPlayerLabel(decision, opt) ?? opt.label)}{/if}</span>
         {#if at >= 0 && multi}<span class="order" data-pick-order>{decision.repeatable ? `×${count}` : at + 1}</span>{/if}
       </button>
     {/each}

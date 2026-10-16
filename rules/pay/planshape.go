@@ -60,7 +60,11 @@ func PaymentPlanShapeTierOf(ma *cards.SA, cost costvocab.Cost) (tier Tier, c Con
 	deferred := func(detail string) (Tier, Consequence, string, bool) {
 		return TierDeferred, Consequence{}, detail, false
 	}
-	if ma == nil || ma.API != "Mana" {
+	// A reflected-mana ability is planned only in its one opponent-reflecting
+	// shape (PaymentPlanReflectedShape); it then takes the same key, cost
+	// and SubAbility$ checks as an AB$ Mana ability.
+	reflected := PaymentPlanReflectedShape(ma)
+	if ma == nil || (ma.API != "Mana" && !reflected) {
 		return deferred("source:special_production")
 	}
 	// The key loop carries the key NAMES only (never a Params value) into
@@ -74,7 +78,7 @@ func PaymentPlanShapeTierOf(ma *cards.SA, cost costvocab.Cost) (tier Tier, c Con
 	// the sorted copy.
 	failing, found := "", false
 	for key := range maps.Keys(ma.Params) {
-		if (!found || key < failing) && paymentPlanShapeKeyFails(key) {
+		if (!found || key < failing) && paymentPlanShapeKeyFails(key) && !(reflected && paymentPlanReflectedParamSet.Has(key)) {
 			failing, found = key, true
 		}
 	}
@@ -341,6 +345,91 @@ func PaymentPlanSelfDamageTrigger(f *cards.Face, t cards.Trigger) (uint32, bool)
 	return paymentPlanDamageBody(body)
 }
 
+// PlanTapMana is the deterministic extra mana one static TapsForMana trigger
+// adds when its carrier's matcher accepts a planned tap (Forsaken Monument,
+// Badgermole Cub, Crypt Ghast, Wild Growth). ToTapped records Defined$
+// TriggeredCardController (the mana goes to the tapped permanent's controller
+// rather than the trigger controller).
+type PlanTapMana struct {
+	Mana     state.Mana
+	ToTapped bool
+}
+
+// PaymentPlanFoldableTapMana classifies a `Mode$ TapsForMana | Static$ True`
+// trigger of face f as a fixed additional-mana body the planner can fold into
+// a source's production: closed-world over the trigger's parameters and a
+// single `DB$ Mana` body naming one literal symbol and a literal amount, with
+// no SubAbility$, cost or other parameter. Anything else is not foldable and
+// the caller keeps deferring.
+func PaymentPlanFoldableTapMana(f *cards.Face, t cards.Trigger) (PlanTapMana, bool) {
+	if t.Mode != "TapsForMana" || !strings.EqualFold(strings.TrimSpace(t.ParamStr(cards.PKStatic)), "True") {
+		return PlanTapMana{}, false
+	}
+	if v, ok := t.Param(cards.PKTriggerZones); ok && strings.TrimSpace(v) != "Battlefield" {
+		return PlanTapMana{}, false
+	}
+	for _, k := range slices.Sorted(maps.Keys(t.Params)) {
+		if paymentPlanTapManaTriggerCodes.Code(string(k)) == 0 {
+			return PlanTapMana{}, false
+		}
+	}
+	body := t.Effect
+	if body == nil && f != nil {
+		body = cards.ResolveSVar(f.SVars, strings.TrimSpace(t.ParamStr(cards.PKExecute)))
+	}
+	if body == nil || body.API != "Mana" || body.Sub != nil || strings.TrimSpace(body.ParamStr(cards.PKSubAbility)) != "" {
+		return PlanTapMana{}, false
+	}
+	for _, k := range slices.Sorted(maps.Keys(body.Params)) {
+		switch k {
+		case "API", "Produced", "Amount", "Defined", "SpellDescription", "StackDescription":
+		default:
+			return PlanTapMana{}, false
+		}
+	}
+	var out PlanTapMana
+	switch ref := params.DefinedRefOf(body); {
+	case ref.Kind == params.RefAbsent || ref.Kind == params.RefYou:
+	case ref.Text == "TriggeredCardController":
+		out.ToTapped = true
+	default:
+		return PlanTapMana{}, false
+	}
+	mp := params.ManaOf(body)
+	raw := mp.Produced
+	if len(raw) != 1 || !strings.Contains("WUBRGC", raw) {
+		return PlanTapMana{}, false
+	}
+	n := 1
+	if mp.Amount.Present {
+		if !mp.AmountIsLit || mp.AmountLit <= 0 || mp.AmountLit > 20 {
+			return PlanTapMana{}, false
+		}
+		n = mp.AmountLit
+	}
+	counts, anyColour := cards.ProducedCounts(raw)
+	if anyColour {
+		return PlanTapMana{}, false
+	}
+	for i, c := range counts {
+		out.Mana[i] = c * int32(n)
+	}
+	return out, true
+}
+
+type paymentPlanTapManaTriggerCode uint16
+
+var paymentPlanTapManaTriggerCodes = state.NewStrCodes(
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "Mode", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "ValidCard", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "Activator", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "Produced", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "Execute", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "Static", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "TriggerZones", Val: 1},
+	state.StrEntry[paymentPlanTapManaTriggerCode]{Key: "TriggerDescription", Val: 1},
+)
+
 // PaymentPlanAlive mirrors the engine walks' AliveFrom scope: an object in a
 // lost player's zones is not walked for triggers or replacements.
 func PaymentPlanAlive(e Engine, o *state.Object) bool {
@@ -528,8 +617,10 @@ func ManaReachable(e Engine, p state.PlayerID, cost costvocab.Cost, pool, snow s
 				// A PayLife activation spends real life: it must be
 				// present before the tap and is gone for the priced cost
 				// afterwards. Every shared-window alt carries life 0, so
-				// this is inert for the attack and unless windows.
-				if a.Life > lifeLeft {
+				// this is inert for the attack and unless windows. A
+				// zero-debit alt is unaffected by the payer's life total,
+				// even when the payer has been carried below 0.
+				if (a.Life > 0 && a.Life > lifeLeft) || (a.LifeKeep && a.Life >= lifeLeft) {
 					continue
 				}
 				if rec(i+1, remaining-1, ManaAdd(acc, a.Mana()), lifeLeft-a.Life) {

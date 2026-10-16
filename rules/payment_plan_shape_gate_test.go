@@ -15,7 +15,7 @@ func TestPaymentPlanShapeGate(t *testing.T) {
 	for i, tc := range []struct {
 		name, face, detail string
 	}{
-		{"discard", "A:SP$ Draw | Cost$ B Discard<1/Card> | NumCards$ 1", "shape:additional_cost"},
+		{"discardX", "A:SP$ Draw | Cost$ B Discard<X/Card> | NumCards$ 1", "shape:additional_cost"},
 		{"life", "A:SP$ Draw | Cost$ B PayLife<2> | NumCards$ 1", "shape:additional_cost"},
 		{"exile", "A:SP$ Draw | Cost$ B Exile<1/Card> | NumCards$ 1", "shape:additional_cost"},
 		{"tapXType", "A:SP$ Draw | Cost$ B tapXType<1/Creature> | NumCards$ 1", "shape:additional_cost"},
@@ -194,9 +194,10 @@ func TestPaymentPlanShapeGateSpreeOffers(t *testing.T) {
 	}
 }
 
-// The executor half of the audit story (ticket autopay-exec-harden) is no
-// longer reachable through the planner offer for these shapes, because PP-08
-// withholds it. Build the witness directly, exactly as
+// The executor half of the audit story (ticket autopay-exec-harden) is not
+// reachable through the planner offer for delve, because PP-08 withholds it
+// (the fixed discard is offered since botmanual:
+// TestPaymentPlanSeeksDiscardOffer covers that route end to end). Build the witness directly, exactly as
 // TestPaymentPlanExecutesAfterCastTimeChoice does for sacrifice, and prove the
 // executor still pays the whole cost after the additional-cost choice: the
 // spell must not sit on the stack unpaid. This is executor coverage only; it

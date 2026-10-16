@@ -3,6 +3,7 @@ package rules
 import (
 	"github.com/adams-shaun/gorge/decision"
 	"github.com/adams-shaun/gorge/events"
+	"github.com/adams-shaun/gorge/rules/pay"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -37,9 +38,53 @@ import (
 // pending window, because New folds the resolved toss unconditionally. The
 // candidate seats travel in the Decision's own option list (Option.Player),
 // so replay rebuilds them from the live survivors without a second copy here.
+// configured is true when a Config.StartChooser named this seat rather than
+// the toss (E3-1); it only picks the decision's prompt.
 type tossChoice struct {
-	active bool
-	winner state.PlayerID
+	active     bool
+	winner     state.PlayerID
+	configured bool
+}
+
+// TossWinner is the seat that wins the CR 103.1 toss of a game seeded with
+// seed for seats players: the first draw of the game's rng. 0 when seats < 1.
+func TossWinner(seed uint64, seats int) int {
+	if seats < 1 {
+		return 0
+	}
+	return newRNG(seed).IntN(seats)
+}
+
+// tossOutcome applies cfg.StartChooser to the drawn toss: it returns the seat
+// that will be posed the choice, the genesis Note text for it, and whether
+// the seat was configured rather than tossed. An index outside the seats is
+// ignored (the toss stands), so a nil -- every Config before E3 -- or
+// out-of-range chooser returns the toss itself, byte-identical to today.
+// It is the one home of both the genesis Note text and the tossChoice
+// configured flag: genesisDeal (rules/genesis.go) emits the Note it returns
+// and rebinds its toss variable to the seat, and the choice-pending guard
+// re-derives the flag through it.
+func (e *Engine) tossOutcome(cfg Config, toss int) (seat int, note string, configured bool) {
+	seat = toss
+	note = pay.SeatName(e.G, state.PlayerID(toss)) + " won the toss"
+	if chooser := cfg.StartChooser; chooser != nil && *chooser >= 0 && *chooser < len(cfg.Names) {
+		seat = *chooser
+		note = pay.SeatName(e.G, state.PlayerID(*chooser)) + " chooses who takes the first turn"
+		configured = true
+	}
+	return seat, note, configured
+}
+
+// StartingChoicePending reports whether the CR 103.1 play/draw choice is
+// still unresolved. It is true from the end of New's deal (once the opening
+// deal has fixed the survivors) until the choice is answered or defaulted --
+// the window in which CR 103.5's "no player may see any hand" rule binds, so
+// a seat-scoped projection or bot input suppresses every hand-derived fact
+// while it holds. It is the read side of tossChoice.active for the view and
+// botpolicy layers, which reach it through an optional capability interface
+// rather than importing rules (Ruling F7).
+func (e *Engine) StartingChoicePending() bool {
+	return e != nil && e.tossChoice.active
 }
 
 // AskStartingPlayer poses the CR 103.1 winner-chooses decision when one is
@@ -66,8 +111,15 @@ func (e *Engine) AskStartingPlayer() *decision.Decision {
 		opts[i] = decision.Option{Index: i, Kind: "player",
 			Label: seatFacingName(e.G, p), Player: p}
 	}
+	prompt := "You won the toss. Choose who takes the first turn."
+	if e.tossChoice.configured {
+		// A configured chooser (Config.StartChooser, E3-1) did not win a
+		// toss -- MTR 2.2 hands the previous game's loser the choice -- so
+		// the honest prompt omits the toss.
+		prompt = "Choose who takes the first turn."
+	}
 	e.ask(decision.New(e.tossChoice.winner, decision.KStartingPlayer,
-		"You won the toss. Choose who takes the first turn.", 1, 1, opts))
+		prompt, 1, 1, opts))
 	return e.pending
 }
 

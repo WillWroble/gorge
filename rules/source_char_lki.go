@@ -41,6 +41,9 @@ import (
 type sourceCharSnapshot struct {
 	power, toughness int32
 	counters         []state.Counter
+	// chosenType and chosenColor are the source's recorded "as this enters"
+	// choices; the live object loses them on leaving the battlefield.
+	chosenType, chosenColor string
 }
 
 // sourceCharSnapshotOf reads src's characteristics now; src must still be on
@@ -51,7 +54,8 @@ func (e *Engine) sourceCharSnapshotOf(src state.ObjID) sourceCharSnapshot {
 		return sourceCharSnapshot{}
 	}
 	return sourceCharSnapshot{power: e.Power(src), toughness: e.Toughness(src),
-		counters: append([]state.Counter(nil), o.Counters...)}
+		counters:   append([]state.Counter(nil), o.Counters...),
+		chosenType: o.ChosenType, chosenColor: o.ChosenColor}
 }
 
 // captureSourceCharLKI records src's snapshot, immediately before it leaves
@@ -114,7 +118,8 @@ func (e *Engine) sourceCharLKIFor(stack, source state.ObjID, lki *state.Object, 
 	if o := e.G.Obj(source); o != nil && o.Zone == state.ZBattlefield && o.Incarnation == lki.Incarnation {
 		return sourceCharSnapshot{}, false
 	}
-	return sourceCharSnapshot{power: lkiPower, toughness: lkiToughness, counters: lki.Counters}, true
+	return sourceCharSnapshot{power: lkiPower, toughness: lkiToughness, counters: lki.Counters,
+		chosenType: lki.ChosenType, chosenColor: lki.ChosenColor}, true
 }
 
 // count answers a source-characteristic Count$ body from the snapshot:

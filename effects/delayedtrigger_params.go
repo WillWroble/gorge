@@ -33,7 +33,8 @@ type DelayedTriggerParams struct {
 	Phase string
 	// PhaseText is the Mode$ Phase registration's event Text: Phase$ plus
 	// the "|VP=" ValidPlayer$ and "|IP=/|PZ=/|PC=" IsPresent$/PresentZone$/
-	// PresentCompare$ suffixes rules' delayed scan decodes.
+	// PresentCompare$ suffixes rules' delayed scan decodes, then the bare
+	// "|ST" flag when Static$ True (the fired body resolves off the stack).
 	PhaseText string
 	// EventText is an event-matched registration's Text before the ThisTurn$
 	// expiry suffix: "<Mode>:" plus the inline trigger body
@@ -46,6 +47,12 @@ type DelayedTriggerParams struct {
 	RememberObjects string
 	// NextTurn is NextTurn$ True.
 	NextTurn bool
+	// UpcomingTurn is UpcomingTurn$ True: the registration is live from the
+	// next turn of any player (Forge's registerDelayedTrigger at cleanup).
+	UpcomingTurn bool
+	// DefinedPlayer is DelayedTriggerDefinedPlayer$, trimmed: the player
+	// whose NEXT turn arms the registration (Gideon Jura's "Targeted").
+	DefinedPlayer string
 	// RememberChainFalse is RememberChain$ False.
 	RememberChainFalse bool
 	// RememberNumber is RememberNumber$ True: the registration carries the
@@ -81,14 +88,14 @@ var delayedTriggerKnownKeys = [...]string{
 	"ClassBand", "ClearImprinted", "CombatDamage", "Condition",
 	"ConditionActivationLimit", "ConditionCheckSVar", "ConditionCompare", "ConditionCompare2",
 	"ConditionDefined", "ConditionDescription", "ConditionFirstCombat",
-	"ConditionNotPresent", "ConditionPhases", "ConditionPlayerTurn",
+	"ConditionNotPresent", "ConditionOptionalPaid", "ConditionPhases", "ConditionPlayerTurn",
 	"ConditionPresent", "ConditionPresent2", "ConditionSVarCompare", "ConditionZone", "CopyCard", "Cost", "CostDesc",
-	"Defined", "DefinedCards", "DefinedTarget", "Description", "Destination",
+	"Defined", "DefinedCards", "DefinedTarget", "DelayedTriggerDefinedPlayer", "Description", "Destination",
 	"Exclude", "ExcludedOrigins", "Execute", "Exhaust", "ForgetOtherTargets", "GameActivationLimit",
 	"Image", "ImprintCards", "ImprintPlayed", "InstantSpeed",
 	"IsCurse", "IsPresent", "KW", "Keyword", "KeywordLine", "MaxTotalTargetCMC",
 	"MaxTotalTargetPower", "Mentor", "Mode", "ModeCost", "Monstrosity",
-	"NewController", "NextTurn", "NumDmg", "OpponentTurn", "Origin", "Phase",
+	"NewController", "NextTurn", "OpponentTurn", "Origin", "Phase",
 	"Planeswalker", "PlayCost", "PlayerTurn", "PowerUp", "PrecostDesc",
 	"PresentCompare", "PresentDefined", "PresentZone", "RandomNumTargets", "ReduceAmount", "ReduceCost",
 	"RememberAnimated", "RememberChain", "RememberCostMana", "RememberNumber", "RememberObjects", "RememberTargets", "ReplaceColor",
@@ -100,12 +107,12 @@ var delayedTriggerKnownKeys = [...]string{
 	"TargetsForEachPlayer", "TargetsWithControllerProperty",
 	"TargetsWithDefinedController", "TargetsWithDifferentCMC",
 	"TargetsWithDifferentControllers", "TargetsWithDifferentNames",
-	"TargetsWithEqualToughness", "TargetsWithSameCardType",
+	"TargetsWithEqualToughness", "TargetsWithRelatedProperty", "TargetsWithSameCardType",
 	"TargetsWithSameController", "TargetsWithSameCreatureType",
 	"TargetsWithSharedCardType", "TargetsWithSharedTypes", "TgtPrompt", "TgtZone",
 	"ThisTurn", "TokenScript", "TriggerDescription", "TriggerZones", "Type",
 	"Ultimate", "UnlessAI", "UnlessCost", "UnlessPayer", "UnlessResolveSubs",
-	"UnlessSwitched", "ValidActivatingPlayer", "ValidAttackers",
+	"UnlessSwitched", "UpcomingTurn", "ValidActivatingPlayer", "ValidAttackers",
 	"ValidAttackersAmount", "ValidCard", "ValidCards", "ValidCardsDesc",
 	"ValidChoices", "ValidCounterType", "ValidDescription", "ValidOriginalController",
 	"ValidPlayer", "ValidSA", "ValidSource", "ValidTarget", "ValidTgts",
@@ -152,6 +159,8 @@ func compileDelayedTrigger(sa *cards.SA, ap *ActivationParams) *DelayedTriggerPa
 	p.Phase = sa.ParamStr(cards.PKPhase)
 	p.RememberObjects = strings.TrimSpace(sa.ParamStr(cards.PKRememberObjects))
 	p.NextTurn = isTrue(sa.ParamStr(cards.PKNextTurn))
+	p.UpcomingTurn = isTrue(sa.ParamStr(cards.PKUpcomingTurn))
+	p.DefinedPlayer = strings.TrimSpace(sa.ParamStr(cards.PKDelayedTriggerDefinedPlayer))
 	p.RememberChainFalse = strings.EqualFold(strings.TrimSpace(sa.ParamStr(cards.PKRememberChain)), "False")
 	p.RememberNumber = isTrue(sa.ParamStr(cards.PKRememberNumber))
 	p.Execute = strings.TrimSpace(sa.ParamStr(cards.PKExecute))
@@ -171,6 +180,11 @@ func compileDelayedTrigger(sa *cards.SA, ap *ActivationParams) *DelayedTriggerPa
 		if cmp := ap.PresentCompare.Text; cmp != "" {
 			text += "|PC=" + cmp
 		}
+	}
+	// Static$ True rides a bare "|ST" flag LAST, so the decode strips it
+	// before the value-bearing suffixes.
+	if isTrue(p.Static) {
+		text += "|ST"
 	}
 	p.PhaseText = text
 	p.EventText = p.Mode + ":" + delayedTriggerBody(sa, ap)

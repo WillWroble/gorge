@@ -81,7 +81,11 @@ func xanswersForScenario(res rules.OracleResult, sc Scenario, modes map[string]i
 		}
 	}
 	collapseRoomLock(ds)
-	out := xanswersSetup(ds, len(sc.Steps), modes, castSteps, sc.Setup)
+	if castSteps == nil {
+		castSteps = stepsWithOwnTargets(sc)
+	}
+	castSteps = withoutDividedActivations(castSteps, ds, sc)
+	out := xanswersSetup(ds, len(sc.Steps), modes, castSteps, sc.Setup, res.Flips)
 	// The deterministic trample assignment XMage poses as a multi-amount
 	// dialog is no decision the engine recorded, so it is synthesized from
 	// the scenario's own attack/block steps and leads the pass_to step that
@@ -183,4 +187,54 @@ func movedCards(snaps []rules.OracleSnapshot, sc Scenario, step, seat int, zone 
 		return nil
 	}
 	return added
+}
+
+// stepsWithOwnTargets marks the cast/activate steps that carry their own
+// Targets, for a caller that rewrote none (castSteps nil). The driver queues
+// a step's Targets itself, so its target decisions must not be scripted a
+// second time: the spare answer is consumed by the next target ask
+// (Meltstrider's Resolve's "Hill Giant" answered its own enters trigger's
+// opponent-creature target; Choreographed Sparks' "p1" answered its
+// TargetSpell), which rejects it.
+func stepsWithOwnTargets(sc Scenario) map[int]bool {
+	out := map[int]bool{}
+	for i, st := range sc.Steps {
+		if (st.Op == "cast" || st.Op == "activate") && len(st.Targets) > 0 {
+			out[i] = true
+		}
+	}
+	return out
+}
+
+// withoutDividedActivations drops from castSteps every activate step whose own
+// target ask is divided (DividedAsYouChoose$: The Earth Crystal's "distribute
+// two +1/+1 counters among one or two target creatures"), so xanswersSetup
+// scripts that ask in XMage's TargetAmount form, one "<ref>^X=<share>" per
+// recipient with gorge's own shares (dividedTargetAnswers). XMage's
+// chooseTargetAmount rejects a bare alias ("Must be target amount, but found
+// unknown target"), and the driver queues an activation's step targets bare,
+// so it skips them when the step scripts a "^X=" answer. Cast steps keep their
+// castSpell route ("^"-joined names), so their scenario bytes are unchanged.
+// The input map is never mutated.
+func withoutDividedActivations(castSteps map[int]bool, ds []rules.OracleDecision, sc Scenario) map[int]bool {
+	var out map[int]bool
+	for _, d := range ds {
+		if d.Kind != "target" || d.Via != "target" || d.Resume == "copy_targets" || d.Divided <= 0 || len(d.PickRefs) == 0 {
+			continue
+		}
+		if d.Step < 0 || d.Step >= len(sc.Steps) || sc.Steps[d.Step].Op != "activate" || !castSteps[d.Step] {
+			continue
+		}
+		if out == nil {
+			out = make(map[int]bool, len(castSteps))
+			for k, v := range castSteps {
+				out[k] = v
+			}
+		}
+		delete(out, d.Step)
+	}
+	if out == nil {
+		return castSteps
+	}
+	return out
 }

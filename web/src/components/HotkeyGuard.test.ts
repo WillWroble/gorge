@@ -162,6 +162,60 @@ describe('the hotkey guard against an open modal — mounted', () => {
     await page.close();
   });
 
+  it('the always-visible Auto chip LOOKS different on, off and paused, so every press is visible', async () => {
+    // Operator report (2026-10-14): "the ui seems unable to go back into
+    // auto pass mode -- the button has no effect". The live strip's AUTO chip
+    // is the only Auto switch visible during play, and pressAuto toggled
+    // autoPass correctly -- but the chip painted the SAME colours on and off,
+    // and the undo pause painted it LIT. So resuming from a pause turned the
+    // chip dark (reads as "switched off"), and every later press flipped
+    // autoPass with nothing on screen changing. Measured on computed style,
+    // because the class list alone cannot prove a player can see it.
+    const page = await browser.newPage();
+    await page.goto(`${url}src/components/HotkeyGuard.fixture.html`);
+    const chip = page.locator('#fixture [data-auto-status]');
+    const look = async (): Promise<string> => {
+      // Park the pointer away so :hover never contributes to the reading.
+      await page.mouse.move(0, 0);
+      return chip.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return `${s.backgroundColor}|${s.color}`;
+      });
+    };
+    const autoOn = (): Promise<boolean> =>
+      page.evaluate(() => (window as unknown as { __state: { auto: boolean } }).__state.auto);
+
+    // The fixture is a manual seat: auto off.
+    expect(await autoOn()).toBe(false);
+    await expect.poll(() => chip.getAttribute('aria-checked')).toBe('false');
+    const off = await look();
+
+    await chip.click();
+    await expect.poll(() => chip.getAttribute('aria-checked')).toBe('true');
+    expect(await autoOn()).toBe(true);
+    const on = await look();
+    expect(on, 'turning Auto on must change how the chip looks').not.toBe(off);
+
+    await chip.click();
+    await expect.poll(() => chip.getAttribute('aria-checked')).toBe('false');
+    expect(await look(), 'turning Auto off must restore the off look').toBe(off);
+
+    // The undo pause with auto ON: distinct from both, and the resume press
+    // must land on the ON look -- not the off look it used to land on.
+    await chip.click();
+    await expect.poll(() => chip.getAttribute('aria-checked')).toBe('true');
+    await page.evaluate(() => (window as unknown as { __state: { rewind: () => void } }).__state.rewind());
+    await expect.poll(() => chip.getAttribute('data-play-mode')).toBe('paused');
+    const paused = await look();
+    expect(paused, 'the pause must not look like Auto on').not.toBe(on);
+    expect(paused, 'the pause must not look like Auto off').not.toBe(off);
+    await chip.click();
+    await expect.poll(() => chip.getAttribute('data-play-mode')).not.toBe('paused');
+    expect(await autoOn()).toBe(true);
+    expect(await look(), 'resuming from the pause must read as Auto on').toBe(on);
+    await page.close();
+  });
+
   it('Space and Enter stay behind PileModal; Escape closes it and preserves End Turn', async () => {
     const page = await browser.newPage();
     await page.goto(`${url}src/components/HotkeyGuard.fixture.html`);

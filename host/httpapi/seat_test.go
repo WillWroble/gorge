@@ -139,6 +139,44 @@ func parkedSeat(t *testing.T, r *host.Registry) (parked, other state.PlayerID) {
 	}
 }
 
+// pastStartingChoice parks a human seat on a decision AFTER the CR 103.1
+// starting-player choice. While that choice is pending no seat may see any
+// hand card (CR 103.5, E3-fx1), so a test about hand redaction between seats
+// has to look at the next decision (the London mulligan), where each seat
+// sees its own opening hand again. The choice is answered over HTTP by the
+// seat that owns it, exactly as a client would.
+func pastStartingChoice(t *testing.T, srv *httptest.Server, r *host.Registry) (parked, other state.PlayerID) {
+	t.Helper()
+	for i := 0; i < 8; i++ {
+		parked, other = parkedSeat(t, r)
+		d, err := r.Pending("t1", 1, parked)
+		if err != nil {
+			t.Fatalf("pending for parked seat %d: %v", parked, err)
+		}
+		if d.Kind != decision.KStartingPlayer {
+			return parked, other
+		}
+		sess := "s" + strconv.Itoa(int(parked))
+		if code, e, _ := seatReq(t, http.MethodPost, srv.URL+"/api/tables/t1/matches/1/intent", sess, answerFor(d)); code >= 300 {
+			t.Fatalf("answering the starting-player choice: %d %+v", code, e)
+		}
+		// Wait for the head to move past the answered choice before re-parking.
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			nd, err := r.Pending("t1", 1, parked)
+			if err != nil || nd.Seq != d.Seq {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("the starting-player answer was never consumed")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	t.Fatal("still parked on a starting-player choice after 8 answers")
+	return 0, 0
+}
+
 // seatReq runs an HTTP request carrying the X-Seat-Session claim header
 // ("" = no claim presented, the spectator path) and returns the status, the
 // decoded error body (zero when the status is < 400) and the raw body, so a
@@ -330,7 +368,7 @@ func TestSeatParamAbsentIsByteIdenticalToToday(t *testing.T) {
 // seat's ?seat= is refused before any projection runs.
 func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	srv, r := parkedSeatServer(t, seatClaims)
-	parked, other := parkedSeat(t, r)
+	parked, other := pastStartingChoice(t, srv, r)
 	ps, os := "s"+strconv.Itoa(int(parked)), "s"+strconv.Itoa(int(other))
 	head := liveHead(t, r)
 
@@ -362,6 +400,13 @@ func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	if pv.Viewer != parked || pv.Visibility != view.Seat.String() {
 		t.Fatalf("parked seat view: viewer %d visibility %q", pv.Viewer, pv.Visibility)
 	}
+	// The fixture parks PAST the CR 103.1 starting-player ask (see
+	// pastStartingChoice), so the CR 103.5 pregame blind has lifted by the
+	// time this reads: the parked seat's own hand is visible again in full,
+	// count matching. While the choice is pending the blind hides it (the
+	// shape view/starting_choice_test.go pins) and the seat's own Secret
+	// draws are served shape-only (host/starting_choice_events_test.go pins
+	// both halves of the window).
 	if pv.Players[parked].Hand == nil || len(pv.Players[parked].Hand) != int(pv.Players[parked].HandSize) || pv.Players[parked].HandSize == 0 {
 		t.Fatalf("the parked seat's own hand is not present: %+v", pv.Players[parked])
 	}
@@ -386,6 +431,9 @@ func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 	} else if err := json.Unmarshal(raw, &ov); err != nil {
 		t.Fatal(err)
 	}
+	// The other seat's view is under the same post-choice terms: its own
+	// hand visible (the blind lifted once the choice resolved), the parked
+	// seat's hand nil.
 	if ov.Viewer != other || ov.Players[other].Hand == nil || ov.Players[parked].Hand != nil {
 		t.Fatalf("the other seat's view is not its own game: viewer %d hands %v/%v", ov.Viewer, ov.Players[parked].Hand, ov.Players[other].Hand)
 	}
@@ -408,12 +456,14 @@ func TestSeatViewRedactsTheOtherSeatsHand(t *testing.T) {
 }
 
 // TestSeatEventsRedactEveryOtherSeatsDraws pins the redaction of the event
-// stream: seat P's stream keeps P's own draws (object and transcript line
-// identical to the omniscient spectator stream's) and reduces every other
-// seat's draw — the two human seats and both bots — to its shape ("draws a
-// card", no object, no name). The omitted card's name never surfaces in a
-// transcript line. The mirror direction (other's claim, other's stream) is
-// asserted too, so the property is per-viewer, not a quirk of one claim.
+// stream: seat P's stream reduces every other seat's draw — the two human
+// seats and both bots — to its shape ("draws a card", no object, no name),
+// and (E3-fx3, CR 103.5) while the CR 103.1 starting-player choice is
+// pending — the fixture's parked state — P's own Secret opening-hand draws
+// are redacted to that same shape, so no opening-hand id or name leaves the
+// server during the window. The mirror direction (other's claim, other's
+// stream) is asserted too, so the property is per-viewer, not a quirk of
+// one claim.
 func TestSeatEventsRedactEveryOtherSeatsDraws(t *testing.T) {
 	srv, r := parkedSeatServer(t, seatClaims)
 	parked, other := parkedSeat(t, r)
@@ -462,18 +512,24 @@ func TestSeatEventsRedactEveryOtherSeatsDraws(t *testing.T) {
 
 	assertDraws := func(stream []protocol.EventBody, viewer state.PlayerID) {
 		t.Helper()
-		for i, b := range stream {
+		for _, b := range stream {
 			if b.Event.Kind != "draw" {
 				continue
 			}
-			sb := spec[i]
 			who := state.PlayerID(b.Event.Player)
 			if who == viewer {
-				if b.Event.Obj == 0 || b.Event.Obj != sb.Event.Obj {
-					t.Fatalf("seat %d loses its own draw at seq %d: obj %d, spectator has %d", viewer, b.Event.Seq, b.Event.Obj, sb.Event.Obj)
+				// E3-fx3 (CR 103.5): the fixture reads these streams while
+				// the CR 103.1 starting-player choice is pending, so the
+				// seat's OWN Secret draws are redacted to the same shape an
+				// opponent gets — no object, a shape transcript line. Once
+				// the choice resolves the same request serves the ids again
+				// (host/starting_choice_events_test.go pins both halves).
+				if b.Event.Obj != 0 {
+					t.Fatalf("seat %d's own draw at seq %d carries obj %d while the starting-player choice is pending", viewer, b.Event.Seq, b.Event.Obj)
 				}
-				if b.Line != sb.Line {
-					t.Fatalf("seat %d's own draw at seq %d reads %q, the spectator stream reads %q", viewer, b.Event.Seq, b.Line, sb.Line)
+				want := sv.Players[who].Name + " draws a card"
+				if b.Line != want {
+					t.Fatalf("seat %d's own blind draw at seq %d reads %q, want the shape line %q", viewer, b.Event.Seq, b.Line, want)
 				}
 				continue
 			}

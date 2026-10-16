@@ -28,6 +28,8 @@ const { fakeMatch } = vi.hoisted(() => {
   return { fakeMatch: { shared, MatchState: FakeMatch } };
 });
 vi.mock('../lib/match.svelte', () => ({ MatchState: fakeMatch.MatchState }));
+const { fakeTables } = vi.hoisted(() => ({ fakeTables: { list: [] as { info: Record<string, unknown> }[] } }));
+vi.mock('../lib/tables.svelte', () => ({ tables: fakeTables }));
 vi.mock('../lib/session.svelte', () => ({
   session: { stream: { onFrame: () => () => {} }, focus: async () => {}, unfocus: async () => {} },
 }));
@@ -35,7 +37,7 @@ vi.mock('../lib/session.svelte', () => ({
 import Table from './Table.svelte';
 
 const player = (seat: number): PlayerView => ({
-  seat, name: `P${seat}`, life: 20, lost: false, library_size: 30, hand_size: 7, graveyard_size: 0,
+  seat, name: `P${seat}`, life: 20, lost: false, spells_cast_this_turn: 0, life_gained_this_turn: 0, life_lost_this_turn: 0, tokens_created_this_turn: 0, library_size: 30, hand_size: 7, graveyard_size: 0,
   completed_dungeons: 0,
   hand: [], battlefield: [], graveyard: [], exile: [], pool: {}, command: [], commanders: [], commander_casts: [],
 });
@@ -109,6 +111,28 @@ describe('Table.svelte — Restart control eligibility and placement (fb-2026092
     const { html } = render(Table, { props: { table: 't1' } });
 
     expect(html).not.toContain('data-restart-control');
+    initSeatContext('');
+  });
+
+  it('a draft-event table (TableInfo.event) gets no Restart control', () => {
+    initSeatContext('?seat=0&token=tok');
+    fakeMatch.shared.view = view();
+    fakeMatch.shared.seats = vsBotSeats;
+    fakeTables.list = [{ info: { id: 't1', event: true } }];
+    const { html } = render(Table, { props: { table: 't1' } });
+    expect(html).not.toContain('data-restart-control');
+    fakeTables.list = [];
+    initSeatContext('');
+  });
+
+  it('a series table (TableInfo.series) gets no Restart control', () => {
+    initSeatContext('?seat=0&token=tok');
+    fakeMatch.shared.view = view();
+    fakeMatch.shared.seats = vsBotSeats;
+    fakeTables.list = [{ info: { id: 't1', series: true } }];
+    const { html } = render(Table, { props: { table: 't1' } });
+    expect(html).not.toContain('data-restart-control');
+    fakeTables.list = [];
     initSeatContext('');
   });
 });

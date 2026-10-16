@@ -25,16 +25,35 @@ func NewBotPolicySeat(name string, seed uint64) (seat.Seat, error) {
 
 // newCaretakerSeat builds the timeout caretaker for a human seat. deps is
 // the embedder's card dependency (host.Options.BotDeps), threaded so a
-// corpus-hungry policy can still build its caretaker on a served table.
-func newCaretakerSeat(name string, seed uint64, autoPayMana bool, deps bots.Deps) (seat.Seat, error) {
-	s, err := NewBotPolicySeatWithDeps(name, seed, autoPayMana, deps)
+// corpus-hungry policy can still build its caretaker on a served table;
+// commonSense is the table's persisted CommonSense opt-in (TableConfig.
+// BotCommonSense), threaded so the caretaker answers through the same
+// bots/sanity guard the table's bots do. The public NewBotPolicySeatWithDeps
+// wrapper keeps its load-bearing CommonSense-free signature (cmd/cardfuzz and
+// tests build the plain seat); this internal path threads the full option set
+// the table path (defaultSeatsWithAutoPayMana) threads.
+func newCaretakerSeat(name string, seed uint64, autoPayMana, commonSense bool, deps bots.Deps) (seat.Seat, error) {
+	s, err := bots.New(name, bots.Options{Seed: seed, AutoPayMana: autoPayMana, CommonSense: commonSense, Deps: deps, DecisionDeadlineMS: hostedDecisionDeadlineMS})
 	if err != nil {
 		return nil, err
+	}
+	skipLifePlans(s, autoPayMana)
+	return s, nil
+}
+
+// skipLifePlans arms the caretaker's SkipLifePlans on the *seat.Bot under s,
+// seeing through decorators that expose UnwrapSeat (the bots/sanity guard).
+func skipLifePlans(s seat.Seat, autoPayMana bool) {
+	for {
+		u, ok := s.(interface{ UnwrapSeat() seat.Seat })
+		if !ok {
+			break
+		}
+		s = u.UnwrapSeat()
 	}
 	if b, ok := s.(*seat.Bot); ok && autoPayMana {
 		b.SkipLifePlans()
 	}
-	return s, nil
 }
 
 // NewBotPolicySeatWithAutoPayMana builds a named hosted bot. Its public

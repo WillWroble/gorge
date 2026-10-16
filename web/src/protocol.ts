@@ -4,7 +4,7 @@
 
 export type BotTier = "production" | "experimental";
 
-export type FrameType = "hello" | "widget" | "match_start" | "snapshot" | "event" | "decision" | "match_end" | "table_halted" | "overflow" | "error" | "rewind";
+export type FrameType = "hello" | "widget" | "match_start" | "snapshot" | "event" | "decision" | "match_end" | "table_halted" | "table_state" | "overflow" | "error" | "rewind" | "event_state" | "draft_pack" | "pod_progress" | "series_update";
 
 export type MatchState = "live" | "finished" | "aborted" | "crashed";
 
@@ -81,6 +81,22 @@ export interface TableInfo {
    * AutoMana enables the human payment-plan UI for this table.
    */
   auto_mana: boolean;
+  /**
+   * Series marks a series table (TableConfig.Series, E3-2): it plays match
+   * after match, its end decided by the series hook rather than a match
+   * count, and between games it sits in the "between_games" table_state
+   * while players sideboard. omitempty: false is the default and the zero
+   * value, so a non-series table is byte-identical to a table before the
+   * field existed.
+   */
+  series?: boolean;
+  /**
+   * Event marks a table owned by a draft event (TableConfig.Event): its
+   * games are the event's to schedule, so the client offers no restart
+   * (a fresh vs-bot game) from it. omitempty, like Series: a non-event
+   * table is byte-identical to a table before the field existed.
+   */
+  event?: boolean;
 }
 
   /**
@@ -318,6 +334,18 @@ export interface CardView {
   tapped: boolean;
   power: number;
   toughness: number;
+  /**
+   * PrintedPT is the face's PRINTED power/toughness as text ("1/1", "* /*"),
+   * the value the physical card or token is printed with. Power/Toughness
+   * above are the CURRENT layer-7 values a counter or an anthem moves; a
+   * token whose current P/T differs from its printed P/T (a 1/1 Soldier
+   * with a +1/+1 counter reads "2/2") must still resolve to the same art as
+   * its un-pumped sibling, and only the printed value is stable across
+   * pumping. Empty for a face with no printed P/T (a noncreature) and on
+   * every redacted face-down CardView, which is rebuilt from a fresh
+   * literal.
+   */
+  printed_pt?: string;
   damage: number;
   attacking: boolean;
   counters?: Record<string, number>;
@@ -554,6 +582,14 @@ export interface PlayerView {
   name: string;
   life: number;
   lost: boolean;
+  /**
+   * Per-turn watchers (state.Player's *ThisTurn tallies): public counts
+   * for this seat since the last turn change, for every viewer.
+   */
+  spells_cast_this_turn: number;
+  life_gained_this_turn: number;
+  life_lost_this_turn: number;
+  tokens_created_this_turn: number;
   library_size: number;
   hand_size: number;
   planar_deck?: CardView[];
@@ -1051,6 +1087,14 @@ export interface Option {
    * budget (Decision.MaxSum2).
    */
   value2?: number;
+  /**
+   * TargetHints is the engine's opt-in hint for a cast or activation whose
+   * first targeting step is a hostile effect: own and opponent legal-target
+   * counts (see TargetHints). Information only; built by
+   * Engine.EnsureTargetHints for seats that ask. omitempty: absent for every
+   * option otherwise, so existing option lists serialise byte-identically.
+   */
+  target_hints?: number;
 }
 
   /**
@@ -1067,7 +1111,9 @@ export interface WindowReason {
    *
    * Origin is the zone the cast begins from: "hand", "command_zone" (the plain
    * taxed commander cast), or "exile" / "graveyard" (the plain cast an untyped
-   * may-play permission grants a card there).
+   * may-play permission grants a card there) -- or "flashback" (OriginFlashback),
+   * the CR 702.34a flashback cast of a graveyard card for its primary flashback
+   * cost, the one alternative-cost cast a V1 witness pays.
    */
 export interface PlannedCast {
   object: number;
@@ -1164,6 +1210,13 @@ export interface PaymentAction {
   base_option_index?: number | null;
   label: string;
   plans: PaymentPlan[];
+  /**
+   * TargetHints is the same opt-in hint Option.TargetHints carries, for the
+   * action's card: set by Engine.EnsureTargetHints, including for an action
+   * with no base option (a floating-mana plan) that no Option can carry it
+   * for. omitempty: absent unless the seat asked for hints.
+   */
+  target_hints?: number;
 }
 
   /**
@@ -1587,6 +1640,23 @@ export interface TableHaltedBody {
 }
 
   /**
+   * TableStateBody is the table_state frame: a table's coarse lifecycle state
+   * as it changes, so a client need not infer it from match_end. State is
+   * TableBetweenGames while a series table sideboards between two games,
+   * TableLive while a match is on the table, and TableIdle otherwise. The
+   * envelope's Table names the table.
+   *
+   * E3-fx2 chose a new frame over reusing an existing one: the widget frame
+   * carries a State field but is only built from a live match (host/widgetFrame
+   * reads the engine), and a series table between games has no match at all
+   * (host/registry.go retires it before the hook plans the next), so no widget
+   * can be built in exactly the state this signal must report.
+   */
+export interface TableStateBody {
+  state: string;
+}
+
+  /**
    * Overflow is the last frame on a stream whose session channel filled.
    */
 export interface Overflow {
@@ -1675,6 +1745,306 @@ export interface BotPolicyInfo {
 export interface BotPolicyList {
   default: string;
   policies: BotPolicyInfo[];
+}
+
+  /**
+   * EventSeat is one entrant of a draft event. Kind is "human" or "bot";
+   * Policy and Drafter name a bot seat's game policy and pickbot persona.
+   * Picks is the public count of cards drafted so far, never the cards.
+   */
+export interface EventSeat {
+  seat: number;
+  kind: string;
+  name: string;
+  policy?: string;
+  drafter?: string;
+  joined: boolean;
+  picks: number;
+  ready: boolean;
+}
+
+  /**
+   * EventSeries is one pairing of an event round. State is "pending", "live",
+   * "between" or "ended" — "between" names the sideboarding step between two
+   * games of a series (E3-3). Table names the live (or last) game's host
+   * table, so a spectator can watch at /t/{table}; Attempt is the game
+   * attempt in flight. Game is the live game, or the next one while between.
+   * Games is the winner seat per played game (-1 for a draw); Chooser names
+   * the event seat choosing play/draw for Game; Waiting lists the seats
+   * still to submit their deck while between. Winner is nil while the series
+   * is not ended and for a drawn series. Join appears only in the viewer's
+   * own state: the seat-tokenised spectate URL for that seat's side of the
+   * live game.
+   */
+export interface EventSeries {
+  round: number;
+  a: number;
+  b: number;
+  best_of: number;
+  state: string;
+  table?: string;
+  attempt?: number;
+  game?: number;
+  games?: number[];
+  chooser?: number | null;
+  waiting?: number[];
+  score: [number, number];
+  winner: number | null;
+  join?: string;
+}
+
+  /**
+   * EventStanding is one row of the event standings: MTR Appendix C points
+   * and match/game win percentages.
+   */
+export interface EventStanding {
+  seat: number;
+  points: number;
+  mw: number;
+  omw: number;
+  gw: number;
+  ogw: number;
+}
+
+  /**
+   * EventState is the full public draft-event state, the event_state body.
+   * You is the viewer's seat when a valid seat token was presented, nil for a
+   * spectator. Series lists every pairing of rounds 1..3 in round then
+   * pairing order. Error carries a human-readable problem with the event's
+   * progress (a crashed game attempt that could not be rescheduled), never a
+   * request-validation message.
+   */
+export interface EventState {
+  event: string;
+  set: string;
+  phase: string;
+  round: number;
+  best_of: number;
+  pick_timer?: string;
+  seats: EventSeat[];
+  you: number | null;
+  series: EventSeries[];
+  standings: EventStanding[];
+  error?: string;
+}
+
+  /**
+   * DraftCard is one card as a draft client sees it: the server-minted
+   * instance ID to answer a pick with, plus the printed facts it renders.
+   * Rarity is one letter: C U R M (mythic) L (special) S.
+   */
+export interface DraftCard {
+  id: string;
+  name: string;
+  set: string;
+  number: string;
+  rarity: string;
+  mana_cost?: string;
+  mana_value?: number;
+  colors?: string;
+  type_line?: string;
+}
+
+  /**
+   * DraftPack is the draft_pack body: the pack waiting at a seat's queue head
+   * and the pool it has drafted so far. Waiting means no pack is queued for
+   * this seat right now, so Pack and Pool carry their last-known (or empty)
+   * contents.
+   */
+export interface DraftPack {
+  event: string;
+  seat: number;
+  waiting: boolean;
+  round: number;
+  pick_no: number;
+  time_limit_ms?: number;
+  remaining_ms?: number;
+  pack: DraftCard[];
+  pool: DraftCard[];
+}
+
+  /**
+   * PodProgress is the pod_progress body: how far every seat is through the
+   * current draft round, as public counts.
+   */
+export interface PodProgress {
+  event: string;
+  round: number;
+  picks: number[];
+  queued: number[];
+}
+
+  /**
+   * SeriesUpdate is the series_update body: one series' row changed.
+   */
+export interface SeriesUpdate {
+  event: string;
+  series: EventSeries;
+}
+
+  /**
+   * CreateEventSeat is one seat of a CreateEventRequest. Kind is "human" or
+   * "bot"; Policy names the bot's game policy ("" = server default) and
+   * Drafter the pickbot persona ("" = "rating-colour").
+   */
+export interface CreateEventSeat {
+  kind: string;
+  policy?: string;
+  drafter?: string;
+}
+
+  /**
+   * CreateEventRequest is the POST /api/events body: the drafted set, the
+   * series format and the four seats. BestOf is 1 or 3 (0 = 1). PickTimer is
+   * "", "off", "standard" or "relaxed". The seed is always minted by the
+   * server; no client field may choose it.
+   */
+export interface CreateEventRequest {
+  set: string;
+  best_of?: number;
+  pick_timer?: string;
+  seats: CreateEventSeat[];
+}
+
+  /**
+   * EventInvite is one seat's join token in a CreateEventResponse. Join is the
+   * tokenised event URL /e/{event}?seat=N&token=T.
+   */
+export interface EventInvite {
+  seat: number;
+  token: string;
+  join: string;
+}
+
+  /**
+   * CreateEventResponse is the POST /api/events reply: the event id, one
+   * invite per seat and the event's initial state.
+   */
+export interface CreateEventResponse {
+  event: string;
+  invites: EventInvite[];
+  state: EventState;
+}
+
+  /**
+   * JoinEventRequest is the POST /api/events/{id}/join body: the joining
+   * human's display name.
+   */
+export interface JoinEventRequest {
+  name: string;
+}
+
+  /**
+   * PickRequest is the POST /api/events/{id}/pick body: which card instance
+   * the seat takes from the pack at its queue head. Round and PickNo are
+   * compared against server state; a stale answer is a 409.
+   */
+export interface PickRequest {
+  round: number;
+  pick_no: number;
+  id: string;
+}
+
+  /**
+   * DeckRequest is a seat's deck list: maindeck CardRef IDs from its own pool
+   * plus basic-land counts (W U B R G). It is also DeckPool's saved-deck and
+   * suggestion shape.
+   */
+export interface DeckRequest {
+  main: string[];
+  basics: [number, number, number, number, number];
+}
+
+  /**
+   * DeckCheck is the deck-check reply: whether the submitted (or suggested)
+   * deck is legal, its total card count, the auto-land counts the builder
+   * would add to this main, and the revision a successful save produced.
+   */
+export interface DeckCheck {
+  valid: boolean;
+  total: number;
+  error?: string;
+  auto_lands: [number, number, number, number, number];
+  rev?: number;
+}
+
+  /**
+   * EventPool is the GET /api/events/{id}/pool body: the seat's drafted cards,
+   * its latest saved deck revision (nil before the first save), whether the
+   * seat has readied, and the bot builder's suggested deck for this pool.
+   * Playing is, in a round, the deck the seat plays or last played in its
+   * series, with PlayingRev naming its revision.
+   */
+export interface EventPool {
+  event: string;
+  seat: number;
+  pool: DraftCard[];
+  deck: DeckRequest | null;
+  rev: number;
+  ready: boolean;
+  playing?: DeckRequest | null;
+  playing_rev?: number;
+  suggestion: DeckRequest;
+}
+
+  /**
+   * ReadyRequest is the POST /api/events/{id}/ready body: the deck revision
+   * the seat is readying; a stale revision is a 409.
+   */
+export interface ReadyRequest {
+  rev: number;
+}
+
+  /**
+   * SideboardRequest is the POST /api/events/{id}/sideboard body: the seat's
+   * deck for game Game of its current series. Keep re-submits the deck it
+   * played last game; otherwise Deck is the new list (pool CardRef ids plus
+   * basics), saved as a new revision. Exactly one of Keep and Deck is set.
+   * Game is compared with the server's next game; a stale one is a 409.
+   */
+export interface SideboardRequest {
+  game: number;
+  keep?: boolean;
+  deck?: DeckRequest | null;
+}
+
+  /**
+   * EventLog is the GET /api/events/{id}/log body: the event's log entries.
+   * Entries stay redacted until the event is COMPLETE (see event.LogFor).
+   */
+export interface EventLog {
+  event: string;
+  complete: boolean;
+  entries: unknown[];
+}
+
+  /**
+   * EventSubscribe is the POST /api/events/{id}/subscribe body: the session id
+   * the client echoes, opening its event SSE stream.
+   */
+export interface EventSubscribe {
+  session: string;
+}
+
+  /**
+   * EventSetInfo is one draftable set as GET /api/events/sets reports it.
+   * Ratings is the rating source the pickbot uses for it: "17lands" when a
+   * ratings manifest exists, "heuristic" otherwise.
+   */
+export interface EventSetInfo {
+  code: string;
+  name: string;
+  pack_size: number;
+  ratings: string;
+}
+
+  /**
+   * EventPersonas is the GET /api/events/personas reply: the registered
+   * pickbot persona names, offered to a create body's Drafter fields.
+   */
+export interface EventPersonas {
+  drafters: string[];
+  builders: string[];
 }
 
   /**

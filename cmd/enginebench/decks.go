@@ -43,6 +43,12 @@ type workload struct {
 	// expectedEvents is the event-capacity hint the row passes to every game
 	// (rules.Config.ExpectedEvents). 0 keeps the engine default.
 	expectedEvents int
+	// paidManaCensus is the -paid-mana-census knob (default true, the engine
+	// default): false sets rules.Config.DisablePaidManaCensus for every game
+	// the row plays, so the census's cost can be measured against the narrow
+	// census. A pre-flip binary reads the same flag as opt-in, so pairing
+	// across the flip with -paid-mana-census runs the census on both sides.
+	paidManaCensus bool
 }
 
 // openCorpus opens the corpus: the whole corpus, as every gorge bench did at
@@ -221,10 +227,11 @@ func (w workload) config(decks [2][]*cards.Card, names [2]string, base uint64, g
 		a, b = 1, 0
 	}
 	return rules.Config{
-		Seed:           base + uint64(g),
-		Names:          []string{names[a], names[b]},
-		Decks:          [][]*cards.Card{decks[a], decks[b]},
-		Tokens:         w.reg.Tokens,
-		ExpectedEvents: w.expectedEvents,
+		Seed:                  base + uint64(g),
+		Names:                 []string{names[a], names[b]},
+		Decks:                 [][]*cards.Card{decks[a], decks[b]},
+		Tokens:                w.reg.Tokens,
+		ExpectedEvents:        w.expectedEvents,
+		DisablePaidManaCensus: !w.paidManaCensus,
 	}
 }

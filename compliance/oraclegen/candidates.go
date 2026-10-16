@@ -479,6 +479,9 @@ type cand struct {
 	// "creature with a +1/+1 counter on it" filter).
 	counterKind string
 	counterN    int
+	// equipment is an Equipment placed beside the candidate on its seat and
+	// attached to it by an attach prelude (an "equipped creature" filter).
+	equipment string
 }
 
 // It reads the registry for subtype and qualifier filters the fixed type list
@@ -532,6 +535,9 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 	}
 	alt := strings.Split(filter, ",")
 	base := strings.ToLower(strings.SplitN(strings.TrimSpace(alt[0]), ".", 2)[0])
+	if role == roleNone && len(alt) == 1 && filterHasComponent(filter, "YouOwn") && filterHasComponent(filter, "YouDontCtrl") {
+		return donatedCandidates(base)
+	}
 	mine := strings.Contains(filter, "YouCtrl") || strings.Contains(filter, "YouOwn")
 	if role == roleNone {
 		if pair {
@@ -570,6 +576,12 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 				return []cand{{seat: "p0", zone: "battlefield", card: "Wyleth, Soul of Steel"}}
 			}
 			return []cand{{seat: "p1", zone: "battlefield", card: "Wyleth, Soul of Steel"}}
+		}
+		if cs, ok := faceDownCandidates(reg, filter); ok {
+			// A face-down permanent exists only through a face-down cast
+			// prelude; the face-up stand-ins below are never offered by the
+			// engine's faceDown word.
+			return cs
 		}
 		if base == "artifact" && strings.Contains(filter, "token") {
 			return artifactTokenCandidates()
@@ -649,6 +661,18 @@ func candidatesFor(reg *cards.Registry, filter, parentTarget string, stackTarget
 		}
 		if kind, n, ok := counterDemand(filter); ok {
 			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Grizzly Bears", counterKind: kind, counterN: n}})
+		}
+		// An "equipped creature" (Item Shopkeep's "target attacking equipped
+		// creature") carries a quiet Equipment the setup attaches; a
+		// "modified creature" (Silver Sable's, CR 700.9) is served by the
+		// simplest modification, a +1/+1 counter placed at setup. Hill Giant,
+		// not the Grizzly Bears Baseline already puts on p1, so the target
+		// ref names one object.
+		if filterPredicate(filter, "equipped") {
+			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Hill Giant", equipment: quietEquipment}})
+		}
+		if filterPredicate(filter, "modified") {
+			return withRole([]cand{{seat: opp, zone: "battlefield", card: "Hill Giant", counterKind: "P1P1", counterN: 1}})
 		}
 	}
 	// A combat-role filter over a subtype or a token (Totentanz, Swarm
@@ -868,7 +892,16 @@ func filterSubtypeWord(alt string) (string, bool) {
 		case "youctrl", "youown", "oppcrtl", "oppctrl", "oppown", "you", "opponent", "opponents",
 			"white", "blue", "black", "red", "green", "colorless", "multicolour",
 			"token", "enchanted", "attacking", "blocking", "tapped", "untapped",
-			"noabilities", "legendary", "thisturnentered", "other", "self", "noncreature", "nonland":
+			"noabilities", "legendary", "thisturnentered", "other", "self", "noncreature", "nonland",
+			// Board-state qualifiers the predicate block in candidatesFor
+			// arranges (a counter, an attached Equipment), not subtypes.
+			"modified", "equipped":
+			continue
+		}
+		// A relational exclusion ("other than the triggered card / target",
+		// NotDefinedTriggeredCard) is met by any candidate that is not that
+		// object, so it names no subtype.
+		if strings.HasPrefix(lower, "notdefined") {
 			continue
 		}
 		if strings.HasPrefix(lower, "non") || strings.HasPrefix(lower, "!") || strings.HasPrefix(lower, "with") ||
@@ -896,7 +929,7 @@ func tokenCandidates(mine bool) []cand {
 	}
 	return []cand{{
 		seat: "p0", zone: "battlefield", card: "Grizzly Bears",
-		ref: "p0:token:Goblin",
+		ref: "p0:token:Goblin Token",
 		pre: []Step{
 			{Op: "cast", Seat: 0, Card: "p0:Dragon Fodder", Mana: "CR", Targets: nil},
 			{Op: "resolve"},
@@ -936,6 +969,12 @@ func enchantedCandidates(mine bool) []cand {
 		},
 	}}
 }
+
+// quietEquipment is the Equipment an "equipped creature" candidate carries:
+// Bonesplitter ({1}, equipped creature gets +2/+0, Equip {1}) has no trigger
+// and no target of its own, so attaching it at setup adds nothing but the
+// equipped state.
+const quietEquipment = "Bonesplitter"
 
 func seatIndex(seat string) int {
 	if seat == "p0" {
@@ -978,11 +1017,16 @@ func registrySubtype(reg *cards.Registry, subtype string) (string, bool) {
 	if reg == nil {
 		return "", false
 	}
+	// Only the front face: setup deals a card by its front name, so a back
+	// face (Tecutlan, the Searing Rift) is "not dealt".
+	keep := func(c *cards.Card) bool {
+		return len(c.Faces) > 0 && faceHasSubtype(c.Faces[0], subtype) && XMageKnown(c.Faces[0].Name)
+	}
+	if name, ok := pinnedFixture(reg, pinnedSubtypeFixtures, subtype, keep); ok {
+		return name, true
+	}
 	for i := 0; i < reg.Len(); i++ {
-		c := reg.Card(i)
-		// Only the front face: setup deals a card by its front name, so a back
-		// face (Tecutlan, the Searing Rift) is "not dealt".
-		if len(c.Faces) > 0 && faceHasSubtype(c.Faces[0], subtype) && XMageKnown(c.Faces[0].Name) {
+		if c := reg.Card(i); keep(c) {
 			return c.Faces[0].Name, true
 		}
 	}
@@ -1006,17 +1050,21 @@ func registryQuietSubtype(reg *cards.Registry, subtype string) (string, bool) {
 	if reg == nil {
 		return "", false
 	}
-	for i := 0; i < reg.Len(); i++ {
-		c := reg.Card(i)
+	keep := func(c *cards.Card) bool {
 		if len(c.Faces) != 1 {
-			continue
+			return false
 		}
 		f := c.Faces[0]
-		if !XMageKnown(f.Name) || !faceHasSubtype(f, subtype) || !faceHasSubtype(f, "Creature") ||
-			faceHasSubtype(f, "Legendary") || len(f.Triggers) != 0 || len(f.Statics) != 0 || entersWithCounters(f) {
-			continue
+		return XMageKnown(f.Name) && faceHasSubtype(f, subtype) && faceHasSubtype(f, "Creature") &&
+			!faceHasSubtype(f, "Legendary") && len(f.Triggers) == 0 && len(f.Statics) == 0 && !entersWithCounters(f)
+	}
+	if name, ok := pinnedFixture(reg, pinnedQuietSubtypeFixtures, subtype, keep); ok {
+		return name, true
+	}
+	for i := 0; i < reg.Len(); i++ {
+		if c := reg.Card(i); keep(c) {
+			return c.Faces[0].Name, true
 		}
-		return f.Name, true
 	}
 	return "", false
 }
@@ -1312,6 +1360,9 @@ func buildFixtures(reg *cards.Registry, slots []Slot, serveStack bool, stackTarg
 					if c.attachTo != "" {
 						n.pre = append(n.pre, Step{Op: "attach", Seat: seatIndex(c.seat), Card: ref, AttachedTo: c.attachTo})
 					}
+					if c.equipment != "" {
+						n.pre = append(n.pre, Step{Op: "attach", Seat: seatIndex(c.seat), Card: c.seat + ":" + c.equipment, AttachedTo: ref})
+					}
 					switch c.role {
 					case roleAttacker:
 						n.combat.attackers = append(n.combat.attackers, ref)
@@ -1399,6 +1450,9 @@ func place(fx *fixture, c cand) {
 		switch c.zone {
 		case "battlefield":
 			s.Battlefield = append(s.Battlefield, c.card)
+			if c.equipment != "" {
+				s.Battlefield = append(s.Battlefield, c.equipment)
+			}
 			if c.counterN > 0 {
 				*s = WithCounters(*s, c.card, c.counterKind, int32(c.counterN))
 			}

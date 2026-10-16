@@ -22,10 +22,20 @@ type legalWalk struct {
 	// gates counts the walk's reads of its pricing pool (pricing): the
 	// block reuse below (walk_block_reuse.go) treats a block that read none
 	// as independent of the pool.
-	gates     int
-	castsOnly bool
-	sorcery   bool
-	out       []decision.Option
+	gates int
+	// autoBound is the lazily read PotentialMana bound the autopay offer
+	// (autoPayOffer) prices against; nil until first needed.
+	autoBound *state.Mana
+	// autoPlain/autoPlainP/autoPlainSet are the lazily built payment-window
+	// census (windowManaUnits) the autopay fast path (autoPayFast) shares
+	// across every ability it prices. autoPlainSet distinguishes "not read
+	// yet" from an empty census; autoPlainP guards against a differing payer.
+	autoPlain    []windowManaUnit
+	autoPlainP   state.PlayerID
+	autoPlainSet bool
+	castsOnly    bool
+	sorcery      bool
+	out          []decision.Option
 	// outHW is the most options out held before a truncation (the
 	// verification path's rewind), so an in-place arena build clears every
 	// slot it wrote (legalActionsWalkWithWindow).

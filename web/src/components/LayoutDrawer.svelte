@@ -1,6 +1,8 @@
 <script lang="ts">
   import { MOTION_SPEEDS, MOTION_SPEED_LABELS } from '../lib/motion/settings';
   import { motionStore } from '../lib/motion/settings.svelte';
+  import { FX_MODES, FX_MODE_LABELS } from '../lib/visualfx';
+  import { fxStore } from '../lib/visualfx.svelte';
   import { layoutStore } from '../lib/layouts.svelte';
   import { pointerRelease } from '../lib/pointer';
   import {
@@ -191,6 +193,9 @@
     {#if motionStore.reduced}
       <p class="note" data-motion-reduced>Your system asks for reduced motion, so animations are off.</p>
     {/if}
+    <!-- GPU filters (lib/visualfx): blur, dimming scrims and shadows. Off is
+         for a GPU or driver that hangs on them; also settable with ?fx=off. -->
+    {@render seg('Visual effects', FX_MODES, FX_MODE_LABELS, fxStore.mode, (v) => fxStore.setMode(v), 'fx')}
 
     <h3>Profiles</h3>
     <div class="f">

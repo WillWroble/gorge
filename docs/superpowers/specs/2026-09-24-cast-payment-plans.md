@@ -211,6 +211,25 @@ charges, not the printed `ManaCost` alone:
   check (`nonManaCastable`) and rejects a plan whose candidate has left the
   battlefield, so the seat falls back to the manual window instead of
   committing an unpayable cast.
+
+  (Amended 2026-10-14, botmanual.) A **fixed-count mandatory discard**
+  (`Discard<N/Spec>` with a literal N, Thrill of Possibility) is admitted on
+  the same terms (`pay.PlanNonManaAdmissible`): it is answered from the hand
+  after the card moves to the stack, never touches a witnessed source, and
+  the submit-time feasibility check covers it. A variable discard and a
+  discard beside any other non-mana part (life, exile ...) stay manual.
+
+  (Amended 2026-10-14, botmanual.) One alternative cost IS planned: a
+  graveyard card's **primary flashback** cast (CR 702.34a), as
+  `PlannedCast.Origin` `"flashback"` (`decision.OriginFlashback`; the cast
+  begins in Mode `"flashback"`, `PlannedCast.CastMode`). Its witness pays the
+  flashback cost composed exactly as the offer walk and `beginCast` charge it
+  (the flashback cost, the spell ability's extras, then the cost statics in
+  `"flashback"` scope: `plannedFlashbackCost`), so it is never priced at the
+  printed cost. A further flashback instance (an `Option.Cost`-carrying
+  offer) is never planned. Measured before the amendment, flashback casts
+  were the largest set of manual taps the auto-pay bot made while plans were
+  on offer.
 * Contributions announced at CR 601.2b: Convoke, Improvise and Delve, whether
   printed or granted to the spell on the stack (`hasCastConvoke` /
   `hasCastImprovise` read the stack-zone derivation; Inspiring Statuary grants

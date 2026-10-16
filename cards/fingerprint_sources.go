@@ -2,39 +2,38 @@ package cards
 
 import "embed"
 
-// compilerSources embeds every non-test .go file in this package so
-// CompilerFingerprint can hash the source the running binary was actually
-// built from. It is the package's own parse/compile source that determines
-// the IR a cache holds, so two builds that differ anywhere in cards/ must never
+// compilerSources embeds the IR-AFFECTING non-test .go files of this package
+// so CompilerFingerprint can hash the compiler source the running binary was
+// built from. It is the package's own parse/compile source that determines the
+// IR a cache holds, so two builds that differ in any of these files must never
 // share an IR cache file (see CachePath).
+//
+// Only the files fingerprintCensus (fingerprint_sources_test.go) marks
+// IR-affecting are listed. A file that only reads compiled IR at runtime, or
+// manages the cache without shaping its bytes (fetch, open, the cache lock,
+// coverage reports), is left out: editing one used to name a new cache
+// and make every process on the box recompile the corpus.
 //
 // The files are listed one per directive instead of `//go:embed *.go`, because
 // that pattern also matches the _test.go files: their bytes then became part of
 // this PRODUCTION package's build input, so every test-only edit in cards/
 // recompiled cards and invalidated the cached test result of every package
-// that imports it (79 of the module's 88 test binaries). The fingerprint value
-// is unchanged by the split (computeCompilerFingerprint always skipped
-// _test.go files).
+// that imports it (79 of the module's 88 test binaries).
 //
-// Adding a non-test .go file to cards/ means adding its line here, in sorted
-// order; TestCompilerSourcesListEveryNonTestFile fails naming the missing line.
+// Adding a non-test .go file to cards/ means classifying it in
+// fingerprintCensus and, when it is IR-affecting (or you are unsure), adding
+// its line here in sorted order; TestCompilerSourcesFollowTheCensus fails
+// naming whichever step is missing.
 //
 //go:embed ability_class.go
 //go:embed affected_defined.go
-//go:embed breakdown.go
+//go:embed ateot_values.go
 //go:embed cache_canon.go
-//go:embed card_probes.go
+//go:embed cache_codec.go
 //go:embed compiled_catalog.go
 //go:embed compiled_codes.go
-//go:embed control_static_probe.go
 //go:embed counter_keyword.go
-//go:embed doc.go
-//go:embed equal.go
 //go:embed face.go
-//go:embed fetch.go
-//go:embed fingerprint.go
-//go:embed fingerprint_sources.go
-//go:embed gitenv.go
 //go:embed hiddenkeyword.go
 //go:embed image.go
 //go:embed image_build.go
@@ -75,7 +74,6 @@ import "embed"
 //go:embed kw_formirrodin.go
 //go:embed kw_fortify.go
 //go:embed kw_graft.go
-//go:embed kw_granted.go
 //go:embed kw_gravestorm.go
 //go:embed kw_hideaway.go
 //go:embed kw_increment.go
@@ -110,27 +108,17 @@ import "embed"
 //go:embed kw_unearth.go
 //go:embed kw_vanishing.go
 //go:embed kw_ward.go
-//go:embed layout.go
 //go:embed linemodes.go
 //go:embed link.go
 //go:embed mana_production.go
-//go:embed mayask.go
-//go:embed modes.go
-//go:embed mustblock_shape.go
-//go:embed open.go
 //go:embed params.go
 //go:embed parse.go
-//go:embed primitive.go
 //go:embed registry.go
 //go:embed registry_lazy.go
-//go:embed saga.go
-//go:embed slot.go
+//go:embed rider_shape.go
 //go:embed strtab.go
 //go:embed subset.go
-//go:embed svar_activator.go
 //go:embed tokens.go
-//go:embed universe.go
 //go:embed validate.go
-//go:embed value_heads.go
 //go:embed words.go
 var compilerSources embed.FS

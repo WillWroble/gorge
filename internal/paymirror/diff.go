@@ -334,6 +334,9 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "previewOwner"}:  true,
 	{"rules.Engine", "previewBusy"}:   true,
 	{"rules.Engine", "decArena"}:      true,
+	// The arena's lazy-creation count (activeArena): how many decisions an
+	// arena-less clone posed on the heap -- where bytes live, never game state.
+	{"rules.Engine", "arenaHeapAsks"}: true,
 	// The pendingCast recycling pair (cast_pool.go): the last issued cast
 	// storage and a zeroed spare -- capacity, never game state (the cast in
 	// flight is e.cast, compared as usual).

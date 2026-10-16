@@ -6,6 +6,7 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/events"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -20,9 +21,10 @@ import (
 // discard is deliberately narrow, because a single placement's emit also
 // queues triggers the entry causes indirectly and that XMage DOES see fire:
 //
-//   - TriggerChangesZone / Destination$ Battlefield and TriggerChangesZoneAll
-//     are the entry shapes ("when this enters, ..."; "whenever one or more
-//     creatures enter"). Both are XMage-addCard-silent and are dropped.
+//   - TriggerChangesZone (Destination$ Battlefield, a list admitting it, or
+//     no Destination$ at all) and TriggerChangesZoneAll are the entry shapes
+//     ("when this enters, ..."; "whenever one or more creatures enter").
+//     Both are XMage-addCard-silent and are dropped.
 //   - A Saga's synthesized chapter ability (pendingTrigger.Chapter) is dropped
 //     only for a back-face placement whose ENTERING face is not itself a Saga
 //     (backFaceChapter, computed by setupBackFaceDropsChapter): XMage's
@@ -55,10 +57,14 @@ func setupPlacementDropsTrigger(t cards.Trigger, backFaceChapter bool) bool {
 	case cards.TriggerChangesZone:
 		// Destination$ compiles once through the registered coder (the same
 		// read the merge-base filter used), so this is a trip through the
-		// compiled zone enum rather than a fresh string comparison.
+		// compiled zone enum rather than a fresh string comparison. A
+		// trigger queued in the placement window matched the placement's
+		// own move to the battlefield, so an ABSENT Destination$ (Bullseye,
+		// Death Dealer's "When NICKNAME enters", scripted with ValidCard$
+		// Card.Self and no destination) is that entry too, as is a
+		// destination list that admits the battlefield.
 		d, ok := t.ParamCode(cards.PKDestination)
-		z, sole := effects.Destination(d).SoleZone()
-		return ok && sole && z == state.ZBattlefield
+		return !ok || effects.Destination(d).Admits(state.ZBattlefield)
 	case cards.TriggerChangesZoneAll:
 		return true
 	}
@@ -76,6 +82,141 @@ func setupBackFaceDropsChapter(o *state.Object, backFace bool) bool {
 	}
 	n, _ := cards.SagaChapters(o.Face())
 	return n == 0
+}
+
+// placeSetupCard moves a setup card from the zone it was dealt to into its
+// scenario zone (the MoveZone of oracleRun.build's placement loop).
+//
+// A generated compliance scenario (fixture) mirrors XMage's setup, which
+// places every card with addCard rather than by playing it:
+//
+//   - A BATTLEFIELD placement keeps the ordinary move, so the card's own
+//     enters-with replacements still run, and discards exactly the entry-
+//     shaped triggers the move queued (setupPlacementDropsTrigger).
+//   - Any OTHER zone (graveyard, exile, hand, library, command) is a plain
+//     placement: no "Moved" replacement of a battlefield card may rewrite it
+//     (Rest in Peace's "exile instead", Leyline of the Void's) and no
+//     trigger it queued may fire (Planar Void's "whenever another card is
+//     put into a graveyard"). The replacement pass is skipped with
+//     applyingReplacement for this one emit, restored by defer so a panic or
+//     any early return of the caller cannot leak it past setup, and every
+//     trigger the move queued is discarded.
+//
+// Only fixture scenarios take either branch; a hand-written scenario keeps the
+// ordinary move and every trigger it queues.
+func (r *oracleRun) placeSetupCard(id state.ObjID, from, to state.Zone, fixture, backFace bool) {
+	e := r.e
+	pendingBefore := len(e.pendingTriggers)
+	move := events.Event{Kind: events.MoveZone, Obj: id, From: from, To: to}
+	if !fixture {
+		e.emit(move)
+		return
+	}
+	if to != state.ZBattlefield {
+		func() {
+			prior := e.applyingReplacement
+			e.applyingReplacement = true
+			defer func() { e.applyingReplacement = prior }()
+			e.emit(move)
+		}()
+		if len(e.pendingTriggers) > pendingBefore {
+			e.pendingTriggers = e.pendingTriggers[:pendingBefore]
+		}
+		e.orderedTriggers = min(e.orderedTriggers, len(e.pendingTriggers))
+		return
+	}
+	e.emit(move)
+	// A battlefield placement whose card carries an as-enters choice
+	// (Gathering Stone's "As this artifact enters, choose a creature type")
+	// is PARKED on that ask: the move is re-emitted only when the setup
+	// drive answers it, after this window has closed, so its entry triggers
+	// queue later. Hand the drop to putTriggersOnStack, which runs before
+	// any of them can reach the stack (dropSetupEntryTriggers).
+	if e.landEntryParked(id) {
+		e.setupEntryDrops = append(e.setupEntryDrops, setupEntryDrop{
+			obj: id, dropChapter: setupBackFaceDropsChapter(e.G.Obj(id), backFace)})
+	}
+	// XMage fixture setup places battlefield cards with addCard, which does
+	// not queue entry triggers; drop exactly the entry-shaped triggers this
+	// placement queued and keep every other trigger, including the
+	// CounterAdded triggers a planeswalker's entry loyalty counters fire on
+	// an already-placed permanent (setupPlacementDropsTrigger).
+	kept := e.pendingTriggers[:pendingBefore]
+	ordered := min(e.orderedTriggers, pendingBefore)
+	// Copy the tail first: appending to kept writes back into
+	// e.pendingTriggers[pendingBefore:], the very slice this loop reads, and a
+	// dropped trigger would shift later entries down under the iteration.
+	tail := append([]pendingTrigger(nil), e.pendingTriggers[pendingBefore:]...)
+	// A back-face chapter is dropped only when the entering face is not
+	// itself a Saga (setupBackFaceDropsChapter).
+	dropChapter := setupBackFaceDropsChapter(e.G.Obj(id), backFace)
+	for _, pt := range tail {
+		t, _ := e.triggerOf(pt)
+		if setupPlacementDropsTrigger(t, pt.Chapter && dropChapter) {
+			continue
+		}
+		kept = append(kept, pt)
+	}
+	e.pendingTriggers = kept
+	e.orderedTriggers = ordered
+}
+
+// setupEntryDrop is one fixture battlefield placement whose entry an
+// as-enters choice parked (placeSetupCard): obj is the placed card, and
+// dropChapter carries the back-face chapter verdict the placement window
+// would have applied (setupBackFaceDropsChapter, read at placement).
+type setupEntryDrop struct {
+	obj         state.ObjID
+	dropChapter bool
+}
+
+// dropSetupEntryTriggers is placeSetupCard's discard for a PARKED fixture
+// placement, run by putTriggersOnStack before the queue is ordered or pushed.
+// XMage's addCard answers the as-enters choice but still places the card
+// without "entering", so the entry-shaped triggers the completed move queued
+// must not fire -- exactly setupPlacementDropsTrigger's verdict, applied to
+// the pending queue once the parked card is on the battlefield and no longer
+// parked. Between the answer that completes the entry and this first drain
+// the engine only runs turn 1's untap and upkeep turn-based actions, which
+// move nothing onto the battlefield, so every entry-shaped trigger then
+// pending is the parked entry's own. A card still parked (a second as-enters
+// ask) waits for the next drain; one that never reached the battlefield
+// (its entry replaced away) is forgotten. The list is the harness's alone:
+// nil in every host, replay and test outside a fixture setup, and cleared
+// when the setup drive stops.
+func (e *Engine) dropSetupEntryTriggers() {
+	pending := e.setupEntryDrops[:0]
+	for _, sd := range e.setupEntryDrops {
+		if e.landEntryParked(sd.obj) {
+			pending = append(pending, sd)
+			continue
+		}
+		o := e.G.Obj(sd.obj)
+		if o == nil || o.Zone != state.ZBattlefield {
+			continue
+		}
+		kept := e.pendingTriggers[:0]
+		ordered := 0
+		for i, pt := range e.pendingTriggers {
+			t, _ := e.triggerOf(pt)
+			if setupPlacementDropsTrigger(t, pt.Chapter && pt.Source == sd.obj && sd.dropChapter) {
+				continue
+			}
+			if i < e.orderedTriggers {
+				ordered++
+			}
+			kept = append(kept, pt)
+		}
+		if len(kept) < len(e.pendingTriggers) {
+			e.noteTrigShrink()
+		}
+		e.pendingTriggers = kept
+		e.orderedTriggers = ordered
+	}
+	e.setupEntryDrops = pending
+	if len(pending) == 0 {
+		e.setupEntryDrops = nil
+	}
 }
 
 // setupPlacedBackFace reports whether the seat's setup places the named

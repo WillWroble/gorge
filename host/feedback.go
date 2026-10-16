@@ -56,7 +56,14 @@ type FeedbackMatch struct {
 	Format       Format              `json:"format,omitempty"`
 	StartingLife int32               `json:"starting_life,omitempty"`
 	Commanders   [][]int             `json:"commanders,omitempty"`
-	BotPolicy    string              `json:"bot_policy"`
+	// StartChooser mirrors the sidecar's field of the same name: the
+	// configured seat posed CR 103.1's starting-player choice in place of
+	// the toss winner (E3-2). It is genesis replay input like Mulligans —
+	// the genesis Note names the chooser — so a replay rebuilt from
+	// match.json alone needs it recorded. Absent = the toss, which every
+	// match before E3 used.
+	StartChooser *int   `json:"start_chooser,omitempty"`
+	BotPolicy    string `json:"bot_policy"`
 
 	// NameUniverse and NameUniverseNames mirror the sidecar's fields of the
 	// same names, and for the same reason the deck contents and the token
@@ -76,6 +83,15 @@ type FeedbackMatch struct {
 	// diverging on a corpus pin move exactly the way a token-stripped
 	// fixture does, and saying so.
 	NameUniverseNames []string `json:"name_universe_names,omitempty"`
+
+	// PaidManaCensus mirrors the sidecar's field of the same name: whether the
+	// live match ran with the widened paid-cost mana census. Like the name
+	// universe it is a match MODE, not data the log can recover — the census
+	// changes the offered option list, so a replay rebuilt from match.json
+	// alone without the bit takes a different option list and diverges at the
+	// first census-sensitive decision. A pre-flip capture carries no field,
+	// which reads back as census OFF (the narrow census those matches ran).
+	PaidManaCensus bool `json:"paid_mana_census,omitempty"`
 
 	// Tokens carries the raw token scripts — keyed by file stem, the exact
 	// spelling a card's TokenScript$ parameter uses — behind the match's
@@ -197,7 +213,31 @@ func (r *Registry) SnapshotForFeedback(id TableID, seat *state.PlayerID) (Feedba
 	if m == nil {
 		return FeedbackSnapshot{}, fmt.Errorf("host: table %s has no match", id)
 	}
+	return snapshotOf(id, m, seat)
+}
 
+// SnapshotMatch is SnapshotForFeedback for match k of table id, named
+// explicitly through lookup (HD-3, design §5.3): the current match, a
+// retired one in the table's history, or an archived one rebuilt from disk.
+// SnapshotForFeedback snapshots whichever match is current, so a caller that
+// runs after the table has moved on to match k+1 (the divergence worker
+// runs at match end, on its own goroutine) would capture the wrong one; this
+// entry point removes that race for every table shape. Both go through
+// snapshotOf, so the two cannot drift. seat nil skips the view.json half,
+// which the divergence capture never wants (the end-of-game view is useless
+// there and the review UI asks for historical views by seq).
+func (r *Registry) SnapshotMatch(id TableID, k int, seat *state.PlayerID) (FeedbackSnapshot, error) {
+	_, m, err := r.lookup(id, k)
+	if err != nil {
+		return FeedbackSnapshot{}, fmt.Errorf("host: table %s match %d: %w", id, k, err)
+	}
+	return snapshotOf(id, m, seat)
+}
+
+// snapshotOf is the copy section SnapshotForFeedback and SnapshotMatch
+// share: it copies what a snapshot needs out of m under its lock and
+// projects the seat's view outside it.
+func snapshotOf(id TableID, m *match, seat *state.PlayerID) (FeedbackSnapshot, error) {
 	m.mu.Lock()
 	l := m.e.L.Clone()
 	// reconcileLog's trim is for crash-cut FILES, and this clone is not one:
@@ -321,8 +361,10 @@ func feedbackMatch(sc sidecar, deckCards [][]string, sideboards [][]string,
 		State:     sc.State, Result: sc.Result, Winner: sc.Winner, Head: sc.Head, Events: sc.Events,
 		Turns: sc.Turns, Reason: sc.Reason, Mulligans: sc.Mulligans, Format: sc.Format,
 		StartingLife: sc.StartingLife, Commanders: sc.Commanders, BotPolicy: sc.BotPolicy,
+		StartChooser:      sc.StartChooser,
 		NameUniverse:      sc.NameUniverse,
 		NameUniverseNames: append([]string(nil), sc.NameUniverseNames...),
+		PaidManaCensus:    sc.PaidManaCensus,
 		Tokens:            tokens, TokensUnread: tokensUnread,
 	}
 }

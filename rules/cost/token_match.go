@@ -35,6 +35,7 @@ const (
 	hBeholdExile
 	hBlight
 	hChooseCard
+	hChooseCreatureType
 	hCollectEvidence
 	hDamageYou
 	hDiscard
@@ -77,6 +78,7 @@ var costHeadNames = [numCostHeads]string{
 	hBeholdExile:                 "BeholdExile",
 	hBlight:                      "Blight",
 	hChooseCard:                  "ChooseCard",
+	hChooseCreatureType:          "ChooseCreatureType",
 	hCollectEvidence:             "CollectEvidence",
 	hDamageYou:                   "DamageYou",
 	hDiscard:                     "Discard",

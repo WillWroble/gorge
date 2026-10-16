@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "t": "draft_pack",
+  "id": 4182,
+  "table": "t1",
+  "match": 7,
+  "seq": 0,
+  "body": {
+    "event": "ev-1",
+    "seat": 1,
+    "waiting": false,
+    "round": 2,
+    "pick_no": 7,
+    "pack": [
+      {
+        "id": "r2p7c3",
+        "name": "Ajani Vengeant",
+        "set": "FDN",
+        "number": "201",
+        "rarity": "R"
+      }
+    ],
+    "pool": [
+      {
+        "id": "r1p1c0",
+        "name": "Blightsteel Colossus",
+        "set": "FDN",
+        "number": "250",
+        "rarity": "M"
+      }
+    ]
+  }
+}

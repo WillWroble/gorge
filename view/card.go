@@ -81,15 +81,25 @@ type CardView struct {
 	// Attacking is true, nil otherwise; BlockedBy lists the creatures
 	// blocking it. Both exist for the arrow overlay (PL-17) and come
 	// straight from the object's combat fields, which EndCombatReset clears.
-	AttackingPlayer *state.PlayerID  `json:"attacking_player,omitempty"`
-	BlockedBy       []state.ObjID    `json:"blocked_by,omitempty"`
-	Tapped          bool             `json:"tapped"`
-	Power           int32            `json:"power"`
-	Toughness       int32            `json:"toughness"`
-	Damage          int32            `json:"damage"`
-	Attacking       bool             `json:"attacking"`
-	Counters        map[string]int32 `json:"counters,omitempty"`
-	Keywords        []string         `json:"keywords,omitempty"`
+	AttackingPlayer *state.PlayerID `json:"attacking_player,omitempty"`
+	BlockedBy       []state.ObjID   `json:"blocked_by,omitempty"`
+	Tapped          bool            `json:"tapped"`
+	Power           int32           `json:"power"`
+	Toughness       int32           `json:"toughness"`
+	// PrintedPT is the face's PRINTED power/toughness as text ("1/1", "*/*"),
+	// the value the physical card or token is printed with. Power/Toughness
+	// above are the CURRENT layer-7 values a counter or an anthem moves; a
+	// token whose current P/T differs from its printed P/T (a 1/1 Soldier
+	// with a +1/+1 counter reads "2/2") must still resolve to the same art as
+	// its un-pumped sibling, and only the printed value is stable across
+	// pumping. Empty for a face with no printed P/T (a noncreature) and on
+	// every redacted face-down CardView, which is rebuilt from a fresh
+	// literal.
+	PrintedPT string           `json:"printed_pt,omitempty"`
+	Damage    int32            `json:"damage"`
+	Attacking bool             `json:"attacking"`
+	Counters  map[string]int32 `json:"counters,omitempty"`
+	Keywords  []string         `json:"keywords,omitempty"`
 	// Controller and Owner can differ (a stolen permanent, a stack object
 	// created for someone else's turn); a client needs both. Battlefield
 	// zone lists are keyed by controller, every hidden/graveyard/exile list
@@ -215,17 +225,27 @@ type projector struct {
 	viewer state.PlayerID
 	// effective and namer are ch's optional SpellEffectiveCost and layer-3
 	// Name capabilities (nil when ch lacks them); noTokens is a
-	// tokenSuppressor's answer.
+	// tokenSuppressor's answer. namer is consulted only when vchars is
+	// absent, and its empty string keeps the printed name: a bound-empty
+	// name (a both-locked Room) needs vchars' flag.
 	effective interface {
 		SpellEffectiveCost(state.PlayerID, state.ObjID) string
 	}
 	namer interface{ Name(state.ObjID) string }
 	// vchars is ch's optional one-call Name/Keywords/Power/Toughness
-	// (rules.Engine.ViewCharacteristics), nil when ch lacks it.
+	// (rules.Engine.ViewCharacteristics), nil when ch lacks it. The second
+	// return is the name's bound flag: when true, the (possibly empty) name
+	// is authoritative and the printed face is not a fallback.
 	vchars interface {
-		ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	}
 	noTokens bool
+	// hideHand is the CR 103.5 blind: true while the CR 103.1 play/draw
+	// choice is unresolved, when no player may see any hand. It is probed
+	// once from ch's optional StartingChoicePending capability
+	// (rules.Engine); a Chars without it (a hand-built snapshot, a test
+	// stand-in) never blinds, matching the R-9 no-ask host.
+	hideHand bool
 	// noDerived leaves every CardView's Chars-derived facts (layer-3 name,
 	// keywords, P/T) unasked: a lean projection's OmitDerivedChars.
 	noDerived bool
@@ -242,10 +262,13 @@ func newProjector(g *state.Game, ch Chars, viewer state.PlayerID, sc *projScratc
 	})
 	p.namer, _ = ch.(interface{ Name(state.ObjID) string })
 	p.vchars, _ = ch.(interface {
-		ViewCharacteristics(state.ObjID) (string, []string, int32, int32)
+		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	})
 	if s, ok := ch.(tokenSuppressor); ok && s.SuppressCardTokens() {
 		p.noTokens = true
+	}
+	if s, ok := ch.(interface{ StartingChoicePending() bool }); ok && s.StartingChoicePending() {
+		p.hideHand = true
 	}
 	return p
 }
@@ -465,19 +488,22 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 	// vchars answers the four derived facts below in one call; without it
 	// each is asked for separately.
 	var dName string
+	var dNameSet bool
 	var dKw []string
 	if p.vchars != nil && !p.noDerived {
-		dName, dKw, cv.Power, cv.Toughness = p.vchars.ViewCharacteristics(id)
+		dName, dNameSet, dKw, cv.Power, cv.Toughness = p.vchars.ViewCharacteristics(id)
 	}
 	if f := o.Face(); f != nil {
 		cv.Name = f.Name
 		// Name is a layer-3 characteristic. Keep the optional method so
 		// lightweight Chars test doubles remain source-compatible while the
-		// real rules engine exposes SetName$ results to clients.
+		// real rules engine exposes SetName$ results to clients. A bound
+		// name is authoritative even when empty: a both-locked Room has no
+		// name (CR 709.5) and must not fall back to its printed front face.
 		if p.noDerived {
 			// a lean projection's printed name
 		} else if p.vchars != nil {
-			if dName != "" {
+			if dNameSet || dName != "" {
 				cv.Name = dName
 			}
 		} else if p.namer != nil {
@@ -492,6 +518,7 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 		}
 		cv.Types = p.typeLine(types, f.Types)
 		cv.ManaCost = f.ManaCost
+		cv.PrintedPT = f.PT
 		cv.Printing = Printing{Name: f.Name}
 		// The spell-ability API projection: the card's own SP$ line, the
 		// same fact boardFromGame reads for the casting census. Empty when

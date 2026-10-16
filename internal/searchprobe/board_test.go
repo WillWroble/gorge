@@ -27,13 +27,25 @@ import (
 // equivalence itself stays held on every prefix of a real game by
 // TestHistoryChainEqualsTheLegacyEncodingOnEveryPrefix; these goldens are
 // the new fixture's chained digests.
+//
+// Re-pinned 2026-10-12 (eng-turnwatch): view.PlayerView gained the four
+// per-turn watcher fields (SpellsCastThisTurn, LifeGainedThisTurn,
+// LifeLostThisTurn, TokensCreatedThisTurn), which every board's JSON and
+// canonical encoding now carries, so every prefix digest moves; the
+// legacy-encoding equivalence tests above still hold.
+//
+// Re-pinned 2026-10-16 (token-art-pt-key): view.CardView gained PrintedPT
+// (the face's printed P/T, so the token-art cache key stops keying on the
+// current, counter-modified value), which every board's JSON and canonical
+// encoding now carries, so every prefix digest moves. Attributed by hiding
+// only that field (json:"-"): the old digests return byte-for-byte.
 func TestHistoryDigestMatchesTheJSONBoardEncoding(t *testing.T) {
 	f := benchRoot(t)
 	golden := map[int]string{
-		1:   "30ebca40b220967de92f19a45f0bbe2e31f48e73e4084312eaa2342d8819be02",
-		2:   "a91770a6a1eafae58bfaea2b3d9b096723c1f740052484ee021fae69f4a3d873",
-		17:  "801ca0af241882edec3e717fcc007eca5103b36a4f33f4c39ac463fdc1094f24",
-		120: "8b22aa8b2a2d703807d19b42c14ed677b823914796efccae73355339184b7bf2",
+		1:   "5074d37819a5cb8a83a96aa5edcff463a4db54036de9802e82ae134fc2c5224a",
+		2:   "5782b165ba5cc5e68722a37cfa33ac960a9b6428564b4e2409918141b82aaaa4",
+		17:  "355ddaed8cfd831073e1d22407c556dd49277ac80b0d75f13c83d8d083d4e8e3",
+		120: "90d19be27cae25c186c00c8a4eb9565febfe7dc6642ff93a11fa0035f043e3cf",
 	}
 	if len(f.h.Frames) != 120 {
 		t.Fatalf("bench fixture has %d frames, the goldens were measured on 120", len(f.h.Frames))

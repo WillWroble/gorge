@@ -29,6 +29,11 @@ import (
 // UntilEOT, dropped at end-of-turn cleanup; an explicit Permanent (and other
 // source-relative durations) persists while its source stays on the battlefield.
 func effEffect(h Host, c *Ctx, sa *cards.SA) {
+	// A nested Effect (this body is an Effect-created delayed trigger's own
+	// execution, under its carrier's source-scoped frame): its chain's self-exile idiom names the OUTER carrier, so
+	// the registrations this call makes are spared. See EffectFrame.Spare.
+	nested := c.EffectFrame.Carrier && c.EffectFrame.Source == c.Source && c.EffectFrame.Stamp == 0
+	clock := h.Game().Clock
 	ep := EffectOf(sa)
 	noteUnreadParams(h, c, "Effect", ep.Unread)
 	rawDur := ep.Duration
@@ -475,6 +480,28 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 			text := tl.Phase + expiry + odSuffix
 			if vp := tl.ValidPlayer; vp != "" {
 				text += "|VP=" + vp
+			}
+			// IsPresent$/PresentZone$/PresentCompare$ (Scars of the Veteran's
+			// "if it's a creature"): the Phase registration's presence
+			// condition, decoded by rules' delayed scan exactly like the
+			// DelayedTrigger SA path's PhaseText (delayedtrigger_params.go).
+			// Appended before |RN= so the decoder's reverse strip order sees
+			// the amount suffix at the tail.
+			if tl.IsPresent != "" {
+				text += "|IP=" + tl.IsPresent
+				if tl.PresentZone != "" {
+					text += "|PZ=" + tl.PresentZone
+				}
+				if tl.PresentCompare != "" {
+					text += "|PC=" + tl.PresentCompare
+				}
+			}
+			// A prevention rider's delayed counter body (Sacred Boon) reads the
+			// amount this application prevented as Count$TriggerRememberAmount;
+			// "|RN=" rides last so the decode strips it first.
+			if c.Num.RememberedCMCBound && (cards.DelayedPreventedCounterBody(c.SVars, exec) ||
+				cards.DelayedPreventedCounterBody(effectFaceSVars(h, c.Source), exec)) {
+				text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
 			}
 			for _, owner := range owners {
 				h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
@@ -1219,6 +1246,12 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 	// every Effect-created registration from the source (Host.EndEffectSource)
 	// while leaving the source's printed statics alone.
 	c.EffectFrame = EffectFrame{Source: c.Source}
+	if nested {
+		c.EffectFrame.Spare = clock
+		if c.EffectFrame.Spare == 0 {
+			c.EffectFrame.Spare = 1
+		}
+	}
 }
 
 type effEffectCode uint16
@@ -1231,3 +1264,12 @@ var effEffectCodes = state.NewStrCodes(
 	state.StrEntry[effEffectCode]{Key: "Targeted", Val: effEffectTargeted},
 	state.StrEntry[effEffectCode]{Key: "True", Val: effEffectTargeted},
 )
+
+// effectFaceSVars is the SVar table of source's current face (nil when the
+// object or face is gone).
+func effectFaceSVars(h Host, source state.ObjID) map[string]string {
+	if o := h.Game().Obj(source); o != nil && o.Face() != nil {
+		return o.Face().SVars
+	}
+	return nil
+}

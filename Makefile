@@ -49,14 +49,22 @@ FORGE_REPO ?= https://github.com/adams-shaun/forge.git
 # 25a608a4f = fb4d80911 (Card-Forge master 2026-10-02) + Card-Forge/forge#12153
 # (Bard's Company P/T, Voice of Victory type, Yip Yip! target) + #12160
 # (Demonic Pact's discard mode targets an opponent).
-FORGE_REF  ?= 25a608a4fc5fe837314a263e4ac6600a01d7c348
+# 1dc038bc6 = the adams-shaun/forge branch `gorge` (2026-10-12): adds 764b1e3a3
+# (g_1_1_elf token is Elf, not Elf Warrior; Card-Forge/forge#12242/#12244) and
+# 1dc038bc6 (Bullseye, Death Dealer, Ghostly Dancers ETB Origin$ Any |
+# Destination$ Battlefield; Reckless Detective UnlessResolveSubs$ WhenPaid;
+# Card-Forge/forge#12243/#12245).
+# 098b05531 = 1dc038bc6 + The Earth Crystal targets only creatures you control
+# (ValidTgts$ Creature.YouCtrl; Card-Forge/forge#12255/#12256).
+FORGE_REF  ?= 098b055313459c4b36c9e1f1d4e81a2c8aef815e
 # The XMage commit the compliance oracle (manifests, out-of-tree driver)
 # is pinned to. XMage is MIT; nothing from it is a build dependency.
 # docs/superpowers/specs/2026-10-02-xmage-compliance-oracle-design.md
 XMAGE_REF  ?= 6b602a1c85e8ed738a4b40b1ef44c54845b57f68
 XMAGE_ORACLE_DIR ?= /mnt/sata/gorge-training/xmageoracle
 # Forge oracle driver commit (fork, branch oracle-harness): a descendant of FORGE_REF with identical script trees.
-FORGE_ORACLE_REF ?= e27d2bdb25449df986106f0cc9de22078e779a6a
+# da1c712c3 = e27d2bdb2 + fork gorge 098b05531 (restores the pin invariant, 2026-10-13).
+FORGE_ORACLE_REF ?= da1c712c31abec3063b0dbf3b517365f18951f89
 FORGE_ORACLE_DIR ?= /mnt/sata/gorge-training/forgeoracle
 
 .PHONY: help
@@ -74,6 +82,7 @@ help:
 	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
 	@echo "  make compliance-status — generated per-set/per-format compliance status (compliance/status.md, never committed) + ratchet check"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
+	@echo "  make draftsim       — build draftsim and play 2 verified draft events (SET/SEED override)"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
 	@echo "  make deploy-demo    — rebuild and (re)serve the demo on :8080 (bot tables omniscient)"
 	@echo "                        (PACE=1.5s / TABLES / SEATS / FORMATS / SEED override the defaults)"
@@ -87,6 +96,7 @@ help:
 	@echo "  make smoke          — headless-browser smoke gate vs two real gorged servers (public+omniscient); fails on any browser error or a hung loading state"
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
+	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; scripts/nightly.sh)"
 	@echo "  make oracle-audit   — run the Oracle-text card audit (rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
 	@echo "  make clean-seats    — delete finished pi-agent seat dirs (~/.cache/pi-agent); dry run unless APPLY=1"
 	@echo "  make clean-worktrees — remove merged, clean .worktrees/* and their branches; dry run unless APPLY=1"
@@ -112,6 +122,17 @@ $(BIN_DIR)/botbench: $(GO_SRC)
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -o $@ ./cmd/botbench
 
+$(BIN_DIR)/draftsim: $(GO_SRC)
+	@mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build -o $@ ./cmd/draftsim
+
+.PHONY: draftsim
+# draftsim runs E0's headless limited lab: 4-bot draft pods over the two
+# embedded set specs, best-23 deck builds, and a Bo1 round-robin played
+# through the rules engine, with -verify replaying every game's chain.
+draftsim: $(BIN_DIR)/draftsim
+	$(BIN_DIR)/draftsim -set FDN -seed 1 -events 2 -verify
+
 .PHONY: gorged
 # gorged runs the M2a table server: perpetual bot tables served to a browser
 # at the listen address. make web builds the Svelte client it embeds first.
@@ -120,7 +141,7 @@ $(BIN_DIR)/botbench: $(GO_SRC)
 gorged: $(BIN_DIR)/gorged
 	$(BIN_DIR)/gorged -decks internal/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
 
-# dzbroker is the experimental, tag-gated decision broker (internal/broker).
+# dzbroker is the experimental, tag-gated decision broker (internal/inferbroker).
 # It batches learner decisions from many independent games into one inference
 # call with no all-games barrier, and expands one deck matchup into -multiply
 # games with distinct shuffles. The tag keeps it, its seat wrapper and its
@@ -132,10 +153,21 @@ dzbroker:
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./cmd/dzbroker
 
+# gamepool is the experimental, tag-gated pooled-games driver. It is built
+# from the nested module experimental/gamepool, which alone requires purego
+# (the GPU scorer's CUDA binding): the root go.mod has no require lines
+# (TestRootModuleHasNoRequires). Add gamepool_gpu to GAMEPOOL_TAGS for the GPU
+# scorer.
+.PHONY: gamepool
+GAMEPOOL_TAGS ?= gamepool
+gamepool:
+	@mkdir -p $(BIN_DIR)
+	cd experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
+
 # test-broker runs the broker package's tests under the tag. Kept out of the
 # default `make test` for the same reason the build is.
 test-broker:
-	go test -tags broker -count=1 ./internal/broker
+	go test -tags broker -count=1 ./internal/inferbroker
 
 .PHONY: traindash
 # traindash serves the read-only live training dashboard over the policynet/PPO
@@ -191,8 +223,13 @@ sim: $(BIN_DIR)/mtgsim
 	$(BIN_DIR)/mtgsim -seats 4 -games 20 -verify
 
 .PHONY: fetch-cards
+# A worktree's corpus tests open the main checkout's .cards, which is outside
+# that worktree's module root, so `go test` does not hash it: a cached pass
+# would survive a corpus change. Drop the test cache when the pin moves.
 fetch-cards: $(BIN_DIR)/forgec
-	$(BIN_DIR)/forgec fetch -dir $(CARDS_DIR) -repo $(FORGE_REPO) -ref $(FORGE_REF)
+	@before=$$(cat $(CARDS_DIR)/cards.lock 2>/dev/null); \
+	$(BIN_DIR)/forgec fetch -dir $(CARDS_DIR) -repo $(FORGE_REPO) -ref $(FORGE_REF) && \
+	if [ "$$before" != "$$(cat $(CARDS_DIR)/cards.lock 2>/dev/null)" ]; then go clean -testcache; echo "corpus changed: go test cache cleared"; fi
 
 .PHONY: compile-cards
 compile-cards: $(BIN_DIR)/forgec
@@ -318,6 +355,22 @@ fuzz:
 test-manabrew:
 	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./protocol/manabrew ./internal/manabrew/... ./host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
 
+# test-spellbench-bridge builds and tests the parked SpellBench protocol v1/v2
+# bridge (build tag `spellbench_bridge`): internal/spellbench/{v1agent,kshadow,
+# v2agent,v2engine,v2shadow}, internal/policynet/v2front and the sbagent,
+# sbv1agent, kshadowcheck, sbv2engine, sbv2local and sbv2shadow commands. Like
+# test-manabrew it is excluded from `go test ./...`, `make test` and the
+# pipeline gates; the live bots' spellbench catalogs, builtins, sbsearch,
+# payexec and registry stay untagged.
+SPELLBENCH_BRIDGE_PKGS = ./internal/spellbench/v1agent ./internal/spellbench/kshadow \
+	./internal/spellbench/v2agent ./internal/spellbench/v2engine ./internal/spellbench/v2shadow \
+	./internal/policynet/v2front ./cmd/sbagent ./cmd/sbv1agent ./cmd/kshadowcheck \
+	./cmd/sbv2engine ./cmd/sbv2local ./cmd/sbv2shadow
+.PHONY: test-spellbench-bridge
+test-spellbench-bridge:
+	go vet -tags spellbench_bridge $(SPELLBENCH_BRIDGE_PKGS)
+	go test $(GO_TEST_FLAGS) -tags spellbench_bridge -count=1 $(SPELLBENCH_BRIDGE_PKGS)
+
 # Engine-speed benchmarking (cmd/enginebench; scripts in scripts/enginebench-*.sh,
 # workload decks committed in cmd/enginebench/testdata/decks). Every run is
 # capped in a systemd scope and serialised on HEAVY_LOCK; binaries, results
@@ -349,6 +402,15 @@ enginebench-verify:
 .PHONY: smoke-perf
 smoke-perf: $(BIN_DIR)/botbench
 	BASE=$(BASE) CAND=$(CAND) scripts/smoke-perf.sh
+
+# nightly is the T3 tier (docs/agents/test-throughput-2026-10-12.md §4):
+# fuzz, conformance, test-manabrew, test-spellbench-bridge, a -race pass and
+# an opt-in perf record (PERF_NIGHTLY=1), each in its own capped scope holding
+# a heavy lane, against a fresh detached worktree of origin/main. Heavy: the
+# deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.
+.PHONY: nightly
+nightly:
+	scripts/nightly.sh
 
 COVER_OUT  ?= coverage.out
 COVER_HTML ?= coverage.html

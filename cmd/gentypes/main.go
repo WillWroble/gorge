@@ -27,9 +27,20 @@ func Render() (string, error) {
 		{protoPkg, "Widget"}, {protoPkg, "SeatInfo"}, {protoPkg, "MatchStart"},
 		{protoPkg, "Snapshot"}, {protoPkg, "Event"}, {protoPkg, "EventBody"},
 		{protoPkg, "DecisionBody"}, {protoPkg, "MatchEnd"}, {protoPkg, "TableHaltedBody"},
+		{protoPkg, "TableStateBody"},
 		{protoPkg, "Overflow"}, {protoPkg, "ErrorBody"}, {protoPkg, "MatchInfo"},
 		{protoPkg, "Subscribe"}, {protoPkg, "Unsubscribe"},
 		{protoPkg, "BotPolicyList"},
+		// Draft-event wire types (E1-1). The four frame bodies are roots;
+		// the request/reply types below are also roots because nothing
+		// reaches them transitively.
+		{protoPkg, "EventState"}, {protoPkg, "DraftPack"}, {protoPkg, "PodProgress"},
+		{protoPkg, "SeriesUpdate"}, {protoPkg, "CreateEventRequest"}, {protoPkg, "CreateEventResponse"},
+		{protoPkg, "JoinEventRequest"}, {protoPkg, "PickRequest"}, {protoPkg, "DeckRequest"},
+		{protoPkg, "DeckCheck"}, {protoPkg, "EventPool"}, {protoPkg, "ReadyRequest"},
+		{protoPkg, "SideboardRequest"},
+		{protoPkg, "EventLog"}, {protoPkg, "EventSubscribe"},
+		{protoPkg, "EventSetInfo"}, {protoPkg, "EventPersonas"},
 		// decision.Intent is the client's ANSWER — the one wire type a human
 		// needs. Every other decision type reaches the client through View,
 		// but nothing reaches it from the server's offered decisions, so
@@ -48,7 +59,7 @@ func Render() (string, error) {
 		roots = append(roots, t)
 	}
 	unions := map[string][]string{
-		"FrameType":  {"hello", "widget", "match_start", "snapshot", "event", "decision", "match_end", "table_halted", "overflow", "error", "rewind"},
+		"FrameType":  {"hello", "widget", "match_start", "snapshot", "event", "decision", "match_end", "table_halted", "table_state", "overflow", "error", "rewind", "event_state", "draft_pack", "pod_progress", "series_update"},
 		"Mode":       {protocol.ModeOverview, protocol.ModeFocus},
 		"TableState": {protocol.TableIdle, protocol.TableLive, protocol.TableCooldown, protocol.TableHalted},
 		"MatchState": {protocol.MatchLive, protocol.MatchFinished, protocol.MatchAborted, protocol.MatchCrashed},

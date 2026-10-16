@@ -1,8 +1,9 @@
 package effects
 
 import (
-	"github.com/adams-shaun/gorge/state"
 	"testing"
+
+	"github.com/adams-shaun/gorge/state"
 )
 
 // TestFlipCoinModScopesToController pins the ValidPlayer$ You scoping of the

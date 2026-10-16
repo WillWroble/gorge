@@ -17,6 +17,9 @@ var update = flag.Bool("update", false, "rewrite protocol/testdata goldens")
 
 func seat(n uint8) *uint8 { return &n }
 
+// nint is an *int literal for the draft-event fixtures.
+func nint(n int) *int { return &n }
+
 // fixtures is one frame per type with every field populated, so a golden
 // pins the whole wire shape. Change a golden only with a protocol change
 // (and a Version bump when it is not additive).
@@ -52,9 +55,27 @@ func fixtures(t *testing.T) []Frame {
 		mk(TDecision, 9131, DecisionBody{Player: 2, Kind: "priority", Prompt: "You have priority."}),
 		mk(TMatchEnd, 9500, MatchEnd{Result: "win", Winner: seat(2), Head: "6c8f9e4512366476"}),
 		mk(TTableHalted, 9500, TableHaltedBody{Reason: "intent rejected: choice 3 out of range (2 options)"}),
+		mk(TTableState, 9500, TableStateBody{State: TableBetweenGames}),
 		mk(TOverflow, 0, Overflow{Dropped: 17}),
 		mk(TError, 0, ErrorBody{Code: "unknown_table", Message: "no table t9"}),
 		mk(TRewind, 900, Snapshot{View: v, TurnStarts: []uint64{0, 402}, Head: 900, Seats: []SeatInfo{{Name: "mono-red-goblins", Deck: "mono-red-goblins", Colour: SeatColours[0], Human: true, DeckID: "mono-red-goblins"}}}),
+		// Draft-event frames (E1): every field populated. Production sends
+		// these with an empty table/match/seq; the mk harness shape is what
+		// the golden pins.
+		mk(TEventState, 0, EventState{Event: "ev-1", Set: "FDN", Phase: "ROUND1", Round: 1,
+			Seats: []EventSeat{
+				{Seat: 0, Kind: "human", Name: "Alice", Joined: true, Picks: 42, Ready: true},
+				{Seat: 1, Kind: "bot", Policy: "az-aggro", Drafter: "rating-colour", Joined: true, Picks: 41},
+				{Seat: 2, Kind: "bot", Policy: "bot", Drafter: "rating-colour", Joined: true, Picks: 40},
+				{Seat: 3, Kind: "human", Joined: false, Picks: 0},
+			}, You: nint(0),
+			Series:    []EventSeries{{Round: 1, A: 0, B: 1, BestOf: 1, State: "live", Table: "ev1g1", Attempt: 2, Score: [2]int{0, 0}, Join: "/t/ev1g1?seat=0&token=abc"}},
+			Standings: []EventStanding{{Seat: 0, Points: 6, MW: 1, OMW: 0.5, GW: 0.9, OGW: 0.45}}}),
+		mk(TDraftPack, 0, DraftPack{Event: "ev-1", Seat: 1, Waiting: false, Round: 2, PickNo: 7,
+			Pack: []DraftCard{{ID: "r2p7c3", Name: "Ajani Vengeant", Set: "FDN", Number: "201", Rarity: "R"}},
+			Pool: []DraftCard{{ID: "r1p1c0", Name: "Blightsteel Colossus", Set: "FDN", Number: "250", Rarity: "M"}}}),
+		mk(TPodProgress, 0, PodProgress{Event: "ev-1", Round: 3, Picks: []int{42, 42, 41, 40}, Queued: []int{1, 0, 1, 1}}),
+		mk(TSeriesUpdate, 0, SeriesUpdate{Event: "ev-1", Series: EventSeries{Round: 2, A: 1, B: 3, BestOf: 1, State: "ended", Table: "ev1g4", Attempt: 1, Score: [2]int{1, 0}, Winner: nint(1)}}),
 	}
 }
 

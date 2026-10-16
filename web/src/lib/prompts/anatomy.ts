@@ -201,8 +201,12 @@ export function promptAnatomy(d: Decision, view: View): Anatomy {
           plain = sentence(d.prompt);
           break;
         case 'starting_player':
-          title = 'Who plays first?';
-          plain = 'You won the toss.';
+          // The server's prompt is the heading: "You won the toss. Choose
+          // who takes the first turn." after a toss, or "Choose who takes
+          // the first turn." for a Bo3 game's chooser (the previous game's
+          // loser), who won no toss (E3-9).
+          title = d.prompt || 'Who plays first?';
+          plain = null;
           break;
         case 'replacement':
           title = 'Choose which applies first';

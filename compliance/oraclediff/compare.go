@@ -135,11 +135,15 @@ func fields(s rules.OracleSnapshot, xmage bool, compare []string) []field {
 		if wantsCompare(compare, CompareHandCount) {
 			hand = fmt.Sprint(len(p.Hand))
 		}
+		graveyard := list(p.Graveyard, false)
+		if wantsCompare(compare, CompareGraveyardCount) {
+			graveyard = fmt.Sprint(len(p.Graveyard))
+		}
 		out = append(out,
 			field{pf("life"), fmt.Sprint(p.Life)},
 			field{pf("counters"), counters(p.Counters)},
 			field{pf("hand"), hand},
-			field{pf("graveyard"), list(p.Graveyard, false)},
+			field{pf("graveyard"), graveyard},
 			field{pf("exile"), list(p.Exile, true)},
 			field{pf("library_count"), fmt.Sprint(p.LibraryCount)},
 		)
@@ -149,6 +153,12 @@ func fields(s rules.OracleSnapshot, xmage bool, compare []string) []field {
 		out = append(out,
 			field{pf("pool"), sortMana(p.Pool)},
 		)
+		if len(s.Players) > 2 {
+			// Only a multiplayer game goes on after a seat loses (CR
+			// 800.4a), so only its checkpoints carry the field: every
+			// two-seat canonical form, and so every frozen hash, is unchanged.
+			out = append(out, field{pf("lost"), fmt.Sprint(p.Lost)})
+		}
 	}
 	out = append(out,
 		field{"permanents", strings.Join(permKeysOpts(s.Permanents, compare), "\n")},
@@ -175,7 +185,7 @@ func compareSnap(g, x rules.OracleSnapshot, compare []string, ignore []string) (
 	}
 	gf, xf := fields(g, false, compare), fields(x, true, compare)
 	for k := range gf {
-		if ignored(gf[k].name, ignore) {
+		if ignored(gf[k].name, ignore) || (g.Over && x.Over && !gameOverField(gf[k].name)) {
 			continue
 		}
 		if k >= len(xf) || !fieldEqual(gf[k], xf[k]) {
@@ -355,7 +365,8 @@ func permKeys(ps []rules.OracleSnapPerm) []string {
 // when it names "keywords_named" it gains the wider named vocabulary
 // (spec 2026-10-05-compliance-level-b section 2.3).
 func permKeysOpts(ps []rules.OracleSnapPerm, compare []string) []string {
-	wantNamed := wantsCompare(compare, CompareKeywordsNamed)
+	wantHexFrom := wantsCompare(compare, CompareKeywordsHexproofFrom)
+	wantNamed := wantHexFrom || wantsCompare(compare, CompareKeywordsNamed)
 	wantKeywords := wantNamed || wantsCompare(compare, CompareKeywords)
 	// attached_to names its host the way XMage's driver does: the host
 	// permanent's CURRENT name (its layer-3 SetName$ name, or "" while face
@@ -388,7 +399,11 @@ func permKeysOpts(ps []rules.OracleSnapPerm, compare []string) []string {
 			k += " counters=" + c
 		}
 		if wantKeywords {
-			if kw := ComparedKeywords(p.Keywords, wantNamed); kw != "" {
+			kw := ComparedKeywords(p.Keywords, wantNamed)
+			if wantHexFrom {
+				kw = ComparedKeywordsHexproofFrom(p.Keywords, p.Colors)
+			}
+			if kw != "" {
 				k += " kw=" + kw
 			}
 		}

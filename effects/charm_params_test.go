@@ -10,7 +10,7 @@ import (
 // TestCharmKnownKeysSorted: the unread lookup binary-searches the table.
 func TestCharmKnownKeysSorted(t *testing.T) {
 	if !slices.IsSorted(charmKnownKeys[:]) || len(slices.Compact(slices.Clone(charmKnownKeys[:]))) != len(charmKnownKeys) {
-		t.Fatal("charmKnownKeys must be sorted and duplicate-free")
+		t.Fatal("charmKnownKeys must be sorted and duplicate-free; regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update")
 	}
 }
 

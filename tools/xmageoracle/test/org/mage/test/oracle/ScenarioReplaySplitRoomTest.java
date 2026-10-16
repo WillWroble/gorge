@@ -29,6 +29,14 @@ public final class ScenarioReplaySplitRoomTest {
         // Unsafe allocation skips initialisers; driver() fills these.
         java.util.List<String> queued;
         java.util.List<String> casts;
+        // The XMage card names this double treats as Rooms (cardIsRoom asks
+        // the card repository, which needs H2).
+        java.util.Set<String> rooms;
+
+        @Override
+        boolean cardIsRoom(String xmageCardName) {
+            return rooms != null && rooms.contains(xmageCardName);
+        }
 
         @Override
         public void addTarget(TestPlayer player, String target) {
@@ -134,6 +142,34 @@ public final class ScenarioReplaySplitRoomTest {
     public static void main(String[] args) throws Exception {
         checkHalf("Cease", "Cease // Desist", "graveyard", "Cease // Desist");
         checkHalf("Walk-In Closet", "Walk-In Closet // Forgotten Cellar", "battlefield", "Walk-In Closet");
+        // CR 709.5: a Room permanent with only the back door unlocked IS named
+        // for the back half, and gorge reports it so. A Room spell cast as its
+        // back door is named for that door too (CR 709.3b), so it keeps the
+        // name; ScenarioReplayRoomSpellingTest pins the non-Room face-1 alias.
+        String front = "Dazzling Theater", whole = "Dazzling Theater // Prop Room", back = "Prop Room";
+        RecordingDriver room = driver(front, whole);
+        room.rooms = java.util.Set.of(whole);
+        JsonObject perm = new JsonObject();
+        perm.addProperty("name", back);
+        JsonArray perms = new JsonArray();
+        perms.add(perm);
+        JsonObject spell = new JsonObject();
+        spell.addProperty("kind", "spell");
+        spell.addProperty("source", back);
+        JsonObject ability = new JsonObject();
+        ability.addProperty("kind", "ability");
+        ability.addProperty("source", back);
+        JsonArray stack = new JsonArray();
+        stack.add(spell);
+        stack.add(ability);
+        JsonObject snap = new JsonObject();
+        snap.add("permanents", perms);
+        snap.add("stack", stack);
+        JsonObject norm = (JsonObject) call(room, "gorgeSpellings", new Class<?>[]{JsonElement.class}, snap);
+        equal(back, norm.getAsJsonArray("permanents").get(0).getAsJsonObject().get("name").getAsString());
+        equal(back, norm.getAsJsonArray("stack").get(0).getAsJsonObject().get("source").getAsString());
+        equal(back, norm.getAsJsonArray("stack").get(1).getAsJsonObject().get("source").getAsString());
+        System.out.println("PASS unlocked back door keeps its name; a Room's back-door spell keeps the door name");
         RecordingDriver alias = driver("Dáin Ironfoot", "Dain Ironfoot");
         equal("Dain Ironfoot", call(alias, "castSpelling", new Class<?>[]{String.class}, "Dáin Ironfoot"));
         RecordingDriver plain = driver("Shock", "");

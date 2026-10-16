@@ -11,13 +11,49 @@ import (
 // answered by the bot.
 type Kinds struct {
 	Priority, Attackers, Blockers, Target bool
+	// Modes, Optional, Choose and MultiTarget are the fuller search's
+	// pick-a-set kinds, off in AllKinds (FullKinds turns them on). Each is
+	// enumerated by subsetCandidates -- the bot's answer first, then every
+	// legal set of options in size order -- and its candidate's prior logit
+	// is the sum of its options' scores:
+	//   - Modes: decision.KModes, a modal spell's or trigger's modes (and an
+	//     UnlessCost$ pay/decline, which shares the kind): every legal mode
+	//     set;
+	//   - Optional: decision.KTriggerOptional, a may trigger's yes or no;
+	//   - Choose: decision.KChoose with at most Options.Limit options (an X
+	//     value, a number, a name, the cards of a cost, a dig or a search),
+	//     never a mana-payment window (its "activate"/"mana"/"done" options,
+	//     the manual payment the priority vocabulary never searches either);
+	//   - MultiTarget: decision.KTarget shapes Target's single-target test
+	//     refuses -- up to N targets, an optional target (Min 0), a
+	//     budgeted pick -- every set d.Validate accepts.
+	Modes, Optional, Choose, MultiTarget bool
+	// chooseMax is the largest KChoose option list Choose searches: Search
+	// sets it to Options.Limit; 0 (a Kinds built by hand and passed to an
+	// enumerator directly) reads DefaultOptions' Limit.
+	chooseMax int
 }
 
 // AllKinds is the spec's searched set.
 func AllKinds() Kinds { return Kinds{Priority: true, Attackers: true, Blockers: true, Target: true} }
 
-// ParseKinds parses a comma list of priority, attackers, blockers, target
-// (botbench's -az-kinds). An unknown or empty entry is an error.
+// FullKinds is AllKinds plus the fuller search's kinds: Modes, Optional,
+// Choose and MultiTarget.
+func FullKinds() Kinds {
+	k := AllKinds()
+	k.Modes, k.Optional, k.Choose, k.MultiTarget = true, true, true, true
+	return k
+}
+
+// any reports whether k searches any kind.
+func (k Kinds) any() bool {
+	k.chooseMax = 0
+	return k != Kinds{}
+}
+
+// ParseKinds parses a comma list of priority, attackers, blockers, target,
+// modes, optional, choose, multitarget, or all (FullKinds) (botbench's
+// -az-kinds). An unknown or empty entry is an error.
 func ParseKinds(s string) (Kinds, error) {
 	var k Kinds
 	for _, part := range strings.Split(s, ",") {
@@ -30,8 +66,20 @@ func ParseKinds(s string) (Kinds, error) {
 			k.Blockers = true
 		case "target":
 			k.Target = true
+		case "modes":
+			k.Modes = true
+		case "optional":
+			k.Optional = true
+		case "choose":
+			k.Choose = true
+		case "multitarget":
+			k.MultiTarget = true
+		case "all":
+			f := FullKinds()
+			k.Priority, k.Attackers, k.Blockers, k.Target = true, true, true, true
+			k.Modes, k.Optional, k.Choose, k.MultiTarget = f.Modes, f.Optional, f.Choose, f.MultiTarget
 		default:
-			return Kinds{}, fmt.Errorf("unknown searched kind %q (want priority, attackers, blockers, target)", p)
+			return Kinds{}, fmt.Errorf("unknown searched kind %q (want priority, attackers, blockers, target, modes, optional, choose, multitarget, all)", p)
 		}
 	}
 	return k, nil
@@ -71,6 +119,15 @@ type Options struct {
 	// visits (tau = 1) instead of the argmax. Generation only, turns 1-4
 	// (the seat decides); eval leaves it false.
 	Sample bool
+	// Temp > 0 samples the move on EVERY searched decision with probability
+	// proportional to visits^(1/Temp) (overrides Sample). 0 is off.
+	Temp float64
+	// Second in (0,1] is the probability of playing the second most-visited
+	// root move instead of the best (when it has any visits). 0 is off.
+	Second float64
+	// ChoiceSalt is mixed into the seed of the root-noise/choice randomness
+	// only (never the world or environment streams). 0 reproduces Seed alone.
+	ChoiceSalt uint64
 	// HeuristicLeaf keeps the frozen heuristic leaf (searchprobe.LeafValue)
 	// even when a network supplies the prior: the network's value head is
 	// then unused (M1b's prior-only ablation).
@@ -173,7 +230,8 @@ type Options struct {
 	// enumerates the manual-payment vocabulary even under AutoPayment: its
 	// walk bot is the manual one, whose casts are offered only once mana
 	// floats (a tap is never a candidate, so such a priority stays the
-	// bot's).
+	// bot's). Its points are capped at Limit in enumeration order even
+	// under PriorTopK. OpponentMirror changes both.
 	OpponentNodes bool
 	// SkipPass makes the search's world engines auto-pass every priority
 	// window outside a main phase with an empty stack (rules.Engine.SetSkipPass):
@@ -183,6 +241,21 @@ type Options struct {
 	// game's engine or the root decision. Level 2 also
 	// passes the non-active seat's empty-stack main-phase window. 0 (default) is off.
 	SkipPass int
+	// OpponentMirror makes the opponent's points (OpponentNodes, which it
+	// requires) mirror the searching seat's settings: the auto-pay walk bot
+	// and payment vocabulary under AutoPayment, the PriorTopK ranking under
+	// PriorTopK. Off (the default), the opponent's points are OpponentNodes'
+	// alone whatever AutoPayment and PriorTopK say.
+	//
+	// With AutoPayment, the opponent's walk bot is the auto-pay bot (seeded
+	// per seat, like the searching seat's), and its priority points are the
+	// payment vocabulary (paymentPriorityCands), so its casts are searched
+	// candidates (Stats.OppPayPoints). With PriorTopK (and a network prior),
+	// its points are enumerated in full, ranked by the network prior on its
+	// own view and cut to PriorTopK, as the searching seat's are
+	// (Stats.PriorTopK* count them too). Neither changes either flag's effect
+	// on the searching seat's own decisions.
+	OpponentMirror bool
 }
 
 // DiscountUnit is what one step of the backup discount counts.
@@ -258,6 +331,25 @@ type Stats struct {
 	PriorFallbacks int // network priors that fell back to uniform, at the root and at in-walk points (a discarded simulation's included)
 	FeedStopped    int // decisions the driver routed around the search (its observation feed stopped): the bot's answer was played
 	RedealRefused  int // decisions whose honest (redeal) world source refused to prepare: no world, the bot's answer was played
+	// RootRefused is the share of FeedStopped whose feed was LIVE but whose
+	// honest root (searchseat.HonestRoot) refused to build: the driver
+	// routed around the search for the root, not for a stopped feed. It is
+	// additive -- FeedStopped keeps counting every routed-around decision --
+	// so a true feed stop is FeedStopped - RootRefused.
+	RootRefused int
+	// BotTapRerooted counts searched priority decisions whose bot answer
+	// under AutoPayment was a manual mana tap (outside the payment
+	// vocabulary): Seat.DecideSearch searched the full vocabulary with no bot
+	// candidate (Root.NoBot) instead of playing the tap unsearched. Nonzero
+	// means a seat reached a decision without payment plans built or its
+	// bot preferred tapping by hand; near zero is healthy.
+	BotTapRerooted int
+	// Livelocks counts simulations whose world tripped the engine's
+	// livelock contract (*rules.LivelockError: the token-plan mint cap, the
+	// runaway watchers) -- an unrepresentable game the bench ends as a
+	// stall. The walk scores it a terminal draw (also counted Terminal and
+	// Completed); it is no longer a Panic.
+	Livelocks int
 	// Truncated counts searched points -- the root and in-walk decisions
 	// (an opponent's too, under OpponentNodes), a discarded simulation's
 	// included -- whose candidate list the Limit cut; RootTruncated is the
@@ -315,6 +407,21 @@ type Stats struct {
 	PriorTopKPoints int
 	PriorTopKCuts   int
 	PriorTopKBefore int
+
+	// ExtraSearched and ExtraSkipped are KindSearched and KindSkipped for
+	// the fuller search's kinds (Kinds.Modes, Optional, Choose, MultiTarget;
+	// ExtraKindNames order), kept apart so the reports that range over
+	// KindNames read as before. ExtraPoints counts those kinds' in-walk
+	// points -- the searching seat's and, under OpponentNodes, the
+	// opponent's -- a discarded simulation's included. All stay 0 unless
+	// Kinds enables one.
+	ExtraSearched [NumExtraKinds]int
+	ExtraSkipped  [NumExtraKinds][NumSkipReasons]int
+	ExtraPoints   [NumExtraKinds]int
+	// OppPayPoints counts the opponent's in-walk priority points enumerated
+	// over the auto-payment vocabulary (OpponentMirror with AutoPayment), a
+	// discarded simulation's included.
+	OppPayPoints int
 }
 
 // The searched kinds, indexing Stats' per-kind breakdowns.
@@ -338,6 +445,39 @@ func kindIndex(kind string) int {
 		}
 	}
 	return -1
+}
+
+// The fuller search's kinds (Kinds.Modes, Optional, Choose, MultiTarget),
+// indexing Stats' Extra* breakdowns.
+const (
+	ExtraModes = iota
+	ExtraOptional
+	ExtraChoose
+	ExtraMultiTarget
+	NumExtraKinds
+)
+
+// ExtraKindNames are the fuller kinds' names in index order (their
+// Result.Kind and Diag.Kind strings).
+var ExtraKindNames = [NumExtraKinds]string{"modes", "optional", "choose", "multitarget"}
+
+// extraIndex is kind's index in ExtraKindNames, or -1.
+func extraIndex(kind string) int {
+	for i, n := range ExtraKindNames {
+		if n == kind {
+			return i
+		}
+	}
+	return -1
+}
+
+// countSearched counts one searched root of kind in st.
+func countSearched(st *Stats, kind string) {
+	if k := kindIndex(kind); k >= 0 {
+		st.KindSearched[k]++
+	} else if x := extraIndex(kind); x >= 0 {
+		st.ExtraSearched[x]++
+	}
 }
 
 // SkipReason is why a decision of a searched kind was not searched.
@@ -397,6 +537,9 @@ func (s *Stats) Add(o Stats) {
 	s.PriorFallbacks += o.PriorFallbacks
 	s.FeedStopped += o.FeedStopped
 	s.RedealRefused += o.RedealRefused
+	s.RootRefused += o.RootRefused
+	s.BotTapRerooted += o.BotTapRerooted
+	s.Livelocks += o.Livelocks
 	s.DeadlineHits += o.DeadlineHits
 	s.OppPoints += o.OppPoints
 	s.OppExpanded += o.OppExpanded
@@ -414,6 +557,14 @@ func (s *Stats) Add(o Stats) {
 	s.PriorTopKPoints += o.PriorTopKPoints
 	s.PriorTopKCuts += o.PriorTopKCuts
 	s.PriorTopKBefore += o.PriorTopKBefore
+	s.OppPayPoints += o.OppPayPoints
+	for x := range s.ExtraSearched {
+		s.ExtraSearched[x] += o.ExtraSearched[x]
+		s.ExtraPoints[x] += o.ExtraPoints[x]
+		for r := range s.ExtraSkipped[x] {
+			s.ExtraSkipped[x][r] += o.ExtraSkipped[x][r]
+		}
+	}
 	for k := range s.KindSearched {
 		s.KindSearched[k] += o.KindSearched[k]
 		for r := range s.KindSkipped[k] {

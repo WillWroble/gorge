@@ -129,6 +129,21 @@ func IsAbort(stallOn string) bool { return stallOn == "livelock" || stallOn == "
 // with that StallOn kind and diag in Livelock -- a harness-side watchdog
 // (cmd/cardfuzz's board-size cap) that needs the engine rather than the
 // seat's board. It must only read the engine. Nil costs nothing.
+// FallbackTrace, when set, receives every decision the Env branch routes
+// around a seat's search -- a feed that stopped (its capture or answer
+// record failed) or an honest root that refused on a live feed -- with the
+// game seed, the seat index, the decision and the reason. Diagnostic only
+// (cmd/draftrl -az-fallbacks); set once before any game starts, and the
+// consumer synchronises itself.
+var FallbackTrace func(seed uint64, seatIdx int, d *decision.Decision, reason string)
+
+// rootRefuser is a search seat's live-feed refused-root fallback
+// (*azmcts.Seat and the hosted az adapter): counted apart from a stopped
+// feed.
+type rootRefuser interface {
+	DecideRootRefused(ctx context.Context, b botpolicy.Board, d decision.Decision, reason string) (decision.Intent, error)
+}
+
 type Hooks struct {
 	Decision func(seatIdx int, d *decision.Decision, in decision.Intent, board *botpolicy.Board) error
 	// Submit may consume an intent instead of the ordinary Engine.Submit. It
@@ -151,6 +166,20 @@ type Hooks struct {
 	// state at the ask point). Inline answers are not counted in
 	// Outcome.Intents. With the kernel off it changes nothing.
 	SyncAnswer bool
+	// NewEngine builds the engine, in place of the default rules.New: the
+	// place a caller that needs a different constructor (cmd/draftsim's
+	// rules.NewStartingPlayerChoice, which defers the pregame rounds and
+	// lets Setup pose the CR 103.1 ask) selects it. Nil (the zero value) is
+	// exactly rules.New, so every existing caller's shape is unchanged.
+	NewEngine func(rules.Config) *rules.Engine
+	// EnvSeats drives every seat implementing bots.EnvSeat the way the host
+	// does (host/botenv.go envData): the seat gets its own observation feed,
+	// and at a decision where WantsEnv(d) is true it answers DecideEnv with a
+	// bots.Env whose Search.Engine is the honest root searchseat.HonestRoot
+	// builds from that feed at bots.RootSeed(cfg.Seed^uint64(seat+1), d.Seq)
+	// — never the live engine. false (the zero value) changes nothing: such a
+	// seat is driven as before.
+	EnvSeats bool
 }
 
 // PlayGame plays one game between the given per-seat seats to completion, or
@@ -163,7 +192,19 @@ type Hooks struct {
 // The outcome is a pure function of (cfg, seats): the seats own their RNG,
 // the engine replays from cfg.Seed, and nothing reads the wall clock.
 func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hooks Hooks) (Outcome, *rules.Engine, error) {
-	e := rules.New(cfg)
+	newEng := hooks.NewEngine
+	if newEng == nil {
+		newEng = rules.New
+	}
+	// The default object cap (CV-8): a caller that set no explicit budget
+	// (cmd/cardfuzz's -max-objects, a search harness's own LoopGuard) plays
+	// under rules.DefaultMaxObjs, so a degenerate token storm ends as a
+	// recorded bigboard stall (the classification below) instead of growing
+	// the arena and event log until the box OOMs. An explicit MaxObjs wins;
+	// a Disabled guard (the host's stall-guard opt-out propagation) is
+	// returned unchanged.
+	cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
+	e := newEng(cfg)
 	if hooks.Setup != nil {
 		hooks.Setup(e)
 	}
@@ -195,14 +236,24 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 	// records the played intent back. A game with no search seat never builds
 	// a Feed and never pays a capture: its loop is byte-identical to the
 	// pre-feed one, which is what the bot-vs-bot self-control run relies on.
+	// With Hooks.EnvSeats a bots.EnvSeat gets a feed the same way (the host's
+	// newMatchFeeds, host/botenv.go) so the Env branch below can build its
+	// honest root; stopped marks a feed the driver has retired early -- a
+	// failed capture (matchFeeds.observe) or a RecordAnswer translation
+	// failure (matchFeeds.record) -- because its history would miss an answer,
+	// so it is never read again.
 	var feeds []*searchseat.Feed
+	var stopped []bool
 	var setup searchprobe.PublicGame
 	for i, s := range seats {
-		if _, ok := s.(searchseat.SearchSeat); !ok {
+		_, isSearch := s.(searchseat.SearchSeat)
+		_, isEnv := s.(bots.EnvSeat)
+		if !isSearch && !(hooks.EnvSeats && isEnv) {
 			continue
 		}
 		if feeds == nil {
 			feeds = make([]*searchseat.Feed, len(seats))
+			stopped = make([]bool, len(seats))
 			setup = searchprobe.PublicGame{
 				Names: cfg.Names, Decks: cfg.Decks, Tokens: cfg.Tokens, StartingLife: cfg.StartingLife,
 			}
@@ -249,6 +300,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 			if consumer, ok := seats[d.Player].(seat.PaymentPlanConsumer); ok && consumer.WantsPaymentActions() {
 				e.EnsurePaymentActions()
 			}
+			if consumer, ok := seats[d.Player].(seat.TargetHintConsumer); ok && consumer.WantsTargetHints() {
+				e.EnsureTargetHints()
+			}
 			var in decision.Intent
 			var err error
 			var decisionBoard *botpolicy.Board
@@ -256,20 +310,86 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 			// player -- the sampler's epoch constraints need every player's
 			// bursts, exactly the teacher's loop (which captures at every
 			// decision, not only the search seat's). A feed that fails a
-			// capture stops observing; the game plays on.
+			// capture stops observing; the game plays on. This is the host's
+			// matchFeeds.observe (host/botenv.go): a stopped or non-live feed
+			// is skipped, and a capture failure stops only that one feed.
 			var fdFrame bool
 			if feeds != nil {
-				fd := searchFeed(feeds, d.Player)
-				for _, f := range feeds {
-					if f == nil {
+				for i, f := range feeds {
+					if f == nil || stopped[i] || !f.Live() {
 						continue
 					}
-					if _, ok := f.Observe(e); ok && f == fd {
+					if _, ok := f.Observe(e); !ok {
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, i, d, "feed stopped: "+f.StopReason())
+						}
+						// The host's observe: a capture failure stops that one
+						// feed (so its stale history is never read again and
+						// the Env branch below passes it as nil); the game
+						// plays on.
+						stopped[i] = true
+						continue
+					}
+					if state.PlayerID(i) == d.Player {
 						fdFrame = true
 					}
 				}
 			}
-			if fd := searchFeed(feeds, d.Player); fd != nil {
+			var envRecorded bool
+			if es, ok := seats[d.Player].(bots.EnvSeat); hooks.EnvSeats && ok && es.WantsEnv(d) {
+				// The Env branch, mirroring host/botenv.go envData line for
+				// line: the deciding seat's own feed, the honest root
+				// searchseat.HonestRoot builds from it at this seat's
+				// per-seat seed and decision seq, the projected View and the
+				// Board -- never the live engine. A stopped feed is passed as
+				// nil, so a refused redeal (nil root) is answered from the
+				// Board/View the Env still carries (the host's fail-closed
+				// contract), never the real engine.
+				b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
+				decisionBoard = &board // b is a copy of board; &b would escape per decision
+				seatSetup := searchseat.SeatSetup(setup, es, d.Player)
+				var fd *searchseat.Feed
+				if !stopped[d.Player] {
+					fd = feeds[d.Player]
+				}
+				root, reason := searchseat.HonestRoot(seatSetup, fd, e,
+					bots.RootSeed(cfg.Seed^(uint64(d.Player)+1), d.Seq))
+				if reason != "" && fd != nil && FallbackTrace != nil {
+					FallbackTrace(cfg.Seed, int(d.Player), d, "honest root refused: "+reason)
+				}
+				v := view.Project(e.G, e, d.Player, d)
+				v.Round = rounds.Of(e.G, e.L.Events)
+				in, err = es.DecideEnv(context.Background(), bots.Env{
+					View:        v,
+					Board:       b,
+					Search:      searchseat.Env{Setup: seatSetup, Engine: root, Board: b, Feed: fd},
+					RootRefused: reason,
+				}, *d)
+				// Record the played intent on the seat's feed, the host's
+				// matchFeeds.record: a translation error stops that feed for
+				// the rest of the game rather than crashing it.
+				if err == nil && fd != nil {
+					// A payment-plan answer names one of the decision's
+					// PaymentActions, which the engine builds lazily; a seat
+					// that opts out of PaymentPlanConsumer (az-redeal's manual
+					// config, or a test seat) leaves them unbuilt here, the answer
+					// would not translate and the feed would stop for the
+					// rest of the game -- the hosted fix of 964bab2f7
+					// (host/match.go). A pure derived read: no event, no RNG.
+					if in.Payment != nil || in.Announce != nil {
+						e.EnsurePaymentActions()
+					}
+					if rerr := fd.RecordAnswer(d, in); rerr != nil {
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, int(d.Player), d, "feed stopped: record answer: "+rerr.Error())
+						}
+						stopped[d.Player] = true
+					}
+				}
+				// The seat's feed carried the answer, so a refused Submit is
+				// left to its own repair (the search branch's rule).
+				envRecorded = feeds[d.Player] != nil
+			} else if fd := searchFeed(feeds, seats, d.Player); fd != nil {
 				// The search branch: answer from the deciding seat's own
 				// feed. A feed that stopped observing (a capture error) or
 				// failed THIS capture plays the wrapped bot -- the teacher's
@@ -282,8 +402,12 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				decisionBoard = &board // b is a copy of board; &b would escape per decision
 				rootEngine := e
 				fdLive := fdFrame
+				rootRefused := ""
+				// A closed-list seat sees the game without its opponents'
+				// lists (searchseat.SeatSetup): its root and Setup both.
+				seatSetup := searchseat.SeatSetup(setup, seats[d.Player], d.Player)
 				if hooks.HonestRoot && fdLive {
-					hroot, reason := searchseat.HonestRoot(setup, fd, e,
+					hroot, reason := searchseat.HonestRoot(seatSetup, fd, e,
 						bots.RootSeed(cfg.Seed^(uint64(d.Player)+1), d.Seq))
 					if hroot != nil {
 						rootEngine = hroot
@@ -291,12 +415,16 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 						if hooks.RootRefused != nil {
 							hooks.RootRefused(int(d.Player), d, reason)
 						}
+						if FallbackTrace != nil {
+							FallbackTrace(cfg.Seed, int(d.Player), d, "honest root refused (search branch): "+reason)
+						}
 						fdLive = false
+						rootRefused = reason
 					}
 				}
 				if fdLive {
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideSearch(context.Background(),
-						searchseat.Env{Setup: setup, Engine: rootEngine, Board: b, Feed: fd}, *d)
+						searchseat.Env{Setup: seatSetup, Engine: rootEngine, Board: b, Feed: fd}, *d)
 					// The played intent is recorded back into the history
 					// exactly as the teacher's loop records it (the FINAL
 					// intent, post-override). A translation error means the
@@ -306,7 +434,14 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					if err == nil {
 						err = fd.RecordAnswer(d, in)
 					}
+				} else if rr, ok := seats[d.Player].(rootRefuser); ok && rootRefused != "" {
+					// A live feed whose honest root refused: counted apart
+					// from a true feed stop (azmcts.Stats.RootRefused).
+					in, err = rr.DecideRootRefused(context.Background(), b, *d, rootRefused)
 				} else {
+					if !fdFrame && FallbackTrace != nil {
+						FallbackTrace(cfg.Seed, int(d.Player), d, "feed stopped (search branch): "+fd.StopReason())
+					}
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideBoard(context.Background(), b, *d)
 				}
 			} else if s, ok := seats[d.Player].(seat.BoardSeat); ok {
@@ -358,8 +493,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					// engine-illegal answer is a re-answer rather than a
 					// fatal error. A search seat's feed already recorded its
 					// answer, so it is left to its own repair (the
-					// historical fatal path).
-					if searchFeed(feeds, d.Player) != nil {
+					// historical fatal path); so is an Env seat whose feed
+					// carried the answer (envRecorded).
+					if searchFeed(feeds, seats, d.Player) != nil || envRecorded {
 						return nil, nil, fmt.Errorf("seed %d, intent %d: %w", cfg.Seed, n, err)
 					}
 					if ferr := reanswerRefused(e, seats, d, in); ferr != nil {
@@ -380,6 +516,13 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 			hooks.Finish(o)
 		}
 		return o, e, nil
+	}
+	if lle != nil && rules.IsVolumeReason(lle.Reason) {
+		// A runaway burst on a board past rules.RunawayBigBoardObjs (CV-2)
+		// and the armed object cap (CV-8) are volume, not a loop: a stalled
+		// game (the cardfuzz "bigboard" kind), excluded from rates like any
+		// watchdog cap.
+		return finish(Outcome{StallOn: "bigboard", Turns: e.G.Turn, Intents: n, Livelock: lle.Error()})
 	}
 	if lle != nil {
 		return finish(Outcome{StallOn: "livelock", Turns: e.G.Turn, Intents: n, Livelock: lle.Error()})
@@ -433,9 +576,15 @@ func reanswerRefused(e *rules.Engine, seats []seat.Seat, d *decision.Decision, r
 
 // searchFeed is the deciding seat's feed, or nil when that seat is not a
 // search seat (feeds is nil for a game with no search seat at all -- the
-// zero-capture fast path).
-func searchFeed(feeds []*searchseat.Feed, p state.PlayerID) *searchseat.Feed {
+// zero-capture fast path). The bots.EnvSeat requirement keeps the search
+// branch from asserting a seat that only has a feed because Hooks.EnvSeats
+// gave it one (an EnvSeat is never a searchseat.SearchSeat unless it declares
+// both).
+func searchFeed(feeds []*searchseat.Feed, seats []seat.Seat, p state.PlayerID) *searchseat.Feed {
 	if feeds == nil || p < 0 || int(p) >= len(feeds) {
+		return nil
+	}
+	if _, ok := seats[p].(searchseat.SearchSeat); !ok {
 		return nil
 	}
 	return feeds[p]

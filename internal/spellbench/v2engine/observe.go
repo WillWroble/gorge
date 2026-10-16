@@ -1,3 +1,5 @@
+//go:build spellbench_bridge
+
 package v2engine
 
 import (
@@ -60,8 +62,10 @@ func (g *Game) visibleName(o *state.Object, viewer state.PlayerID) *string {
 	}
 	name := f.Name
 	if o.Zone == state.ZBattlefield && !o.FaceDown {
-		if n := g.e.Name(o.ID); n != "" {
-			name = n
+		// The bound flag, not the empty string, is the "no override" test: a
+		// both-locked Room's name is the empty string for real (CR 709.5).
+		if c := g.e.Derived(o.ID); c.NameSet {
+			name = c.Name
 		}
 	}
 	return &name

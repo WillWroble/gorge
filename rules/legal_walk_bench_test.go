@@ -164,6 +164,14 @@ func TestLegalWalkDigest(t *testing.T) {
 			Commanders: [][]int{{testutil.RepoDeckFile(t, g.file).CommanderIndex()}, {testutil.RepoDeckFile(t, g.opp).CommanderIndex()}},
 		}, g.bot})
 	}
+	// The paid-cost census is on by default; LEGAL_WALK_DIGEST_PAID=0 sets
+	// DisablePaidManaCensus on every game, so the same digest can be taken
+	// with the narrow census (the autopay offer path off) and compared.
+	if os.Getenv("LEGAL_WALK_DIGEST_PAID") == "0" {
+		for i := range games {
+			games[i].cfg.DisablePaidManaCensus = true
+		}
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)

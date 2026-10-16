@@ -57,6 +57,9 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 				continue
 			}
 		case "ExileFromGrave":
+			if _, ok := groupExileFixtures(tok); ok {
+				continue
+			}
 			if selfZoneCost(tok) {
 				if zone == "graveyard" {
 					continue
@@ -75,6 +78,9 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 				continue
 			}
 		case "Exile":
+			if _, ok := groupExileFixtures(tok); ok {
+				continue
+			}
 			if selfZoneCost(tok) || exileCreatureCostFixtures(tok) != nil {
 				continue
 			}
@@ -95,6 +101,13 @@ func activationCostIn(cost, zone, name string, xMin ...int) (pool, gap string) {
 				continue
 			}
 			if _, _, _, ok := otherCounterCost(tok); ok {
+				continue
+			}
+		case "RevealChosen":
+			// Revealing the source's secretly chosen type (A Killer Among
+			// Us): the choice is made by the source's own cast in
+			// revealChosenTokenPrelude; the reveal pays no resource.
+			if strings.HasPrefix(tok, "RevealChosen<Type/") {
 				continue
 			}
 		case "RemoveAnyCounter":
@@ -169,6 +182,12 @@ func filterCostFixturesX(tok string, x int) []string {
 	var candidates []string
 	for _, clause := range strings.Split(filter, "|") {
 		clause = strings.TrimSpace(clause)
+		if strings.Contains(clause, "named") {
+			// A name predicate ("Card.Other+YouOwn+namedSay Its Name") is
+			// paid by copies of that card (namedSelfCount), never by the
+			// generic "card" stand-ins, which XMage's named target rejects.
+			return nil
+		}
 		switch {
 		case strings.HasPrefix(clause, "permanent.other"):
 			candidates = append(candidates, permanentCostFixtures(clause)...)
@@ -234,8 +253,41 @@ func returnCreatureFixture(tok string) string {
 	switch strings.ToLower(strings.TrimSpace(parts[1])) {
 	case "creature.tapped", "creature.youctrl.tapped", "creature.other.tapped":
 		return "Grizzly Bears"
+	case unblockedAttackerFilter:
+		return unblockedAttacker
 	}
 	return ""
+}
+
+// unblockedAttackerFilter is Ninjutsu's minted return cost filter
+// (cards/kw_ninjutsu.go: "Return an unblocked attacker you control to hand").
+const unblockedAttackerFilter = "creature.youctrl+attacking+unblocked"
+
+// unblockedAttacker is the p0 creature that attacks p1 unblocked to pay it: a
+// vanilla flier, so p1's baseline ground creature has no legal block and no
+// blockers declaration needs scripting in either engine.
+const unblockedAttacker = "Wind Drake"
+
+// returnUnblockedPrelude declares the unblocked attack a Ninjutsu return cost
+// needs: p0's flying fixture attacks p1, which can block nothing, and p0 has
+// priority in the declare blockers step (CR 702.49a's activation window).
+// ok is false for a cost without that part.
+func returnUnblockedPrelude(cost string) (conditionPrelude, bool) {
+	for _, tok := range costTokens(cost) {
+		if !strings.HasPrefix(tok, "Return<") {
+			continue
+		}
+		if payload, ok := bracketPayload(tok); ok {
+			parts := strings.Split(payload, "/")
+			if len(parts) >= 2 && strings.EqualFold(strings.TrimSpace(parts[1]), unblockedAttackerFilter) {
+				return conditionPrelude{steps: []oraclegen.Step{
+					{Op: "attack", Seat: 0, Defender: "p1", Attackers: []string{"p0:" + unblockedAttacker}},
+					{Op: "pass_to", Seat: 0, Step: "declare-blockers"},
+				}}, true
+			}
+		}
+	}
+	return conditionPrelude{}, false
 }
 
 // namedSelfCount reports n when an ExileFromGrave token's filter names the
@@ -290,6 +342,9 @@ func activationCostFixturesX(tok string, x int) []string {
 	head := tok
 	if i := strings.IndexByte(tok, '<'); i >= 0 {
 		head = tok[:i]
+	}
+	if fixtures, ok := groupExileFixtures(tok); ok {
+		return fixtures
 	}
 	switch head {
 	case "Discard":

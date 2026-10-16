@@ -245,9 +245,16 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 		arena = nil
 	}
 	e.decArena = nil
+	heapAsks := e.arenaHeapAsks
+	// The genesis manifest table is immutable for a game's whole lineage, so
+	// S0's is the live engine's -- except in a closed search world, whose
+	// table is redacted to the searching seat's own list (UseDeckManifests).
+	// Keep the live one: a re-run must not restore the opponents' real lists.
+	manifests := e.deckManifests
 	sp := e.Release()
 	l.Events, l.Intents = evs, ints
 	sc := s0.CloneInto(&sp)
+	sc.rng.forked = false
 	if w, ok := cp.World.(*rngSplice); ok {
 		sc.rng.splice = w
 		// Stay a hypothetical engine across the prefix (SubmitHypothetical
@@ -256,14 +263,30 @@ func (b *resolveBoard) Restore(cp *resolve.Checkpoint, evEnd int) {
 		sc.rng.chance = w.next.chance.clone()
 	}
 	l.RewindTo(s0.L, evEnd)
+	// A hypothetical world's card table and pool gates survive the restore:
+	// the re-run re-applies the world's HiddenIdentity events (the injected
+	// redeal), which read the table, and S0 predates them when the world was
+	// forked at a posed resolution. Both only ever grow within one world.
+	hypCards := g.HypotheticalCards
+	gates := [3]bool{e.setNameInPool, e.layer4InPool, e.controlStaticInPool}
 	*g = *sc.G
+	if hypCards != nil {
+		g.HypotheticalCards = hypCards
+	}
 	sc.L = l
 	*e = *sc
 	e.G, e.L = g, l
+	e.deckManifests = manifests
+	if hypCards != nil {
+		e.setNameInPool = e.setNameInPool || gates[0]
+		e.layer4InPool = e.layer4InPool || gates[1]
+		e.controlStaticInPool = e.controlStaticInPool || gates[2]
+	}
 	e.tape, e.tapeEpoch = kernel, epoch
 	if arena != nil {
 		e.decArena = arena
 	}
+	e.arenaHeapAsks = heapAsks
 	e.tapeHeldHook, e.tapeHeldStats = hook, stats
 	tapeRebindOwner(e, sc, arenaOn)
 }

@@ -236,11 +236,13 @@ func TestCostStaticProfilesAndOpponentGap(t *testing.T) {
 	}
 	for _, req := range levelb.Requirements(c) {
 		if req.Key == "static#0.0" {
-			if req.Sub != "static.cost" || !strings.Contains(req.Gap, "opponent-cast") {
-				t.Fatalf("Aven Interrupter gap = %+v, want named opponent-cast gap", req)
+			// The graveyard-cast raise is served by an opponent's flashback
+			// cast (cost_raise_chosen.go, lb4-gcost).
+			if req.Sub != "static.cost" || req.Gap != "" {
+				t.Fatalf("Aven Interrupter requirement = %+v, want served static.cost", req)
 			}
-			if _, skip := GenerateB(reg, "Aven Interrupter", req); skip == nil || !strings.Contains(skip.Reason, "opponent-cast") {
-				t.Fatalf("Aven Interrupter did not remain a named gap: %v", skip)
+			if _, skip := GenerateB(reg, "Aven Interrupter", req); skip != nil {
+				t.Fatalf("Aven Interrupter skipped: %v", skip.Reason)
 			}
 			return
 		}

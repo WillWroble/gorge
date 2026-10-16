@@ -320,7 +320,7 @@ func (e *Engine) potentialModeCastPlan(p state.PlayerID, o decision.Option) Paym
 		return PaymentPlanOutcome{Reason: "unsupported"}
 	}
 	f := obj.Face()
-	if e.hasCastConvoke(id) || e.hasCastImprovise(id) || e.hasKeywordH(id, kwhDelve) {
+	if e.hasCastConvoke(id) || e.hasCastImprovise(id) || e.hasCastDelve(id) {
 		return PaymentPlanOutcome{Reason: "unsupported", Detail: "cost:credit"}
 	}
 	base, ok := e.potentialModeBaseCost(p, id, f, o)
@@ -530,6 +530,13 @@ func (e *Engine) planAbilityPayment(p state.PlayerID, id state.ObjID, ability in
 		cost.Generic -= n
 	} else if n > 0 {
 		cost.Generic = 0
+	}
+	// Heirloom Epic's `TapCreaturesForMana` ability: the offer gate prices the
+	// activation with the same conservative creature credit (mana.go's
+	// offerCastableUsing), so the witness must compose that identical cost, or
+	// its Cost would over-state the activation the payment actually makes.
+	if pay.TapCreaturesForMana(ab) {
+		cost.Generic -= e.creatureManaOfferCredit(p, id, cost)
 	}
 	composed := e.offerCostFor(p, id, cost, abilityScope(ab))
 	return e.planComposedCost(p, id, composed, true, true)

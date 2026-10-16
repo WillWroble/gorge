@@ -112,8 +112,12 @@
   // not HOW MUCH of the delta is counters, auras or a base change — omitting
   // that attribution is a known engine gap (capability registry); no fake
   // base is invented. Remove the naive compare when provenance is on the wire.
+  // A card that is not an engine object (a draft pick: the draft wire
+  // carries no P/T) has no current values; the row then prints the
+  // catalog's printed P/T, and there is nothing to compare.
+  const hasLivePT = $derived(card.power !== undefined && card.power !== null);
   const ptNote = $derived.by(() => {
-    if (!isCreature || !orc) return null;
+    if (!isCreature || !orc || !hasLivePT) return null;
     const differs =
       (orc.power !== undefined && String(card.power) !== orc.power) ||
       (orc.toughness !== undefined && String(card.toughness) !== orc.toughness);
@@ -211,13 +215,18 @@
 
     <!-- Rows appear only when they carry something. -->
     <dl class="ledger">
-    {#if isCreature}
+    {#if isCreature && hasLivePT}
       <div class="row">
         <dt>Power / toughness</dt>
         <dd>
           <span class="data value">{card.power}/{card.toughness}</span>
           {#if ptNote}<span class="printed">{ptNote}</span>{/if}
         </dd>
+      </div>
+    {:else if isCreature && orc?.power !== undefined}
+      <div class="row">
+        <dt>Power / toughness</dt>
+        <dd><span class="data value">{orc.power}/{orc.toughness}</span></dd>
       </div>
     {/if}
     {#if isPlaneswalker && loyalty !== undefined}
@@ -262,11 +271,15 @@
 
     {#if orc?.oracle_text}<p class="card-detail__oracle"><OracleText text={orc.oracle_text} /></p>{/if}
 
-    <footer class="stamp">
-      <span class="data">#{card.id}</span>
-      <span class="data">seat {card.controller}</span>
-      {#each states as s (s)}<span class="state">{s}</span>{/each}
-    </footer>
+    <!-- The stamp names the engine object; a card that is not one (a draft
+         pick, cardView: no controller) has no id or seat to name. -->
+    {#if card.controller !== undefined && card.controller !== null}
+      <footer class="stamp">
+        <span class="data">#{card.id}</span>
+        <span class="data">seat {card.controller}</span>
+        {#each states as s (s)}<span class="state">{s}</span>{/each}
+      </footer>
+    {/if}
   </div>
 </div>
 

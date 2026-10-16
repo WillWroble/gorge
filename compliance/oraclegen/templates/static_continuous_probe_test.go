@@ -216,33 +216,21 @@ func TestStaticContinuousBearRowUnchanged(t *testing.T) {
 	}
 }
 
-// TestStaticContinuousNamedSkips: a qualifier the setup cannot give a probe
-// (counters, a token) is a named skip, not the generic one. Each card's static
-// must otherwise show nothing, so the test pins the reason text. A grant of a
-// named ability (Bria's Prowess, Ward) is no longer here: the named-keyword
-// vocabulary serves those, pinned by TestStaticNamedKeywordGrant.
-//
-// A counter gate the probe-counters fixture CAN place is no longer a skip:
-// Vigorbloom Vanguard's counter-gated vigilance is served, pinned by
-// TestStaticCounterGatesServed. Agatha's Soul Cauldron stays here: its
-// GainsAbilitiesOf$ Creature.ExiledWithSource grant observes nothing even with
-// the counters on the probes, so the row falls through to the named gap.
+// TestStaticContinuousNamedSkips pinned the counters-qualifier named skip.
+// Its last carrier, Agatha's Soul Cauldron, is now served by the source's own
+// exile-and-counter activation (static_gains_exiled_with.go; pinned by
+// TestLevelBCostAndStaticRowsServed), so this pins that the row no longer
+// falls through to the probe paths' named gap. Gideon's Memorial ("token")
+// and Firion ("equipped") left for the state fixtures (ticket
+// cli-20261009T031407Z-8f4b4f49).
 func TestStaticContinuousNamedSkips(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	for _, tc := range []struct{ card, key, want string }{
-		{"Agatha's Soul Cauldron", "static#0.1", "counters"},
-		// Gideon's Memorial ("token") and Firion ("equipped") left this table
-		// for the served rows with the state fixtures (ticket
-		// cli-20261009T031407Z-8f4b4f49): the token fixture casts the tokens,
-		// the equip fixture attaches Bonesplitter to the Bear.
-	} {
-		_, skip := GenerateB(reg, tc.card, probeRequirement(t, reg, tc.card, tc.key))
-		if skip == nil {
-			t.Fatalf("%s: served, want a named skip mentioning %q", tc.card, tc.want)
-		}
-		if !strings.Contains(skip.Reason, tc.want) || strings.Contains(skip.Reason, "not observable") {
-			t.Fatalf("%s: skip %q, want a named reason mentioning %q", tc.card, skip.Reason, tc.want)
-		}
+	it, skip := GenerateB(reg, "Agatha's Soul Cauldron", probeRequirement(t, reg, "Agatha's Soul Cauldron", "static#0.1"))
+	if skip != nil {
+		t.Fatalf("Agatha's Soul Cauldron static#0.1 skipped: %s", skip.Reason)
+	}
+	if len(it.Steps) == 0 || it.Steps[0].Op != "activate" || it.Steps[0].Card != "p0:Agatha's Soul Cauldron" {
+		t.Fatalf("the row does not open with the source's own exile activation: %+v", it.Steps)
 	}
 }
 

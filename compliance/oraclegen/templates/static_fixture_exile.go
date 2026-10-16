@@ -17,6 +17,7 @@ import (
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
 	"github.com/adams-shaun/gorge/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/rules"
 	"github.com/adams-shaun/gorge/state"
 )
 
@@ -40,6 +41,9 @@ var staticExileDonorNames = []string{"Braidwood Cup", "Marble Chalice", "Ghoulca
 func staticExileFixtures(reg *cards.Registry, f *cards.Face, st cards.Static, affected string) []staticFixture {
 	var out []staticFixture
 	if fx, ok := staticExiledCardTypesFixture(f, st, affected); ok {
+		out = append(out, fx)
+	}
+	if fx, ok := staticExiledWithCountFixture(f, st); ok {
 		out = append(out, fx)
 	}
 	return out
@@ -144,8 +148,7 @@ type staticExileActivation struct {
 // ability and asserting the exiled card is offered as a cast. It is the
 // offered sibling of staticExiledCardTypesFixture: the same association is
 // the engine's, never a setup placement. Only the caster's own cards are
-// served -- an opponent-owned exile is not offered by the engine today, and
-// such a row keeps its named gap.
+// served here; an opponent-owned exile is staticExileOpponentOfferItem's.
 func staticExileOfferItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, st cards.Static) (oraclegen.Item, bool) {
 	if !st.HasParam(cards.PKMayPlay) {
 		return oraclegen.Item{}, false
@@ -155,9 +158,9 @@ func staticExileOfferItem(reg *cards.Registry, f *cards.Face, name string, req l
 		return oraclegen.Item{}, false
 	}
 	if st.HasParam(cards.PKMayPlayAltManaCost) {
-		// The alt-cost delivery is an engine gap (staticExileWithGap names
-		// it); the fixture must not paper over it with a scenario the engine
-		// cannot price.
+		// The permission's own alternative is the cast's price, observed by
+		// static_offer_altcost.go; this printed-cost offer fixture would pay
+		// the wrong price.
 		return oraclegen.Item{}, false
 	}
 	victim, ok := staticExileFilterVictim(reg, affected)
@@ -387,25 +390,28 @@ func staticExileWithGap(f *cards.Face, st cards.Static) string {
 		// craft materials, and the driver has no craft op.
 		return "needs the craft activation (the driver has no craft op)"
 	case strings.Contains(all, "exiledwith$amount"):
-		// Veteran Survivor: the ExiledWith$Amount count reads only the
-		// reverse scalar, which this source's own exile never stamps.
-		return "the ExiledWith$Amount count reads only the reverse exiled-with stamp (engine gap)"
+		// The count itself reads the shared exiled-with association
+		// (forward and reverse links, every seat); what is left is a source
+		// whose exile is not the Survival trigger
+		// staticExiledWithCountFixture runs (Veteran Survivor is served).
+		return "no fixture runs the source's own exile for an ExiledWith$Amount count (its exile is not a Survival trigger)"
 	case st.HasParam(cards.PKMayPlay) && strings.Contains(st.ParamStr(cards.PKAffected), "ExiledWithSource"):
 		switch {
 		case st.HasParam(cards.PKMayPlayAltManaCost):
-			// Valgavoth, Terror Eater: mayPlayStatic withholds the zone
-			// permission from a cost-carrying static, and mayPlayAltCosts
-			// delivers the alternative only on the ordinary hand cast.
-			return "a MayPlayAltManaCost$ card in exile is not offered (the engine delivers the alternative cost only on a hand cast)"
-		case strings.Contains(all, "db$ dig"):
-			// Maralen, Fae Ascendant: the trigger's Dig exile goes through
-			// moveZoneEvent without the exiled-with association.
-			return "cards exiled by the source's Dig carry no exiled-with association (engine gap)"
+			// The engine prices the permission's own alternative
+			// (Valgavoth, Terror Eater is served by
+			// static_offer_altcost.go); what is left is a source whose
+			// exile is not the graveyard replacement that fixture runs, or
+			// an alternative other than the life payment it observes.
+			return "no fixture runs the source's exile for a MayPlayAltManaCost$ permission (its exile is not a graveyard replacement, or the alternative is not PayLife<ConvertedManaCost>)"
 		case !strings.Contains(st.ParamStr(cards.PKAffected), "YouOwn"):
-			// Azula, Cunning Usurper / Null Summoner: the exiled card is
-			// owned by the opponent, and the may-play spell walk covers only
-			// the caster's own cards.
-			return "an opponent-owned exiled card is not offered (the engine's may-play walk covers only the caster's own cards)"
+			// Azula, Cunning Usurper / Null Summoner (an enters ChangeZone)
+			// and Maralen, Fae Ascendant (an enters Dig) are served by
+			// staticExileOpponentOfferItem. The engine's may-play walk does
+			// cover opponent-owned cards; what the rest of the class lacks is
+			// a fixture that makes the source exile an opponent's card
+			// (combat damage, upkeep, activation and spell exiles).
+			return "no fixture exiles an opponent's card with the source (its exile is not an enters ChangeZone or Dig of a targeted opponent's cards)"
 		}
 	}
 	return ""
@@ -413,7 +419,7 @@ func staticExileWithGap(f *cards.Face, st cards.Static) string {
 
 // faceSVarBodies is every SVar body on the face, lowercased and in sorted
 // key order (map order never reaches the classifier's boolean result): the
-// exile-move classifier needs the trigger's body (a Dig) even when the
+// classifier needs a count body (ExiledWith$Amount) even when the
 // static's own params reach no SVar.
 func faceSVarBodies(f *cards.Face) []string {
 	keys := make([]string, 0, len(f.SVars))
@@ -426,4 +432,178 @@ func faceSVarBodies(f *cards.Face) []string {
 		out = append(out, strings.ToLower(f.SVars[k]))
 	}
 	return out
+}
+
+// staticExileOpponentVictim is the opponent-owned card the cast-ETB offer
+// fixture has the source exile: a vanilla nonland, nontoken creature, so it
+// meets every corpus opponent-exile ETB's ChangeType$ (Creature.!token,
+// Card.nonLand) from the battlefield, the hand or the graveyard alike.
+const staticExileOpponentVictim = "Hill Giant"
+
+// staticExileOpponentCheapVictim is the library-origin fixture's second
+// victim, a one-mana vanilla creature: a Dig-exile carrier's grant may cap the
+// mana value by a count the bare board keeps at 1 (Maralen, Fae Ascendant's
+// Card.nonLand+cmcLEX, X = the Elves and Faeries you control -- Maralen
+// alone), which Hill Giant's 4 never meets.
+const staticExileOpponentCheapVictim = "Savannah Lions"
+
+// staticExileOpponentOfferItem serves a MayPlay static over cards exiled with
+// the source that an OPPONENT owns (Azula, Cunning Usurper: its ETB makes
+// the target opponent exile a creature they control, and "you may cast cards
+// exiled with Azula"). The source is cast from p0's hand with the victim in
+// the zone its ETB exiles from (p1's), the ETB resolves -- so the engine's
+// own move records the association -- and p0 is asserted to be offered the
+// cast of p1's exiled card. The control places the same victim directly in
+// p1's exile (no association) and asserts it is NOT offered, so the offer is
+// the permission's doing and not a zone-wide leak.
+func staticExileOpponentOfferItem(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, st cards.Static) (oraclegen.Item, bool) {
+	if !st.HasParam(cards.PKMayPlay) || st.HasParam(cards.PKMayPlayAltManaCost) {
+		return oraclegen.Item{}, false
+	}
+	affected := st.ParamStr(cards.PKAffected)
+	if !strings.Contains(affected, "ExiledWithSource") || strings.Contains(affected, "YouOwn") {
+		return oraclegen.Item{}, false
+	}
+	origin, ok := staticExileOpponentETBOrigin(f)
+	if !ok {
+		return oraclegen.Item{}, false
+	}
+	mana, why := oraclegen.PoolFor(f.ManaCost)
+	if why != "" {
+		return oraclegen.Item{}, false
+	}
+	victims := []string{staticExileOpponentVictim}
+	if origin == state.ZLibrary {
+		victims = append(victims, staticExileOpponentCheapVictim)
+	}
+	for _, victim := range victims {
+		if it, ok := staticExileOpponentOfferVictim(reg, f, name, req, st, origin, mana, victim); ok {
+			return it, true
+		}
+	}
+	return oraclegen.Item{}, false
+}
+
+// staticExileOpponentOfferVictim builds staticExileOpponentOfferItem's
+// scenario around one victim card seated in p1's origin zone (a library
+// origin seats it on top, where the source's Dig takes it).
+func staticExileOpponentOfferVictim(reg *cards.Registry, f *cards.Face, name string, req levelb.Requirement, st cards.Static, origin state.Zone, mana, victim string) (oraclegen.Item, bool) {
+	var tail []oraclegen.Step
+	if !st.HasParam(cards.PKMayPlayWithoutManaCost) {
+		c, ok := reg.Lookup(victim)
+		if !ok || len(c.Faces) == 0 {
+			return oraclegen.Item{}, false
+		}
+		pool, why := oraclegen.PoolFor(c.Faces[0].ManaCost)
+		if why != "" {
+			return oraclegen.Item{}, false
+		}
+		tail = []oraclegen.Step{{Op: "mana", Seat: 0, Mana: pool}}
+	}
+	run := func(p0Grave []string, p1 oraclegen.Seat, want, pick bool) (oraclegen.Scenario, rules.OracleResult, bool) {
+		resolve := oraclegen.Step{Op: "resolve"}
+		if pick {
+			// The exile choice names the victim: the baseline may seat
+			// other cards the ETB could take in its place. A lone
+			// candidate is taken without a choice, so the unpicked
+			// variant is tried too.
+			resolve.Answers = []oraclegen.Answer{{Kind: "choose", Pick: []string{victim}}}
+		}
+		steps := []oraclegen.Step{{Op: "cast", Seat: 0, Card: "p0:" + name, Mana: mana}, resolve}
+		steps = append(steps, tail...)
+		steps = append(steps, oraclegen.Step{Op: "pass_to", Seat: 0, Decision: "priority",
+			Expect: []oraclegen.Expect{{Offered: &oraclegen.Offered{Seat: 0, Kind: "cast", Card: "p1:" + victim}, Want: &want}}})
+		sc := staticScenario(f, name, nil, []string{name}, steps)
+		p0 := sc.Setup["p0"]
+		p0.Graveyard = append(p0.Graveyard, p0Grave...)
+		sc.Setup["p0"] = p0
+		seat := sc.Setup["p1"]
+		seat.Battlefield = append(seat.Battlefield, p1.Battlefield...)
+		seat.Hand = append(seat.Hand, p1.Hand...)
+		seat.Graveyard = append(seat.Graveyard, p1.Graveyard...)
+		seat.Exile = append(seat.Exile, p1.Exile...)
+		seat.LibraryTop = append(seat.LibraryTop, p1.LibraryTop...)
+		sc.Setup["p1"] = seat
+		res, ok := runStatic(reg, sc)
+		return sc, res, ok && len(res.Fails) == 0
+	}
+	var p1 oraclegen.Seat
+	switch origin {
+	case state.ZBattlefield:
+		p1.Battlefield = []string{victim}
+	case state.ZHand:
+		p1.Hand = []string{victim}
+	case state.ZGraveyard:
+		p1.Graveyard = []string{victim}
+	case state.ZLibrary:
+		p1.LibraryTop = []string{victim}
+	default:
+		return oraclegen.Item{}, false
+	}
+	// A gated grant (Null Summoner's Condition$ Threshold) needs its
+	// condition met: after the bare board, each graveyard-only condition
+	// prelude is tried in conditionPreludes' stable order.
+	graves := [][]string{nil}
+	for _, pre := range conditionPreludes(reg, st.Params, f.SVars) {
+		if len(pre.graveyard) != 0 && len(pre.steps) == 0 && len(pre.hand) == 0 && len(pre.battlefield) == 0 && len(pre.exile) == 0 {
+			graves = append(graves, pre.graveyard)
+		}
+	}
+	for _, grave := range graves {
+		for _, pick := range []bool{true, false} {
+			sc, res, ok := run(grave, p1, true, pick)
+			if !ok {
+				continue
+			}
+			// The control's victim is already in exile: nothing to pick.
+			if _, _, ok := run(grave, oraclegen.Seat{Exile: []string{victim}}, false, false); !ok {
+				continue
+			}
+			it := oraclegen.NewLevelBItem(name, req.Key, StaticApplies.Version, []string{"601.3"}, sc)
+			it.XAnswers = oraclegen.XAnswersForScenario(res, sc, oraclegen.ModeNumbers(f), nil)
+			return it, true
+		}
+	}
+	return oraclegen.Item{}, false
+}
+
+// staticExileOpponentETBOrigin finds the face's own enters trigger whose
+// effect makes a targeted opponent's card move to exile -- the move that
+// records "exiled with" the source for an opponent-owned card -- and returns
+// the zone it exiles from: a ChangeZone's Origin$, or the library for a Dig
+// into exile. ok is false when the face has no such trigger.
+func staticExileOpponentETBOrigin(f *cards.Face) (state.Zone, bool) {
+	for _, tr := range f.Triggers {
+		if tr.Mode != "ChangesZone" || tr.Effect == nil || (tr.Effect.API != "ChangeZone" && tr.Effect.API != "Dig") {
+			continue
+		}
+		if !strings.EqualFold(strings.TrimSpace(tr.Params["Destination"]), "Battlefield") ||
+			!strings.HasPrefix(strings.TrimSpace(tr.Params["ValidCard"]), "Card.Self") {
+			continue
+		}
+		p := tr.Effect.Params
+		if tr.Effect.API == "Dig" {
+			// Maralen, Fae Ascendant: "exile the top two cards of target
+			// opponent's library" -- a Dig whose exile records the
+			// exiled-with association (lb-digexiledwith).
+			if strings.EqualFold(strings.TrimSpace(p["DestinationZone"]), "Exile") &&
+				strings.Contains(p["ValidTgts"], "Opponent") {
+				return state.ZLibrary, true
+			}
+			continue
+		}
+		if !strings.EqualFold(strings.TrimSpace(p["Destination"]), "Exile") ||
+			!strings.Contains(p["ValidTgts"], "Opponent") {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(p["Origin"])) {
+		case "battlefield":
+			return state.ZBattlefield, true
+		case "hand":
+			return state.ZHand, true
+		case "graveyard":
+			return state.ZGraveyard, true
+		}
+	}
+	return 0, false
 }

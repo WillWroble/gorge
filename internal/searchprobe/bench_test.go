@@ -159,14 +159,27 @@ func TestSampleRealDeckGolden(t *testing.T) {
 		// priority frames (122 -> 120 frames), so the captured history that
 		// seeds the sampler moves. Measured after: attempts 64, accepted 4,
 		// worlds 8, ESS 4 (land exclusion: accepted 27, ESS 27).
-		{"pre-optimisation sampler", true, "21569d4bdab784abffb877980eff8f14805840353e5ae3f00d2f29a13b368ed6"},
+		// Re-measured for the per-turn watcher view fields (eng-turnwatch):
+		// PlayerView gained spells_cast/life_gained/life_lost/tokens_created
+		// _this_turn, so the captured frames marshal four more keys per seat
+		// and the sampled worlds move. Attributed by hiding only those four
+		// fields (json:"-"): the old digests return byte-for-byte. Measured
+		// after: frames 120, attempts 64, accepted 12, worlds 8, ESS 12
+		// (land exclusion: accepted 31, ESS 31).
+		// Re-measured for the token-art printed-P/T field (token-art-pt-key):
+		// CardView gained printed_pt, so the captured frames marshal one more
+		// key per token and the sampled worlds move. Attributed by hiding only
+		// that field (json:"-"): the old digests return byte-for-byte.
+		// Measured after: frames 120, attempts 64, accepted 10, worlds 8,
+		// ESS 10 (land exclusion: accepted 29, ESS 29).
+		{"pre-optimisation sampler", true, "fec727353b53b1e71bb40f6bd5d7da6eec6b5a5c231894e394e98e5640fb651a"},
 		// With the declined-land-drop exclusion: different proposals (so
 		// different worlds for a seed), same target distribution -- see
 		// TestLandExclusionRemovesOnlyRejectedWorlds. Re-measured for the
 		// Mausoleum Wanderer unless-cost ask label (see the test comment) and
 		// again for the damage-provenance fact (see above); see the
 		// pre-optimisation entry for the archetype-posterior re-measure.
-		{"land exclusion", false, "f3ce01cb27c179289b698dd2cb97d386324285adfeea27bc1a5b3f78e9e18589"},
+		{"land exclusion", false, "1cda502289afa8cb2b8f799a2605db91939e40d614f911e931427a02d8ad7f81"},
 	} {
 		opts := benchSampleOptions()
 		opts.MinESS = 1 // resample worlds from the thin pool so the digest covers them
@@ -337,7 +350,28 @@ func TestTeacherChoiceRealDeckGolden(t *testing.T) {
 	// sampled worlds moved with the fixture's frames (above), so only Submits
 	// moves, 2995 -> 3450; Index 0, Values all 1, Rollouts 32, Terminal 32,
 	// Capped 0 and the 8/8/8/8 wins split are unchanged.
-	const want = "4b26415741b821965323d6fdae60d17859f0b45e1642cb26ca287289d7c01841"
+	// Re-measured for the per-turn watcher view fields (eng-turnwatch): the
+	// captured frames marshal four more PlayerView keys, so the sampled worlds
+	// move and only Submits moves, 3450 -> 3598. Index 0, Values
+	// [1,0.875,1,1], Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8
+	// TerminalByCandidate split are as measured. Attributed by hiding only the
+	// four view fields (json:"-"): the old digest returns byte-for-byte.
+	// Re-measured for the paid-cost mana census default flip (2026-10-13): the
+	// census offers pool-short abilities and counts paid-cost sources, so the
+	// rollouts' games move and Submits 3598 -> 3852 with WinsByCandidate
+	// [8,7,8,8] and LossesToBaseline [0,1,0,0]; Index 0, Values [1,0.875,1,1],
+	// Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8 TerminalByCandidate
+	// split as measured. Attributed by forcing rules/genesis.go's
+	// paidManaCensus to false: the old digest returns byte-for-byte.
+	// Re-measured for the token-art printed-P/T field (token-art-pt-key):
+	// CardView gained printed_pt, so the captured frames that seed these
+	// worlds marshal one more key per token and the sampled worlds (and hence
+	// the rollouts) move. Attributed by hiding only that field (json:"-"): the
+	// old digest returns byte-for-byte. Measured after: Index 0, Values
+	// [1,0.5,1,1], Rollouts 32, Submits 6288, Terminal 32, Capped 0,
+	// WinsByCandidate [8,4,8,8], TerminalByCandidate [8,8,8,8],
+	// WinsOverBaseline [0,0,0,0], LossesToBaseline [0,4,0,0].
+	const want = "707beb02b9cf745a476585c3695073d8cd001be15840545b610c1244e728fb08"
 	for _, parallelism := range []int{0, 4} {
 		res, err := TeacherChoice(worlds, cands, TeacherOptions{Seed: 99, MaxSubmits: 5000, Parallelism: parallelism})
 		if err != nil {

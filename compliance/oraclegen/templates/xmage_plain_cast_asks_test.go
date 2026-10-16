@@ -139,7 +139,11 @@ func TestPlainCastAsksDriverPins(t *testing.T) {
 		"owner.recordedCostIsFirst(trueText, falseText)",
 		"castCostPicks.addAll(names(a, \"pick\"))",
 		"this.owner = player.owner;",
-		"optionalAdditionalCostAnswer(owner.bargainedCast, getChoices())",
+		// The election flags: Bargain pays, and an "optionalcost" cast or a
+		// promised Gift (lb4w2-driver) consumes the leading Yes.
+		"switch (optionalAdditionalCostAnswer(owner.bargainedCast,",
+		"owner.optionalCostCast || owner.giftPromisedCast",
+		"getChoices())) {",
 		"static boolean castModeSupported(String mode)",
 	} {
 		if !strings.Contains(java, required) {

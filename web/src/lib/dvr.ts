@@ -14,7 +14,24 @@ export interface DvrState {
   events: EventBody[];
   turnStarts: number[];
   gap: boolean;
+  /**
+   * losses holds the player_lost events trimmed out of a live window (see
+   * LIVE_KEEP), so a seat's loss reason outlives the window. Optional: a
+   * state built without it has trimmed nothing.
+   */
+  losses?: EventBody[];
 }
+
+/**
+ * LIVE_KEEP bounds the events a LIVE DVR holds. A spectator receives every
+ * event of the match (~100/s on a 50ms-paced commander table), and holding
+ * them all grew memory and every per-event pass over the log without bound.
+ * Older events are refetched on demand: showCursor backfills when the
+ * cursor precedes the first event held. A paused DVR is never trimmed.
+ */
+export const LIVE_KEEP = 3000;
+// Trim in steps rather than per event, so the slice is amortised.
+const LIVE_SLACK = 500;
 
 export type DvrAction =
   | { type: 'snapshot'; match: string; head: number; turnStarts: number[] }
@@ -62,7 +79,8 @@ export function dvrReducer(s: DvrState, a: DvrAction): DvrState {
       if (seq <= s.head) return s; // already accounted for: a duplicate, or redelivered after a snapshot dropped events
       // sticky until 'snapshot' or 'reset': the caller must re-snapshot to clear it
       if (seq !== s.head + 1) return { ...s, gap: true };
-      return { ...s, head: seq, cursor: s.live ? seq : s.cursor, events: [...s.events, a.body] };
+      const next = { ...s, head: seq, cursor: s.live ? seq : s.cursor, events: [...s.events, a.body] };
+      return s.live && next.events.length > LIVE_KEEP + LIVE_SLACK ? trimLive(next) : next;
     }
     case 'head': {
       if (a.seq <= s.head) return s;
@@ -94,6 +112,23 @@ export function dvrReducer(s: DvrState, a: DvrAction): DvrState {
     case 'scrub':
       return { ...s, live: false, cursor: clamp(a.seq, 0, s.head) };
   }
+}
+
+/** trimLive keeps the newest LIVE_KEEP events, setting aside trimmed losses. */
+function trimLive(s: DvrState): DvrState {
+  const cut = s.events.length - LIVE_KEEP;
+  const lost = s.events.slice(0, cut).filter((e) => e.event.kind === 'player_lost');
+  return { ...s, events: s.events.slice(cut), losses: lost.length ? [...(s.losses ?? []), ...lost] : s.losses };
+}
+
+/**
+ * railEvents is what the seat rail reads (loss reasons, the last resolved
+ * card): the held events, preceded by any trimmed losses older than them.
+ */
+export function railEvents(s: DvrState): EventBody[] {
+  const first = s.events[0]?.event.seq ?? Infinity;
+  const older = (s.losses ?? []).filter((e) => e.event.seq < first);
+  return older.length ? [...older, ...s.events] : s.events;
 }
 
 export const behindLive = (s: DvrState): number => s.head - s.cursor;

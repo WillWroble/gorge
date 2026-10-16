@@ -187,7 +187,16 @@ func classifyTrigger(f *cards.Face, t *cards.Trigger) (sub, gap string, covered 
 	gapMode := func() (string, string, bool) {
 		return "trigger.gap:" + t.Mode, "trigger mode " + t.Mode, false
 	}
+	// A Static$ bookkeeping line is observed through its consumer
+	// (trigger_bookkeeping.go); it never reaches the stack, so no event
+	// recipe below can observe it directly.
+	if sub, ok := classifyBookkeeping(f, t); ok {
+		return sub, "", false
+	}
 	if sub, ok := classifyEventTrigger(t); ok {
+		return sub, "", false
+	}
+	if sub, ok := classifyMayPlayRider(f, t); ok {
 		return sub, "", false
 	}
 	if sub, ok := classifyPhaseOther(t); ok {
@@ -205,11 +214,21 @@ func classifyTrigger(f *cards.Face, t *cards.Trigger) (sub, gap string, covered 
 	if sub, ok := classifyManaTrigger(t); ok {
 		return sub, "", false
 	}
+	if sub, ok := classifyLosesGameTrigger(t); ok {
+		return sub, "", false
+	}
 	switch t.ModeKind() {
 	case cards.TriggerChangesZone:
 		dest := t.ParamStr(cards.PKDestination)
 		origin := t.ParamStr(cards.PKOrigin)
 		self := namesSelf(t.ParamStr(cards.PKValidCard))
+		// A self line naming neither zone (Ghostly Dancers, Bullseye: "When
+		// CARDNAME enters") does not look back in time, so its source sees
+		// only the move that leaves it ON the battlefield: an enters trigger
+		// (rules/trigger_zone_gate.go zoneChangeNoLookBack).
+		if self && dest == "" && origin == "" {
+			dest = "Battlefield"
+		}
 		if strings.EqualFold(dest, "Battlefield") {
 			if !self {
 				return "trigger.etb-other", "", false
@@ -347,9 +366,13 @@ func classifyStatic(f *cards.Face, st *cards.Static) (sub, gap string) {
 			return "static.cost", ""
 		}
 		if strings.EqualFold(activator, "Opponent") || strings.EqualFold(activator, "Player.Opponent") {
-			if strings.EqualFold(f.Name, "Aven Interrupter") {
-				return "static.cost", "opponent-cast cost static: graveyard/exile cast zone unsupported"
-			}
+			// A graveyard/exile-cast recipient (Aven Interrupter) is served
+			// by an opponent's flashback cast (templates/cost_raise_chosen.go).
+			return "static.cost", ""
+		}
+		if vc := st.ParamStr(cards.PKValidCard); strings.EqualFold(vc, "Card.ChosenType") || strings.EqualFold(vc, "Card.NamedCard") {
+			// The as-enters choice is led at setup and the probe is of the
+			// chosen type or name (templates/cost_raise_chosen.go).
 			return "static.cost", ""
 		}
 		if vc := st.ParamStr(cards.PKValidCard); strings.Contains(vc, "NamedCard") || strings.Contains(vc, "ChosenType") {
@@ -364,6 +387,9 @@ func classifyStatic(f *cards.Face, st *cards.Static) (sub, gap string) {
 	}
 	if TapPowerValueShape(st) {
 		return "static.tap-power-value", ""
+	}
+	if TapPowerValueStationShape(st) {
+		return "static.tap-power-value-station", ""
 	}
 	if CastWithFlashShape(st) {
 		return "static.cast-with-flash", ""
@@ -439,6 +465,12 @@ func supportedLegalityStatic(f *cards.Face, st *cards.Static) (string, bool) {
 			}
 			if len(st.Params) == allowed {
 				return "static.cant-gain-life", true
+			}
+		case "player.enchantedby":
+			// Grievous Wound's "Enchanted player can't gain life": an
+			// Enchant player Aura cast onto p0, then the life-gain probe.
+			if f.HasKeyword("Enchant") && len(st.Params) == 3 && st.HasParam(cards.PKDescription) {
+				return "static.cant-gain-life-enchanted", true
 			}
 		}
 	case "cantattack":
@@ -579,7 +611,7 @@ func NamedCardActivationStatic(f *cards.Face, st *cards.Static) bool {
 // while the trigger resolves ("When this land enters, choose a land card
 // name"), not through an as-enters replacement. The name is chosen
 // mid-trigger-resolution, so the observation plays the land and answers the
-// ask with the library top (static_named_enters.go).
+// ask with the probe land's name (static_named_enters.go).
 func NamedCardActivationEntersStatic(f *cards.Face, st *cards.Static) bool {
 	if !f.IsLand() || !strings.EqualFold(st.ParamStr(cards.PKValidCard), "Card.NamedCard") ||
 		!strings.EqualFold(st.ParamStr(cards.PKValidSA), "Activated.!ManaAbility") {

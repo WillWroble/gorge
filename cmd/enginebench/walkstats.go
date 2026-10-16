@@ -55,14 +55,14 @@ type walkStats struct {
 	s5Timing, s5TimingSorc, s5TimingPool int
 	s5TimingPoolSame                     int
 	// W0 (action-walk.md §2): the W1/W2 admissibility classes.
-	w1, w1Same  int
-	w2, w2Same  int
-	w1KindsSeen [256]int // per-kind presence in a W1-admissible suffix
-	onlyPassOffered                      int
-	opts, hand, bf                       int
-	sigs                                 map[string]*sigStat
-	kindIn, kindInSame                   [256]int
-	prev                                 [8]prevAsk
+	w1, w1Same         int
+	w2, w2Same         int
+	w1KindsSeen        [256]int // per-kind presence in a W1-admissible suffix
+	onlyPassOffered    int
+	opts, hand, bf     int
+	sigs               map[string]*sigStat
+	kindIn, kindInSame [256]int
+	prev               [8]prevAsk
 }
 
 var wm = walkStats{sigs: map[string]*sigStat{}}

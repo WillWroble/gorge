@@ -50,11 +50,12 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			// or its source object's NAME. These two picks share one source
 			// (Celebrate the Mountain-king), so a name could not tell them
 			// apart and the rule text is the only distinguishing answer: a
-			// same-source order keeps the inert text form. A distinct-source
-			// order names each source; see gen_trigger_order_test.go.
+			// same-source order keys every pick but the last in XMage's
+			// rule-text form (trigger_order_text.go). A distinct-source order
+			// names each source; see gen_trigger_order_test.go.
 			name: "trigger order with one shared source: rule text for chooseTriggeredAbility",
 			d:    rules.OracleDecision{Step: 0, Seat: 1, Kind: "order", GorgeKind: "trigger_order", Options: 2, Picks: []string{"Celebrate the Mountain-king: When this enters, do a thing.", "Celebrate the Mountain-king: When this enters, do another."}, PickRefs: []string{"p1:Celebrate the Mountain-king", "p1:Celebrate the Mountain-king"}, PickIdx: []int{0, 1}, PickKinds: []string{"trigger", "trigger"}},
-			want: []XAnswer{{1, "choice", "When this enters, do a thing."}, {1, "choice", "When this enters, do another."}},
+			want: []XAnswer{{1, "choice", "When this enters, do a thing."}},
 		},
 		{
 			// A card-type pick is makeChoose, not a target, however much its
@@ -149,8 +150,9 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			// measured pair at the routing level: the same decision shape
 			// agrees with it on a cast item (Break Out's cast-resolve row),
 			// so the XMage pose follows the card, not the decision. The
-			// trigger template re-scripts the card-side-proven look chooser
-			// (Whiskervale Forerunner) to the lone target skip.
+			// trigger template forces the card-side-proven look chooser's
+			// pick instead (Whiskervale Forerunner: XMage's 1..1 makeChoose
+			// rejects every skip token).
 			name: "declined look pick max 1: the measured pair at routing",
 			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "choice", Options: 1, Min: 0, Max: 1, OptionRefs: []string{"p0:Grizzly Bears"}},
@@ -165,24 +167,36 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			want: []XAnswer{{0, "choice", "no"}, {0, "target", "[target_skip]"}},
 		},
 		{
-			// A declined "you may put it into your hand" hidden pick: XMage
-			// poses the optional ask on the target queue only (measured
-			// driver error on Sparring Dummy: "Found wrong choice command"
-			// for the pair's "no").
-			name: "declined hidden pick: target skip only",
+			// A declined "you may put it into your hand" hidden pick: XMage's
+			// choose(Cards, TargetCard) is makeChoose, the choice queue
+			// (measured on Sparring Dummy: "Missing CHOICE def"; the pair's
+			// "no" is "Found wrong choice command").
+			name: "declined hidden pick: choice skip only",
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "hidden_pick", Options: 1, Min: 0, Max: 1, First: "Wastes", OptionRefs: []string{"p0:Wastes#27"}},
-			want: []XAnswer{{0, "target", "[target_skip]"}},
+			want: []XAnswer{{0, "choice", "[choice_skip]"}},
 		},
 		{
 			// A declined optional Play after a hidden-zone look: XMage poses
-			// the "cast from among them" ask on the target queue only
-			// (measured driver error on Cosmic Cube: "Found wrong choice
-			// command" for the chooseUse "no"). A plain Play carrier
+			// the "cast from among them" ask as player.choose over a
+			// TargetCard(0, 1), which TestPlayer serves from the CHOICE queue
+			// (makeChoose), so the up-to skip token is a [choice_skip].
+			// Measured on Cosmic Cube: a chooseUse "no" there is "Found wrong
+			// choice command", and a [target_skip] is left unused ("Missing
+			// CHOICE def") while the AI casts. A plain Play carrier
 			// (Discover, Cascade — no look) stays with the "no".
-			name: "declined optional play after look: target skip only",
+			name: "declined optional play after look: choice skip only",
 			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "mode", GorgeKind: "mode", Resume: "play", Options: 2, Min: 0, Max: 1, First: "Play Grizzly Bears", OptionRefs: []string{"p0:Grizzly Bears#2", "p0:Shock"}},
-			want: []XAnswer{{0, "target", "[target_skip]"}},
+			want: []XAnswer{{0, "choice", "[choice_skip]"}},
+		},
+		{
+			// One castable card: XMage skips its "which card" target ask and
+			// goes straight to chooseUse, so the decline is the "no" (a
+			// target skip would be unused and XMage would cast).
+			name: "declined optional play after look, one castable card: no",
+			pre:  &rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "look_ack", Options: 1, Min: 1, Max: 1, Picks: []string{"Continue"}, PickIdx: []int{0}, PickKinds: []string{"yes"}, First: "Continue", Via: "answer"},
+			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "mode", GorgeKind: "mode", Resume: "play", Options: 1, Min: 0, Max: 1, First: "Play Grizzly Bears", OptionRefs: []string{"p0:Grizzly Bears#2"}},
+			want: []XAnswer{{0, "choice", "no"}},
 		},
 		{
 			// A declined two-option look pick is not scripted from the pair
@@ -218,6 +232,21 @@ func TestXAnswersQueueRoutingShapes(t *testing.T) {
 			name: "short up-to choose: choice skip to stop the dialog",
 			d:    rules.OracleDecision{Step: 0, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Options: 5, Max: 5, Min: 0, Picks: []string{"Jace Beleren"}, PickRefs: []string{"p0:Jace Beleren"}, PickIdx: []int{0}, PickKinds: []string{"twopiles"}},
 			want: []XAnswer{{0, "choice", "Jace Beleren"}, {0, "choice", "[choice_skip]"}},
+		},
+		{
+			// The pile pick (Curator of Destinies, Fact or Fiction) is
+			// XMage's opponent.chooseUse("Face-down", "Face-up"), a boolean
+			// choice. Taking pile A -- the separator's face-down pile -- is
+			// the boolean true, scripted "yes".
+			name: "two-piles pick pile A: chooseUse yes",
+			d:    rules.OracleDecision{Step: 0, Seat: 1, Kind: "choose_n", GorgeKind: "choose", Resume: "twopiles_pick", Options: 2, Max: 1, Picks: []string{"First pile"}, PickRefs: []string{"First pile"}, PickIdx: []int{0}, PickKinds: []string{"pile-a"}},
+			want: []XAnswer{{1, "choice", "yes"}},
+		},
+		{
+			// Pile B (the face-up pile) is the boolean false, "no".
+			name: "two-piles pick pile B: chooseUse no",
+			d:    rules.OracleDecision{Step: 0, Seat: 1, Kind: "choose_n", GorgeKind: "choose", Resume: "twopiles_pick", Options: 2, Max: 1, Picks: []string{"Second pile"}, PickRefs: []string{"Second pile"}, PickIdx: []int{1}, PickKinds: []string{"pile-b"}},
+			want: []XAnswer{{1, "choice", "no"}},
 		},
 	}
 	for _, tt := range tests {
@@ -284,6 +313,18 @@ func TestYesNoRequiresAnEngineBoolean(t *testing.T) {
 		})
 	}
 
+	// The gift ask lists the decline first (option 0), so the promise is
+	// option 1 and must still read as XMage's yes (Jolly Gerbils trigger#0.0
+	// promised in gorge and never in XMage while the index decided it).
+	promise := rules.OracleDecision{Options: 2, Picks: []string{"Promise b a gift"}, PickRefs: []string{"Promise b a gift"}, PickIdx: []int{1}, PickKinds: []string{"gift_promise"}}
+	if got, ok := yesNo(promise); !ok || got != "yes" {
+		t.Fatalf("yesNo(gift promise at option 1) = %q, %v; want yes", got, ok)
+	}
+	decline := rules.OracleDecision{Options: 2, Picks: []string{"Don't promise a gift"}, PickRefs: []string{"Don't promise a gift"}, PickIdx: []int{0}, PickKinds: []string{"gift_decline"}}
+	if got, ok := yesNo(decline); !ok || got != "no" {
+		t.Fatalf("yesNo(gift decline at option 0) = %q, %v; want no", got, ok)
+	}
+
 	// A snapshot written before PickKinds existed carries no kind; an exact
 	// boolean label with ref==label is still a true yes/no.
 	legacy := rules.OracleDecision{Options: 2, Picks: []string{"Yes"}, PickRefs: []string{"Yes"}, PickIdx: []int{0}}
@@ -309,6 +350,15 @@ func TestMayYesQueuesEveryFallbackDecisionInStepOrder(t *testing.T) {
 	want := []Answer{{Kind: "choose", Pick: []string{"Yes"}}, {Kind: "choose", Pick: []string{"Forest"}}}
 	if !reflect.DeepEqual(got.Steps[0].Answers, want) {
 		t.Fatalf("answers = %+v, want %+v", got.Steps[0].Answers, want)
+	}
+
+	// A fallback that deliberately answered past option 0 (the runner's
+	// "done" on an optional triggered cost's unpayable mana window) is not
+	// re-pinned to option 0: that would tap the source it declined to tap.
+	done := []rules.OracleDecision{{Step: 0, GorgeKind: "choose", First: "Tap Llanowar Elves for mana", Options: 2,
+		Via: "resolve fallback", Picks: []string{"Done"}, PickIdx: []int{1}}}
+	if got, changed := MayYes(sc, done); changed || len(got.Steps[0].Answers) != 0 {
+		t.Fatalf("MayYes re-pinned a deliberate non-first fallback: %+v", got.Steps)
 	}
 }
 

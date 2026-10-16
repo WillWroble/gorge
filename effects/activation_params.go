@@ -239,6 +239,12 @@ type ConditionParams struct {
 	PhasesOK        bool
 	FirstCombat     string
 	ActivationLimit string
+	// OptionalPaid is ConditionOptionalPaid$, the paid/unpaid selector of a
+	// bare `Condition$ OptionalCost` gate (Ruinous Waterbending's "If this
+	// spell's additional cost was paid", Undergrowth's unpaid Fog). It is
+	// read through the raw Params map: the key is not in cards' compiled
+	// vocabulary.
+	OptionalPaid string
 }
 
 // Any reports whether any key conditionMet evaluates is written (a lone
@@ -247,7 +253,7 @@ func (c *ConditionParams) Any() bool {
 	return c.Defined != "" || c.Present.Text != "" || c.NotPresent != "" || c.Compare.Text != "" ||
 		c.CheckSVar != "" || c.Bare != "" || c.PlayerTurn != "" || c.Phases != "" ||
 		c.FirstCombat != "" || c.ActivationLimit != "" ||
-		c.Present2.Text != "" || c.Compare2.Text != "" || c.Zone != ""
+		c.Present2.Text != "" || c.Compare2.Text != "" || c.Zone != "" || c.OptionalPaid != ""
 }
 
 // ActivationParams is one ability's activation/condition-tier parameters,
@@ -428,6 +434,7 @@ func compileActivation(sa *cards.SA) *ActivationParams {
 	c.Present2 = paramText(p2, p2OK)
 	c.Compare2 = CompareOf(sa.ParamStr(cards.PKConditionCompare2))
 	c.Zone = conditionZoneParam(sa)
+	c.OptionalPaid = strings.TrimSpace(sa.Params["ConditionOptionalPaid"])
 
 	p.UnlessCost = sa.ParamStr(cards.PKUnlessCost)
 	p.UnlessPayer = strings.TrimSpace(sa.ParamStr(cards.PKUnlessPayer))
@@ -487,4 +494,5 @@ var conditionEvaluatedKeys = state.NewNameSet(
 	"Condition", "ConditionPlayerTurn", "ConditionPhases",
 	"ConditionFirstCombat", "ConditionActivationLimit",
 	"ConditionPresent2", "ConditionCompare2", "ConditionZone",
+	"ConditionOptionalPaid",
 )

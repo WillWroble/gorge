@@ -30,6 +30,10 @@ const (
 	wordInZone
 	wordActivePlayerCtrl
 	wordTopLibrary
+	// Forge's BottomLibrary: the last card of its owner's library (Jace,
+	// Reality Sculptor's !BottomLibrary ultimate, The Heron Moon, Mind
+	// Flayer, the Shadow).
+	wordBottomLibrary
 	wordHasCounters
 	// Mjölnir's Worthy equip qualifier (CR 702.6): a legendary creature that
 	// is red or white and is not a Villain.
@@ -297,6 +301,12 @@ const (
 	// non-base argument (Seifer's `attacking Valid Planeswalker.OppCtrl`,
 	// the referent spellings) stays wordUnknown and loud.
 	wordAttackingPlayer
+	// The referent-based block-history words (filter_blockhistory.go).
+	wordBlockedByValid
+	wordBlockedValid
+	wordBlockedByRemembered
+	wordBlockedRemembered
+	wordBlockedBySourceLKI
 )
 
 // wordPredicate classifies a bare predicate word. key is the WUBRG letter for
@@ -470,6 +480,8 @@ func wordPredicate(p string) (wordKind, string) {
 		return wordActivePlayerCtrl, ""
 	case wordPredicateWordTopLibrary:
 		return wordTopLibrary, ""
+	case wordPredicateWordBottomLibrary:
+		return wordBottomLibrary, ""
 	case wordPredicateWordFaceDown:
 		return wordFaceDown, ""
 	case wordPredicateWordCanBeTurnedFaceUp:
@@ -588,6 +600,9 @@ func wordPredicate(p string) (wordKind, string) {
 	// else falls through to wordUnknown and fails closed.
 	if arg, ok := enchantedByArg(p); ok {
 		return wordEnchantedBy, arg
+	}
+	if k, arg, ok := blockHistoryWord(p); ok {
+		return k, arg
 	}
 	// Forge's numTypesGE<n> (CardProperty numTypesGE<n>): at least n
 	// distinct card types on the printed face. A non-integer or
@@ -836,6 +851,15 @@ func wordMatches(kind wordKind, key string, g *state.Game, o *state.Object, sc S
 		}
 		ids := g.Zone(state.ZLibrary, o.Owner)
 		return len(ids) > 0 && ids[0] == o.ID
+	case wordBottomLibrary:
+		// Forge's BottomLibrary: the object is the bottom card of its
+		// library -- the last index of the owner's library slice, the
+		// mirror of wordTopLibrary.
+		if o.Zone != state.ZLibrary {
+			return false
+		}
+		ids := g.Zone(state.ZLibrary, o.Owner)
+		return len(ids) > 0 && ids[len(ids)-1] == o.ID
 	case wordHasCounters:
 		// Forge's HasCounters: the object has at least one counter of any
 		// kind on it. Test the COUNT, not the slice length -- state's
@@ -889,16 +913,9 @@ func wordMatches(kind wordKind, key string, g *state.Game, o *state.Object, sc S
 			}
 		}
 		return false
-	case wordBlockingSource:
-		// Forge's blockingSource: the object is a creature blocking the
-		// source. BlockedBy is recorded on the attacked object, so the
-		// source's BlockedBy names its blockers; this object is one of them.
-		s := g.Obj(source)
-		return s != nil && containsID(s.BlockedBy, o.ID)
-	case wordBlockedBySource:
-		// Forge's blockedBySource: the object is being blocked by the source
-		// -- the source is one of THIS object's blockers.
-		return containsID(o.BlockedBy, source)
+	case wordBlockingSource, wordBlockedBySource, wordBlockedByValid, wordBlockedValid,
+		wordBlockedByRemembered, wordBlockedRemembered, wordBlockedBySourceLKI:
+		return blockHistoryMatches(kind, key, g, o, &sc)
 	case wordNumTypesGE:
 		// Forge's numTypesGE<n>: the object's printed face carries at least
 		// n distinct real card types (CR 205.1). The vocabulary is the one
@@ -1315,7 +1332,14 @@ func contextPredicateBound(g *state.Game, kind wordKind, key string, sc SpecCont
 		base := strings.TrimSuffix(key, ".YouCtrl")
 		return base == "Card" || base == "Giant" || base == "Spider"
 	case wordSharesNameWith:
+		if _, sweep := sharesNameValidBattlefield(key); sweep {
+			// A battlefield sweep needs no context referent: the board is
+			// always there to compare against.
+			return true
+		}
 		return len(sharesTypeReferents(g, sc, key)) > 0
+	case wordBlockedByValid, wordBlockedValid, wordBlockedByRemembered, wordBlockedRemembered, wordBlockedBySourceLKI:
+		return blockHistoryBound(g, kind, key, &sc)
 	case wordRememberedPlayerOwn:
 		_, bound := controlReferentPlayers(g, sc, "OwnedBy", "RememberedPlayer")
 		return bound
@@ -1422,6 +1446,7 @@ const (
 	wordPredicateWordRememberedPlayerOwn
 	wordPredicateWordDealtDamageToAny
 	wordPredicateWordDealtCombatDamageToAny
+	wordPredicateWordBottomLibrary
 )
 
 var wordPredicateWordCodes = state.NewStrCodes(
@@ -1439,6 +1464,7 @@ var wordPredicateWordCodes = state.NewStrCodes(
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourGraveyard", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourGraveyardByYou", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromTheirHand", Val: wordPredicateWordCastProvenance},
+	state.StrEntry[wordPredicateWordCode]{Key: "wasCastFromYourLibrary", Val: wordPredicateWordCastProvenance},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromTreasure", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromCave", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.ManaFromDesert", Val: wordPredicateWordCastSa},
@@ -1449,6 +1475,7 @@ var wordPredicateWordCodes = state.NewStrCodes(
 	state.StrEntry[wordPredicateWordCode]{Key: "CastSa Spell.MayPlaySource", Val: wordPredicateWordCastSa},
 	state.StrEntry[wordPredicateWordCode]{Key: "ActivePlayerCtrl", Val: wordPredicateWordActivePlayerCtrl},
 	state.StrEntry[wordPredicateWordCode]{Key: "TopLibrary", Val: wordPredicateWordTopLibrary},
+	state.StrEntry[wordPredicateWordCode]{Key: "BottomLibrary", Val: wordPredicateWordBottomLibrary},
 	state.StrEntry[wordPredicateWordCode]{Key: "faceDown", Val: wordPredicateWordFaceDown},
 	state.StrEntry[wordPredicateWordCode]{Key: "canBeTurnedFaceUp", Val: wordPredicateWordCanBeTurnedFaceUp},
 	state.StrEntry[wordPredicateWordCode]{Key: "IsRingbearer", Val: wordPredicateWordIsRingbearer},

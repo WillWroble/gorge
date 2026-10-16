@@ -124,25 +124,91 @@ check "helper preserves input order" $? "got=$got"
 
 # --- the wiring: match the candidate assignment itself, not the helper's
 # definition. Removing the call from this pipeline must fail this assertion.
-grep -Eq '^  pkgs=\$\(printf .+ \| gate_affected_default_build_pkgs\)$' "$GATE"
+grep -Eq '^ +pkgs=\$\(printf .+ \| gate_affected_default_build_pkgs\)$' "$GATE"
 check "candidate derivation pipes pkgs through the default-build filter" $?
+
+# --- the selection plan (gate_affected_plan): a pure function of the touched
+# file list, fed synthetic lists here. The structural set must be present for
+# EVERY list (the post-merge culprit classes of 2026-10-05..12 were tree
+# censuses no import-based selection reaches), the fast reverse-dependency
+# closure must follow non-test edits only, and each cheap trigger must fire
+# on exactly its class.
+plan() ( cd "$ROOT" && bash -c "source '$GATE'; gate_affected_plan" )
+STRUCT=$(cd "$ROOT" && bash -c "source '$GATE'; gate_structural_pkgs")
+for want in ./cmd/testbudget ./cmd/gentypes ./compliance/levelb ./internal/policynet ./cmd/pkgmap; do
+	printf '%s\n' "$STRUCT" | grep -qx -- "$want"
+	check "structural set names $want" $?
+done
+has() { printf '%s\n' "$1" | grep -qx -- "others $2"; }
+flag() { printf '%s\n' "$1" | grep -qx -- "$2 $3"; }
+for case in '' 'docs/agents/README.md' 'web/src/protocol.ts' 'rules/mana.go' 'cards/open.go' 'internal/archtest/arch_test.go'; do
+	P=$(printf '%s\n' "$case" | plan)
+	miss=
+	for want in $STRUCT ./internal/codeshape ./view ./compliance/gate ./compliance/adopt; do
+		has "$P" "$want" || miss="$miss $want"
+	done
+	[ -z "$miss" ]
+	check "plan for [${case:-<empty>}] keeps the always-run set" $? "missing:$miss"
+done
+P=$(printf 'docs/agents/README.md\n' | plan)
+flag "$P" archtest_lean 1 && flag "$P" tplrest 0 && flag "$P" traj 0 && flag "$P" botbench_subset 0 && flag "$P" tpl 0
+check "docs-only plan: archtest lean, no engine triggers" $? "$P"
+P=$(printf 'internal/archtest/arch_test.go\n' | plan)
+has "$P" ./internal/archtest && flag "$P" archtest_lean 0
+check "touched internal/archtest runs whole, not lean" $? "$P"
+P=$(printf 'rules/mana.go\n' | plan)
+has "$P" ./bots && ! has "$P" ./rules && ! has "$P" ./deck && flag "$P" traj 1 && flag "$P" tplrest 1 && flag "$P" botbench_subset 0
+check "rules non-test edit: fast rdep closure (./bots), no corpus-heavy rdep (./deck), traj + templates remainder" $? "$P"
+P=$(printf 'rules/mana_test.go\n' | plan)
+! has "$P" ./bots && flag "$P" traj 0 && flag "$P" tplrest 0
+check "rules test-only edit: no rdep closure, no engine triggers" $? "$P"
+P=$(printf 'cards/open.go\n' | plan)
+has "$P" ./internal/corpusheap && has "$P" ./cards && flag "$P" botbench_subset 1 && flag "$P" tplrest 1 && flag "$P" traj 0
+check "corpus loader edit: corpusheap + botbench subset + templates remainder" $? "$P"
+P=$(printf 'cards/open.go\ncmd/botbench/main.go\n' | plan)
+has "$P" ./cmd/botbench && flag "$P" botbench_subset 0
+check "touched cmd/botbench runs whole, not the subset test" $? "$P"
+P=$(printf 'compliance/oraclegen/templates/trigger.go\n' | plan)
+flag "$P" tpl 1 && flag "$P" tplrest 0 && ! has "$P" ./compliance/oraclegen/templates
+check "touched templates: four shards, not in the batch, no extra remainder" $? "$P"
+P=$(printf 'compliance/oraclegen/generate.go\n' | plan)
+flag "$P" tpl 0 && flag "$P" tplrest 1
+check "generator edit runs the templates remainder shard" $? "$P"
+# The fast allowlist must not rot: every member is a real directory.
+rot=$(cd "$ROOT" && bash -c "source '$GATE'; gate_fast_rdep_pkgs" | while read -r d; do [ -d "$ROOT/$d" ] || echo "$d"; done)
+[ -z "$rot" ]
+check "every fast rdep allowlist member exists" $? "missing: $rot"
+# Wiring: the body reads the plan, --list exits before any go work, the lean
+# archtest line skips only the 32-bit compile, and the remainder shard uses
+# the tpl=1 path's exact h4 invocation (shared result-cache entry).
+grep -qF 'plan=$(git diff --name-only "$mb" HEAD | gate_affected_plan)' "$GATE"
+check "gate body derives its selection from gate_affected_plan" $?
+awk '/^if \[ "\$list_only" = 1 \]/{l=NR} /^GOMAXPROCS=6 go vet/{v=NR} END{exit !(l && v && l < v)}' "$GATE"
+check "--list exits before vet/test" $?
+grep -qF "go test -p=1 -skip '^TestEngineCompilesFor32Bit\$' ./internal/archtest/" "$GATE"
+check "lean archtest skips only the 32-bit compile" $?
+[ "$(grep -cF 'go test -p=1 -skip "$tpl4" ./compliance/oraclegen/templates' "$GATE")" = 2 ]
+check "templates remainder trigger reuses the h4 invocation" $?
+! grep -q 'TestInvariantsUnderSeedFuzz' "$GATE"
+check "no dead //go:build fuzz skip pattern in the gate" $?
 
 # --- the shard partition: complete, disjoint, and covering the digit-prefixed
 # names a naive [A-Z] split drops. rules_shard_patterns_from_list is the pure
 # half of the gate's shard helper, so it can be fed a synthetic list here.
 patterns() ( bash -c "source '$GATE'; rules_shard_patterns_from_list" )
 
-# A list whose first characters are all letters EXCEPT one digit-prefixed name
+# A list whose 2-char prefixes are all letters EXCEPT one digit-prefixed name
 # (Test3141... exists in the real corpus). A partition keyed to [A-Z] silently
-# drops it; this asserts the class is covered.
-SYN=$(printf 'TestAlpha\nTestBravo\nTestAlphaTwo\nTest3141Discard\nTestZulu\nTestZuluTwo\nTestZuluThree\n')
+# drops it; this asserts the class is covered, and that the six 2-char buckets
+# are complete and disjoint.
+SYN=$(printf 'TestAlpha\nTestBravo\nTestAlphaTwo\nTest3141Discard\nTestZulu\nTestZuluTwo\nTestZuluThree\nTestCharlie\nTestDelta\nTestEcho\n')
 out=$(printf '%s\n' "$SYN" | patterns)
-nlines=$(printf '%s\n' "$out" | /usr/bin/grep -c '^\^Test\[')
-[ "$nlines" = 4 ]
-check "shard helper emits exactly four patterns" $? "nlines=$nlines out=$out"
+nlines=$(printf '%s\n' "$out" | /usr/bin/grep -c '^\^Test(')
+[ "$nlines" = 6 ]
+check "shard helper emits exactly six patterns" $? "nlines=$nlines out=$out"
 uncovered=$(python3 - "$out" "$SYN" <<'PY'
 import re, sys
-pats = [l for l in sys.argv[1].split('\n') if l.startswith('^Test[')]
+pats = [l for l in sys.argv[1].split('\n') if l.startswith('^Test(')]
 names = [l for l in sys.argv[2].split('\n') if l]
 hits = [sum(1 for p in pats if re.match(p, n)) for n in names]
 print(' '.join(n for n, h in zip(names, hits) if h == 0))
@@ -159,7 +225,7 @@ if [ -n "$REALLIST" ]; then
 	printf '%s\n' "$REALLIST" >"$TMP/names.txt"
 	bad=$(python3 - "$TMP/patterns.txt" "$TMP/names.txt" <<'PY'
 import re, sys
-pats = [l for l in open(sys.argv[1]).read().split('\n') if l.startswith('^Test[')]
+pats = [l for l in open(sys.argv[1]).read().split('\n') if l.startswith('^Test(')]
 names = [l for l in open(sys.argv[2]).read().split('\n') if l]
 miss = [n for n in names if sum(1 for p in pats if re.match(p, n)) != 1]
 print(len(miss))
@@ -246,13 +312,13 @@ printf '' | patterns >/dev/null 2>&1
 check "empty list makes the shard helper fail (caller falls back)" $?
 printf 'Test\n' | patterns >/dev/null 2>&1
 [ "$?" != 0 ]
-check "a name shorter than five characters makes the shard helper fail" $?
-# Four buckets need four distinct first characters; fewer would print an
-# invalid empty character class, so the helper must fail instead and the
-# caller falls back to the unsplit run.
+check "a name shorter than six characters makes the shard helper fail" $?
+# Six buckets need six distinct 2-char prefixes; fewer would leave an empty
+# bucket (an invalid empty alternation), so the helper must fail instead and
+# the caller falls back to the unsplit run.
 printf 'TestAlpha\nTestBravo\nTestAlphaTwo\n' | patterns >/dev/null 2>&1
 [ "$?" != 0 ]
-check "fewer than four first characters makes the shard helper fail (caller falls back)" $?
+check "fewer than six distinct prefixes makes the shard helper fail (caller falls back)" $?
 
 # --- the heavy $others packages: compliance/gate and compliance/adopt (plus
 # internal/paymirror, cmd/repro, effects, compliance/oraclegen/templates) are
@@ -389,6 +455,87 @@ done
 nkr8=$(grep -cE "^GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -p=1 -run .*TestKr8" "$GATE")
 [ "$nkr8" = 2 ]
 check "both Kr8 runs override the gate env's GOMAXPROCS (t.Parallel, like the shards)" $? "nkr8=$nkr8"
+
+# --- the stale-only certification classifier: a certification failure whose
+# every failing test logged "GORGE-CERT-RESULT <name> stale-only" (the line
+# gate.CertVerdict and adopt's ratchetVerdict emit) is a host XMage replay's
+# to clear, not the ticket's defect: the heavy pool returns the gate's requeue
+# exit (76) so the ticket is retried without a paid fix round. A non-stale
+# problem, a t.Fatal before the verdict, a package-level failure, or no
+# failing test at all must classify NOT stale-only, so the gate fails closed
+# and a real certification regression still bills the fix round. These cases
+# are synthetic (no XMage host needed) and pin the class, not one card.
+cert() ( bash -c "source '$GATE'; gate_affected_cert_stale_only" )
+
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 stale-only' \
+	'    declared_chunks_test.go:121: BLB:A Thundertrap Trainer: verdict is for an older scenario (Thundertrap Trainer/cast-resolve/v1); re-run the XMage pass' \
+	'--- FAIL: TestCertificationRatchet (9.0s)' \
+	'    ratchet_test.go:130: GORGE-CERT-RESULT TestCertificationRatchet stale-only' \
+	'    ratchet_test.go:131: BLB: 1 outstanding, ratchet 0 -- per-set outstanding only shrinks (oraclediff status -set BLB)' \
+	| cert
+check "a stale-only certification failure is classified stale-only (non-charging path)" $?
+
+# The 2026-10-05..14 non-stale counterexamples the classification must NOT
+# absorb: an unsupported primitive, and an unmet frozen expectation.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk03 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk03 mixed' \
+	'    declared_chunks_test.go:121: OTJ:A Luxurious Locomotive: unsupported [count:CrewSize]' \
+	| cert
+[ "$?" != 0 ]
+check "an unsupported-primitive certification failure is NOT stale-only" $?
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 mixed' \
+	'    declared_chunks_test.go:121: FDN:A Taurean Mauler: gorge no longer meets the frozen expectation: life (id)' \
+	| cert
+[ "$?" != 0 ]
+check "an unmet-expectation certification failure is NOT stale-only" $?
+
+# A failing test that logged no verdict at all (a t.Fatal before the line, e.g.
+# a missing corpus) leaves nothing for the classifier to match: fail closed.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk01 (0.1s)' \
+	'    declared_chunks_test.go:90: declared sets need the corpus (make fetch-cards compile-cards): open ../../.cards/ir-...: no such file or directory' \
+	| cert
+[ "$?" != 0 ]
+check "a certification failure with no verdict line is NOT stale-only (fails closed)" $?
+
+# One stale-only test and one non-stale test is NOT stale-only: the non-stale
+# one is a real regression the gate must still fail.
+printf '%s\n' \
+	'--- FAIL: TestDeclaredSetsCompliantChunk00 (5.0s)' \
+	'    declared_chunks_test.go:120: GORGE-CERT-RESULT TestDeclaredSetsCompliantChunk00 stale-only' \
+	'--- FAIL: TestCertificationRatchet (9.0s)' \
+	'    ratchet_test.go:130: GORGE-CERT-RESULT TestCertificationRatchet mixed' \
+	| cert
+[ "$?" != 0 ]
+check "a mixed stale/non-stale certification failure is NOT stale-only" $?
+
+# A clean certification (no failing test) is not a stale-only failure.
+printf 'ok  \tgithub.com/adams-shaun/gorge/compliance/gate\t9.0s\n' | cert
+[ "$?" != 0 ]
+check "a clean certification run is NOT classified stale-only" $?
+
+# Wiring: the pool returns the requeue exit for a stale-only certification, the
+# gate body maps it through (and keeps an ordinary failure a failure), the
+# config maps exit 76 to a non-charging requeue, and both certification tests
+# emit the verdict line the classifier reads. A stale-only path not wired to
+# the requeue exit, or a test that stops emitting the marker, would silently
+# restore the paid fix round this change removes.
+grep -qF 'return 76' "$GATE"
+check "the heavy pool returns the stale-only requeue exit (76)" $?
+grep -qF 'exit 76' "$GATE"
+check "the gate body exits the stale-only requeue exit" $?
+grep -qF 'gate_affected_cert_stale_only' "$GATE"
+check "the heavy pool calls the stale-only classifier" $?
+grep -qE 'requeue_exit *= *\[75, 76\]' "$ROOT/.agentctl/config.toml"
+check "the affected gate maps exit 76 to a non-charging requeue" $?
+grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/gate/declared_chunks_test.go" \
+	&& grep -qF 'GORGE-CERT-RESULT' "$ROOT/compliance/adopt/ratchet_test.go"
+check "both certification tests emit the GORGE-CERT-RESULT verdict line" $?
 
 printf '\ngate_affected_smoke: %s\n' "$([ $fails = 0 ] && echo ALL GREEN || echo FAILURES ABOVE)"
 exit "$fails"

@@ -1,0 +1,3 @@
+#!/bin/sh
+# git merge runs this instead of pre-commit.
+exec "$(dirname "$0")/pkgmap-check" pre-merge-commit

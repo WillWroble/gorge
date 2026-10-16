@@ -50,21 +50,32 @@ func TestStaticGatedGrantOffered(t *testing.T) {
 	}
 }
 
-func TestStaticGatedGrantFallsThroughToNamedGap(t *testing.T) {
+// TestStaticGatedGrantTargetFixture: a gated self grant whose ability has a
+// target is not offered without a legal one (CR 602.2b), so the observation
+// retries with the target fixture its ValidTgts$ names. Slick Imitator's
+// "Copy target spell you control" is offered with a spell of p0's on the stack;
+// Adagia, Windswept Bastion's "copy target artifact or enchantment you
+// control" with an artifact of p0's on the battlefield. Both left the
+// "gated self grant is not offered in the gate-on fixture" skip (lb4-g7); no
+// card in the 20 measured sets carries that skip any more. Earlier rows of
+// the fall-through table left it as their observations landed: Debris Field
+// Crusher (setup counters), Dawnsire (granted trigger) and Far Fortune, End
+// Boss (granted replacement).
+func TestStaticGatedGrantTargetFixture(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	for _, tc := range []struct{ card, key, reason string }{
-		// Debris Field Crusher left this table when the setup-counters
-		// fixture served its station gate on the placed path
-		// (TestStaticCounterGatesServed): the cast-path gap it pinned is gone.
-		// Dawnsire's trigger grant moved to the granted-trigger observation
-		// (static_granted_trigger_test.go pins its served row).
-		{"Far Fortune, End Boss", "static#0.0", staticGrantReplacementReason},
+	for _, tc := range []struct{ card, key, fixture string }{
+		{"Slick Imitator", "static#0.0", gatedGrantTargetSpell},
+		{"Adagia, Windswept Bastion", "static#0.0", gatedGrantTargetArtifact},
 	} {
 		t.Run(tc.card, func(t *testing.T) {
 			req := counterReq(t, reg, tc.card, tc.key)
-			_, skip := GenerateB(reg, tc.card, req)
-			if skip == nil || skip.Reason != "static "+tc.reason {
-				t.Fatalf("skip = %v, want static %q", skip, tc.reason)
+			item, skip := GenerateB(reg, tc.card, req)
+			if skip != nil {
+				t.Fatalf("skip = %q, want served", skip.Reason)
+			}
+			p0 := item.Scenario.Setup["p0"]
+			if !slices.Contains(p0.Hand, tc.fixture) && !slices.Contains(p0.Battlefield, tc.fixture) {
+				t.Fatalf("scenario lacks the target fixture %s: %+v", tc.fixture, p0)
 			}
 		})
 	}

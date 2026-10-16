@@ -18,7 +18,9 @@ import (
 
 	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/compliance/levelb"
+	"github.com/adams-shaun/gorge/compliance/oraclegen"
 	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/rules"
 )
 
 // millProbes are the spells that put cards from p0's library into p0's
@@ -28,13 +30,14 @@ var millProbes = []string{"Tome Scour"}
 
 // residueCauses builds the causes of one zone-change-residue shape. ok is
 // false when the trigger is none of them (the named skip stands). A
-// ChosenCardStrict filter keeps its named skip: the trigger matcher's filter
-// context binds no chosen set, so the predicate fails closed and the
-// trigger cannot fire (ticket g17 follow-up, engine side).
+// ChosenCardStrict filter is served when the card's own ETB chooses an
+// opposing creature (chosenCardLeavesCauses).
 func residueCauses(reg *cards.Registry, name string, t *cards.Trigger, filter string) ([]triggerCause, string, bool) {
 	origin := strings.ToLower(t.ParamStr(cards.PKOrigin))
 	dest := strings.ToLower(t.ParamStr(cards.PKDestination))
 	switch {
+	case strings.Contains(strings.ToLower(filter), "chosencardstrict"):
+		return chosenCardLeavesCauses(reg, name, t)
 	case strings.Contains(origin, "library") && strings.Contains(dest, "graveyard"):
 		return libraryToGraveyardCauses(reg, name, t)
 	case strings.Contains(dest, "graveyard"):
@@ -122,4 +125,93 @@ func anyToGraveyardCauses(reg *cards.Registry, name string, t *cards.Trigger) ([
 		return nil, "", false
 	}
 	return out, "", true
+}
+
+// chosenCardLeavesCauses serves "When the chosen creature leaves the
+// battlefield" (Zenos yae Galvus: ValidCard$ Card.ChosenCardStrict, Origin$
+// Battlefield) on a card whose own ETB chooses the creature (DB$ ChooseCard
+// | Choices$ Creature.OppCtrl). The card is cast first, so its ETB chooses
+// p1's baseline Grizzly Bears -- the only opposing creature -- and a probe
+// whose destination the trigger admits then removes that creature. ok is
+// false for any other ChosenCardStrict shape.
+func chosenCardLeavesCauses(reg *cards.Registry, name string, t *cards.Trigger) ([]triggerCause, string, bool) {
+	c, ok := reg.Lookup(name)
+	if !ok || len(c.Faces) == 0 || !strings.EqualFold(t.ParamStr(cards.PKOrigin), "Battlefield") {
+		return nil, "", false
+	}
+	f := c.Faces[0]
+	if !f.IsCreature() || !selfETBChoosesOpposingCreature(f) {
+		return nil, "", false
+	}
+	var out []triggerCause
+	for _, probe := range zoneProbes(t.ParamStr(cards.PKDestination)) {
+		cs, ok := castCause(reg, name, probe, "p1:"+bearsProbe)
+		if !ok {
+			continue
+		}
+		cs.castSelfX = true
+		cs.choicesAsTargets = true
+		out = append(out, cs)
+	}
+	if len(out) == 0 {
+		return nil, "", false
+	}
+	return out, "", true
+}
+
+// selfETBChoosesOpposingCreature reports a self-ETB trigger on f whose body
+// is a ChooseCard over Creature.OppCtrl.
+func selfETBChoosesOpposingCreature(f *cards.Face) bool {
+	for i := range f.Triggers {
+		tr := &f.Triggers[i]
+		if tr.ModeKind() != cards.TriggerChangesZone || !strings.EqualFold(tr.ParamStr(cards.PKDestination), "Battlefield") ||
+			!strings.EqualFold(tr.ParamStr(cards.PKValidCard), "Card.Self") {
+			continue
+		}
+		body := f.SVars[tr.ParamStr(cards.PKExecute)]
+		if strings.Contains(body, "DB$ ChooseCard") && strings.Contains(body, "Choices$ Creature.OppCtrl") {
+			return true
+		}
+	}
+	return false
+}
+
+// choicesAsTargetAnswers rewrites the item's object "choice" answers as
+// "target" answers naming the decision's exact pick: Zenos's ETB "choose a
+// creature an opponent controls" is a target ask in XMage, so a choice-queue
+// answer is consumed by the wrong ask (measured lb4-gtrig: "Found wrong
+// choice command ... TargetOpponent"). A player pick stays a choice:
+// Shinryu's "choose an opponent" is XMage's player.choose over a
+// TargetOpponent, which reads the choice queue by player name (strict replay,
+// lb4w2-3seat: "Missing CHOICE def ... TargetOpponent" with the pick queued
+// as a target).
+func choicesAsTargetAnswers(xa [][]oraclegen.XAnswer, ds []rules.OracleDecision) [][]oraclegen.XAnswer {
+	for step := range xa {
+		for i := range xa[step] {
+			a := &xa[step][i]
+			if a.Kind != "choice" || a.Value == "yes" || a.Value == "no" || isSeatAnswer(a.Value) {
+				continue
+			}
+			a.Kind = "target"
+			for _, d := range ds {
+				if d.Step == step && len(d.ObjectPicks) == 1 && len(d.PickRefs) == 1 {
+					a.Value = d.PickRefs[0]
+				}
+			}
+		}
+	}
+	return xa
+}
+
+// isSeatAnswer reports an answer value naming a player ("p0", "p1", "p2").
+func isSeatAnswer(v string) bool {
+	if len(v) < 2 || v[0] != 'p' {
+		return false
+	}
+	for _, r := range v[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

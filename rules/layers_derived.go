@@ -154,19 +154,21 @@ func (e *Engine) derivedCompute(id state.ObjID, atStack state.Zone) Derived {
 	return chars.Compute(asChars(e), &e.charsWalk, id, atStack)
 }
 
-// derivedName is Derived(id).Name without the rest of the walk (chars.Name):
-// it evaluates exactly the layer-3 SetName$ effects the full walk would, with
-// the same bindings, so it names what derivedCompute names. In the rules test
-// binary derivedMemoVerify recomputes the full walk and panics on a
-// difference.
-func (e *Engine) derivedName(id state.ObjID) string {
-	name := chars.Name(asChars(e), &e.charsWalk, id)
+// derivedName is Derived(id).Name and .NameSet without the rest of the walk
+// (chars.Name): it applies exactly the CR 709.5 Room rule and layer-3
+// SetName$ effects the full walk would, with the same bindings, so it names
+// what derivedCompute names. The bound flag is load-bearing: the empty string
+// is a real name for a both-locked Room, not the "no override" sentinel. In
+// the rules test binary derivedMemoVerify recomputes the full walk and panics
+// on a difference.
+func (e *Engine) derivedName(id state.ObjID) (string, bool) {
+	name, nameSet := chars.Name(asChars(e), &e.charsWalk, id)
 	if derivedMemoVerify {
-		if want := e.derivedCompute(id, 0).Name; want != name {
-			panic(fmt.Sprintf("rules: derivedName(%d) = %q, full walk %q", id, name, want))
+		if want := e.derivedCompute(id, 0); want.Name != name || want.NameSet != nameSet {
+			panic(fmt.Sprintf("rules: derivedName(%d) = %q (set %v), full walk %q (set %v)", id, name, nameSet, want.Name, want.NameSet))
 		}
 	}
-	return name
+	return name, nameSet
 }
 
 // Name returns the current layer-3 name of an object. Callers that render or
@@ -287,9 +289,19 @@ func (e *Engine) derivedTypesOf(id state.ObjID) []string {
 	if o == nil || o.Face() == nil {
 		return nil
 	}
-	e.charsWalk.Depth++
-	ty := e.typeCharacteristics(id, 0)
-	e.charsWalk.Depth--
+	// A Derived the current memo scope already holds for id answers without
+	// a second layer-4 walk (derivedMemoPeek never computes). The census's
+	// mana-ability gate reads every own permanent's types on every
+	// collection, and an animated all-creature-types manland's walk is the
+	// expensive one; verify mode below still compares the full walk.
+	var ty []string
+	if d := e.derivedMemoPeek(id); d != nil {
+		ty = d.Types
+	} else {
+		e.charsWalk.Depth++
+		ty = e.typeCharacteristics(id, 0)
+		e.charsWalk.Depth--
+	}
 	if derivedMemoVerify {
 		if want := e.derivedCompute(id, 0).Types; !slices.Equal(ty, want) {
 			panic(fmt.Sprintf("rules: derivedTypesOf(%d) = %v, full walk %v", id, ty, want))

@@ -24,6 +24,19 @@ const OFFLINE_FOR = 60_000;
 // rest (nothing is stored, so the name re-resolves later) while the
 // server's prewarm warms the cache meanwhile.
 const REQUEST_TIMEOUT = 10_000;
+// A 503 from /art/named is the server's "pending": its wait budget expired
+// while the Scryfall fetch is still running detached, and the entry will be a
+// plain disk hit shortly (cmd/gorged/art.go errArtPending). That is not an
+// outage, so it must NOT take the 60s offline rest: a cold cache answers
+// 503 for a burst of names (a fresh draft pack of a set the server never
+// prewarmed), and the offline rest then answered null to every later name
+// and left whole packs blank. A pending name is retried on its own after
+// PENDING_RETRY_MS, up to PENDING_RETRIES times, without marking anything
+// offline or storing anything.
+const PENDING_RETRY_MS = 3_000;
+const PENDING_RETRIES = 8;
+
+class ArtPending extends Error {}
 // Version the browser cache independently of the server's art blobs. Existing
 // browsers may hold a valid immutable URL whose bytes were selected by older
 // face-matching logic; changing this namespace makes them resolve the name
@@ -45,6 +58,33 @@ type Scryfall = {
   image_uris?: { normal?: string };
   card_faces?: { name?: string; image_uris?: { normal?: string } }[];
 };
+
+/**
+ * ImageFacts are the token facts a CardView carries that disambiguate a
+ * token's art on the server: an in-game token's display name ("Goblin
+ * Token") is never a card Scryfall's named endpoint knows, so the token
+ * path resolves the art by SEARCH over the stripped base name, and the
+ * type line + P/T feed the deterministic pick. Only read when isToken is
+ * set — every ordinary card name goes to /art/named as before.
+ */
+export interface ImageFacts {
+  isToken?: boolean;
+  types?: string;
+  pt?: string;
+  /**
+   * printedPt is the token's PRINTED P/T (CardView.printed_pt), the value the
+   * token card is printed with. The cache key and the server's pick key on
+   * this, not on pt: a 1/1 Soldier with a +1/+1 counter carries pt "2/2" but
+   * printedPt "1/1", so it resolves to the same entry as its un-pumped
+   * sibling instead of a second paced search for identical art.
+   */
+  printedPt?: string;
+}
+
+/** tokenCacheKey namespaces a token's storage/memo entries away from any same-named real card's entries: the names collide, the facts don't. Keyed on the PRINTED P/T so a counter or anthem does not mint a second entry. */
+function tokenCacheKey(name: string, facts: ImageFacts): string {
+  return `token\u001f${name}\u001f${facts.types ?? ''}\u001f${facts.printedPt ?? ''}`;
+}
 
 /** createImages resolves exact card names to card art served from this app's own origin (art.go proxies and caches Scryfall server-side) with memory + localStorage caches, request spacing and an offline backoff. */
 export function createImages(src: Partial<ImageSource> = {}) {
@@ -80,14 +120,15 @@ export function createImages(src: Partial<ImageSource> = {}) {
     if (queue.length) env.setTimeout(drain, SPACING);
   }
 
-  async function lookup(name: string): Promise<string | null> {
-    // Same-origin, not Scryfall directly: cmd/gorged's /art/named proxies and
-    // caches Scryfall on the server (art.go), so every viewer's browser only
-    // ever talks to this app's own origin, and a card fetched once by any
-    // viewer is served from disk for every viewer after. The response shape
-    // mirrors Scryfall's own /cards/named (name + image_uris.normal) on
-    // purpose, so this parsing needs no change from when it read Scryfall
-    // directly — only the request's base URL moved.
+  async function lookup(name: string, endpoint: string): Promise<string | null> {
+    // Same-origin, not Scryfall directly: cmd/gorged's /art/named (and, for
+    // tokens, /art/token) proxies and caches Scryfall on the server
+    // (art.go / art_token.go), so every viewer's browser only ever talks to
+    // this app's own origin, and a card fetched once by any viewer is
+    // served from disk for every viewer after. The response shape mirrors
+    // Scryfall's own /cards/named (name + image_uris.normal) on purpose, so
+    // this parsing needs no change from when it read Scryfall directly —
+    // only the request's base URL moved.
     // REQUEST_TIMEOUT (see the constant's comment) bounds the whole lookup —
     // body read included — because every millisecond of it holds a browser
     // connection. The abort is armed through env.setTimeout so the fake-clock
@@ -96,8 +137,9 @@ export function createImages(src: Partial<ImageSource> = {}) {
     let settled = false;
     env.setTimeout(() => { if (!settled) abort.abort(); }, REQUEST_TIMEOUT);
     try {
-      const res = await env.fetch(withBase(`/art/named?exact=${encodeURIComponent(name)}`), { headers: { Accept: 'application/json' }, signal: abort.signal });
+      const res = await env.fetch(withBase(endpoint), { headers: { Accept: 'application/json' }, signal: abort.signal });
       if (res.status === 404) return null;
+      if (res.status === 503) throw new ArtPending(name);
       if (!res.ok) throw new Error(`art ${res.status}`);
       const j = (await res.json()) as Scryfall;
       // A multi-faced card (Delver of Secrets / Insectile Aberration) puts no
@@ -119,28 +161,49 @@ export function createImages(src: Partial<ImageSource> = {}) {
     }
   }
 
-  function url(name: string): Promise<string | null> {
-    if (memo.has(name)) return Promise.resolve(memo.get(name)!);
-    const stored = fromStorage(name);
-    if (stored !== undefined) { memo.set(name, stored); return Promise.resolve(stored); }
+  function url(name: string, facts?: ImageFacts): Promise<string | null> {
+    // A token resolves through /art/token against namespaced cache keys: its
+    // display name is NOT a card name, so sharing the plain-name key with a
+    // same-named real card would let one entry poison the other.
+    const isToken = facts?.isToken === true;
+    const ck = isToken && facts ? tokenCacheKey(name, facts) : name;
+    if (memo.has(ck)) return Promise.resolve(memo.get(ck)!);
+    const stored = fromStorage(ck);
+    if (stored !== undefined) { memo.set(ck, stored); return Promise.resolve(stored); }
     if (offline()) return Promise.resolve(null);
-    const inflight = pending.get(name);
+    const inflight = pending.get(ck);
     if (inflight) return inflight;
+
+    const endpoint = isToken && facts
+      ? `/art/token?exact=${encodeURIComponent(name)}&types=${encodeURIComponent(facts.types ?? '')}&pt=${encodeURIComponent(facts.pt ?? '')}&ppt=${encodeURIComponent(facts.printedPt ?? '')}`
+      : `/art/named?exact=${encodeURIComponent(name)}`;
 
     const idle = queue.length === 0 && pending.size === 0;
     const p = new Promise<string | null>((resolve) => {
+      let tries = 0;
       const run = () => {
         // A queued lookup can sit for a while before its turn; re-check here
         // too, so a source that went offline after this was queued doesn't
         // still fire the request once its slot comes up.
         if (offline()) { resolve(null); return; }
-        lookup(name).then((u) => { memo.set(name, u); toStorage(name, u); resolve(u); })
-          .catch(() => { offlineUntil = env.now() + OFFLINE_FOR; resolve(null); });
+        lookup(name, endpoint).then((u) => { memo.set(ck, u); toStorage(ck, u); resolve(u); })
+          .catch((e) => {
+            if (e instanceof ArtPending) {
+              // The server is still fetching this name: ask again later,
+              // this name only. Out of retries, resolve null unstored, so a
+              // later mount asks again.
+              if (++tries <= PENDING_RETRIES) env.setTimeout(run, PENDING_RETRY_MS);
+              else resolve(null);
+              return;
+            }
+            offlineUntil = env.now() + OFFLINE_FOR;
+            resolve(null);
+          });
       };
       if (idle) run();
       else { queue.push(run); if (queue.length === 1) env.setTimeout(drain, SPACING); }
-    }).finally(() => pending.delete(name));
-    pending.set(name, p);
+    }).finally(() => pending.delete(ck));
+    pending.set(ck, p);
     return p;
   }
 

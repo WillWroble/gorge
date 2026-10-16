@@ -16,15 +16,18 @@ func TestDriverStepSwitchCoversLevelBPass(t *testing.T) {
 	if !ok {
 		t.Fatal("ScenarioReplay.java has no pass case")
 	}
-	for _, required := range []string{"passAction(steps(sc0), stepIdx)"} {
+	for _, required := range []string{"passAction(steps(sc0), stepIdx, activeSeat)"} {
 		if !strings.Contains(body, required) {
 			t.Errorf("pass case does not contain %q", required)
 		}
 	}
 	for _, required := range []string{
 		"static int passAction(JsonArray steps, int index)",
+		"static int passAction(JsonArray steps, int index, int activeSeat)",
+		"PASS_ACTIVE_OWN",
+		"PASS_P1_PAIR_FIRST",
 		"static List<String> passCommands(JsonArray steps, int index, int activeSeat)",
-		"waitStackResolved(turn, phase, playerA, true)",
+		"waitStackResolved(turn, phase, active, true)",
 		"(info, pl, g) -> pl.pass(g)",
 		"PASS_HANDOFF",
 		"PASS_PAIR_SECOND",

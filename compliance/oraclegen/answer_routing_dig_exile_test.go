@@ -9,9 +9,9 @@ import (
 
 // TestDigExileFamilyScriptsComplement pins the Ashiok, Wicked Manipulator
 // shape: a one-card Dig take over two named cards whose second destination is
-// exile. XMage's Dig dialog for that family selects the card to EXILE, the
-// opposite of gorge's pick (the card to hand), so the scripted answer must be
-// the OTHER offered card.
+// exile. XMage's Dig dialog for that family (a chooseTarget, the target
+// queue) selects the card to EXILE, the opposite of gorge's pick (the card to
+// hand), so the scripted answer must be the OTHER offered card.
 func TestDigExileFamilyScriptsComplement(t *testing.T) {
 	d := rules.OracleDecision{Step: 2, Seat: 0, Kind: "choose_n", GorgeKind: "choose", Resume: "dig",
 		Options: 2, Min: 1, Max: 1, Picks: []string{"Jace Beleren"}, PickIdx: []int{0},
@@ -27,9 +27,9 @@ func TestDigExileFamilyScriptsComplement(t *testing.T) {
 		t.Fatalf("digExileComplement = %q, want %q", got, "Grizzly Bears")
 	}
 	got := routed(t, []rules.OracleDecision{d}, 3)
-	want := []XAnswer{{0, "choice", "Grizzly Bears"}}
+	want := []XAnswer{{0, "target", "Grizzly Bears"}}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("routed = %#v, want %#v (the exile family scripts the complement)", got, want)
+		t.Fatalf("routed = %#v, want %#v (the exile family scripts the complement on the target queue)", got, want)
 	}
 }
 

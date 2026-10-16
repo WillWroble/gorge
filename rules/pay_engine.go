@@ -186,7 +186,14 @@ func (pe *payer) Emit(ev events.Event) events.Event { return (*Engine)(pe).emit(
 func (pe *payer) Verify() bool                      { return walkCacheVerify }
 func (pe *payer) Log() *events.Log                  { return pe.L }
 func (pe *payer) MatchesSpecFrom(spec string, id state.ObjID, you state.PlayerID, source state.ObjID) bool {
-	return (*Engine)(pe).matchesSpecFrom(spec, id, you, source)
+	e := (*Engine)(pe)
+	// A cost spec comparing against an X the ability's targets fix
+	// (cost_target_bound.go) is matched with that X bound, or open before
+	// the targets exist.
+	if e.costSpecTargetBound(spec, source) {
+		return e.matchTargetBoundCostSpec(spec, id, you, source)
+	}
+	return e.matchesSpecFrom(spec, id, you, source)
 }
 func (pe *payer) CastProvenanceAdmitsPending(spec string, objID state.ObjID, you state.PlayerID) (string, bool) {
 	return (*Engine)(pe).castProvenanceAdmitsPending(spec, objID, you)

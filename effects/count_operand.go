@@ -188,6 +188,39 @@ func parseCountCompare(tok string) (op string, threshold int32, ok bool) {
 	return op, int32(n), true
 }
 
+// parseCountCompareOrSVar is parseCountCompare for a HasProperty comparison
+// whose bound may be an SVar name rather than a literal: Wojek
+// Investigator's and Consuming Tide's `HasCardsInHand_Card_GTY` ("an
+// opponent who has more cards in hand than you") names Y, whose body
+// `Count$CardsInYourHand` is read from the SOURCE's controller -- the "you"
+// of the Oracle text -- once, not re-read as each member's own hand (which
+// would make every member "more than themselves" and never qualify). A
+// non-numeric bound that is not a printed SVar of the source, or whose body
+// does not evaluate, fails closed (ok false) rather than reading zero.
+func parseCountCompareOrSVar(h Host, c *Ctx, tok string) (op string, threshold int32, ok bool) {
+	if op, threshold, ok = parseCountCompare(tok); ok {
+		return op, threshold, true
+	}
+	if len(tok) < 3 || c == nil {
+		return "", 0, false
+	}
+	switch CmpOpOf(strings.ToUpper(tok[:2])) {
+	case CmpGE, CmpGT, CmpLE, CmpLT, CmpEQ:
+	default:
+		return "", 0, false
+	}
+	name := tok[2:]
+	body, named := c.SVars[name]
+	if !named {
+		return "", 0, false
+	}
+	n, evaluated := evalCountExprOK(h, c, body, 1)
+	if !evaluated {
+		return "", 0, false
+	}
+	return strings.ToUpper(tok[:2]), n, true
+}
+
 // countOpHolds applies a comparison against a per-player hit count, the
 // same operator set parseCountCompare recognises.
 func countOpHolds(op string, threshold, got int32) bool {

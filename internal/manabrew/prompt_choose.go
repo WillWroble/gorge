@@ -528,6 +528,9 @@ func (t *Translator) parseChooseFromSelection(out mb.PromptOutputValue, p *Pendi
 var electionKinds = map[string]bool{
 	"yes": true, "no": true,
 	"trigger_cost_pay": true, "trigger_cost_decline": true,
+	// The pay-first election's manual route (rules/respay.go) rides beside
+	// the plain pay; the confirm side stays the plain (auto) pay.
+	"trigger_cost_pay_manual": true,
 }
 
 // isCastContributionOptions reports whether every option of the ask is a

@@ -404,6 +404,34 @@ func (e *Engine) hasCastConvoke(id state.ObjID) bool {
 	return false
 }
 
+// hasCastDelve reports whether the spell being cast carries Delve (CR
+// 702.66a: "Delve is a static ability that functions while the spell with
+// delve is on the stack"): the keyword the object carries in its current zone
+// (printed, or granted there), or a layer-6 grant whose AffectedZone$ Stack
+// scope reaches it once cast -- Teval, Arbiter of Virtue's "Spells you cast
+// have delve" -- read the way hasCastConvoke reads Convoke, through the stack
+// override, so the offer gate, the delve ask and the payment all see the
+// grant. A permanent on the battlefield is never a spell being cast: its
+// activated abilities' costs must not pick up a stack-scoped grant whose
+// Affected$ (wasCast) also matches the permanent the spell became.
+func (e *Engine) hasCastDelve(id state.ObjID) bool {
+	if e.hasKeywordH(id, kwhDelve) {
+		return true
+	}
+	if o := e.G.Obj(id); o == nil || o.Zone == state.ZBattlefield {
+		return false
+	}
+	if !e.stackKeywordPossibleH(id, kwhDelve) {
+		return false
+	}
+	for _, k := range e.derivedWith(id, state.ZStack).Keywords {
+		if strings.EqualFold(cardsKeywordHead(k), "Delve") {
+			return true
+		}
+	}
+	return false
+}
+
 // hasCastImprovise reports whether the spell being cast carries Improvise
 // (CR 702.66), read the same way hasCastConvoke reads Convoke: the printed
 // keyword or a layer-6 grant reaching the cast spell. Inspiring Statuary
@@ -766,7 +794,7 @@ func (e *Engine) flashbackCostFor(id state.ObjID, opt decision.Option) Cost {
 // cost whose generic requirement is generic: the smaller of that and p's
 // graveyard size. Zero for a card without Delve.
 func (e *Engine) delveCredit(p state.PlayerID, id state.ObjID, generic int32) int32 {
-	if generic <= 0 || !e.hasKeywordH(id, kwhDelve) {
+	if generic <= 0 || !e.hasCastDelve(id) {
 		return 0
 	}
 	gy := int32(len(e.G.Zone(state.ZGraveyard, p)))

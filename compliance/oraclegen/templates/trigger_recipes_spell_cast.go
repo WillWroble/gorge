@@ -290,6 +290,13 @@ func spellCastNarrowSkip(t *cards.Trigger) string {
 			return "spell-cast unsupported " + shape.reason
 		}
 	}
+	// "Whenever you cast a spell using mana produced by CARDNAME" (Tecutlan,
+	// The Myriad Pools, Barracks of the Thousand) is served by
+	// spellCastSourceManaCause; a carrier it could not serve (no bare-{T}
+	// mana ability of its own) is named here rather than "did not fire".
+	if strings.Contains(strings.ToLower(t.ParamStr(cards.PKValidSA)), "manafromcard") {
+		return "spell-cast mana-from-source provenance: no own {T} mana ability to produce the spent mana"
+	}
 	// No OpponentTurn$ branch: levelb routes every OpponentTurn$ True row to
 	// the trigger.spell-cast-opponent-turn sub, whose cast-family cause
 	// passes to p1's main phase before the cast, so an unserved row here is

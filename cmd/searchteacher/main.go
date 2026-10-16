@@ -58,6 +58,10 @@ type config struct {
 	// policynet.LabelExtras; off, the corpus is schema 2 byte for byte.
 	labelExtras bool
 	rescore     int
+	// explore is -explore: the probability a covered search-seat priority
+	// decision's played answer is forced coverage exploration (0 = off, the
+	// corpus is byte-identical).
+	explore float64
 	// value is the -value-checkpoint model (nil: the heuristic leaf). It is
 	// loaded once before any game and shared read-only by every worker.
 	value *policynet.Model
@@ -152,6 +156,7 @@ func run(args []string, stdout, progress io.Writer) error {
 	labelsPath := fs.String("labels", "", "JSONL label corpus of covered decisions (new file only, atomic publish; gzip-compressed when the path ends in .gz)")
 	rescoreFlag := fs.Int("rescore-worlds", 0, "measurement only: at every covered decision also run an independent search with this many worlds and a different sample seed, recorded as rescore_values in the label (never used to choose; 0 = off)")
 	labelExtrasFlag := fs.Bool("label-extras", false, "pn12: write schema 3 label records with the extras object (the opponent's hand and next draws, flagged diagnostic; every cast/activate option's follow-up target decision; the in-game target answer)")
+	exploreFlag := fs.Float64("explore", 0, "coverage-directed exploration probability per search-seat priority decision (0 = off, byte-identical): the played answer is the least-chosen offered slot, and its label carries explore:true so policy imitation drops it while value/outcome learning keeps it")
 	corpus := fs.String("cards", ".cards", "compiled corpus directory")
 	cpuprofile := fs.String("cpuprofile", "", "write a CPU profile to this pprof file over the whole run (empty = off)")
 	priorPath := fs.String("prior-checkpoint", "", "policynet checkpoint whose policy head ranks the attackers/cast candidates: enumerate -prior-widen, keep the bot answer plus the top -prior-topk (empty = off, today's fixed candidate list)")
@@ -188,6 +193,10 @@ func run(args []string, stdout, progress io.Writer) error {
 	cfg.priorTopK, cfg.priorWiden = *priorTopK, *priorWiden
 	cfg.labelExtras = *labelExtrasFlag
 	cfg.rescore = *rescoreFlag
+	if *exploreFlag < 0 || *exploreFlag > 1 {
+		return fmt.Errorf("-explore must be in [0,1]")
+	}
+	cfg.explore = *exploreFlag
 	if *priorPath != "" {
 		m, err := policynet.LoadCheckpointFile(*priorPath)
 		if err != nil {
@@ -392,6 +401,7 @@ func playGame(setup searchprobe.PublicGame, seed uint64, searchSeat int, cfg con
 	feed := searchseat.NewFeed(actor)
 	observing := search
 	track := targetTracker{label: -1}
+	exp := newExploreDriver(cfg.explore, setup, seed, searchSeat, e)
 	for steps := 0; !e.G.Over; steps++ {
 		if steps >= 20000 || e.G.Turn >= 200 {
 			return e, nil // stall: Over=false
@@ -412,6 +422,13 @@ func playGame(setup searchprobe.PublicGame, seed uint64, searchSeat int, cfg con
 				if e.G.Turn <= cfg.maxTurn {
 					if chosen, ok := teach(setup, feed.HistoryRef(), feed.Collector(), e, d, in, f, cfg, rec, &b); ok {
 						in = chosen
+					}
+					if exp != nil {
+						var forced bool
+						in, forced = exp.answer(e, d, in)
+						if forced && len(rec.Labels) > before {
+							rec.Labels[len(rec.Labels)-1].Explore = true
+						}
 					}
 				}
 				if cfg.labelExtras {

@@ -141,6 +141,11 @@ type Facts struct {
 	FinishingLifeLossBatch bool
 	// TappedTurn maps a permanent to the turn it last became tapped.
 	TappedTurn map[state.ObjID]int32
+	// PlayingLand is the land whose land-play special action (CR 305.1) is
+	// moving it onto the battlefield right now, or 0: it tells a land PLAYED
+	// from a graveyard or exile apart from one merely put onto the
+	// battlefield from there.
+	PlayingLand state.ObjID
 }
 
 // SpecOpts are a matcher's overrides on the filter context Board.MatchesSpec

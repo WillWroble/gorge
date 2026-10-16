@@ -141,11 +141,17 @@ func (w *walker) processPlayer(f *Node, pv *view.PlayerView, isDecisionPlayer bo
 	// nested under the player's subtree exactly as upstream.
 	w.processBattlefield(f.SubFeatures("Battlefield", true), pv, w.ch)
 
-	// graveyard then hand (StateEncoder.java:596-608). perfectInfo is always
-	// true for the public entry, so every player's Hand is walked and no
-	// CardsInHand scalar is emitted.
+	// graveyard then hand (StateEncoder.java:596-608). A visible hand
+	// (pv.Hand non-nil: the viewer's own seat or an omniscient view) is
+	// walked card by card. A redacted hand (nil, CR 400.2) cannot be walked,
+	// so only its COUNT is emitted as CardsInHand, never any identity.
 	w.processGraveyard(f.SubFeatures("Graveyard", true), pv, w.ch)
-	w.processHand(f.SubFeatures("Hand", true), pv, w.ch)
+	if pv.Hand == nil {
+		f.AddNumericFeature("CardsInHand", pv.HandSize, true)
+		w.emit(famCardsInHand)
+	} else {
+		w.processHand(f.SubFeatures("Hand", true), pv, w.ch)
+	}
 
 	// command zone (StateEncoder.java:610-611): after hand, exactly as
 	// upstream. processCommandZone creates the "CommandZone" subtree itself.
@@ -506,7 +512,18 @@ func ProcessState(v view.View, ch view.Chars, seat state.PlayerID, decisionType 
 // hot path and the walker's emit/note calls are no-ops then; ProcessStateReport
 // supplies both maps and reads them back.
 func processState(v view.View, ch view.Chars, seat state.PlayerID, decisionType int, decisionsText string, emitted, unsupported map[string]bool) (map[int32]struct{}, map[string]bool) {
+	return processStateWith(NewEncoder(DefaultTableSize), v, ch, seat, decisionType, decisionsText, emitted, unsupported)
+}
+
+// ProcessStateHook is ProcessState with Encoder.Hook set: every emitted
+// feature is reported with its origin node. Research only (cmd/encablate).
+func ProcessStateHook(v view.View, seat state.PlayerID, decisionType int, decisionsText string, hook func(origin, at *Node, key string)) {
 	e := NewEncoder(DefaultTableSize)
+	e.Hook = hook
+	processStateWith(e, v, nil, seat, decisionType, decisionsText, nil, nil)
+}
+
+func processStateWith(e *Encoder, v view.View, ch view.Chars, seat state.PlayerID, decisionType int, decisionsText string, emitted, unsupported map[string]bool) (map[int32]struct{}, map[string]bool) {
 	w := &walker{e: e, seat: seat, active: v.Active, ch: ch, v: &v,
 		names: map[state.ObjID]string{}, emitted: emitted, unsupported: unsupported}
 	w.indexCards()

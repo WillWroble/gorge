@@ -17,7 +17,12 @@ set -euo pipefail
 
 BIN=${BIN:-bin/gorged}
 DECKS=${DECKS:-internal/testutil/decks}
-# 2026-10-07: 16 tables, 8 constructed + 8 commander. The demo now serves
+# 2026-10-13: 2 tables, the operator's layout: t1 a 1v1 constructed table
+# (two bots, SEATS) and t2 a 4-bot commander pod (COMMANDER_SEATS), both
+# spectated omniscient ("clairvoyant": every hand shown). On-demand
+# play-vs-bot games (-vsbot) are unchanged and come on top of these.
+#
+# 2026-10-07 (retired): 16 tables, 8 constructed + 8 commander. The demo now serves
 # commander games, so the policy must support both formats and 4 seats: the
 # old sb-search-lite-atk default is constructed-only/2-seat and
 # gorged's validateBotPolicyFlags REJECTS it for lacking commander, which
@@ -25,10 +30,12 @@ DECKS=${DECKS:-internal/testutil/decks}
 # constructed+commander and seats 4. TABLES=16 with the FORMATS below
 # cycling constructed,commander gives exactly 8 of each (table i takes
 # formats[(i-1) mod 2]).
-TABLES=${TABLES:-16}
-# 2026-10-07: 4, lethal-pressure's supported seat count (it plays commander,
-# which is a 4-player format).
-SEATS=${SEATS:-4}
+TABLES=${TABLES:-2}
+# Seats of a constructed table, and of a commander table (gorged
+# -commander-seats). 2026-10-13: 2 and 4 -- a bot-vs-bot constructed table
+# beside a 4-player pod. Before that every table seated 4 (2026-10-07).
+SEATS=${SEATS:-2}
+COMMANDER_SEATS=${COMMANDER_SEATS:-4}
 # Wall-clock delay gorged inserts per decision. This has walked 1.5s -> 250ms
 # -> 500ms -> 250ms; the user asked for 250ms back on 2026-09-07, so 250ms is
 # the ruling and the earlier "tighter than a person can follow" judgement was
@@ -46,7 +53,17 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # Hosted bot policy (host/bot_policy.go's closed vocabulary) for every
 # startup table and for a play-vs-bot game that names none.
 #
-# 2026-10-07: lethal-pressure. The demo serves 8 constructed and 8 commander
+# 2026-10-13: bot. Of the three commander-capable entries (bot,
+# lethal-pressure, cast-profile) it is the strongest: on auto-pay tables
+# (-bot-auto-mana, on by default) bot is lethal-pressure plus the
+# combat-simulation attacker/blocker, while lethal-pressure plays as the
+# plain auto-pay bot. That arm passed the held-out gate at 53.69%
+# [52.73, 54.64] Commander and 53.17% [52.68, 53.65] constructed vs the
+# plain auto-pay bot (commit 66aa546dd; docs/superpowers/reports/
+# 2026-10-09-bot-consolidation-plan.md finding 1). Same cost (<1 ms per
+# decision), so the 2026-10-07 load reasoning below still holds.
+#
+# 2026-10-07 (retired): lethal-pressure. The demo serves 8 constructed and 8 commander
 # tables (see TABLES above), and lethal-pressure is constructed+commander and
 # seats 4, so it is the only default that satisfies gorged's
 # validateBotPolicyFlags for that table mix. It also removes the sb-search
@@ -66,12 +83,19 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # 247ms, same ballpark (docs/superpowers/specs/2026-09-28-spellbench-agent-
 # design.md §12.6). Both are Experimental and constructed-only/2-seat-only
 # (bots.Info.Formats/MaxSeats), so neither could serve the commander half of
-# the demo at all. Before that (2026-09-28): lethal-pressure (AR7), which is
-# again today's default.
-BOT_POLICY=${BOT_POLICY:-lethal-pressure}
-# 2026-10-07: constructed,commander -- cycled across 16 TABLES this deals 8
-# tables of each format (table i takes formats[(i-1) mod 2]). Matches the
-# 4-format, 4-seat lethal-pressure shape.
+# the demo at all. Before that (2026-09-28): lethal-pressure (AR7).
+BOT_POLICY=${BOT_POLICY:-bot}
+# false -- the demo serves every policy UNWRAPPED by the bots/sanity
+# CommonSense guard. COMMON_SENSE=true opts the `bot` and `sb-tactical`
+# seats into the guard (hostile self-removal dropped from the option list,
+# the London mulligan answered by botpolicy.MulliganConstructed); measured
+# 2026-10-09 on constructed games only (docs/superpowers/reports/2026-10-09-
+# common-sense-rules-evaluation.md: `bot` 52.6% [50.9, 54.3], `sb-tactical`
+# 51.3% [49.6, 53.0], hostile self-hits 17% -> 0.4%), so it stays opt-in
+# until a commander measurement lands (cli-20261013T173521Z-a00fec60).
+COMMON_SENSE=${COMMON_SENSE:-false}
+# constructed,commander -- table i takes formats[(i-1) mod 2], so TABLES=2
+# deals t1 constructed and t2 commander.
 FORMATS=${FORMATS:-constructed,commander}
 # Deterministic across deploys: the same seed deals the same opening tables,
 # so a UI change is the only thing that differs between two screenshots.
@@ -83,7 +107,44 @@ SEED=${SEED:-1}
 # A distinct variable name here means the Makefile's export can never
 # silently reach the server; a long-running demo wants a higher ceiling.
 DEMO_GOMEMLIMIT=${DEMO_GOMEMLIMIT:-8GiB}
+# gorged -pprof: Go runtime profiles at /debug/pprof/ on each demo server.
+# Off by default. gorged refuses -pprof on a non-loopback listener, and the
+# demo binds 127.0.0.1, but anything the box forwards to these ports (a
+# tunnel or reverse proxy publishing the demo) forwards /debug/pprof/ with
+# it. Set PPROF=true for one deploy to profile it, then redeploy without.
+PPROF=${PPROF:-false}
 
+# AZ_C3_NET / AZ_C3_DECKS (both or neither) serve the az-c3 bot: its .dzgw network
+# and the directory of the FDN decks it was trained on (docs/superpowers/reports/
+# 2026-10-09-az-c3-hosted.md). Set, the demo gains an az-c3 vs az-c3 table —
+# bot-only, so setting AZ_C3_NET is the operator's explicit opt-in for
+# -allow-decklist-bots (az-c3 reads every seat's real decklist; it never plays
+# against a human, and the play-vs-bot deck list no longer offers it).
+AZ_C3_NET=${AZ_C3_NET-}
+AZ_C3_DECKS=${AZ_C3_DECKS-}
+# AZ_C4_NET / AZ_C4_DECKS / AZ_C4_BELIEF (all three or none) serve the az-c4
+# bot (docs/superpowers/reports/2026-10-14-az-c4-hosted.md): its .dzgw network,
+# the FDN decks it may play (AZ_C3_DECKS's directory may be reused: a shared
+# deck is reserved for both) and the belief corpus it guesses its opponent's
+# list from; AZ_C4_BELIEF_POOL optionally names a pool.tsv whose train split
+# is the belief (the C4 corpus: dzgorge-repro/inputs/decks + pool.tsv).
+# az-c4 never reads an opponent's decklist, so it is offered in the
+# play-vs-bot picker against humans and needs NO -allow-decklist-bots; it also
+# gets its own az-c4 vs az-c4 spectator table.
+AZ_C4_NET=${AZ_C4_NET-}
+AZ_C4_DECKS=${AZ_C4_DECKS-}
+AZ_C4_BELIEF=${AZ_C4_BELIEF-}
+AZ_C4_BELIEF_POOL=${AZ_C4_BELIEF_POOL-}
+# AZ_C5_NET / AZ_C5_DECKS / AZ_C5_BELIEF (all three or none), and the optional
+# AZ_C5_BELIEF_POOL, serve the az-c5 bot exactly as the AZ_C4 variables serve
+# az-c4 (docs/superpowers/reports/2026-10-15-az-c5.md): the C5 net, trained
+# after the payment-plan fixes, with az-c4's decks and belief. AZ_C5_DECKS may
+# be AZ_C4_DECKS's (or AZ_C3_DECKS's) directory: a shared deck is reserved for
+# every policy that names it. It gets its own az-c5 vs az-c5 spectator table.
+AZ_C5_NET=${AZ_C5_NET-}
+AZ_C5_DECKS=${AZ_C5_DECKS-}
+AZ_C5_BELIEF=${AZ_C5_BELIEF-}
+AZ_C5_BELIEF_POOL=${AZ_C5_BELIEF_POOL-}
 PUB_PORT=${PUB_PORT:-8080}
 # OMNI_PORT empty (the default) runs no second server.
 OMNI_PORT=${OMNI_PORT-}
@@ -162,6 +223,28 @@ ART_FILL_CEILING=${ART_FILL_CEILING:-230s}
 # With no timeout at all, gorged's own -prewarm-art-budget is the only bound.
 TIMEOUT=$(command -v gnutimeout || command -v timeout || true)
 
+AZ_ARGS=()
+if [ -n "$AZ_C3_NET$AZ_C3_DECKS" ]; then
+	[ -n "$AZ_C3_NET" ] && [ -n "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET and AZ_C3_DECKS go together" >&2; exit 1; }
+	[ -r "$AZ_C3_NET" ] && [ -d "$AZ_C3_DECKS" ] || { echo "deploy-demo: AZ_C3_NET is not a file or AZ_C3_DECKS is not a directory" >&2; exit 1; }
+	AZ_ARGS=(-az-c3-net "$AZ_C3_NET" -az-c3-decks "$AZ_C3_DECKS" -allow-decklist-bots)
+fi
+# closed_az C4 adds the az-c4 flags from the AZ_C4_* variables (C5: az-c5).
+# No -allow-decklist-bots: the closed-list policies never read a decklist.
+closed_az() {
+	local v=AZ_$1 p
+	p=az-$(printf %s "$1" | tr '[:upper:]' '[:lower:]')
+	local net_v=${v}_NET decks_v=${v}_DECKS belief_v=${v}_BELIEF pool_v=${v}_BELIEF_POOL
+	local net=${!net_v} decks=${!decks_v} belief=${!belief_v} pool=${!pool_v}
+	[ -n "$net$decks$belief$pool" ] || return 0
+	[ -n "$net" ] && [ -n "$decks" ] && [ -n "$belief" ] || { echo "deploy-demo: ${v}_NET, ${v}_DECKS and ${v}_BELIEF go together" >&2; exit 1; }
+	[ -r "$net" ] && [ -d "$decks" ] && [ -d "$belief" ] || { echo "deploy-demo: ${v}_NET is not a file, or ${v}_DECKS or ${v}_BELIEF is not a directory" >&2; exit 1; }
+	[ -z "$pool" ] || [ -r "$pool" ] || { echo "deploy-demo: ${v}_BELIEF_POOL is not a file" >&2; exit 1; }
+	AZ_ARGS+=("-$p-net" "$net" "-$p-decks" "$decks" "-$p-belief" "$belief")
+	[ -z "$pool" ] || AZ_ARGS+=("-$p-belief-pool" "$pool")
+}
+closed_az C4
+closed_az C5
 say() { printf 'deploy-demo: %s\n' "$*"; }
 
 # SWEEP=ports (default) stops only the gorged serving the two demo ports —
@@ -264,15 +347,19 @@ start_one() {
 		-spectator "$spectator" \
 		-vsbot-spectator "$vsbot_spectator" \
 		-bot-policy "$BOT_POLICY" \
+		-bot-common-sense="$COMMON_SENSE" \
 		-dir "$dir" \
 		-decks "$DECKS" \
 		-tables "$TABLES" \
 		-seats "$SEATS" \
+		-commander-seats "$COMMANDER_SEATS" \
 		-pace "$PACE" \
 		-format "$FORMATS" \
 		-seed "$SEED" \
 		-art-dir "$ART_DIR" \
+		-pprof="$PPROF" \
 		-vsbot \
+		-events \
 		"$@" \
 		>"$log" 2>&1 </dev/null 9>&- &
 	say "started $spectator on 127.0.0.1:$port (log $log)"
@@ -322,9 +409,30 @@ if [ "$art_rc" -ne 0 ]; then
 	say "!!! art fill INCOMPLETE (exit $art_rc; 124/137 = the $ART_FILL_CEILING hard ceiling under GNU timeout; 125 = uutils timeout gave up after TERM and cannot force-kill a wedged fill) — see the summary above; starting the servers anyway, their background prewarm finishes the cache"
 fi
 
+if [ -n "$AZ_C3_DECKS" ]; then
+	say "filling card-art cache for the az-c3 decks in $AZ_C3_DECKS"
+	${TIMEOUT:+"$TIMEOUT" -k 5s "$ART_FILL_CEILING"} "$BIN" -prewarm-art-only \
+		-prewarm-art-budget "$ART_FILL_BUDGET" \
+		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
+		-decks "$AZ_C3_DECKS" -art-dir "$ART_DIR" || say "!!! az-c3 art fill incomplete (exit $?); the demo still starts"
+fi
+if [ -n "$AZ_C4_DECKS" ] && [ "$AZ_C4_DECKS" != "$AZ_C3_DECKS" ]; then
+	say "filling card-art cache for the az-c4 decks in $AZ_C4_DECKS"
+	${TIMEOUT:+"$TIMEOUT" -k 5s "$ART_FILL_CEILING"} "$BIN" -prewarm-art-only \
+		-prewarm-art-budget "$ART_FILL_BUDGET" \
+		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
+		-decks "$AZ_C4_DECKS" -art-dir "$ART_DIR" || say "!!! az-c4 art fill incomplete (exit $?); the demo still starts"
+fi
+if [ -n "$AZ_C5_DECKS" ] && [ "$AZ_C5_DECKS" != "$AZ_C3_DECKS" ] && [ "$AZ_C5_DECKS" != "$AZ_C4_DECKS" ]; then
+	say "filling card-art cache for the az-c5 decks in $AZ_C5_DECKS"
+	${TIMEOUT:+"$TIMEOUT" -k 5s "$ART_FILL_CEILING"} "$BIN" -prewarm-art-only \
+		-prewarm-art-budget "$ART_FILL_BUDGET" \
+		-prewarm-art-max-consecutive-failures "$ART_FILL_MAX_FAILURES" \
+		-decks "$AZ_C5_DECKS" -art-dir "$ART_DIR" || say "!!! az-c5 art fill incomplete (exit $?); the demo still starts"
+fi
 stop_all
-start_one "$PUB_PORT" "$SPECTATOR" "$PUB_DIR" "$PUB_LOG" "$VSBOT_SPECTATOR"
-if [ -n "$OMNI_PORT" ]; then start_one "$OMNI_PORT" omniscient "$OMNI_DIR" "$OMNI_LOG" public; fi
+start_one "$PUB_PORT" "$SPECTATOR" "$PUB_DIR" "$PUB_LOG" "$VSBOT_SPECTATOR" ${AZ_ARGS[@]+"${AZ_ARGS[@]}"}
+if [ -n "$OMNI_PORT" ]; then start_one "$OMNI_PORT" omniscient "$OMNI_DIR" "$OMNI_LOG" public ${AZ_ARGS[@]+"${AZ_ARGS[@]}"}; fi
 if [ -n "$MB_PORT" ]; then start_one "$MB_PORT" "$SPECTATOR" "$MB_DIR" "$MB_LOG" "$VSBOT_SPECTATOR" -manabrew; fi
 wait_ready "$PUB_PORT"
 [ -z "$OMNI_PORT" ] || wait_ready "$OMNI_PORT"
@@ -336,4 +444,4 @@ wait_ready "$PUB_PORT"
 say "$(curl -fsS "http://127.0.0.1:$PUB_PORT/api/tables" |
 	tr ',' '\n' | grep '"format"' | cut -d'"' -f4 | sort | uniq -c |
 	tr '\n' ' ')on :$PUB_PORT"
-say "ready — spectator ($SPECTATOR, bots $BOT_POLICY, pace $PACE) http://localhost:$PUB_PORT/${OMNI_PORT:+  ·  omniscient http://localhost:$OMNI_PORT/}${MB_PORT:+  ·  manabrew wire http://localhost:$MB_PORT/}"
+say "ready — spectator ($SPECTATOR, bots $BOT_POLICY, seats $SEATS/commander $COMMANDER_SEATS, pace $PACE) http://localhost:$PUB_PORT/${OMNI_PORT:+  ·  omniscient http://localhost:$OMNI_PORT/}${MB_PORT:+  ·  manabrew wire http://localhost:$MB_PORT/}"

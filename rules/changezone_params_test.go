@@ -2,10 +2,8 @@ package rules
 
 import (
 	"slices"
-	"sort"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
 	"github.com/adams-shaun/gorge/effects"
 )
 
@@ -107,30 +105,16 @@ func TestRepeatEachKnownKeysMatchTheCensus(t *testing.T) {
 
 // checkKnownKeysMatchTheCensus holds an API compiler's known-key table equal
 // to the census's measured read set for api plus its ignored and structural
-// keys.
+// keys. A mismatch is bookkeeping, not a finding: the failure names the
+// family's one regenerate command, and -update rewrites every table from the
+// same measurement (paramcensus_update_test.go).
 func checkKnownKeysMatchTheCensus(t *testing.T, api string, got []string) {
 	t.Helper()
 	_, d := measureParamCensus(t, nil)
-	want := map[string]bool{}
-	for k := range d.api[api] {
-		// This key is read by the generic activation-cost tier, not the
-		// resolving API's compiler. Its unread suppression is conditional
-		// on an AB carrying a valid typed permission.
-		if k != cards.PKTapCreaturesForMana.String() {
-			want[k] = true
-		}
+	wantList := knownKeysCensusWant(api, d)
+	if *updateKnownKeys {
+		updateKnownKeyTables(t, got, wantList)
 	}
-	for k := range ignoredParamKeys {
-		want[k] = true
-	}
-	for k := range structuralKeys["sa"] {
-		want[k] = true
-	}
-	var wantList []string
-	for k := range want {
-		wantList = append(wantList, k)
-	}
-	sort.Strings(wantList)
 	if !slices.Equal(got, wantList) {
 		var missing, extra []string
 		for _, k := range wantList {
@@ -139,10 +123,10 @@ func checkKnownKeysMatchTheCensus(t *testing.T, api string, got []string) {
 			}
 		}
 		for _, k := range got {
-			if !want[k] {
+			if !slices.Contains(wantList, k) {
 				extra = append(extra, k)
 			}
 		}
-		t.Fatalf("effects' %s known-key table disagrees with the census: add %q, remove %q", api, missing, extra)
+		t.Fatalf("effects' %s known-key table disagrees with the census: add %q, remove %q -- regenerate with: go test ./rules -run 'KnownKeysMatchTheCensus' -update (the rewrite lands for the NEXT run: the package var was loaded before it; rerun without -update to verify)", api, missing, extra)
 	}
 }

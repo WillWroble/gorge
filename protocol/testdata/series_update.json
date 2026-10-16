@@ -1,0 +1,25 @@
+{
+  "v": 1,
+  "t": "series_update",
+  "id": 4182,
+  "table": "t1",
+  "match": 7,
+  "seq": 0,
+  "body": {
+    "event": "ev-1",
+    "series": {
+      "round": 2,
+      "a": 1,
+      "b": 3,
+      "best_of": 1,
+      "state": "ended",
+      "table": "ev1g4",
+      "attempt": 1,
+      "score": [
+        1,
+        0
+      ],
+      "winner": 1
+    }
+  }
+}

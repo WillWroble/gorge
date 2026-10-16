@@ -12,7 +12,27 @@ type Player struct {
 	// CoinFlipsThisTurn counts canonical flip-result Notes. Folded by
 	// events.Apply and cleared at TurnChange; clone copies this scalar.
 	CoinFlipsThisTurn int32
-	Pool              Mana
+	// SpellsCastThisTurn, LifeGainedThisTurn, LifeLostThisTurn and
+	// TokensCreatedThisTurn are the per-seat turn watchers: spells put on
+	// the stack, life gained, life lost (damage to the player included,
+	// infect poison excluded) and tokens minted since the last TurnChange.
+	// Folded only by events.Apply (events/apply_turnwatch.go) and cleared at
+	// TurnChange, so a log-only replay rebuilds them exactly; clone copies
+	// these scalars with the Player struct.
+	SpellsCastThisTurn    int32
+	LifeGainedThisTurn    int32
+	LifeLostThisTurn      int32
+	TokensCreatedThisTurn int32
+	// AttackedPlayersThisTurn and AttackedPlaneswalkersThisTurn are the
+	// seat's attack watchers: bit d is set when a creature this seat
+	// controlled was declared attacking player d itself, or a planeswalker
+	// player d controlled, since the last TurnChange (CR 508.1b) --
+	// Forge's attackedYouTheirCurrentTurn / attackedYouCtrlTheirCurrentTurn
+	// player properties (Sandswirl Wanderglyph). Folded only by events.Apply
+	// (DeclareAttackers) and cleared at TurnChange with the other watchers.
+	AttackedPlayersThisTurn       uint64
+	AttackedPlaneswalkersThisTurn uint64
+	Pool                          Mana
 
 	// RestrictedMana retains the spend restriction on mana produced by a
 	// RestrictValid$ mana ability. It is cleared with the pool at step/phase
@@ -446,6 +466,13 @@ type Game struct {
 	// A persisted match supplies it on replay so a later corpus update cannot
 	// renumber a NameCard decision's options.
 	NameUniverseNames []string
+	// HypotheticalCards is the card table a hypothetical search world's
+	// HiddenIdentity events name their cards from (the closed-decklist
+	// redeal's belief universe). Like Tokens it is immutable shared corpus
+	// data, not game state: rules.ReidentifyHidden sets it once on a
+	// hypothetical engine before emitting the events that read it, clones
+	// share it, and it is nil in every real match and replay.
+	HypotheticalCards *cards.Universe
 
 	// Delayed holds delayed-trigger registrations (CR 603.7: Mode$ Phase, or
 	// the event-matched shape a DelayedTrigger.EventMode names) that have not
@@ -622,6 +649,19 @@ type DelayedTrigger struct {
 	// ("|RN=<n>") because the event gains no field (Ruling T20-a); zero when
 	// the registration remembered no number.
 	RememberedAmount int32
+	// DefinedPlayer is a DelayedTriggerDefinedPlayer$ registration's player
+	// (seat+1; zero = none): the registration is armed only from that
+	// player's first turn start after BirthTurn, and with ThisTurn$ it dies
+	// when that turn ends. It rides the DelayedRegister Text ("|DP=<n>")
+	// because the event gains no field (Ruling T20-a).
+	DefinedPlayer int32
+	// ThisTurnDefined marks a DefinedPlayer registration that also carried
+	// ThisTurn$ True (expires at the end of the defined player's turn).
+	// Rides "|TD".
+	ThisTurnDefined bool
+	// Static is a Static$ True Mode$ Phase registration: Forge runs its body
+	// at fire time without a stack object. Rides the bare "|ST" flag.
+	Static bool
 }
 
 const startingLife = 20

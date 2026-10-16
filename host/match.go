@@ -106,6 +106,12 @@ type match struct {
 	// each rewind until the queue is empty. Created at match build, never
 	// reassigned, and dies with the match.
 	undo *undoQueue
+	// ledger is HD-2's per-intent provenance ledger (host/divergence_ledger.go):
+	// one byte per accepted intent, bit 0 caretaker, bit 1 client-auto. Host
+	// metadata like m.snaps — never replay input, never an event. Appended in
+	// attempt's exclusive section, truncated beside the other per-intent
+	// bookkeeping on undo; its length always equals m.intents. Guarded by m.mu.
+	ledger []uint8
 	// feeds owns the live observation feed of every non-human bots.EnvSeat on
 	// this match (host/botenv.go, spec §5.2 Create/Observe/Record). Nil when
 	// no seat implements bots.EnvSeat — the allocation-free fast path every
@@ -123,11 +129,21 @@ type snapshot struct {
 	e      *rules.Engine
 }
 
-// newMatch resolves decks, seeds and builds the engine through genesis and
-// the first Advance, so the returned match is at intent boundary 0. When
-// persistence is on it also opens the match's files, writes the live
-// sidecar and appends the genesis events; any error halts the table.
+// newMatch is the pre-E3 constructor, still called directly by tests and
+// embedders: it builds match k from the table's own deck list (rotated by
+// k) with the seeded toss.
 func (r *Registry) newMatch(t *table, k int) (*match, error) {
+	return r.newMatchWith(t, k, nil)
+}
+
+// newMatchWith resolves decks, seeds and builds the engine through genesis
+// and the first Advance, so the returned match is at intent boundary 0.
+// When persistence is on it also opens the match's files, writes the live
+// sidecar and appends the genesis events; any error halts the table. A
+// non-nil plan (E3-2) replaces the rotated deck list with the series hook's
+// per-seat decks and, when plan.Chooser >= 0, poses CR 103.1's
+// starting-player choice to that seat in place of the toss winner.
+func (r *Registry) newMatchWith(t *table, k int, plan *SeriesGame) (*match, error) {
 	c := t.cfg
 	seed := MatchSeed(c.Seed, k)
 	names := make([]string, c.Seats)
@@ -157,6 +173,11 @@ func (r *Registry) newMatch(t *table, k int) (*match, error) {
 	infos := make([]protocol.SeatInfo, c.Seats)
 	for i := 0; i < c.Seats; i++ {
 		dn := c.Decks[(i+k)%len(c.Decks)]
+		if plan != nil {
+			// E3-2: a series plan indexes decks by SEAT — the hook decides
+			// who plays what this match; no k rotation.
+			dn = plan.Decks[i]
+		}
 		d, err := r.opts.LoadDeck(dn)
 		if err != nil {
 			return nil, fmt.Errorf("host: table %s match %d: deck %q: %w", c.ID, k, dn, err)
@@ -187,6 +208,14 @@ func (r *Registry) newMatch(t *table, k int) (*match, error) {
 	// Config with the host guard at its default keeps the watcher on.
 	if r.opts.MaxDecisionsPerTurn == 0 {
 		cfg.LoopGuard = &rules.LoopGuard{Disabled: true}
+	} else {
+		// The default object cap (CV-8): a hosted table's degenerate token
+		// storm ends as a recorded stalled match (the play recover below
+		// re-classifies it) instead of growing the arena and event log
+		// until the process OOMs. The same volume bound the shared harness
+		// drive loop (internal/bench) arms; an explicit caller guard would
+		// win, and no host path sets one.
+		cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	}
 	// The format the table was configured with is threaded into the engine
 	// once, here, so the match's rules.Config is the single value both the
@@ -209,6 +238,14 @@ func (r *Registry) newMatch(t *table, k int) (*match, error) {
 			cfg.Commanders[i] = append([]int(nil), cmds[i]...)
 		}
 	default: // FormatConstructed: the zero rules.Config, every field stays unset.
+	}
+	if plan != nil && plan.Chooser >= 0 {
+		// E3-2: the series hook chose the seat posed CR 103.1's
+		// starting-player choice in place of the toss winner (rules.
+		// Config.StartChooser). A fresh int, so the plan can never be
+		// aliased into the match's Config.
+		chooser := plan.Chooser
+		cfg.StartChooser = &chooser
 	}
 	e := rules.NewStartingPlayerChoice(cfg)
 	// Events growEvents was the top allocator in ./host (2.87 GB of the test
@@ -301,22 +338,27 @@ func (m *match) sidecar() sidecar {
 		Head: m.head, Events: events, Turns: m.e.G.Turn, Reason: m.reason, Mulligans: m.cfg.Mulligans,
 		NameUniverse:      m.cfg.NameUniverse.Len() > 0,
 		NameUniverseNames: append([]string(nil), m.e.G.NameUniverseNames...),
+		PaidManaCensus:    !m.cfg.DisablePaidManaCensus,
 		Format:            Format(m.cfg.Format), StartingLife: m.cfg.StartingLife, Commanders: m.cfg.Commanders, BotPolicy: m.table.cfg.BotPolicy,
-		Refusals: m.refusals, Fallbacks: m.fallbacks, RootRefusals: m.rootRefusals}
+		StartChooser: m.cfg.StartChooser,
+		Refusals:     m.refusals, Fallbacks: m.fallbacks, RootRefusals: m.rootRefusals}
 }
 
 // defaultSeats is PL-14: one bot per seat, seeded from the match seed.
 func defaultSeats(policy string, names []string, seed uint64) []seat.Seat {
-	return defaultSeatsWithAutoPayMana(policy, false, names, seed, 0, bots.Deps{}, hostedDecisionDeadlineMS)
+	return defaultSeatsWithAutoPayMana(policy, false, false, names, seed, 0, bots.Deps{}, hostedDecisionDeadlineMS)
 }
 
 // defaultSeatsWithAutoPayMana builds every table bot with the persisted
-// auto-payment setting, the registry's search parallelism and the embedder's
-// card dependency (BP-13: deps rides bots.Options.Deps into every factory,
-// so a policy that reads card facts builds on a served table). Keeping the
-// legacy wrapper preserves embedders and tests that intentionally exercise
-// the historical manual-mana policy.
-func defaultSeatsWithAutoPayMana(policy string, autoPayMana bool, names []string, seed uint64, searchParallelism int, deps bots.Deps, deadlineMS int) []seat.Seat {
+// auto-payment and CommonSense settings (bots.Options.AutoPayMana and
+// bots.Options.CommonSense — the bots/sanity guard; both are part of the
+// table's configuration, so a restart rebuilds the same seats), the
+// registry's search parallelism and the embedder's card dependency (BP-13:
+// deps rides bots.Options.Deps into every factory, so a policy that reads
+// card facts builds on a served table). Keeping the legacy wrapper preserves
+// embedders and tests that intentionally exercise the historical manual-mana
+// policy.
+func defaultSeatsWithAutoPayMana(policy string, autoPayMana, commonSense bool, names []string, seed uint64, searchParallelism int, deps bots.Deps, deadlineMS int) []seat.Seat {
 	out := make([]seat.Seat, len(names))
 	for i := range names {
 		// BP-10: BotSearchParallelism rides bots.Options.SearchParallelism so a
@@ -324,9 +366,9 @@ func defaultSeatsWithAutoPayMana(policy string, autoPayMana bool, names []string
 		// policy wrapper (bot_policy.go NewBotPolicySeatWithAutoPayMana) stays
 		// untouched — its public signature is used by cmd/cardfuzz and the
 		// tests; the table path builds through bots.New with Seed,
-		// AutoPayMana, SearchParallelism and BotDeps, exactly what the
-		// wrapper would thread.
-		bot, err := bots.New(policy, bots.Options{Seed: seed ^ uint64(i+1), AutoPayMana: autoPayMana, SearchParallelism: searchParallelism, Deps: deps, DecisionDeadlineMS: deadlineMS})
+		// AutoPayMana, SearchParallelism, BotDeps and CommonSense, exactly what
+		// the wrapper would thread.
+		bot, err := bots.New(policy, bots.Options{Seed: seed ^ uint64(i+1), AutoPayMana: autoPayMana, CommonSense: commonSense, SearchParallelism: searchParallelism, Deps: deps, DecisionDeadlineMS: deadlineMS})
 		if err != nil {
 			panic(err) // policy was normalized before the table was registered.
 		}
@@ -367,6 +409,22 @@ func (pd *parkedDecision) answer() (decision.Intent, error) {
 		return decision.CloneIntent(in), err
 	}
 	return decision.CloneIntent(pd.in), pd.err
+}
+
+// provenance reports HD-2's provenance bits for the decision this parking
+// just answered (host/divergence_ledger.go): the caretaker bit is the seat's
+// caretakerFires delta across the await — the counter's only writer is the
+// await's own caretaker path, whose increment happens before it returns —
+// and the auto bit is the ?auto flag the accepted submit stamped on the
+// slot, copied out by await on receive. A bot seat (hs nil) is never a
+// caretaker or an autopilot: both bits false. Call after answer() returned
+// an intent the loop is about to submit; on the undo/error paths the loop
+// never reads it and appends nothing.
+func (pd *parkedDecision) provenance() (caretaker, auto bool) {
+	if pd.hs == nil {
+		return false, false
+	}
+	return pd.hs.s.caretakerCount() > pd.hs.fires0, pd.hs.auto
 }
 
 // parkedData is the projected shape of one pending decision, split out of the
@@ -459,6 +517,9 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 	if wantsPlans {
 		m.e.EnsurePaymentActions()
 	}
+	if c, ok := seats[d.Player].(seat.TargetHintConsumer); ok && c.WantsTargetHints() {
+		m.e.EnsureTargetHints()
+	}
 	dc := *d.Clone()
 	// Payment plans are an opt-in human interface. Keep the engine's pending
 	// decision intact for replay and independently configured bots, but never
@@ -494,13 +555,13 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 	// never implements bots.EnvSeat today, but if one ever did, the human
 	// must still be parked on a View, not silently handed an Env.
 	if es, ok := seats[d.Player].(bots.EnvSeat); ok && !isHuman && es.WantsEnv(&dc) {
-		return m.envData(d.Player, &dc, brd)
+		return m.envData(d.Player, &dc, brd, es)
 	}
 	if _, ok := seats[d.Player].(seat.BoardSeat); ok && !isHuman {
 		return &parkedData{
 			p:       d.Player,
 			dc:      dc,
-			brd:     botpolicy.BoardFromGameInto(m.e.G, m.e, d.Player, brd),
+			brd:     botpolicy.BoardFromGameInto(m.e.G, m.e, d.Player, brd).Detached(),
 			isBoard: true,
 		}
 	}
@@ -602,6 +663,17 @@ func parkSeat(ctx context.Context, seats []seat.Seat, pd *parkedData, undo <-cha
 func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) {
 	defer func() {
 		if p := recover(); p != nil {
+			// A volume LivelockError (the armed object cap, CV-8) is not an
+			// engine bug: the game's board grew past its budget mid-turn,
+			// exactly the shape the per-turn decision guard's own stall
+			// crash records. Record it through the same ordinary MatchCrashed
+			// path with the stall wording -- the table halts with a reason an
+			// operator reads as a stall, never as a "panic:" bug report, and
+			// it cannot wedge: play returns, run() ends the table.
+			if lle, ok := p.(*rules.LivelockError); ok && rules.IsVolumeReason(lle.Reason) {
+				final = r.crash(t, m, fmt.Errorf("stalled: %v", lle))
+				return
+			}
 			final = r.crash(t, m, fmt.Errorf("panic: %v\n%s", p, debug.Stack()))
 		}
 	}()
@@ -629,7 +701,13 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	if r.opts.BotUnboundedDecisions {
 		budget = 0
 	}
-	seats := defaultSeatsWithAutoPayMana(t.cfg.BotPolicy, autoPayMana, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	seats := defaultSeatsWithAutoPayMana(t.cfg.BotPolicy, autoPayMana, t.cfg.BotCommonSense, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	if len(t.cfg.SeatBotPolicies) > 0 {
+		// E1-2: a table with per-seat bot policies rebuilds its bots from
+		// SeatBotPolicies (seat i plays seatBotPolicy(i)); the embedder's
+		// r.opts.Seats override below still wins over it.
+		seats = seatPolicySeats(t.cfg, autoPayMana, m.cfg.Names, m.seed, r.opts.BotSearchParallelism, r.opts.BotDeps, budget)
+	}
 	if r.opts.Seats != nil {
 		seats = r.opts.Seats(m.cfg.Names, m.seed)
 	}
@@ -651,6 +729,12 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	// every Observe/Record below is a nil-receiver no-op (§5.2 Create).
 	m.feeds = newMatchFeeds(seats)
 	m.mu.Unlock()
+	// Decklist privacy (host/closedlist.go): at a table with a human, every
+	// search seat must close its opponents' lists, checked on the seats
+	// actually built rather than on the policy's declaration.
+	if err := closedListGuard(t.cfg, seats); err != nil {
+		return r.crash(t, m, err)
+	}
 	// Task M2b-3: arm every human seat with its think budget and its
 	// deterministic caretaker bot — the one defaultSeats would have built
 	// for that slot (seed ^ slot+1), so a timed-out human decision is
@@ -662,7 +746,7 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 	// never races a Decide.
 	for i, s := range seats {
 		if hs, ok := s.(*HumanSeat); ok {
-			caretaker, err := newCaretakerSeat(t.cfg.BotPolicy, m.seed^uint64(i+1), autoPayMana, r.opts.BotDeps)
+			caretaker, err := newCaretakerSeat(t.cfg.BotPolicy, m.seed^uint64(i+1), autoPayMana, t.cfg.BotCommonSense, r.opts.BotDeps)
 			if err != nil {
 				return r.crash(t, m, err)
 			}
@@ -805,6 +889,13 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 		}
 		var next *parkedDecision
 		var nextData *parkedData
+		// HD-2's provenance bits for the intent the seat just gave (the doc
+		// on parkedDecision.provenance). They mark THIS seat's own answer;
+		// the refusal ladder's rungs below are bots.RefusalAnswerer
+		// fallbacks — a HumanSeat is never one, so a human's caretaker/auto
+		// bits can never ride a rung, and for a bot seat both bits are false
+		// — so the same flags append on every rung the ladder submits.
+		caretaker, auto := parked.provenance()
 		// attempt runs one Submit attempt as its own exclusive section and
 		// reports whether the ENGINE refused it (a submission error) as
 		// opposed to a post-Submit failure (persistence). A refused Submit
@@ -824,6 +915,18 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 				d := m.e.Pending()
 				var drec *decision.Decision
 				if d != nil && m.feeds != nil {
+					// A payment-plan answer (in.Payment / in.Announce) names
+					// one of the decision's PaymentActions, which the engine
+					// builds lazily -- Submit builds them to validate it. A
+					// seat that opts out of PaymentPlanConsumer (az-redeal's
+					// manual config, or a test seat) leaves them
+					// unbuilt on the live decision, so the copy recorded on
+					// the feed could not translate the answer and the feed
+					// stopped for the rest of the game. Build them first: a
+					// pure derived read, no event, no RNG.
+					if in.Payment != nil || in.Announce != nil {
+						m.e.EnsurePaymentActions()
+					}
 					drec = d.Clone()
 				}
 				if e := m.e.Submit(in); e != nil {
@@ -831,6 +934,10 @@ func (r *Registry) play(ctx context.Context, t *table, m *match) (final string) 
 					return e
 				}
 				m.afterSubmit(before)
+				// HD-2: the accepted intent's provenance byte, appended in
+				// the same exclusive section (a refused submit appends
+				// nothing). host/divergence_ledger.go holds the shape.
+				m.ledgerAppend(caretaker, auto)
 				// Record the ACCEPTED intent (which may be a refusal-ladder
 				// rung, not the seat's first answer) on the actor's feed, after
 				// the Submit that took it (§5.2 Record).

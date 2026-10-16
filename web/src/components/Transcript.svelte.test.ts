@@ -178,3 +178,24 @@ describe('Transcript — the client-local auto-pass notes (prio5)', () => {
     expect(html).not.toContain('data-auto-log');
   });
 });
+
+describe('Transcript — live tail window', () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ev(i + 1, 'put_on_stack', `Ann casts Island #${i + 1}`));
+
+  it('renders only the newest 150 lines while live, and says how many it hid', () => {
+    const html = renderLog(dvr(many(1000)));
+    expect(html.match(/data-seq="/g)).toHaveLength(150);
+    expect(html).toContain('data-seq="1000"');
+    expect(html).toContain('data-seq="851"');
+    expect(html).not.toContain('data-seq="850"');
+    expect(html).toContain('Earlier lines hidden while live');
+  });
+
+  it('renders every line when paused, and a short live log whole', () => {
+    const paused = { ...dvr(many(1000)), live: false, cursor: 10 };
+    const html = renderLog(paused);
+    expect(html.match(/data-seq="/g)).toHaveLength(1000);
+    expect(html).not.toContain('data-clipped');
+    expect(renderLog(dvr(many(50))).match(/data-seq="/g)).toHaveLength(50);
+  });
+});
