@@ -643,13 +643,20 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 
 // deferPrior is lazyPrior's deferred prior for the point pd with candidates
 // cands, or nil when the prior must be computed now: lazyPrior off, no
-// network (the uniform prior costs nothing), or a top-k cut that may drop
-// candidates. The closure ranks cands as rankedPrior does (it reads their
-// intents, never their keys, and modifies neither) and returns the ranked
-// keys and prior; it counts PriorFallbacks when it runs.
+// network (the uniform prior costs nothing), a top-k cut that may drop
+// candidates, or two candidates sharing a key. The closure ranks cands as
+// rankedPrior does (it reads their intents, never their keys, and modifies
+// neither) and returns the ranked keys and prior; it counts PriorFallbacks
+// when it runs.
+//
+// A deferred point leaves e.cands in enumeration order, where the eager
+// prior leaves it ranked, and Play submits the first candidate holding the
+// key it is given: the two agree only while every key is held once. Keys
+// can collide (a "choose" division's key omits the split, so its six
+// candidates hold three keys), and such a point is ranked now.
 func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int, seat bool) func() ([]Key, []float64) {
 	net := e.cfg.priorNet()
-	if !e.cfg.lazyPrior || net == nil || (topK > 0 && len(cands) > topK) {
+	if !e.cfg.lazyPrior || net == nil || (topK > 0 && len(cands) > topK) || sharedKey(cands) {
 		return nil
 	}
 	return func() ([]Key, []float64) {
@@ -667,6 +674,18 @@ func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind s
 		}
 		return candKeys(kept), prior
 	}
+}
+
+// sharedKey reports whether two of cands hold one key.
+func sharedKey(cands []cand) bool {
+	for i := 1; i < len(cands); i++ {
+		for j := range i {
+			if cands[i].key == cands[j].key {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // oppBot is seat p's auto-pay walk bot under oppAutoPay, nil otherwise.
