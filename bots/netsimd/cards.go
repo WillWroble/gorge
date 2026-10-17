@@ -124,6 +124,21 @@ func (g *Net) BagAdd(dst []float32, rows []policynet.Feature) {
 	}
 }
 
+// SumRows adds Σ value·table[row·width : (row+1)·width] over rows to dst
+// (width floats): the bag kernel over a caller's own table (width 32 or
+// 64, the table width·rows long). A caller keeping per-part
+// sums in one table adds them up with it (value 1: exactly dst + row, in
+// order).
+func SumRows(dst, table []float32, width int, rows []policynet.Feature) {
+	if width != 32 && width != 64 {
+		panic("netsimd: SumRows width must be 32 or 64")
+	}
+	if len(rows) == 0 {
+		return
+	}
+	bag(&dst[0], &table[0], (*feat)(unsafe.Pointer(&rows[0])), len(rows), len(table)/width, width)
+}
+
 // EvalBag is EvalCards with the state's sparse bag given as its row sum
 // (BagWidth floats, BagAdd's) instead of its entries. Summed in another
 // order than Eval sums the sorted entries, the logits agree with Eval's to

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/netsimd"
+	"github.com/adams-shaun/gorge/bots/policynet"
 )
 
 // Every precomputed path -- vectors, identity halves, raw features and
@@ -214,4 +215,34 @@ func TestEvalBagMatchesEval(t *testing.T) {
 	if maxd > 1e-4 {
 		t.Fatalf("two-part bag logits differ by %v", maxd)
 	}
+}
+
+// SumRows over a caller's table with value-1 rows is the plain sum, in
+// order, through the AVX-512 kernel and the scalar fallback.
+func TestSumRows(t *testing.T) {
+	for _, scalar := range []bool{false, true} {
+		netsimd.ForceScalar = scalar
+		const w, n = 32, 50
+		tab := make([]float32, n*w)
+		for i := range tab {
+			tab[i] = float32(i%97)*0.37 - 11
+		}
+		rows := []policynet.Feature{{Row: 3, Value: 1}, {Row: 49, Value: 1}, {Row: 3, Value: 1}, {Row: 7, Value: 1}}
+		got := make([]float32, w)
+		got[5] = 2
+		netsimd.SumRows(got, tab, w, rows)
+		for j := 0; j < w; j++ {
+			want := float32(0)
+			if j == 5 {
+				want = 2
+			}
+			for _, r := range rows {
+				want += tab[int(r.Row)*w+j]
+			}
+			if math.Float32bits(got[j]) != math.Float32bits(want) {
+				t.Fatalf("scalar=%v lane %d: %v, want %v", scalar, j, got[j], want)
+			}
+		}
+	}
+	netsimd.ForceScalar = false
 }
