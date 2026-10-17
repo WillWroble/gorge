@@ -33,7 +33,7 @@ func (e *Engine) checkGrantedStormTriggers(observer *Engine, id state.ObjID, o *
 	if ev.Kind != events.PutOnStack || id != ev.Obj {
 		return
 	}
-	if !e.hasKeywordH(id, kwhStorm) || f.HasKeyword("Storm") {
+	if !e.hasKeywordH(id, kwhStorm) || f.HasKeywordRef(kwRefStorm) {
 		return
 	}
 	t := cards.Trigger{Mode: "SpellCast", Params: map[string]string{

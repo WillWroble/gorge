@@ -1732,7 +1732,7 @@ type ExileReturnEntry struct {
 // An unattached bestowed card, and any object printed without Bestow, is
 // never "bestowed attached".
 func (o *Object) BestowedAttached() bool {
-	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeyword("Bestow")
+	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeywordRef(kwRefBestow)
 }
 
 // BestowedAuraSpell reports whether o is a card printed with Bestow that is
@@ -1750,7 +1750,7 @@ func (o *Object) BestowedAttached() bool {
 // (no FlagBestowed), is never a bestowed Aura spell.
 func (o *Object) BestowedAuraSpell() bool {
 	return o.Zone == ZStack && o.CastFlags&FlagBestowed != 0 &&
-		o.Face() != nil && o.Face().HasKeyword("Bestow")
+		o.Face() != nil && o.Face().HasKeywordRef(kwRefBestow)
 }
 
 // ReconfiguredAttached reports whether o is a card printed with Reconfigure
@@ -1762,7 +1762,7 @@ func (o *Object) BestowedAuraSpell() bool {
 // An unattached reconfigure card, and any object printed without
 // Reconfigure, is never "reconfigured attached".
 func (o *Object) ReconfiguredAttached() bool {
-	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeyword("Reconfigure")
+	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeywordRef(kwRefReconfigure)
 }
 
 // ImpendingDormant reports whether o is a permanent cast for its impending

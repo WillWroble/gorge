@@ -147,6 +147,7 @@ var fingerprintCensus = map[string]fingerprintFile{
 	"open.go":                 {false, "cache lookup, freshness, prune and path re-rooting; load side only"},
 	"params.go":               {true, "compiled ParamKey vocabulary and ParamSet encoding"},
 	"parse.go":                {true, "the script parser"},
+	"keyword_refs.go":         {false, "runtime KeywordRef vars the cards package asks faces through"},
 	"primitive.go":            {false, "coverage Primitives computed on demand, not stored"},
 	"printed_facts.go":        {false, "view facts in an unexported Face field gob never encodes; derive recomputes them on load"},
 	"registry.go":             {true, "Registry, CompileDir, Save/LoadRegistry and cacheVersion"},

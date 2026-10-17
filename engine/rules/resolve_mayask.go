@@ -175,7 +175,7 @@ func tapeTextMayAsk(e *Engine) bool {
 		if sa == nil {
 			return false
 		}
-	} else if f.HasKeyword("Cipher") {
+	} else if f.HasKeywordRef(kwRefCipher) {
 		return true // the resolving spell's CR 702.99a encode election
 	}
 	if sa == nil {

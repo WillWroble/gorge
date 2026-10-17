@@ -39,7 +39,7 @@ func init() { effects.RegisterNonAPI("kw:Paradigm") }
 // object may be a spell on the stack (spellRestZone) or the exiled card
 // (paradigmMayPlay); both read the same printed face.
 func hasParadigm(o *state.Object) bool {
-	return o != nil && o.Face() != nil && o.Face().HasKeyword("Paradigm")
+	return o != nil && o.Face() != nil && o.Face().HasKeywordRef(kwRefParadigm)
 }
 
 // paradigmMayPlay reports whether the exiled Paradigm card o is a free

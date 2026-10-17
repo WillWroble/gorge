@@ -82,7 +82,7 @@ func (e *Engine) giftAsk() bool {
 		return false
 	}
 	o := e.G.Obj(pc.card)
-	if o == nil || o.Face() == nil || !o.Face().HasKeyword("Gift") {
+	if o == nil || o.Face() == nil || !o.Face().HasKeywordRef(kwRefGift) {
 		return false
 	}
 	if _, ok := o.Face().SVars["GiftAbility"]; !ok {

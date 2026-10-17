@@ -941,7 +941,7 @@ func quietAffordable(floor, ceiling int32, unbounded bool) bool {
 
 // quietFaceHasDownCast reports a Morph/Megamorph/Disguise face-down cast.
 func quietFaceHasDownCast(f *cards.Face) bool {
-	return f.HasKeyword("Morph") || f.HasKeyword("Megamorph") || f.HasKeyword("Disguise")
+	return f.HasKeywordRef(kwRefMorph) || f.HasKeywordRef(kwRefMegamorph) || f.HasKeywordRef(kwRefDisguise)
 }
 
 // quietHandKeywordAction reports a hand keyword action offered regardless of

@@ -99,7 +99,7 @@ func (e *Engine) sunburstEntryMatch(ev events.Event) *replMatch {
 	if o == nil || o.Face() == nil {
 		return nil
 	}
-	if o.Face().HasKeyword("Sunburst") {
+	if o.Face().HasKeywordRef(kwRefSunburst) {
 		// Printed K:Sunburst: already expanded cards-side (engine/cards/kw_sunburst.go);
 		// the face-Repl scan collected it. The grant shape's printed face never
 		// carries the line, so this gate admits only the granted case.
@@ -186,7 +186,7 @@ func (e *Engine) applyRiotReplacement(ev events.Event) bool {
 	}
 	o := e.G.Obj(ev.Obj)
 	if o == nil || o.Zone == state.ZBattlefield || o.Face() == nil ||
-		!o.Face().HasKeyword("Riot") || o.RiotChoice != "" {
+		!o.Face().HasKeywordRef(kwRefRiot) || o.RiotChoice != "" {
 		return false
 	}
 	// A face-down entry (manifest or cloak, CR 708.5) is a vanilla 2/2

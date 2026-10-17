@@ -272,7 +272,7 @@ func faceMayPlayHot(f *cards.Face) bool {
 			return true
 		}
 	}
-	return f.HasKeyword("Paradigm")
+	return f.HasKeywordRef(kwRefParadigm)
 }
 
 // walkClassOf returns id's class, computing and caching it on first use.

@@ -298,7 +298,7 @@ func IntrinsicAllCreatureTypes(o *state.Object) bool {
 		return false
 	}
 	f := o.Face()
-	if f.HasKeywordID("Changeling", kwChangeling) || f.AllCreatureTypesCDA() {
+	if f.HasKeywordRef(kwRefChangeling) || f.AllCreatureTypesCDA() {
 		return true
 	}
 	for _, kw := range o.IntrinsicKeywords {

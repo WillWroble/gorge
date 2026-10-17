@@ -62,7 +62,7 @@ func (e *Engine) applyUnleashReplacement(ev events.Event) bool {
 	}
 	o := e.G.Obj(ev.Obj)
 	if o == nil || o.Zone == state.ZBattlefield || o.Face() == nil ||
-		!o.Face().HasKeyword("Unleash") || o.UnleashChoice != "" {
+		!o.Face().HasKeywordRef(kwRefUnleash) || o.UnleashChoice != "" {
 		return false
 	}
 	move := ev

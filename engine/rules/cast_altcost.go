@@ -345,7 +345,7 @@ func harmonizeCost(f *cards.Face) (Cost, bool) {
 // battlefield order and returns the creatures that pay it by becoming tapped.
 func (e *Engine) harmonizePayment(p state.PlayerID, id state.ObjID, c Cost) (Cost, []state.ObjID) {
 	o := e.G.Obj(id)
-	if o == nil || o.Face() == nil || !o.Face().HasKeyword("Harmonize") {
+	if o == nil || o.Face() == nil || !o.Face().HasKeywordRef(kwRefHarmonize) {
 		return c, nil
 	}
 	var tapped []state.ObjID

@@ -259,7 +259,7 @@ func computeQuietFaceFacts(f *cards.Face, hasAltCosts bool) quietFaceFacts {
 	var q quietFaceFacts
 	q.isLand = f.IsLand()
 	q.castFloor = f.Cmc()
-	q.instantSpeed = f.IsInstant() || f.HasKeyword("Flash") || mayFlashSacFace(f) || faceHasCastWithFlash(f)
+	q.instantSpeed = f.IsInstant() || f.HasKeywordRef(kwRefFlash) || mayFlashSacFace(f) || faceHasCastWithFlash(f)
 	if hasAltCosts {
 		q.castOpen = true
 	} else if r, open := quietCastOpen(f); open {

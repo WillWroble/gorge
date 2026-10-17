@@ -336,7 +336,7 @@ func (e *Engine) paymentPlanCastShapeDetailScoped(statics costStaticViews, p sta
 		spellCost.Waterbend != 0 || spellCost.WaterbendX {
 		return "shape:contribution"
 	}
-	if f.HasKeyword("Gift") {
+	if f.HasKeywordRef(kwRefGift) {
 		return "shape:gift"
 	}
 	// faceHasModeCost, memoised per face (face_scan_memo.go).

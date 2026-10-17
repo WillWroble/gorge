@@ -398,7 +398,7 @@ func compiledBaseMatch(g *state.Game, a *compiledAlt, o *state.Object, sc *SpecC
 				}
 			}
 		} else {
-			m = o.Face() != nil && o.Face().HasKeyword("Affinity")
+			m = o.Face() != nil && o.Face().HasKeywordRef(kwRefAffinity)
 		}
 	case cbPermanentCard:
 		m = o.Face() != nil && o.Face().IsPermanent()

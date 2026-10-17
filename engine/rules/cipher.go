@@ -29,7 +29,7 @@ func init() { effects.RegisterNonAPI("kw:Cipher") }
 // resolveTop follows). A shallow copy per node keeps the compiled-API cache
 // intact while re-pointing Sub, so nothing downstream observes the original.
 func cipherTailFor(f *cards.Face, chain *cards.SA) *cards.SA {
-	if f == nil || chain == nil || !f.HasKeyword("Cipher") {
+	if f == nil || chain == nil || !f.HasKeywordRef(kwRefCipher) {
 		return nil
 	}
 	cipher := cards.ResolveSVar(f.SVars, "__kwCipher")

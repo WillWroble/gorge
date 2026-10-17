@@ -99,7 +99,7 @@ func (e *Engine) entryETBChoice(ev events.Event, ordinal int) (etbChoice, bool) 
 		}
 		seen++
 	}
-	if o.Face().HasKeyword("Riot") {
+	if o.Face().HasKeywordRef(kwRefRiot) {
 		if seen == ordinal {
 			return etbChoice{kind: "riot", options: []decision.Option{
 				{Index: 0, Kind: "riot", Label: "Enter with a +1/+1 counter", Obj: o.ID, Player: you},
@@ -108,7 +108,7 @@ func (e *Engine) entryETBChoice(ev events.Event, ordinal int) (etbChoice, bool) 
 		}
 		seen++
 	}
-	if o.Face().HasKeyword("Unleash") {
+	if o.Face().HasKeywordRef(kwRefUnleash) {
 		if seen == ordinal {
 			return etbChoice{kind: "unleash", options: unleashOptions(o.ID, you)}, true
 		}

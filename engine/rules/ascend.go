@@ -88,7 +88,7 @@ func (e *Engine) checkBlessingGrants() {
 // is the continuous scan above -- and the stack object itself is never on the
 // battlefield, so it does not count toward the ten.
 func (e *Engine) grantSpellBlessing(o *state.Object, f *cards.Face) {
-	if f == nil || f.IsPermanent() || !f.HasKeyword("Ascend") {
+	if f == nil || f.IsPermanent() || !f.HasKeywordRef(kwRefAscend) {
 		return
 	}
 	p := o.Controller
