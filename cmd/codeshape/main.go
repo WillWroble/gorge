@@ -1,5 +1,5 @@
 // Command codeshape prints the rules engine's code-shape metrics
-// (internal/codeshape): functions over 300 lines in rules/ and effects/,
+// (internal/codeshape): functions over 300 lines in engine/rules/ and engine/effects/,
 // Engine method count, effects.Host width, effects.Ctx and resumePoint field
 // counts, string-literal Params reads and case literals, and the
 // effects.Ctx / SpecContext / TriggerContext composite literals outside the

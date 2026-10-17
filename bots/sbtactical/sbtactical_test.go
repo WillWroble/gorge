@@ -20,18 +20,20 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // sampleRegistry builds a cards registry over testutil.SampleDecks' inline
@@ -130,7 +132,7 @@ func TestSBTacticalWantsEnvIsPriorityOnly(t *testing.T) {
 func driveToPriority(t *testing.T, cfg rules.Config) (*rules.Engine, *decision.Decision, view.View) {
 	t.Helper()
 	e := rules.New(cfg)
-	bot := seat.NewBot(1)
+	bot := heuristic.NewBot(1)
 	ctx := context.Background()
 	for step := 0; step < 2000; step++ {
 		e.Advance()

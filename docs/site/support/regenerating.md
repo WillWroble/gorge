@@ -1,41 +1,29 @@
 # Regenerating the set tables
 
-The support tables are measured from the repository; nothing on the
-[Support by set](sets.md) page needs XMage to reproduce. It needs the Forge
-corpus in `.cards/` and the compiled IR cache.
+The per-set figures on [Support by set](sets.md) come from the compliance
+oracle, which compares gorge with XMage scenario by scenario. Since
+2026-10-16 that oracle runs from the public companion repository
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance), not from gorge, so the docs build no
+longer measures sets: the page shows its hand snapshot. The status JSONL the
+renderer reads is `go run ./cmd/oraclediff status -all -json -level A` in a
+gorge-compliance checkout.
 
-## What the docs build does
+## What stays in gorge
 
-The [`docs` workflow](https://github.com/adams-shaun/gorge/blob/main/.github/workflows/docs.yml)
-runs on every push to `main` that touches the docs, the set script or the
-committed verdicts:
-
-1. `make fetch-cards` fetches the corpus at `FORGE_REF` into `.cards/` (thrown
-   away with the runner; never committed).
-2. `go run ./cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl`
-   measures every set (about 7.5 minutes on 4 CPUs). The command also checks
-   `compliance/ratchet.json` and exits non-zero when a set moves past it; the
-   build tolerates that exit and uses the output if it is non-empty.
-3. `python3 scripts/docs_sets.py status-A.jsonl` writes
-   `docs/site/support/_generated_sets.md`, which `sets.md` includes at the end
-   through `pymdownx.snippets`. The fragment is gitignored; when it is absent
-   the page shows only the hand snapshot.
-
-Only counts and percentages are published, never card text.
-
-## Running it locally
+The renderer does. `scripts/docs_sets.py` turns the oracle's per-set status
+JSONL into `docs/site/support/_generated_sets.md`, which `sets.md` includes at
+the end through `pymdownx.snippets`. The fragment is gitignored; when it is
+absent the page shows only the hand snapshot. Only counts and percentages
+are published, never card text.
 
 ```sh
-make fetch-cards && make compile-cards
-go run ./cmd/oraclediff status -all -json -level A -procs 2 > status-A.jsonl
 python3 scripts/docs_sets.py status-A.jsonl          # -> docs/site/support/_generated_sets.md
 uvx --with mkdocs-material==9.7.7 mkdocs serve        # preview at http://127.0.0.1:8000/
 ```
 
 `docs_sets.py` needs only the Python standard library. It skips any line that
-is not a JSON object, so the ratchet summary `oraclediff` prints alongside the
-JSON is harmless. Options: `-o PATH`, `--commit SHA` and `--date YYYY-MM-DD`
-(shown in the fragment's header).
+is not a JSON object. Options: `-o PATH`, `--commit SHA` and
+`--date YYYY-MM-DD` (shown in the fragment's header).
 
 Each JSONL line is one set:
 
@@ -43,8 +31,8 @@ Each JSONL line is one set:
 |---|---|
 | `set`, `name`, `set_type`, `released` | set code, name, XMage set type, release date |
 | `formats` | formats the set is legal in |
-| `level`, `declared` | level checked; level declared in `compliance/declared.json` |
-| `printed` | whether a full printed card list exists (`compliance/printed/`) |
+| `level`, `declared` | level checked; level the set is declared at |
+| `printed` | whether a full printed card list exists |
 | `cards` | cards the claim covers |
 | `outstanding`, `problem_cards` | problems, and distinct cards with at least one problem |
 | `buckets` | problems by reason: `unsupported`, `not in corpus`, `template gap`, `no verdict`, `diverge`, `harness`, `no printed list`, … |
@@ -55,13 +43,12 @@ Each JSONL line is one set:
 cards with no Level A problem (`no printed list` is a per-set pseudo-problem
 and is not counted as a card).
 
-## Other useful commands
+## What you can measure from gorge alone
 
 ```sh
-go run ./cmd/oraclediff status -all -json -level B -sets FDN,DSK -procs 2   # Level B for chosen sets
-go run ./cmd/oraclediff sets -out compliance-sets.md                        # markdown summary, ~1.6 min
+make fetch-cards && make compile-cards
 make coverage             # .coverage/{summary,coverage}.md: corpus coverage by type, colour, mana value
-make compliance-status    # compliance/status.md (gitignored)
+make report               # corpus-wide playable count
 ```
 
 The separate [`card coverage`](https://github.com/adams-shaun/gorge/blob/main/.github/workflows/coverage.yml)

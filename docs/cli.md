@@ -6,9 +6,10 @@ gorge's root module has no third-party requires (invariant 7,
 `internal/archtest/gomod_test.go`), so these conventions are implemented on
 the standard library by package [`cli`](../cli/doc.go).
 
-`cmd/dzgorge` is the first command built on it. The other 44 commands under
-`cmd/` still use the standard `flag` package; see [Migrating a
-command](#migrating-a-command).
+The first command built on it, `dzgorge`, lives in four-yay (the private
+companion module); `cli` is public so outside modules can use it. All 16
+commands under gorge's `cmd/` still use the standard `flag` package; see
+[Migrating a command](#migrating-a-command).
 
 ## Conventions
 
@@ -112,8 +113,8 @@ Rules:
   explicitly (nil in a test) so the test stays hermetic.
 - If anything outside the repo writes config files for the command, register
   its config as a contract: a `ConfigSchema` tag, an example file, and its
-  `--print-config` output as goldens. See dzgorge-config in
-  [contracts.md](contracts.md).
+  `--print-config` output as goldens. See dzgorge-config in four-yay's
+  `docs/contracts.md` (private).
 
 ## Migrating a command
 
@@ -124,8 +125,8 @@ when:
    `Var` with a small duration `Value`.
 2. A test runs the parser over the exact argv shapes the repo's scripts and
    known external callers pass, and checks the effective values through
-   `--print-config` (see `cmd/dzgorge/cli_test.go`, `TestScriptArgvShapes`
-   and `TestScriptFlagsExist`).
+   `--print-config` (see four-yay's `cmd/dzgorge/cli_test.go`,
+   `TestScriptArgvShapes` and `TestScriptFlagsExist`).
 3. Behaviour changes are named in the commit. Under `flag`, parsing stopped
    at the first positional and ignored the rest. `cli` reads flags after
    positionals, and `cli.NoArgs` refuses a stray positional. This catches
@@ -134,8 +135,8 @@ when:
 
 Follow-up work:
 
-- Migrate the other 44 commands under `cmd/`, user-facing ones first
-  (`gorged`, `botbench`, `mtgsim`, `repro`, `forgec`).
+- Migrate the commands under `cmd/`, user-facing ones first
+  (`gorged`, `mtgsim`, `repro`, `forgec`).
 - Shell completion (`prog completion bash|zsh`).
 - Accepting the previous config major for one release once some program's
   config moves to v2 (a list of accepted `$schema` tags on the root).

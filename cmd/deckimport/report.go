@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/deck"
 )
 
 // missingCard is one card name the corpus does not contain and its count in

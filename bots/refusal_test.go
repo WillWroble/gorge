@@ -4,14 +4,14 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // spellbenchRungs is the inline ladder lifted verbatim from
-// cmd/botbench/spellbench.go's sbSubmitWithFallback (the minimal rung, then
+// four-yay cmd/botbench/spellbench.go's sbSubmitWithFallback (the minimal rung, then
 // the default-bot rung), so TestFallbacksMatchTheSpellbenchRunner proves
 // bots.Fallbacks is that code and not a parallel re-implementation that can
 // drift from the bench.

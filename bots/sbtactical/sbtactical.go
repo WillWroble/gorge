@@ -15,7 +15,7 @@
 // built for an earlier decision.
 //
 // The adapter never sees the live engine: the host's Env carries only the
-// honest root (host/botenv.go envData), and the planner derives the actor's
+// honest root (server/host/botenv.go envData), and the planner derives the actor's
 // own pool and sources from it. Priority is the only kind the host builds an
 // Env for here (WantsEnv), so an sb-tactical table costs one honest redeal
 // per priority decision and nothing else beyond a plain bot.
@@ -27,10 +27,10 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/sanity"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/spellbench/builtins"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Policy is the registry key.
@@ -47,19 +47,19 @@ func init() {
 				Claim:   "110-18 on the Pauper kernel (benchmark seed); 106-22 at seed 99991; 87-41 on FDN mirrors",
 				Versus:  "bot",
 				Setting: "SpellBench §3.4 'Measured' table: Pauper-kernel and FDN-limited mirrors vs the sb bot",
-				Source:  "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §3.4",
+				Source:  "docs/design/2026-09-28-spellbench-agent-design.md §3.4",
 			},
 			{
 				Claim:   "Elo 1507 vs bot 1242",
 				Versus:  "bot",
 				Setting: "SpellBench §3.4 'Measured' table, Pauper kernel",
-				Source:  "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §3.4",
+				Source:  "docs/design/2026-09-28-spellbench-agent-design.md §3.4",
 			},
 		},
 		Cost: bots.Cost{
 			MeanMS: 1, Scope: "per decision (INFERRED)",
 			Note:   "~80 ms per GAME vs bot on 8 workers (SB §3.4); per-decision think time never measured, ~1 ms INFERRED",
-			Source: "docs/superpowers/specs/2026-09-28-hosted-bot-packages.md §3.2",
+			Source: "docs/design/2026-09-28-hosted-bot-packages.md §3.2",
 		},
 		Env: true, Search: false,
 		Formats:   []string{"constructed"},

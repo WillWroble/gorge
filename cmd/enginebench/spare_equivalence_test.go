@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestEnginebenchPooledRowsMatchFresh(t *testing.T) {

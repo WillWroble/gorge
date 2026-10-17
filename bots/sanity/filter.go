@@ -17,7 +17,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/engine/decision"
 )
 
 // Allow lists, SORTED, the card names the guard never drops: spells and

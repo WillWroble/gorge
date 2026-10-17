@@ -11,11 +11,11 @@
 //
 // Compatibility: the harness uses only APIs that exist at a4af596 (the pin
 // docs/015 measured) and at today's main: rules.New/Advance/Pending/Submit/
-// Clone, decision.Decision/Intent, seat.NewBot(+EnableAutoPayMana),
-// botpolicy.BoardFromGameInto, internal/bench.PlayGame, internal/searchseat
+// Clone, decision.Decision/Intent, heuristic.NewBot(+EnableAutoPayMana),
+// botpolicy.BoardFromGameInto, testkit/bench.PlayGame, bots/searchseat
 // (Feed, NewSearchBot, Watch) and testutil.OpenCorpusRegistry. The azmcts
 // row lives behind the build tag enginebench_az (az.go), because
-// internal/azmcts does not exist at a4af596; built without the tag, -row az
+// bots/azmcts does not exist at a4af596; built without the tag, -row az
 // reports "unavailable".
 //
 // The wall clock is read only to report elapsed time; no game, decision or
@@ -23,7 +23,7 @@
 //
 // Baseline break, 2026-10-06: the random and bot rows now recycle a finished
 // game's log and object arrays into the next game through a shared
-// internal/bench.SparePool (rules.Spare), the way production self-play does.
+// testkit/bench.SparePool (rules.Spare), the way production self-play does.
 // The rows therefore no longer include a per-game events.NewLogInto /
 // state.NewGameInto allocation, so their turns/s and games/s are not
 // comparable to runs before this date; re-measure a baseline rather than
@@ -42,7 +42,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/adams-shaun/gorge/rules/resolve"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
 )
 
 type result struct {
@@ -113,7 +113,7 @@ func main() {
 	cpuprof := flag.String("cpuprofile", "", "write a CPU profile of the run (after the corpus loads) here")
 	memprof := flag.String("memprofile", "", "write an allocation profile of the run (after the corpus loads; MemProfileRate 64KiB) here")
 	walkstats := flag.Bool("walkstats", false, "random/bot rows: also print the priority legal-walk reuse table (spec 2026-10-06-legal-walk-design §1.5) to stderr")
-	quietstats := flag.Bool("quietstats", false, "print the quiet-seat proof counters at exit (needs -ldflags \"-X github.com/adams-shaun/gorge/rules.quietStatsFlag=1\")")
+	quietstats := flag.Bool("quietstats", false, "print the quiet-seat proof counters at exit (needs -ldflags \"-X github.com/adams-shaun/gorge/engine/rules.quietStatsFlag=1\")")
 	flag.Parse()
 	walkStatsFlag = *walkstats
 	quietStatsFlag = *quietstats

@@ -14,10 +14,11 @@ benchmark results; nothing here was re-run for this page.*
 | `make enginebench-pair BASE= CAND=` | A paired, interleaved ABBA comparison of two revisions, each built from `git archive` | JSONL plus a text table: per-row median throughput and the median per-repetition candidate/base ratio |
 | `make enginebench-profile [REV=]` | CPU and allocation pprof per row, and GC share | pprof files |
 | `make enginebench-verify [REV=]` | A memo-verifying build; fails on errors, stalls, panics or stale memos | pass/fail |
-| `make smoke-perf` | A five-minute whole-game smoke (four scenarios), base vs candidate, pinned to one core | text |
 | `make sim` | 20 verified four-seat games | replay OK count |
-| `make gc-gate` | GC CPU share of one package's tests (default `./host`, budget 0.30) | ratio |
-| `cmd/botbench -out json` | Win rates with 95% confidence intervals, stalls, livelocks, mean turns | JSON (no timing) |
+| `make gc-gate` | GC CPU share of one package's tests (default `./server/host`, budget 0.30) | ratio |
+
+Bot win-rate evaluation and the whole-game smoke run from a private companion
+repository, not from gorge.
 
 The `enginebench` workloads use four 17lands Foundations (FDN) draft decks
 (CC BY 4.0) and an mtg-kernel Burn deck (MIT), in
@@ -30,7 +31,6 @@ make enginebench-pair BASE=main CAND=.          # BUDGET=60s per row, REPS=2 by 
 make enginebench-pair BASE=main CAND=. BUILD_ARGS="-tags enginebench_az" ROWS="-row az -sims 100"
 make enginebench-profile REV=.
 make enginebench-verify REV=.
-make smoke-perf BASE=main CAND=.
 ```
 
 Knobs: `BUDGET`, `ROWS`, `REPS`, `SECS`, `GOGC`, `BENCH_DIR`, `HEAVY_LOCK`.
@@ -89,7 +89,7 @@ CPU milliseconds per game over 29 decks:
 | 2026-10-09/10 | quiet-machine series | MCTS-100 | +10.4% median |
 
 The engine-speed method and the first pinned comparison are written up in
-[`docs/superpowers/reports/2026-09-30-gorge-engine-speed.md`](https://github.com/adams-shaun/gorge/blob/main/docs/superpowers/reports/2026-09-30-gorge-engine-speed.md).
+[`2026-09-30-gorge-engine-speed.md` (archived)](https://github.com/adams-shaun/gorge/blob/main/docs/design/ARCHIVE.md).
 
 ## Tracking over time
 

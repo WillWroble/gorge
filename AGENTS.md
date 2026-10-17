@@ -7,7 +7,27 @@ Pure-Go Magic rules engine.
 The rules engine that will replace `mtgplay`'s XMage bridge. Card behaviour is
 compiled from Forge card scripts into an IR; the engine implements the
 primitives that IR references. See
-`docs/superpowers/specs/2026-09-03-mtgcore-go-engine-design.md`.
+[`docs/site/architecture/overview.md`](docs/site/architecture/overview.md).
+
+## Repository layout
+
+[ADR 0001](docs/decisions/0001-repo-layout.md) (2026-10-16) groups the tree:
+
+- `engine/`: the rules core (`cards state decision events effects rules view
+  replay deck`, and `seat`, the `Seat` contract only). Imports nothing outside.
+- `server/`: `gorged` (the importable server; `cmd/gorged` is its thin main), `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`.
+- `bots/`: `botpolicy`, `heuristic` (the default bot), the registry, hosted bots and their inference runtime.
+- `cmd/`: product and developer tools. `internal/`: ratchets, test support, generators.
+- Draft events, training research and the research bots live in the private
+  companion module four-yay (`github.com/adams-shaun/four-yay`, checkout `../four-yay`), which
+  imports gorge; gorge never imports it (ADR 0001 amendment, 2026-10-16).
+- The compliance oracles and the oracle-scenario corpora (hand Oracle-text audit, XMage ports)
+  live in the public gorge-compliance (`github.com/adams-shaun/gorge-compliance`), which pins
+  gorge and plays the corpora through `engine/rules`' exported oracle runner (ADR 0001
+  amendment 3). gorge keeps the runner and `oracle_contract_test.go`'s residual scenarios.
+- `scripts/`: contributor and CI scripts. gorge carries no agent-pipeline or demo-deploy
+  machinery; the maintainers' pipeline, its hooks and the demo deploy live in four-yay's `ops/`.
+- `docs/design/`: living designs; parked history is indexed in `docs/design/ARCHIVE.md`.
 
 ## Agent guide
 
@@ -30,7 +50,7 @@ guidelines*.
 - **Never commit Forge card scripts.** They are GPL-3.0; gorge is Apache-2.0.
   `forgec fetch` pulls the card corpus and token scripts into `.cards/`,
   pinned to a commit SHA (`FORGE_REF` in the Makefile), which is gitignored.
-  `cards/boundary_test.go` fails the build if any are tracked.
+  `engine/cards/boundary_test.go` fails the build if any are tracked.
 - **No cgo, no third-party deps** in the card pipeline and rules core.
   `wazero` arrives with the plugin tier in M3.
 - **All state mutation goes through `events.Apply`.** If you are writing to a
@@ -58,11 +78,10 @@ make conformance          # the focused CR conformance audit
 **Test budget (operator, 2026-10-05, doubled 2026-10-09 with the box's DRAM):**
 every test fits 4 GB RSS, 4 vCPU and 1 minute wall; one outside it is a defect
 to split, never to trim. Agents run tests focused and capped, never
-`go test ./...`, `./compliance/...` or `-count=1`:
+`go test ./...` or `-count=1`:
 `systemd-run --user --scope -q -p MemoryMax=4G -p CPUQuota=400% env GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -timeout 2m -run X ./pkg`.
-The full suite is `scripts/postmerge_batch.sh`'s (once per batch on main;
-red pauses the pipeline and bisects to a CULPRIT). Rules and rationale:
-[invariants.md](docs/agents/invariants.md#workflow).
+The full suite runs after merge (CI, and the maintainers' post-merge batch).
+Rules and rationale: [invariants.md](docs/agents/invariants.md#workflow).
 
 `make conformance` is the focused CR 601/733 audit. I-2 (mandatory-target
 feasibility), I-7 (targets before payment), and the CR 733.1 illegal-cast
@@ -122,7 +141,7 @@ prints `DIVERGED` naming the first mismatching event — **a corpus change since
 the report was filed is a real, expected cause** (the snapshot replays against
 the corpus as it was at the report's pin), and so is an engine change; read the
 first diverging event before assuming either. In a test, load the same
-snapshot with `feedback.EngineAt(t, dir, n)` (`internal/testutil/feedback`;
+snapshot with `feedback.EngineAt(t, dir, n)` (`testkit/testutil/feedback`;
 `n < 0` = every recorded intent) and assert at the engine it returns.
 
 The committed fixture `cmd/repro/testdata/feedback/20260914T120000Z-fb01/` is
@@ -134,34 +153,34 @@ DIVERGED exactly as a stale report would.
 ## Status
 
 **The coverage ratchet.** `knownUnsupported`, one file per card in
-`rules/testdata/known-unsupported/` (Ruling P12/D2-a), names exactly the repo-deck cards the build does not fully
+`engine/rules/testdata/known-unsupported/` (Ruling P12/D2-a), names exactly the repo-deck cards the build does not fully
 support. `TestEveryRepoDeckIsFullySupported` asserts that the measured gap
 equals the table in both directions (Ruling R-20). A card the build newly
 cannot support fails, named together with its missing primitives. A table
 entry the build now supports is stale and fails too. **The test's log line is
 the live count.**
 
-Measured 2026-10-12 on `main` (`go test ./rules/ -run
+Measured 2026-10-12 on `main` (`go test ./engine/rules/ -run
 'TestEveryRepoDeckIsFullySupported|TestEveryRepoDeckParamsAreRead' -v`,
-`make report`, `rules/testdata/heads/*.txt`). The live, regenerated numbers
+`make report`, `engine/rules/testdata/heads/*.txt`). The live, regenerated numbers
 are on the docs site, https://adams-shaun.github.io/gorge/; prefer it over
 this snapshot.
 
 - **Ratchet: 2 of 1123 distinct cards unsupported.** The cards come from the
-  30 deck files in `internal/testutil/decks/*.json`: 15 60-card constructed
+  30 deck files in `testkit/testutil/decks/*.json`: 15 60-card constructed
   decks and 15 100-card Commander decks. The two are:
   - Incinerate (`stat:CantRegenerate`)
   - Vines of Vastwood (`stat:CantTarget`)
 - **Param census: 17 of 1123.** `TestEveryRepoDeckParamsAreRead`
-  (`rules/paramcensus_test.go`) is the companion ratchet over the same decks'
-  parameters. Its per-card files in `rules/testdata/paramcensus/` hold 17 cards that carry an
+  (`engine/rules/paramcensus_test.go`) is the companion ratchet over the same decks'
+  parameters. Its per-card files in `engine/rules/testdata/paramcensus/` hold 17 cards that carry an
   unread param or an unmodelled cost token: 13 distinct param labels and 1
   cost label.
 - **Golden games.** The 12 pinned Legacy decks (`legacyDeckNames`, which
   deliberately excludes the Commander decks) round-robin across 2/4/6/8 seats
   (`TestRepoDecksPlayAtEverySeatCount`). They replay byte-identically
   (`TestRepoDeckGamesReplayExactly`), and `TestHeads` pins their chain heads
-  in `rules/testdata/heads/<seats>.txt`. Those files are the authority. At
+  in `engine/rules/testdata/heads/<seats>.txt`. Those files are the authority. At
   this date:
 
   | seats | 2 | 4 | 6 | 8 |
@@ -205,7 +224,7 @@ ask are listed under **Known approximations** below.
 Acceptance commands:
 
 ```sh
-go test ./rules/ -run 'TestEveryRepoDeck|TestRepoDecks|TestRepoDeckGames' -v
+go test ./engine/rules/ -run 'TestEveryRepoDeck|TestRepoDecks|TestRepoDeckGames' -v
 make sim
 ```
 
@@ -225,7 +244,7 @@ remaining row now has a P1 ticket whose only job is to delete it.
 So:
 
 - **A landing ticket DELETES its row** and lowers the
-  `knownApproximationRows` constant in `internal/testutil/agentsdoc_test.go`
+  `knownApproximationRows` constant in `testkit/testutil/agentsdoc_test.go`
   by the number of rows it deleted. `TestKnownApproximationsOnlyShrinks`
   fails the build on a row added, a row grown past 600 bytes, or a count
   above the constant.
@@ -236,19 +255,19 @@ So:
 
 Behaviour that is a deliberate contract rather than debt — the R-9 no-ask
 host degradation contract, regeneration, the exact round number — is in
-[`docs/superpowers/specs/2026-09-22-engine-contracts.md`](docs/superpowers/specs/2026-09-22-engine-contracts.md),
+[`docs/design/2026-09-22-engine-contracts.md`](docs/design/2026-09-22-engine-contracts.md),
 not here.
 
 | Stand-in | Where | Removed by |
 |---|---|---|
-| `RestrictValid$` is carried into the mana pool; only dotted `Spell.<filter>`/`Activated.<filter>` alternatives supported by the matcher are enforced. Unsupported alternatives fail closed, including bare `Spell`/`Activated` (13 raw lines), `CostContainsX`, `CumulativeUpkeep`, `CantCast*`, `Static.*` and `nonSpell`; 41 raw `RestrictValid$` lines across 39 corpus files contain at least one such term, so mixed alternatives can lose only the unsupported branch. | `effects/mana_effect.go` (`effMana`), `rules/mana_payment.go` (`restrictValidMatches`) | M4 (the remaining restriction grammar) |
-| `Effect` registers a `StaticAbilities$`/`Triggers$` mode for real via `effects/effect.go`'s switch and `trigmatch.Lookup`; these still Note: statics `AssignCombatDamageAsUnblocked`, `AssignNoCombatDamage`, `AttackVigilance`, `BlockRestrict`, `CanAdapt`, `CantBeActivated`, `CantBeCast`, `CantBecomeMonarch`, `CantBlock`, `CantChangeLife`, `CantLoseLife`, `CantPhaseIn`, `CantPhaseOut`, `IgnoreLegendRule`, `IgnoreShroud`, `MinMaxBlocker`, `UntapOtherPlayer`; triggers `Abandoned`, `Adapt`, `AttackerBlocked`, `AttackerBlockedByCreature`, `AttackerUnblocked`, `Blocks`, `Shuffled`, `VisitAttraction`. | `effects/effect.go` (`effEffect`), `effects/effect_ignorehexproof.go`, `rules/trigmatch` (`Lookup`), `rules/layers_restrict.go`, `state/continuous.go` | M4 (the named modes) |
-| An explicit multi-zone `ChangeZone Origin$` including `Hand` has no origin-aware chooser: the exact-hand and exact-library walkers cannot build one private option list across hand, graveyard, library and battlefield, so a source-default picker emits one replay-visible Note and moves nothing loudly. | `effects/zone.go` (`mixedOriginIncludesHand`), `effects/zone_change.go` (`effChangeZone`) | M4 (origin-aware mixed hidden-zone chooser) |
-| (cloak1) Turn-face-up (CR 708.6) is not implemented: a manifested or cloaked card stays face down forever. Loud-unimplemented: `ManifestDread` (a different API), `RememberManifested$`, `Defined$`-object manifests, the `Choices$` asking forms; for Cloak, the from-hand chooser. Ordinary filters read the printed face, missing a manifested Elf. | `effects/zone_manifest.go` (`effManifest`, `effCloak`), `rules/layers_types.go` (`typeCharacteristics`, `faceDownPrintedHides`), `effects/filter_word.go` (`faceDown`) | M4 (turn-face-up CR 708.6 for both -- the Morph/Megamorph/Disguise ticket owns the shared path; ManifestDread; RememberManifested$) |
-| (copyperm-grants) `api:CopyPermanent` now grants named `AddTriggers$`/`AddSVars$`/`AddAbilities$` from the resolving source table, supports a named `AttachedTo$` destination and the exact Zndrsplt `Choices$`/`Chooser$` shape. `WithDifferentNames$` remains loud-unimplemented, while `ImprintTokens$ True` still records no copies for delayed exile/sacrifice (Kharasha Foothills, Shredder, Shadow Master); `TokenRemembered$` is real. | `effects/copypermanent.go` (`effCopyPermanent`, unread-parameter Note block) | M4 (`WithDifferentNames$`, `ImprintTokens$`) |
-| (combatrestriction1) Only whitelisted static shapes are enforced; an unwhitelisted parameter means the static is SKIPPED, not enforced blanket — the deliberate permissive direction. `MustAttack$ ChosenPlayer`/`RememberedPlayer` name their defender for real (Territorial Hellkite's ChoosePlayer riders, via `attackRequirementSet`); every OTHER `MustAttack$` player reference stays unread and fails closed, and a NAMED duty whose defender no offered pair reaches releases the creature entirely (CR 508.1d: attacking anyone else obeys zero requirements too), so it is not marked Required. Unread: CantAttack's UnlessDefender$/Condition$/CheckSVar$ family, CantSacrifice's `ForCost$ True`, a `Target$` list's walker half, `stat:MustBlock`. | `rules/layers_restrict.go` (`SacrificeBlocked`), `rules/combat/` (`AttackBlocked`, `AttackRequirements`), `rules/combat.go` (`mustAttackRequired`, `attackDutyDischargeable`), `effects/choose_control.go` (`effChoosePlayer`), `effects/misc.go` (`effEffect`) | M4 (the conditional parameter grammar; ForCost$ True cost provenance; stat:MustBlock; the walker Target$ half) |
-| (ap1) AddPhase loud-degrades (one Note, grant still applied) on an unresolvable `ExtraPhase$`/`AfterPhase$`/`FollowedBy$`/`NumPhases$`/DelTrig value or a multi-step set. Deliberate: a grant whose splice point has passed is dropped silently at TurnChange; a splice mid-range of another active extra phase is untested; a multi-completion takes the LAST entry's resume point. `FirstAttack$` unread. | `effects/addphase.go` (`effAddPhase`, `parseExtraPhaseValue`), `rules/turn.go` (`extraPhaseBoundary`) | M4 (a real per-turn attack history for the unread `FirstAttack$` gate) |
-| (kw:MayFlashSac) The keyword is implemented rules-side, not as a `cards/keywords.go` expansion: its meaning is a casting OPTION, which `expandKeywords`' own doc lists as the family rules reads directly, and the sibling `kw:MayFlashCost` landed the same way. The rider ("if you CAST it any time a sorcery couldn't have been cast") rides a pay-time `FlagMayFlashSac` CastInfo, and `state.CastProvenanceFlags` strips that bit from a stack copy, since a copy is put on the stack and never cast (CR 707.10). Deliberately NOT changed with it: the sibling entry-hook bits `FlagEvoked`/`FlagDashed`/`FlagWarped` are still inherited by a copy, because they are conditioned on an alternative COST having been paid — a cast-time choice the copy rules do carry for the comparable kicked case. | `rules/mayflashsac.go`, `rules/statics_cast.go` (`spellTimingOK`), `rules/altcast.go` (`altCostEnter`), `state/object.go` (`CastProvenanceFlags`), `events/apply.go` (`StackCopy`) | M4 (a copy ruling for the evoke/dash/warp entry hooks) |
+| `RestrictValid$` is carried into the mana pool; only dotted `Spell.<filter>`/`Activated.<filter>` alternatives supported by the matcher are enforced. Unsupported alternatives fail closed, including bare `Spell`/`Activated` (13 raw lines), `CostContainsX`, `CumulativeUpkeep`, `CantCast*`, `Static.*` and `nonSpell`; 41 raw `RestrictValid$` lines across 39 corpus files contain at least one such term, so mixed alternatives can lose only the unsupported branch. | `engine/effects/mana_effect.go` (`effMana`), `engine/rules/pay/payment.go` (`RestrictValidMatches`) | M4 (the remaining restriction grammar) |
+| `Effect` registers a `StaticAbilities$`/`Triggers$` mode for real via `engine/effects/effect.go`'s switch and `trigmatch.Lookup`; these still Note: statics `AssignCombatDamageAsUnblocked`, `AssignNoCombatDamage`, `AttackVigilance`, `BlockRestrict`, `CanAdapt`, `CantBeActivated`, `CantBeCast`, `CantBecomeMonarch`, `CantBlock`, `CantChangeLife`, `CantLoseLife`, `CantPhaseIn`, `CantPhaseOut`, `IgnoreLegendRule`, `IgnoreShroud`, `MinMaxBlocker`, `UntapOtherPlayer`; triggers `Abandoned`, `Adapt`, `AttackerBlocked`, `AttackerBlockedByCreature`, `AttackerUnblocked`, `Blocks`, `Shuffled`, `VisitAttraction`. | `engine/effects/effect.go` (`effEffect`), `engine/effects/effect_ignorehexproof.go`, `engine/rules/trigmatch` (`Lookup`), `engine/rules/layers_restrict.go`, `engine/state/continuous.go` | M4 (the named modes) |
+| An explicit multi-zone `ChangeZone Origin$` including `Hand` has no origin-aware chooser: the exact-hand and exact-library walkers cannot build one private option list across hand, graveyard, library and battlefield, so a source-default picker emits one replay-visible Note and moves nothing loudly. | `engine/effects/zone.go` (`mixedOriginIncludesHand`), `engine/effects/zone_change.go` (`effChangeZone`) | M4 (origin-aware mixed hidden-zone chooser) |
+| (cloak1) Turn-face-up (CR 708.6) is not implemented: a manifested or cloaked card stays face down forever. Loud-unimplemented: `ManifestDread` (a different API), `RememberManifested$`, `Defined$`-object manifests, the `Choices$` asking forms; for Cloak, the from-hand chooser. Ordinary filters read the printed face, missing a manifested Elf. | `engine/effects/zone_manifest.go` (`effManifest`, `effCloak`), `engine/rules/layers_types.go` (`typeCharacteristics`, `faceDownPrintedHides`), `engine/effects/filter_word.go` (`faceDown`) | M4 (turn-face-up CR 708.6 for both -- the Morph/Megamorph/Disguise ticket owns the shared path; ManifestDread; RememberManifested$) |
+| (copyperm-grants) `api:CopyPermanent` now grants named `AddTriggers$`/`AddSVars$`/`AddAbilities$` from the resolving source table, supports a named `AttachedTo$` destination and the exact Zndrsplt `Choices$`/`Chooser$` shape. `WithDifferentNames$` remains loud-unimplemented, while `ImprintTokens$ True` still records no copies for delayed exile/sacrifice (Kharasha Foothills, Shredder, Shadow Master); `TokenRemembered$` is real. | `engine/effects/copypermanent.go` (`effCopyPermanent`, unread-parameter Note block) | M4 (`WithDifferentNames$`, `ImprintTokens$`) |
+| (combatrestriction1) Only whitelisted static shapes are enforced; an unwhitelisted parameter means the static is SKIPPED, not enforced blanket — the deliberate permissive direction. `MustAttack$ ChosenPlayer`/`RememberedPlayer` name their defender for real (Territorial Hellkite's ChoosePlayer riders, via `attackRequirementSet`); every OTHER `MustAttack$` player reference stays unread and fails closed, and a NAMED duty whose defender no offered pair reaches releases the creature entirely (CR 508.1d: attacking anyone else obeys zero requirements too), so it is not marked Required. Unread: CantAttack's UnlessDefender$/Condition$/CheckSVar$ family, CantSacrifice's `ForCost$ True`, a `Target$` list's walker half, `stat:MustBlock`. | `engine/rules/layers_restrict.go` (`SacrificeBlocked`), `engine/rules/combat/` (`AttackBlocked`, `AttackRequirements`), `engine/rules/combat.go` (`mustAttackRequired`, `attackDutyDischargeable`), `engine/effects/choose_control.go` (`effChoosePlayer`), `engine/effects/misc.go` (`effEffect`) | M4 (the conditional parameter grammar; ForCost$ True cost provenance; stat:MustBlock; the walker Target$ half) |
+| (ap1) AddPhase loud-degrades (one Note, grant still applied) on an unresolvable `ExtraPhase$`/`AfterPhase$`/`FollowedBy$`/`NumPhases$`/DelTrig value or a multi-step set. Deliberate: a grant whose splice point has passed is dropped silently at TurnChange; a splice mid-range of another active extra phase is untested; a multi-completion takes the LAST entry's resume point. `FirstAttack$` unread. | `engine/effects/addphase.go` (`effAddPhase`, `parseExtraPhaseValue`), `engine/rules/turn.go` (`extraPhaseBoundary`) | M4 (a real per-turn attack history for the unread `FirstAttack$` gate) |
+| (kw:MayFlashSac) The keyword is implemented rules-side, not as a `engine/cards/keywords.go` expansion: its meaning is a casting OPTION, which `expandKeywords`' own doc lists as the family rules reads directly, and the sibling `kw:MayFlashCost` landed the same way. The rider ("if you CAST it any time a sorcery couldn't have been cast") rides a pay-time `FlagMayFlashSac` CastInfo, and `state.CastProvenanceFlags` strips that bit from a stack copy, since a copy is put on the stack and never cast (CR 707.10). Deliberately NOT changed with it: the sibling entry-hook bits `FlagEvoked`/`FlagDashed`/`FlagWarped` are still inherited by a copy, because they are conditioned on an alternative COST having been paid — a cast-time choice the copy rules do carry for the comparable kicked case. | `engine/rules/mayflashsac.go`, `engine/rules/statics_cast.go` (`spellTimingOK`), `engine/rules/altcast.go` (`altCostEnter`), `engine/state/object.go` (`CastProvenanceFlags`), `engine/events/apply.go` (`StackCopy`) | M4 (a copy ruling for the evoke/dash/warp entry hooks) |
 
 
 ## Runtime behavior details
@@ -260,14 +279,14 @@ matching, host observer hooks, or seat-authorised HTTP/session handling.
 
 ## Running a gorged server while you work
 
-Two orchestrator sessions share this box, and one of them serves a live demo
-that the operator redeploys by hand (`make deploy-demo`; a redeploy aborts
-every in-flight vs-bot game, so nothing does it automatically). So ports are
+On the maintainers' shared box several sessions run servers at once, and a
+live demo (deployed by hand from four-yay, `make deploy-demo` there; a
+redeploy aborts every in-flight vs-bot game) holds 8080-8081. So ports are
 allocated, not first-come:
 
 | range | who |
 |---|---|
-| 8080-8081 | the demo. **Never bind these**, and never run `make deploy-demo` |
+| 8080-8081 | the demo. **Never bind these**, and never run the demo deploy |
 | 8082-8089 | the bot-policy / botbench workstream |
 | 8090-8099 | task agents on the engine side — pick one of these |
 
@@ -285,75 +304,18 @@ and it has killed a session here. Find the server by its listening socket
 is the BINARY's name -- if you built `gorged-after`, its `comm` is
 `gorged-after`, not `gorged` -- so match on the port rather than the name.
 
-`scripts/fleet.sh ports` prints the current allocation, and `scripts/fleet.sh
-port` prints a free one in your range.
+(four-yay's `ops/scripts/fleet.sh ports` prints the current allocation, and
+`fleet.sh port` a free one in your range.)
 
-## Working in a task worktree
+## Working in a worktree
 
-**Every change is made in its own worktree, and `main`'s checkout is left
-clean.** This is not only for dispatched seats -- it applies to an operator
-session's own hand work too, including a one-line fix. Merge into `main`, then
-remove the worktree immediately: a stale worktree is what makes the next
-agent's `git grep` and `find` return duplicate hits from a sibling checkout.
+Make each change in its own git worktree and keep the main checkout clean;
+several sessions may share one checkout, so never `git checkout`, `git
+switch`, `git reset` or bare `git stash` in it, and stage explicit paths
+(never `git add -A`). A worktree carries only tracked files: link the
+`.cards` corpus into it (`ln -s <main>/.cards .cards`; four-yay's
+`ops/scripts/agent-worktree.sh` does this and verifies it), or every
+corpus-dependent test SKIPS through `testutil.CorpusRegistry` and the package
+still prints `ok` in about 2ms. If you find yourself in a worktree with no
+`.cards`, stop and say so rather than reporting a green suite.
 
-The reason is that several sessions share the one `/home/sadams/projects/gorge`
-checkout, and a working tree has exactly ONE HEAD, so anything done to it
-happens to everyone:
-
-- `git checkout -b` in the main checkout to commit your own work switches the
-  shared tree. A peer switching back to `main` then reverts your edited files
-  out from under you mid-task.
-- `git reset` and branch switches are worse than dirty files: they move HEAD
-  for the other session too, so a peer's next commit lands on a base it never
-  chose.
-- A peer mid-refactor leaves the shared tree not compiling. That has produced
-  19 build failures in `go test ./...` belonging to nobody in the room. **In a
-  shared checkout a red suite is not evidence about your own change**: check
-  `git status` for untracked or modified files you did not write, and their
-  mtimes -- a file seconds old is a peer mid-edit, not a defect to fix, and not
-  yours to fix. (Red that is genuinely committed on `main` is still yours to
-  bisect and fix in the same turn.)
-
-So, in the main checkout: never `git checkout`, `git switch`, `git reset` or
-bare `git stash`, and never `git checkout` inside another worktree either (it
-discards that seat's uncommitted work). Stage explicit paths and never
-`git add -A`, which sweeps up a peer's in-flight files.
-
-Task worktrees are created with `scripts/agent-worktree.sh <id> [base] [--web]`,
-never with a bare `git worktree add`. A worktree carries only tracked files, and
-this repo needs one untracked thing to test honestly: the `.cards` corpus. Without
-it `internal/testutil`'s `CorpusRegistry` calls `t.Skip`, so every
-corpus-dependent test SKIPS instead of running, the package still prints `ok` --
-in about 2ms -- and the run reads green to you, to the review pre-filter and to
-the gate while having executed almost nothing. If you find yourself in a worktree
-with no `.cards`, stop and say so rather than reporting a green suite.
-
-Which agent seats exist, what they cost and when to escalate between them is
-recorded in `docs/superpowers/agent-seats.md`.
-
-## Hot files: a branch that touches one of these is sequenced, not parallel
-
-Measured by `scripts/reward_collect.py hotspots --repo .`: one merge in four
-(199 of 802 tickets, 7d) needed a resolver round, and one ticket burned 48 of
-them. The cause is always the same shape — two or three live branches editing
-the same file, each rebasing onto the other's landing. If your brief touches a
-file below, keep the change as small as the brief allows; prefer adding a new
-file next to it over growing it.
-
-**This table is generated; do not hand-edit it.** Regenerate with:
-`python3 scripts/reward_collect.py hotspots --repo . --format md` (add
-`--max-rows N` for this embedded cut). The durable "why it collides" prose
-lives only in `scripts/hotfiles-notes.json` (tracked): a seat filing a new
-contended pair adds one note entry there in its own commit and never mirrors
-the prose here.
-Rendered 2026-10-01 at merge of main@0b368ba80 into 078f1bb3d, with `--max-rows 5`:
-| file | why it collides |
-|---|---|
-| `docs/agents/repo-map.md` | the per-package map table: every workstream that adds or re-describes a package appends a row here, so the file collides by construction while a docs-heavy workstream is live. The 2026-10-01 set (eng-board tip a27a125db, enginecmp tip 6db84d459, sbrep-fast tip 683b3cf69) is NOT a resolver round: an in-memory `git merge-tree --write-tree` of every pairwise tip AUTO-MERGES docs/agents/repo-map.md clean, and the file is one markdown table with no seam a split could cut — a main-side split would only fragment the agent-facing package map and move the very lines a live branch is rebasing onto. eng-board's whole change to this file (the `cards` and `.cards/` rows) is a STRICT SUBSET of sbrep-fast's (the same two rows plus the `rules` row and the `searchbench` / `searchbench/statespec` rows), i.e. duplicate work carried from the shared ancestor wt/perf-tip (e43cde989), whose blob at that merge-base is eng-board's blob BYTE-IDENTICALLY (599e565c6); enginecmp adds the unrelated one-row `enginebench` entry. The script's carrier pass keeps eng-board because it is a carrier against sbrep-fast but not against enginecmp, and dropping it would still leave the two real editors, so no script fix removes this row — the resolution is this note plus sequencing. SEQUENCE: land sbrep-fast first (it already contains eng-board's repo-map rows), then enginecmp (its one-row append rebases trivially), then eng-board (whose file change is then already present and drops out); the branches carry no ticket file, so no Depends-On chain is expressible and the ordering is a controller action. A durable package-map seam is filed as a follow-up so the next docs-heavy workstream does not re-collide. Re-briefed after cli-20261001T042757Z-fcbaaa35; dedupe against that id. |
-| `view/card.go` | the card projection: every projection-perf ticket and every exposed-card-fact ticket edits cardViews/cardView. The 2026-10-01 pair is a GENUINE intra-function collision — cpu-redeal rewrites cardViews/cardView into a pooled projector method while libcomp inserts the printed CardName assignment inside the old cardView body (main line 250) — so the second branch to rebase re-applies its hunk in the new shape; no file split can separate edits inside one function. Land libcomp first (its other four files merge clean on rebase); cpu-redeal's rewrite folds the 5-line assignment in as it goes |
-| `botpolicy/combat.go` | the Board refill: combat.go's BoardFromGameInto fills the fields policy.go's Board declares, so every own-state exposure ticket extends one function and one struct and the edits are adjacent by construction — no file split can separate them. The 2026-10-01 pair (cpu-redeal's shared-manifest read, OwnDeckShared, at combat.go lines 187-194 vs libcomp's fillOwnLibrary insert and its OwnLibrary field) is line-disjoint and merges clean on rebase; only the per-file hotspot granularity flags it. Keep each exposure to its own field + fill lines RECURRED: the cpu workstream and libcomp were briefed again as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) already recorded this exact pair; dedupe against that id. The cpu head's name rotates (cpu-redeal / cpu-emit / cpu-maps); the note is keyed by FILE and applies to whichever cpu head is the live representative, so a new cpu head is not a new collision. |
-| `botpolicy/policy.go` | the Board refill: combat.go's BoardFromGameInto fills the fields policy.go's Board declares, so every own-state exposure ticket extends one function and one struct and the edits are adjacent by construction — no file split can separate them. The 2026-10-01 pair (cpu-redeal's shared-manifest read, OwnDeckShared, at combat.go lines 187-194 vs libcomp's fillOwnLibrary insert and its OwnLibrary field) is line-disjoint and merges clean on rebase; only the per-file hotspot granularity flags it. Keep each exposure to its own field + fill lines RECURRED: the cpu workstream and libcomp were briefed again as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) already recorded this exact pair; dedupe against that id. The cpu head's name rotates (cpu-redeal / cpu-emit / cpu-maps); the note is keyed by FILE and applies to whichever cpu head is the live representative, so a new cpu head is not a new collision. |
-| `cmd/botbench/azcost.go` | the az policy flag block: every az workstream ticket registers a flag in registerAZFlags or rewords one in azFrontDoor — one function, so edits are adjacent by construction. The 2026-10-01 pair (cpu-redeal adds -az-node-cache; libcomp rewords -az-corpus-features' help and error) is line-disjoint and merges clean on rebase. Append new flags to the registration list; no split is honest inside one flag block RECURRED: re-briefed as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) recorded it; dedupe against that id. The cpu head's name rotates; the note is keyed by FILE and covers whichever cpu head is live. |
-… and 11 more; run the command for the live list
-
-Durable per-file notes, including those for files not shown above, live only in `scripts/hotfiles-notes.json`; they are not mirrored here.

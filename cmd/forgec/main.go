@@ -12,17 +12,18 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/effects"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/effects"
+
 	// Ruling W1: forgec's report command reads effects.Supported() but never
 	// otherwise touches rules, so without this blank import none of
-	// rules/combat.go's, rules/statics.go's or rules/trigger.go's init()
+	// engine/rules/combat.go's, engine/rules/statics.go's or rules/trigger.go's init()
 	// functions (each an effects.RegisterNonAPI call) ever run in this
 	// binary, and Supported() here sees "api:" primitives only -- the report
 	// undercounts coverage by thousands of cards (trig:ChangesZone alone
-	// gates 7008 of them). rules/coverage_test.go's
+	// gates 7008 of them). engine/rules/coverage_test.go's
 	// TestForgecBinaryImportsRules pins that this import stays in place.
-	_ "github.com/adams-shaun/gorge/rules"
+	_ "github.com/adams-shaun/gorge/engine/rules"
 )
 
 func main() {
@@ -138,17 +139,17 @@ func report(dir string, top int) error {
 // sa.Params/t.Params/s.Params/r.Params key that is passed directly as the
 // spec argument to effects.MatchesSpec / MatchesSpecFrom somewhere in this
 // build. That is the whole vocabulary matchesBase's base-type switch
-// (effects/filter.go) governs, so it is exactly the set where a typo'd type
+// (engine/effects/filter.go) governs, so it is exactly the set where a typo'd type
 // token is dangerous the way Ruling T16-a describes: matchesBase's "non"
 // handling negates a base check that never succeeds for anything, so a
 // typo'd "non<Type>" silently matches EVERY object instead of none.
 //
-// The keys, and where each is read: ValidTgts (rules/stack.go),
-// ValidCards (effects/combatfx.go, effects/counters.go, effects/damage.go,
-// effects/zone.go), ValidCard/ValidBlocker (rules/statics.go),
+// The keys, and where each is read: ValidTgts (engine/rules/stack.go),
+// ValidCards (engine/effects/combatfx.go, engine/effects/counters.go, engine/effects/damage.go,
+// engine/effects/zone.go), ValidCard/ValidBlocker (engine/rules/statics.go),
 // ValidTarget/ValidSource (rules/trigger.go), ChangeType
-// (effects/zone.go's effChangeZoneAll) and ChangeValid
-// (effects/cardflow.go's effDig). Fix round 1 (Important #1): ChangeType and
+// (engine/effects/zone.go's effChangeZoneAll) and ChangeValid
+// (engine/effects/cardflow.go's effDig). Fix round 1 (Important #1): ChangeType and
 // ChangeValid were missing from this list even though the doc comment
 // claimed a complete audit of every MatchesSpec/MatchesSpecFrom call site --
 // they were not, and adding them moved several tokens materially (Remembered
@@ -158,7 +159,7 @@ func report(dir string, top int) error {
 // friends) use a wholly different vocabulary -- You/Opponent/Player/Any via
 // MatchesPlayerSpec -- so including them here would just flood this report
 // with tokens that were never card types to begin with. Also excluded, and
-// genuinely out of scope rather than an oversight: effects/count.go's
+// genuinely out of scope rather than an oversight: engine/effects/count.go's
 // evalCountBody feeds MatchesSpecFrom an `arg` parsed out of a `Count$Valid…`
 // SVar *expression body*, not a Params key -- there is no Params key to add
 // for it, since the corpus SVar table effects.Ctx.SVars carries is not
@@ -172,8 +173,8 @@ var validCardFilterKeys = map[string]bool{
 // pseudoFilterTypes are base tokens that are legal in a ValidTgts$-style spec
 // but deliberately match no card TYPE at all, so they are not typos:
 // "any"/"card"/"permanent"/"spell" are matchesBase's own hard-coded cases
-// (effects/filter.go); "player"/"opponent"/"you" are the player-targeting
-// alternative rules/stack.go's targetsPlayers recognises and routes to a
+// (engine/effects/filter.go); "player"/"opponent"/"you" are the player-targeting
+// alternative engine/rules/stack.go's targetsPlayers recognises and routes to a
 // player option before the spec's card-side alternatives ever reach
 // matchesBase at all (e.g. "ValidTgts$ Creature,Player" -- a very common
 // "target a creature or a player" shape -- would otherwise make this
@@ -219,7 +220,7 @@ func unknownFilterTypes(r *cards.Registry) []unknownFilterType {
 			}
 			base, _, _ := strings.Cut(alt, ".")
 			// Mirror matchesBase's own single-level "non" strip exactly
-			// (effects/filter.go): an unconditional TrimPrefix, not a
+			// (engine/effects/filter.go): an unconditional TrimPrefix, not a
 			// case-insensitive or repeated one.
 			base = strings.TrimPrefix(base, "non")
 			if base == "" {

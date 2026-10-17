@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegister(t *testing.T) {
-	for _, name := range []string{"bot", "lethal-pressure", "cast-profile", "search", "az-redeal", "sb-tactical", "sb-search-lite-atk", "sb-heuristic", "sb-uniform", "sb-first"} {
+	for _, name := range []string{"bot", "lethal-pressure", "az-redeal", "sb-tactical"} {
 		if _, ok := bots.Lookup(name); !ok {
 			t.Fatalf("built-in %q was not registered", name)
 		}
@@ -16,7 +16,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestNormalize(t *testing.T) {
-	for _, tc := range []struct{ in, want string }{{"", "bot"}, {"bot", "bot"}, {"lethal-pressure", "lethal-pressure"}, {"cast-profile", "cast-profile"}, {"search", "search"}, {"az-redeal", "az-redeal"}, {"sb-tactical", "sb-tactical"}, {"sb-search-lite-atk", "sb-search-lite-atk"}, {"sb-heuristic", "sb-heuristic"}, {"sb-uniform", "sb-uniform"}, {"sb-first", "sb-first"}} {
+	for _, tc := range []struct{ in, want string }{{"", "bot"}, {"bot", "bot"}, {"lethal-pressure", "lethal-pressure"}, {"az-redeal", "az-redeal"}, {"sb-tactical", "sb-tactical"}} {
 		got, err := bots.Normalize(tc.in)
 		if err != nil || got != tc.want {
 			t.Errorf("Normalize(%q) = %q, %v; want %q", tc.in, got, err, tc.want)
@@ -29,29 +29,14 @@ func TestNormalize(t *testing.T) {
 
 func TestEntries(t *testing.T) {
 	entries := bots.Entries()
-	// BP-15 adds the three SpellBench plain policies. The count pin and
-	// name-based blocks below move together with the built-in set; update this
-	// test deliberately on the next policy.
-	if len(entries) != 10 {
-		t.Fatalf("Entries() has %d entries, want 10", len(entries))
+	// gorge links four built-ins (bots/all); the research policies register
+	// from four-yay. The count pin and name-based blocks below move together
+	// with the built-in set; update this test deliberately on the next policy.
+	if len(entries) != 4 {
+		t.Fatalf("Entries() has %d entries, want 4", len(entries))
 	}
 	if entries[0].Name != "bot" || entries[0].Tier != bots.Production {
 		t.Fatalf("production entry is not first: %+v", entries[0])
-	}
-	// BP-11: the search teacher is the registry's one experimental entry, and
-	// it is an Env/search policy — asserted by name, not by index, so a later
-	// experimental entry cannot silently re-order this test's expectations.
-	var searchEntry *bots.Entry
-	for i := range entries {
-		if entries[i].Name == "search" {
-			searchEntry = &entries[i]
-		}
-	}
-	if searchEntry == nil {
-		t.Fatal("no search entry in Entries()")
-	}
-	if searchEntry.Tier != bots.Experimental || !searchEntry.Env || !searchEntry.Search {
-		t.Errorf("search entry is not the experimental Env policy: %+v", searchEntry.Info)
 	}
 	var azEntry *bots.Entry
 	for i := range entries {
@@ -76,18 +61,6 @@ func TestEntries(t *testing.T) {
 	}
 	if sbEntry.Tier != bots.Experimental || !sbEntry.Env || sbEntry.Search {
 		t.Errorf("sb-tactical entry is not the experimental Env-only policy: %+v", sbEntry.Info)
-	}
-	var sbsEntry *bots.Entry
-	for i := range entries {
-		if entries[i].Name == "sb-search-lite-atk" {
-			sbsEntry = &entries[i]
-		}
-	}
-	if sbsEntry == nil {
-		t.Fatal("no sb-search-lite-atk entry in Entries()")
-	}
-	if sbsEntry.Tier != bots.Experimental || !sbsEntry.Env || !sbsEntry.Search || sbsEntry.MaxSeats != 2 {
-		t.Errorf("sb-search-lite-atk entry is not the experimental Env+search 2-seat policy: %+v", sbsEntry.Info)
 	}
 	for _, e := range entries {
 		if e.Label == "" || e.Description == "" || len(e.Strength) == 0 || e.Cost.Note == "" || len(e.Formats) == 0 {

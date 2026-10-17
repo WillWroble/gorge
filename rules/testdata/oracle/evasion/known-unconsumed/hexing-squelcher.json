@@ -1,6 +1,0 @@
-{
-  "card": "Hexing Squelcher",
-  "rows": {
-    "granted-ward-pays-and-bear-dies": "step 3 (cast): [{\"kind\":\"any\",\"pick\":[\"yes\"]}]"
-  }
-}

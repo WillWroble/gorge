@@ -1,5 +1,5 @@
 // Command keywordbench measures keyword presence separately from event-log use.
-// It drives the same engine / view / seat.Bot path as mtgsim, with mirror matches
+// It drives the same engine / view / heuristic.Bot path as mtgsim, with mirror matches
 // so every named deck gets the same number of seat-games. No policy is changed.
 package main
 
@@ -15,17 +15,18 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/effects"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func main() {
@@ -363,7 +364,7 @@ func play(cfg rules.Config, t tally) (status string, err error) {
 	mirror := e.G.Clone()
 	offset := len(e.L.Events) // New has already applied genesis/deal to the clone.
 	seen := map[string]bool{}
-	b := seat.NewBot(cfg.Seed)
+	b := heuristic.NewBot(cfg.Seed)
 	e.Advance()
 	intents := 0
 	for {
@@ -454,7 +455,7 @@ func run(dir, spec string, games int, seed uint64, corpus bool, recompile bool, 
 		}
 	}
 	total.at("api:Regenerate")
-	fmt.Fprintf(w, "# games_per_deck=%d seeds=%d+i mirror_seats=2 bot=seat.NewBot mulligans=0 max_turns=200 max_intents=40000; commander files use commander/40 life; other files constructed/20 life\n", games, seed)
+	fmt.Fprintf(w, "# games_per_deck=%d seeds=%d+i mirror_seats=2 bot=heuristic.NewBot mulligans=0 max_turns=200 max_intents=40000; commander files use commander/40 life; other files constructed/20 life\n", games, seed)
 	fmt.Fprintln(w, "# activated=AbilityPush; triggered=TriggerPush; special_cast=CastInfo flags. Zeros for static/cost keywords without these encodings mean NOT MEASURED, not inert. Pushes do not prove resolution or benefit. Offered/selected are option occurrences, not unique opportunities. Battlefield excludes tokens and granted keywords.")
 	fmt.Fprintln(w, "deck\tmetric\tdistinct_deck_cards\tbattlefield_objects\toffered\tselected\tactivated\ttriggered\tspecial_cast")
 	for _, name := range names {

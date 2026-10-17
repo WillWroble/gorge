@@ -15,9 +15,9 @@
 // package missing from the classification renders under "Unclassified".
 //
 // Packages are found by walking the source tree, not with `go list`, so
-// tag-gated packages (cmd/dzbroker, cmd/gamepool, ...) are mapped too and
+// tag-gated packages (cmd/cardfuzz's fuzz files, ...) are mapped too and
 // their imports counted regardless of build constraints. Nested modules
-// (web/, experimental/gamepool/), testdata, and dot- or underscore-prefixed
+// (web/), testdata, and dot- or underscore-prefixed
 // directories are skipped. Output is sorted and deterministic.
 package main
 

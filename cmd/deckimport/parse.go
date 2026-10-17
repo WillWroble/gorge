@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // parsedCard is one line of a plain-text decklist, already split into its

@@ -29,7 +29,7 @@ func TestTableInfoAutoManaCommentMatchesGeneratedOutput(t *testing.T) {
 
 	// 1. Precondition: read the doc comment straight out of the Go source.
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "../../protocol/protocol.go", nil, parser.ParseComments)
+	file, err := parser.ParseFile(fset, "../../server/protocol/protocol.go", nil, parser.ParseComments)
 	if err != nil {
 		t.Fatalf("parse protocol source: %v", err)
 	}

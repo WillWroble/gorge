@@ -1,10 +1,4 @@
 #!/bin/sh
-# Staged content may not reference the issue tracker (spelled [j]ira so this
-# hook never matches itself).
-bad=$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -v '^+++ ' | grep -Ei '[j]ira' | head -3)
-if [ -n "$bad" ]; then
-	echo "pre-commit: staged lines reference the issue tracker; gorge carries no such references:" >&2
-	echo "$bad" >&2
-	exit 1
-fi
+# A change that adds, deletes or renames a Go package must leave it classified
+# (see pkgmap-check).
 exec "$(dirname "$0")/pkgmap-check" pre-commit

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && touch ../cmd/gorged/webdist/.keep",
+    "build": "vite build && touch ../server/gorged/webdist/.keep",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",

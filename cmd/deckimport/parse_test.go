@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/engine/deck"
 )
 
 // mustParse reads and parses one testdata decklist, failing the test on error

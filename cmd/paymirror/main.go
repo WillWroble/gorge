@@ -4,7 +4,7 @@
 // (floating each planned source through the ordinary priority "activate"
 // option, then casting and replaying the planned run's follow-up answers) and
 // the two engines are compared for state equivalence
-// (internal/paymirror). It prints the planned casts checked, how many were
+// (testkit/paymirror). It prints the planned casts checked, how many were
 // equivalent, the mismatches grouped by signature and the unmirrorable casts
 // grouped by reason, and writes every non-equivalent report as JSONL.
 package main
@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adams-shaun/gorge/internal/paymirror"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func writeReportFinding(enc *json.Encoder, spec paymirror.GameSpec, report *paymirror.Report) error {

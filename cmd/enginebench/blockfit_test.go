@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/decision"
+	"github.com/adams-shaun/gorge/engine/decision"
 )
 
 // TestMenaceRepairDropsTheLoneBlocker: a blockers answer the engine

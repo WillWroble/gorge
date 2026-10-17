@@ -1,5 +1,5 @@
 // Command deckimport turns a plain-text decklist into a repo deck file
-// (the {name, count} JSON that internal/testutil/decks/*.json already holds)
+// (the {name, count} JSON that testkit/testutil/decks/*.json already holds)
 // and reports, card by card, what the corpus is missing — the gap that
 // otherwise only surfaces at runtime, mid-deal, when the deck cannot be
 // dealt.
@@ -48,8 +48,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/deck"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/deck"
 )
 
 func main() {

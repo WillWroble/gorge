@@ -12,15 +12,16 @@ so most of these hurt someone other than you.
   `git stash push -u -m <unique-tag>` and apply it by SHA.
 - **Don't `git checkout` inside another worktree.** It discards that seat's
   uncommitted work. Back it up with `cp`, or make a WIP commit first.
-- **Don't create worktrees with a bare `git worktree add`.** Use
-  `scripts/agent-worktree.sh`, which links `.cards/`. Without the corpus, tests
-  skip and read green.
+- **Don't use a worktree without `.cards/`.** A bare `git worktree add`
+  carries only tracked files: link the main checkout's `.cards` into it (or
+  use four-yay's `ops/scripts/agent-worktree.sh`, which does and verifies it).
+  Without the corpus, tests skip and read green.
 - **Don't `git add -A`.** Stage explicit paths.
 - **Don't leave a worktree behind after its merge.** Stale worktrees double
   every `git grep` and `find` hit.
 - **Don't add `Co-Authored-By:`, "Generated with …", `Ref:` or issue-tracker
-  references to commits.** Hooks reject them. This is a repo rule, and it
-  overrides harness defaults.
+  references to commits.** The maintainers' hooks reject them. This is a repo
+  rule, and it overrides harness defaults.
 
 ## Engine code
 
@@ -36,12 +37,12 @@ so most of these hurt someone other than you.
   checkpoints.**
 - **Don't add a Go dependency or cgo.** The root `go.mod` has no `require`
   lines, and it stays that way (`TestRootModuleHasNoRequires`); a tag-gated
-  experiment that needs one is a nested module, like `experimental/gamepool`.
+  experiment that needs one is a separate module that imports gorge, like four-yay's `training/experimental/gamepool`.
 - **Don't use maps or per-call string parsing on hot paths.** Use bitsets and
   dense slices, and compile strings to masks once.
 - **Don't hand-edit `web/src/protocol.ts`.** Run `make gentypes`.
-- **Don't edit `cards/` casually.** Any change moves `CompilerFingerprint` and
-  forces every IR cache to recompile. `cards/oracletext` is exempt.
+- **Don't edit `engine/cards/` casually.** Any change moves `CompilerFingerprint` and
+  forces every IR cache to recompile. `engine/cards/oracletext` is exempt.
 
 ## Licensing
 
@@ -64,29 +65,29 @@ so most of these hurt someone other than you.
   one: the ratchets fail both ways.
 - **Don't move `TestHeads` goldens without naming the first diverging event**
   in the commit body (`cmd/headdiff` finds it), and don't write head-move
-  prose into `rules/testdata/heads/` or `docs/agents/heads-history.md`.
+  prose into `engine/rules/testdata/heads/` or `docs/agents/heads-history.md`.
 - **Don't add a fuzz test to the default build.** A `Fuzz*` target or a
   seed-sweep test starts with `//go:build fuzz` and runs via `make fuzz` or
   `go test -tags fuzz`; the default suite and the pipeline gates skip it.
   Regression tests pinning a fixed fuzz finding stay untagged.
-- **Don't add a row to `wall_exceptions.txt` / `rss_exceptions.txt`** (`internal/testutil/testdata/`): they only shrink. Split the over-budget test instead.
+- **Don't add a row to `wall_exceptions.txt` / `rss_exceptions.txt`** (`testkit/testutil/testdata/`): they only shrink. Split the over-budget test instead.
 - **Don't write or run a test outside the budget** (4 GB RSS, 4 vCPU, 1 min
   wall; operator 2026-10-05, doubled 2026-10-09). Don't call `cards.LoadRegistry` in a test (use
-  `internal/testutil.CorpusRegistry`), don't pass `-count=1`, don't run
-  `go test ./...`, `./compliance/...` or a whole package uncapped, and don't
+  `testkit/testutil.CorpusRegistry`), don't pass `-count=1`, don't run
+  `go test ./...` or a whole package uncapped, and don't
   run a known-heavy test whole "for a baseline": measure one chunk under the
-  2 GB cap. Split a heavy test into chunk tests sharing fixtures; never
+  4 GB cap. Split a heavy test into chunk tests sharing fixtures; never
   delete assertions or shrink a census to make it fit.
 - **Don't grow `AGENTS.md` with detail.** It is loaded on every agent turn.
-  Put the detail in `docs/agents/` or `docs/superpowers/` and link to it.
+  Put the detail in `docs/agents/` or `docs/design/` and link to it.
 - **Don't quote an unmeasured number as fact.** Name the command or report,
   or label it a hypothesis.
 
 ## Running things on this box
 
-- **Don't bind ports 8080–8081** (the demo), and **don't run `make
-  deploy-demo`** or `make gorged` as-is (it binds `:8080`). Engine-side task
-  agents use ports 8090–8099; `scripts/fleet.sh port` prints a free one.
+- **Don't bind ports 8080–8081** (the demo), and **don't run the demo deploy**
+  or `make gorged` as-is (it binds `:8080`). Engine-side task agents use ports
+  8090–8099.
 - **Don't point two servers at one persistence directory,** and don't use the
   repo-root `gorged-data/`. Use `-dir /tmp/gorge-<unique>`.
 - **Don't stop a server with `pkill -f` or a bare `pgrep -f`.** It has killed a
@@ -102,9 +103,10 @@ so most of these hurt someone other than you.
 
 - **Don't let clairvoyant or oracle modes near a hosted table or a rated
   game.** They are measurement ceilings only.
-- **Don't add a policy to `host/bot_policy.go`'s hosted vocabulary** without
-  passing the adoption gate (see the README's *Bot player training and
-  adoption guidelines*).
+- **Don't register a hosted policy** (`bots.Register`, linked from `bots/all`) without
+  passing the adoption gate (see [`docs/site/research/bots.md`](../site/research/bots.md)).
+- **Don't import four-yay.** gorge is
+  public and four-yay is private; four-yay depends on gorge, never the reverse.
 - **Don't train through PyTorch or any out-of-tree runtime** for anything
   meant to ship. Learned policies are pure Go and deterministic.
 - **Don't commit neural checkpoints (`.gpol`)** without an operator decision.

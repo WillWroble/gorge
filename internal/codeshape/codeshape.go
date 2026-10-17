@@ -2,8 +2,9 @@
 // its functions are, how wide its interfaces and context structs are, and how
 // much of its behaviour is still keyed on string literals. It is the metric
 // behind the W0 shrink-only ratchets of the rules-engine refactor spec
-// (docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
-// 4) and behind the steward axis of scripts/reward_collect.py, which replaced
+// (docs/design/2026-10-03-rules-engine-lasagna-design.md, section
+// 4) and behind the steward axis of the maintainers' reward loop (four-yay's
+// ops/scripts/reward_collect.py, moved there 2026-10-16), which replaced
 // the old file-size count: a long FUNCTION is a concern without a seam, while
 // a long FILE says nothing about boundaries and rewarded size-only splits.
 //
@@ -33,33 +34,33 @@ const LongFuncLines = 300
 
 // ScannedDirs are the repo-relative trees measured. Each is walked
 // recursively (testdata and dot/underscore directories excluded), so a later
-// move of code into a rules/* subpackage stays inside the census.
-var ScannedDirs = []string{"rules", "effects"}
+// move of code into a engine/rules/* subpackage stays inside the census.
+var ScannedDirs = []string{"engine/rules", "engine/effects"}
 
 // CtxConstructorFiles are the designated context-constructor files of the W1c
 // ratchet (rules-engine refactor spec section 5): the only non-test files in
 // which an effects.Ctx / effects.SpecContext / effects.TriggerContext
 // composite literal is not counted. Repo-relative, slash-separated.
-var CtxConstructorFiles = []string{"effects/ctx_new.go", "rules/ctx_new.go"}
+var CtxConstructorFiles = []string{"engine/effects/ctx_new.go", "engine/rules/ctx_new.go"}
 
 // ChangeZoneCompilerFile is api:ChangeZone's parameter compiler (W4 step 3 of
-// the rules-engine refactor spec, section 8): the one file in rules/ and
-// effects/ allowed to read a ChangeZone ability's parameters.
-const ChangeZoneCompilerFile = "effects/changezone_params.go"
+// the rules-engine refactor spec, section 8): the one file in engine/rules/ and
+// engine/effects/ allowed to read a ChangeZone ability's parameters.
+const ChangeZoneCompilerFile = "engine/effects/changezone_params.go"
 
 // ChangeZoneFiles are ChangeZone's own resolution files. Every parameter read
 // there goes through the compiled ChangeZoneParams, so the files carry no
 // parameter read of any key.
 var ChangeZoneFiles = []string{
-	"effects/zone_change.go",
-	"effects/zone_hand.go",
-	"effects/zone_hidden.go",
-	"effects/zone_search.go",
-	"effects/zone_library.go",
+	"engine/effects/zone_change.go",
+	"engine/effects/zone_hand.go",
+	"engine/effects/zone_hidden.go",
+	"engine/effects/zone_search.go",
+	"engine/effects/zone_library.go",
 }
 
 // ChangeZoneOnlyKeys are the parameter keys only ChangeZone's compiler reads:
-// a read of one of them anywhere else in rules/ or effects/ is a sibling path
+// a read of one of them anywhere else in engine/rules/ or engine/effects/ is a sibling path
 // interpreting a ChangeZone parameter on its own.
 var ChangeZoneOnlyKeys = []string{
 	"AlternativeDecider", "AttachedToPlayer", "ChooseFromDefined", "DestAltSVar",
@@ -72,11 +73,11 @@ var ChangeZoneOnlyKeys = []string{
 
 // ChangeZoneAllCompilerFile is api:ChangeZoneAll's parameter compiler (W4
 // step 3): the one file allowed to read a ChangeZoneAll ability's parameters.
-const ChangeZoneAllCompilerFile = "effects/changezoneall_params.go"
+const ChangeZoneAllCompilerFile = "engine/effects/changezoneall_params.go"
 
 // ChangeZoneAllFiles are ChangeZoneAll's own resolution files (the sweep):
 // they carry no parameter read of any key.
-var ChangeZoneAllFiles = []string{"effects/zone_changeall.go"}
+var ChangeZoneAllFiles = []string{"engine/effects/zone_changeall.go"}
 
 // ChangeZoneAllOnlyKeys are the parameter keys only ChangeZoneAll's compiler
 // reads.
@@ -84,11 +85,11 @@ var ChangeZoneAllOnlyKeys = []string{"RandomOrder", "UseAllOriginZones"}
 
 // AttachCompilerFile is api:Attach's parameter compiler (W4 step 3): the one
 // file allowed to read an Attach ability's parameters.
-const AttachCompilerFile = "effects/attach_params.go"
+const AttachCompilerFile = "engine/effects/attach_params.go"
 
 // AttachFiles are Attach's own resolution files: they carry no parameter read
 // of any key.
-var AttachFiles = []string{"effects/attach.go"}
+var AttachFiles = []string{"engine/effects/attach.go"}
 
 // AttachOnlyKeys are the parameter keys only Attach's compiler reads (the
 // Reconfigure offer gate reads Unattach$ through it too).
@@ -97,12 +98,12 @@ var AttachOnlyKeys = []string{"Object", "RememberAttached", "Unattach"}
 // CharmCompilerFile is the modal family's parameter compiler (W4 step 3):
 // the one file allowed to read a Charm/GenericChoice ability's own
 // parameters (the Choices$ mode list for every modal carrier).
-const CharmCompilerFile = "effects/charm_params.go"
+const CharmCompilerFile = "engine/effects/charm_params.go"
 
 // CharmFiles are the modal family's own resolution files: they carry no
 // parameter read of any key (the mode BODIES' reads are in
-// effects/charm_modes.go, api:Vote's in effects/vote_effect.go).
-var CharmFiles = []string{"effects/charm.go"}
+// engine/effects/charm_modes.go, api:Vote's in engine/effects/vote_effect.go).
+var CharmFiles = []string{"engine/effects/charm.go"}
 
 // CharmOnlyKeys are the parameter keys only the Charm compiler reads.
 var CharmOnlyKeys = []string{"CanRepeatModes", "CharmNum", "ChoiceRestriction", "FallbackAbility",
@@ -110,31 +111,31 @@ var CharmOnlyKeys = []string{"CanRepeatModes", "CharmNum", "ChoiceRestriction", 
 
 // PumpCompilerFile is api:Pump's parameter compiler (W4 step 3), including
 // the KW$/Duration$/LeaveBattlefield$ grant PumpAll shares.
-const PumpCompilerFile = "effects/pump_params.go"
+const PumpCompilerFile = "engine/effects/pump_params.go"
 
 // PumpFiles are Pump's own resolution files: no parameter read of any key.
-var PumpFiles = []string{"effects/pump.go"}
+var PumpFiles = []string{"engine/effects/pump.go"}
 
 // PumpOnlyKeys are the parameter keys only Pump's compiler reads.
 var PumpOnlyKeys = []string{"ClearNotedCardsFor", "ForgetImprinted", "KWChoice", "NoteCards",
 	"NoteCardsFor", "NoteNumber"}
 
 // DrawCompilerFile is api:Draw's parameter compiler (W4 step 3).
-const DrawCompilerFile = "effects/draw_params.go"
+const DrawCompilerFile = "engine/effects/draw_params.go"
 
 // DrawFiles are Draw's own resolution files: no parameter read of any key.
-var DrawFiles = []string{"effects/draw.go"}
+var DrawFiles = []string{"engine/effects/draw.go"}
 
 // DrawOnlyKeys are the parameter keys only Draw's compiler reads.
 var DrawOnlyKeys = []string{"RememberDrawn", "Upto"}
 
 // ReplaceEffectCompilerFile is api:ReplaceEffect's parameter compiler (W4
 // step 3).
-const ReplaceEffectCompilerFile = "effects/replaceeffect_params.go"
+const ReplaceEffectCompilerFile = "engine/effects/replaceeffect_params.go"
 
 // ReplaceEffectFiles are ReplaceEffect's own resolution files: no parameter
 // read of any key.
-var ReplaceEffectFiles = []string{"effects/replacement.go"}
+var ReplaceEffectFiles = []string{"engine/effects/replacement.go"}
 
 // ReplaceEffectOnlyKeys are the parameter keys only ReplaceEffect's compiler
 // reads (rules' Scry and count-operator readers of a ReplaceWith$ body read
@@ -142,10 +143,10 @@ var ReplaceEffectFiles = []string{"effects/replacement.go"}
 var ReplaceEffectOnlyKeys = []string{"VarName", "VarValue"}
 
 // ManaCompilerFile is api:Mana's production-parameter compiler (W4 step 3).
-const ManaCompilerFile = "effects/params/mana.go"
+const ManaCompilerFile = "engine/effects/params/mana.go"
 
 // ManaFiles are Mana's own resolution files: no parameter read of any key.
-var ManaFiles = []string{"effects/mana_effect.go"}
+var ManaFiles = []string{"engine/effects/mana_effect.go"}
 
 // ManaOnlyKeys are the parameter keys only Mana's compiler reads (the
 // production riders; Produced$/Amount$/RestrictValid$ are read through it by
@@ -156,11 +157,11 @@ var ManaOnlyKeys = []string{"AddsCounters", "AddsNoCounter", "PersistentMana",
 
 // ManaReflectedCompilerFile is api:ManaReflected's parameter compiler (W4
 // step 3).
-const ManaReflectedCompilerFile = "effects/manareflected_params.go"
+const ManaReflectedCompilerFile = "engine/effects/manareflected_params.go"
 
 // ManaReflectedFiles are ManaReflected's own resolution files: no parameter
 // read of any key.
-var ManaReflectedFiles = []string{"effects/mana_reflected.go"}
+var ManaReflectedFiles = []string{"engine/effects/mana_reflected.go"}
 
 // ManaReflectedOnlyKeys are the parameter keys only ManaReflected's compiler
 // reads.
@@ -168,11 +169,11 @@ var ManaReflectedOnlyKeys = []string{"ColorOrType", "ReflectProperty"}
 
 // DealDamageCompilerFile is api:DealDamage's parameter compiler (W4 step 3):
 // the one file allowed to read a DealDamage ability's parameters.
-const DealDamageCompilerFile = "effects/params/dealdamage.go"
+const DealDamageCompilerFile = "engine/effects/params/dealdamage.go"
 
 // DealDamageFiles are DealDamage's own resolution files: they carry no
 // parameter read of any key.
-var DealDamageFiles = []string{"effects/damage_deal.go"}
+var DealDamageFiles = []string{"engine/effects/damage_deal.go"}
 
 // DealDamageOnlyKeys are the parameter keys only DealDamage's compiler reads
 // (Fight's unread-parameter Note names ExcessSVar$ through a variable key,
@@ -181,11 +182,11 @@ var DealDamageOnlyKeys = []string{"ExcessSVar", "ExcessSVarCondition", "Relative
 
 // PutCounterCompilerFile is api:PutCounter's parameter compiler (W4 step 3):
 // the one file allowed to read a PutCounter ability's parameters.
-const PutCounterCompilerFile = "effects/putcounter_params.go"
+const PutCounterCompilerFile = "engine/effects/putcounter_params.go"
 
 // PutCounterFiles are PutCounter's own resolution files: they carry no
 // parameter read of any key.
-var PutCounterFiles = []string{"effects/counters_put.go"}
+var PutCounterFiles = []string{"engine/effects/counters_put.go"}
 
 // PutCounterOnlyKeys are the parameter keys only PutCounter's compiler reads
 // (the entry-counter fold and the Adapt$ offer gate read them through it).
@@ -196,11 +197,11 @@ var PutCounterOnlyKeys = []string{"Adapt", "Bolster", "ChooseDifferent", "Counte
 // EffectCompilerFile is api:Effect's parameter compiler (W4 step 3): the one
 // file allowed to read an Effect ability's parameters (and its Triggers$
 // bodies' own, readEffectTriggerLine).
-const EffectCompilerFile = "effects/effect_params.go"
+const EffectCompilerFile = "engine/effects/effect_params.go"
 
 // EffectFiles are Effect's own resolution files: they carry no parameter read
 // of any key.
-var EffectFiles = []string{"effects/effect.go"}
+var EffectFiles = []string{"engine/effects/effect.go"}
 
 // EffectOnlyKeys are the parameter keys only Effect's compiler reads (the
 // opening-hand Effect reads EffectOwner$ through it too).
@@ -209,12 +210,12 @@ var EffectOnlyKeys = []string{"EffectOwner", "ExileOnMoved", "ForgetCounter", "F
 	"Stackable"}
 
 // TargetCompilerFile is the generic targeting tier's parameter compiler (W4
-// step 3's cross-API tier): the one file in rules/ and effects/ allowed to
+// step 3's cross-API tier): the one file in engine/rules/ and engine/effects/ allowed to
 // read a targeting parameter, whatever the ability's API.
-const TargetCompilerFile = "effects/params/targets.go"
+const TargetCompilerFile = "engine/effects/params/targets.go"
 
 // TargetOnlyKeys are the targeting parameter keys: a read of one of them
-// anywhere in rules/ or effects/ outside TargetCompilerFile is a path
+// anywhere in engine/rules/ or engine/effects/ outside TargetCompilerFile is a path
 // interpreting a targeting parameter on its own (effects.TargetsOf serves
 // every path the compiled TargetParams). The API-scoped rider
 // DividedAsYouChoose$ is read in the same file by its own single reader
@@ -230,12 +231,12 @@ var TargetOnlyKeys = []string{
 }
 
 // DefinedCompilerFile is the generic Defined-reference tier's parameter
-// compiler (W4 step 4's cross-API tier): the one file in rules/ and effects/
+// compiler (W4 step 4's cross-API tier): the one file in engine/rules/ and engine/effects/
 // allowed to read a Defined-reference parameter, whatever the ability's API.
-const DefinedCompilerFile = "effects/params/defined.go"
+const DefinedCompilerFile = "engine/effects/params/defined.go"
 
 // DefinedOnlyKeys are the Defined-reference parameter keys: a read of one of
-// them anywhere in rules/ or effects/ outside DefinedCompilerFile is a path
+// them anywhere in engine/rules/ or engine/effects/ outside DefinedCompilerFile is a path
 // interpreting a selector on its own (effects.DefinedOf serves every path the
 // compiled Ref). DefinedPlayer$ is read in the same file by its own single
 // reader (definedPlayerRef). The API-scoped DefinedName$, DefinedMagnet$,
@@ -244,99 +245,99 @@ var DefinedOnlyKeys = []string{"Defined", "DefinedCards", "DefinedPlayer", "Defi
 
 // DelayedTriggerCompilerFile is api:DelayedTrigger's parameter compiler (W4 step 3): the
 // one file allowed to read a DelayedTrigger ability's parameters.
-const DelayedTriggerCompilerFile = "effects/delayedtrigger_params.go"
+const DelayedTriggerCompilerFile = "engine/effects/delayedtrigger_params.go"
 
 // DelayedTriggerFiles are DelayedTrigger's own resolution files: they carry no parameter
 // read of any key.
-var DelayedTriggerFiles = []string{"effects/delayed_trigger.go"}
+var DelayedTriggerFiles = []string{"engine/effects/delayed_trigger.go"}
 
 // DelayedTriggerOnlyKeys are the parameter keys only DelayedTrigger's compiler reads.
 var DelayedTriggerOnlyKeys = []string{"NextTurn", "RememberChain"}
 
 // CopyPermanentCompilerFile is api:CopyPermanent's parameter compiler (W4 step 3): the
 // one file allowed to read a CopyPermanent ability's parameters.
-const CopyPermanentCompilerFile = "effects/copypermanent_params.go"
+const CopyPermanentCompilerFile = "engine/effects/copypermanent_params.go"
 
 // CopyPermanentFiles are CopyPermanent's own resolution files: they carry no parameter
 // read of any key.
-var CopyPermanentFiles = []string{"effects/copypermanent.go"}
+var CopyPermanentFiles = []string{"engine/effects/copypermanent.go"}
 
 // CopyPermanentOnlyKeys are the parameter keys only CopyPermanent's compiler reads.
 var CopyPermanentOnlyKeys = []string{"AtEOTTrig", "DefinedName", "NumCopies", "Pawprint", "Populate", "RandomCopied", "RandomNum", "ValidSupportedCopy", "WithDifferentNames"}
 
 // CloneCompilerFile is api:Clone's parameter compiler (W4 step 3): the one
 // file allowed to read a Clone ability's parameters.
-const CloneCompilerFile = "effects/clone_params.go"
+const CloneCompilerFile = "engine/effects/clone_params.go"
 
 // CloneFiles are Clone's own resolution files: they carry no parameter read
 // of any key.
-var CloneFiles = []string{"effects/clone.go"}
+var CloneFiles = []string{"engine/effects/clone.go"}
 
 // CloneOnlyKeys are the parameter keys only Clone's compiler reads.
 var CloneOnlyKeys = []string{"CloneTarget", "CloneZone", "CopyFromChosenName", "ExcludeChosen", "GainThisAbility", "KeepFacedown", "NewName"}
 
 // DigCompilerFile is api:Dig's parameter compiler (W4 step 3): the one
 // file allowed to read a Dig ability's parameters.
-const DigCompilerFile = "effects/dig_params.go"
+const DigCompilerFile = "engine/effects/dig_params.go"
 
 // DigFiles are Dig's own resolution files: they carry no parameter
 // read of any key.
-var DigFiles = []string{"effects/dig.go"}
+var DigFiles = []string{"engine/effects/dig.go"}
 
 // DigOnlyKeys are the parameter keys only Dig's compiler reads.
 var DigOnlyKeys = []string{"ChangeValid", "Choser", "DestinationZone", "DestinationZone2", "DigNum", "ForceRevealToController", "FromBottom", "LibraryPosition2", "OptionalAbilityPrompt", "PromptToSkipOptionalAbility", "RestRandomOrder", "SkipReorder"}
 
 // DigUntilCompilerFile is api:DigUntil's parameter compiler (W4 step 3): the one
 // file allowed to read a DigUntil ability's parameters.
-const DigUntilCompilerFile = "effects/diguntil_params.go"
+const DigUntilCompilerFile = "engine/effects/diguntil_params.go"
 
 // DigUntilFiles are DigUntil's own resolution files: they carry no parameter
 // read of any key.
-var DigUntilFiles = []string{"effects/diguntil.go"}
+var DigUntilFiles = []string{"engine/effects/diguntil.go"}
 
 // DigUntilOnlyKeys are the parameter keys only DigUntil's compiler reads.
 var DigUntilOnlyKeys = []string{"DigZone", "FoundDestination", "FoundLibraryPosition", "ImprintRevealed", "NoMoveFound", "NoMoveRevealed", "NoneFoundDestination", "NoneFoundLibraryPosition", "OptionalFoundMove", "OptionalNoDestination", "RevealRandomOrder", "RevealedDestination", "RevealedLibraryPosition", "ShuffleCondition"}
 
 // RemoveCounterCompilerFile is api:RemoveCounter's parameter compiler (W4 step 3): the one
 // file allowed to read a RemoveCounter ability's parameters.
-const RemoveCounterCompilerFile = "effects/removecounter_params.go"
+const RemoveCounterCompilerFile = "engine/effects/removecounter_params.go"
 
 // RemoveCounterFiles are RemoveCounter's own resolution files: they carry no parameter
 // read of any key.
-var RemoveCounterFiles = []string{"effects/removecounter.go"}
+var RemoveCounterFiles = []string{"engine/effects/removecounter.go"}
 
 // RemoveCounterOnlyKeys are the parameter keys only RemoveCounter's compiler reads.
 var RemoveCounterOnlyKeys = []string{"ChoiceNum", "CounterNumShared", "RememberRemoved"}
 
 // TokenCompilerFile is api:Token's parameter compiler (W4 step 3): the one
 // file allowed to read a Token ability's parameters.
-const TokenCompilerFile = "effects/token_params.go"
+const TokenCompilerFile = "engine/effects/token_params.go"
 
 // TokenFiles are Token's own resolution files: they carry no parameter
 // read of any key.
-var TokenFiles = []string{"effects/token.go"}
+var TokenFiles = []string{"engine/effects/token.go"}
 
 // TokenOnlyKeys are the parameter keys only Token's compiler reads.
 var TokenOnlyKeys = []string{"RememberOriginalTokens", "TokenAmount", "TokenOwner", "TokenPower", "TokenToughness"}
 
 // VoteCompilerFile is api:Vote's parameter compiler (W4 step 3): the one
 // file allowed to read a Vote ability's parameters.
-const VoteCompilerFile = "effects/vote_params.go"
+const VoteCompilerFile = "engine/effects/vote_params.go"
 
 // VoteFiles are Vote's own resolution files: they carry no parameter
 // read of any key.
-var VoteFiles = []string{"effects/vote.go", "effects/vote_effect.go"}
+var VoteFiles = []string{"engine/effects/vote.go", "engine/effects/vote_effect.go"}
 
 // VoteOnlyKeys are the parameter keys only Vote's compiler reads.
 var VoteOnlyKeys = []string{"RememberVotedObjects", "StoreVoteNum", "VoteCard", "VoteMessage", "VotePlayer", "VoteSubAbility", "VoteTiedAbility"}
 
 // RepeatEachCompilerFile is api:RepeatEach's parameter compiler (W4 step 3): the one
 // file allowed to read a RepeatEach ability's parameters.
-const RepeatEachCompilerFile = "effects/repeateach_params.go"
+const RepeatEachCompilerFile = "engine/effects/repeateach_params.go"
 
 // RepeatEachFiles are RepeatEach's own resolution files: they carry no parameter
 // read of any key.
-var RepeatEachFiles = []string{"effects/repeateach.go"}
+var RepeatEachFiles = []string{"engine/effects/repeateach.go"}
 
 // RepeatEachOnlyKeys are the parameter keys only RepeatEach's compiler reads.
 var RepeatEachOnlyKeys = []string{"AmountFromVotes", "ChangeZoneTable", "ChooseOrder", "ClearRememberedBeforeLoop", "RepeatCards", "RepeatOptionalForEachPlayer", "RepeatOptionalMessage", "RepeatPlayers", "RepeatSpellAbilities", "RepeatTargeted"}
@@ -344,7 +345,7 @@ var RepeatEachOnlyKeys = []string{"AmountFromVotes", "ChangeZoneTable", "ChooseO
 // TypedParamCompiler names one API's parameter compiler for the leak census
 // (Metrics.ChangeZoneParamLeaks and its siblings): the compiler file, the
 // API's own resolution files (no parameter read of any key there) and the
-// keys only that compiler may read anywhere in rules/ or effects/.
+// keys only that compiler may read anywhere in engine/rules/ or effects/.
 type TypedParamCompiler struct {
 	CompilerFile string
 	Files        []string
@@ -353,7 +354,7 @@ type TypedParamCompiler struct {
 
 // effectsImportPath is the import path whose Ctx, SpecContext and
 // TriggerContext types the context-literal census counts.
-const effectsImportPath = "github.com/adams-shaun/gorge/effects"
+const effectsImportPath = "github.com/adams-shaun/gorge/engine/effects"
 
 // Func is one function declaration over LongFuncLines.
 type Func struct {
@@ -367,14 +368,14 @@ type Func struct {
 // file's directory and the receiver-qualified name ("rules (*Engine).payCast").
 func (f Func) CeilingKey() string { return path.Dir(f.File) + " " + f.Name }
 
-// Metrics is one measurement. The JSON names are the contract
-// scripts/reward_collect.py reads; extend, never rename.
+// Metrics is one measurement. The JSON names are the contract four-yay's
+// ops/scripts/reward_collect.py reads; extend, never rename.
 type Metrics struct {
-	// FuncsOver300 counts non-test FuncDecls in rules/ and effects/ spanning
+	// FuncsOver300 counts non-test FuncDecls in engine/rules/ and engine/effects/ spanning
 	// more than LongFuncLines lines.
 	FuncsOver300 int `json:"funcs_over_300"`
 	// EngineMethods counts non-test methods whose receiver base type is
-	// Engine, under rules/ (recursive).
+	// Engine, under engine/rules/ (recursive).
 	EngineMethods int `json:"engine_methods"`
 	// HostMethods counts the methods in effects.Host's method set: the ones it
 	// declares directly plus every method of the role interfaces it embeds
@@ -402,11 +403,11 @@ type Metrics struct {
 	// fields per name, plus embeds).
 	ResumePointFields int `json:"resume_point_fields"`
 	// StringParamReads counts index expressions <x>Params["<literal>"] in
-	// rules/ and effects/ non-test files (reads and writes alike; the
+	// engine/rules/ and engine/effects/ non-test files (reads and writes alike; the
 	// literal key is the debt). StringParamKeys is the distinct-key count.
 	StringParamReads int `json:"string_param_reads"`
 	StringParamKeys  int `json:"string_param_keys"`
-	// StringCaseLiterals counts, in rules/ and effects/ non-test files, the
+	// StringCaseLiterals counts, in engine/rules/ and engine/effects/ non-test files, the
 	// string literals appearing directly in a case clause's expression list:
 	// each such literal counts once (`case "A", "B":` is 2). A literal
 	// nested deeper inside a case expression (`case f("A"):`) or in the
@@ -414,7 +415,7 @@ type Metrics struct {
 	// counted string literals on case lines.
 	StringCaseLiterals int `json:"string_case_literals"`
 	// CtxLiterals, SpecContextLiterals and TriggerContextLiterals count, in
-	// rules/ and effects/ non-test files other than CtxConstructorFiles, the
+	// engine/rules/ and engine/effects/ non-test files other than CtxConstructorFiles, the
 	// composite literals of effects.Ctx, effects.SpecContext and
 	// effects.TriggerContext (`effects.Ctx{...}` / `&effects.Ctx{...}`, the
 	// bare `Ctx{...}` inside package effects, and a type-elided element of a
@@ -427,7 +428,7 @@ type Metrics struct {
 	// ChangeZoneParamLeaks counts ChangeZone parameter reads outside its
 	// compiler (ChangeZoneCompilerFile): every parameter read in
 	// ChangeZoneFiles, plus every read of a ChangeZoneOnlyKeys key in any other
-	// rules/ or effects/ non-test file. A read is an index expression
+	// engine/rules/ or engine/effects/ non-test file. A read is an index expression
 	// <x>Params["k"] that is not an assignment target, a Param/ParamStr/
 	// HasParam(cards.PK<k>) call, or a Num/NumResolved/NumResolvedStrict/
 	// NumForObject call with a literal key. ChangeZoneLeaks lists them
@@ -522,14 +523,14 @@ type Metrics struct {
 	RepeatEachParamLeaks int      `json:"repeat_each_param_leaks"`
 	RepeatEachLeaks      []string `json:"repeat_each_leaks"`
 	// TrigmatchBoardMethods counts the methods trigmatch.Board declares
-	// (rules/trigmatch/board.go): the read-only view the trigger matchers
+	// (engine/rules/trigmatch/board.go): the read-only view the trigger matchers
 	// reach the engine through (W5 E3). Zero when the package is absent.
 	TrigmatchBoardMethods int `json:"trigmatch_board_methods"`
 	// PayEngineMethods counts the methods pay.Engine declares
-	// (rules/pay/engine.go): the payment layer's whole view of the engine
+	// (engine/rules/pay/engine.go): the payment layer's whole view of the engine
 	// (W5 E7). Zero when the package is absent.
 	PayEngineMethods int `json:"pay_engine_methods"`
-	// EngineSurface counts, under rules/ (recursive, non-test), the *Engine
+	// EngineSurface counts, under engine/rules/ (recursive, non-test), the *Engine
 	// methods plus the free functions with a *Engine parameter plus the
 	// methods of struct types holding a *Engine field: the reach of the
 	// engine that EngineMethods alone misses (sidedoor.go).
@@ -549,7 +550,7 @@ type Metrics struct {
 	StringKeyedParamReads   int      `json:"string_keyed_param_reads"`
 	StringKeyedParamHelpers []string `json:"string_keyed_param_helpers"`
 	// StrCodesTables counts the NewStrCodes / NewNameSet / NewStrTable call
-	// sites (cards/strtab.go, re-exported by state). StrCodesKeyDup is the sum
+	// sites (engine/cards/strtab.go, re-exported by state). StrCodesKeyDup is the sum
 	// over string keys of (distinct tables naming the key - 1): one word
 	// spread over several tables.
 	StrCodesTables int `json:"str_codes_tables"`
@@ -561,7 +562,7 @@ type Metrics struct {
 	LongFuncs []Func `json:"long_funcs"`
 }
 
-// Measure parses rules/ and effects/ under root (the module root) and returns
+// Measure parses engine/rules/ and engine/effects/ under root (the module root) and returns
 // the metrics. It fails if a measured type (effects.Host, effects.Ctx,
 // rules' resumePoint) cannot be found, so a rename cannot silently zero a
 // ratchet.
@@ -589,7 +590,7 @@ func Measure(root string) (Metrics, error) {
 			}
 			m.Files++
 			parsed = append(parsed, parsedFile{fset: fset, f: f, rel: rel, dir: dir})
-			inEffectsTop := dir == "effects" && strings.Count(rel, "/") == 1
+			inEffectsTop := dir == "engine/effects" && strings.Count(rel, "/") == 2
 			if !isCtxConstructorFile(rel) {
 				countCtxLiterals(f, inEffectsTop, &m)
 			}
@@ -601,7 +602,7 @@ func Measure(root string) (Metrics, error) {
 					if n := end - start + 1; n > LongFuncLines {
 						m.LongFuncs = append(m.LongFuncs, Func{Name: QualName(d), File: rel, Line: start, Lines: n})
 					}
-					if dir == "rules" && receiverBase(d) == "Engine" {
+					if dir == "engine/rules" && receiverBase(d) == "Engine" {
 						m.EngineMethods++
 					}
 				case *ast.GenDecl:
@@ -626,7 +627,7 @@ func Measure(root string) (Metrics, error) {
 							}
 							ctxFound = true
 							m.CtxFields, m.CtxEmbeds = named, embeds
-						case path.Dir(rel) == "rules/trigmatch" && ts.Name.Name == "Board":
+						case path.Dir(rel) == "engine/rules/trigmatch" && ts.Name.Name == "Board":
 							it, ok := ts.Type.(*ast.InterfaceType)
 							if !ok {
 								return m, fmt.Errorf("codeshape: %s: trigmatch.Board is not an interface", rel)
@@ -637,7 +638,7 @@ func Measure(root string) (Metrics, error) {
 								}
 								m.TrigmatchBoardMethods += len(fld.Names)
 							}
-						case path.Dir(rel) == "rules/pay" && ts.Name.Name == "Engine":
+						case path.Dir(rel) == "engine/rules/pay" && ts.Name.Name == "Engine":
 							it, ok := ts.Type.(*ast.InterfaceType)
 							if !ok {
 								return m, fmt.Errorf("codeshape: %s: pay.Engine is not an interface", rel)
@@ -648,7 +649,7 @@ func Measure(root string) (Metrics, error) {
 								}
 								m.PayEngineMethods += len(fld.Names)
 							}
-						case dir == "rules" && ts.Name.Name == "resumePoint":
+						case dir == "engine/rules" && ts.Name.Name == "resumePoint":
 							named, embeds, err := structFields(ts, rel)
 							if err != nil {
 								return m, err
@@ -662,7 +663,7 @@ func Measure(root string) (Metrics, error) {
 					}
 				}
 			}
-			inEffects := dir == "effects"
+			inEffects := dir == "engine/effects"
 			m.ChangeZoneLeaks = append(m.ChangeZoneLeaks, paramLeaks(fset, f, rel,
 				TypedParamCompiler{ChangeZoneCompilerFile, ChangeZoneFiles, ChangeZoneOnlyKeys})...)
 			m.ChangeZoneAllLeaks = append(m.ChangeZoneAllLeaks, paramLeaks(fset, f, rel,
@@ -740,11 +741,11 @@ func Measure(root string) (Metrics, error) {
 	}
 	switch {
 	case !hostFound:
-		return m, fmt.Errorf("codeshape: no `type Host interface` in effects/; update codeshape if it moved")
+		return m, fmt.Errorf("codeshape: no `type Host interface` in engine/effects/; update codeshape if it moved")
 	case !ctxFound:
-		return m, fmt.Errorf("codeshape: no `type Ctx struct` in effects/; update codeshape if it moved")
+		return m, fmt.Errorf("codeshape: no `type Ctx struct` in engine/effects/; update codeshape if it moved")
 	case !rpFound:
-		return m, fmt.Errorf("codeshape: no `type resumePoint struct` under rules/; update codeshape if it moved or was retired")
+		return m, fmt.Errorf("codeshape: no `type resumePoint struct` under engine/rules/; update codeshape if it moved or was retired")
 	}
 	if err := measureHost(ifaces, &m); err != nil {
 		return m, err

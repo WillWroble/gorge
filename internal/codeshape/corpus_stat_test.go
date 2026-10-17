@@ -34,7 +34,7 @@ var (
 // directory: the resolvers themselves (both are the one place that probes
 // where the corpus is) and the test that proves the resolver's fallback.
 func corpusStatAllowed(rel string) bool {
-	return strings.HasPrefix(rel, "internal/testutil/") || rel == "cards/sharedcorpus_test.go" ||
+	return strings.HasPrefix(rel, "testkit/testutil/") || rel == "engine/cards/sharedcorpus_test.go" ||
 		rel == "internal/codeshape/corpus_stat_test.go"
 }
 

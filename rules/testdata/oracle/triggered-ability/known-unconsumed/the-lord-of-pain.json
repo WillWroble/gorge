@@ -1,7 +1,0 @@
-{
-  "card": "The Lord of Pain",
-  "rows": {
-    "first-spell-damages-chosen-player": "step 0 (cast): [{\"kind\":\"choose\",\"pick\":[\"p1\"]}]; step 1 (resolve): [{\"kind\":\"choose\",\"pick\":[\"p1\"]}]",
-    "second-spell-same-turn-does-not-trigger": "step 0 (cast): [{\"kind\":\"choose\",\"pick\":[\"p1\"]}]; step 1 (resolve): [{\"kind\":\"choose\",\"pick\":[\"p1\"]}]"
-  }
-}

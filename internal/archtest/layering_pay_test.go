@@ -6,44 +6,44 @@ import (
 	"testing"
 )
 
-// layering_pay_test.go pins rules/pay, the L5 payment-planning package of the
+// layering_pay_test.go pins engine/rules/pay, the L5 payment-planning package of the
 // rules-engine lasagna (spec 2026-10-03 §3, W5 step E7): the planner's
 // vocabulary (alternatives, consequences, rank, witness) and its bounded
 // rank-aware search, the pool solver and payment core, and the payment
 // vocabulary (cost modifiers, window sources, planner classification and
 // stats). It reaches the engine only through the pay.Engine interface package
-// rules implements (rules/pay_engine.go). Its rows live in their own file so
+// rules implements (engine/rules/pay_engine.go). Its rows live in their own file so
 // parallel W5 steps do not edit the same lines.
 
-// payImports is the closed set of module packages rules/pay may import
+// payImports is the closed set of module packages engine/rules/pay may import
 // directly: the L0/L1 vocabulary (cards, state, decision, events), the L2
-// cost vocabulary and effects/params (the leaf compiled-parameter records;
+// cost vocabulary and engine/effects/params (the leaf compiled-parameter records;
 // paramsImports pins it below effects), the L4 characteristics read
-// interface rules/chars (chars.Reader, lasagna spec §9.2) and the L3
+// interface engine/rules/chars (chars.Reader, lasagna spec §9.2) and the L3
 // effects vocabulary (effects.Ctx and its pure constructors and parsers --
 // never an effects.Host, TestPayHoldsNoHost). rules, the sibling L5
 // packages, the resolution kernel and the bot layer would invert the
 // layering.
 var payImports = map[string]bool{
-	module + "/cards":          true,
-	module + "/state":          true,
-	module + "/decision":       true,
-	module + "/events":         true,
-	module + "/rules/cost":     true,
-	module + "/effects/params": true,
-	module + "/rules/chars":    true,
-	module + "/effects":        true,
+	module + "/engine/cards":          true,
+	module + "/engine/state":          true,
+	module + "/engine/decision":       true,
+	module + "/engine/events":         true,
+	module + "/engine/rules/cost":     true,
+	module + "/engine/effects/params": true,
+	module + "/engine/rules/chars":    true,
+	module + "/engine/effects":        true,
 }
 
-// TestPayImportsStayBelowRules pins rules/pay's direct module imports to
+// TestPayImportsStayBelowRules pins engine/rules/pay's direct module imports to
 // payImports and forbids the transitive edges the layering rules out. It
 // skips until the package exists.
 func TestPayImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/pay"
+	const sub = module + "/engine/rules/pay"
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
-		t.Skip("rules/pay is not built yet")
+		t.Skip("engine/rules/pay is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -57,11 +57,11 @@ func TestPayImportsStayBelowRules(t *testing.T) {
 			"(internal/archtest/layering_pay_test.go payImports)", sub, imp, sortedKeys(payImports))
 	}
 	for _, to := range []string{
-		module + "/rules",
-		module + "/rules/combat",
-		module + "/rules/trigmatch",
-		module + "/rules/resolve",
-		module + "/botpolicy",
+		module + "/engine/rules",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/trigmatch",
+		module + "/engine/rules/resolve",
+		module + "/bots/botpolicy",
 	} {
 		if p.deps[to] {
 			t.Errorf("%s depends on %s (transitively); the dependency order forbids it", sub, to)
@@ -69,18 +69,18 @@ func TestPayImportsStayBelowRules(t *testing.T) {
 	}
 }
 
-// payForbiddenStd is the standard library rules/pay must not import: the
+// payForbiddenStd is the standard library engine/rules/pay must not import: the
 // payment layer is part of the deterministic replay core (no wall clock, no
 // ambient randomness) and holds no shared mutable state of its own.
 var payForbiddenStd = []string{"time", "math/rand", "math/rand/v2", "crypto/rand", "sync", "unsafe", "os"}
 
-// TestPayStaysDeterministic pins rules/pay off the standard-library packages
+// TestPayStaysDeterministic pins engine/rules/pay off the standard-library packages
 // that would let a payment depend on anything but the game it is handed.
 func TestPayStaysDeterministic(t *testing.T) {
-	const sub = module + "/rules/pay"
+	const sub = module + "/engine/rules/pay"
 	p, ok := packages(t)[sub]
 	if !ok {
-		t.Skip("rules/pay is not built yet")
+		t.Skip("engine/rules/pay is not built yet")
 	}
 	for _, imp := range payForbiddenStd {
 		if p.imports[imp] {
@@ -90,25 +90,25 @@ func TestPayStaysDeterministic(t *testing.T) {
 	}
 }
 
-// paramsImports is the closed set of module packages effects/params may
-// import directly: the L0/L1 vocabulary only. effects/params is the leaf
+// paramsImports is the closed set of module packages engine/effects/params may
+// import directly: the L0/L1 vocabulary only. engine/effects/params is the leaf
 // home of the compiled ability-parameter records both the resolution
-// (effects aliases every name) and the payment layer (rules/pay) read (W5
+// (effects aliases every name) and the payment layer (engine/rules/pay) read (W5
 // step E7); anything above L1 would put the resolution's Host/Ctx machinery,
 // or the engine, back under the payment layer.
 var paramsImports = map[string]bool{
-	module + "/cards":    true,
-	module + "/state":    true,
-	module + "/decision": true,
+	module + "/engine/cards":    true,
+	module + "/engine/state":    true,
+	module + "/engine/decision": true,
 }
 
-// TestParamsIsALeaf pins effects/params' direct module imports to
+// TestParamsIsALeaf pins engine/effects/params' direct module imports to
 // paramsImports.
 func TestParamsIsALeaf(t *testing.T) {
-	const sub = module + "/effects/params"
+	const sub = module + "/engine/effects/params"
 	p, ok := packages(t)[sub]
 	if !ok {
-		t.Fatal("effects/params is not built")
+		t.Fatal("engine/effects/params is not built")
 	}
 	var bad []string
 	for imp := range p.imports {

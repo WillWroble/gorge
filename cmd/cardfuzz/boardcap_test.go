@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // boardCapDecks is a deck pair whose games must mint tokens: 30 Dragon
@@ -21,7 +21,7 @@ func boardCapDecks() []genDeck {
 
 // TestMidResolutionObjectCap pins the mid-resolution arm of the object
 // budget: -max-objects is armed on the engine's own per-event watchdog
-// (rules/livelock.go's LoopGuard.MaxObjs), so a budget crossing INSIDE one
+// (engine/rules/livelock.go's LoopGuard.MaxObjs), so a budget crossing INSIDE one
 // resolution is caught one event after it happens -- not at the next
 // decision boundary, which may be tens of thousands of expensive events
 // later and, on a wall-clock-budget harness, after the game has already

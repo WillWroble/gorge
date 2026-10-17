@@ -56,8 +56,8 @@ metric.
 
 Planned metrics: random play (pairs A, B, Burn), bot play (pair A, manual and
 auto-pay), clone µs and allocation, MCTS at 100 sims, the sampler, and live
-heap. An optional separate series would track bot strength from
-`botbench -out json`.
+heap. An optional separate series would track bot strength, measured outside
+gorge.
 
 ## How the series is produced (plan)
 
@@ -71,7 +71,7 @@ ROWS="-row random -pair A;-row random -pair B;-row random -pair burn;-row bot -p
   scripts/enginebench-pair.sh "$ANCHOR" "$REV" "$OUT"
 ```
 
-A small converter (planned: `scripts/perf-record.py`) turns the pair output
+A small converter (the maintainers' `perf-record.py`, outside this repo) turns the pair output
 into the schema above and appends it to `history.jsonl` on the orphan
 `perf-data` branch, so performance data never lands on `main`.
 

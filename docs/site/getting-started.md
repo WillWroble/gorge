@@ -7,8 +7,8 @@ to build the browser client.
 
 ```sh
 git clone https://github.com/adams-shaun/gorge && cd gorge
-make fetch-cards      # one-time, ~25 MB: Forge card + token scripts at FORGE_REF into .cards/
-make compile-cards    # parse the scripts into the IR cache (.cards/ir.gob.gz)
+make fetch-cards      # one-time, ~240 MB: Forge card + token scripts at FORGE_REF into .cards/
+make compile-cards    # parse the scripts into the IR cache (.cards/ir-<fingerprint>.gob.gz)
 make report           # print corpus coverage against the implemented primitives
 ```
 
@@ -64,16 +64,22 @@ lists every flag (`-tables`, `-seats`, `-format`, `-pace`, `-mulligans`,
 
 ## 4. Run the tests
 
+Run tests focused: one package and a `-run` pattern at a time.
+
 ```sh
-make test lint        # the full suite; heavy, see the note below
-go test ./rules/ -run 'TestHeads$|TestRepoDeckGamesReplayExactly' -v
+go test -run 'TestHeads$' ./engine/rules/
+go test -run 'TestOracleRunnerContract' ./engine/rules/
 ```
 
-The full suite is large (about 12,000 tests). For day-to-day work run single
-packages with `-run`. Tests that need the corpus **skip** when `.cards/` is
-missing, so a fast green run without the corpus has tested very little.
+Avoid `make test` (`go test ./...`) as an everyday command. The full suite is
+large (about 12,000 tests) and runs after merge. Never add `-count=1`; it only
+defeats the test cache. Tests that need the corpus **skip** when `.cards/` is
+missing, so a fast green run without the corpus has tested very little. Every
+test must fit 4 GB RSS, 4 vCPU and one minute of wall time.
 
-`make conformance` runs the focused CR 601/733 conformance audit on its own.
+[Testing](contributing/testing.md) explains the helpers, the oracle scenarios
+and what each ratchet failure means. `make conformance` runs the focused
+CR 601/733 conformance audit on its own.
 
 ## 5. Reproduce a reported game
 
@@ -99,7 +105,7 @@ committed** to this repository:
 
 - `forgec fetch` downloads them into `.cards/`, which is gitignored, pinned to
   a commit SHA (`FORGE_REF`).
-- `cards/boundary_test.go` fails the build if any Forge script is tracked in
+- `engine/cards/boundary_test.go` fails the build if any Forge script is tracked in
   the working tree, the index or `HEAD`.
 - Replay fixtures strip embedded token-script text before they are committed;
   it is resolved from the local corpus at load time.

@@ -1,0 +1,46 @@
+package rules
+
+import (
+	"strings"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules/pay"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+// plotZoneWalk offers Plot for the top card of this player's library only
+// when an active PlotZone static explicitly selects it.
+func plotZoneWalk(w *legalWalk) {
+	e, p := w.e, w.p
+	if !w.sorcery {
+		return
+	}
+	library := e.G.Zone(state.ZLibrary, p)
+	if len(library) == 0 {
+		return
+	}
+	id := library[0]
+	o := e.G.Obj(id)
+	if o == nil || o.Face() == nil || o.Face().IsLand() || !plotZoneAllowed(e, id) {
+		return
+	}
+	f := o.Face()
+	raw, ok := f.KeywordCostParam("Plot")
+	if !ok {
+		if raw, ok = e.derivedKeywordParamH(id, kwHeadOf("Plot")); ok {
+			raw = cards.KeywordCostField(raw)
+		}
+	}
+	if !ok {
+		return
+	}
+	cost := ParseCost(raw)
+	if strings.EqualFold(strings.TrimSpace(raw), "CardManaCost") {
+		cost = pay.RawBaseCost(asPayer(e), p, id)
+	}
+	if w.offerCastable(p, id, cost, spellScope("plot"), false) {
+		w.out = append(w.out, decision.Option{Index: len(w.out), Kind: "cast",
+			Label: "Plot " + f.Name, Obj: id, Mode: "plot"})
+	}
+}

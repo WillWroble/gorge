@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Two verbatim records from a GODEBUG=gctrace=1 run of ./host on go1.26.3.
+// Two verbatim records from a GODEBUG=gctrace=1 run of ./server/host on go1.26.3.
 // Kept exactly as the runtime emitted them: the parser's whole job is to
 // survive this format, so paraphrasing them would test nothing.
 const (

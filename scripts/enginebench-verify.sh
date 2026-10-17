@@ -15,7 +15,7 @@ set -euo pipefail
 . "$(dirname "$0")/enginebench-lib.sh"
 rev=${1:-.}
 IFS=' ' read -r -a buildargs <<<"${BUILD_ARGS:-}"
-bin=$("$(dirname "$0")/enginebench-build.sh" "$rev" -ldflags "-X github.com/adams-shaun/gorge/rules.derivedMemoVerifyFlag=1" ${buildargs[@]+"${buildargs[@]}"})
+bin=$("$(dirname "$0")/enginebench-build.sh" "$rev" -ldflags "-X github.com/adams-shaun/gorge/engine/rules.derivedMemoVerifyFlag=1" ${buildargs[@]+"${buildargs[@]}"})
 out=$BENCH_DIR/results/verify-$(date +%Y%m%dT%H%M%S).jsonl
 mkdir -p "$BENCH_DIR/results"
 echo "verify binary $bin -> $out"

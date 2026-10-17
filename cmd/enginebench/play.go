@@ -9,12 +9,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 // Game caps. docs/015 reports gorge's random games at 36-43 turns; a game
@@ -209,7 +211,7 @@ func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool
 	if walkStatsFlag {
 		wm.reset()
 	}
-	var fb [2]*seat.Bot
+	var fb [2]*heuristic.Bot
 	board := botpolicy.NewBoard(2)
 	stall := ""
 	func() {
@@ -241,7 +243,7 @@ func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool
 				}
 				p := int(d.Player)
 				if fb[p] == nil {
-					fb[p] = seat.NewBot(cfg.Seed ^ uint64(p+1))
+					fb[p] = heuristic.NewBot(cfg.Seed ^ uint64(p+1))
 				}
 				b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
 				in, err := fb[p].DecideBoard(context.Background(), b, *d)
@@ -280,7 +282,7 @@ func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool
 			if !ok {
 				p := int(d.Player)
 				if fb[p] == nil {
-					fb[p] = seat.NewBot(cfg.Seed ^ uint64(p+1))
+					fb[p] = heuristic.NewBot(cfg.Seed ^ uint64(p+1))
 				}
 				b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
 				in, err := fb[p].DecideBoard(context.Background(), b, *d)
@@ -344,7 +346,7 @@ func playBot(cfg rules.Config, autopay bool, st *botStats) error {
 func playBotWithPool(cfg rules.Config, autopay bool, st *botStats, pool *bench.SparePool) error {
 	seats := make([]seat.Seat, 2)
 	for i := range seats {
-		b := seat.NewBot(cfg.Seed ^ uint64(i+1))
+		b := heuristic.NewBot(cfg.Seed ^ uint64(i+1))
 		if autopay {
 			b = b.EnableAutoPayMana()
 		}

@@ -4,7 +4,7 @@
 // and in parallel with every other package's tests.
 //
 // The point is the pointer-free corpus work (S0 of
-// docs/superpowers/specs/2026-10-06-pointer-free-corpus-design.md): the whole
+// archived 2026-10-06-pointer-free-corpus-design.md (docs/design/ARCHIVE.md)): the whole
 // corpus is 163 MB live, 102 MB of it scannable, and every GC cycle re-marks
 // it. This test pins the measured values so a regression that grows the heap,
 // or a later step that shrinks it, cannot pass unnoticed: a measurement above
@@ -19,12 +19,12 @@ import (
 	"runtime/metrics"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 
 	// Register the effects' ParamCoders exactly as a real process does, so the
 	// census reflects what a server holds, not a bare parser.
-	_ "github.com/adams-shaun/gorge/rules"
+	_ "github.com/adams-shaun/gorge/engine/rules"
 )
 
 // The ceilings, in absolute bytes/objects. They are the values the spec's §1.1
@@ -35,7 +35,7 @@ const (
 	// Lowered at S4 (the imaged lazy registry): measured 1.4 MB scan,
 	// 40.5 MB heap, 18,405 objects. S4 set the heap ceiling to 35.6 MB from
 	// the design's ESTIMATE ("~35-40 MB") rather than from the measurement
-	// it logged, so it landed just above the ceiling; cmd/botbench failed
+	// it logged, so it landed just above the ceiling; four-yay cmd/botbench failed
 	// first in the same batch run and masked it.
 	//
 	// Re-pinned 2026-10-07 (agent-20261007T001003Z-312ebafa) when the census
@@ -110,7 +110,7 @@ func report() heapSample {
 // LoadRegistry serves from it, so the census is deterministic -- independent
 // of which ir-<fingerprint>.gob.gz files .cards happens to hold, of .cards
 // being writable, and of where the checkout lives. It skips when there is no
-// .cards/ corpus, the same way internal/testutil.CorpusRegistry does, so a
+// .cards/ corpus, the same way testkit/testutil.CorpusRegistry does, so a
 // clean clone with no fetched corpus still passes.
 func TestCorpusHeapCensus(t *testing.T) {
 	dir := testutil.CorpusDirOrSkip(t)
@@ -123,7 +123,7 @@ func TestCorpusHeapCensus(t *testing.T) {
 	// was the defect: it served the shared cache when one existed and an
 	// embedded, eager compiled registry when the Save back into a read-only
 	// .cards failed, and the two measured 37 MB vs 165 MB. The census measures
-	// the registry itself, so it cannot use internal/testutil.CorpusRegistry's
+	// the registry itself, so it cannot use testkit/testutil.CorpusRegistry's
 	// shared cache either (that would reintroduce the same dependence).
 	//
 	// Compile from a RELATIVE root (t.Chdir into the corpus dir, then

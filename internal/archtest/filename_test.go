@@ -15,7 +15,7 @@ import (
 // `_util`). The old steward metric rewarded splitting a long file at a line
 // count, which scattered one concern over several files without adding a
 // moved verbatim; rules/stack_helpers.go hosted 39 effects.Host methods until
-// W1d split it by role into rules/host_*.go).
+// W1d split it by role into engine/rules/host_*.go).
 var sizeOnlyFileName = regexp.MustCompile(
 	`(^|_)(rest|more|extra|part|cont|continued|tail|remainder|overflow|helpers?|misc|utils?)\d*\.go$|_\d+\.go$`)
 
@@ -24,18 +24,18 @@ var sizeOnlyFileName = regexp.MustCompile(
 // splitting one by concern behind a named seam deletes its entry here.
 // NEVER add an entry.
 var sizeOnlyFileNamesAllowed = map[string]bool{
-	"effects/misc.go":           true,
-	"rules/raise_cost_extra.go": true,
-	"rules/token_rest.go":       true,
+	"engine/effects/misc.go":           true,
+	"engine/rules/raise_cost_extra.go": true,
+	"engine/rules/token_rest.go":       true,
 }
 
 // TestNoNewSizeOnlyFileNames is the rules-engine refactor spec's W0 file-name
-// lint: a new non-test file in rules/ or effects/ (recursively) may not be
+// lint: a new non-test file in engine/rules/ or engine/effects/ (recursively) may not be
 // named for its size. It checks names only; it does not measure file length.
 func TestNoNewSizeOnlyFileNames(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var seen []string
-	for _, dir := range []string{"rules", "effects"} {
+	for _, dir := range []string{"engine/rules", "engine/effects"} {
 		for _, file := range goSourcesUnder(t, filepath.Join(root, dir)) {
 			rel, err := filepath.Rel(root, file)
 			if err != nil {
@@ -49,7 +49,7 @@ func TestNoNewSizeOnlyFileNames(t *testing.T) {
 			if !sizeOnlyFileNamesAllowed[rel] {
 				t.Errorf("%s is named for its size, not its concern (matches %s).\n"+
 					"Split by CONCERN behind a named seam, not by size: name the file for "+
-					"the one thing it owns (e.g. rules/ward.go, rules/replacement_life.go), "+
+					"the one thing it owns (e.g. engine/rules/ward.go, engine/rules/replacement_life.go), "+
 					"and move a cohesive concern -- its types, its entry point and its "+
 					"helpers -- rather than the second half of a long function or file. "+
 					"Do not add the name to sizeOnlyFileNamesAllowed.",

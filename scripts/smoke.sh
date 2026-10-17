@@ -274,7 +274,7 @@ wait_ready() {
 start_server() {
   local port="$1" dir="$2" spec="$3" log="$4"
   ./bin/gorged -addr "127.0.0.1:$port" -dir "$dir" -spectator "$spec" \
-    -decks internal/testutil/decks -tables 4 -seats 4 -pace 1.5s >"$log" 2>&1 &
+    -decks testkit/testutil/decks -tables 4 -seats 4 -pace 1.5s >"$log" 2>&1 &
   SERVER_PIDS+=("$!")
 }
 
@@ -288,7 +288,7 @@ start_server() {
 start_seated_server() {
   local port="$1" dir="$2" log="$3"
   ./bin/gorged -addr "127.0.0.1:$port" -dir "$dir" -spectator omniscient \
-    -decks internal/testutil/decks -tables 2 -seats 2 -pace 1.5s -seed 1 \
+    -decks testkit/testutil/decks -tables 2 -seats 2 -pace 1.5s -seed 1 \
     -format constructed -vsbot -humans 1 -seat-token ui19seat1 >"$log" 2>&1 &
   SERVER_PIDS+=("$!")
 }

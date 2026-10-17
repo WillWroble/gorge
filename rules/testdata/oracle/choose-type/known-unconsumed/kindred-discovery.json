@@ -1,6 +1,0 @@
-{
-  "card": "Kindred Discovery",
-  "rows": {
-    "chosen-goblin-enters-draws": "step 0 (cast): [{\"kind\":\"any\",\"pick\":[\"Goblin\"]}]"
-  }
-}

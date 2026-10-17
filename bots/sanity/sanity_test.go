@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 func hostileOwnOnly() decision.TargetHints { return decision.MakeTargetHints(2, 0, true) }
@@ -166,7 +168,7 @@ func (r *recBoard) DecideBoard(ctx context.Context, _ botpolicy.Board, d decisio
 func TestWrapAsksOnceAndMapsBack(t *testing.T) {
 	inner := &recSeat{pick: "Cast Lightning Bolt"}
 	w := Wrap(inner)
-	if _, ok := w.(seat.BoardSeat); ok {
+	if _, ok := w.(heuristic.BoardSeat); ok {
 		t.Fatal("a non-board inner became a BoardSeat")
 	}
 	if c, ok := w.(seat.TargetHintConsumer); !ok || !c.WantsTargetHints() {
@@ -185,7 +187,7 @@ func TestWrapAsksOnceAndMapsBack(t *testing.T) {
 
 	b := &recBoard{recSeat{pick: "Cast Ghost Quarter"}}
 	wb := Wrap(b)
-	bs, ok := wb.(seat.BoardSeat)
+	bs, ok := wb.(heuristic.BoardSeat)
 	if !ok {
 		t.Fatal("a BoardSeat inner must stay a BoardSeat")
 	}
@@ -223,7 +225,7 @@ func TestWrapAnswersMulliganItself(t *testing.T) {
 		Prompt:  "p0 plays first. Keep your hand (put 0 cards on the bottom of your library) or take a mulligan?",
 		Options: []decision.Option{{Index: 0, Kind: "keep"}, {Index: 1, Kind: "mulligan"}}}
 	inner := &recBoard{recSeat{pick: "never"}}
-	bs := Wrap(inner).(seat.BoardSeat)
+	bs := Wrap(inner).(heuristic.BoardSeat)
 	for lands, want := range map[int]int{0: 1, 1: 1, 2: 0, 3: 0, 5: 0, 6: 1, 7: 1} {
 		in, err := bs.DecideBoard(context.Background(), hand(lands), ask)
 		if err != nil || len(in.Choices) != 1 || in.Choices[0] != want || in.Seq != 4 {

@@ -14,22 +14,24 @@
 // target decisions.
 //
 // The adapter never sets SeatConfig.Source: the clairvoyant world source is
-// a bench-only injection (internal/azmcts/clairvoyant), and a hosted entry
+// a bench-only injection (bots/azmcts/clairvoyant), and a hosted entry
 // with it would clone the real engine.
 package azredeal
 
 import (
 	"context"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/azmcts"
-	"github.com/adams-shaun/gorge/internal/policynet"
-	"github.com/adams-shaun/gorge/internal/searchprobe"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/azmcts"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/policynet"
+	"github.com/adams-shaun/gorge/bots/searchprobe"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Policy is the registry key.
@@ -46,19 +48,19 @@ func init() {
 				Claim:   "70.5% [68.5, 72.5] vs bot (+20.5pp over the 50.0% control)",
 				Versus:  "bot",
 				Setting: "gorge botbench, az100 redeal (gen 0), 2,000 games, uw-tempo vs the 5 mono decks, true lists visible",
-				Source:  "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §12.5",
+				Source:  "docs/design/2026-09-28-spellbench-agent-design.md §12.5",
 			},
 			{
 				Claim:   "az-redeal-sims25 rated 1382 [1320, 1455] vs bot 1264 on the Pauper kernel",
 				Versus:  "bot",
 				Setting: "gorge botbench -spellbench, SB's eight-deck seat-swapped mirror pool, Bradley-Terry rating",
-				Source:  "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §12.5",
+				Source:  "docs/design/2026-09-28-spellbench-agent-design.md §12.5",
 			},
 		},
 		Cost: bots.Cost{
 			MeanMS: 247, P95MS: 465, Scope: "per searched decision",
 			Note:   "216-278 ms mean uncontended at 100 sims (p95 380-550); contention raises it, the host never cuts the search",
-			Source: "docs/superpowers/specs/2026-09-28-spellbench-agent-design.md §12.5",
+			Source: "docs/design/2026-09-28-spellbench-agent-design.md §12.5",
 		},
 		Env: true, Search: true,
 		Formats:   []string{"constructed"},
@@ -149,7 +151,7 @@ type hostedSeat struct {
 var (
 	_ bots.EnvSeat              = (*hostedSeat)(nil)
 	_ bots.BudgetedSeat         = (*hostedSeat)(nil)
-	_ seat.BoardSeat            = (*hostedSeat)(nil)
+	_ heuristic.BoardSeat       = (*hostedSeat)(nil)
 	_ seat.PaymentPlanConsumer  = (*hostedSeat)(nil)
 	_ searchseat.SearchSeat     = (*hostedSeat)(nil)
 	_ searchseat.ClosedListSeat = (*hostedSeat)(nil)
@@ -238,7 +240,7 @@ func (s *hostedSeat) WantsEnv(d *decision.Decision) bool {
 // redeal source is built from the feed's history, so a nil or stopped feed
 // reaches it as an error and the az seat fails loudly instead of playing its
 // fallback. A nil feed is the host's signal for a stopped feed or a table
-// that built none (host/botenv.go envData), the same state Feed.Live() ==
+// that built none (server/host/botenv.go envData), the same state Feed.Live() ==
 // false reports.
 func (s *hostedSeat) DecideEnv(ctx context.Context, env bots.Env, d decision.Decision) (decision.Intent, error) {
 	if env.Search.Engine != nil && env.Search.Feed != nil && env.Search.Feed.Live() {

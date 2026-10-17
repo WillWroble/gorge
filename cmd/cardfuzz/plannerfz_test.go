@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestPlannerFZFindings replays the fuzz-1003 autopay-planner contract

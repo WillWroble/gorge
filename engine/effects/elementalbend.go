@@ -1,0 +1,19 @@
+package effects
+
+import (
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/events"
+)
+
+func init() {
+	Register("ElementalBend", effElementalBend)
+	RegisterNonAPI("trig:ElementalBend")
+}
+
+func effElementalBend(h Host, c *Ctx, sa *cards.SA) {
+	verb := sa.ParamStr(cards.PKVerb)
+	if verb != "water" && verb != "earth" && verb != "fire" && verb != "air" {
+		return
+	}
+	h.Emit(events.Event{Kind: events.ElementalBend, Obj: c.Source, Player: c.Controller, Text: verb})
+}

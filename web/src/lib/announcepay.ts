@@ -3,7 +3,7 @@ import { findCardAnywhere } from './board';
 
 /**
  * announcepay.ts is the client half of announce-then-pay
- * (docs/superpowers/specs/2026-09-27-announce-then-pay.md). Pure functions
+ * (docs/design/2026-09-27-announce-then-pay.md). Pure functions
  * only: which casts a seat with Auto-pay OFF may announce, and how the
  * announced CR 601.2g window ("select mana" prompt) is regrouped for display.
  *

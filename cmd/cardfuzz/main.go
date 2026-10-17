@@ -20,7 +20,7 @@
 // and the diagnostic, and `cardfuzz -repro <file> -line N` replays it.
 //
 // -autopay off|all|mixed arms production-bot seats with the hosted bot's
-// payment-plan wrapper (seat.Bot.EnableAutoPayMana), so they cast through the
+// payment-plan wrapper (heuristic.Bot.EnableAutoPayMana), so they cast through the
 // engine's offered PaymentActions instead of floating mana by hand; off is
 // byte-identical to the fuzzer before the flag. The failure record carries the
 // mode, and the run summary (and -stats) counts planned casts, reversed
@@ -36,7 +36,7 @@
 //
 // -manabrew replaces every seat's bot policy with the ManaBrew wire:
 // each seat is an mbtest.TranslatingSeat answering a seeded-random
-// mbtest.MockClient, so every decision crosses internal/manabrew's
+// mbtest.MockClient, so every decision crosses server/manabrew's
 // Translator as a wire prompt and back. A game fails on any unmapped
 // decision, rejected response, translator panic or replay divergence, and
 // its failure record carries "manabrew": true so -repro rebuilds the same
@@ -68,19 +68,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/effects"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/host"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/manabrew/mbtest"
-	"github.com/adams-shaun/gorge/internal/paymirror"
-	"github.com/adams-shaun/gorge/replay"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/state"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/manabrew/mbtest"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
 )
 
 var colourNames = []string{"W", "U", "B", "R", "G"}
@@ -383,7 +385,7 @@ func signature(kind, diag string) string {
 	}
 	if kind == "panic" {
 		for i, l := range lines {
-			if strings.Contains(l, "github.com/adams-shaun/gorge/") && !strings.Contains(l, "internal/bench") && !strings.Contains(l, "runtime/") && i+1 < len(lines) && !strings.Contains(l, "panic(") {
+			if strings.Contains(l, "github.com/adams-shaun/gorge/") && !strings.Contains(l, "testkit/bench") && !strings.Contains(l, "runtime/") && i+1 < len(lines) && !strings.Contains(l, "panic(") {
 				fr := strings.TrimSpace(l)
 				if j := strings.LastIndex(fr, "("); j > 0 {
 					fr = fr[:j]
@@ -464,13 +466,13 @@ var autopayMirrorOptions = paymirror.Options{Control: true}
 var mbCensus *mbtest.Census
 
 // botSeat is the production hosted bot, or with explore the opt-in
-// coverage-exploration policy (seat.NewExploreBot, botpolicy.ExploreDecide);
-// autoPay arms either with the payment-plan wrapper (seat.Bot.
+// coverage-exploration policy (heuristic.NewExploreBot, botpolicy.ExploreDecide);
+// autoPay arms either with the payment-plan wrapper (heuristic.Bot.
 // EnableAutoPayMana), exactly as host.NewBotPolicySeatWithAutoPayMana arms a
 // hosted bot. With autoPay false both are the pre-flag seats.
 func botSeat(seed uint64, explore, autoPay bool) seat.Seat {
 	if explore {
-		b := seat.NewExploreBot(seed)
+		b := heuristic.NewExploreBot(seed)
 		if autoPay {
 			b.EnableAutoPayMana()
 		}
@@ -514,7 +516,7 @@ func played(e *rules.Engine, decks [][]*cards.Card, probe *useProbe) *gameCov {
 }
 
 // playedLand is the object a LandPlayed event (at index i) played. The event
-// carries only the player (rules/cast.go's settleLandPlay: it closes the
+// carries only the player (engine/rules/cast.go's settleLandPlay: it closes the
 // land-play accounting AFTER the land's entry boundary), so the land is the
 // latest MoveZone before it in the same action -- the scan stops at the
 // Priority event the play_land answer emits before moving the card. The land's
@@ -726,7 +728,7 @@ func playGame(reg *cards.Registry, decks []genDeck, seed uint64, maxTurns, maxIn
 		// usual token engine) rather than the log tail.
 		return mk("bigboard", o.Livelock, o), gc
 	}
-	// The inert backstop (rules/priority_guard.go) keeps a game from spinning
+	// The inert backstop (engine/rules/priority_guard.go) keeps a game from spinning
 	// on a priority option whose handler changed nothing, but the option was
 	// still an offer/handler disagreement: report the game.
 	for i, ev := range e.L.Events {
@@ -816,19 +818,19 @@ func boardGuard(max int) func(*rules.Engine) (string, string) {
 }
 
 // objectCapReason is rules.ObjectCapReason, rules.LivelockError's Reason for
-// the mid-resolution object-cap abort (rules/livelock.go). It is the string
+// the mid-resolution object-cap abort (engine/rules/livelock.go). It is the string
 // both the abort's own rendering and the re-classification below key on, so
-// the two cannot drift apart silently: rules/livelock_objectcap_test.go pins
+// the two cannot drift apart silently: engine/rules/livelock_objectcap_test.go pins
 // the rendering and cmd/cardfuzz's boardcap test pins the classification.
 const objectCapReason = rules.ObjectCapReason
 
 // objectCapAbortPrefix is the head of the rendered abort diagnostic for the
 // mid-resolution object cap. It is what survives into an Outcome (the
-// LivelockError itself is recovered inside internal/bench), so it is all the
+// LivelockError itself is recovered inside testkit/bench), so it is all the
 // re-classification can key on there.
 const objectCapAbortPrefix = "livelock detected (object cap"
 
-// objectCapGuard arms the engine's own per-event watchdog (rules/livelock.go)
+// objectCapGuard arms the engine's own per-event watchdog (engine/rules/livelock.go)
 // with the mid-resolution object cap. Between two decisions one resolution
 // can mint thousands of objects -- one Krenko, Mob Boss activation doubles
 // the Goblin count -- and a decision-boundary check cannot see inside it, so
@@ -1069,7 +1071,7 @@ func main() {
 	maxIntents := flag.Int("max-intents", 20000, "intent cap (recorded as an 'intents' failure)")
 	maxObjects := flag.Int("max-objects", 20000, "live object cap (recorded as a 'bigboard' failure; 0 disables)")
 	verify := flag.Bool("verify", true, "replay every finished game and compare")
-	explore := flag.Bool("explore", true, "one seat per game (by seed parity) plays the coverage-exploration policy (seat.NewExploreBot) instead of the production bot")
+	explore := flag.Bool("explore", true, "one seat per game (by seed parity) plays the coverage-exploration policy (heuristic.NewExploreBot) instead of the production bot")
 	repro := flag.String("repro", "", "replay a failure record from this JSONL file (with -line)")
 	line := flag.Int("line", 1, "1-based line of -repro to replay")
 	report := flag.Bool("report", false, "print coverage summary from -state and exit")
@@ -1077,7 +1079,7 @@ func main() {
 	hang = flag.Duration("hang", 90*time.Second, "wall-clock budget per game before it is recorded as a 'hang' (its goroutine is abandoned)")
 	maxHangs := flag.Int("max-hangs", 6, "stop the run once this many hung games are leaked (each burns a core)")
 	cpuProfile := flag.String("cpuprofile", "", "with -repro: write a CPU profile of the replay here")
-	autoPayMode := flag.String("autopay", "off", "off|all|mixed: which production-bot seats cast through offered payment plans (seat.Bot.EnableAutoPayMana); mixed picks per game and seat from the seed")
+	autoPayMode := flag.String("autopay", "off", "off|all|mixed: which production-bot seats cast through offered payment plans (heuristic.Bot.EnableAutoPayMana); mixed picks per game and seat from the seed")
 	mirror := flag.Bool("autopay-mirror", false, "mirror each auto-pay planned cast against float-then-cast (opt-in)")
 	exploreAutoPay := flag.Bool("explore-autopay", false, "the -explore seat auto-pays too wherever -autopay would select its seat (off by default: the wrapper hides priority mana activations, cutting explore coverage)")
 	statsPath := flag.String("stats", "", "write the run's failure counts and auto-pay counters here as JSON")
@@ -1086,7 +1088,7 @@ func main() {
 	journalPath := flag.String("journal", "", "append 'start <goroutine> <seed>' / 'end <seed>' around every game: a fatal runtime error (a stack overflow) kills the whole process past any recover, and the journal names the game the crashing goroutine was playing")
 	skipPath := flag.String("skip", "", "JSONL of games not to play ({seed, sig, diag} per line, from a -journal crash): each is recorded as a 'fatal' failure instead")
 	flag.Uint64Var(&dumpAt, "dump-at", 0, "with -repro: print the first pending decision whose Seq is at least this log index (options, payment actions, pool, battlefield)")
-	flag.BoolVar(&tapeDual, "tape", false, "print the W3 resolution kernel (rules/resolve, the default engine path) counters, the legacy-ask census and the predicate-miss census at the end")
+	flag.BoolVar(&tapeDual, "tape", false, "print the W3 resolution kernel (engine/rules/resolve, the default engine path) counters, the legacy-ask census and the predicate-miss census at the end")
 	flag.BoolVar(&tapeWorlds, "tape-worlds", false, "with -tape: fork a redealt hypothetical world at every posed tape decision and drive it 6 random intents")
 	flag.BoolVar(&planFailures, "plan-failures", true, "record a game whose planned cast was reversed (kind planrev) or fell back to the manual window (planfb) as a failure")
 	maxStack := flag.Int("max-stack", 256<<20, "per-goroutine stack limit in bytes (runtime/debug.SetMaxStack): an unbounded recursion dies here instead of at Go's 1 GB default")

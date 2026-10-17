@@ -189,23 +189,23 @@ members of the frozen acceptance or default `make sim` rotation.
   on the new deck, the selected kind was cast 710, mana activation 319, land 36,
   another ability 23, pass 3. Overlapping contexts: source already attached
   106, no printed own creature 153, outside main 0. These are not 1091 missed
-  tactical opportunities. `botpolicy/policy.go:Decide` prioritizes mana/lands/
-  casts before `chooseAbility`; `botpolicy/ability.go:equipNoOp` deliberately
+  tactical opportunities. `bots/botpolicy/policy.go:Decide` prioritizes mana/lands/
+  casts before `chooseAbility`; `bots/botpolicy/ability.go:equipNoOp` deliberately
   refuses re-equips and creatureless boards. A follow-up needs per-ability
   value/target/cost facts before changing that order, not simply activating more.
 - **Living Weapon and Prowess really trigger** (33 and 31); these are automatic
   engine triggers, not evidence of learned spell timing. Prowess-aware sequencing
-  belongs in `botpolicy/cast.go:chooseCast` and `policy.go:Decide`; trigger
-  ordering is `botpolicy/trigger.go:chooseTriggerOrder`.
+  belongs in `bots/botpolicy/cast.go:chooseCast` and `policy.go:Decide`; trigger
+  ordering is `bots/botpolicy/trigger.go:chooseTriggerOrder`.
 - **Flashback really casts**: all 22 offered occurrences were selected. No
   refusal was observed. This is not proof that all four flashback cards were
   used, or that sacrificing a land for a flashback was beneficial. The mana
   planner still prices printed cost rather than Flashback cost:
-  `botpolicy/tap.go:poolPays`, `tapWants`, `bestUnpayable`.
+  `bots/botpolicy/tap.go:poolPays`, `tapWants`, `bestUnpayable`.
 - **Kicker remains inert in the new prowess games:** zero kicked options and
   zero kicked `CastInfo` events, not a claim of policy rejecting an offer.
-  `rules/legal.go:legalActions` requires floating mana for base+kicker;
-  `botpolicy/tap.go:poolPays` only budgets printed cost. Burst Lightning needs
+  `engine/rules/legal.go:legalActions` requires floating mana for base+kicker;
+  `bots/botpolicy/tap.go:poolPays` only budgets printed cost. Burst Lightning needs
   five mana kicked in a low-curve deck. A mode-aware mana plan is the next task;
   changing only `chooseCast` cannot choose an option that was never offered.
   Baseline Kicker's 25 casts proves this is context-dependent, not globally

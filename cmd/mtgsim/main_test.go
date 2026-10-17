@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/replay"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/replay"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRunPlaysAndVerifiesATwoSeatGame is the fix-round-1 test Minor #3 asked
@@ -42,7 +42,7 @@ func TestRunPlaysAndVerifiesATwoSeatGame(t *testing.T) {
 // -- and, crucially, never prints the zero events.Event's Kind
 // ("game_start") that a naive "always print Want" branch would produce for
 // the Missing case, where Want is documented meaningless
-// (replay/replay.go's own Divergence doc).
+// (engine/replay/replay.go's own Divergence doc).
 func TestPrintReplayOutcomeHonoursMissingWithoutAZeroEvent(t *testing.T) {
 	var buf bytes.Buffer
 	div := &replay.Divergence{Seq: 7, Missing: true, Got: events.Event{Kind: events.Draw}}

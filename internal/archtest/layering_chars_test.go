@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// layering_chars_test.go pins rules/chars, the L4 characteristic-computation
+// layering_chars_test.go pins engine/rules/chars, the L4 characteristic-computation
 // package of the rules-engine lasagna (spec 2026-10-03 §3, W5 step E4): the
 // CR 613 layer walk, read through the chars.Board interface package rules
 // implements. Its rows live in their own file (not TestDependencyOrderHolds'
 // slice) so the W5 extraction steps running in parallel do not edit the same
 // lines; the check is the same transitive one.
 
-// charsImports is the closed set of module packages rules/chars may import
+// charsImports is the closed set of module packages engine/rules/chars may import
 // directly: the L0/L1 vocabulary (cards, state) and the L3 filter and count
 // grammar (effects) its Affected$ binding and CDA evaluators use. Anything
 // else -- rules, an L5 subsystem, the resolution kernel, a bot layer --
@@ -26,22 +26,22 @@ import (
 // To widen it, add the package here with a sentence arguing it sits below
 // L4; rules and its subsystem packages never belong in this list.
 var charsImports = map[string]bool{
-	module + "/cards":   true,
-	module + "/state":   true,
-	module + "/effects": true,
+	module + "/engine/cards":   true,
+	module + "/engine/state":   true,
+	module + "/engine/effects": true,
 }
 
-// TestCharsImportsStayBelowRules pins rules/chars' direct module imports to
+// TestCharsImportsStayBelowRules pins engine/rules/chars' direct module imports to
 // charsImports, and forbids the transitive edges the layering rules out:
 // rules itself, the L5 subsystem packages above it (combat, pay, trigmatch),
 // the L6 resolution kernel and the bot layer. It skips until the package
 // exists.
 func TestCharsImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/chars"
+	const sub = module + "/engine/rules/chars"
 	pkgs := packages(t)
 	p, ok := pkgs[sub]
 	if !ok {
-		t.Skip("rules/chars is not built yet")
+		t.Skip("engine/rules/chars is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -58,12 +58,12 @@ func TestCharsImportsStayBelowRules(t *testing.T) {
 			"(internal/archtest/layering_chars_test.go charsImports)", sub, imp, sortedKeys(charsImports))
 	}
 	for _, to := range []string{
-		module + "/rules",
-		module + "/rules/combat",
-		module + "/rules/pay",
-		module + "/rules/trigmatch",
-		module + "/rules/resolve",
-		module + "/botpolicy",
+		module + "/engine/rules",
+		module + "/engine/rules/combat",
+		module + "/engine/rules/pay",
+		module + "/engine/rules/trigmatch",
+		module + "/engine/rules/resolve",
+		module + "/bots/botpolicy",
 	} {
 		if p.deps[to] {
 			t.Errorf("%s depends on %s (transitively); the dependency order forbids it", sub, to)
@@ -72,7 +72,7 @@ func TestCharsImportsStayBelowRules(t *testing.T) {
 }
 
 // charsBoardMethods is the method count of chars.Board, the read-only
-// interface rules/chars reads the game through (rules/chars/board.go). It is
+// interface engine/rules/chars reads the game through (engine/rules/chars/board.go). It is
 // a SHRINK-ONLY ratchet on the pattern of combatBoardMethods: measured 8 when
 // the package landed (W5 step E4). A change that removes a method lowers the
 // constant in the same commit; NEVER raise it -- derive a new fact from an
@@ -83,10 +83,10 @@ const charsBoardMethods = 8
 // interfaces are counted by name and fail: Board declares every method
 // itself, so its size is visible here).
 func TestCharsBoardOnlyShrinks(t *testing.T) {
-	dir := filepath.Join("..", "..", "rules", "chars")
+	dir := filepath.Join("..", "..", "engine", "rules", "chars")
 	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil || len(files) == 0 {
-		t.Skip("rules/chars is not built yet")
+		t.Skip("engine/rules/chars is not built yet")
 	}
 	n, found := 0, false
 	for _, file := range files {
@@ -121,7 +121,7 @@ func TestCharsBoardOnlyShrinks(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("rules/chars declares no Board interface; the ratchet would run vacuously")
+		t.Fatal("engine/rules/chars declares no Board interface; the ratchet would run vacuously")
 	}
 	switch {
 	case n > charsBoardMethods:

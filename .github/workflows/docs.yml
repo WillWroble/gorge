@@ -1,11 +1,10 @@
 # Build the public documentation site (mkdocs.yml, docs/site/) and publish it
 # to GitHub Pages.
 #
-# Like the card-coverage job, the set-support measurement needs the Forge
-# corpus, which is GPL-3.0 and never committed: the job fetches it at the
-# FORGE_REF pin into the gitignored .cards/ and throws it away with the
-# runner. Only counts and percentages reach the site, never card text, and
-# nothing is written back to the repository.
+# The set-support table is no longer measured here: the compliance oracle
+# that measures it (oraclediff) lives in gorge-compliance
+# (github.com/adams-shaun/gorge-compliance), so the set page shows its hand
+# snapshot (docs/decisions/0001-repo-layout.md, amendment 3).
 #
 # The engine-speed chart reads history.jsonl from the orphan `perf-data`
 # branch when that branch exists; perf data never lands on main.
@@ -20,8 +19,7 @@ on:
       - scripts/docs_sets.py
       - cmd/pkgmap/**
       - .github/workflows/docs.yml
-  # Verdicts and the perf-data branch change many times a day; a daily
-  # rebuild picks both up without a 7.5-minute oraclediff run per push.
+  # The perf-data branch changes many times a day; a daily rebuild picks it up.
   schedule:
     - cron: '17 9 * * *'
   workflow_dispatch:
@@ -54,23 +52,6 @@ jobs:
 
       - name: Install MkDocs
         run: pip install -r docs/site/requirements.txt
-
-      # ~25 MB sparse checkout of FORGE_REPO at the Makefile's FORGE_REF.
-      - name: Fetch and compile the Forge corpus
-        run: make fetch-cards compile-cards
-
-      # ~7.5 min on 4 CPUs. `status -all` also checks compliance/ratchet.json
-      # and exits non-zero when a set moves past it; that is not a docs
-      # failure, so the exit is tolerated and the output used if non-empty.
-      - name: Measure set support
-        run: |
-          go run ./cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl || true
-          if [ -s status-A.jsonl ]; then
-            python3 scripts/docs_sets.py status-A.jsonl \
-              --commit "$GITHUB_SHA" --date "$(date -u +%F)" || true
-          else
-            echo "::warning::oraclediff produced no output; the set page shows only the hand snapshot"
-          fi
 
       # Corpus-free and ~1 s: the per-tier package tables and the tier graph
       # (cmd/pkgmap, classification in docs/site/architecture/packages.tiers.json).

@@ -1,6 +1,0 @@
-{
-  "card": "Crypt Ghast",
-  "rows": {
-    "extort-pays-swing-life-then-bolt-resolves": "step 0 (cast): [{\"kind\":\"any\",\"pick\":[\"yes\"]}]"
-  }
-}

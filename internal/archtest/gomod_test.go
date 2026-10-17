@@ -15,7 +15,7 @@ import (
 // only ever there for a dependency.
 //
 // An experiment that genuinely needs a third-party module lives in its own
-// nested module (experimental/gamepool requires purego for its CUDA binding)
+// module of its own (four-yay's training/experimental/gamepool requires purego for its CUDA binding)
 // and imports the root module through a replace; the root never requires it
 // back. wazero, the one planned exception (the M3 plugin tier), lands by
 // changing this test in the same commit, under an operator decision.
@@ -32,7 +32,7 @@ func TestRootModuleHasNoRequires(t *testing.T) {
 	if bad := requireLines(string(data)); len(bad) > 0 {
 		t.Errorf("the root go.mod has a require directive (invariant 7: no third-party "+
 			"dependencies in the root module):\n\t%s\n"+
-			"move the code that needs it into a nested module (see experimental/gamepool) "+
+			"move the code that needs it into a module of its own "+
 			"instead of adding the dependency here", strings.Join(bad, "\n\t"))
 	}
 

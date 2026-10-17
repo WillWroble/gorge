@@ -5,12 +5,14 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/botpolicy"
+	"github.com/adams-shaun/gorge/bots/heuristic"
+
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 type unwrapper interface{ UnwrapSeat() seat.Seat }
@@ -20,15 +22,15 @@ func TestCommonSenseOffReturnsThePlainSeat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := s.(*seat.Bot); !ok {
-		t.Fatalf("manual bot = %T, want *seat.Bot", s)
+	if _, ok := s.(*heuristic.Bot); !ok {
+		t.Fatalf("manual bot = %T, want *heuristic.Bot", s)
 	}
 	s, err = bots.New("bot", bots.Options{Seed: 1, AutoPayMana: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := s.(*seat.Bot); !ok {
-		t.Fatalf("auto-pay bot = %T, want *seat.Bot", s)
+	if _, ok := s.(*heuristic.Bot); !ok {
+		t.Fatalf("auto-pay bot = %T, want *heuristic.Bot", s)
 	}
 }
 
@@ -42,8 +44,8 @@ func TestCommonSenseOnWrapsAndKeepsSurfaces(t *testing.T) {
 		if !ok {
 			t.Fatalf("auto=%v: %T is not wrapped", auto, s)
 		}
-		if _, ok := u.UnwrapSeat().(*seat.Bot); !ok {
-			t.Fatalf("auto=%v: inner = %T, want *seat.Bot", auto, u.UnwrapSeat())
+		if _, ok := u.UnwrapSeat().(*heuristic.Bot); !ok {
+			t.Fatalf("auto=%v: inner = %T, want *heuristic.Bot", auto, u.UnwrapSeat())
 		}
 		if c, ok := s.(seat.TargetHintConsumer); !ok || !c.WantsTargetHints() {
 			t.Fatalf("auto=%v: wrapper does not request target hints", auto)
@@ -86,11 +88,11 @@ func TestCommonSenseOffMulliganIsTheCoin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var ref *seat.Bot
+			var ref *heuristic.Bot
 			if auto {
-				ref = seat.NewAttackSimBot(seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana()
+				ref = heuristic.NewAttackSimBot(seed, botpolicy.DefaultAttackSimParams()).EnableAutoPayMana()
 			} else {
-				ref = seat.NewBot(seed)
+				ref = heuristic.NewBot(seed)
 			}
 			e := rules.New(mulliganConfig(t, seed))
 			for step := 0; step < 400; step++ {
@@ -100,7 +102,7 @@ func TestCommonSenseOffMulliganIsTheCoin(t *testing.T) {
 					break
 				}
 				b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
-				got, err1 := s.(seat.BoardSeat).DecideBoard(ctx, b, *d)
+				got, err1 := s.(heuristic.BoardSeat).DecideBoard(ctx, b, *d)
 				want, err2 := ref.DecideBoard(ctx, b, *d)
 				if err1 != nil || err2 != nil || !slices.Equal(got.Choices, want.Choices) {
 					t.Fatalf("auto=%v seed %d: off answer %v (%v), bare bot %v (%v)", auto, seed, got.Choices, err1, want.Choices, err2)
@@ -134,7 +136,7 @@ func TestCommonSenseOnMulliganIsTheConstructedRule(t *testing.T) {
 					break
 				}
 				b := botpolicy.BoardFromGameInto(e.G, e, d.Player, &board)
-				got, err := s.(seat.BoardSeat).DecideBoard(ctx, b, *d)
+				got, err := s.(heuristic.BoardSeat).DecideBoard(ctx, b, *d)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRandomIntentScratchKeepsTheStream pins the random row's per-seed
@@ -27,7 +27,7 @@ func TestRandomIntentScratchKeepsTheStream(t *testing.T) {
 	// deterministic, so the totals are too. Re-pinned for the paid-cost mana
 	// census default flip (2026-10-13; was 1600/38249, 1621/38800, 1648/40117):
 	// the census offers more options, so the random games move. Forcing
-	// rules/genesis.go's paidManaCensus to false restores the old totals.
+	// engine/rules/genesis.go's paidManaCensus to false restores the old totals.
 	want := []struct {
 		games, turns, decisions, rejected int
 	}{

@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// costVocabularyImports is the closed set of module packages rules/cost may
-// import directly (the standard library is always allowed). rules/cost is the
+// costVocabularyImports is the closed set of module packages engine/rules/cost may
+// import directly (the standard library is always allowed). engine/rules/cost is the
 // L2 leaf of the rules-engine lasagna (spec 2026-10-03 §3, W5 step E1): the
 // Cost/CostPart vocabulary, cost parsing and cost formatting that every rules
 // subsystem shares. It reads only the L1 state vocabulary (state.Mana,
@@ -22,18 +22,18 @@ import (
 // To widen it, add the package here with a sentence arguing it is at or below
 // L1 (cards, state); a package above L2 never belongs in this list.
 var costVocabularyImports = map[string]bool{
-	module + "/state": true,
+	module + "/engine/state": true,
 }
 
-// TestCostVocabularyIsALeaf pins rules/cost's direct module imports to
+// TestCostVocabularyIsALeaf pins engine/rules/cost's direct module imports to
 // costVocabularyImports. It skips until the package exists, so the row lands
 // before the package (spec §9: "archtest rows for the new package land
 // first").
 func TestCostVocabularyIsALeaf(t *testing.T) {
-	const leaf = module + "/rules/cost"
+	const leaf = module + "/engine/rules/cost"
 	p, ok := packages(t)[leaf]
 	if !ok {
-		t.Skip("rules/cost is not built yet")
+		t.Skip("engine/rules/cost is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -51,8 +51,8 @@ func TestCostVocabularyIsALeaf(t *testing.T) {
 	}
 }
 
-// trigmatchImports is the closed set of module packages rules/trigmatch may
-// import directly (the standard library is always allowed). rules/trigmatch is
+// trigmatchImports is the closed set of module packages engine/rules/trigmatch may
+// import directly (the standard library is always allowed). engine/rules/trigmatch is
 // the L5 trigger-matching layer of the rules-engine lasagna (spec 2026-10-03
 // §3, W5 step E3): the Mode$ registry and the per-mode matchers, reading the
 // game through trigmatch.Board. It reads the L0/L1 vocabulary (cards, state,
@@ -60,23 +60,23 @@ func TestCostVocabularyIsALeaf(t *testing.T) {
 // evaluators (matchesSpec's grammar, MatchesPlayerSpec, EvalCountOK).
 //
 // To widen it, add the package with a sentence arguing it is below L5 (L4
-// rules/chars at most). rules, a sibling L5 package (pay, combat) or the L6
+// engine/rules/chars at most). rules, a sibling L5 package (pay, combat) or the L6
 // resolution kernel never belongs here.
 var trigmatchImports = map[string]bool{
-	module + "/cards":      true,
-	module + "/state":      true,
-	module + "/events":     true,
-	module + "/effects":    true,
-	module + "/rules/cost": true,
+	module + "/engine/cards":      true,
+	module + "/engine/state":      true,
+	module + "/engine/events":     true,
+	module + "/engine/effects":    true,
+	module + "/engine/rules/cost": true,
 }
 
-// TestTrigmatchImportsStayBelowL5 pins rules/trigmatch's direct module
+// TestTrigmatchImportsStayBelowL5 pins engine/rules/trigmatch's direct module
 // imports to trigmatchImports.
 func TestTrigmatchImportsStayBelowL5(t *testing.T) {
-	const pkg = module + "/rules/trigmatch"
+	const pkg = module + "/engine/rules/trigmatch"
 	p, ok := packages(t)[pkg]
 	if !ok {
-		t.Skip("rules/trigmatch is not built yet")
+		t.Skip("engine/rules/trigmatch is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -94,30 +94,30 @@ func TestTrigmatchImportsStayBelowL5(t *testing.T) {
 	}
 }
 
-// scriptfactsImports is the closed set of module packages rules/scriptfacts
-// may import directly (the standard library is always allowed). rules/scriptfacts
+// scriptfactsImports is the closed set of module packages engine/rules/scriptfacts
+// may import directly (the standard library is always allowed). engine/rules/scriptfacts
 // is the pure card-fact leaf of the rules-split plan (2026-10-06): facts a
 // card's printed text and compiled script imply, derived with no *rules.Engine
 // and no game state. It reads the L0/L1 vocabulary (cards, state) and the L2
-// cost vocabulary (rules/cost); anything wider -- effects, events, decision,
+// cost vocabulary (engine/rules/cost); anything wider -- effects, events, decision,
 // rules or a rules subsystem package -- would pull a game-state reader into a
 // package whose whole contract is that a moving game cannot change an answer.
 //
 // To widen it, add the package here with a sentence arguing it is at or below
 // L2; a package above L2 never belongs in this list.
 var scriptfactsImports = map[string]bool{
-	module + "/cards":      true,
-	module + "/state":      true,
-	module + "/rules/cost": true,
+	module + "/engine/cards":      true,
+	module + "/engine/state":      true,
+	module + "/engine/rules/cost": true,
 }
 
-// TestScriptFactsImportsStayBelowRules pins rules/scriptfacts' direct module
+// TestScriptFactsImportsStayBelowRules pins engine/rules/scriptfacts' direct module
 // imports to scriptfactsImports.
 func TestScriptFactsImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/scriptfacts"
+	const sub = module + "/engine/rules/scriptfacts"
 	p, ok := packages(t)[sub]
 	if !ok {
-		t.Skip("rules/scriptfacts is not built yet")
+		t.Skip("engine/rules/scriptfacts is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -144,8 +144,8 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-// combatImports is the closed set of module packages rules/combat may import
-// directly. rules/combat is an L5 subsystem package of the rules-engine
+// combatImports is the closed set of module packages engine/rules/combat may import
+// directly. engine/rules/combat is an L5 subsystem package of the rules-engine
 // lasagna (spec 2026-10-03 §3, W5 step E5): attack and block legality, read
 // through the combat.Board interface package rules implements. It reads the
 // L0/L1 vocabulary (cards, state, events) and the L3 filter and restriction
@@ -155,19 +155,19 @@ func sortedKeys(m map[string]bool) []string {
 // To widen it, add the package here with a sentence arguing it sits below
 // L5; rules and its other subsystem packages never belong in this list.
 var combatImports = map[string]bool{
-	module + "/cards":   true,
-	module + "/state":   true,
-	module + "/events":  true,
-	module + "/effects": true,
+	module + "/engine/cards":   true,
+	module + "/engine/state":   true,
+	module + "/engine/events":  true,
+	module + "/engine/effects": true,
 }
 
-// TestCombatImportsStayBelowRules pins rules/combat's direct module imports
+// TestCombatImportsStayBelowRules pins engine/rules/combat's direct module imports
 // to combatImports. It skips until the package exists.
 func TestCombatImportsStayBelowRules(t *testing.T) {
-	const sub = module + "/rules/combat"
+	const sub = module + "/engine/rules/combat"
 	p, ok := packages(t)[sub]
 	if !ok {
-		t.Skip("rules/combat is not built yet")
+		t.Skip("engine/rules/combat is not built yet")
 	}
 	var bad []string
 	for imp := range p.imports {
@@ -186,7 +186,7 @@ func TestCombatImportsStayBelowRules(t *testing.T) {
 }
 
 // combatBoardMethods is the method count of combat.Board, the read-only
-// interface rules/combat reads the game through (rules/combat/board.go). It
+// interface engine/rules/combat reads the game through (engine/rules/combat/board.go). It
 // is a SHRINK-ONLY ratchet on the pattern of internal/codeshape's: measured
 // 17 when the package landed (W5 step E5). A change that removes a method
 // lowers the constant in the same commit; NEVER raise it -- derive a new fact
@@ -198,10 +198,10 @@ const combatBoardMethods = 17
 // interfaces are counted by name and fail: Board declares every method
 // itself, so its size is visible here).
 func TestCombatBoardOnlyShrinks(t *testing.T) {
-	dir := filepath.Join("..", "..", "rules", "combat")
+	dir := filepath.Join("..", "..", "engine", "rules", "combat")
 	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil || len(files) == 0 {
-		t.Skip("rules/combat is not built yet")
+		t.Skip("engine/rules/combat is not built yet")
 	}
 	n, found := 0, false
 	for _, file := range files {
@@ -236,7 +236,7 @@ func TestCombatBoardOnlyShrinks(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("rules/combat declares no Board interface; the ratchet would run vacuously")
+		t.Fatal("engine/rules/combat declares no Board interface; the ratchet would run vacuously")
 	}
 	switch {
 	case n > combatBoardMethods:

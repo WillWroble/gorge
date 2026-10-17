@@ -1,7 +1,7 @@
 package main
 
 // tape.go is cardfuzz's dual-run harness for the W3 resolution kernel
-// (rules/resolve; lasagna spec §7.7): -tape plays every game on the kernel
+// (engine/rules/resolve; lasagna spec §7.7): -tape plays every game on the kernel
 // and verifies its replay on the kernel, -tape-worlds forks a
 // redealt hypothetical world at every posed tape decision, and the
 // predicate-miss census classes every resolution the ask-free predicate
@@ -15,11 +15,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/rules/resolve"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // tapeDual is -tape; tapeWorlds is -tape-worlds.

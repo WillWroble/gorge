@@ -5,8 +5,8 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
-	"github.com/adams-shaun/gorge/cards"
-	"github.com/adams-shaun/gorge/seat"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/seat"
 )
 
 // paymentOptOut names the registered policies that may answer

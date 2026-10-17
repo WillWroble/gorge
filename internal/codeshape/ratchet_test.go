@@ -8,8 +8,8 @@ import (
 )
 
 // The W0 shrink-only ratchets of the rules-engine refactor spec
-// (docs/superpowers/specs/2026-10-03-rules-engine-lasagna-design.md, section
-// 4), on the pattern of internal/testutil/agentsdoc_test.go's
+// (docs/design/2026-10-03-rules-engine-lasagna-design.md, section
+// 4), on the pattern of testkit/testutil/agentsdoc_test.go's
 // knownApproximationRows: each constant is the measured value on main at
 // 49bd9af8d, the test FAILS when the measurement grows past it and LOGS when
 // it falls below it. A change that shrinks a metric lowers its constant to
@@ -17,20 +17,20 @@ import (
 //
 // Measure with `go run ./cmd/codeshape -table`.
 const (
-	// maxFuncLinesOver300 is the number of non-test functions in rules/ and
-	// effects/ spanning more than 300 lines.
+	// maxFuncLinesOver300 is the number of non-test functions in engine/rules/ and
+	// engine/effects/ spanning more than 300 lines.
 	// W4 step 3's ChangeZoneAll compiler shrank effChangeZoneAll: 54 -> 53.
 	// W1a generated Engine.cloneWith's field copies from the clone tags
-	// (rules/clone_gen.go): 53 -> 52. Re-measured at W1a pool/rekey/if tags: 48. W3 dead: 45. E7 flow slices: 44,
+	// (engine/rules/clone_gen.go): 53 -> 52. Re-measured at W1a pool/rekey/if tags: 48. W3 dead: 45. E7 flow slices: 44,
 	// then the CR 103.8a first-draw-step skip landed without locking its shrink: 41.
 	maxFuncLinesOver300 = 41
 	// engineMethodCount is the number of non-test methods on rules.Engine.
-	// W5 E5 moved combat legality onto rules/combat's Board (2159 -> 2126)
-	// and W5 E3 the trigger matchers onto rules/trigmatch's: -> 2022. W5 E4
-	// moved the layer walk onto rules/chars: -> 2019. W3 clean deleted the
-	// Suspend* no-ops: -> 1965. W5 E7 moved mana payment onto rules/pay:
+	// W5 E5 moved combat legality onto engine/rules/combat's Board (2159 -> 2126)
+	// and W5 E3 the trigger matchers onto engine/rules/trigmatch's: -> 2022. W5 E4
+	// moved the layer walk onto engine/rules/chars: -> 2019. W3 clean deleted the
+	// Suspend* no-ops: -> 1965. W5 E7 moved mana payment onto engine/rules/pay:
 	// -> 1944. Slice 4 made the payer grants pay.Engine adapter methods: -> 1940. W3 dead deleted the resume-scratch setters: -> 1931.
-	// E7 slice 9 moved the payment board reads to rules/pay funcs: -> 1917.
+	// E7 slice 9 moved the payment board reads to engine/rules/pay funcs: -> 1917.
 	// E7 flow slice 3 moved the announced-SubCounter mana stage: -> 1822.
 	engineMethodCount = 1821
 	// hostMethodCount is the number of methods in the effects.Host interface
@@ -55,7 +55,7 @@ const (
 	// W1d folded EffectiveNames, EffectiveTypes, StaticGoads and the embedded
 	// LayerTables into the one named Layers field: 293/2 -> 291/1. W3 clean
 	// grouped the LKI snapshot set, the replacement context, clone-as-enters,
-	// mana, kicker and the per-primitive cursors (effects/ctx_groups.go): 121 -> 73.
+	// mana, kicker and the per-primitive cursors (engine/effects/ctx_groups.go): 121 -> 73.
 	// W3 dead removed write-only/never-set fields: 73 -> 68.
 	// lb-copyperm-sel grouped the cost-paid lists (Exiled, Revealed and the
 	// new CounterPut) into Ctx.Paid: 68 -> 67.
@@ -64,13 +64,13 @@ const (
 	// resumePointFieldCount is the number of fields in rules' resumePoint.
 	resumePointFieldCount = 5
 	// stringParamReads is the number of <x>Params["literal"] index
-	// expressions in rules/ and effects/ non-test files. W4 slice 3 (194
+	// expressions in engine/rules/ and engine/effects/ non-test files. W4 slice 3 (194
 	// ParamKeys, the 256-key mask) moved 488 reads onto the typed accessors:
-	// 1302 -> 814. The same rewrite over rules/trigmatch's moved matchers
+	// 1302 -> 814. The same rewrite over engine/rules/trigmatch's moved matchers
 	// (W5 E3, ValidSA/Static): 805 -> 798. W4 slice 4 added 56 keys (250 of
-	// the 254 a uint8 ParamKey can name) and migrated rules/chars too:
+	// the 254 a uint8 ParamKey can name) and migrated engine/rules/chars too:
 	// 798 -> 630. W4 step 3's ChangeZone compiler (one read per key,
-	// effects/changezone_params.go): 630 -> 628. loop-bugs: effReveal reads
+	// engine/effects/changezone_params.go): 630 -> 628. loop-bugs: effReveal reads
 	// RevealDefined$ once: 628 -> 627. W4 step 3's Attach compiler
 	// (RememberAttached$ read once): 627 -> 626. The Charm and Pump
 	// compilers (charm_params.go, pump_params.go): 626 -> 624. W4 step 3's
@@ -104,16 +104,16 @@ const (
 	// 562 -> 561.
 	// The RepeatEach compiler (effRepeatEach moved to repeateach.go): reads
 	// compiled once, RepeatCards$ Zone$ switch a ZoneMask table.
-	// W4 tail: every remaining literal read in effects/ and rules/ went through
+	// W4 tail: every remaining literal read in engine/effects/ and engine/rules/ went through
 	// the ParamKey accessors (state.ContinuousEffect.RestrictParam and kin for
-	// the continuous-effect maps); what is left is writes and rules/play_tape.go
+	// the continuous-effect maps); what is left is writes and engine/rules/play_tape.go
 	// (left to its live branch): 549 -> 20. W4 cases: play_tape.go and
 	// resolution_modes.go reads moved to ParamStr (7 new keys): 20 -> 12 (what
 	// is left are writes). W4 cases: the twelve writes go through the typed
 	// SA.SetParam / Repl.SetParam setters: 12 -> 0.
 	stringParamReads = 0
 	// stringCaseLiterals is the number of string literals in switch case
-	// lists in rules/ and effects/ non-test files.
+	// lists in engine/rules/ and engine/effects/ non-test files.
 	// W4 step 3: Attach: 2886 -> 2883. RepeatEach: 2883 -> 2876. W4 cases:
 	// constant-returning switches and param whitelists became cards.StrTable /
 	// cards.NameSet (sorted dense slices, built once at init): 2876 -> 2046. Every
@@ -126,15 +126,15 @@ const (
 	// switches plain comparisons: 181 -> 0.
 	stringCaseLiterals = 0
 	// ctxLiterals, specContextLiterals and triggerContextLiterals are the
-	// effects.Ctx / SpecContext / TriggerContext composite literals in rules/
-	// and effects/ non-test files outside codeshape.CtxConstructorFiles (W1c,
+	// effects.Ctx / SpecContext / TriggerContext composite literals in engine/rules/
+	// and engine/effects/ non-test files outside codeshape.CtxConstructorFiles (W1c,
 	// spec section 5). Measured 108 / 22 / 19 on main at c49d04e14 before the
 	// constructors landed.
 	ctxLiterals            = 0
 	specContextLiterals    = 0
 	triggerContextLiterals = 13
 	// trigmatchBoardMethods is the method count of trigmatch.Board, the
-	// read-only view rules/trigmatch's matchers read the engine through (W5
+	// read-only view engine/rules/trigmatch's matchers read the engine through (W5
 	// E3). It replaced 21 distinct *Engine methods, 15 Engine fields and
 	// pendingCast that the matcher closure reached directly. The move folded
 	// SpecCtx/MatchesSpec/MatchesSpecFrom into MatchesSpec/MatchesObject with
@@ -178,91 +178,91 @@ const (
 	// 18 -> 16.
 	payEngineMethods = 16
 	// changeZoneParamLeaks is the number of ChangeZone parameter reads
-	// outside its compiler, effects/changezone_params.go (W4 step 3, spec
+	// outside its compiler, engine/effects/changezone_params.go (W4 step 3, spec
 	// section 8): any read in ChangeZone's own resolution files, plus any
 	// read of a ChangeZone-only key elsewhere (codeshape.ChangeZoneFiles,
 	// codeshape.ChangeZoneOnlyKeys). It landed at zero.
 	changeZoneParamLeaks = 0
 	// changeZoneAllParamLeaks is the same census for api:ChangeZoneAll's
-	// compiler, effects/changezoneall_params.go (codeshape.ChangeZoneAllFiles,
+	// compiler, engine/effects/changezoneall_params.go (codeshape.ChangeZoneAllFiles,
 	// codeshape.ChangeZoneAllOnlyKeys). It landed at zero.
 	changeZoneAllParamLeaks = 0
 	// attachParamLeaks is the same census for api:Attach's compiler,
-	// effects/attach_params.go (codeshape.AttachFiles, codeshape.AttachOnlyKeys).
+	// engine/effects/attach_params.go (codeshape.AttachFiles, codeshape.AttachOnlyKeys).
 	// It landed at zero.
 	attachParamLeaks = 0
 	// charmParamLeaks, pumpParamLeaks and drawParamLeaks are the same census
-	// for the modal family's compiler (effects/charm_params.go), api:Pump's
-	// (effects/pump_params.go) and api:Draw's (effects/draw_params.go). Each
+	// for the modal family's compiler (engine/effects/charm_params.go), api:Pump's
+	// (engine/effects/pump_params.go) and api:Draw's (engine/effects/draw_params.go). Each
 	// landed at zero.
 	charmParamLeaks = 0
 	pumpParamLeaks  = 0
 	drawParamLeaks  = 0
 	// replaceEffectParamLeaks is the same census for api:ReplaceEffect's
-	// compiler (effects/replaceeffect_params.go). It landed at zero.
+	// compiler (engine/effects/replaceeffect_params.go). It landed at zero.
 	replaceEffectParamLeaks = 0
 	// manaParamLeaks is the same census for api:Mana's production compiler
-	// (effects/mana_params.go). It landed at zero.
+	// (engine/effects/mana_params.go). It landed at zero.
 	manaParamLeaks = 0
 	// manaReflectedParamLeaks is the same census for api:ManaReflected's
-	// compiler (effects/manareflected_params.go). It landed at zero.
+	// compiler (engine/effects/manareflected_params.go). It landed at zero.
 	manaReflectedParamLeaks = 0
 	// dealDamageParamLeaks is the same census for api:DealDamage's compiler,
-	// effects/dealdamage_params.go (codeshape.DealDamageFiles,
+	// engine/effects/dealdamage_params.go (codeshape.DealDamageFiles,
 	// codeshape.DealDamageOnlyKeys). It landed at zero.
 	dealDamageParamLeaks = 0
 	// putCounterParamLeaks is the same census for api:PutCounter's compiler,
-	// effects/putcounter_params.go (codeshape.PutCounterFiles,
+	// engine/effects/putcounter_params.go (codeshape.PutCounterFiles,
 	// codeshape.PutCounterOnlyKeys). It landed at zero.
 	putCounterParamLeaks = 0
 	// effectParamLeaks is the same census for api:Effect's compiler,
-	// effects/effect_params.go (codeshape.EffectFiles,
+	// engine/effects/effect_params.go (codeshape.EffectFiles,
 	// codeshape.EffectOnlyKeys). It landed at zero.
 	effectParamLeaks = 0
 	// targetParamLeaks is the same census for the generic targeting tier's
-	// compiler, effects/targets_params.go (codeshape.TargetOnlyKeys): no
-	// targeting key is read anywhere in rules/ or effects/ outside it. It
+	// compiler, engine/effects/targets_params.go (codeshape.TargetOnlyKeys): no
+	// targeting key is read anywhere in engine/rules/ or engine/effects/ outside it. It
 	// landed at zero.
 	targetParamLeaks = 0
 	// definedParamLeaks is the same census for the generic Defined-reference
-	// tier's compiler, effects/defined_params.go (codeshape.DefinedOnlyKeys):
+	// tier's compiler, engine/effects/defined_params.go (codeshape.DefinedOnlyKeys):
 	// no Defined$/DefinedCards$/DefinedPlayer$/DefinedTarget$ read anywhere
-	// in rules/ or effects/ outside it. It landed at zero.
+	// in engine/rules/ or engine/effects/ outside it. It landed at zero.
 	definedParamLeaks = 0
 	// delayedTriggerParamLeaks is the same census for api:DelayedTrigger's compiler,
-	// effects/delayedtrigger_params.go (codeshape.DelayedTriggerFiles, codeshape.DelayedTriggerOnlyKeys). It landed
+	// engine/effects/delayedtrigger_params.go (codeshape.DelayedTriggerFiles, codeshape.DelayedTriggerOnlyKeys). It landed
 	// at zero.
 	delayedTriggerParamLeaks = 0
 	// copyPermanentParamLeaks is the same census for api:CopyPermanent's compiler,
-	// effects/copypermanent_params.go (codeshape.CopyPermanentFiles, codeshape.CopyPermanentOnlyKeys). It landed
+	// engine/effects/copypermanent_params.go (codeshape.CopyPermanentFiles, codeshape.CopyPermanentOnlyKeys). It landed
 	// at zero.
 	copyPermanentParamLeaks = 0
 	// cloneParamLeaks is the same census for api:Clone's compiler,
-	// effects/clone_params.go (codeshape.CloneFiles, codeshape.CloneOnlyKeys).
+	// engine/effects/clone_params.go (codeshape.CloneFiles, codeshape.CloneOnlyKeys).
 	// It landed at zero.
 	cloneParamLeaks = 0
 	// digParamLeaks is the same census for api:Dig's compiler,
-	// effects/dig_params.go (codeshape.DigFiles, codeshape.DigOnlyKeys). It landed at
+	// engine/effects/dig_params.go (codeshape.DigFiles, codeshape.DigOnlyKeys). It landed at
 	// zero.
 	digParamLeaks = 0
 	// digUntilParamLeaks is the same census for api:DigUntil's compiler,
-	// effects/diguntil_params.go (codeshape.DigUntilFiles, codeshape.DigUntilOnlyKeys). It landed at
+	// engine/effects/diguntil_params.go (codeshape.DigUntilFiles, codeshape.DigUntilOnlyKeys). It landed at
 	// zero.
 	digUntilParamLeaks = 0
 	// removeCounterParamLeaks is the same census for api:RemoveCounter's compiler,
-	// effects/removecounter_params.go (codeshape.RemoveCounterFiles, codeshape.RemoveCounterOnlyKeys). It landed at
+	// engine/effects/removecounter_params.go (codeshape.RemoveCounterFiles, codeshape.RemoveCounterOnlyKeys). It landed at
 	// zero.
 	removeCounterParamLeaks = 0
 	// tokenParamLeaks is the same census for api:Token's compiler,
-	// effects/token_params.go (codeshape.TokenFiles, codeshape.TokenOnlyKeys). It landed at
+	// engine/effects/token_params.go (codeshape.TokenFiles, codeshape.TokenOnlyKeys). It landed at
 	// zero.
 	tokenParamLeaks = 0
 	// voteParamLeaks is the same census for api:Vote's compiler,
-	// effects/vote_params.go (codeshape.VoteFiles, codeshape.VoteOnlyKeys). It landed at
+	// engine/effects/vote_params.go (codeshape.VoteFiles, codeshape.VoteOnlyKeys). It landed at
 	// zero.
 	voteParamLeaks = 0
 	// repeatEachParamLeaks is the same census for api:RepeatEach's compiler,
-	// effects/repeateach_params.go (codeshape.RepeatEachFiles, codeshape.RepeatEachOnlyKeys). It landed at
+	// engine/effects/repeateach_params.go (codeshape.RepeatEachFiles, codeshape.RepeatEachOnlyKeys). It landed at
 	// zero.
 	repeatEachParamLeaks = 0
 	// engineSurface is the engine's reach beyond engineMethodCount: *Engine
@@ -287,7 +287,7 @@ const (
 	// Measured on main at 00363b185.
 	stringKeyedParamReads = 167
 	// strCodesTables is the NewStrCodes / NewNameSet / NewStrTable call sites
-	// in rules/ and effects/, and strCodesKeyDup the sum over string keys of
+	// in engine/rules/ and engine/effects/, and strCodesKeyDup the sum over string keys of
 	// (distinct tables naming the key - 1): the W4 cases tables replaced the
 	// string switches, and a word named in a second table is the vocabulary
 	// splitting again. Measured on main at 00363b185; the CR 103.8a
@@ -296,7 +296,7 @@ const (
 	strCodesKeyDup = 1259
 )
 
-// longFuncCeilings freezes every non-test function in rules/ and effects/
+// longFuncCeilings freezes every non-test function in engine/rules/ and engine/effects/
 // over codeshape.LongFuncLines at its length on main (00363b185), keyed
 // "<dir> <Name>" (codeshape.Func.CeilingKey). TestLongFunctionsOnlyShrink
 // fails on a new key, on growth, and on an entry no longer over the limit;
@@ -342,8 +342,8 @@ var longFuncCeilings = map[string]int{
 	"rules (*Engine).xAsk":                                  404,
 	"rules (*legalWalk).battlefieldWalk":                    861,
 	"rules (*legalWalk).handWalk":                           670,
-	"rules/cost ParseCost":                                  561,
-	"rules/pay NonManaCastableP":                            344,
+	"engine/rules/cost ParseCost":                           561,
+	"engine/rules/pay NonManaCastableP":                     344,
 }
 
 func measureRepo(t *testing.T) Metrics {
@@ -391,7 +391,7 @@ func TestCodeShapeOnlyShrinks(t *testing.T) {
 	t.Skip("codeshape ratchets disabled by the operator (2026-10-06) while main is unblocked; re-enable by deleting this line")
 	m := measureRepo(t)
 	if m.TrigmatchBoardMethods == 0 {
-		t.Error("trigmatch.Board measured no methods: rules/trigmatch/board.go's `type Board interface` " +
+		t.Error("trigmatch.Board measured no methods: engine/rules/trigmatch/board.go's `type Board interface` " +
 			"moved or was renamed; update codeshape.Measure so the ratchet cannot read zero")
 	}
 	checkRatchets(t, []ratchet{
@@ -407,7 +407,7 @@ func TestCodeShapeOnlyShrinks(t *testing.T) {
 			"effects.Host is the union of narrow role interfaces; derive what you " +
 				"need from an existing method (Chars carries every characteristic), or replace one, instead of adding another."},
 		{"hostDirectMethodCount", m.HostDirectMethods, hostDirectMethodCount,
-			"effects.Host is the union of the role interfaces in effects/host_roles.go; " +
+			"effects.Host is the union of the role interfaces in engine/effects/host_roles.go; " +
 				"add a new method to the one role it belongs to, not to Host itself."},
 		{"hostRoleMaxMethods", m.HostRoleMaxMethods, hostRoleMaxMethods,
 			"A Host role is to stay narrow (<= 20 methods); split a role that grows by " +
@@ -436,7 +436,7 @@ func TestCodeShapeOnlyShrinks(t *testing.T) {
 			"Build an effects.Ctx with effects.NewCtx / NewCtxPtr (seeded by a CtxInit, " +
 				"other fields assigned on the result), derive one from a resolving context " +
 				"with (*Ctx).Child or (*Ctx).ForTrigger, or add a constructor to " +
-				"effects/ctx_new.go (rules/ctx_new.go for one that binds engine-owned " +
+				"engine/effects/ctx_new.go (engine/rules/ctx_new.go for one that binds engine-owned " +
 				"tables). A hand-written literal that copies another context's fields drops " +
 				"the next field added to Ctx."},
 		{"specContextLiterals", m.SpecContextLiterals, specContextLiterals,
@@ -454,119 +454,119 @@ func TestCodeShapeOnlyShrinks(t *testing.T) {
 				"instead of adding a method."},
 		{"changeZoneParamLeaks", m.ChangeZoneParamLeaks, changeZoneParamLeaks,
 			"Read the parameter through effects.ChangeZoneOf's compiled ChangeZoneParams " +
-				"(add a field to compileChangeZone in effects/changezone_params.go) instead " +
+				"(add a field to compileChangeZone in engine/effects/changezone_params.go) instead " +
 				"of reading the ability's Params in a ChangeZone file or a ChangeZone-only " +
 				"key elsewhere. Leaks: " + strings.Join(m.ChangeZoneLeaks, ", ")},
 		{"changeZoneAllParamLeaks", m.ChangeZoneAllParamLeaks, changeZoneAllParamLeaks,
 			"Read the parameter through effects.ChangeZoneAllOf's compiled ChangeZoneAllParams " +
-				"(add a field to compileChangeZoneAll in effects/changezoneall_params.go) instead " +
-				"of reading the ability's Params in effects/zone_changeall.go or a " +
+				"(add a field to compileChangeZoneAll in engine/effects/changezoneall_params.go) instead " +
+				"of reading the ability's Params in engine/effects/zone_changeall.go or a " +
 				"ChangeZoneAll-only key elsewhere. Leaks: " + strings.Join(m.ChangeZoneAllLeaks, ", ")},
 		{"attachParamLeaks", m.AttachParamLeaks, attachParamLeaks,
 			"Read the parameter through effects.AttachOf's compiled AttachParams (add a " +
-				"field to compileAttach in effects/attach_params.go) instead of reading the " +
-				"ability's Params in effects/attach.go or an Attach-only key elsewhere. " +
+				"field to compileAttach in engine/effects/attach_params.go) instead of reading the " +
+				"ability's Params in engine/effects/attach.go or an Attach-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.AttachLeaks, ", ")},
 		{"charmParamLeaks", m.CharmParamLeaks, charmParamLeaks,
 			"Read the parameter through effects.CharmOf's compiled CharmParams (add a " +
-				"field to compileCharm in effects/charm_params.go) instead of reading the " +
-				"ability's Params in effects/charm.go or a Charm-only key elsewhere. " +
+				"field to compileCharm in engine/effects/charm_params.go) instead of reading the " +
+				"ability's Params in engine/effects/charm.go or a Charm-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.CharmLeaks, ", ")},
 		{"pumpParamLeaks", m.PumpParamLeaks, pumpParamLeaks,
 			"Read the parameter through effects.PumpOf's compiled PumpParams (add a " +
-				"field to compilePump in effects/pump_params.go) instead of reading the " +
-				"ability's Params in effects/pump.go or a Pump-only key elsewhere. " +
+				"field to compilePump in engine/effects/pump_params.go) instead of reading the " +
+				"ability's Params in engine/effects/pump.go or a Pump-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.PumpLeaks, ", ")},
 		{"drawParamLeaks", m.DrawParamLeaks, drawParamLeaks,
 			"Read the parameter through effects.DrawOf's compiled DrawParams (add a " +
-				"field to compileDraw in effects/draw_params.go) instead of reading the " +
-				"ability's Params in effects/draw.go or a Draw-only key elsewhere. " +
+				"field to compileDraw in engine/effects/draw_params.go) instead of reading the " +
+				"ability's Params in engine/effects/draw.go or a Draw-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.DrawLeaks, ", ")},
 		{"replaceEffectParamLeaks", m.ReplaceEffectParamLeaks, replaceEffectParamLeaks,
 			"Read the parameter through effects.ReplaceEffectOf's compiled " +
 				"ReplaceEffectParams (add a field to compileReplaceEffect in " +
-				"effects/replaceeffect_params.go) instead of reading the ability's Params " +
-				"in effects/replacement.go or a ReplaceEffect-only key elsewhere. " +
+				"engine/effects/replaceeffect_params.go) instead of reading the ability's Params " +
+				"in engine/effects/replacement.go or a ReplaceEffect-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.ReplaceEffectLeaks, ", ")},
 		{"manaParamLeaks", m.ManaParamLeaks, manaParamLeaks,
 			"Read the parameter through effects.ManaOf's compiled ManaParams (add a " +
-				"field to compileMana in effects/mana_params.go) instead of reading the " +
-				"ability's Params in effects/mana_effect.go or a Mana-only rider key " +
+				"field to compileMana in engine/effects/mana_params.go) instead of reading the " +
+				"ability's Params in engine/effects/mana_effect.go or a Mana-only rider key " +
 				"elsewhere. Leaks: " + strings.Join(m.ManaLeaks, ", ")},
 		{"manaReflectedParamLeaks", m.ManaReflectedParamLeaks, manaReflectedParamLeaks,
 			"Read the parameter through effects.ManaReflectedOf's compiled " +
 				"ManaReflectedParams (add a field to compileManaReflected in " +
-				"effects/manareflected_params.go) instead of reading the ability's Params " +
-				"in effects/mana_reflected.go or a ManaReflected-only key elsewhere. " +
+				"engine/effects/manareflected_params.go) instead of reading the ability's Params " +
+				"in engine/effects/mana_reflected.go or a ManaReflected-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.ManaReflectedLeaks, ", ")},
 		{"dealDamageParamLeaks", m.DealDamageParamLeaks, dealDamageParamLeaks,
 			"Read the parameter through effects.DealDamageOf's compiled DealDamageParams (add " +
-				"a field to compileDealDamage in effects/dealdamage_params.go) instead of reading " +
-				"the ability's Params in effects/damage_deal.go or a DealDamage-only key elsewhere. " +
+				"a field to compileDealDamage in engine/effects/dealdamage_params.go) instead of reading " +
+				"the ability's Params in engine/effects/damage_deal.go or a DealDamage-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.DealDamageLeaks, ", ")},
 		{"putCounterParamLeaks", m.PutCounterParamLeaks, putCounterParamLeaks,
 			"Read the parameter through effects.PutCounterOf's compiled PutCounterParams (add " +
-				"a field to compilePutCounter in effects/putcounter_params.go) instead of reading " +
-				"the ability's Params in effects/counters_put.go or a PutCounter-only key elsewhere. " +
+				"a field to compilePutCounter in engine/effects/putcounter_params.go) instead of reading " +
+				"the ability's Params in engine/effects/counters_put.go or a PutCounter-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.PutCounterLeaks, ", ")},
 		{"effectParamLeaks", m.EffectParamLeaks, effectParamLeaks,
 			"Read the parameter through effects.EffectOf's compiled EffectParams (add a " +
-				"field to compileEffect in effects/effect_params.go) instead of reading the " +
-				"ability's Params in effects/effect.go or an Effect-only key elsewhere. " +
+				"field to compileEffect in engine/effects/effect_params.go) instead of reading the " +
+				"ability's Params in engine/effects/effect.go or an Effect-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.EffectLeaks, ", ")},
 		{"targetParamLeaks", m.TargetParamLeaks, targetParamLeaks,
 			"Read the targeting parameter through effects.TargetsOf's compiled TargetParams " +
-				"(add a field to compileTargets in effects/targets_params.go) instead of reading " +
+				"(add a field to compileTargets in engine/effects/targets_params.go) instead of reading " +
 				"a targeting key from the ability's Params. Leaks: " + strings.Join(m.TargetLeaks, ", ")},
 		{"definedParamLeaks", m.DefinedParamLeaks, definedParamLeaks,
 			"Read the selector through effects.DefinedOf's compiled Ref (add a field to " +
-				"compileDefined in effects/defined_params.go, or resolve selector text with " +
+				"compileDefined in engine/effects/defined_params.go, or resolve selector text with " +
 				"effects.RefOf/DefinedSpec) instead of reading a Defined key from the ability's " +
 				"Params. Leaks: " + strings.Join(m.DefinedLeaks, ", ")},
 		{"delayedTriggerParamLeaks", m.DelayedTriggerParamLeaks, delayedTriggerParamLeaks,
 			"Read the parameter through effects.DelayedTriggerOf's compiled DelayedTriggerParams (add a " +
-				"field to compileDelayedTrigger in effects/delayedtrigger_params.go) instead of reading the ability's Params in " +
-				"effects/delayed_trigger.go or a DelayedTrigger-only key elsewhere. " +
+				"field to compileDelayedTrigger in engine/effects/delayedtrigger_params.go) instead of reading the ability's Params in " +
+				"engine/effects/delayed_trigger.go or a DelayedTrigger-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.DelayedTriggerLeaks, ", ")},
 		{"copyPermanentParamLeaks", m.CopyPermanentParamLeaks, copyPermanentParamLeaks,
 			"Read the parameter through effects.CopyPermanentOf's compiled CopyPermanentParams (add a " +
-				"field to compileCopyPermanent in effects/copypermanent_params.go) instead of reading the ability's Params in " +
-				"effects/copypermanent.go or a CopyPermanent-only key elsewhere. " +
+				"field to compileCopyPermanent in engine/effects/copypermanent_params.go) instead of reading the ability's Params in " +
+				"engine/effects/copypermanent.go or a CopyPermanent-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.CopyPermanentLeaks, ", ")},
 		{"cloneParamLeaks", m.CloneParamLeaks, cloneParamLeaks,
 			"Read the parameter through effects.CloneOf's compiled CloneParams (add a " +
-				"field to compileClone in effects/clone_params.go) instead of reading the ability's Params in " +
-				"effects/clone.go or a Clone-only key elsewhere. " +
+				"field to compileClone in engine/effects/clone_params.go) instead of reading the ability's Params in " +
+				"engine/effects/clone.go or a Clone-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.CloneLeaks, ", ")},
 		{"digParamLeaks", m.DigParamLeaks, digParamLeaks,
 			"Read the parameter through effects.DigOf's compiled DigParams (add a " +
-				"field to compileDig in effects/dig_params.go) instead of reading the ability's Params in " +
-				"effects/dig.go or a Dig-only key elsewhere. " +
+				"field to compileDig in engine/effects/dig_params.go) instead of reading the ability's Params in " +
+				"engine/effects/dig.go or a Dig-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.DigLeaks, ", ")},
 		{"digUntilParamLeaks", m.DigUntilParamLeaks, digUntilParamLeaks,
 			"Read the parameter through effects.DigUntilOf's compiled DigUntilParams (add a " +
-				"field to compileDigUntil in effects/diguntil_params.go) instead of reading the ability's Params in " +
-				"effects/diguntil.go or a DigUntil-only key elsewhere. " +
+				"field to compileDigUntil in engine/effects/diguntil_params.go) instead of reading the ability's Params in " +
+				"engine/effects/diguntil.go or a DigUntil-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.DigUntilLeaks, ", ")},
 		{"removeCounterParamLeaks", m.RemoveCounterParamLeaks, removeCounterParamLeaks,
 			"Read the parameter through effects.RemoveCounterOf's compiled RemoveCounterParams (add a " +
-				"field to compileRemoveCounter in effects/removecounter_params.go) instead of reading the ability's Params in " +
-				"effects/removecounter.go or a RemoveCounter-only key elsewhere. " +
+				"field to compileRemoveCounter in engine/effects/removecounter_params.go) instead of reading the ability's Params in " +
+				"engine/effects/removecounter.go or a RemoveCounter-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.RemoveCounterLeaks, ", ")},
 		{"tokenParamLeaks", m.TokenParamLeaks, tokenParamLeaks,
 			"Read the parameter through effects.TokenOf's compiled TokenParams (add a " +
-				"field to compileToken in effects/token_params.go) instead of reading the ability's Params in " +
-				"effects/token.go or a Token-only key elsewhere. " +
+				"field to compileToken in engine/effects/token_params.go) instead of reading the ability's Params in " +
+				"engine/effects/token.go or a Token-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.TokenLeaks, ", ")},
 		{"voteParamLeaks", m.VoteParamLeaks, voteParamLeaks,
 			"Read the parameter through effects.VoteOf's compiled VoteParams (add a " +
-				"field to compileVote in effects/vote_params.go) instead of reading the ability's Params in " +
-				"effects/vote.go or effects/vote_effect.go or a Vote-only key elsewhere. " +
+				"field to compileVote in engine/effects/vote_params.go) instead of reading the ability's Params in " +
+				"engine/effects/vote.go or engine/effects/vote_effect.go or a Vote-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.VoteLeaks, ", ")},
 		{"repeatEachParamLeaks", m.RepeatEachParamLeaks, repeatEachParamLeaks,
 			"Read the parameter through effects.RepeatEachOf's compiled RepeatEachParams (add a " +
-				"field to compileRepeatEach in effects/repeateach_params.go) instead of reading the ability's Params in " +
-				"effects/repeateach.go or a RepeatEach-only key elsewhere. " +
+				"field to compileRepeatEach in engine/effects/repeateach_params.go) instead of reading the ability's Params in " +
+				"engine/effects/repeateach.go or a RepeatEach-only key elsewhere. " +
 				"Leaks: " + strings.Join(m.RepeatEachLeaks, ", ")},
 		{"engineSurface", m.EngineSurface, engineSurface,
 			"A free func taking *Engine is an Engine method; take a narrow interface " +

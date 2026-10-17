@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render `oraclediff status -all -json` output as the docs site's set table.
 
-Reads the JSONL that
+Reads the JSONL that gorge-compliance's
 
     go run ./cmd/oraclediff status -all -json -level A -procs 4 > status-A.jsonl
 

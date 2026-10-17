@@ -1,0 +1,134 @@
+# Glossary
+
+The words gorge's code, commits and reviews use, for a Go developer who knows
+neither Magic engine internals nor Forge.
+
+**Card script.** One text file per card in Forge's corpus,
+`.cards/cardsfolder/<letter>/<name>.txt` (token definitions are under
+`.cards/tokenscripts/`). Each line is a characteristic (`Name:`, `ManaCost:`,
+`Types:`, `PT:`, `Oracle:`) or an ability: `A:` (spell or activated ability),
+`T:` (trigger), `S:` (static), `R:` (replacement), `K:` (keyword), `SVar:`.
+The scripts are GPL-3.0. They are fetched, never committed. See
+[Card pipeline](card-pipeline.md).
+
+**`$` parameter.** An ability line is a `|`-separated list of `Key$ Value`
+pairs. Examples: `ValidTgts$ Creature` (what may be targeted), `NumDmg$ 3`,
+`AffectedZone$ Hand` (where a static's affected cards are), `EffectZone$
+Graveyard` (where the static's *source* must be for it to function; absent
+means the battlefield, CR 113.6). In the IR they are the `Params` map on each
+ability (`cards.SA`, `cards.Trigger`, `cards.Static`, `cards.Repl`). A
+parameter no code reads is an "unread param", which the param census tracks.
+
+**SVar.** A named value on a card (`SVar:<Name>:<body>`), stored in
+`cards.Face.SVars`. The body is either another ability (a sub-ability that a
+trigger's `Execute$` or an ability's `SubAbility$` names) or a value
+expression (`Count$…`) that a parameter refers to by name.
+
+**IR (intermediate representation).** What `engine/cards` compiles a script
+into: a `cards.Card` holding one or more `cards.Face`s, each with its
+`Abilities`, `Triggers`, `Statics`, `Repls`, `Keywords` and `SVars` (types in
+`engine/cards/ir.go`). The whole corpus is cached as
+`.cards/ir-<fingerprint>.gob.gz`.
+
+**Face.** One printed face of a card (`cards.Face`). Most cards have one.
+Split, adventure, modal double-faced and transforming cards have more
+(`ALTERNATE` in the script starts the next one). `Object.Face()` is the face
+an object currently shows.
+
+**Intrinsic.** An ability the rules grant rather than the script prints. The
+script for a basic Forest has no mana ability; `Face.ApplyIntrinsics`
+(`engine/cards/intrinsic.go`) adds "{T}: Add {G}" from the subtype (CR 305.6).
+
+**Primitive.** One named engine capability a card needs. `Face.Primitives()`
+(`engine/cards/primitive.go`) lists a face's primitives as prefixed strings,
+and a card is *playable* when every one is implemented:
+
+| Head | Means | Implemented by |
+|---|---|---|
+| `api:<Name>` | an effect, from `SP$`/`AB$`/`DB$ <Name>` (`api:DealDamage`) | `effects.Register` in `engine/effects` |
+| `trig:<Mode>` | a trigger mode, from `T:Mode$ <Mode>` (`trig:ChangesZone`) | `engine/rules`, declared via `effects.RegisterNonAPI` |
+| `stat:<Mode>` | a static ability mode, from `S:Mode$ <Mode>` (`stat:Continuous`) | `engine/rules`, `RegisterNonAPI` |
+| `repl:<Event>` | a replacement effect, from `R:Event$ <Event>` (`repl:Moved`) | `engine/rules`, `RegisterNonAPI` |
+| `kw:<Keyword>` | a keyword (`kw:Flying`) | `engine/rules` (`RegisterNonAPI`), or an `engine/cards/kw_*.go` expander that rewrites it into ordinary lines |
+| `count:<Head>` | a value expression an SVar reads (`count:Domain` for `Count$Domain`) | the evaluator in `engine/effects/count*.go` plus `modelledValueHeads` |
+
+`effects.Supported()` returns the implemented set. `make report` compares it
+with the corpus.
+
+**Registry.** `cards.Registry`: every compiled card and token, looked up by
+name (`Registry.Lookup`). Tests get the shared one from
+`testutil.CorpusRegistry(t)`. Not to be confused with the *effect registry*
+in `engine/effects/registry.go` (primitive name → implementation) or the bot
+registry in `bots/`.
+
+**Event.** One entry in the game's log (`events.Event`, kinds in
+`engine/events/event.go`): a zone move, a life change, damage, a tap, a
+choice made. The only way state changes is `events.Apply`. Engine code
+proposes events with `e.emit` (rules) or `Host.Emit` (effects). `events.Kind`
+is append-only.
+
+**Chain head.** The event log is a SHA-256 hash chain: each event's hash
+covers the previous one. `Log.Head()` (`engine/events/log.go`) is the latest
+hash, printed as 16 hex digits. Two runs with the same head did exactly the
+same thing. `TestHeads`
+pins the heads of the golden acceptance games in
+`engine/rules/testdata/heads/<seats>.txt`, so "the head moved" means your
+change altered what those games do.
+
+**Decision, intent and decision kinds.** When the engine needs a player's
+input it poses a `decision.Decision` listing *every* legal `Option`. The
+player answers with a `decision.Intent` naming option indices, and anything
+not offered is rejected. The kinds are a closed set
+(`engine/decision/decision.go`): `priority`, `target`, `attackers`,
+`blockers`, `trigger_order`, `trigger_optional`, `choose`, `mulligan`,
+`modes`, `commander_zone`, `replacement`, `arrange`, `starting_player`.
+Conceding is an option on a priority decision, not a kind.
+
+**Seat.** Whoever answers a seat's decisions: a bot, a test script, a human
+over HTTP. The contract is `seat.Seat` (`engine/seat/seat.go`), whose one
+method is `Decide(ctx, view.View, decision.Decision) (decision.Intent, error)`.
+A seat never sees the engine.
+
+**View.** One seat's redacted picture of the game (`view.View`, built by
+`view.Project` in `engine/view`): hidden zones are counts, other players'
+decisions are hidden. Clients and bots read state only through a view.
+
+**Replay.** Re-running a match from its `Config` plus recorded intents and
+checking the rebuilt event stream event for event (`engine/replay`,
+`make sim`'s `-verify`, `cmd/repro`). Because all mutation is in the log,
+replay is also how a server resumes after a restart.
+
+**Ratchet.** A test whose expected value is a committed table and which fails
+in both directions. A new gap fails, and a listed gap that is now closed
+(stale) fails too. Tables only shrink. Examples:
+`engine/rules/testdata/known-unsupported/`, `engine/rules/testdata/paramcensus/`,
+the oracle audit's `known-divergent/` files. See [Testing](testing.md).
+
+**Census.** A test or one-off measurement that walks the whole corpus (or
+every card with a given shape) and counts how many behave a certain way.
+"Measure the class, not the card": a fix is checked against every card
+sharing the bug's shape, not just the reported one. The param census
+(`engine/rules/paramcensus_test.go`) is a committed one.
+
+**Oracle text / oracle scenario.** A card's printed rules text (the script's
+`Oracle:` line). An *oracle scenario* is a JSON test, played by gorge's oracle runner, whose
+expectations come from the printed text and the CR, not from the script or
+the engine. (Separately, *compliance oracles* compare gorge with other
+engines, XMage and Forge.) Both live in [gorge-compliance](https://github.com/adams-shaun/gorge-compliance); gorge
+keeps the runner and a few residual scenarios under
+`engine/rules/testdata/oracle/`.
+
+**CR citation.** A reference to the
+[Magic: The Gathering Comprehensive Rules](https://magic.wizards.com/en/rules)
+by rule number: "CR 113.6" (where abilities function), "CR 704.5a"
+(a state-based action), "CR 613" (the layer system). Code comments and commit
+messages cite the rule a line enforces.
+
+**Known approximation.** A place where a registered primitive behaves more
+narrowly than the card text, listed in `AGENTS.md`'s *Known approximations*
+table. The table only shrinks.
+
+**Forge, `FORGE_REF`, the fork.** [Forge](https://github.com/Card-Forge/forge)
+is an open-source Java Magic engine whose card scripts gorge compiles. gorge
+reads them from its fork [adams-shaun/forge](https://github.com/adams-shaun/forge)
+at the commit pinned by `FORGE_REF` in the `Makefile`.

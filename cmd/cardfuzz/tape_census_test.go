@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/rules/resolve"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/rules/resolve"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The resolution kernel's predicate-miss census ratchet (W3; lasagna spec
@@ -26,7 +26,7 @@ import (
 //
 //   - tapeMissClasses is a two-directional, SHRINK-ONLY allowlist. A class
 //     the sample shows that is not listed fails (fix the predicate at its
-//     root -- cards/mayask.go for text, rules/resolve_mayask.go for the stack
+//     root -- engine/cards/mayask.go for text, engine/rules/resolve_mayask.go for the stack
 //     object or a board gate -- never add it); a listed class the sample no
 //     longer shows fails as stale (delete the line in the same commit).
 //   - tapeMissCountCeiling is a generous ceiling on the total, a guard

@@ -11,7 +11,7 @@ import (
 // (bots.Options.DecisionDeadlineMS) on the adapter for the host to arm as its
 // DecideEnv context's deadline (bots.BudgetedSeat), and a bench-style build
 // -- the same factory, a zero budget -- declares none and stays unbounded.
-// The bail-out itself is pinned at azmcts level (internal/azmcts
+// The bail-out itself is pinned at azmcts level (bots/azmcts
 // bailout_test.go); this file pins that the hosted path is the one that arms
 // it.
 func TestHostedAZDeclaresTheHostedDecisionDeadline(t *testing.T) {

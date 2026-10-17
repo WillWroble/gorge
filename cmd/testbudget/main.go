@@ -4,7 +4,8 @@
 // per-package TEST_HISTORY.md / ALLOC_HISTORY.md budgets, which nothing
 // enforced.
 //
-// It has three subcommands, wired together by scripts/postmerge_full.sh:
+// It has three subcommands, wired together by the post-merge full suite (the
+// maintainers' postmerge_full.sh, in four-yay's ops/scripts since 2026-10-16):
 //
 //	go test -exec "/abs/testbudget exec" ...
 //	    Runs each test binary, records its peak RSS (KiB, from wait4's
@@ -26,7 +27,7 @@
 // heaviest subtest is named so the split is obvious). RSS can only be probed
 // per test BINARY, which is an upper bound on any test inside it; a package
 // over budget is attributed to a test by a capped `-run '^T$'` run and the
-// pinned inventory lives in internal/testutil/testdata/rss_exceptions.txt.
+// pinned inventory lives in testkit/testutil/testdata/rss_exceptions.txt.
 // CPU is not probed: the 4 vCPU budget is a property of the scope the suite
 // runs in, not of a single test.
 package main

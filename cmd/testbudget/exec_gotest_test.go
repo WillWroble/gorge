@@ -77,7 +77,7 @@ func goTestExec(t *testing.T, root, bin string, env ...string) string {
 }
 
 // TestExecKeepsGoTestCacheUsable guards the -test.testlogfile workaround in
-// runExec: postmerge_full.sh runs the whole suite under -exec, and without
+// runExec: the post-merge full suite runs the whole suite under -exec, and without
 // the workaround every package re-runs on every batch. If a future Go breaks
 // it, this fails so the slowdown is noticed rather than silently paid.
 func TestExecKeepsGoTestCacheUsable(t *testing.T) {

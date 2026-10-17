@@ -3,11 +3,11 @@ package bots
 import (
 	"context"
 
-	"github.com/adams-shaun/gorge/botpolicy"
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/internal/searchseat"
-	"github.com/adams-shaun/gorge/seat"
-	"github.com/adams-shaun/gorge/view"
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/searchseat"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/seat"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // EnvSeat is a hosted seat that answers some decisions from host-built

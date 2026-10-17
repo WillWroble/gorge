@@ -20,9 +20,9 @@ import (
 // (reverse rows on p.imports). This test fails in either direction.
 func TestManaBrewBoundaryFromRowsUseDirectImports(t *testing.T) {
 	const (
-		manabrew = module + "/internal/manabrew"
-		rules    = module + "/rules"
-		events   = module + "/events"
+		manabrew = module + "/server/manabrew"
+		rules    = module + "/engine/rules"
+		events   = module + "/engine/events"
 	)
 	// fromMessage/reverseMessage are the helper's verbatim message shapes.
 	fromMessage := func(from, to string) string {
@@ -103,7 +103,7 @@ func TestManaBrewBoundaryFromRowsUseDirectImports(t *testing.T) {
 		t.Errorf("missing from-packages must be skipped; got %v", msgs)
 	}
 	// A present but unrelated package must also not trip any row.
-	unrelated := pkg{path: module + "/deck", imports: set(events), deps: set(manabrew)}
+	unrelated := pkg{path: module + "/engine/deck", imports: set(events), deps: set(manabrew)}
 	msgs = manabrewBoundaryViolations(map[string]pkg{unrelated.path: unrelated})
 	for _, m := range msgs {
 		if strings.Contains(m, "deck") {

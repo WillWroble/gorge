@@ -16,10 +16,10 @@ import (
 // compiled to two calls followed by two loads, both from b's record: the
 // api:ExchangeTextBox capture swapped one box with itself. So no single
 // statement may make two Chars calls; read each into its own statement.
-// Scans rules/, effects/, botpolicy/ and view/ non-test files.
+// Scans engine/rules/, engine/effects/, bots/botpolicy/ and engine/view/ non-test files.
 func TestNoTwoCharsReadsInOneStatement(t *testing.T) {
 	root := filepath.Join("..", "..")
-	for _, dir := range []string{"rules", "effects", "botpolicy", "view"} {
+	for _, dir := range []string{"engine/rules", "engine/effects", "bots/botpolicy", "engine/view"} {
 		for _, file := range goSourcesUnder(t, filepath.Join(root, dir)) {
 			fset := token.NewFileSet()
 			f, err := parser.ParseFile(fset, file, nil, parser.SkipObjectResolution)

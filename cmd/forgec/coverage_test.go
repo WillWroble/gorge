@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/cards"
+	"github.com/adams-shaun/gorge/engine/cards"
 )
 
 // readRepoFile reads a path relative to the repository root. Tests run in the

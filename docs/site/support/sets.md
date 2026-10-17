@@ -6,9 +6,9 @@ measured card by card against an oracle; every other set is an estimate.
 !!! info "Snapshot"
     The tables on this page are a hand snapshot **as of 2026-10-12, `main` @
     `f1ac002c4`** (Forge pin `25a608a4fc5f`, XMage pin `6b602a1c85e8`, verdicts
-    last written at `e606fe616`). When the docs build can run the measurement
-    itself, its output appears in the *Automated measurement* section at the
-    end of this page. See [Regenerating the tables](regenerating.md).
+    last written at `e606fe616`). The compliance oracle that produces these
+    figures runs from [gorge-compliance](https://github.com/adams-shaun/gorge-compliance),
+    so the docs build no longer re-measures them. See [Regenerating the tables](regenerating.md).
 
 **Headline.** All 20 Standard sets pass **Level A** (5,331 / 5,331 cards).
 **Level B** stands at 5,002 / 5,331 (**93.8%**), with 329 cards outstanding;
@@ -24,8 +24,8 @@ Support is layered. Each tier certifies more than the one above it.
 |---|---|---|---|
 | Compiles | `forgec` → IR cache | the Forge script parses into the IR | behaviour |
 | **Playable** | `forgec report` / `make coverage` | every primitive the card uses (`api:`, `trig:`, `kw:`, `stat:`, `count:`, …) is implemented | that the card behaves correctly; a parameter can still be unread (tracked by a separate census ratchet) |
-| **Level A** | `compliance/gate` against `compliance/verdicts/*.jsonl` | playable **and** a generated cast-and-resolve, play-land or counter-spell scenario agrees with XMage (or a ruled divergence, or a hand-written oracle scenario). Basic lands are skipped; cards XMage lacks need a hand scenario | activated abilities, trigger modes, attacks and blocks, static abilities |
-| **Level B** | the same gate, level B ([spec](https://github.com/adams-shaun/gorge/blob/main/docs/superpowers/specs/2026-10-05-compliance-level-b.md)) | Level A plus one XMage-compared scenario **per requirement**: each activated ability (mana abilities included), each trigger, each static ability, and attack/block for creatures with combat keywords or legality statics | requirements no scenario template serves yet are reported as a *template gap*; keywords are not compared on their own |
+| **Level A** | the compliance gate against the recorded XMage verdicts | playable **and** a generated cast-and-resolve, play-land or counter-spell scenario agrees with XMage (or a ruled divergence, or a hand-written oracle scenario). Basic lands are skipped; cards XMage lacks need a hand scenario | activated abilities, trigger modes, attacks and blocks, static abilities |
+| **Level B** | the same gate, level B | Level A plus one XMage-compared scenario **per requirement**: each activated ability (mana abilities included), each trigger, each static ability, and attack/block for creatures with combat keywords or legality statics | requirements no scenario template serves yet are reported as a *template gap*; keywords are not compared on their own |
 
 **Oracle verdicts.** Each (card, template, scenario hash) gets one verdict:
 *agree*, *diverge*, *harness* (the test rig, not the engine, failed) or
@@ -39,10 +39,9 @@ A third oracle, Forge itself, is being added for three-way adjudication. It
 only corroborates; it never writes verdicts.
 
 **Set membership.** Forge scripts carry no set information, so set lists
-come from XMage's set classes (`compliance/manifests/<SET>.json`, 589 sets,
-only cards XMage implements) and, for the 20 Standard sets, from full printed
-lists (`compliance/printed/<SET>.json`). `compliance/declared.json` declares
-all 20 Standard sets at Level A; none is declared at Level B yet.
+come from XMage's set classes (589 sets, only cards XMage implements) and,
+for the 20 Standard sets, from full printed lists. All 20 Standard sets are
+declared at Level A; none is declared at Level B yet.
 
 ## Standard (measured)
 
@@ -147,7 +146,7 @@ Per-set entries: a card reprinted in several sets is counted in each.
 
 ## Method and error bars
 
-`oraclediff status -all -json -level A` runs the compliance gate over all 589
+The Level A status run checks the compliance gate over all 589
 manifests and puts each card in one bucket: *unsupported*, *not in corpus*,
 *template gap* or *no verdict*. Agreeing reprints and basic lands pass. As a
 cross-check, the corpus-wide figure (94.2%, distinct cards including Un-sets

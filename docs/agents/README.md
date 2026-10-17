@@ -6,15 +6,15 @@ so it can stay out of every turn's context.
 
 | Read | When |
 |---|---|
-| [repo-map.md](repo-map.md) (the index) and its per-domain files (`repo-map-engine.md`, `repo-map-internal.md`, `repo-map-research.md`, `repo-map-paths.md`) | Finding where something lives, or where a kind of change goes. |
+| [repo-map.md](repo-map.md) (the index) and its per-domain files (`repo-map-engine.md`, `repo-map-internal.md`, `repo-map-paths.md`; the research map moved to four-yay) | Finding where something lives, or where a kind of change goes. |
 | `go run ./cmd/pkgmap` (classification: `docs/site/architecture/packages.tiers.json`) | Every package with its purpose, LOC, reverse importers, tier and status, plus the tier-dependency graph; `-check` fails on an unclassified package. |
 | [invariants.md](invariants.md) | Before changing engine code. It lists each design invariant, what enforces it, and the legitimate way to change it, and ends with the contributor workflow. |
 | [do-not.md](do-not.md) | Before you touch git, run a server, or merge. Every entry has happened here. |
 | [heads-history.md](heads-history.md) | Frozen: why the acceptance chain heads moved before 2026-10-03. New head-move rationale goes in the commit message. |
 | [runtime-behavior.md](runtime-behavior.md) | When changing trigger-relative filters, cast provenance, host observer hooks, or seat privacy/session handling. |
-| [test-throughput-2026-10-12.md](test-throughput-2026-10-12.md) | Changing the gate, post-merge suite or test budgets: the 2026-10-12 audit of where test wall time goes, with ranked fixes. |
 | [README § Bot player training and adoption](../../README.md#bot-player-training-and-adoption-guidelines) | Building, training or evaluating a bot policy. |
-| `docs/superpowers/specs/2026-09-22-engine-contracts.md` | Behaviour that looks like a bug but is a deliberate contract. |
+| [`docs/design/2026-09-22-engine-contracts.md`](../design/2026-09-22-engine-contracts.md) | Behaviour that looks like a bug but is a deliberate contract. |
+| [`docs/design/`](../design/ARCHIVE.md) and [`docs/decisions/`](../decisions/0001-repo-layout.md) | Living designs (flat, date-prefixed) and architecture decisions. Historical records were parked; `docs/design/ARCHIVE.md` indexes them. |
 
 ## The six rules that matter most
 
@@ -25,7 +25,11 @@ so it can stay out of every turn's context.
 3. Never commit Forge scripts (GPL-3.0). No cgo, no third-party dependencies.
 4. Seats see a `view.View`, never the engine. Clairvoyance never reaches a
    hosted or rated game.
-5. Work in a `scripts/agent-worktree.sh` worktree that has `.cards/` linked,
-   and leave `main`'s checkout alone.
+5. Work in a git worktree that has `.cards/` linked, and leave `main`'s
+   checkout alone.
 6. Ratchets fail both ways, the Known-approximations table only shrinks, and
    golden heads move only with a named cause.
+
+The maintainers' agent pipeline (gates, hooks, systemd units, the post-merge
+batch, the seed agent and its rubric, the demo deploy) is not part of gorge:
+it lives in the private four-yay repository's `ops/` (moved 2026-10-16).

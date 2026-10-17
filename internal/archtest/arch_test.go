@@ -136,94 +136,36 @@ func set(s string) map[string]bool {
 // only clocks in the system. Every other package must be a pure function
 // of its inputs.
 //
-// cmd/botbench is exempt because it is a build-time developer tool, not part
-// of the engine or the server: its grind mode reads the wall clock only to
-// bound its own run window (deadline) and report per-deck elapsed time — how long the BENCH chose to run, not anything a game,
-// event, view or replay depends on. cmd/ledger is exempt likewise: it stamps
-// the ledger document's Generated: field for the dashboard, a docs tool
-// output, never engine state.
-// cmd/searchprobe is another diagnostic tool: it measures corpus load, total
-// elapsed time and per-root sampling/search cost. It injects a clock into the
-// experimental harness only for returned metrics; fixed work counts, explicit
-// seeds and ordinary engine execution govern every proposal and action.
-// cmd/searchteacher (the 2026-09-19 search-teacher spike) is exempt on the
-// same terms: it reads the clock only to report per-decision sampling and
-// search milliseconds; no proposal, rollout, label or game reads it.
-// cmd/cardfuzz reads it only for its per-game hang watchdog and its
-// games/s progress line; every deck and game is a pure function of its seed.
-// cmd/exitloop (the L10 expert-iteration loop) reads it only to report each
-// stage's wall seconds in timing.tsv; the stages are separate processes and no
-// label, checkpoint, game or summary.tsv byte reads it.
-// cmd/traindash (the live read-only training dashboard) reads it only to
-// stamp Generated:/last-modified fields and to decide a run's live/stale
-// status from file mtimes; it scans a training output tree and never drives
-// the engine, so no game, event, view or replay depends on its clock.
-// The paymirror A/B harness reads the clock only in
-// its cmd/paymirror CLI: the per-game wall-time budget is injected to the
-// library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
-// builds from time.Now, and the CLI's progress line prints per-game elapsed
-// seconds. The internal/paymirror library itself imports no time and is a
-// pure function of its seeds and the corpus for a completed game; every
-// spec, game, report and trace byte is either that pure result or a game the
-// CLI's own budget truncated (Err "truncated: budget"), never something the
-// library's clock changed; elapsed time cannot affect engine choices, events,
-// replays or verdicts.
-// cmd/sbv1agent (the SpellBench v1 agent) reads it only to report each
-// shadow-policy decision's wall milliseconds in its -stats line; every
-// answer is a pure function of the decision stream and its seed.
-// cmd/kshadowcheck (the kernel-shadow fidelity tool) reads it only to report
-// staging cost; it plays no game.
-// cmd/sbagent (the SpellBench v2 agent) reads it to report each shadow
-// policy decision's wall milliseconds in its -stats line and for the
-// search's per-decision clock guard (counted when it fires); cmd/sbv2local
-// (the in-process v2 runner) only reports latency. cmd/searchbench reads it
-// only at the command boundary: a run's per-item CoreSeconds and progress
-// lines, a build's stage seconds (build.json, never the manifest); every
-// answer and every manifest byte is a pure function of the items, seeds and
-// corpus. cmd/enginebench (the docs/015 engine-speed rows) reads it only to
-// report each row's elapsed wall time beside its CPU time; every game and
-// seed is fixed by its flags. host/manabrewhttp uses time only for SSE
-// keep-alive and write deadlines. cmd/dzgorge (the DraftZero driver) reads
-// it only for its remote-batch flush timer, retry back-off and per-call
-// timing counters; every game is a pure function of its seed.
-// internal/gamepool and internal/inferbroker (both tag-gated schedulers) use
-// timers only to decide WHEN a ready batch is flushed and to report queue and
-// serve nanoseconds; which decisions are answered, and every answer, is a
-// pure function of the games' seeds. eventhost (the draft-event runtime,
-// docs/superpowers/specs/2026-10-13-draft-events-design.md) uses time only
-// for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
-// event package as a logged auto-pick entry, so replaying an event's log
-// never reads the clock. cmd/draftrl (the draft-RL driver) reads it only
-// for rollout's throughput line (stdout, never a record) and for the
-// GORGE_PAUSE_FILE poll's sleep; every pick, deck and game record is a pure
-// function of its seed. No game, event, view or
-// replay reads the clock, and intents reach the engine only through
-// SubmitIntent.
+// The other allowed packages are developer tools that read the clock only to
+// bound or report their own run, never anything a game, event, view or replay
+// depends on. cmd/cardfuzz reads it only for its per-game hang watchdog and its games/s
+// progress line; every deck and game is a pure function of its seed. The
+// paymirror A/B harness reads the clock only in its cmd/paymirror CLI: the
+// per-game wall-time budget is injected to the library as a
+// paymirror.DriverOptions.BudgetExceeded predicate the CLI builds from
+// time.Now, and the CLI's progress line prints per-game elapsed seconds. The
+// testkit/paymirror library itself imports no time and is a pure function of
+// its seeds and the corpus for a completed game; a game the CLI's budget
+// truncated says so (Err "truncated: budget"). cmd/enginebench (the docs/015
+// engine-speed rows) reads it only to report each row's elapsed wall time
+// beside its CPU time; every game and seed is fixed by its flags.
+// server/host/manabrewhttp uses time only for SSE keep-alive and write
+// deadlines. No game, event, view or replay reads the clock, and intents reach
+// the engine only through SubmitIntent.
+//
+// The research tools that also read the clock (botbench, searchteacher, the
+// SpellBench agents, the draft-event runtime and the rest) moved to four-yay
+// with the lab tree, and the pipeline's issue ledger (cmd/ledger) with the ops
+// tree (docs/decisions/0001-repo-layout.md and its amendments).
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
-		module + "/host":                 true,
-		module + "/host/httpapi":         true,
-		module + "/cmd/gorged":           true,
-		module + "/cmd/botbench":         true,
-		module + "/cmd/ledger":           true,
-		module + "/cmd/searchprobe":      true,
-		module + "/cmd/searchteacher":    true,
-		module + "/cmd/cardfuzz":         true,
-		module + "/cmd/exitloop":         true,
-		module + "/cmd/traindash":        true,
-		module + "/cmd/paymirror":        true,
-		module + "/cmd/sbv1agent":        true,
-		module + "/cmd/kshadowcheck":     true,
-		module + "/cmd/sbagent":          true,
-		module + "/cmd/sbv2local":        true,
-		module + "/cmd/searchbench":      true,
-		module + "/cmd/enginebench":      true,
-		module + "/cmd/dzgorge":          true,
-		module + "/cmd/draftrl":          true,
-		module + "/internal/gamepool":    true,
-		module + "/internal/inferbroker": true,
-		module + "/host/manabrewhttp":    true,
-		module + "/eventhost":            true,
+		module + "/server/host":              true,
+		module + "/server/host/httpapi":      true,
+		module + "/server/gorged":            true,
+		module + "/cmd/cardfuzz":             true,
+		module + "/cmd/paymirror":            true,
+		module + "/cmd/enginebench":          true,
+		module + "/server/host/manabrewhttp": true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
@@ -237,53 +179,40 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 func TestDependencyOrderHolds(t *testing.T) {
 	pkgs := packages(t)
 	forbidden := []struct{ from, to string }{
-		{module + "/effects", module + "/rules"},
-		{module + "/view", module + "/rules"},
-		{module + "/botpolicy", module + "/view"},
-		{module + "/botpolicy", module + "/rules"},
-		{module + "/botpolicy", module + "/seat"},
-		{module + "/protocol", module + "/rules"},
-		{module + "/protocol", module + "/bots"},
-		{module + "/host", module + "/internal/testutil"},
-		{module + "/host/httpapi", module + "/internal/testutil"},
-		{module + "/cmd/gorged", module + "/internal/testutil"},
-		{module + "/cards", module + "/state"},
-		{module + "/deck", module + "/rules"},
-		// The az search seat's clairvoyant world clones the REAL engine,
-		// hidden zones and future chance included (spec 2026-09-27 §1). It
-		// lives in internal/azmcts/clairvoyant and is bench and training only
-		// (botbench injects it as azmcts.SeatConfig.Source), so nothing that
-		// seats a non-bench opponent may link it. The honest azmcts core
-		// never pulls the clone back in, and neither do the hosted search
-		// packages or any bots/ entry.
+		{module + "/engine/effects", module + "/engine/rules"},
+		{module + "/engine/view", module + "/engine/rules"},
+		{module + "/bots/botpolicy", module + "/engine/view"},
+		{module + "/bots/botpolicy", module + "/engine/rules"},
+		{module + "/bots/botpolicy", module + "/engine/seat"},
+		{module + "/server/protocol", module + "/engine/rules"},
+		{module + "/server/protocol", module + "/bots"},
+		{module + "/server/host", module + "/testkit/testutil"},
+		{module + "/server/host/httpapi", module + "/testkit/testutil"},
+		{module + "/server/gorged", module + "/testkit/testutil"},
+		{module + "/engine/cards", module + "/engine/state"},
+		{module + "/engine/deck", module + "/engine/rules"},
 		// The shadow answer (HD-3, human-divergence design §5.4) is computed by
 		// a package the host calls and the offline triage tool recomputes
 		// through: it may not depend on the host that calls it, nor on test
 		// scaffolding.
-		{module + "/internal/divergence/shadow", module + "/host"},
-		{module + "/internal/divergence/shadow", module + "/internal/testutil"},
-		{module + "/host", module + "/internal/azmcts/clairvoyant"},
-		{module + "/host/httpapi", module + "/internal/azmcts/clairvoyant"},
-		{module + "/cmd/gorged", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/azmcts", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/spellbench/sbsearch", module + "/internal/azmcts/clairvoyant"},
-		{module + "/internal/searchseat", module + "/internal/azmcts/clairvoyant"},
-		// The lasagna layering (spec 2026-10-03 §3): rules/cost is the L2
+		{module + "/server/divergence/shadow", module + "/server/host"},
+		{module + "/server/divergence/shadow", module + "/testkit/testutil"},
+		// The lasagna layering (spec 2026-10-03 §3): engine/rules/cost is the L2
 		// cost vocabulary leaf. It sits below effects and below every rules
 		// subsystem package, so none of them -- and never rules itself -- may
 		// be reachable from it. TestCostVocabularyIsALeaf pins its whole
 		// direct import set; these rows name the edges the layering forbids.
-		{module + "/rules/cost", module + "/rules"},
-		{module + "/rules/cost", module + "/effects"},
-		{module + "/rules/cost", module + "/events"},
-		{module + "/rules/cost", module + "/decision"},
-		{module + "/rules/cost", module + "/botpolicy"},
-		{module + "/rules/cost", module + "/rules/pay"},
-		{module + "/rules/cost", module + "/rules/chars"},
-		{module + "/rules/cost", module + "/rules/trigmatch"},
-		{module + "/rules/cost", module + "/rules/combat"},
-		{module + "/rules/cost", module + "/rules/resolve"},
-		// rules/combat is an L5 subsystem package (W5 step E5): attack and
+		{module + "/engine/rules/cost", module + "/engine/rules"},
+		{module + "/engine/rules/cost", module + "/engine/effects"},
+		{module + "/engine/rules/cost", module + "/engine/events"},
+		{module + "/engine/rules/cost", module + "/engine/decision"},
+		{module + "/engine/rules/cost", module + "/bots/botpolicy"},
+		{module + "/engine/rules/cost", module + "/engine/rules/pay"},
+		{module + "/engine/rules/cost", module + "/engine/rules/chars"},
+		{module + "/engine/rules/cost", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/cost", module + "/engine/rules/combat"},
+		{module + "/engine/rules/cost", module + "/engine/rules/resolve"},
+		// engine/rules/combat is an L5 subsystem package (W5 step E5): attack and
 		// block legality behind combat.Board. It never reaches back into
 		// rules (Go forbids the direct cycle once rules imports it; these
 		// rows also forbid the transitive one), never into a sibling
@@ -292,41 +221,41 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// is not a transitive row; TestCombatImportsStayBelowRules pins the
 		// direct import set, which keeps decision -- and with it the asks
 		// and validators of the declaration flow -- out of the package.)
-		{module + "/rules/combat", module + "/rules"},
-		{module + "/rules/combat", module + "/rules/pay"},
-		{module + "/rules/combat", module + "/rules/trigmatch"},
-		{module + "/rules/combat", module + "/rules/resolve"},
-		{module + "/rules/combat", module + "/botpolicy"},
-		// rules/trigmatch (W5 E3) is an L5 subsystem package: the trigger
+		{module + "/engine/rules/combat", module + "/engine/rules"},
+		{module + "/engine/rules/combat", module + "/engine/rules/pay"},
+		{module + "/engine/rules/combat", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/combat", module + "/engine/rules/resolve"},
+		{module + "/engine/rules/combat", module + "/bots/botpolicy"},
+		// engine/rules/trigmatch (W5 E3) is an L5 subsystem package: the trigger
 		// matchers read the engine through trigmatch.Board, never through
 		// *rules.Engine, so it may not reach rules, its sibling L5 packages
-		// (pay, combat) or the L6 resolution kernel. It may sit on rules/chars
-		// (L4) and rules/cost (L2). TestTrigmatchImportsStayBelowL5 pins its
+		// (pay, combat) or the L6 resolution kernel. It may sit on engine/rules/chars
+		// (L4) and engine/rules/cost (L2). TestTrigmatchImportsStayBelowL5 pins its
 		// direct import set.
-		{module + "/rules/trigmatch", module + "/rules"},
-		{module + "/rules/trigmatch", module + "/rules/pay"},
-		{module + "/rules/trigmatch", module + "/rules/combat"},
-		{module + "/rules/trigmatch", module + "/rules/resolve"},
-		// rules/scriptfacts is the pure card-fact leaf of the rules-split plan
+		{module + "/engine/rules/trigmatch", module + "/engine/rules"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/pay"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/combat"},
+		{module + "/engine/rules/trigmatch", module + "/engine/rules/resolve"},
+		// engine/rules/scriptfacts is the pure card-fact leaf of the rules-split plan
 		// (2026-10-06): facts a card's printed text and compiled script imply,
 		// with no *rules.Engine and no game state. It sits below every rules
 		// subsystem, so it may never reach rules or any package above it.
 		// TestScriptFactsImportsStayBelowRules pins its whole direct import set;
 		// these rows name the edges the layering forbids transitively.
-		{module + "/rules/scriptfacts", module + "/rules"},
-		{module + "/rules/scriptfacts", module + "/effects"},
-		{module + "/rules/scriptfacts", module + "/events"},
-		{module + "/rules/scriptfacts", module + "/decision"},
-		{module + "/rules/scriptfacts", module + "/botpolicy"},
-		{module + "/rules/scriptfacts", module + "/rules/pay"},
-		{module + "/rules/scriptfacts", module + "/rules/chars"},
-		{module + "/rules/scriptfacts", module + "/rules/trigmatch"},
-		{module + "/rules/scriptfacts", module + "/rules/combat"},
-		{module + "/rules/scriptfacts", module + "/rules/resolve"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/effects"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/events"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/decision"},
+		{module + "/engine/rules/scriptfacts", module + "/bots/botpolicy"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/pay"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/chars"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/trigmatch"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/combat"},
+		{module + "/engine/rules/scriptfacts", module + "/engine/rules/resolve"},
 	}
 	for path, p := range pkgs {
 		if strings.HasPrefix(path, module+"/bots") {
-			for _, target := range []string{module + "/host", module + "/internal/testutil", module + "/internal/azmcts/clairvoyant"} {
+			for _, target := range []string{module + "/server/host", module + "/testkit/testutil"} {
 				if p.deps[target] {
 					t.Errorf("%s depends on %s (transitively); bots packages may not", path, target)
 				}
@@ -355,7 +284,7 @@ func TestDependencyOrderHolds(t *testing.T) {
 // translator is allowed to import view, decision and state (spec §5.1), and
 // view imports events; the transport is allowed to import host, and host
 // imports rules. A transitive check on those rows would therefore forbid the
-// imports §5.1 requires, and note that host/manabrewhttp cannot avoid host.
+// imports §5.1 requires, and note that server/host/manabrewhttp cannot avoid host.
 // What the boundary actually forbids is the adapter reaching an engine
 // package ITSELF — a direct edge — which is what p.imports reports. The
 // reverse rows stay transitive: nothing on the engine side may depend on the
@@ -368,17 +297,17 @@ func TestDependencyOrderHolds(t *testing.T) {
 // The returned slice is sorted so the helper is deterministic.
 func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 	forbiddenManaBrewDirect := []struct{ from, to string }{
-		{module + "/internal/manabrew", module + "/rules"},
-		{module + "/internal/manabrew", module + "/effects"},
-		{module + "/internal/manabrew", module + "/events"},
-		{module + "/internal/manabrew", module + "/host"},
-		{module + "/internal/manabrew", module + "/host/httpapi"},
-		{module + "/internal/manabrew", module + "/internal/azmcts"},
-		{module + "/internal/manabrew", module + "/internal/testutil"},
-		{module + "/host/manabrewhttp", module + "/rules"},
-		{module + "/host/manabrewhttp", module + "/effects"},
-		{module + "/host/manabrewhttp", module + "/internal/testutil"},
-		{module + "/host/manabrewhttp", module + "/internal/azmcts"},
+		{module + "/server/manabrew", module + "/engine/rules"},
+		{module + "/server/manabrew", module + "/engine/effects"},
+		{module + "/server/manabrew", module + "/engine/events"},
+		{module + "/server/manabrew", module + "/server/host"},
+		{module + "/server/manabrew", module + "/server/host/httpapi"},
+		{module + "/server/manabrew", module + "/bots/azmcts"},
+		{module + "/server/manabrew", module + "/testkit/testutil"},
+		{module + "/server/host/manabrewhttp", module + "/engine/rules"},
+		{module + "/server/host/manabrewhttp", module + "/engine/effects"},
+		{module + "/server/host/manabrewhttp", module + "/testkit/testutil"},
+		{module + "/server/host/manabrewhttp", module + "/bots/azmcts"},
 	}
 	var msgs []string
 	for _, f := range forbiddenManaBrewDirect {
@@ -392,10 +321,10 @@ func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 	}
 	var forbiddenManaBrewReverse []struct{ from, to string }
 	for _, from := range []string{
-		"cards", "state", "decision", "events", "effects", "botpolicy",
-		"rules", "view", "seat", "replay", "protocol", "host", "host/httpapi",
+		"engine/cards", "engine/state", "engine/decision", "engine/events", "engine/effects", "bots/botpolicy",
+		"engine/rules", "engine/view", "engine/seat", "engine/replay", "server/protocol", "server/host", "server/host/httpapi",
 	} {
-		for _, to := range []string{"protocol/manabrew", "internal/manabrew", "host/manabrewhttp"} {
+		for _, to := range []string{"server/protocol/manabrew", "server/manabrew", "server/host/manabrewhttp"} {
 			forbiddenManaBrewReverse = append(forbiddenManaBrewReverse, struct{ from, to string }{module + "/" + from, module + "/" + to})
 		}
 	}
@@ -413,13 +342,13 @@ func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 }
 
 // TestManaBrewWireIsStdlibOnly keeps the protocol's public wire types free of
-// gorge package dependencies. The row is in place before protocol/manabrew
+// gorge package dependencies. The row is in place before server/protocol/manabrew
 // exists and starts enforcing the boundary as soon as it is added.
 func TestManaBrewWireIsStdlibOnly(t *testing.T) {
-	const wire = module + "/protocol/manabrew"
+	const wire = module + "/server/protocol/manabrew"
 	p, ok := packages(t)[wire]
 	if !ok {
-		t.Skip("protocol/manabrew is not built yet")
+		t.Skip("server/protocol/manabrew is not built yet")
 	}
 	for imp := range p.imports {
 		out, err := exec.Command("go", "list", "-f", "{{.Standard}}", imp).Output()
@@ -434,11 +363,11 @@ func TestManaBrewWireIsStdlibOnly(t *testing.T) {
 }
 
 // TestNoExportLeaksAnEngineGame is D6's compile-time half: no exported
-// function or method of host or host/httpapi may expose a *state.Game or a
+// function or method of host or server/host/httpapi may expose a *state.Game or a
 // *rules.Engine through its signature — by return type, or by any parameter
 // shape a caller could funnel back into a leaked live game. Every value that
 // crosses either package is already a view.View, a protocol.* or a
-// decision.* payload; the engine and its game never leave rules/ at all (a
+// decision.* payload; the engine and its game never leave engine/rules/ at all (a
 // client layer must read state only through view).
 //
 // The scan is deliberately structural and text-restricted: it reads `go doc
@@ -464,7 +393,7 @@ func TestNoExportLeaksAnEngineGame(t *testing.T) {
 		regexp.MustCompile(`\bstate\.Game\b`),
 		regexp.MustCompile(`\brules\.Engine\b`),
 	}
-	for _, pkg := range []string{module + "/host", module + "/host/httpapi"} {
+	for _, pkg := range []string{module + "/server/host", module + "/server/host/httpapi"} {
 		out, err := exec.Command("go", "doc", "-all", pkg).CombinedOutput()
 		if err != nil {
 			t.Fatalf("go doc -all %s: %v", pkg, err)
@@ -483,7 +412,7 @@ func TestNoExportLeaksAnEngineGame(t *testing.T) {
 }
 
 // TestNoLegacyMathRand: math/rand/v2 with an explicit seeded source is the
-// only randomness (rules/rng.go, seat/bot.go). The v1 package's global
+// only randomness (engine/rules/rng.go, bots/heuristic/bot.go). The v1 package's global
 // functions are exactly the ambient randomness the engine spec forbids.
 func TestNoLegacyMathRand(t *testing.T) {
 	for path, p := range packages(t) {
@@ -493,8 +422,8 @@ func TestNoLegacyMathRand(t *testing.T) {
 	}
 }
 
-// resumeFieldWriters walks the non-test rules/ sources (recursively, so a
-// rules/* subpackage stays in the census) and returns every
+// resumeFieldWriters walks the non-test engine/rules/ sources (recursively, so a
+// engine/rules/* subpackage stays in the census) and returns every
 // function that assigns to the Engine.resume state, keyed by the receiver-
 // qualified function name (e.g. "(*Engine).Ask") with the sites it writes.
 // A write reachable through the resume field is a write to the resume state:
@@ -505,7 +434,7 @@ func TestNoLegacyMathRand(t *testing.T) {
 // and keeps exact.
 func resumeFieldWriters(t *testing.T) map[string][]string {
 	t.Helper()
-	dir := filepath.Join("..", "..", "rules")
+	dir := filepath.Join("..", "..", "engine", "rules")
 	files := goSourcesUnder(t, dir)
 	if len(files) == 0 {
 		t.Fatalf("no rules sources found under %s (cwd %s)", dir, mustCwd())

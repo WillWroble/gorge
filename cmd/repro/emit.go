@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 // writeCommittedMatch takes a feedback capture's match.json bytes and

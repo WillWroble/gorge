@@ -1,5 +1,5 @@
 // walkstats.go implements enginebench's -walkstats observer: the reuse oracle
-// for the priority legal-action walk (docs/superpowers/specs/2026-10-06-legal-walk-design.md
+// for the priority legal-action walk (archived 2026-10-06-legal-walk-design.md (docs/design/ARCHIVE.md)
 // §1.5, step S0).
 //
 // At every posed priority decision it compares the offered option list with the
@@ -22,10 +22,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/decision"
-	"github.com/adams-shaun/gorge/events"
-	"github.com/adams-shaun/gorge/rules"
-	"github.com/adams-shaun/gorge/state"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // walkStatsFlag is set from -walkstats in main. When false the hooks and the

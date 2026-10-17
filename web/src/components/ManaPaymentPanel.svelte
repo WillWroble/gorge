@@ -9,7 +9,7 @@
 
   /**
    * ManaPaymentPanel is the "select mana" prompt: the announced CR 601.2g
-   * window of announce-then-pay (docs/superpowers/specs/
+   * window of announce-then-pay (docs/design/
    * 2026-09-27-announce-then-pay.md §4, §8). It reads the window's readout
    * (decision.mana_payment: total cost, still owed, pool, the Auto-fill
    * sources) and regroups the offered "mana" options by source. Every button

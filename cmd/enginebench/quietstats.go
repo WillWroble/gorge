@@ -4,7 +4,7 @@
 // The counters are compiled into rules behind a link-time flag, so a build
 // without
 //
-//	-ldflags "-X github.com/adams-shaun/gorge/rules.quietStatsFlag=1"
+//	-ldflags "-X github.com/adams-shaun/gorge/engine/rules.quietStatsFlag=1"
 //
 // pays nothing for the observer and reports all zeros here. -quietstats
 // therefore errors clearly rather than printing an empty table.
@@ -15,7 +15,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/adams-shaun/gorge/rules"
+	"github.com/adams-shaun/gorge/engine/rules"
 )
 
 // quietStatsFlag is set from -quietstats in main.
@@ -40,7 +40,7 @@ func printQuietStats() {
 	}
 	quietStatsPrinted = true
 	if !rules.QuietStatsLinked() {
-		fmt.Fprintln(os.Stderr, `enginebench: -quietstats needs -ldflags "-X github.com/adams-shaun/gorge/rules.quietStatsFlag=1" (or verify mode)`)
+		fmt.Fprintln(os.Stderr, `enginebench: -quietstats needs -ldflags "-X github.com/adams-shaun/gorge/engine/rules.quietStatsFlag=1" (or verify mode)`)
 		return
 	}
 	fmt.Fprint(os.Stderr, rules.QuietStatsPrint(rules.QuietStats()))
