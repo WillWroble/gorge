@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/adams-shaun/gorge/cli"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/effects"
-	"github.com/adams-shaun/gorge/internal/cli"
 )
 
 // poolDeck is one row of data/gorge/pool.tsv (gorge/decks.py).

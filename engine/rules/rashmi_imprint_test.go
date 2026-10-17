@@ -28,7 +28,7 @@ import (
 // the imprint was never recorded, so BOTH branches registered the static.
 // Rashmi and Ragavan is in NO repo deck and NO legacy golden deck, so no
 // chain head depends on this card (measured: grepping the carrier names
-// against internal/testutil/decks/*.json returns nothing).
+// against testkit/testutil/decks/*.json returns nothing).
 
 // rashmiTestEngine builds a 2-seat game with Rashmi and Ragavan plus a Sol
 // Ring on seat 0's battlefield, an Ornithopter in seat 0's hand (the spell

@@ -7,7 +7,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // This file is the regression suite for the choice-free Mill<N> component in

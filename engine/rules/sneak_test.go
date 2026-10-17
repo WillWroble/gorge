@@ -8,7 +8,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // K:Sneak (CR 702.190) is pinned end to end on a real corpus carrier, Oroku

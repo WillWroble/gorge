@@ -51,7 +51,7 @@ Python example point at.
   the built-in `bot`, with targets in §11.
 
 No UI ticket; no edit to `server/protocol/`, `server/host/`, `server/host/httpapi`, `lab/draft/eventhost/`, `web/`,
-`cmd/gorged/`, `bots/` or `internal/bench/`.
+`cmd/gorged/`, `bots/` or `testkit/bench/`.
 
 ## 2. Packages and responsibilities
 
@@ -119,7 +119,7 @@ the subpackage (E5 plan §9).
 
 ### 3.2 bench drive loop (unchanged by E5-d)
 
-- `bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)` (`internal/bench/bench.go:179`)
+- `bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)` (`testkit/bench/bench.go:179`)
   dispatches each decision, in order: Env (`:313`), search (`:350`), `seat.BoardSeat`
   (`:393-399`), `view.LeanReader` — `view.ProjectLeanInto(lv, …, lr.ViewOmit(d))` into a
   per-seat reused View with `Round` set (`:400-409`), else `view.Project` (`:410-418`). A seat
@@ -199,7 +199,7 @@ the subpackage (E5 plan §9).
   (`GOMAXPROCS=1`, `CPUQuota=100%`, 357 MB RSS) — under 50 ms per limited game, so at least
   ~72k games/hour/core.
 - A scratch probe (outside the repo, not committed: `rules.New` + two `seat.Bot` with
-  autopay, 20 games each of two FDN starter-deck pairings from `internal/testutil/decks/`,
+  autopay, 20 games each of two FDN starter-deck pairings from `testkit/testutil/decks/`,
   timing `view.Project` and `json.Marshal` at seat 0's decisions): **209–241 decisions per
   game for one seat; a Seat view marshals to 34–36 KB on average (max ~44 KB);
   `view.Project` 72–138 µs and `json.Marshal` 95–139 µs per decision.** So a full-view
@@ -667,12 +667,12 @@ a re-run may differ. The refagent policies satisfy the contract; E5d-4 tests Wor
 
 - A tape holds the ACCEPTED intents only (§3.5), so a game whose agent was refused and fell
   back replays the fallback answer; refusals leave no trace in the engine (a refused Submit
-  leaves the pending decision intact, `internal/bench/bench.go:436-441`).
+  leaves the pending decision intact, `testkit/bench/bench.go:436-441`).
 - Tape replay drives BOTH seats with tape seats through the same `playGame` hooks (starting
   player ask, mulligan counting). Payment-action and target-hint offers are pure derived
   reads (§3.2), so a tape seat need not mirror the original seat's consumer flags. A game
   that ran under the bench Env driver replays under plain hooks; the Env branch never writes
-  the live engine (`internal/bench/bench.go:313-349`) — **INFERRED**, pinned by an E5d-3 test
+  the live engine (`testkit/bench/bench.go:313-349`) — **INFERRED**, pinned by an E5d-3 test
   with `sb-tactical`.
 - A stalled game's tape replays to the same watchdog and head; tape verification compares
   heads for stalls too (unlike `VerifyEvent`, which refuses a stalled re-drive,
@@ -703,7 +703,7 @@ logs one line through `Options.Log`, and answers with:
 
 An intent that passes `Decision.Validate` but the engine still refuses reaches bench's
 ladder, which calls the seat's `AnswerRefused` (counted, answered with the same fallback),
-then `bots.Fallbacks` (`internal/bench/bench.go:492-514`). With `StrictRefusals` every
+then `bots.Fallbacks` (`testkit/bench/bench.go:492-514`). With `StrictRefusals` every
 refusal is an error wrapping `ErrRefused` (for debugging a model).
 
 ### 8.2 Session failures (`OnFailure`)
@@ -809,7 +809,7 @@ ext:exec:<built extagent> -workers 4` against the same command with `-player bot
 6. **Tape fidelity** (§7 INFERRED points). Pinned by E5d-3 tests over whole games, including
    an Env player.
 7. **Concurrency bugs in the hub.** Tests are channel-driven (no sleeps, wall-clock ratchet
-   `internal/testutil/wallclock_threshold_test.go:55`); the barrier's begin-all-then-call shape
+   `testkit/testutil/wallclock_threshold_test.go:55`); the barrier's begin-all-then-call shape
    makes batch sizes exactly assertable; `-race` on the hub tests.
 8. **Unix socket path length** (~108 bytes): tests use a short name inside `t.TempDir()`.
 9. **Hot docs**: only E5d-6 touches `docs/agents/repo-map-engine.md` and
@@ -823,7 +823,7 @@ ext:exec:<built extagent> -workers 4` against the same command with `-player bot
 | D2 | E5 plan §9: a pick id not in the pack "is a hard error" | `pickbot.Drafter.Pick` has no error path (`lab/draft/limited/pickbot/registry.go:93-95`) | `FallibleDrafter`/`FallibleBuilder`; an illegal pick is a refusal → counted fallback by default (consistent with decide, where random agents' illegal answers are routine), a hard error with `StrictRefusals` |
 | D3 | §9: flush "when every in-flight game is blocked on the model" | a seat never learns its game ended (`engine/seat/seat.go:19-21`); one hub per agent deadlocks across agents | `GameScoped` seam in `playGame`; ONE process-wide hub counting "waiting on any agent" (§6.1) |
 | D4 | brief: the game "replays without the model" | events log only a game's head (`lab/draft/draftlab/event.go:271`); `VerifyEvent` re-drives with players (`:340-373`) | `Options.RecordTape`, `GameResult.Tape`, `ReplayTape`, `VerifyEventTapes` |
-| D5 | §9: `Player` adapter returns "a `seat.Seat` (or `seat.BoardSeat`)" | a BoardSeat gets no View (`internal/bench/bench.go:393-399`) | plain Seat + `view.LeanReader`; never BoardSeat |
+| D5 | §9: `Player` adapter returns "a `seat.Seat` (or `seat.BoardSeat`)" | a BoardSeat gets no View (`testkit/bench/bench.go:393-399`) | plain Seat + `view.LeanReader`; never BoardSeat |
 | D6 | brief: "errors/timeouts" | no `time` outside the allow-list (`internal/archtest/arch_test.go:122-152`) | ctx-only deadlines; §15 Q2 |
 | D7 | — | `GameResult.Intents` is already an `int` (`lab/draft/draftlab/play.go:46`) | the new field is `Tape` |
 | D8 | prior art: msgpack, timer flushes (`mzclient`, `dzgorge/remote.go`) | no third-party deps (`internal/archtest/gomod_test.go:26`); no clock | JSON lines; barrier/ready flushes; lean views for volume |

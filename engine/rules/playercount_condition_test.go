@@ -27,7 +27,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // pcCondEngine builds a seats-seat engine (seat 0 the starter) with Mountain

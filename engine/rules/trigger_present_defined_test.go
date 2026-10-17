@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // This live-corpus census keeps trigger PresentDefined groups from quietly

@@ -14,7 +14,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const angelicOverseerSrc = "Name:Angelic Overseer\nManaCost:3 W W\nTypes:Creature Angel\nPT:5/3\nK:Flying\n" +

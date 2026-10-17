@@ -3,7 +3,7 @@ package levelb
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // A static whose only effect is a Forge AI hint (AddSVar$ of HasAttackEffect,

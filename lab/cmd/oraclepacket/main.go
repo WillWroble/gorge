@@ -4,7 +4,7 @@
 // 2026-09-27-oracle-text-card-audit.md). It never prints script lines.
 //
 //	go run ./lab/cmd/oraclepacket "Fatal Push" "Relic Vial"
-//	go run ./lab/cmd/oraclepacket -decks internal/testutil/decks -grep 'as long as'
+//	go run ./lab/cmd/oraclepacket -decks testkit/testutil/decks -grep 'as long as'
 //	go run ./lab/cmd/oraclepacket -grep '(?i)\brevolt\b' -names
 //
 // -grep selects cards by a regexp over their Oracle text (the whole corpus,

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // testLab opens the lab over the shared corpus. Skips, honestly, when the

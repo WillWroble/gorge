@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // repeatModesRun plays one repeat-mode Charm scenario and returns the run.

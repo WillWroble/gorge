@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // This file pins War Room, the corpus's only carrier of BOTH the

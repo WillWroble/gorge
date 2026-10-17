@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Beseech the Queen is the corpus example of Forge's 2B monocolour hybrid.

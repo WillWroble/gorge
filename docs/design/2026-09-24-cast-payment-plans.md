@@ -128,7 +128,7 @@ the navigation anchors because other tickets are landing continuously:
 | Pool solver | `engine/rules/mana.go`: resolveManaWith, manaPayment |
 | Submit and event boundary | `engine/rules/engine.go`: ask, Submit, decisionMadeText |
 | Copying | `engine/rules/clone.go`, `engine/events/log.go`, `engine/view/view.go`, `server/host/action.go`, `server/host/humanseat.go` |
-| Replay and recovery | `engine/replay/`, `server/host/viewat.go`, `server/host/undo.go`, `server/host/feedback.go`, `internal/testutil/feedback/` |
+| Replay and recovery | `engine/replay/`, `server/host/viewat.go`, `server/host/undo.go`, `server/host/feedback.go`, `testkit/testutil/feedback/` |
 | Browser submission | `web/src/lib/seatpanel.svelte.ts`, `web/src/lib/api.ts`, `web/src/components/SeatPanel.svelte` |
 
 The ordinary offer gate prices casts against the current pool. The potential

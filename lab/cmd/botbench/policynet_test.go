@@ -19,7 +19,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 
 	"github.com/adams-shaun/gorge/bots/policynet"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // writeZeroCheckpoint writes a genuinely zero-weight checkpoint (every

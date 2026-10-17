@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Zurgo, Thunder's Decree: "During your end step, Warrior tokens you control

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // validSelfArg extracts the Card$ argument of every `Count$ValidSelf` body in

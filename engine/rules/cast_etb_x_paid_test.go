@@ -22,7 +22,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const hydroidKrasisSrc = "Name:Hydroid Krasis\nManaCost:X G U\nTypes:Creature Jellyfish Hydra Beast\nPT:0/0\n" +

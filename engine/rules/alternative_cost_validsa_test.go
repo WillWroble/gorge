@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Leyline of Mutation: "You may pay {W}{U}{B}{R}{G} rather than pay the mana

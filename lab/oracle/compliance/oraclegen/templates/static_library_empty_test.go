@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStaticLibraryEmpty: Living Conundrum's "as long as there are no cards in

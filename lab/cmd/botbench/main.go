@@ -139,10 +139,10 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/view"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/paymirror"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/registry"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // policies registers every bot policy the bench can pit against another,
@@ -900,7 +900,7 @@ func playMatchOnce(cfg rules.Config, pols []string, seats []seat.Seat, maxTurns,
 // ordinary wrapper passes nil and retains its pre-trace allocation and output
 // path.
 //
-// The engine drive loop itself lives in internal/bench (bench.PlayGame), the
+// The engine drive loop itself lives in testkit/bench (bench.PlayGame), the
 // SAME loop lab/cmd/policytune runs: this function only translates the optional
 // observers (decision stats, action coverage, decision trace) into bench's
 // Hooks and the policy-name-free bench.Outcome back into a gameOutcome. There
@@ -1603,7 +1603,7 @@ func outcomeToBench(o gameOutcome) gbench.Outcome {
 
 // gamePool is the one shared execution budget for the single-pair bench
 // (benchWithPool) and the -rotate run. The matrix scheduler moved to
-// internal/bench (gbench.RunPairs); this remains the single-pair pool.
+// testkit/bench (gbench.RunPairs); this remains the single-pair pool.
 type gamePool struct {
 	jobs chan func()
 	wg   sync.WaitGroup
@@ -1669,7 +1669,7 @@ func (p *progressWriter) line(format string, a ...any) {
 // cap, a policy failure) records it, closes stop, and the whole run returns
 // that error -- the same abort-on-error behaviour as the single-pair bench.
 func runPairs(baseSeed uint64, games int, aName, bName string, pairs []pairDef, play pairPlayer, workers int, prog *progressWriter) ([]pairResult, error) {
-	// The scheduler itself lives in internal/bench (gbench.RunPairs), the SAME
+	// The scheduler itself lives in testkit/bench (gbench.RunPairs), the SAME
 	// pair-matrix runner lab/cmd/policytune calls: it owns the worker pool, the
 	// per-pair seed block, the side-to-seat trading and the ascending-order
 	// fold. This function only translates the bench command's policy-name

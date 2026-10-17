@@ -321,7 +321,7 @@ func serveFlags() (*flag.FlagSet, *config) {
 	c := new(config)
 	fs.StringVar(&c.addr, "addr", ":8080", "listen address")
 	fs.StringVar(&c.cards, "cards", ".cards", "corpus directory (ir.gob.gz / cardsfolder)")
-	fs.StringVar(&c.decks, "decks", "internal/testutil/decks", "directory of deck JSON files")
+	fs.StringVar(&c.decks, "decks", "testkit/testutil/decks", "directory of deck JSON files")
 	fs.IntVar(&c.tables, "tables", 4, "number of tables")
 	fs.IntVar(&c.seats, "seats", 4, "seats per table")
 	fs.IntVar(&c.commanderSeats, "commander-seats", 0, "seats per commander table; 0 = -seats")

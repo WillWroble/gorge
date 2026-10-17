@@ -12,11 +12,11 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/replay"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // repoRootOrSkip resolves the repo root with git (cards.GitEnv, so a hook's
-// exported GIT_DIR cannot redirect it; see internal/testutil/decks.go) and
+// exported GIT_DIR cannot redirect it; see testkit/testutil/decks.go) and
 // leaves the corpus to testutil.CorpusDirOrSkip.
 func repoRootOrSkip(t *testing.T) string {
 	t.Helper()

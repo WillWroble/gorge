@@ -28,7 +28,7 @@
 //	"$tmp/headdiff" -dir .cards -dump "$tmp/main.json"
 //	go run ./cmd/headdiff -against "$tmp/main.json"
 //
-// The base's deck lists come from its own embedded internal/testutil/decks,
+// The base's deck lists come from its own embedded testkit/testutil/decks,
 // so the dump is main's game even though the corpus directory is shared. If
 // the two builds differ in engine/cards/ (CompilerFingerprint), each run recompiles
 // the corpus IR cache for its own fingerprint, which takes a minute.
@@ -61,7 +61,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/effects"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestFlipCoinModCarrierCensus(t *testing.T) {

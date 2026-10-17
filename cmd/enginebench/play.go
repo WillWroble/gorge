@@ -16,7 +16,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 // Game caps. docs/015 reports gorge's random games at 36-43 turns; a game

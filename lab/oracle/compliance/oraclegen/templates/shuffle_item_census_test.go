@@ -6,10 +6,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Count emitted items, not shuffle-capable cards: one face can serve several

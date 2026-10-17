@@ -321,7 +321,7 @@ printf 'TestAlpha\nTestBravo\nTestAlphaTwo\n' | patterns >/dev/null 2>&1
 check "fewer than six distinct prefixes makes the shard helper fail (caller falls back)" $?
 
 # --- the heavy $others packages: lab/oracle/compliance/gate and lab/oracle/compliance/adopt (plus
-# internal/paymirror, cmd/repro, effects, lab/oracle/compliance/oraclegen/templates) are
+# testkit/paymirror, cmd/repro, effects, lab/oracle/compliance/oraclegen/templates) are
 # extracted from the -p=6 batch and split by test_name_packs_from_list into
 # three count-balanced packs run as concurrent `go test` processes
 # (heavy_shard_pool). A heavy package is never put back in the batch whole.

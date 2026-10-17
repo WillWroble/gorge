@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Brigid, Doun's Mind: "{T}: Add X {G} or X {W}, where X is the number of

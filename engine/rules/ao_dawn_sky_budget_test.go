@@ -13,7 +13,7 @@ import (
 // seven cards of your library. Put any number of nonland permanent cards with
 // total mana value 4 or less from among them onto the battlefield. Put the
 // rest on the bottom of your library in a random order." Ao is in NO repo
-// deck and NO legacy golden deck (grepping internal/testutil/decks/*.json for
+// deck and NO legacy golden deck (grepping testkit/testutil/decks/*.json for
 // ao_the_dawn_sky returns nothing), so no chain head depends on this card.
 //
 // The deck is built from compiled corpus cards only (the

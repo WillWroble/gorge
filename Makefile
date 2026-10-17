@@ -139,7 +139,7 @@ draftsim: $(BIN_DIR)/draftsim
 # -vsbot arms the landing page's play-a-human-vs-bot entry point; without it
 # the server is spectator-only, exactly as before the feature existed.
 gorged: $(BIN_DIR)/gorged
-	$(BIN_DIR)/gorged -decks internal/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
+	$(BIN_DIR)/gorged -decks testkit/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
 
 # dzbroker is the experimental, tag-gated decision broker (lab/training/inferbroker).
 # It batches learner decisions from many independent games into one inference
@@ -148,7 +148,7 @@ gorged: $(BIN_DIR)/gorged
 # dependencies out of the default build, vet and the 32-bit gate; the package
 # has an untagged stub, so importing it is always safe.
 .PHONY: dzbroker test-broker
-BROKER_DECKS ?= internal/testutil/decks
+BROKER_DECKS ?= testkit/testutil/decks
 dzbroker:
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./lab/cmd/dzbroker
@@ -211,7 +211,7 @@ ART_DIR ?= /mnt/sata/gorge-data/art
 # and starts its servers whatever the fill's exit.
 .PHONY: prewarm-art
 prewarm-art:
-	go run ./cmd/gorged -prewarm-art-only -decks internal/testutil/decks -art-dir $(ART_DIR)
+	go run ./cmd/gorged -prewarm-art-only -decks testkit/testutil/decks -art-dir $(ART_DIR)
 
 # stop-demo takes the demo down without starting it again. Same socket
 # lookup as the deploy: never `pkill -f`.

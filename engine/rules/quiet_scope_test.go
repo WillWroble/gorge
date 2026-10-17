@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestQuietProofScansServedFromWalkCache is the Q4 mechanism test: the proof

@@ -8,9 +8,9 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen/templates"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // static_exileperm_class_test.go is the wave-5 group X ratchet: the exile-zone

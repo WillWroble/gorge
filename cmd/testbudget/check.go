@@ -147,8 +147,8 @@ func runCheck(args []string, out, errw io.Writer) int {
 	fs.SetOutput(errw)
 	events := fs.String("events", "", "per-test events file written by `testbudget tee` (or `go test -json` output)")
 	rssDir := fs.String("rss-dir", "", "directory test binaries recorded peak RSS in")
-	wallFile := fs.String("wall-exceptions", "internal/testutil/testdata/wall_exceptions.txt", "shrink-only wall inventory")
-	rssFile := fs.String("rss-exceptions", "internal/testutil/testdata/rss_exceptions.txt", "shrink-only RSS inventory")
+	wallFile := fs.String("wall-exceptions", "testkit/testutil/testdata/wall_exceptions.txt", "shrink-only wall inventory")
+	rssFile := fs.String("rss-exceptions", "testkit/testutil/testdata/rss_exceptions.txt", "shrink-only RSS inventory")
 	gomod := fs.String("gomod", "go.mod", "go.mod naming the module")
 	wallLimit := fs.Float64("wall-limit-s", defaultWallLimitS, "per-test wall limit, seconds")
 	rssLimit := fs.Int64("rss-limit-kib", defaultRSSLimitKiB, "per-binary peak RSS limit, KiB")
@@ -220,7 +220,7 @@ func runCheck(args []string, out, errw io.Writer) int {
 	fmt.Fprintf(out, "testbudget: %d tests in %d packages checked against %.0fs wall; %s\n", len(m.tests), len(m.pkgs), *wallLimit, rssNote)
 	if wallExc.unseeded && failed > 0 {
 		fmt.Fprintf(out, "testbudget: UNSEEDED: %s has never been populated from a whole-suite run, so these %d findings do not fail this run.\n", *wallFile, failed)
-		fmt.Fprintln(out, "testbudget: seed the wall and RSS exceptions with the rows below (and their pins in internal/testutil), then delete the !unseeded line:")
+		fmt.Fprintln(out, "testbudget: seed the wall and RSS exceptions with the rows below (and their pins in testkit/testutil), then delete the !unseeded line:")
 		for _, r := range rows {
 			fmt.Fprintln(out, "  "+strings.ReplaceAll(r, "\t", "<TAB>"))
 		}

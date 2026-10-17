@@ -24,7 +24,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const augurCreatureTop = "Name:Elvish Guide\nManaCost:1 G\nTypes:Creature Elf\nPT:2/2\nOracle:x\n"

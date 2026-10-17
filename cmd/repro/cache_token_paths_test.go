@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // decodeLiveCaptureTokens reads a captured match.json back into host's own

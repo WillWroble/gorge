@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestStaticGatedGrantOffered(t *testing.T) {

@@ -19,16 +19,16 @@ import (
 
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/eventhost"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // eventsPollEvery is the sleep between polls. It is a poll interval, not a
 // threshold: every wait it paces has a deadline of 10s or more, so load only
 // slows a poll and never turns PASS into FAIL (the wall-clock ratchet,
-// internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+// testkit/testutil TestNoNewSubSecondWallClockThresholdInTests).
 const eventsPollEvery = time.Second / 20
 
 // mapGate is the seat gate the e2e stands in for cmd/gorged's seatGate: a

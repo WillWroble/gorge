@@ -11,11 +11,11 @@ import (
 
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/engine/deck"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/event"
 	"github.com/adams-shaun/gorge/lab/draft/limited/build"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestBotOnlyEventReachesRound1(t *testing.T) {

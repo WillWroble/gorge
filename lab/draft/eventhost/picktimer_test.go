@@ -11,10 +11,10 @@ import (
 	"time"
 
 	_ "github.com/adams-shaun/gorge/bots/all"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/event"
 	"github.com/adams-shaun/gorge/lab/draft/limited/draft"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // fakeClock is an Options.Clock whose timers fire synchronously from

@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/adams-shaun/gorge/engine/decision"
-	"github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/testkit/bench"
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/azc3"

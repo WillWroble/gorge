@@ -30,7 +30,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const fbSoftlockSearchSrc = "Name:Dragon Hunt\nManaCost:1 U\nTypes:Sorcery\n" +

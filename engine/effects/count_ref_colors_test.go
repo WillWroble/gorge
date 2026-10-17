@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The ExiledWith$Colors ref property (ticket levelb-static-count-attachments):

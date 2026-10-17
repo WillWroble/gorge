@@ -33,8 +33,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/corpuscov"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const maxIntents = 200000

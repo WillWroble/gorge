@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 var castLedgerTriggeredControl = regexp.MustCompile(`ThisTurnCast_[^|]*\b(?:ControlledBy|OwnedBy) Triggered[A-Za-z]+`)

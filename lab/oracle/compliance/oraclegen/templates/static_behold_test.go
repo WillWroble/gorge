@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStaticBeholdProbe: Champion of the Clachan's "Other Kithkin you control

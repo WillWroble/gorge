@@ -30,11 +30,11 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2agent"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2engine"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2shadow"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }

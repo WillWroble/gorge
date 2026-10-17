@@ -9,7 +9,7 @@ import (
 
 	"github.com/adams-shaun/gorge/bots/gonet"
 	"github.com/adams-shaun/gorge/bots/policynet"
-	"github.com/adams-shaun/gorge/internal/cli"
+	"github.com/adams-shaun/gorge/cli"
 )
 
 // gonetCheckCommand is the hidden subcommand gonet-check: the Go network against

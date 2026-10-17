@@ -3,7 +3,7 @@ package oraclegen
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Pyrrhic Strike's CharmNum$ X is Count$OptionalGenericCostPaid.2.1 ("choose

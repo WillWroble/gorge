@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestAttachedToLiteralPredicate is the effects leaf for the two-token space

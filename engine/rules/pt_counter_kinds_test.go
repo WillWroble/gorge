@@ -5,7 +5,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestWallOfRootsM0M1CountersLowerToughness is the brief's instance test:

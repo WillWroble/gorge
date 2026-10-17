@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStaticValidAfterStackLibraryTop: Glarb, Calamity's Augur's "you may play

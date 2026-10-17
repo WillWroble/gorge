@@ -60,7 +60,7 @@ trap cleanup EXIT
 
 # --- a throwaway target repo + stubbed agentctl (seed_smoke.sh's harness)
 TARGET=$TMP/target
-mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/engine/rules" "$TARGET/internal/testutil/decks"
+mkdir -p "$TARGET/.ds4/orchestrator" "$TARGET/engine/rules" "$TARGET/testkit/testutil/decks"
 git -C "$TARGET" init -q 2>/dev/null
 printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1

@@ -3,7 +3,7 @@ package paymirror
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRoundSixFindingsMirrorKernel replays the round-6 finding games end to

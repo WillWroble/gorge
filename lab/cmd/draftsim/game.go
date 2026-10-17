@@ -11,9 +11,9 @@ import (
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/lab/draft/event"
 	"github.com/adams-shaun/gorge/lab/draft/limited/build"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 // The game watchdogs, the same props lab/cmd/dzgorge's play lane uses: a

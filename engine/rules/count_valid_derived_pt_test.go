@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestCountValidDerivationIsNotFactorial (general; the fuzzer's "hang"

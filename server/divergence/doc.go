@@ -10,7 +10,7 @@
 // choice-summary renderer shared with cmd/repro.
 //
 // Layering contract: this is a leaf. Its only gorge imports are decision
-// and state; host, rules, internal/testutil and time are forbidden, so
+// and state; host, rules, testkit/testutil and time are forbidden, so
 // anything in the engine or server tiers may depend on it without a cycle.
 // It owns no clock, no files and no engine state: the JSONL helpers take
 // an io.Writer/io.Reader and nothing here mutates a game.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // This is the measured whole-corpus carrier census, not a repo-deck sample.

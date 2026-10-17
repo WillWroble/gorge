@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // mimeoplasmScenario builds the cast-with-X=1 prelude: p0 holds Mimeoplasm and

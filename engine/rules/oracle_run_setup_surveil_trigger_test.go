@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The two level-B templates that pose a setup-drive upkeep-surveil arrange ask

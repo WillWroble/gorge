@@ -39,7 +39,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // amassRememberConsumer describes, for one card, how its chain reads the Army

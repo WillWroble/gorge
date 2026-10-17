@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/shape"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestTicketsAtHead holds the C4 generator's contract over the committed

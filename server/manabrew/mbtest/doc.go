@@ -6,7 +6,7 @@
 // against real repo-deck games.
 //
 // It is test support, not the engine or the wire transport: it imports
-// server/manabrew, server/protocol/manabrew, seat and internal/bench, the same
+// server/manabrew, server/protocol/manabrew, seat and testkit/bench, the same
 // tier the scoping spec's §5.1 architecture table assigns it. HTTP is out of
 // scope (server/host/manabrewhttp, MB-9/MB-10/MB-11).
 package mbtest

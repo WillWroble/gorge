@@ -33,7 +33,7 @@ import (
 //     them), cmd/enginebench searchGame (the engine is handed to the search
 //     and to searchseat.Feed, whose results may retain clones),
 //     lab/cmd/searchteacher playGame (returns the engine to its caller),
-//     internal/paymirror PlayConfig (a deferred handler reads e.G at return
+//     testkit/paymirror PlayConfig (a deferred handler reads e.G at return
 //     and CheckLive may retain), lab/training/spellbench kshadow/v2engine/v2shadow
 //     (the engine outlives the "game" as the observer/translator pipeline).
 //   - already owns spare recycling: bots/searchprobe (per goroutine since

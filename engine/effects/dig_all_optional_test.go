@@ -8,7 +8,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const digAllOptionalSA = "DB$ Dig | Defined$ You | DigNum$ 3 | ChangeNum$ All | Optional$ True | PromptToSkipOptionalAbility$ True | ChangeValid$ Land | DestinationZone$ Exile"

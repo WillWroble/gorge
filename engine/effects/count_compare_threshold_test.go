@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Tests for the Count$Compare THRESHOLD being an operand rather than a

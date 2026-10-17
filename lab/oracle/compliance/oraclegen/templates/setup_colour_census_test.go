@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // wantSetupColourCensus pins, per declared set, the number of generated setup

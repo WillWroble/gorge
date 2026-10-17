@@ -18,10 +18,10 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/host/httpapi"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestServesTablesOverHTTP(t *testing.T) {
@@ -31,7 +31,7 @@ func TestServesTablesOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", tables: 1, seats: 2, pace: 0,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks", tables: 1, seats: 2, pace: 0,
 		cooldown: 0, dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, vsbot: true}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -217,7 +217,7 @@ func (l *fakeListener) Addr() net.Addr            { return l.addr }
 // floor is exactly the failure this test is meant to catch.
 func TestHostThreadsCorpusTokens(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", dir: t.TempDir()}
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks", dir: t.TempDir()}
 	opts := cfg.hostOptions(reg, deckLoader(reg, cfg.decks))
 	if len(opts.Tokens) == 0 {
 		t.Fatalf("host.Options.Tokens empty: token corpus not threaded from %s", cfg.cards)
@@ -228,7 +228,7 @@ func TestHostThreadsCorpusTokens(t *testing.T) {
 }
 
 func TestDeckDirectoryListingIsSortedAndComplete(t *testing.T) {
-	names, err := deckFiles("../../internal/testutil/decks")
+	names, err := deckFiles("../../testkit/testutil/decks")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +289,7 @@ func startServe(t *testing.T, c config) (string, context.CancelFunc, <-chan erro
 		c.cards = testutil.CorpusDirOrSkip(t)
 	}
 	if c.decks == "" {
-		c.decks = "../../internal/testutil/decks"
+		c.decks = "../../testkit/testutil/decks"
 	}
 	if c.dir == "" {
 		c.dir = t.TempDir()

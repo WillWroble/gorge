@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The six stored `diverge` verdict rows whose detail read `step 1 (resolve)

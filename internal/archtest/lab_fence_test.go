@@ -54,7 +54,7 @@ var allowedLabTestEdges = map[string]bool{
 	module + "/bots/azmcts -> " + lab + "/training/spellbench":              true,
 	module + "/bots/spellbench/builtins -> " + lab + "/training/spellbench": true,
 	module + "/bots/spellbench/sbsearch -> " + lab + "/training/spellbench": true,
-	module + "/internal/bench -> " + lab + "/training/spellbench":           true,
+	module + "/testkit/bench -> " + lab + "/training/spellbench":           true,
 }
 
 // TestPlatformTestsImportLabOnlyFromTheAllowlist keeps lab/ out of new

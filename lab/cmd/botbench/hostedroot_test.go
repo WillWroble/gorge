@@ -1,7 +1,7 @@
 package main
 
 // The hosted-root mode (BP-05, spec 2026-09-28-hosted-bot-packages §5.3):
-// internal/bench's search branch, under Hooks.HonestRoot, hands the seat a
+// testkit/bench's search branch, under Hooks.HonestRoot, hands the seat a
 // redeal of the live position (searchseat.HonestRoot) instead of the live
 // engine; botbench's -hosted-root flag switches it on and counts the
 // refusals. These tests pin the three claims the flag and BP-20 depend on:
@@ -25,8 +25,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // probeSearchSeat wraps a SearchBot and records, per decision sequence

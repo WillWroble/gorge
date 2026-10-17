@@ -233,7 +233,7 @@ Oracle:x
 // the ask casts the Bears, which resolve onto the battlefield. Jadzi is in
 // NO repo deck and NO legacy golden deck, so no chain head depends on this
 // card (measured: grepping every SpellCastOrCopy carrier name against
-// internal/testutil/decks/*.json returns nothing).
+// testkit/testutil/decks/*.json returns nothing).
 func TestJadziMagecraftCastRevealsAndOffersThePlayAsk(t *testing.T) {
 	t.Parallel()
 	reg := searchTestRegistry(t)

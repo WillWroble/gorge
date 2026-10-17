@@ -31,7 +31,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // manaFromRow is one site of one ManaFrom spelling. site is "trigger:<Mode>"

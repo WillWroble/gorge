@@ -23,8 +23,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // feedSearchBot remembers the feed the driver handed it, so the test can read

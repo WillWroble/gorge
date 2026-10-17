@@ -209,7 +209,7 @@ type engineEnv struct {
 	capped bool
 	// stalled is set when a submit tripped the engine's livelock contract
 	// (*rules.LivelockError, e.g. the token-plan mint cap): the game is
-	// unrepresentable from here, and the real harness (internal/bench)
+	// unrepresentable from here, and the real harness (testkit/bench)
 	// ends exactly that game as a stall -- a draw. The walk stops at a
 	// terminal draw leaf (Stats.Livelocks), not a discarded panic.
 	stalled bool

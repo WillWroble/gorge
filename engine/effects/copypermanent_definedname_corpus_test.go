@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestCopyPermanentDefinedNameRealCorpus pins ECL Mutable Explorer's real

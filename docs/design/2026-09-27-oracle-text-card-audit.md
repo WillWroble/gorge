@@ -80,7 +80,7 @@ all three, because it checks behaviour.
 ## 4. Card selection and priority
 
 1. **Repo-deck cards first.** 1110 distinct cards across
-   `internal/testutil/decks/*.json` (measured via `lab/cmd/oraclepacket -decks`).
+   `testkit/testutil/decks/*.json` (measured via `lab/cmd/oraclepacket -decks`).
    These are the cards players actually play. Skip basics and vanilla
    creatures (no Oracle text).
 2. **Cards named in feedback reports**, whatever the deck, at the head of
@@ -418,5 +418,5 @@ make oracle-audit ORACLE_RUN='Relic_Vial'      # one card
 go test ./engine/rules -run TestOracleScenarioFilesWellFormed   # corpus-free schema check
 ORACLE_AUDIT_TRACE=1 go test ./engine/rules -run TestOracleAudit -v   # transcripts for passes too
 go run ./lab/cmd/oraclepacket "Fatal Push"         # the author's view of a card
-go run ./lab/cmd/oraclepacket -decks internal/testutil/decks -grep '(?i)as long as' -names
+go run ./lab/cmd/oraclepacket -decks testkit/testutil/decks -grep '(?i)as long as' -names
 ```

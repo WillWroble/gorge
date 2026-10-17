@@ -119,7 +119,7 @@ func TestKnownApproximationsOnlyShrinks(t *testing.T) {
 			"here; if it needs tracking, say so in your report and the operator files a "+
 			"ticket.\n"+
 			"If you DELETED rows, lower knownApproximationRows in %s to %d.",
-			len(rows), knownApproximationRows, "internal/testutil/agentsdoc_test.go", len(rows))
+			len(rows), knownApproximationRows, "testkit/testutil/agentsdoc_test.go", len(rows))
 	}
 	if len(rows) < knownApproximationRows {
 		t.Logf("table is down to %d rows (constant says %d) -- lower knownApproximationRows "+

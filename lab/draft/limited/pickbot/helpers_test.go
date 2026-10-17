@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/limited"
 	pb "github.com/adams-shaun/gorge/lab/draft/limited/pickbot"
 	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // corpus loads the shared card corpus once for the package's tests. A

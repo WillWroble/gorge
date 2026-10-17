@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // prewarmFixture writes two minimal deck files (deck.Parse needs no corpus —

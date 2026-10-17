@@ -38,7 +38,7 @@ import (
 //
 // Vaan, Street Thief is in NO repo deck and NO legacy golden deck (measured:
 // grepping the 19 ForgetPlayed carrier names against
-// internal/testutil/decks/*.json returns nothing), so no chain head depends
+// testkit/testutil/decks/*.json returns nothing), so no chain head depends
 // on this card and TestHeads is safe by construction.
 //
 // The helpers come from search_library_test.go (same package): the deck is

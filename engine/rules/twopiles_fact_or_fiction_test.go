@@ -19,7 +19,7 @@ import (
 // "unimplemented API TwoPiles" Note and moved nothing. Fact or Fiction is in
 // NO repo deck and NO legacy golden deck (the filing report's "Fae Dominion
 // deck-carrier" premise is FALSE — measured against
-// internal/testutil/decks/*.json), so no chain head depends on this card.
+// testkit/testutil/decks/*.json), so no chain head depends on this card.
 //
 // The helpers come from search_library_test.go / cast_test.go (same
 // package); the deck is built from compiled corpus cards only, so no Forge

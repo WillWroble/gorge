@@ -2,7 +2,7 @@ package rules
 
 // Every test here drives the REAL repo-deck card -- Entreat the Angels,
 // compiled from the corpus (.cards/cardsfolder/e/entreat_the_angels.txt,
-// shipped in internal/testutil/decks/uw-control.json) and looked up through
+// shipped in testkit/testutil/decks/uw-control.json) and looked up through
 // testutil.CorpusRegistry, never a hand-written fixture that happens to
 // share its name. That is the point: the fixture-shaped twin ("Name:Entreat")
 // this file's first draft asserted passed even if the corpus card's compiled
@@ -22,7 +22,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // entreatCorpusCard looks Entreat the Angels up in the compiled corpus and

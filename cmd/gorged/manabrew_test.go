@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestManaBrewAddrRefusesDemoPorts pins the -manabrew-addr validation
@@ -64,7 +64,7 @@ func TestManaBrewOnRequiresSeatGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks", tables: 1, seats: 2,
+	cfg := config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks", tables: 1, seats: 2,
 		dir: t.TempDir(), spectator: "omniscient", seed: 1, perpetual: false, manabrew: true}
 	err = serve(context.Background(), cfg, ln)
 	if err == nil {

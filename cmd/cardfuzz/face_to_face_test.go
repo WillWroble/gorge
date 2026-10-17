@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestFaceToFaceMatchEnds replays the fuzz-1003 Face to Face livelock

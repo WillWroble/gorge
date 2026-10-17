@@ -16,7 +16,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const lessonFixture = "Name:Test Lesson\nManaCost:1 U\nTypes:Sorcery Lesson\nA:SP$ Draw | NumCards$ 1 | SpellDescription$ Draw a card.\nOracle:x\n"

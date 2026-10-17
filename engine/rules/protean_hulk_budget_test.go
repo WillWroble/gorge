@@ -12,7 +12,7 @@ import (
 // corpus card: "When Protean Hulk dies, search your library for any number
 // of creature cards with total mana value 6 or less, put them onto the
 // battlefield, then shuffle." Protean Hulk is in NO repo deck and NO legacy
-// golden deck (grepping internal/testutil/decks/*.json for protean_hulk
+// golden deck (grepping testkit/testutil/decks/*.json for protean_hulk
 // returns nothing), so no chain head depends on this card.
 //
 // The deck is built from compiled corpus cards only (the

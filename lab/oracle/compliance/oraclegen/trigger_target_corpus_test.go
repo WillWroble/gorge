@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen/templates"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The generated ETB-trigger answers of the cards whose targets reached XMage

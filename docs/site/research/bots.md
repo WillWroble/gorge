@@ -64,7 +64,7 @@ External processes can play a seat in three ways:
 | Observation | `view.Project` / `ProjectFor` (`Seat` / `Public` / `Omniscient`); `policynet.EncodeState` / `EncodeOption` | Hidden zones are counts. Omniscient never exposes library order. |
 | Terminal / reward | `View.Over`, `View.Winner`; `searchprobe.LeafValue` (heuristic leaf); `policynet` value head | No shaped reward is built in. Win/loss is the ground truth. |
 | Replay and audit | `events.Log` (sha256 chain, `Head()`), `replay.Replay` / `ReplayTo` | Any game a policy plays can be re-run and checked event for event. |
-| Game runner | `internal/bench`: `PlayGame`, `RunPairs` | Watchdogs, livelock recovery, no clock. Shared by `botbench` and `policytune`. |
+| Game runner | `testkit/bench`: `PlayGame`, `RunPairs` | Watchdogs, livelock recovery, no clock. Shared by `botbench` and `policytune`. |
 | Throughput | measured | About 17.5 ms per bot-vs-bot game on one core (`archived 2026-09-06-gorge-learned-policy-research.md (docs/design/ARCHIVE.md)`). About 20–23 duel games/s/core after the hotspot work (`archived 2026-09-17-hotspot-resume.md (docs/design/ARCHIVE.md)`). |
 
 ## Engine speed

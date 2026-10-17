@@ -12,7 +12,7 @@ import (
 // precedent: in the dir, out of the pool), every deck parses as a 60-card
 // custom-format main deck, and CatalogByID serves the catalog. The
 // byte-equality guard on the copies lives in lab/cmd/botbench (which imports both
-// lab/training/spellbench and internal/testutil).
+// lab/training/spellbench and testkit/testutil).
 func TestRepoConstructedCatalogDecks(t *testing.T) {
 	entries, err := decksFS.ReadDir(RepoConstructed)
 	if err != nil {

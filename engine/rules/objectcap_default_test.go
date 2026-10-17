@@ -3,7 +3,7 @@ package rules
 import "testing"
 
 // CV-8: the default object cap. WithDefaultObjectCap is the ONE helper every
-// harness/host config goes through (internal/bench's drive loop, the host's
+// harness/host config goes through (testkit/bench's drive loop, the host's
 // match config, cmd/mtgsim), so these pins are the contract every caller
 // inherits: a caller with no budget gets DefaultMaxObjs, an explicit budget
 // wins, and the Disabled opt-out is never overridden.

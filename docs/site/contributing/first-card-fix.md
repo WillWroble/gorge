@@ -181,7 +181,7 @@ go run ./cmd/repro -emit-test ./engine/rules <feedback-dir>   # copy the snapsho
 ```
 
 The skeleton uses `feedback.EngineAt(t, dir, n)` from
-`internal/testutil/feedback`. Replace its TODO with your assertion.
+`testkit/testutil/feedback`. Replace its TODO with your assertion.
 `AGENTS.md`, section *Reproduce a feedback report*, has the details,
 including why a `DIVERGED` replay can be an expected corpus change.
 

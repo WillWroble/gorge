@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/gate"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclediff"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // exportInline exports hand-written scenario lines and returns the requests

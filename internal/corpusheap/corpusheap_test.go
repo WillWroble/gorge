@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 
 	// Register the effects' ParamCoders exactly as a real process does, so the
 	// census reflects what a server holds, not a bare parser.

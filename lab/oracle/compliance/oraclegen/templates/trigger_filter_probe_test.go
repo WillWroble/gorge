@@ -6,9 +6,9 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func triggerFilterOf(t *testing.T, reg *cards.Registry, name string, idx int) string {

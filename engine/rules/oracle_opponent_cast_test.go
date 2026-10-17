@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const oracleOpponentCastScenario = `{"name":"opponent-cast-priority","cr":["601.2"],"why":"p1 casts an instant after p0 passes","setup":{"p1":{"hand":["Shock"]}},"steps":[{"op":"pass","seat":0},{"op":"cast","seat":1,"card":"p1:Shock","mana":"R","targets":["p0"]},{"op":"resolve","seat":1}]}`

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/limited/pickbot"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRolloutSmokeBot is DR-7's smoke: 1 pod, the bot pilot, 2 games per

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/policynet"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // extrasArgs is a cheap oracle run teaching attackers and cast (the pn12

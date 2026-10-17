@@ -17,10 +17,10 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 
-	gbench "github.com/adams-shaun/gorge/internal/bench"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
 )
 
 // fedPosition is a real bot-vs-bot game stopped at a searchable seat-0

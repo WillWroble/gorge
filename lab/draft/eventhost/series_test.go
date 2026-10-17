@@ -449,7 +449,7 @@ func parkSeries(h *Host, ctx context.Context, id host.TableID, k int) <-chan ser
 // parkDwell is how long a "still parked" check waits for an early answer. It
 // is a dwell window, not a threshold: a correct park never answers, so load
 // can only make the check weaker, never turn PASS into FAIL (the wall-clock
-// ratchet, internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+// ratchet, testkit/testutil TestNoNewSubSecondWallClockThresholdInTests).
 const parkDwell = time.Second / 2
 
 func assertParked(t *testing.T, ch <-chan seriesRes, d time.Duration) {

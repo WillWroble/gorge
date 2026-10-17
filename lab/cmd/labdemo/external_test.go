@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab/extern/wire"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // extOptions is the external-agent workflow: every role (frozen player,

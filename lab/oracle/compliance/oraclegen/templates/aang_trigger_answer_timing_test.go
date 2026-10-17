@@ -3,7 +3,7 @@ package templates
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestAangEnterTriggerTargetIsQueuedForResolve pins the generated answer shape:

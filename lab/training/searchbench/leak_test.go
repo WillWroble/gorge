@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/azmcts"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func repeat(label string, n int) []string {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/adams-shaun/gorge/bots/searchseat"
 	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/registry"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestBenchSearchFamilyPoliciesAreSearchSeats(t *testing.T) {

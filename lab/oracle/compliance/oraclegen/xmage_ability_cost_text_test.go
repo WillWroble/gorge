@@ -3,8 +3,8 @@ package oraclegen_test
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestXMageAbilityCostSpelling pins the rewrites of the level-B activate

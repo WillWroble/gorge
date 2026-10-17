@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStaticYouDontOwn: Laughing Jasper Flint's "creatures you control but

@@ -40,7 +40,7 @@ import (
 // value and this file pins the chain end to end on the real card.
 //
 // Both protagonists (Mosswort Bridge, Sunbird's Invocation) are in NO repo
-// deck and NO legacy golden deck (measured against internal/testutil/decks),
+// deck and NO legacy golden deck (measured against testkit/testutil/decks),
 // so no chain head depends on them and TestHeads is safe by construction.
 //
 // The helpers come from cast_test.go / search_library_test.go /

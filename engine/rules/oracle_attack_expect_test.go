@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/decision"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestOracleAttackExpectPreSubmit pins the attack op's pre-submit expect read

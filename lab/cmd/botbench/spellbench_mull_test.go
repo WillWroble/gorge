@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestSpellbenchMulligansKnob exercises -spellbench-mulligans: at 1 a game

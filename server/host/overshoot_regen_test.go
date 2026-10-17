@@ -27,7 +27,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 func TestGenerateOvershootCapture(t *testing.T) {

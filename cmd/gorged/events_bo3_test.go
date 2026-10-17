@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestEventsBotOnlyBo3PodCompletesOverHTTP drives a whole all-bot best-of-3
@@ -24,7 +24,7 @@ import (
 func TestEventsBotOnlyBo3PodCompletesOverHTTP(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks",
+	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks",
 		tables: 1, seats: 2, pace: 0, cooldown: 0, dir: dir, spectator: "omniscient", seed: 1,
 		perpetual: false, events: true})
 	req := protocol.CreateEventRequest{Set: "FDN", BestOf: 3, Seats: []protocol.CreateEventSeat{

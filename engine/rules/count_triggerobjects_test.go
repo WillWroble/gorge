@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/effects"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The three corpus carriers exercise the same event-batch count head. Keep

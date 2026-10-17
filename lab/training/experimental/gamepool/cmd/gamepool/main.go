@@ -14,7 +14,7 @@
 //
 //	make gamepool                               # local scorer
 //	make gamepool GAMEPOOL_TAGS='gamepool gamepool_gpu'   # GPU scorer
-//	bin/gamepool -decks internal/testutil/decks -multiply 64 -per-seat 4 -batch 32
+//	bin/gamepool -decks testkit/testutil/decks -multiply 64 -per-seat 4 -batch 32
 //
 // The reported width histogram is the point: it is how many decisions a single
 // batch (and therefore a single GPU forward) actually covers at a given game
@@ -38,8 +38,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/lab/training/gamepool"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -66,7 +66,7 @@ type cfg struct {
 func run(args []string) int {
 	fs := flag.NewFlagSet("gamepool", flag.ExitOnError)
 	c := &cfg{}
-	fs.StringVar(&c.decksDir, "decks", "internal/testutil/decks", "deck directory (.json decks)")
+	fs.StringVar(&c.decksDir, "decks", "testkit/testutil/decks", "deck directory (.json decks)")
 	fs.StringVar(&c.corpusDir, "cards", ".cards", "gorge corpus directory")
 	fs.StringVar(&c.aDeck, "a", "", "deck A name (file stem); empty picks the first two decks")
 	fs.StringVar(&c.bDeck, "b", "", "deck B name")

@@ -41,7 +41,7 @@ wt=$repo/.worktrees/postmerge-full
 # runtime settings matching the operator's 4 GiB / 4 vCPU budget (doubled
 # 2026-10-09 from 2 GiB / 2 vCPU with the box's DRAM). The two host tests that
 # pinned the 2 GiB inventory fit 4 GiB, so the shrink-only exception inventory
-# at internal/testutil/testdata/rss_exceptions.txt is empty; the scope's hard
+# at testkit/testutil/testdata/rss_exceptions.txt is empty; the scope's hard
 # cap doubles to 32G so eight binaries at the 4 GiB ceiling still fit it.
 SCOPE=(systemd-run --user --scope -q -p MemoryMax=32G -p CPUQuota=1600% env GOMEMLIMIT=3GiB GOMAXPROCS=4 GOGC=200 GOFLAGS="-p=2 -trimpath" GORGE_ORACLEGEN_FULL_TARGET_AUDIT=1)
 

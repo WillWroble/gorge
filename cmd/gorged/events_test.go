@@ -15,14 +15,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/server/protocol"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // eventsPollEvery is the sleep between polls. It is a poll interval, not a
 // threshold: every wait it paces has a deadline of 10s or more, so load only
 // slows a poll and never turns PASS into FAIL (the wall-clock ratchet,
-// internal/testutil TestNoNewSubSecondWallClockThresholdInTests).
+// testkit/testutil TestNoNewSubSecondWallClockThresholdInTests).
 const eventsPollEvery = time.Second / 20
 
 // startEventsServer serves one config on a loopback port and waits until
@@ -66,7 +66,7 @@ func startEventsServer(t *testing.T, cfg config) string {
 func TestEventsBotOnlyPodCompletesOverHTTP(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks",
+	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks",
 		tables: 1, seats: 2, pace: 0, cooldown: 0, dir: dir, spectator: "omniscient", seed: 1,
 		perpetual: false, events: true})
 	req := protocol.CreateEventRequest{Set: "FDN", Seats: []protocol.CreateEventSeat{
@@ -148,7 +148,7 @@ func TestEventsBotOnlyPodCompletesOverHTTP(t *testing.T) {
 func TestEventsOffAre404(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../internal/testutil/decks",
+	base := startEventsServer(t, config{cards: testutil.CorpusDirOrSkip(t), decks: "../../testkit/testutil/decks",
 		tables: 1, seats: 2, pace: 0, cooldown: 0, dir: dir, spectator: "omniscient", seed: 1,
 		perpetual: false})
 	resp, err := http.Post(base+"/api/events", "application/json", strings.NewReader(`{}`))

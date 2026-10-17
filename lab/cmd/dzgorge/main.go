@@ -3,7 +3,7 @@
 // It lives in DraftZero (gorge/cmd/dzgorge) and is copied into a pinned gorge
 // checkout to build (gorge/build.sh), because it uses gorge's internal packages:
 // the AlphaZero-style search (bots/azmcts), the pure-Go network
-// (bots/policynet) and the game runner (internal/bench).
+// (bots/policynet) and the game runner (testkit/bench).
 //
 //	dzgorge play     -a <policy> -b <policy> -pairs N -out games.jsonl [-corpus visits.jsonl.gz]
 //	dzgorge coverage                                  which pool decks gorge fully supports
@@ -28,7 +28,7 @@ package main
 import (
 	"os"
 
-	"github.com/adams-shaun/gorge/internal/cli"
+	"github.com/adams-shaun/gorge/cli"
 	"github.com/adams-shaun/gorge/lab/contracts"
 )
 

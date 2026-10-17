@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/limited/draftfeat"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // readPicksBin parses a picks.bin into its header drafter list and, per

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStaticNotPlayerTurn: Midnight Mangler's "during turns other than yours,

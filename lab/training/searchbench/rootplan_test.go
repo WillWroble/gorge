@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/azmcts/clairvoyant"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // fallbackStore is the sb-v1 item store the fallback test reads

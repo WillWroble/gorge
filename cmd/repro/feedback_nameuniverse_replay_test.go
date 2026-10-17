@@ -32,9 +32,9 @@ import (
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
 	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/testkit/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 // nameUniverseDeckCards builds the deck the table below plays: Pithing
@@ -86,7 +86,7 @@ func nameChoices(l *events.Log) int {
 // and feedback.EngineAt both take. The recorded head must come back.
 //
 // Reverting the fix (dropping the `if m.NameUniverse` restore in
-// internal/testutil/feedback/feedback.go's config, or the two fields in
+// testkit/testutil/feedback/feedback.go's config, or the two fields in
 // host.FeedbackMatch / feedbackMatch) makes the replayed engine pose no name
 // ask, and replay refuses the recorded intent.
 func TestFeedbackSnapshotReplaysAUniverseBackedMatch(t *testing.T) {

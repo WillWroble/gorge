@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // oracleShockLoss is p0's Shock at p1, who starts at 2 life. %s is the

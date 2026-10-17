@@ -9,8 +9,8 @@ import (
 	"github.com/adams-shaun/gorge/bots/spellbench/builtins"
 	"github.com/adams-shaun/gorge/bots/spellbench/sbsearch"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/registry"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestSpellbenchRegistryRoundTrip resolves every name the -spellbench

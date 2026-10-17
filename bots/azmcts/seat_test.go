@@ -8,7 +8,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
 )
 
 func playAZ(t *testing.T, cfg rules.Config, az seat.Seat, maxIntents int) (string, error) {

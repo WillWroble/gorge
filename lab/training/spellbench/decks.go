@@ -27,9 +27,9 @@ var BenchmarkPool = []string{"Wildfire", "Rally", "Affinity", "Elves", "Spy", "B
 
 // RepoConstructed is the repo-constructed catalog directory: byte copies of
 // the 15 supported 60-card constructed repo decks from
-// internal/testutil/decks (format "custom", exactly 60 main-deck cards).
+// testkit/testutil/decks (format "custom", exactly 60 main-deck cards).
 // The copies are deliberate: lab/training/spellbench must never import
-// internal/testutil, and lab/cmd/botbench's byte-equality guard pins the copies
+// testkit/testutil, and lab/cmd/botbench's byte-equality guard pins the copies
 // against drift.
 const RepoConstructed = "decks/repo-constructed"
 

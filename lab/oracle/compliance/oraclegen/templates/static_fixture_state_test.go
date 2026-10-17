@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen/templates"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // stateFixtureServed generates static#0.0 for name and, when the row is

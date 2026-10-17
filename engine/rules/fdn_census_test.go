@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestFDNParamCensusReport runs the parameter census (paramcensus_test.go)

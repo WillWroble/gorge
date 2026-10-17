@@ -8,7 +8,7 @@ import "testing"
 func TestPayMirrorClockStaysAtCommandBoundary(t *testing.T) {
 	pkgs := packages(t)
 	commandPath := module + "/cmd/paymirror"
-	libraryPath := module + "/internal/paymirror"
+	libraryPath := module + "/testkit/paymirror"
 
 	command, commandFound := pkgs[commandPath]
 	library, libraryFound := pkgs[libraryPath]

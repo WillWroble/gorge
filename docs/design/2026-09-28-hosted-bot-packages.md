@@ -123,8 +123,8 @@ cited below as **SB**), and the training summary
     `bot`.
 - **Search seats need a driver feed.** `searchseat.SearchSeat` and `Env`
   (`bots/searchseat/searchbot.go:61-84`) take `Engine *rules.Engine` plus
-  a driver-owned `*Feed`. `internal/bench/bench.go:156-169` builds one feed
-  per search seat. `internal/bench/bench.go:212-251` captures through every
+  a driver-owned `*Feed`. `testkit/bench/bench.go:156-169` builds one feed
+  per search seat. `testkit/bench/bench.go:212-251` captures through every
   feed at every decision, calls `DecideSearch` with `Env{Engine: e}` (the
   **real** engine), and records the answer. botbench's `search` entry
   comment (`lab/cmd/botbench/main.go:248-263`) records that "a live table has no
@@ -190,7 +190,7 @@ cited below as **SB**), and the training summary
 "Measured" is always *gorge botbench*, never hosted play. Two deck settings
 recur below:
 
-- **"mono suite"** is the five `internal/testutil/decks/mono-*` decks: ten
+- **"mono suite"** is the five `testkit/testutil/decks/mono-*` decks: ten
   unordered pairs, held-out seed 1,000,000, 400 games per pair, seats traded
   (TS header; `archived 2026-09-19-bot-policy-decision-trace-and-ar7.md (docs/design/ARCHIVE.md)`).
 - **"Pauper kernel"** is SB's eight-deck seat-swapped mirror pool on the gorge
@@ -344,7 +344,7 @@ func Validate() error                           // each Caretaker resolves to a 
 
 `bots` imports `seat`, `cards`, `decision`, `view`, `botpolicy`, `rules` and
 `bots/searchseat` (for `Env`). It must never import `host`, `protocol`,
-`time`, `internal/testutil` or `bots/azmcts/clairvoyant` (§6.2).
+`time`, `testkit/testutil` or `bots/azmcts/clairvoyant` (§6.2).
 
 ### 4.2 Engine-aware seats and the refusal ladder
 
@@ -434,7 +434,7 @@ At an `EnvSeat`'s decision, only if `WantsEnv(d)` is true, the host builds
   (`server/host/match.go:406`).
 - **`Search.Setup`** is `searchprobe.PublicGame{Names: m.cfg.Names, Decks: m.cfg.Decks,
   Tokens: m.cfg.Tokens, StartingLife: m.cfg.StartingLife}`, the same value
-  `internal/bench/bench.go:164-166` builds. This is **open decklist**: each
+  `testkit/bench/bench.go:164-166` builds. This is **open decklist**: each
   seat's deck id is already public on the wire (`protocol.SeatInfo.Deck`,
   `server/host/match.go:142`), and every hosted deck is a repo file. Q6 covers
   user-imported lists.
@@ -460,7 +460,7 @@ Adapter rules:
   wrapped `DecideSearch` when `env.Search.Engine != nil &&
   env.Search.Feed.Live()`.
   - Otherwise `search` and `az-redeal` play `DecideBoard(env.Board)`: the
-    wrapped bot, exactly the bench's fallback (`internal/bench/bench.go:246-248`).
+    wrapped bot, exactly the bench's fallback (`testkit/bench/bench.go:246-248`).
   - `sb-search-lite-atk` instead plays the *inner* `sb-tactical` on
     `env.View` with the planner set to nil. It does **not** call
     `sbsearch.Seat.DecideBoard`, which would project a view from a stale
@@ -486,7 +486,7 @@ Adapter rules:
 - **Create.** At the top of `play`, after `seats` is final, the host creates
   one `searchseat.NewFeed(slot)` for each non-human seat that implements
   `bots.EnvSeat`. A match with no such seat builds no feed and pays nothing,
-  mirroring `internal/bench/bench.go:152-156`.
+  mirroring `testkit/bench/bench.go:152-156`.
 - **Observe.** At the start of `projectNext`, for every decision of every
   player (the human's included), the host calls `feed.Observe(m.e)` on every
   live feed while holding `m.mu`. The sampler's epoch constraints need every
@@ -498,7 +498,7 @@ Adapter rules:
   decision belonged to that feed's actor and this decision's capture
   succeeded. It must be the accepted intent, which may be a refusal-ladder
   rung (§5.5), not the seat's first answer. A `RecordAnswer` error stops the
-  feed. The bench crashes instead (`internal/bench/bench.go:238-245`), but a
+  feed. The bench crashes instead (`testkit/bench/bench.go:238-245`), but a
   live table plays on with the fallback, and the stop is counted.
 - **Known cards.** `Feed.Known()` (BP-04) folds new frames lazily with the
   tracker moved from `azmcts.KnownTracker` (`bots/azmcts/redeal.go:162-200`).
@@ -674,7 +674,7 @@ that does not yet exist, `continue` already skips it
 | replace `:156-158` | `host`, `server/host/httpapi`, `cmd/gorged` | `bots/azmcts/clairvoyant` | Keeps the ban's intent: nothing that seats a non-bench opponent links the real-engine clone. The honest core becomes linkable. |
 | add | `bots/azmcts` | `bots/azmcts/clairvoyant` | The core must never pull the clone back in. |
 | add | `bots/spellbench/sbsearch`, `bots/searchseat` | `bots/azmcts/clairvoyant` | Both are linked by hosted entries. |
-| add (loop) | every package with prefix `module+"/bots"` | `bots/azmcts/clairvoyant`, `host`, `internal/testutil` | Bots are hostable and host-independent (host imports bots, so the reverse arrow would also be a cycle). |
+| add (loop) | every package with prefix `module+"/bots"` | `bots/azmcts/clairvoyant`, `host`, `testkit/testutil` | Bots are hostable and host-independent (host imports bots, so the reverse arrow would also be a cycle). |
 | add | `protocol` | `module+"/bots"` | The wire stays a leaf. `bots` imports rules, and `{protocol, rules}` is already forbidden. |
 
 `TestTimeIsImportedOnlyByTheHost` needs no edit: `bots/...` are not on its
@@ -906,7 +906,7 @@ report records anything INFERRED that it measured.
   - `cmd/gorged` and `lab/cmd/botbench` import `bots/all`. botbench's
     `hostedPolicy` (`lab/cmd/botbench/main.go:404-412`) calls `bots.New`.
   - archtest rows: `protocol ↛ bots`, and the `bots/...` loop ↛ `host`,
-    `internal/testutil`.
+    `testkit/testutil`.
   - Add `bots/` to `docs/agents/repo-map.md`.
   - Fill `Info` for the three entries from §3.1.
 - **Files:** `bots/registry.go`, `bots/registry_test.go`, `bots/bot/bot.go`,
@@ -1011,7 +1011,7 @@ report records anything INFERRED that it measured.
 ### BP-05 — the bench honest-root mode and the parity smoke
 - **Goal:**
   - `bench.Hooks.HonestRoot bool`. When set, `PlayGame`
-    (`internal/bench/bench.go:233-237`) passes
+    (`testkit/bench/bench.go:233-237`) passes
     `Env{Engine: searchseat.HonestRoot(...)}` in place of `e` (nil on a
     refusal, which takes the `DecideBoard` path), using the same
     `bots.RootSeed`. `bots.RootSeed` lives in `bots/env.go`; BP-05 adds that
@@ -1024,7 +1024,7 @@ report records anything INFERRED that it measured.
     `sb-search-lite-atk`, plus refusal counts.
   - **Stop condition:** `search` agreement is not 100% (INFERRED exact, §5.3).
   - The full-size measurement is BP-20.
-- **Files:** `internal/bench/bench.go`, `lab/cmd/botbench/main.go`,
+- **Files:** `testkit/bench/bench.go`, `lab/cmd/botbench/main.go`,
   `lab/cmd/botbench/hostedroot_test.go`, `bots/env.go` (RootSeed only).
 - **Out of scope:** host, and any strength claim.
 - **Depends-On:** BP-04, BP-02. **Seat:** pipeline, smoke-sized, one run at
@@ -1379,7 +1379,7 @@ everything from BP-02 to BP-16.
 | `lab/cmd/botbench/spellbench_registry.go`, `lab/cmd/botbench/azcost.go` | BP-02 → BP-16 |
 | `bots/azmcts/seat.go` | BP-02 → BP-04 |
 | `bots/searchseat/feed.go` | BP-03 → BP-04 |
-| `internal/bench/bench.go` | BP-05 |
+| `testkit/bench/bench.go` | BP-05 |
 | `bots/env.go` | BP-05 → BP-06 |
 | `server/host/match.go` | BP-06 → BP-07 → BP-08 → BP-10 → BP-13 |
 | `server/host/botenv.go`, `server/host/botenv_test.go` | BP-07 → BP-08 → BP-09 → BP-10 |

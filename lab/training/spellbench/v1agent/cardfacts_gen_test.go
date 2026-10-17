@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestCardFactsMatchIR regenerates cardfacts.json from gorge's compiled card

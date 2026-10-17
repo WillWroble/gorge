@@ -5,7 +5,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/rules/resolve"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const obstinateTapeDrawSrc = "Name:Obstinate Tape Draw\nManaCost:B\nTypes:Sorcery\n" +

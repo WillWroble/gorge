@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // wantCombatCensus pins, per set, every non-gap combat requirement's outcome.

@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The oracle runner records every canonical coin-flip result the seeded RNG

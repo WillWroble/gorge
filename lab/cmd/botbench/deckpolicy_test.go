@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/deck"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func deckWith(name string, policies map[string]string) deck.File {

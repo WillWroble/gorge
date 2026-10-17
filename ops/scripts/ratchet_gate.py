@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """ratchets-only-fall: a branch may lower a shrink-only ratchet, never raise one.
 
-The ratchets (internal/codeshape, internal/archtest, internal/testutil's
+The ratchets (internal/codeshape, internal/archtest, testkit/testutil's
 agentsdoc_test.go, engine/rules/testdata/known-unsupported/) are tests in the
 branch's own tree, so a branch that raises a constant passes its own tests.
 This gate compares the branch against merge-base(<base>, HEAD) and fails when
 the branch:
 
   (a) raises an integer constant in internal/codeshape/*.go,
-      internal/testutil/agentsdoc_test.go or internal/archtest/**/*.go;
+      testkit/testutil/agentsdoc_test.go or internal/archtest/**/*.go;
   (b) deletes such a constant;
   (c) adds an entry to an allow-list / exemption collection in those files
       (and, the mirror image, removes an entry from a deny-list collection);
@@ -47,7 +47,7 @@ def watched(path: str) -> bool:
     """The Go files whose constants and collections are ratchets."""
     if not path.endswith(".go"):
         return False
-    if path == "internal/testutil/agentsdoc_test.go":
+    if path == "testkit/testutil/agentsdoc_test.go":
         return True
     if path.startswith("internal/codeshape/") and path.count("/") == 2:
         return True
@@ -485,7 +485,7 @@ func TestTime(t *testing.T) {
 
 const charsBoardMethods = 8
 """,
-    "internal/testutil/agentsdoc_test.go": """package testutil
+    "testkit/testutil/agentsdoc_test.go": """package testutil
 
 const (
 	knownApproximationRows = 8
@@ -518,14 +518,14 @@ CASES = [
     ("(a) raise LongFuncLines", _sub("internal/codeshape/codeshape.go", "LongFuncLines = 300", "LongFuncLines = 400"), "(a)"),
     ("(a) raise an archtest constant", _sub("internal/archtest/filename_test.go", "charsBoardMethods = 8", "charsBoardMethods = 9"), "(a)"),
     ("(a) lower an archtest constant", _sub("internal/archtest/filename_test.go", "charsBoardMethods = 8", "charsBoardMethods = 7"), None),
-    ("(a) raise agentsdoc constant", _sub("internal/testutil/agentsdoc_test.go", "knownApproximationRows = 8", "knownApproximationRows = 9"), "(a)"),
-    ("(a) lower agentsdoc constant", _sub("internal/testutil/agentsdoc_test.go", "knownApproximationRows = 8", "knownApproximationRows = 7"), None),
+    ("(a) raise agentsdoc constant", _sub("testkit/testutil/agentsdoc_test.go", "knownApproximationRows = 8", "knownApproximationRows = 9"), "(a)"),
+    ("(a) lower agentsdoc constant", _sub("testkit/testutil/agentsdoc_test.go", "knownApproximationRows = 8", "knownApproximationRows = 7"), None),
     ("(a) a comment edit is not a constant", _sub(RATCHET_TEST, "= 99 in a comment", "= 999 in a comment"), None),
     ("(a) a new constant is fine", _sub(RATCHET_TEST, "engineMethodCount   = 1822", "engineMethodCount   = 1822\n\tnewRatchet = 7"), None),
     ("(b) delete a constant", _sub(RATCHET_TEST, "\tengineMethodCount   = 1822\n", ""), "(b)"),
     ("(b) a constant moved to another watched file is kept", lambda t: (
         _sub("internal/archtest/filename_test.go", "const charsBoardMethods = 8\n", "")(t),
-        _sub("internal/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 600\n\tcharsBoardMethods = 8")(t)), None),
+        _sub("testkit/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 600\n\tcharsBoardMethods = 8")(t)), None),
     ("(c) add to a package-level allow-list", _sub("internal/archtest/filename_test.go", '"engine/effects/misc.go": true,', '"engine/effects/misc.go": true,\n\t"engine/rules/more.go": true,'), "(c)"),
     ("(c) remove from a package-level allow-list", _sub("internal/archtest/filename_test.go", '\t"engine/effects/misc.go": true,\n', ""), None),
     ("(c) add to a local allow-list", _sub("internal/archtest/filename_test.go", 'module + "/host": true,', 'module + "/host": true,\n\t\tmodule + "/rules": true,'), "(c)"),
@@ -590,7 +590,7 @@ def selftest() -> int:
             # merge-base, so a base-side raise is never charged to the branch.
             git(repo, "checkout", "-q", "main")
             moved = dict(BASE_TREE)
-            _sub("internal/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 700")(moved)
+            _sub("testkit/testutil/agentsdoc_test.go", "standInCellLimit       = 600", "standInCellLimit       = 700")(moved)
             _write(repo, moved)
             git(repo, *env_git, "commit", "-q", "-am", "main moves")
             git(repo, "checkout", "-q", "wt/case")

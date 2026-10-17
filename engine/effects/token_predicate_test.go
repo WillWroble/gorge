@@ -6,7 +6,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Both spells use real compiled corpus SAs. Tokens must be minted by Apply:

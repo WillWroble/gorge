@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/searchprobe"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestPrepareItemCorpus runs the gorge half over a prep.py batch file

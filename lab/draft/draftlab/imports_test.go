@@ -13,12 +13,12 @@ import (
 // checked instead).
 func TestDraftlabImportsStayClean(t *testing.T) {
 	banned := map[string]string{
-		"time":              "draftlab is a pure API: no wall clock may reach a result",
-		"math/rand":         "use math/rand/v2 and seed every stream (PCG) explicitly",
-		"os/exec":           "draftlab never shells out",
-		"net":               "draftlab has no network reach",
-		"net/http":          "draftlab has no network reach",
-		"internal/testutil": "testutil is test-only; a non-test file importing it breaks `go build ./...`",
+		"time":             "draftlab is a pure API: no wall clock may reach a result",
+		"math/rand":        "use math/rand/v2 and seed every stream (PCG) explicitly",
+		"os/exec":          "draftlab never shells out",
+		"net":              "draftlab has no network reach",
+		"net/http":         "draftlab has no network reach",
+		"testkit/testutil": "testutil is test-only; a non-test file importing it breaks `go build ./...`",
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {

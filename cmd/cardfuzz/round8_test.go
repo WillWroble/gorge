@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRoundEightReplayFindings replays the round-8 cardfuzz replay-divergence

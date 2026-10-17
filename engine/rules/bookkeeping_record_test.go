@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const planetariumTwoScries = `{"name":"planetarium-once-each-turn","cr":["603.2"],"why":"inline","setup":{"p0":{"battlefield":["Planetarium of Wan Shi Tong"],"hand":["Opt","Preordain"],` +

@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2agent"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2engine"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2shadow"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // playLocal plays one in-process protocol game and returns the result and

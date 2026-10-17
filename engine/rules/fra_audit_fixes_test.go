@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestTargetedPermanentGateReadsLastKnownInformation pins CR 608.2h for a

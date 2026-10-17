@@ -9,8 +9,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	costvocab "github.com/adams-shaun/gorge/engine/rules/cost"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // cost_grammar_rows_test.go pins the Level B rows the variable and compound

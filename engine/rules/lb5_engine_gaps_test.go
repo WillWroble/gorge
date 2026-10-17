@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func runLB5Oracle(t *testing.T, raw string) OracleResult {

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestStarfieldVocalistProbeDoublesETBTrigger runs the generated static#0.0

@@ -162,7 +162,7 @@ func set(s string) map[string]bool {
 // its cmd/paymirror CLI: the per-game wall-time budget is injected to the
 // library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
 // builds from time.Now, and the CLI's progress line prints per-game elapsed
-// seconds. The internal/paymirror library itself imports no time and is a
+// seconds. The testkit/paymirror library itself imports no time and is a
 // pure function of its seeds and the corpus for a completed game; every
 // spec, game, report and trace byte is either that pure result or a game the
 // CLI's own budget truncated (Err "truncated: budget"), never something the
@@ -244,9 +244,9 @@ func TestDependencyOrderHolds(t *testing.T) {
 		{module + "/bots/botpolicy", module + "/engine/seat"},
 		{module + "/server/protocol", module + "/engine/rules"},
 		{module + "/server/protocol", module + "/bots"},
-		{module + "/server/host", module + "/internal/testutil"},
-		{module + "/server/host/httpapi", module + "/internal/testutil"},
-		{module + "/cmd/gorged", module + "/internal/testutil"},
+		{module + "/server/host", module + "/testkit/testutil"},
+		{module + "/server/host/httpapi", module + "/testkit/testutil"},
+		{module + "/cmd/gorged", module + "/testkit/testutil"},
 		{module + "/engine/cards", module + "/engine/state"},
 		{module + "/engine/deck", module + "/engine/rules"},
 		// The az search seat's clairvoyant world clones the REAL engine,
@@ -261,7 +261,7 @@ func TestDependencyOrderHolds(t *testing.T) {
 		// through: it may not depend on the host that calls it, nor on test
 		// scaffolding.
 		{module + "/server/divergence/shadow", module + "/server/host"},
-		{module + "/server/divergence/shadow", module + "/internal/testutil"},
+		{module + "/server/divergence/shadow", module + "/testkit/testutil"},
 		{module + "/server/host", module + "/bots/azmcts/clairvoyant"},
 		{module + "/server/host/httpapi", module + "/bots/azmcts/clairvoyant"},
 		{module + "/cmd/gorged", module + "/bots/azmcts/clairvoyant"},
@@ -326,7 +326,7 @@ func TestDependencyOrderHolds(t *testing.T) {
 	}
 	for path, p := range pkgs {
 		if strings.HasPrefix(path, module+"/bots") {
-			for _, target := range []string{module + "/server/host", module + "/internal/testutil", module + "/bots/azmcts/clairvoyant"} {
+			for _, target := range []string{module + "/server/host", module + "/testkit/testutil", module + "/bots/azmcts/clairvoyant"} {
 				if p.deps[target] {
 					t.Errorf("%s depends on %s (transitively); bots packages may not", path, target)
 				}
@@ -374,10 +374,10 @@ func manabrewBoundaryViolations(pkgs map[string]pkg) []string {
 		{module + "/server/manabrew", module + "/server/host"},
 		{module + "/server/manabrew", module + "/server/host/httpapi"},
 		{module + "/server/manabrew", module + "/bots/azmcts"},
-		{module + "/server/manabrew", module + "/internal/testutil"},
+		{module + "/server/manabrew", module + "/testkit/testutil"},
 		{module + "/server/host/manabrewhttp", module + "/engine/rules"},
 		{module + "/server/host/manabrewhttp", module + "/engine/effects"},
-		{module + "/server/host/manabrewhttp", module + "/internal/testutil"},
+		{module + "/server/host/manabrewhttp", module + "/testkit/testutil"},
 		{module + "/server/host/manabrewhttp", module + "/bots/azmcts"},
 	}
 	var msgs []string

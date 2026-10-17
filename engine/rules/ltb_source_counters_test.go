@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // selflessCaptainBounced is the level-B trigger#0.0 scenario oraclediff gen

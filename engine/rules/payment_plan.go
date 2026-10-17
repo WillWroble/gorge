@@ -34,7 +34,7 @@ func (e *Engine) PlanCastPayment(p state.PlayerID, cast decision.PlannedCast) Pa
 // would lock in now (CR 601.2f): the printed cost with its spell-ability
 // extras, re-priced by every live cost static exactly as the planner prices
 // it (planCastPaymentChecked). ok is false for an object that is not a card
-// in p's hand. A pure read, for diagnostics (internal/paymirror) that need
+// in p's hand. A pure read, for diagnostics (testkit/paymirror) that need
 // to show a cast's price moved since a plan was witnessed.
 func (e *Engine) CastPaymentCost(p state.PlayerID, id state.ObjID) (cost decision.PaymentCost, ok bool) {
 	o := e.G.Obj(id)

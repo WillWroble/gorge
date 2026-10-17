@@ -1,6 +1,6 @@
 package bench_test
 
-// The shared spare-recycling helper (internal/bench/spare.go). Two properties
+// The shared spare-recycling helper (testkit/bench/spare.go). Two properties
 // the batch runners depend on:
 //
 //   - a game played on a pooled spare is byte-identical to the same game
@@ -26,8 +26,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // spareTestDecks is a deterministic repo-deck pair for the recycled-game

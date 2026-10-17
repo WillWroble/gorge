@@ -12,9 +12,9 @@ import (
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/limited/pickbot"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/limited/draftfeat"
 	"github.com/adams-shaun/gorge/lab/draft/limited/draftnet"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // writeFixtureNet writes the draftnet parity weights re-sized to the

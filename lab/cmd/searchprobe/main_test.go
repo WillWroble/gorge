@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots/searchprobe"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestRejectInvalidBudgetsBeforeLoadingCorpus(t *testing.T) {

@@ -51,7 +51,7 @@ names what E3 needs from it by behaviour and every E3 brief that leans on it say
 | `rules` | `Config.StartChooser *int` (a configured CR 103.1 chooser), `TossWinner(seed, seats)`; one call in `genesis.go`, prompt text in `starting_player_choice.go` | E3-1 |
 | `view` | render the configured-chooser genesis Note through `player()` like the toss Note | E3-1 |
 | `host` | `TableConfig.Series`, `Options.Series SeriesFunc`, `SeriesGame`, `MatchTossWinner`; run loop consults the hook before every match of a series table; per-seat planned decks; chooser persisted in the sidecar, the disk replay and the feedback capture | E3-2 |
-| `internal/testutil/feedback` | read `start_chooser` back into `rules.Config` | E3-2 |
+| `testkit/testutil/feedback` | read `start_chooser` back into `rules.Config` | E3-2 |
 | `event` (pure) | Bo3 series rules (first to 2, cap 3 games), `Sideboarded` kind, `Entry.Chooser`, `DeckSaved` legal between games, `SeriesState`/`SeriesOf` accessors, `SeriesOutcome.Games` | E3-3 |
 | `protocol` | Bo3/timer fields on existing wire types, `SideboardRequest`; goldens; gentypes root; `web/src/protocol.ts` | E3-3 |
 | `eventhost` | Bo3 runtime (series tables + hook, chooser, bot keep, crash/restart, serial bot-only series) | E3-4 |
@@ -116,7 +116,7 @@ No new package, so no `docs/site/architecture/packages.tiers.json` entry and no
   Config from the sidecar alone (`server/host/viewat.go:271-284`); the feedback capture
   mirrors the sidecar (`server/host/feedback.go:37-…`, `feedbackMatch` `:348-361`) and a test
   pins that the two marshal the same keys (`TestFeedbackMatchMarshalsTheSidecarsKeys`,
-  `server/host/feedback_test.go:15`); `internal/testutil/feedback` rebuilds the Config
+  `server/host/feedback_test.go:15`); `testkit/testutil/feedback` rebuilds the Config
   (`matchJSON` `:51`, `config` `:243-279`).
 - `MatchSeed(tableSeed, k)` (`server/host/seed.go:15`); `protocol.MatchInfo.Seed` is that
   match seed (`server/host/match.go:290-294`).

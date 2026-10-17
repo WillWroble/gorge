@@ -12,7 +12,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestBenchIsDeterministic pins invariant 2: the same (base seed, policies,

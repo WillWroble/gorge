@@ -6,8 +6,8 @@ import (
 	_ "github.com/adams-shaun/gorge/engine/rules"
 
 	"github.com/adams-shaun/gorge/engine/effects"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // sheetEntries are the measured card entries (a card on one sheet of one

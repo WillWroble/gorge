@@ -1,7 +1,7 @@
 package main
 
 // The repo-constructed SpellBench catalog: byte copies of the 14 supported
-// 60-card constructed repo decks from internal/testutil/decks (mono-green-stompy
+// 60-card constructed repo decks from testkit/testutil/decks (mono-green-stompy
 // included in the dir, out of the pool). These tests guard the copies against
 // drift and prove botbench plays the catalog end to end. See
 // archived 2026-09-30-repo-constructed-gauntlet.md (docs/design/ARCHIVE.md).
@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/deck"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // deckPayload is the load-bearing deck payload for the drift guard.
@@ -34,7 +34,7 @@ func payloadOf(f deck.File) deckPayload {
 }
 
 // TestSpellbenchRepoConstructedCatalogCopiesMatchSource guards the catalog
-// copies against drift from internal/testutil/decks, their source of truth.
+// copies against drift from testkit/testutil/decks, their source of truth.
 // The copies are byte-identical to their sources EXCEPT the top-level
 // "name" field, which each copy replaces with its file stem: CatalogIDs
 // (lab/training/spellbench/decks.go) returns the deck's name as its id and
@@ -54,7 +54,7 @@ func TestSpellbenchRepoConstructedCatalogCopiesMatchSource(t *testing.T) {
 		if err != nil {
 			t.Fatalf("catalog copy %s: %v", id, err)
 		}
-		srcB, err := os.ReadFile("../../../internal/testutil/decks/" + id + ".json")
+		srcB, err := os.ReadFile("../../../testkit/testutil/decks/" + id + ".json")
 		if err != nil {
 			t.Fatalf("repo deck %s: %v", id, err)
 		}
@@ -86,11 +86,11 @@ func TestSpellbenchRepoConstructedCatalogCopiesMatchSource(t *testing.T) {
 					}
 				}
 			}
-			t.Errorf("%s: catalog copy has drifted from internal/testutil/decks%s; re-copy the file", id, msg)
+			t.Errorf("%s: catalog copy has drifted from testkit/testutil/decks%s; re-copy the file", id, msg)
 		}
 	}
 	// The mirror image of the guard: every constructed repo deck is in the
-	// catalog, so a deck added to internal/testutil/decks without a copy is
+	// catalog, so a deck added to testkit/testutil/decks without a copy is
 	// caught too.
 	for _, name := range testutil.RepoDeckNames() {
 		f, err := testutil.LoadRepoDeckFile(name)
@@ -116,7 +116,7 @@ func TestSpellbenchRepoConstructedCatalogCopiesMatchSource(t *testing.T) {
 // carve-out is stale.
 func TestSpellbenchRepoConstructedSourceNamesAreDisplayNames(t *testing.T) {
 	for _, id := range append(append([]string(nil), spellbench.RepoPool...), "mono-green-stompy") {
-		srcB, err := os.ReadFile("../../../internal/testutil/decks/" + id + ".json")
+		srcB, err := os.ReadFile("../../../testkit/testutil/decks/" + id + ".json")
 		if err != nil {
 			t.Fatalf("repo deck %s: %v", id, err)
 		}

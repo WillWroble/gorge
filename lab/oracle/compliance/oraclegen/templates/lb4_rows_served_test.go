@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestLevelBCostAndStaticRowsServed pins the wave-4 rows the cost-gap,

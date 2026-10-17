@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/paymirror"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
 )
 
 func TestEquivalentReportWithMismatchingRouteIsFinding(t *testing.T) {

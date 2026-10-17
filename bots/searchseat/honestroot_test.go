@@ -20,11 +20,11 @@ import (
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // rootPosition is a real bot-vs-bot game stopped at a seat-0 decision with
-// seat 0's observation feed maintained exactly as internal/bench does (a
+// seat 0's observation feed maintained exactly as testkit/bench does (a
 // capture at every decision of every player, seat 0's answers recorded back).
 // The feed is live and holds every frame up to and including this decision.
 type rootPosition struct {

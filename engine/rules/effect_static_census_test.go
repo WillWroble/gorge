@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules/trigmatch"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // This file is the census behind AGENTS.md's Known-approximations row for the

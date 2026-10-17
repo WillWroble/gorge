@@ -3,8 +3,8 @@ package levelb_test
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestWave4TriggerShapeClassification pins the wave-4 trigger-shape routing

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const oracleSearchedLibraryScenario = `{"name":"searched-library-opponent","cr":["603.10"],"why":"p1's tutor search fires Wan Shi Tong's row",

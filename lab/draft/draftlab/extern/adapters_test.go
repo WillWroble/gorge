@@ -14,12 +14,12 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab/extern/refagent"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab/extern/wire"
 	"github.com/adams-shaun/gorge/lab/draft/limited/pickbot"
 	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // testLab opens the lab over the shared corpus; it skips honestly when the

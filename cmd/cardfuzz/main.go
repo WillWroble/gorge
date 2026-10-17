@@ -79,10 +79,10 @@ import (
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/paymirror"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/manabrew/mbtest"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
 )
 
 var colourNames = []string{"W", "U", "B", "R", "G"}
@@ -385,7 +385,7 @@ func signature(kind, diag string) string {
 	}
 	if kind == "panic" {
 		for i, l := range lines {
-			if strings.Contains(l, "github.com/adams-shaun/gorge/") && !strings.Contains(l, "internal/bench") && !strings.Contains(l, "runtime/") && i+1 < len(lines) && !strings.Contains(l, "panic(") {
+			if strings.Contains(l, "github.com/adams-shaun/gorge/") && !strings.Contains(l, "testkit/bench") && !strings.Contains(l, "runtime/") && i+1 < len(lines) && !strings.Contains(l, "panic(") {
 				fr := strings.TrimSpace(l)
 				if j := strings.LastIndex(fr, "("); j > 0 {
 					fr = fr[:j]
@@ -826,7 +826,7 @@ const objectCapReason = rules.ObjectCapReason
 
 // objectCapAbortPrefix is the head of the rendered abort diagnostic for the
 // mid-resolution object cap. It is what survives into an Outcome (the
-// LivelockError itself is recovered inside internal/bench), so it is all the
+// LivelockError itself is recovered inside testkit/bench), so it is all the
 // re-classification can key on there.
 const objectCapAbortPrefix = "livelock detected (object cap"
 

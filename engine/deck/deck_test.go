@@ -81,7 +81,7 @@ func TestLoadAndStem(t *testing.T) {
 	if f.Name != "Tiny Test Deck" || len(cs) != 3 {
 		t.Fatalf("Load: %+v, %d cards", f, len(cs))
 	}
-	if got := Stem("internal/testutil/decks/mono-red-goblins.json"); got != "mono-red-goblins" {
+	if got := Stem("testkit/testutil/decks/mono-red-goblins.json"); got != "mono-red-goblins" {
 		t.Fatalf("Stem = %q", got)
 	}
 	if _, _, err := Load(r, "testdata/missing.json"); err == nil {

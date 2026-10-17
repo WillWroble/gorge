@@ -135,7 +135,7 @@ prints `DIVERGED` naming the first mismatching event — **a corpus change since
 the report was filed is a real, expected cause** (the snapshot replays against
 the corpus as it was at the report's pin), and so is an engine change; read the
 first diverging event before assuming either. In a test, load the same
-snapshot with `feedback.EngineAt(t, dir, n)` (`internal/testutil/feedback`;
+snapshot with `feedback.EngineAt(t, dir, n)` (`testkit/testutil/feedback`;
 `n < 0` = every recorded intent) and assert at the engine it returns.
 
 The committed fixture `cmd/repro/testdata/feedback/20260914T120000Z-fb01/` is
@@ -161,7 +161,7 @@ are on the docs site, https://adams-shaun.github.io/gorge/; prefer it over
 this snapshot.
 
 - **Ratchet: 2 of 1123 distinct cards unsupported.** The cards come from the
-  30 deck files in `internal/testutil/decks/*.json`: 15 60-card constructed
+  30 deck files in `testkit/testutil/decks/*.json`: 15 60-card constructed
   decks and 15 100-card Commander decks. The two are:
   - Incinerate (`stat:CantRegenerate`)
   - Vines of Vastwood (`stat:CantTarget`)
@@ -238,7 +238,7 @@ remaining row now has a P1 ticket whose only job is to delete it.
 So:
 
 - **A landing ticket DELETES its row** and lowers the
-  `knownApproximationRows` constant in `internal/testutil/agentsdoc_test.go`
+  `knownApproximationRows` constant in `testkit/testutil/agentsdoc_test.go`
   by the number of rows it deleted. `TestKnownApproximationsOnlyShrinks`
   fails the build on a row added, a row grown past 600 bytes, or a count
   above the constant.
@@ -335,7 +335,7 @@ discards that seat's uncommitted work). Stage explicit paths and never
 Task worktrees are created with `scripts/agent-worktree.sh <id> [base] [--web]`,
 never with a bare `git worktree add`. A worktree carries only tracked files, and
 this repo needs one untracked thing to test honestly: the `.cards` corpus. Without
-it `internal/testutil`'s `CorpusRegistry` calls `t.Skip`, so every
+it `testkit/testutil`'s `CorpusRegistry` calls `t.Skip`, so every
 corpus-dependent test SKIPS instead of running, the package still prints `ok` --
 in about 2ms -- and the run reads green to you, to the review pre-filter and to
 the gate while having executed almost nothing. If you find yourself in a worktree

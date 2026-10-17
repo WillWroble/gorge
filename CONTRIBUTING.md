@@ -146,7 +146,7 @@ example of the shape we like.
 | Change a seat's projected view | `engine/view/card.go` (cards, battlefield), `engine/view/stack.go` (stack); `engine/view/view.go` only for the assembler. |
 | Change the wire | `server/protocol/`, then `make gentypes`. |
 | Add a bot policy | Bench-only: `lab/cmd/botbench`. Hosted: `server/host/bot_policy.go`. Read [docs/site/research/bots.md](docs/site/research/bots.md) first. |
-| Add a repo deck | `internal/testutil/decks/*.json` via `cmd/deckimport`; every card in it must be fully supported. |
+| Add a repo deck | `testkit/testutil/decks/*.json` via `cmd/deckimport`; every card in it must be fully supported. |
 | Turn a player's feedback report into a test | `go run ./cmd/repro -emit-test <pkg> <feedback-dir>` (see `AGENTS.md`, "Reproduce a feedback report"). |
 | Add a package | Anywhere it fits the tiers, plus an entry in `docs/site/architecture/packages.tiers.json`. |
 

@@ -65,7 +65,7 @@ and every axis except `eff` costs under a second to measure.
 
 | axis | metrics | source | weight |
 |---|---|---|---|
-| `correct` | `validated_defects_found_cum`, `validated_defects_closed_cum`, `validated_cards` | `.ds4/reward/defects.jsonl`, the two ratchet tables, `internal/testutil/decks/*.json` | **1000x (summed)** |
+| `correct` | `validated_defects_found_cum`, `validated_defects_closed_cum`, `validated_cards` | `.ds4/reward/defects.jsonl`, the two ratchet tables, `testkit/testutil/decks/*.json` | **1000x (summed)** |
 | `flow` | `conflict_hotspots`, `merge_fix_rate`, `merge_fix_rounds_max` | `git worktree list` + `git diff main...<branch>`, `.ds4/orchestrator/journal.jsonl` | **1000x (summed)** |
 | `stability` | `oom_kills`, `gate_timeouts`, `gate_starved_minutes`, `broker_kills`, `swap_in_pages`, `provider_failures_24h` | this user's cgroup slice `memory.events` deltas (`oom_kills`; box-wide `/proc/vmstat` only as the no-cgroup-v2 fallback) and `/proc/vmstat` (`swap_in_pages`), the journal, `broker.sh`'s own interventions | **veto (100x)** |
 | `steward` | `gate_wall_s`, `agent_context_bytes`, `funcs_over_300` (replaced `oversized_files` on 2026-10-03; see the rules-engine refactor spec, W0) | gate log mtimes under `.ds4/orchestrator/gates/`, `AGENTS.md` + the dispatch context file, `go run ./cmd/codeshape` | **100x (summed)** |

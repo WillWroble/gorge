@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/cli"
+	"github.com/adams-shaun/gorge/cli"
 	"github.com/adams-shaun/gorge/lab/contracts"
 )
 
@@ -131,7 +131,7 @@ func TestScriptFlagsExist(t *testing.T) {
 	flagTok := regexp.MustCompile(`(?:^|[\s(])(-[a-z][a-z0-9-]*)\b`)
 	arrayLit := regexp.MustCompile(`\w+=\((-[^)]*)\)`)
 	n := 0
-	for _, script := range []string{"../../../lab/scripts/playlines/pl3_run.sh"} {
+	for _, script := range []string{"../../scripts/playlines/pl3_run.sh"} {
 		raw, err := os.ReadFile(script)
 		if err != nil {
 			t.Fatal(err)

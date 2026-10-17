@@ -5,7 +5,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const undauntedSrc = "Name:Undaunted Test\nManaCost:6 G\nTypes:Sorcery\nK:Undaunted\nOracle:x\n"

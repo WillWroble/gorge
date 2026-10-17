@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const malametBattleGlyphScenario = `{"name":"gen1-cast-resolve","cr":["601.2"],"why":"generated level-A scenario","setup":{"p0":{"battlefield":["Grizzly Bears"],"hand":["Malamet Battle Glyph"]},"p1":{"battlefield":["Grizzly Bears"]}},"steps":[{"op":"cast","seat":0,"card":"p0:Malamet Battle Glyph","mana":"G","targets":["p0:Grizzly Bears","p1:Grizzly Bears"]},{"op":"resolve","seat":0}]}`

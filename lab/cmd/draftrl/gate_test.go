@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // withSoftLimit pins the runtime soft memory limit for one test, so the az

@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestXMageStackOnlyCostReductionRuling pins the harness ruling for Swat

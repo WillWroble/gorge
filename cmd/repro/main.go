@@ -49,8 +49,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
 	"github.com/adams-shaun/gorge/server/divergence"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 func main() {
@@ -473,7 +473,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 func TestFeedbackRepro%s(t *testing.T) {

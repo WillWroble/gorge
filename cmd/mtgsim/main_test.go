@@ -7,7 +7,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/replay"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRunPlaysAndVerifiesATwoSeatGame is the fix-round-1 test Minor #3 asked

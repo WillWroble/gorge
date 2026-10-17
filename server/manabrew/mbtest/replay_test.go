@@ -9,11 +9,11 @@ import (
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	manabrew "github.com/adams-shaun/gorge/server/manabrew"
 	"github.com/adams-shaun/gorge/server/protocol"
 	mb "github.com/adams-shaun/gorge/server/protocol/manabrew"
+	"github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestManaBrewReplayEquivalent covers scoping spec §8 item 5, both bullets,

@@ -41,7 +41,7 @@ package does.
 | Add a decision kind | Don't, without an operator decision — the set is closed; every seat, bot, client and the protocol must answer it. |
 | Change the default bot's decisions | `bots/botpolicy/` (the one policy, reading a `Board`); its seat adapter is `bots/heuristic/bot.go`. |
 | Add a bot policy | Bench-only: `lab/cmd/botbench`. Hosted: register it in the `bots/` registry (`bots/registry.go`, linked by `bots/all`) and the host's closed vocabulary `server/host/bot_policy.go`. See the README's *Bot player training and adoption guidelines* and [`docs/design/2026-09-28-hosted-bot-packages.md`](../design/2026-09-28-hosted-bot-packages.md). |
-| Add a repo deck | `internal/testutil/decks/*.json` via `cmd/deckimport`; it must be fully supported (the acceptance ratchet). |
+| Add a repo deck | `testkit/testutil/decks/*.json` via `cmd/deckimport`; it must be fully supported (the acceptance ratchet). |
 | Turn a player report into a test | `go run ./cmd/repro -emit-test <pkg> <feedback-dir>`. |
 | Change the wire | `server/protocol/`, then `make gentypes`. |
 | Change an external file, wire or grammar (dzgorge outputs, `.dzgw`, visit corpus) | Its owner package, then `lab/contracts/registry.json`; the rules are in `docs/contracts.md`. |

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/paymirror"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/paymirror"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestRoundNineFindings replays the round-9 cardfuzz records

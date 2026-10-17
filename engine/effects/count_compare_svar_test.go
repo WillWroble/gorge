@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 var zoneCountSVarBound = regexp.MustCompile(`HasPropertyHasCardsIn(?:Hand|Graveyard)_[^_\s/]+(?:_[^_\s/]+)*_(GE|GT|LE|LT|EQ)([A-Za-z][A-Za-z0-9]*)`)

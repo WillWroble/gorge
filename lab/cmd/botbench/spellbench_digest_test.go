@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // smokeDigestGolden is the games.jsonl digest of the sb-uniform,sb-heuristic,bot

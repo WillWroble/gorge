@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	gbench "github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	gbench "github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestSpellbenchPooledPlayerMatchesFresh(t *testing.T) {

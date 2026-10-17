@@ -10,8 +10,8 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // testLabOpts opens the lab over the shared corpus with explicit options.

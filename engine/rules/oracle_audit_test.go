@@ -32,7 +32,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards/oracletext"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The audit's two ratchets live one file per card per family, never in a

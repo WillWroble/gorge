@@ -54,7 +54,7 @@ changing anything here.
 | `scripts/` | Contributor/CI only: `agent-worktree.sh` (the only sanctioned worktree creator), `ci_shard.sh`, `smoke.sh`, `smoke-perf.sh`, `enginebench-*.sh`, `docs_sets.py`. |
 | `examples/extagent/` | A Python `gorge-agent/1` example agent. |
 | `.github/workflows/` | `ci.yml`; `docs.yml` (builds the site, regenerates the package map); `coverage.yml` (on push to main: `make coverage`, publishes `.coverage/` as the `card-coverage` artifact; commits nothing). |
-| `internal/testutil/testdata/wall_exceptions.txt`, `rss_exceptions.txt` | Shrink-only inventories of tests over the per-test wall / RSS budget. |
+| `testkit/testutil/testdata/wall_exceptions.txt`, `rss_exceptions.txt` | Shrink-only inventories of tests over the per-test wall / RSS budget. |
 
 ## Untracked but load-bearing
 

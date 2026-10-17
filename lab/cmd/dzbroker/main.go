@@ -9,7 +9,7 @@
 // Build and run:
 //
 //	make dzbroker            # go build -tags broker ./lab/cmd/dzbroker
-//	bin/dzbroker -decks internal/testutil/decks -multiply 100 -workers 16
+//	bin/dzbroker -decks testkit/testutil/decks -multiply 100 -workers 16
 //
 // The multiplier: one (deckA, deckB, base seed) matchup expands into N games
 // with distinct shuffles (seed = base + i), so the same decks and the same
@@ -39,8 +39,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
 	"github.com/adams-shaun/gorge/lab/training/inferbroker"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -64,7 +64,7 @@ type cfg struct {
 func run(args []string) int {
 	fs := flag.NewFlagSet("dzbroker", flag.ExitOnError)
 	c := &cfg{}
-	fs.StringVar(&c.decksDir, "decks", "internal/testutil/decks", "deck directory (.json decks)")
+	fs.StringVar(&c.decksDir, "decks", "testkit/testutil/decks", "deck directory (.json decks)")
 	fs.StringVar(&c.corpusDir, "cards", ".cards", "gorge corpus directory")
 	fs.StringVar(&c.aDeck, "a", "", "deck A name (file stem); empty picks the first two decks")
 	fs.StringVar(&c.bDeck, "b", "", "deck B name")

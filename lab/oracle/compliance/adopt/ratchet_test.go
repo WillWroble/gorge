@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // statusChildEnv makes TestStatusChild run the gate for these sets (a

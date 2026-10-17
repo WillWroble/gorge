@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // azulaScenario casts Azula with Grizzly Bears on p1's battlefield and

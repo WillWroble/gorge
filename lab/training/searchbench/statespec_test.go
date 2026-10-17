@@ -9,8 +9,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/searchbench/statespec"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Synthetic StateSpec fixtures: FDN card names only, hand-written, no

@@ -35,7 +35,7 @@ func TestHorizonPanicIsSurfaced(t *testing.T) {
 		t.Fatalf("panic value line = %q", lines[0])
 	}
 	if len(lines) < 2 || !strings.Contains(lines[1], "horizonPanicFixtureBoom") ||
-		!strings.Contains(lines[1], "internal/paymirror/horizon_panic_test.go:") {
+		!strings.Contains(lines[1], "testkit/paymirror/horizon_panic_test.go:") {
 		t.Fatalf("innermost frame not the panicking function:\n%s", a)
 	}
 	for _, l := range lines[1:] {
@@ -61,7 +61,7 @@ func TestHorizonPanicIsSurfaced(t *testing.T) {
 		t.Fatalf("differing panics = %q", got)
 	}
 	sig := HorizonPanicSignature(hp)
-	if want := "both: boom at seq N @ internal/paymirror.horizonPanicFixtureBoom"; sig != want {
+	if want := "both: boom at seq N @ testkit/paymirror.horizonPanicFixtureBoom"; sig != want {
 		t.Fatalf("signature = %q, want %q", sig, want)
 	}
 

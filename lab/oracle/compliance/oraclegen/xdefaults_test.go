@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Transmutation Font's plain GenericChoice is one XMage Choice dialog over the

@@ -5,7 +5,7 @@ import (
 
 	"github.com/adams-shaun/gorge/bots/azmcts"
 	"github.com/adams-shaun/gorge/bots/searchprobe"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // :closedlist parses as an az key only, and the seat it builds once play has set

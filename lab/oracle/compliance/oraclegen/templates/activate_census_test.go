@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // activateCensusSets are the four level-A sets the activate census pins,

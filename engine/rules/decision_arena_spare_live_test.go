@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestSpareRecycledGameIsLiveArena pins enableLiveArena: a game New builds on
-// a Spare (enginebench / internal/bench recycling) must carry the arena ON in
+// a Spare (enginebench / testkit/bench recycling) must carry the arena ON in
 // live mode, not the switched-off arena adoptArena leaves a clone, and its
 // arena must reuse the finished game's chunks.
 func TestSpareRecycledGameIsLiveArena(t *testing.T) {

@@ -423,7 +423,7 @@ requeue_max = 3
 # four concurrent shards at GOMAXPROCS=4 each, alongside the two Kr8 runs,
 # searchprobe, the host overshoot check and the $others run at -p=6: at most
 # ~14 test binaries resident at the peak. No test's peak RSS is above ~2 GiB
-# (internal/testutil/testdata/rss_exceptions.txt is EMPTY as of 2026-10-09);
+# (testkit/testutil/testdata/rss_exceptions.txt is EMPTY as of 2026-10-09);
 # worst case four rules shards at 1.2-1.9 GiB each plus the others and the
 # two Kr8 binaries stays under the 16G scope with headroom.
 timeout = 2100

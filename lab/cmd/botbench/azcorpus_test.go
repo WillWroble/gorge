@@ -7,8 +7,8 @@ import (
 	"github.com/adams-shaun/gorge/bots/azmcts"
 	"github.com/adams-shaun/gorge/bots/azmcts/clairvoyant"
 	"github.com/adams-shaun/gorge/bots/policynet"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // -az-corpus (M1b) is observational, for the clairvoyant and the honest

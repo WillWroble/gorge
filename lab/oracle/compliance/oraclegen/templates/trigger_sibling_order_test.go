@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/rules"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestTriggerSiblingOrderProbe pins a target trigger queued with a sibling:

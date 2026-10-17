@@ -3,7 +3,7 @@ package effects
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The Count$CastTotalManaSpent branch head (task castprov1): the TOTAL mana

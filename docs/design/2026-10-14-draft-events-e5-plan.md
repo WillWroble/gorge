@@ -72,7 +72,7 @@ No UI ticket; no wire/protocol/HTTP change.
 | `draftlab` | game driver `PlayGame` (+ hand/mulligan telemetry, `Verify`), `Games` (parallel), `Play` (roundrobin \| swiss \| none) | E5-c2 |
 | `draftlab` | `Gauntlet`, `RunEvent` (event log pipeline), `VerifyEvent`, `Manifest` | E5-c3 |
 | `event` (csv.go), `draftlab`, `lab/cmd/labdemo` (new) | `DraftDataOptions`/`DraftDataCSVWith` (per-seat draft id), `draftlab.DraftDataCSV`/`GameDataCSV`/`WriteDecksJSON`, the example workflow | E5-c4 |
-| `internal/bench`, `draftlab` | `Hooks.EnvSeats`: drive `bots.EnvSeat` with an honest-root `bots.Env` like the host; lab admits Env players under the opt-in | E5-c5 |
+| `testkit/bench`, `draftlab` | `Hooks.EnvSeats`: drive `bots.EnvSeat` with an honest-root `bots.Env` like the host; lab admits Env players under the opt-in | E5-c5 |
 
 New packages: `draftlab` (E5-c1) and `lab/cmd/labdemo` (E5-c4). Each adds its
 `docs/site/architecture/packages.tiers.json` entry **in the same ticket**
@@ -145,7 +145,7 @@ neither package imports `time` (`TestTimeIsImportedOnlyByTheHost`,
 - Env refusal before anything else (`lab/cmd/draftsim/run.go:70-77`, and for the gauntlet
   player `lab/cmd/draftsim/gauntlet.go:76-78`) — spec §4.8 item 3.
 - Corpus via `testutil.OpenCorpusRegistry` (`run.go:96`), which is `cards.SharedCorpus`
-  (`internal/testutil/decks.go:186-188`). A registry "is read-only after open"
+  (`testkit/testutil/decks.go:186-188`). A registry "is read-only after open"
   (`engine/cards/open.go:56-58`).
 - Seeds: `pickRNG(seed, seat)` salt `0x5011C1<<32|seat`, one stream per seat
   (`lab/cmd/draftsim/event.go:18,26-28`); `gameSeed(seed, round, a, b, game)` salt
@@ -187,7 +187,7 @@ neither package imports `time` (`TestTimeIsImportedOnlyByTheHost`,
 
 ### 3.5 Engine, bots and bench
 
-- `bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)` (`internal/bench/bench.go:171`)
+- `bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)` (`testkit/bench/bench.go:171`)
   is a pure function of (cfg, seats) (`:169-170`); `Outcome{WinnerSeat, Draw, StallOn,
   Turns, Intents, Starter, StarterSet}` (`:61-85`); `IsAbort` (`:95`); `Hooks.NewEngine`
   (`:159`), `Hooks.HonestRoot` (`:144`), `Hooks.Decision` (`:133`).
@@ -614,7 +614,7 @@ manifest.)
 ### 4.6 bench Env driver (E5-c5)
 
 ```go
-// internal/bench/bench.go Hooks, appended:
+// testkit/bench/bench.go Hooks, appended:
 // EnvSeats drives every seat that implements bots.EnvSeat: when WantsEnv(d) is true the
 // seat gets DecideEnv(ctx, bots.Env{...}) built exactly as server/host/botenv.go envData builds
 // it (the deciding seat's own feed, an honest root from searchseat.HonestRoot at
@@ -776,7 +776,7 @@ signature changes.
 | C7 | ROUNDn generic | `RoundPhase(1..3)` literal lists (`lab/draft/event/event.go:458`, `lab/draft/event/timeouts.go:33`, eventhost) | `inRound()` in event; eventhost's lists stay valid at 4 seats |
 | C8 | sealed "6 packs → pool" | PackOpened round ≤ `draft.Rounds` (`lab/draft/event/event.go:361`); pool only from the pod (`:162-168`) | Mode sealed: pack index ≤ Packs, pool = concat, BUILD after supply (E5-b2) |
 | C9 | eventhost "keeps 4 unless trivially parameterised" | persisted `meta.Seats [4]metaSeat` (`lab/draft/eventhost/store.go:30`), 4-wide arrays (`lab/draft/eventhost/host.go:82-108`) | **not trivial: eventhost stays at 4**; no eventhost edit in E5 b/c; hosted 8 = E5-e |
-| C10 | Env opt-in for bot-only runs | draftsim refuses Env (spec §4.8.3, `run.go:70-77`); bench cannot drive `bots.EnvSeat` (`internal/bench/bench.go:208-224,285-327`) | draftsim unchanged; lab `AllowDecklistBots` + bench Env driver (E5-c5); refused until then |
+| C10 | Env opt-in for bot-only runs | draftsim refuses Env (spec §4.8.3, `run.go:70-77`); bench cannot drive `bots.EnvSeat` (`testkit/bench/bench.go:208-224,285-327`) | draftsim unchanged; lab `AllowDecklistBots` + bench Env driver (E5-c5); refused until then |
 | C11 | brief `Draft(packs, drafters, seed)`, `Build(pool, builder)` | `pickbot.Builder.Build(set, pool)` needs the set; `EventCreated` needs `Set` | set taken from the CardRefs; mixed or empty set is an error |
 | C12 | brief `Play(decks, players []string, …)` | a player is a constructor (E5-d seam) | `Play(entrants, …)` plus `PlayDecks(decks, []AgentRef, …)` in the brief's shape |
 | C13 | 17Lands `draft_data` per drafter | `draft_id` = the event seed for every seat (`lab/draft/event/csv.go:99`) | `DraftDataOptions.PerSeatDraftID` (lab uses it; default unchanged) |
@@ -797,10 +797,10 @@ signature changes.
 | E5-c2 | draftlab: game driver, `Games`, `Play` (rr/swiss/none) | E5-c1, E5-b3 | local OK |
 | E5-c3 | draftlab: `Gauntlet`, `RunEvent`, `VerifyEvent`, `Manifest` | E5-c2 | local OK |
 | E5-c4 | draftlab artifacts (CSV/decks) + `lab/cmd/labdemo` example workflow | E5-c3, E5-b4 | local OK |
-| E5-c5 | internal/bench Env driver; lab admits Env players under the opt-in | E5-c2 | paid (DeepSeek) preferred: engine-adjacent |
+| E5-c5 | testkit/bench Env driver; lab admits Env players under the opt-in | E5-c2 | paid (DeepSeek) preferred: engine-adjacent |
 
 Nine. E5-b is serial (b1 → b2 → b3 → b4). E5-c1 can start once E5-b2 and E5-a1 are in;
-c2 → c3 → c4 serial (one package); c5 runs beside c3/c4 (it touches `internal/bench` and
+c2 → c3 → c4 serial (one package); c5 runs beside c3/c4 (it touches `testkit/bench` and
 `draftlab/players.go` only).
 
 ## 14. Open questions for the operator

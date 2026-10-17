@@ -18,7 +18,7 @@ import (
 // library's tail order is asserted exactly. Songbirds' Blessing is in NO
 // repo deck and NO legacy golden deck, so no chain head depends on this
 // card (measured: grepping every DigUntil carrier name against
-// internal/testutil/decks/*.json returns nothing).
+// testkit/testutil/decks/*.json returns nothing).
 //
 // The helpers come from search_library_test.go (same package): the deck is
 // built from compiled corpus cards only, so no Forge script text is

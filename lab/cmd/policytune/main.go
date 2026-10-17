@@ -9,7 +9,7 @@
 // per step. The result is a profile JSON loadable by the L2 loader
 // (botpolicy.ParseCastProfile) and a CSV trajectory.
 //
-// The game-playing itself is internal/bench (gbench), the same policy-
+// The game-playing itself is testkit/bench (gbench), the same policy-
 // agnostic pair-matrix runner lab/cmd/botbench uses, so the fit and the bench
 // cannot drift apart. The two sides are built DIRECTLY with
 // heuristic.NewCastProfileBotWithWeights(seed, w) -- one constructor per side --
@@ -40,8 +40,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/internal/bench"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/bench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Held-out seed range, reserved for gated evaluation (L4) and never used by

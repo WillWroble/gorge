@@ -144,6 +144,10 @@
       "tier": "bots",
       "status": "EXT"
     },
+    "cli": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
     "cmd/cardfuzz": {
       "tier": "cmd",
       "status": "TOOL"
@@ -289,15 +293,7 @@
       "tier": "tooling",
       "status": "TOOL (load-bearing)"
     },
-    "internal/bench": {
-      "tier": "tooling",
-      "status": "TOOL/SUPP"
-    },
     "internal/botobs": {
-      "tier": "tooling",
-      "status": "TOOL"
-    },
-    "internal/cli": {
       "tier": "tooling",
       "status": "TOOL"
     },
@@ -310,19 +306,7 @@
       "status": "TOOL",
       "purpose": "Heap-footprint ratchet (tests only)."
     },
-    "internal/paymirror": {
-      "tier": "tooling",
-      "status": "TOOL"
-    },
     "internal/testbudget": {
-      "tier": "tooling",
-      "status": "TOOL"
-    },
-    "internal/testutil": {
-      "tier": "tooling",
-      "status": "TOOL"
-    },
-    "internal/testutil/feedback": {
       "tier": "tooling",
       "status": "TOOL"
     },
@@ -642,6 +626,22 @@
     },
     "server/protocol/manabrew/internal/schemagen": {
       "tier": "server",
+      "status": "TOOL"
+    },
+    "testkit/bench": {
+      "tier": "tooling",
+      "status": "TOOL/SUPP"
+    },
+    "testkit/paymirror": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "testkit/testutil": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
+    "testkit/testutil/feedback": {
+      "tier": "tooling",
       "status": "TOOL"
     }
   }

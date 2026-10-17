@@ -13,7 +13,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/bench"
+	"github.com/adams-shaun/gorge/testkit/bench"
 )
 
 // Entrant is one seat's input to a game: the deck it plays and the resolved

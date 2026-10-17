@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 const highNoonSecondSpell = `{"name":"high-noon-limit","cr":["601.2"],"why":"inline","setup":{"p0":{"battlefield":["High Noon"],"hand":["Ornithopter","Memnite"]},"p1":{"hand":["Gut Shot"]}},"steps":[` +

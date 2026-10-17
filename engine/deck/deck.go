@@ -1,7 +1,7 @@
 // Package deck reads the repo's deck-list JSON — a bare {name, count} card
 // list — and resolves it against a cards.Registry into the flat, repeated
 // []*cards.Card that rules.Config.Decks wants. It is the one parser both
-// the test fixtures (internal/testutil) and the match host use, so the two
+// the test fixtures (testkit/testutil) and the match host use, so the two
 // can never disagree about what a deck file means. A deck list carries no
 // card text and is not the licensing hazard engine/cards/boundary_test.go guards.
 package deck

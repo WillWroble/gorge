@@ -207,7 +207,7 @@ gate_affected_cert_stale_only() {
 #    keep the existing selection (touched dir, the triggers below, or
 #    post-merge).
 # 3. Cheap triggers for the two expensive culprit classes:
-#    - a non-test Go change under engine/cards/ or internal/testutil/ (the corpus
+#    - a non-test Go change under engine/cards/ or testkit/testutil/ (the corpus
 #      loader) runs internal/corpusheap whole (10.8 s / 14.0 cpu-s) and
 #      lab/cmd/botbench's TestSpellbenchSubsetCorpusMatchesFull (5.5 s / 6.9 cpu-s);
 #    - a non-test Go change under rules|effects|events|state|cards, or any
@@ -305,7 +305,7 @@ gate_affected_plan() {
   # Mechanism 1: the always-run structural set.
   others=$(printf '%s\n' $others $(gate_structural_pkgs) | sort -u)
   # Mechanism 3, corpus loader trigger: corpusheap runs whole (it is one test).
-  if printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/cards|internal/testutil)/([^/]+/)*[^/]+\.go$'; then
+  if printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/cards|testkit/testutil)/([^/]+/)*[^/]+\.go$'; then
     corpus=1
     others=$(printf '%s\n' $others ./internal/corpusheap | sort -u)
   fi
@@ -324,13 +324,13 @@ gate_affected_plan() {
   # event. Any engine change that emits, drops or reorders an event renumbers
   # them even when TestHeads is honestly re-pinned; 2eaca9010 (ExcessDamage
   # history events) re-pinned heads 4/6/8 and turned main red in
-  # ./internal/paymirror unseen by this gate. They run when the branch moves a
+  # ./testkit/paymirror unseen by this gate. They run when the branch moves a
   # chain head or touches engine code (rules/effects/events/state, non-test Go).
   # The cardfuzz half is only its two seed-pinned finding tests.
   if printf '%s\n' "$files" | /usr/bin/grep -v -E '_test\.go$' | /usr/bin/grep -q -E \
     '^engine/rules/testdata/heads/|^(engine/rules|engine/effects|engine/events|engine/state)/([^/]+/)*[^/]+\.go$'; then
     traj=1
-    others=$(printf '%s\n' $others ./internal/paymirror ./cmd/repro | sort -u)
+    others=$(printf '%s\n' $others ./testkit/paymirror ./cmd/repro | sort -u)
   fi
   for p in $others; do echo "others $p"; done
   echo "tpl $tpl"
@@ -409,7 +409,7 @@ echo "gate_affected: rules + $(echo $others)$( [ "$tpl" = 1 ] && echo ' + oracle
 #   lab/oracle/compliance/oraclegen/templates 166.8s (TestSameNameAnswerCensusChunk00 27.7s)
 #   lab/oracle/compliance/adopt                101.1s (TestLevelBRatchet 51.1s serial)
 #   lab/oracle/compliance/gate                 88.9s  (TestDeclaredSetsCompliant 26.8s serial)
-#   internal/paymirror              89.1s  (TestRoundTenFindingsMirror 31.6s serial)
+#   testkit/paymirror              89.1s  (TestRoundTenFindingsMirror 31.6s serial)
 #   effects                         76.2s  (TestCompiledFilterMatchesTextualOracle 29.2s serial)
 #   cmd/repro                       55.4s  (TestReproEmitTestIntoRulesCompilesAndFailsOnTODO 26.4s)
 # Each is split by test name into three packs run as concurrent `go test`
@@ -423,7 +423,7 @@ echo "gate_affected: rules + $(echo $others)$( [ "$tpl" = 1 ] && echo ' + oracle
 # invocation (measured: the same -run/-skip rerun cache-hits, a whole-package
 # run after pack runs does not), so a fresh package's batch line would pay
 # the full package again to repopulate a differently-keyed entry.
-heavy='^\./lab/oracle/compliance/adopt$|^\./lab/oracle/compliance/gate$|^\./internal/paymirror$|^\./cmd/repro$|^\./engine/effects$|^\./lab/oracle/compliance/oraclegen/templates$'
+heavy='^\./lab/oracle/compliance/adopt$|^\./lab/oracle/compliance/gate$|^\./testkit/paymirror$|^\./cmd/repro$|^\./engine/effects$|^\./lab/oracle/compliance/oraclegen/templates$'
 heavy_pkgs=$(printf '%s\n' $others | /usr/bin/grep -E "$heavy" || true)
 heavy_bins=
 build_pids=
@@ -508,7 +508,7 @@ for pid in $build_pids; do wait "$pid" || rc=1; done
 # rules_shard_run_patterns, which falls back to the unsplit run if it cannot
 # list the tests). Every shard keeps -p=1 (single package); the extra
 # concurrent binaries fit the scope: no test's peak RSS is above ~2 GiB
-# (internal/testutil/testdata/rss_exceptions.txt is EMPTY) and each binary is
+# (testkit/testutil/testdata/rss_exceptions.txt is EMPTY) and each binary is
 # held near its GOMEMLIMIT=3GiB soft limit.
 shard1=; shard2=; shard3=; shard4=; shard5=; shard6=
 { read -r shard1; read -r shard2; read -r shard3; read -r shard4; read -r shard5; read -r shard6; } < <(rules_shard_run_patterns) || true
@@ -555,7 +555,7 @@ GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -p=1 -run '^TestKr8HeadsCheckpointAll$' ./e
 # peak RSS ~1.0 GiB. With ./engine/rules now four concurrent shards the peak resident
 # set is ~14 test binaries, each held near its GOMEMLIMIT=3GiB soft limit (the
 # doubled 2026-10-09 per-test budget; a rules shard peaks 1.2-1.9 GiB RSS
-# serially, no test above ~2 GiB and internal/testutil/testdata/
+# serially, no test above ~2 GiB and testkit/testutil/testdata/
 # rss_exceptions.txt is EMPTY): ~10 GiB against the scope's 16 GiB
 # MemoryMax, and most $others binaries are far smaller.
 # The batch keeps the non-heavy packages only. The heavy packages run as
@@ -662,11 +662,11 @@ fi
 go test -p=1 ./bots/searchprobe/ & e=$!
 go test -p=1 -run '^TestCommittedOvershootCaptureReplaysToTheParkedAsk$' ./server/host/ & f=$!
 # The wall-clock ratchet is a tree census (it reads every *_test.go in the
-# repo), so an import-based selection never picks internal/testutil for a
+# repo), so an import-based selection never picks testkit/testutil for a
 # ticket that only adds a sleep to its own tests. Three seat tickets in a row
 # (E1-5 5a52e10ce, E1-7 0106f8c26, E3-4 3858457ec) turned main RED on it
 # post-merge. ~1 s alone; always run.
-go test -p=1 -run '^TestNoNewSubSecondWallClockThresholdInTests$' ./internal/testutil/ & wc=$!
+go test -p=1 -run '^TestNoNewSubSecondWallClockThresholdInTests$' ./testkit/testutil/ & wc=$!
 pids="$a1 $a2 $a3 $a4 $a5 $a6 $b $c $d $e $f $wc${hp:+ $hp}"
 # The four templates shards (tpl=1, extracted above): three named -run
 # patterns plus the -skip remainder, read one per line from

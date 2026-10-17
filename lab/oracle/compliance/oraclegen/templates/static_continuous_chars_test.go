@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/oraclegen/templates"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // staticSkipReason is the skip reason of name's static.continuous requirement

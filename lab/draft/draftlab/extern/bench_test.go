@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab/extern/refagent"
 	"github.com/adams-shaun/gorge/lab/draft/draftlab/extern/wire"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // BenchmarkGames measures what the external-agent path costs against the

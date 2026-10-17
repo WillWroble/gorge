@@ -9,7 +9,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // krenkoFixture builds a deterministic two-seat engine whose seat 0
@@ -212,7 +212,7 @@ func TestKrenkoBoardCapFiresMidResolution(t *testing.T) {
 	// goes on the stack on Submit; the mints happen when priority passes drain
 	// it, so the recover must wrap BOTH the activation and the drain. The
 	// watcher panics with a *rules.LivelockError inside the drain; recover it
-	// exactly the way internal/bench's drive loop does.
+	// exactly the way testkit/bench's drive loop does.
 	var abort *rules.LivelockError
 	func() {
 		defer func() {

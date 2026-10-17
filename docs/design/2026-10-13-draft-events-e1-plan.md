@@ -153,9 +153,9 @@ defines the `EventService` interface and eventhost satisfies it);
   sub-packages of eventhost may import time**, so eventhost stays one
   package. No new allow-list entries, ever.
 - `host`, `server/host/httpapi`, `cmd/gorged` may not depend on
-  `internal/testutil` (`internal/archtest/arch_test.go:166-168`, transitive).
+  `testkit/testutil` (`internal/archtest/arch_test.go:166-168`, transitive).
   Since gorged will import eventhost, **eventhost's non-test code must not
-  import `internal/testutil`** (tests may).
+  import `testkit/testutil`** (tests may).
 - `TestNoLegacyMathRand` (`internal/archtest/arch_test.go:402`): use
   `math/rand/v2` with `rand.NewPCG`.
 - `cmd/pkgmap` `TestClassificationIsComplete` (`cmd/pkgmap/main_test.go:14`,

@@ -11,10 +11,10 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all" // link the built-in policies
 	"github.com/adams-shaun/gorge/engine/cards"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/draft/event"
 	"github.com/adams-shaun/gorge/lab/draft/limited/pickbot"
 	"github.com/adams-shaun/gorge/lab/draft/limited/setdata"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // runner carries everything one draftsim run reads more than once: the card

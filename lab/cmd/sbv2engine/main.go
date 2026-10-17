@@ -31,8 +31,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench/v2engine"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }

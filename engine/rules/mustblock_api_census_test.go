@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // The API carriers have several target/attacker selector grammars; keep the

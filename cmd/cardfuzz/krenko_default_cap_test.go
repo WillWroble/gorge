@@ -9,7 +9,7 @@ import (
 )
 
 // TestKrenkoBoardDefaultCapFiresMidResolution is the DEFAULT budget's storm
-// proof (CV-8): the shared drive loop (internal/bench) and the host arm
+// proof (CV-8): the shared drive loop (testkit/bench) and the host arm
 // LoopGuard.MaxObjs = rules.DefaultMaxObjs on every config that set no
 // explicit budget, and the value must sit far above every ordinary game's
 // arena (measured high-water 554, CV-8's probe) while still truncating the

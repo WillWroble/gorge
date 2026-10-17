@@ -5,7 +5,7 @@
 // the host's dispatch hands that policy.
 //
 // The package may import bots, seat, searchseat, botpolicy, view and rules,
-// and never host or internal/testutil (archtest pins both): the host's
+// and never host or testkit/testutil (archtest pins both): the host's
 // ShadowScan calls it, and the offline triage tool recomputes B through it,
 // so the answer must not depend on a host.
 package shadow

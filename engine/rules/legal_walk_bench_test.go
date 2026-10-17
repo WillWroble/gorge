@@ -10,7 +10,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // legalWalkBenchPairs are the botbench pairs the priority offer walk's cost
@@ -124,7 +124,7 @@ func TestLegalWalkDigest(t *testing.T) {
 		t.Skip("set LEGAL_WALK_DIGEST=<file> to write the offer-walk digest")
 	}
 	reg := testutil.CorpusRegistry(t)
-	names, err := os.ReadDir("../../internal/testutil/decks")
+	names, err := os.ReadDir("../../testkit/testutil/decks")
 	if err != nil {
 		t.Fatal(err)
 	}

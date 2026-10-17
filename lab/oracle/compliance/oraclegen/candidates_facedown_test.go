@@ -3,7 +3,7 @@ package oraclegen
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // isFaceDownCand reports a candidate made by the face-down cast prelude: a

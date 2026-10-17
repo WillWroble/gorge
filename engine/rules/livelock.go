@@ -166,7 +166,7 @@ func WithDefaultObjectCap(g *LoopGuard) *LoopGuard {
 
 // IsVolumeReason reports whether a LivelockError's Reason is degenerate
 // VOLUME -- a game whose board (or creation plan) grew past a deliberate
-// budget -- rather than a stuck resolution. The harnesses (internal/bench's
+// budget -- rather than a stuck resolution. The harnesses (testkit/bench's
 // drive loop, the host's play recover) record a game that tripped a volume
 // reason as a stalled game under the cardfuzz "bigboard" vocabulary, never
 // as an engine-bug abort (Ruling CV-2). "token plan" is deliberately NOT

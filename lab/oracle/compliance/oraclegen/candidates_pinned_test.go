@@ -3,8 +3,8 @@ package oraclegen
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestPinnedSubtypeFixturesResolve: every pin is a real fixture its picker

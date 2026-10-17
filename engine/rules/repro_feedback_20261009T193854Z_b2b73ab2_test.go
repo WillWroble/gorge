@@ -21,7 +21,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 // The report's two hand cards and the board's two mana sources, as captured.

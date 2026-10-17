@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/adopt"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/gate"
 	"github.com/adams-shaun/gorge/lab/oracle/compliance/levelb"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestLevelBProblemsBucketLikeA checks the level-B gate's reasons reuse the

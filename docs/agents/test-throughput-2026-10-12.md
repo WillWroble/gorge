@@ -30,7 +30,7 @@ Gate failures since 10-05: go test (affected) 190, xmage driver 76, go build 3; 
 | 2 | `lab/oracle/compliance/oraclegen/templates` | 166.8 s clean cache | gate_affected.sh comment |
 | 3 | `lab/oracle/compliance/adopt` | 101 s; TestLevelBRatchet 51 s | same; events.json |
 | 4 | `rules` (max of 6 shards) | gate p50 97.5, max 175; alone 15.5–25.6/shard; whole 66 s / 6,470 tests (10-06) | gate logs |
-| 5 | `internal/paymirror` | 89 s; 0/53 cached | |
+| 5 | `testkit/paymirror` | 89 s; 0/53 cached | |
 | 6 | `lab/oracle/compliance/gate` | 89 s; TestDeclaredSetsCompliant 27–34 s | |
 | 7 | `effects` | 76 s; TestCompiledFilterMatchesTextualOracle 29 s | |
 | 8 | `cmd/repro` | 55 s; 0/56 cached | |
@@ -91,4 +91,4 @@ Static: 4,002 test files; 11,941 tests; 672k test LOC. `rules` 6,714 tests, 418k
 | T3 nightly (new; no timer today) | daily on origin/main | `make fuzz`, `make conformance`, `make test-manabrew`, race pass, `make cover`, cold-cache run |
 | T4 on-demand | operator | set audits, broker/gamepool/policyexp tags, enginebench, oracle-audit, xmage/forge replays |
 
-Key paths: `ops/scripts/{postmerge_batch,postmerge_full,gate_affected,heavy_lock,broker}.sh`, `.agentctl/config.toml` (gates 254–480), `cmd/testbudget/check.go`, `internal/testutil/testdata/wall_exceptions.txt`, `engine/cards/open.go`, `engine/cards/fingerprint_sources.go`, `internal/testutil/sharedcorpus.go`. Evidence: `.ds4/postmerge-batch.log`, `.ds4/postmerge-culprits.log`, `.ds4/postmerge-full.out`, `.worktrees/postmerge-full/.ds4/scratch/testbudget/`, `.ds4/orchestrator/gates/`, `.ds4/orchestrator/journal.jsonl`, `.ds4/reward/scoreboard.jsonl`.
+Key paths: `ops/scripts/{postmerge_batch,postmerge_full,gate_affected,heavy_lock,broker}.sh`, `.agentctl/config.toml` (gates 254–480), `cmd/testbudget/check.go`, `testkit/testutil/testdata/wall_exceptions.txt`, `engine/cards/open.go`, `engine/cards/fingerprint_sources.go`, `testkit/testutil/sharedcorpus.go`. Evidence: `.ds4/postmerge-batch.log`, `.ds4/postmerge-culprits.log`, `.ds4/postmerge-full.out`, `.worktrees/postmerge-full/.ds4/scratch/testbudget/`, `.ds4/orchestrator/gates/`, `.ds4/orchestrator/journal.jsonl`, `.ds4/reward/scoreboard.jsonl`.

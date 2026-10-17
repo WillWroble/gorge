@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // Pins every corpus script mentioning Teamwork and its keyword/count spellings.

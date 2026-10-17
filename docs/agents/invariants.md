@@ -26,8 +26,8 @@ only and imports just `decision` and `view`. That is the measured import graph
 enforces the untagged fence). The enforced contract is the set of
 edges that must never appear: `effects` never imports `rules` (effects reaches
 the engine only through `effects.Host`). `view`, `protocol` and `deck` never
-import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host`, `internal/testutil` or `bots/azmcts/clairvoyant`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
-and `cmd/gorged` never import `internal/testutil`. Inside the engine, the
+import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host`, `testkit/testutil` or `bots/azmcts/clairvoyant`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
+and `cmd/gorged` never import `testkit/testutil`. Inside the engine, the
 lasagna packages (spec [`docs/design/2026-10-03-rules-engine-lasagna-design.md`](../design/2026-10-03-rules-engine-lasagna-design.md) §3) are
 pinned as they land: `engine/rules/cost`, the cost vocabulary leaf, imports only
 `state` (`TestCostVocabularyIsALeaf`) and never `rules`, `effects` or a rules
@@ -206,7 +206,7 @@ Adding an entry means a regression, and a branch cannot land one (see below).
 **A ratchet is never raised by a branch.** That covers the coverage tables
 above, the shrink-only constants and `longFuncCeilings` in
 `internal/codeshape`, the constants and allow-lists of `internal/archtest`,
-and `internal/testutil/agentsdoc_test.go`. The pipeline's first gate,
+and `testkit/testutil/agentsdoc_test.go`. The pipeline's first gate,
 "ratchets only fall" (`ops/scripts/ratchet_gate.py`), enforces this. It runs from
 the BASE copy (`git show <base>:ops/scripts/ratchet_gate.py | python3 - <base>`),
 so a branch cannot weaken the gate that judges it. Measured against the
@@ -249,7 +249,7 @@ It is a closing register:
 A landing ticket deletes its row and lowers the constant. A deviation that a
 ticket cannot close goes in the **commit message** and the ticket report.
 
-**Enforced by:** `internal/testutil/agentsdoc_test.go`.
+**Enforced by:** `testkit/testutil/agentsdoc_test.go`.
 
 ### 11. Contracts are written down
 
@@ -272,7 +272,7 @@ by millions.
 **Enforced by:** convention, plus `make gc-gate` (by hand). The per-test
 resource budget (4 GB RSS, 4 vCPU, 1 min wall; doubled 2026-10-09) is enforced by `cmd/testbudget`
 in `ops/scripts/postmerge_full.sh`: any test over budget that
-`internal/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
+`testkit/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
 shrink-only) do not list fails the post-merge batch. Peak RSS is measured per test binary by
 `go test -exec "testbudget exec"`; a new test package needs no TestMain for it.
 

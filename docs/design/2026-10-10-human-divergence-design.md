@@ -69,7 +69,7 @@ Non-goals (v1):
 | Snapshot of the *current or last* match only | it picks `t.cur`, else `t.history` tail, else the last archived sidecar | `server/host/feedback.go:176-196` |
 | Writing the snapshot beside a report, size cap, status line | `feedbackStore.captureSnapshot`, `maxFeedbackSnapshotBytes = 64 MiB`, `report.json` `snapshot` field | `cmd/gorged/feedback.go:265`, `:75`, `:98` |
 | Durable feedback dir outside the wiped `-dir` | `-feedback` flag; empty value disarms the endpoint | `cmd/gorged/main.go:271`, `:449-460` |
-| Load a snapshot dir back to `(Log, Config)` and replay to intent n | `feedback.Load`, `feedback.EngineAt` | `internal/testutil/feedback/feedback.go:165`, `:436` |
+| Load a snapshot dir back to `(Log, Config)` and replay to intent n | `feedback.Load`, `feedback.EngineAt` | `testkit/testutil/feedback/feedback.go:165`, `:436` |
 | Rebuild one seat's observation stream from a log | `searchseat.RebuildFeed(cfg, l, n, actor)`: captures at every intent boundary and records the actor's logged answers | `bots/searchseat/feed.go:57` |
 | Honest teacher over sampled worlds | `searchprobe.TeacherIntentChoice`, with paired `WinsOverBaseline`/`LossesToBaseline` against candidate 0 | `bots/searchprobe/teacher.go:147`, `:73-89` |
 | Adaptive A/B evaluation with CIs, honest and omniscient arms | `hindsight.Evaluate(candidates, source, seed, opts)`: blocks of common-random-number worlds, stops when the top two Wilson intervals separate; `PairedDiff95`; `ClearMargin` (≥ 0.10 and paired lower bound > 0); `Seed` | `internal/hindsight/hindsight.go:270`, `:207`, `:344`, `:365` |
@@ -93,7 +93,7 @@ Non-goals (v1):
 | Client match scrubber | DVR cursor over the match's events (`dvr.ts`); finished `/m/:match` is a spectator replay | `web/src/lib/dvr.ts`, `web/src/routes/Table.svelte:53-75` |
 | Client auto-answers | `autopilot.ts` passes priority for the player | `web/src/lib/autopilot.ts:8` |
 | Policy encoder feature families | v1 dense and sparse (`EncodeState`), mz rows (`mzState`), own-library (`ownLibState`), diagnostic hidden-info sets refused for checkpoints | `bots/policynet/policynet.go:157`, `bots/policynet/features.go:13-87`, `:263`, `bots/policynet/ownlib.go:41` |
-| Layering fences | `host`, `server/host/httpapi`, `cmd/gorged` must not depend on `internal/testutil`. Only allow-listed packages may import `time` | `internal/archtest/arch_test.go:150-160`, `:115-142` |
+| Layering fences | `host`, `server/host/httpapi`, `cmd/gorged` must not depend on `testkit/testutil`. Only allow-listed packages may import `time` | `internal/archtest/arch_test.go:150-160`, `:115-142` |
 | Seat privacy rules | credentials bind table and seat; every seat route goes through `claimForTable` | `docs/agents/runtime-behavior.md:67-76` |
 
 What the measured history says (operator records, **not re-measured here**):
@@ -206,7 +206,7 @@ counter, logged once a minute). A single worker goroutine owns the rest:
      `go run ./cmd/repro <dir>` verifies the replay (exit 0) unchanged.
    - `report.json`: `{"received", "snapshot": "captured: ...", "text": "divergence capture"}`,
      so `feedback.Load` finds its optional status line
-     (`internal/testutil/feedback/feedback.go:104-111`).
+     (`testkit/testutil/feedback/feedback.go:104-111`).
    - `divergences.jsonl` (§5.6).
    - Nothing at all when the scan found zero divergences. The directory is
      created only when there is something to keep.
@@ -226,7 +226,7 @@ Measuring this cost is HD-3's acceptance item.
 ### 5.4 The shadow answer
 
 `server/divergence/shadow` (new; it may import `bots`, `seat`, `searchseat`,
-`botpolicy`, `view`, `rules`, and never `host` or `internal/testutil`):
+`botpolicy`, `view`, `rules`, and never `host` or `testkit/testutil`):
 
 ```go
 // Answer returns the intent policy would give at e's pending decision for
@@ -319,7 +319,7 @@ moved into `server/divergence` so that host can use it.
 
 `cmd/divergence triage -in '<dir>/*' -out triage.jsonl [-block 16 -max-rollouts 128 -attempts N -redeal -omniscient -workers W]`
 
-New command. It may import `internal/testutil/feedback`: only host, httpapi
+New command. It may import `testkit/testutil/feedback`: only host, httpapi
 and gorged are fenced from testutil (`internal/archtest/arch_test.go:158-160`).
 It must not import `time` unless it is added to the allowlist
 (`arch_test.go:115-138`), so wall-clock measurement stays out of the records,
@@ -354,7 +354,7 @@ For each match directory:
      the UI (§10).
 4. Write one `triage-v1` record per divergence: bucket, sub-bucket, both
    `hindsight.Evaluation`s, the options used, and provenance (`git rev-parse
-   HEAD`, `FORGE_REF`). `internal/testutil/feedback` already shells out to git
+   HEAD`, `FORGE_REF`). `testkit/testutil/feedback` already shells out to git
    for the root.
 
 ### 6.2 Buckets (pre-registered)
@@ -712,7 +712,7 @@ HD-9 needs HD-7.
   (§5.5). `label.go`: `choiceSummary`, moved from `cmd/repro/main.go:391`,
   with cmd/repro switched to call it. `seed.go`: `ShadowSeed`.
 - **Imports allowed:** `decision`, `state`, `view`, `events`. Not `host`,
-  `rules`, `internal/testutil`, or `time`.
+  `rules`, `testkit/testutil`, or `time`.
 - **Acceptance:** `TestMaterialTable` (same choices; two same-name lands →
   equivalent; payment-only difference → equivalent; bare mana sources → not
   material; different target → material `target`; attack subset →
@@ -742,7 +742,7 @@ HD-9 needs HD-7.
 - **Files:** `server/host/feedback.go` (factor the copy section; add
   `SnapshotMatch(id, k, seat)`), new `server/divergence/shadow/shadow.go`, new
   `server/host/shadowscan.go`, and `internal/archtest/arch_test.go` (forbid
-  `server/divergence/shadow` → `host` and → `internal/testutil`).
+  `server/divergence/shadow` → `host` and → `testkit/testutil`).
 - **Acceptance:**
   - `TestSnapshotMatchNamesMatchK`: after match k ends and k+1 starts, the
     snapshot is k's (head equals k's sidecar head).

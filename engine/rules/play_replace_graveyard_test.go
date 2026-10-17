@@ -29,7 +29,7 @@ import (
 //
 // TestHeads safety: the 36 ReplaceGraveyard$ CARRIERS are in NO repo deck and
 // NO legacy golden deck (measured: grepping all 36 carrier card names against
-// internal/testutil/decks/*.json returns nothing), so no golden game exercises
+// testkit/testutil/decks/*.json returns nothing), so no golden game exercises
 // the flag; verified unmoved below anyway. (Lightning Bolt itself IS in repo
 // decks — mono-red-goblins and ur-delver — but no deck plays it through a
 // ReplaceGraveyard$ Play, so its resting zone there is unchanged.)

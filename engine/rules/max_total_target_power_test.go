@@ -13,7 +13,7 @@ import (
 // card: "Return any number of target creature cards with total power 10 or
 // less from your graveyard to the battlefield. Exile Reunion of the House."
 // Reunion of the House is in NO repo deck and NO legacy golden deck
-// (grepping internal/testutil/decks/*.json returns nothing), so no chain
+// (grepping testkit/testutil/decks/*.json returns nothing), so no chain
 // head depends on this card. Nethroi, Apex of Death carries the same
 // parameter on its mutate trigger; the shared read is pinned from the
 // ability side by the authored fixture in

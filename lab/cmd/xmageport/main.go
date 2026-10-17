@@ -29,7 +29,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 var dropLands bool

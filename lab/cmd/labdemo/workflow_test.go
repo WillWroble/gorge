@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // smokeOptions is the smoke workflow: two random-deck games, two sealed

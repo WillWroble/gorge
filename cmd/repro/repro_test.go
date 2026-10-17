@@ -12,8 +12,8 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
-	"github.com/adams-shaun/gorge/internal/testutil/feedback"
+	"github.com/adams-shaun/gorge/testkit/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil/feedback"
 )
 
 // fixtureRel is the committed fixture's path from this package's directory
@@ -352,7 +352,7 @@ func TestReproOnFreshSnapshot(t *testing.T) {
 // doc.go declaring that package; it is removed on cleanup.
 //
 // The directory sits at the repo root -- inside the module, so the emitted
-// skeleton can import internal/testutil/feedback and feedback.Root (git
+// skeleton can import testkit/testutil/feedback and feedback.Root (git
 // rev-parse from the working directory) still finds the repo and its corpus
 // -- but under a `_`-prefixed name, which the go tool's `./...` wildcard
 // never matches. A plain root-level scratch package was a real package of
@@ -457,12 +457,12 @@ func TestReproEmitTestIntoRulesCompilesAndFailsOnTODO(t *testing.T) {
 	// internal-package skeleton would form, and the reason the emitted
 	// declaration must carry the _test suffix.
 	depsOut, err := exec.Command("go", "list", "-f", "{{join .Imports \"\\n\"}}",
-		"github.com/adams-shaun/gorge/internal/testutil/feedback").CombinedOutput()
+		"github.com/adams-shaun/gorge/testkit/testutil/feedback").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list feedback imports: %v\n%s", err, depsOut)
 	}
 	if !strings.Contains(string(depsOut), "github.com/adams-shaun/gorge/engine/rules") {
-		t.Fatalf("premise lost: internal/testutil/feedback no longer imports the rules package:\n%s", depsOut)
+		t.Fatalf("premise lost: testkit/testutil/feedback no longer imports the rules package:\n%s", depsOut)
 	}
 
 	target, rel := emitScratch(t, root, "zzrepro-emitrules", "")

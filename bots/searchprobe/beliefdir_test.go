@@ -3,7 +3,7 @@ package searchprobe
 import (
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestLoadBeliefDirTrainSplitOnly: a pool.tsv naming two train decks and one

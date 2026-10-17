@@ -3,7 +3,7 @@
 #
 # `git worktree add` alone is NOT enough here. It carries only tracked files,
 # and this repo needs one untracked thing to test honestly: the `.cards`
-# corpus. Without it internal/testutil's CorpusRegistry calls
+# corpus. Without it testkit/testutil's CorpusRegistry calls
 #
 #     t.Skip("testutil: no .cards/ corpus present -- run `make fetch-cards compile-cards`")
 #

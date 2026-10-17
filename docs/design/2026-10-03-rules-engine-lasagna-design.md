@@ -255,7 +255,7 @@ a deliberate, re-pinned behaviour change.
 ## 4. W0 — Guardrails and shrink-only ratchets
 
 Start immediately. Each is a constant plus a test that fails on growth and
-logs on shrink, copying `internal/testutil/agentsdoc_test.go`
+logs on shrink, copying `testkit/testutil/agentsdoc_test.go`
 (`knownApproximationRows`, `TestKnownApproximationsOnlyShrinks`).
 
 | Ratchet | Measures | Starting value |

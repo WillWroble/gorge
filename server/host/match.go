@@ -215,7 +215,7 @@ func (r *Registry) newMatchWith(t *table, k int, plan *SeriesGame) (*match, erro
 		// storm ends as a recorded stalled match (the play recover below
 		// re-classifies it) instead of growing the arena and event log
 		// until the process OOMs. The same volume bound the shared harness
-		// drive loop (internal/bench) arms; an explicit caller guard would
+		// drive loop (testkit/bench) arms; an explicit caller guard would
 		// win, and no host path sets one.
 		cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	}

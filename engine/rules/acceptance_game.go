@@ -15,7 +15,7 @@ import (
 // comparing the games the goldens pin, not a copy that could drift.
 //
 // The seating (the 12 pinned Legacy decks, round-robined from deck 0) is
-// internal/testutil's AcceptanceDecks, because the deck pool is testutil's
+// testkit/testutil's AcceptanceDecks, because the deck pool is testutil's
 // and production rules may not import it. The bot is botpolicy.GameBot,
 // passed in as a factory because rules may not import botpolicy either
 // (botpolicy's own tests import rules, so the edge would be a test import

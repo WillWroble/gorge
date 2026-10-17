@@ -18,7 +18,7 @@ go test -v -run '^TestHeads$/^4seats$' ./engine/rules/
   inputs changed. The one input it cannot see is the corpus (it is outside the
   module), so `make fetch-cards` clears the test cache whenever the pin moves.
 - **Prove the corpus ran.** Tests load cards through
-  `testutil.CorpusRegistry(t)` (`internal/testutil/decks.go`), which calls
+  `testutil.CorpusRegistry(t)` (`testkit/testutil/decks.go`), which calls
   `t.Skip` when `.cards/` is missing. A package that prints `ok` in about
   2 ms has run almost nothing. Use `-v` and look for `SKIP` if in doubt. In
   a git worktree, link the main checkout's `.cards/` (that is what
@@ -34,7 +34,7 @@ Every single test must fit **4 GB RSS, 4 vCPU and 1 minute of wall time**.
 (`ops/scripts/postmerge_full.sh`). It names every test over 60 s and every
 test binary whose peak RSS is over 4 GiB, and fails the batch on any not
 already listed in the shrink-only files
-`internal/testutil/testdata/wall_exceptions.txt` and `rss_exceptions.txt`.
+`testkit/testutil/testdata/wall_exceptions.txt` and `rss_exceptions.txt`.
 Fix an offender by splitting it into chunk tests that share fixtures. Never
 cut its coverage, and never add a row.
 
@@ -86,12 +86,12 @@ rejects that.
 |---|---|---|
 | `TestHeads` | `engine/rules/heads_test.go`; goldens in `engine/rules/testdata/heads/<seats>.txt` | The deterministic bot games over the 12 Legacy repo decks, at 2/4/6/8 seats, finished with a different hash-chain head. Your change altered what happens in those games. If intended, re-pin with `GORGE_UPDATE_HEADS=1 go test ./engine/rules/ -run '^TestHeads$'` and name the first diverging event and its cause in the commit message (`go doc ./cmd/headdiff` shows how to find it). If not intended, you have a bug, often nondeterminism. |
 | `TestRepoDeckGamesReplayExactly` | `engine/rules/acceptance_test.go` | A game replayed from its log diverged from the live run: something mutated state outside `events.Apply`, or something nondeterministic reached an event. |
-| `TestEveryRepoDeckIsFullySupported` | `engine/rules/acceptance_test.go`; table in `engine/rules/testdata/known-unsupported/` (one JSON file per card) | A card in the repo decks (`internal/testutil/decks/*.json`) needs a primitive this build does not register (a regression: fix it), or a listed card is now fully supported (delete its file). |
+| `TestEveryRepoDeckIsFullySupported` | `engine/rules/acceptance_test.go`; table in `engine/rules/testdata/known-unsupported/` (one JSON file per card) | A card in the repo decks (`testkit/testutil/decks/*.json`) needs a primitive this build does not register (a regression: fix it), or a listed card is now fully supported (delete its file). |
 | `TestEveryRepoDeckParamsAreRead` | `engine/rules/paramcensus_test.go`; table in `engine/rules/testdata/paramcensus/` | The same, for script parameters no code reads and cost tokens no code models. |
 | `TestValueHeadRegistryMatchesEvaluator` | `engine/rules/value_heads_test.go` | A `count:` value head was added to the evaluator but not to `modelledValueHeads` in `engine/effects/value_heads.go`, or the reverse. |
 | `internal/archtest` (`TestDependencyOrderHolds`, `TestTimeIsImportedOnlyByTheHost`, `TestRootModuleHasNoRequires`, the `layering_*` tests, …) | `internal/archtest/` | You added a forbidden import edge (for example `effects` → `rules`, `view` → `rules`), imported `time` outside the host tier and its allowlist, or added a `require` to `go.mod`. Restructure the code; do not edit the allowlists. |
 | `TestClassificationIsComplete` | `cmd/pkgmap/main_test.go` | A package has no tier entry in `docs/site/architecture/packages.tiers.json`. Also run by the `pre-commit` hook (`go run ./cmd/pkgmap -check`). |
-| `TestKnownApproximationsOnlyShrinks` | `internal/testutil/agentsdoc_test.go` | `AGENTS.md`'s *Known approximations* table grew. It only shrinks. |
+| `TestKnownApproximationsOnlyShrinks` | `testkit/testutil/agentsdoc_test.go` | `AGENTS.md`'s *Known approximations* table grew. It only shrinks. |
 | `internal/codeshape` (`TestCodeShapeOnlyShrinks`, `TestLongFunctionsOnlyShrink`) | `internal/codeshape/ratchet_test.go` | Shrink-only ceilings on function length, interface width and string-keyed dispatch in `engine/rules` and `engine/effects` (`go run ./cmd/codeshape -table` measures them). Both tests are currently skipped by the maintainers (since 2026-10-06), but the ceilings still describe the direction: do not grow a function past 300 lines. |
 | `TestNoForgeScriptsTracked` | `engine/cards/boundary_test.go` | A Forge script is tracked in git. Remove it. |
 

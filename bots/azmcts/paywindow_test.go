@@ -127,7 +127,7 @@ func TestAZSearchesTheCounterspellWindow(t *testing.T) {
 	if !s.WantsPaymentActions() {
 		t.Fatal("an AutoPayment az seat must consume payment plans")
 	}
-	e.EnsurePaymentActions() // the driver's gate (internal/bench, host)
+	e.EnsurePaymentActions() // the driver's gate (testkit/bench, host)
 	diags := watchDiags(t)
 	d := *e.Pending()
 	board := botpolicy.NewBoard(2)

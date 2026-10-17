@@ -20,7 +20,7 @@ import (
 	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
 	"github.com/adams-shaun/gorge/bots/searchprobe"
 	"github.com/adams-shaun/gorge/engine/decision"
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 func TestNothingIsRegisteredUntilEnabled(t *testing.T) {

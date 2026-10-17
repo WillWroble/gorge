@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/adams-shaun/gorge/bots/policynet"
-	"github.com/adams-shaun/gorge/internal/cli"
+	"github.com/adams-shaun/gorge/cli"
 	"github.com/adams-shaun/gorge/lab/contracts"
 )
 

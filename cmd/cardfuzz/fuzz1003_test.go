@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adams-shaun/gorge/internal/testutil"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestFuzz1003Findings replays the fuzz-1003 cardfuzz records

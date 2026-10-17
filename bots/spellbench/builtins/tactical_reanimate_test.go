@@ -6,8 +6,8 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/internal/testutil"
 	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
 // TestReanimateValueTerminates: a creature whose own ETB returns a creature

@@ -555,7 +555,7 @@ Deleting a rule. If a rule looks obsolete, say so in the report and leave it.
 ## Done means
 
 `agent_context_bytes` is under {CONTEXT_ALARM_BYTES}, no rule was lost (list
-what moved where), and `go test ./internal/testutil` is green.
+what moved where), and `go test ./testkit/testutil` is green.
 """,
                 est_delta=(ctx.value - CONTEXT_ALARM_BYTES) / 10000.0,
                 est_cost=1.0,
