@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/adams-shaun/gorge/engine/cards"
@@ -17,8 +18,10 @@ import (
 // deterministic: AliveFrom(0) seats, a fixed zone order, slice order inside
 // each zone, and each face's own Statics order.
 func (e *Engine) collectCostStatics() costStaticViews {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return v.cost
+	if c, ok := e.boardStaticsRef(); ok {
+		v := &c.v.cost
+		return costStaticViews{raise: slices.Clip(v.raise), reduce: slices.Clip(v.reduce),
+			set: slices.Clip(v.set), optional: slices.Clip(v.optional), validTarget: v.validTarget}
 	}
 	return e.scanCostStatics()
 }

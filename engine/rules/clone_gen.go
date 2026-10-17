@@ -51,6 +51,7 @@ func cloneSpareFields(c *Engine, sp *Spare) {
 	c.legalOptBuf = sp.legalOpts
 	c.manaAbBuf = sp.manaAb
 	c.lossMemo = sp.lossMemo
+	c.manaGate = sp.manaGate
 	c.castFree = sp.cast
 }
 
@@ -1199,6 +1200,8 @@ type sparePools struct {
 	manaAb []*cards.SA
 	// lossMemo recycles Engine.lossMemo.
 	lossMemo abilityLossMemo
+	// manaGate recycles Engine.manaGate.
+	manaGate manaGateMemo
 	// pending recycles Engine.pendingTriggers.
 	pending []pendingTrigger
 	// trigZones recycles Engine.trigZones.
@@ -1223,6 +1226,7 @@ func releasePools(e *Engine, sp *Spare) {
 	sp.legalOpts, e.legalOptBuf = e.legalOptBuf[:0], nil
 	sp.manaAb, e.manaAbBuf = e.manaAbBuf[:0], nil
 	sp.lossMemo, e.lossMemo = e.lossMemo.recycled(), abilityLossMemo{}
+	sp.manaGate, e.manaGate = e.manaGate.recycled(), manaGateMemo{}
 	sp.pending, e.pendingTriggers = recycledSlice(e.pendingTriggers), nil
 	sp.trigZones, e.trigZones = releasedTrigZones(e.trigZones), nil
 	sp.replZones, e.replZones = releasedReplZones(e.replZones), nil

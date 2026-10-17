@@ -263,6 +263,9 @@ type engineScratch struct {
 	// lossMemo is abilityLoss's per-active()-build answer cache
 	// (abilityloss_memo.go). Clone leaves it zero.
 	lossMemo abilityLossMemo `clone:"reset,pool=lossMemo,release=.recycled"`
+	// manaGate is appendAvailableManaAbilitiesGate's per-walk answer cache
+	// (mana_gate_memo.go). Pure scratch: Clone recycles its storage only.
+	manaGate manaGateMemo `clone:"reset,pool=manaGate,release=.recycled"`
 	// layer5Colors is the on-demand layer-5 derived-colour table
 	// (layer5colors.go) and its key. Clone leaves it zero.
 	layer5Colors   []effects.ObjectColors `clone:"reset"`

@@ -426,7 +426,9 @@ func (e *Engine) appendAvailableManaAbilities(out []*cards.SA, statics *actionSt
 // keeps the live gate. The non-mana gates (zone, loyalty, activation
 // condition, restriction, activation limit) are unchanged, so the probe's
 // membership is still a subset of what the window can eventually offer.
-func (e *Engine) appendAvailableManaAbilitiesGate(out []*cards.SA, statics *actionStaticSource, p state.PlayerID, id state.ObjID, ignorePayable bool) []*cards.SA {
+// appendAvailableManaAbilitiesGateCompute is appendAvailableManaAbilitiesGate
+// without its per-walk memo (mana_gate_memo.go).
+func (e *Engine) appendAvailableManaAbilitiesGateCompute(out []*cards.SA, statics *actionStaticSource, p state.PlayerID, id state.ObjID, ignorePayable bool) []*cards.SA {
 	o := e.G.Obj(id)
 	// CR 702.25b: a phased-out permanent is treated as though it does not
 	// exist, so its mana abilities do not exist. PhasedOut is only ever set on

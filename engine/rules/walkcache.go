@@ -100,6 +100,11 @@ type boardStaticsCache struct {
 	// static_scan_reuse.go.
 	scan    staticScanRec
 	printed [4]int
+	// ver moves on every write of v; carriers is addAbilityCarriers of
+	// v.action.continuous as of carriersVer (collectAddAbilityCarriers asks
+	// once per object, so the filter runs once per scan instead).
+	ver, carriersVer uint64
+	carriers         []staticView
 }
 
 // walkCrossHit reports whether an entry an EARLIER scope built at key k and
@@ -137,9 +142,20 @@ func (e *Engine) walkBuildSeq() uint64 {
 // outside a walk. Every returned slice is clipped, so a caller that appends
 // (castRestrictionSources) reallocates instead of writing the cache.
 func (e *Engine) boardStaticsWalk() (boardStatics, bool) {
-	now, ok := e.walkKeyNow()
+	c, ok := e.boardStaticsRef()
 	if !ok {
 		return boardStatics{}, false
+	}
+	return clipBoardStatics(c.v), true
+}
+
+// boardStaticsRef is boardStaticsWalk's cache, current for this walk, or
+// ok=false outside a walk. A reader of one list clips that list itself
+// rather than copying the whole boardStatics.
+func (e *Engine) boardStaticsRef() (*boardStaticsCache, bool) {
+	now, ok := e.walkKeyNow()
+	if !ok {
+		return nil, false
 	}
 	c := &e.boardStaticsCache
 	switch {
@@ -189,8 +205,9 @@ func (e *Engine) boardStaticsWalk() (boardStatics, bool) {
 			seq = 0 // active() rebuilt mid-scan: never reuse across walks
 		}
 		c.key, c.seq = now, seq
+		c.ver++
 	}
-	return clipBoardStatics(c.v), true
+	return c, true
 }
 
 func clipBoardStatics(v boardStatics) boardStatics {
@@ -344,8 +361,8 @@ func staticViewsSame(a, b []staticView) bool {
 // board, in the scan order manaConversionParts has always applied them.
 // The returned slice is owned by the cache; callers only range it.
 func (e *Engine) manaConvPrintedSources() []manaConvSource {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return v.manaConv
+	if c, ok := e.boardStaticsRef(); ok {
+		return slices.Clip(c.v.manaConv)
 	}
 	return e.scanManaConvSources(nil)
 }

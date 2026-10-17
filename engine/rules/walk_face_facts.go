@@ -547,7 +547,35 @@ func (e *Engine) walkFaceFactsOf(f *cards.Face) *walkFaceFacts {
 			return ff
 		}
 	}
-	return e.compiledText.faceFacts(f)
+	if ff := e.compiledText.faceFacts(f); ff != nil || e.G == nil || e.G.HypotheticalCards == nil {
+		return ff
+	}
+	return publishWalkFaceFacts(f)
+}
+
+// publishWalkFaceFacts computes the facts of a face no configured table holds
+// in a hypothetical search world (a redealt hidden card, drawn from a belief
+// pool outside the match's decks; live and replay engines never publish
+// here) and publishes them on its empty slot, as buildWalkFaceTable
+// does for a configured face: the entry is the same pure function of the
+// face, so every later engine -- each search world is a fresh clone -- takes
+// the slot read instead of re-running the fallbacks' text scans. A face
+// whose slot already holds another face's (or a stale) entry gets nil, the
+// readers' recompute path, as before.
+func publishWalkFaceFacts(f *cards.Face) *walkFaceFacts {
+	slot := f.ExtSlot()
+	if slot == nil || slot.Load() != nil {
+		return nil
+	}
+	ff := computeWalkFaceFacts(f)
+	if !slot.Store(unsafe.Pointer(&ff)) {
+		// A concurrent first store won; serve it if it is f's own.
+		if won := (*walkFaceFacts)(slot.Load()); won.currentFor(f) {
+			return won
+		}
+		return nil
+	}
+	return &ff
 }
 
 // printedHeads is printedHeadsOf(f), read from the face facts when their

@@ -219,8 +219,9 @@ func (s *actionStaticSource) get() actionStaticViews {
 // expansion or collectCostStatics' other zones. Each mode keeps its original
 // seat, zone and parsed-static order while sharing a single membership walk.
 func (e *Engine) collectActionStatics() actionStaticViews {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return v.action
+	if c, ok := e.boardStaticsRef(); ok {
+		a := &c.v.action
+		return actionStaticViews{cantCast: slices.Clip(a.cantCast), cantActivate: slices.Clip(a.cantActivate), continuous: slices.Clip(a.continuous)}
 	}
 	return e.scanActionStatics()
 }
@@ -235,8 +236,11 @@ func (e *Engine) scanActionStatics() actionStaticViews {
 // zone and static order, so a board with no grantor allocates nothing (the
 // mana path asks it once per object).
 func (e *Engine) collectAddAbilityCarriers() []staticView {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return addAbilityCarriers(v.action.continuous)
+	if c, ok := e.boardStaticsRef(); ok {
+		if c.carriersVer != c.ver {
+			c.carriers, c.carriersVer = slices.Clip(addAbilityCarriers(c.v.action.continuous)), c.ver
+		}
+		return c.carriers
 	}
 	return e.scanActionStaticsMode(true).continuous
 }
