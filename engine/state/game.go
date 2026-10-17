@@ -802,8 +802,19 @@ func (g *Game) AddObject(card *cards.Card, owner PlayerID) *Object {
 	return &g.Objs[len(g.Objs)-1]
 }
 
-// cloneObjectHeadroom is the spare Objs capacity Clone gives a copy.
+// cloneObjectHeadroom is the least spare Objs capacity a copy keeps past its
+// objects: a recycled arena (CloneInto) must have this much room, and a
+// fresh one is allocated with cloneObjectReserve.
 const cloneObjectHeadroom = 8
+
+// cloneObjectReserve is the spare Objs capacity a freshly allocated copy
+// gets. It is more than cloneObjectHeadroom so the arena stays recyclable
+// as the game mints objects: a recycled arena is accepted while it keeps
+// cloneObjectHeadroom past the objects, and one allocated with exactly that
+// stops fitting as soon as the game has minted a token or two since --
+// measured on the az-c6 cached-worlds bench (2026-10-17), a fifth of the
+// node cache's recycled arenas were a few objects short. Capacity only.
+const cloneObjectReserve = 32
 
 // Clone deep-copies the game. Everything is slices of value types, so this is
 // a handful of copy() calls rather than a graph walk. Player's Commander
@@ -854,7 +865,7 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 	if cap(objs) >= len(g.Objs)+cloneObjectHeadroom {
 		c.Objs = objs[:len(g.Objs)]
 	} else {
-		c.Objs = make([]Object, len(g.Objs), len(g.Objs)+cloneObjectHeadroom)
+		c.Objs = make([]Object, len(g.Objs), len(g.Objs)+cloneObjectReserve)
 	}
 	// The objects' common slice copies come from one backing array per
 	// element type (cloneArena), and the zone lists from one more below.

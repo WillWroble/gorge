@@ -414,6 +414,13 @@ func (p *sparePool) get(e *rules.Engine) rules.Spare {
 	return sp
 }
 
+// resumeSlack is the spare event capacity a Resume reserves past a history
+// of n events when no pooled array fit it: enough for the walk's appends
+// (under 128 in 99% of simulations, measured on the az-c6 cached-worlds
+// bench) and for the next trees' resumes, whose histories run a few
+// hundred events past this one as the game goes on.
+func resumeSlack(n int) int { return max(512, n/8) }
+
 // fixedEnvs is worldEnvs over a FixedWorldSource: the NodeStateSource the
 // node cache walks. It asks the world source for worlds until the root's
 // state is saved; every later simulation is a copy of a saved state.
@@ -540,6 +547,7 @@ func (f *fixedEnvs) Resume(snap any) (env Env, err error) {
 		// built from the pool's recycled storage, when there is any.
 		f.spare = f.pool.get(s.e)
 	}
+	fits := f.pool != nil && f.spare.Fits(s.e)
 	defer func() {
 		if p := recover(); p != nil {
 			tracePanic("cache-resume", p)
@@ -547,6 +555,15 @@ func (f *fixedEnvs) Resume(snap any) (env Env, err error) {
 		}
 	}()
 	e := s.e.CloneInto(&f.spare)
+	if f.pool != nil && !fits {
+		// No pooled array held this history: the clone shares its parent's
+		// and its first append would copy the history into a fresh array
+		// grown by the forked log's slack. Reserve that array now instead,
+		// with resumeSlack: the same one copy, into an array that will fit
+		// the resumes of the next trees (sparePool) rather than only this
+		// walk's appends. Capacity only (events.Log.Reserve).
+		e.L.Reserve(len(e.L.Events) + resumeSlack(len(e.L.Events)))
+	}
 	rngs, pcgs := make([]*rand.Rand, len(s.pcgs)), make([]*rand.PCG, len(s.pcgs))
 	for i := range s.pcgs {
 		p := s.pcgs[i]

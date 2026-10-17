@@ -323,8 +323,8 @@ func (l *Log) Provenance() (from *Event, n int) { return l.prefixFrom, l.prefixL
 // caller's recycled arrays (a spent clone's, handed back through the rules
 // engine's Release) instead of shared with l, so a search that clones one
 // root per simulation stops allocating a fresh log per simulation. An array
-// too small to hold l's history plus forkMinSlack appends is ignored and the
-// copy shares l's prefix exactly as Clone does. The recycled arrays' contents
+// too small to hold l's history plus recycleMinSlack appends is ignored
+// (RecycleFits) and the copy shares l's prefix exactly as Clone does. The recycled arrays' contents
 // are never read (every slot up to len is overwritten here, and every slot
 // past it is overwritten by Append before it is read); the caller must hold
 // no other reference into them. Everything a reader can observe -- Events,
@@ -360,12 +360,25 @@ func (l *Log) CloneIntoFrom(events []Event, from *Event, n, dirty int, intents [
 	return c
 }
 
+// recycleMinSlack is the least spare capacity past l's history a recycled
+// array must have for CloneInto to copy into it (RecycleFits). Copying
+// into an array the clone's appends then outgrow costs a second copy of
+// the history (growEvents), so the bar is set where that is rare: measured
+// on the az-c6 cached-worlds bench (2026-10-17), a resumed walk appends
+// fewer than 32 events in 65% of simulations, fewer than 64 in 84% and
+// fewer than 128 in 99%. A forked log's own growth leaves it forkMinSlack
+// (256) past where it grew, so with the bar at 256 only an array that
+// came from a log at least as long as l could ever fit; at 128 an array
+// from a log up to 128 events shorter fits too, which is most of a node
+// cache's recycled arrays (bots/azmcts sparePool).
+const recycleMinSlack = 128
+
 // RecycleFits reports whether CloneInto would copy l's history into the
-// recycled array events: it must hold the history plus forkMinSlack appends,
-// the one condition CloneIntoFrom checks. A caller holding several recycled
-// arrays picks one that fits before cloning, instead of handing over one the
-// clone would ignore (and then allocate past).
-func (l *Log) RecycleFits(events []Event) bool { return cap(events) >= len(l.Events)+forkMinSlack }
+// recycled array events: it must hold the history plus recycleMinSlack
+// appends, the one condition CloneIntoFrom checks. A caller holding several
+// recycled arrays picks one that fits before cloning, instead of handing
+// over one the clone would ignore (and then allocate past).
+func (l *Log) RecycleFits(events []Event) bool { return cap(events) >= len(l.Events)+recycleMinSlack }
 
 // Forked reports whether l was made by Clone or CloneInto. A forked log's
 // Events and Intents may still be its parent's backing arrays: they are the
