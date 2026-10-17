@@ -2,9 +2,7 @@ package rules
 
 import (
 	"slices"
-	"strings"
 
-	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -108,55 +106,9 @@ func (e *Engine) storiedPossible() bool {
 		*s = storiedScan{game: e.G}
 	}
 	for ; !s.seen && s.scanned < len(e.G.Objs); s.scanned++ {
-		if _, st := cardMentions(e.G.Objs[s.scanned].Card); st {
+		if e.cardScanHas(e.G.Objs[s.scanned].Card, faceScanStoried) {
 			s.seen = true
 		}
 	}
 	return s.seen
-}
-
-// cardMentionsStoried reports whether any face of c prints Storied or names
-// it in any parameter or SVar (a grant). Deliberately over-inclusive: a false
-// positive only costs the full scan.
-func cardMentionsStoried(c *cards.Card) bool {
-	if c == nil {
-		return false
-	}
-	params := func(m map[string]string) bool {
-		for _, v := range m { // membership test only; order cannot matter.
-			if strings.Contains(v, "Storied") {
-				return true
-			}
-		}
-		return false
-	}
-	for _, f := range c.Faces {
-		if f == nil {
-			continue
-		}
-		for _, k := range f.Keywords {
-			if strings.Contains(k, "Storied") {
-				return true
-			}
-		}
-		if params(f.SVars) {
-			return true
-		}
-		for _, st := range f.Statics {
-			if params(st.Params) {
-				return true
-			}
-		}
-		for _, a := range f.Abilities {
-			if a != nil && params(a.Params) {
-				return true
-			}
-		}
-		for _, tr := range f.Triggers {
-			if params(tr.Params) || (tr.Effect != nil && params(tr.Effect.Params)) {
-				return true
-			}
-		}
-	}
-	return false
 }

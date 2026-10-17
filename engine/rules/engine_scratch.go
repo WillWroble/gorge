@@ -277,9 +277,6 @@ type engineScratch struct {
 	// charsSum is active()'s per-build digest for Characteristics' printed
 	// fast path (derived_printed.go). Clone leaves it zero.
 	charsSum charsSummary `clone:"reset"`
-	// faceScans memoises per-face text-scan verdicts (face_scan_memo.go).
-	// Clone leaves it nil.
-	faceScans map[*cards.Face]faceScan `clone:"reset"`
 	// intentBuf is a recycled intent array from Config.Spare, installed as
 	// the log's Intents on the first Submit (see there). Not cloned.
 	intentBuf []decision.Intent `clone:"reset"`
