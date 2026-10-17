@@ -112,7 +112,7 @@ func paymentPlanAbilityShapeTier(e Engine, p state.PlayerID, id state.ObjID, ma 
 	}
 	var cost costvocab.Cost
 	if ma != nil {
-		cost = ParseCostOf(e, ma.ParamStr(cards.PKCost))
+		cost = AbilityCompiledCost(e, ma).Cost
 	}
 	tier, c, detail, rider := PaymentPlanShapeTierOf(ma, cost)
 	if !rider {

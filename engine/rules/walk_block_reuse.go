@@ -116,7 +116,7 @@ func (r *walkBlockRec) recordMembers(zi int, all []*cards.SA) {
 func (e *Engine) filterPayableMana(dst, all []*cards.SA, p state.PlayerID, o *state.Object, id state.ObjID) []*cards.SA {
 	out := dst[:0]
 	for _, ma := range all {
-		cc := e.compiledCostOf(ma.ParamStr(cards.PKCost))
+		cc := e.abilityCompiledCost(ma)
 		if mf := e.manaFactsOf(ma); mf != nil {
 			cc = mf.cost
 		}

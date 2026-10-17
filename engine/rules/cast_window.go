@@ -131,7 +131,7 @@ func (e *Engine) castWindowProbeUnits(pc *pendingCast, windowUnits []windowManaU
 			if mp.RestrictValid != "" {
 				continue
 			}
-			cost := e.parseCost(ma.ParamStr(cards.PKCost))
+			cost := e.abilityCompiledCost(ma).Cost
 			if pay.ActivationTapCostUnavailable(o, &cost) {
 				continue
 			}
@@ -244,7 +244,7 @@ func (e *Engine) castWindowSourceExcluded(p state.PlayerID, id state.ObjID) bool
 		if mp.RestrictValid != "" {
 			return true
 		}
-		cost := e.parseCost(ma.ParamStr(cards.PKCost))
+		cost := e.abilityCompiledCost(ma).Cost
 		if pay.ActivationTapCostUnavailable(o, &cost) {
 			continue
 		}

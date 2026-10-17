@@ -18,7 +18,7 @@ func (e *Engine) splitCastTargetsAvailable(p state.PlayerID, id state.ObjID, f *
 	}
 	xPending := costAnnouncesX(e.faceCost(f))
 	if ab := f.SpellAbility(); ab != nil {
-		xPending = xPending || costAnnouncesX(e.parseCost(ab.ParamStr(cards.PKCost)))
+		xPending = xPending || costAnnouncesX(e.abilityCompiledCost(ab).Cost)
 	}
 	return e.targetsAvailable(p, id, id, f.SpellAbility(), xPending)
 }

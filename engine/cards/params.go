@@ -1951,6 +1951,9 @@ func (f *Face) deriveParamSets() {
 			if sa.extSlot == nil {
 				sa.extSlot = &ExtSlot{}
 			}
+			if sa.costSlot == nil {
+				sa.costSlot = &Slot{}
+			}
 			sa = sa.Sub
 		}
 	}

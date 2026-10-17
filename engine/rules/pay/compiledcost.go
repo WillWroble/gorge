@@ -135,6 +135,23 @@ func FaceCompiledCost(e Engine, f *cards.Face) *CompiledCost {
 	return slot.Store(f.ManaCost, c).(*CompiledCost)
 }
 
+// AbilityCompiledCost is CompiledCostOf(sa's Cost$ text) through the
+// ability's cost slot, the same way FaceCompiledCost serves a face's
+// ManaCost: later reads follow a pointer instead of hashing the text. The
+// result is READ-ONLY.
+func AbilityCompiledCost(e Engine, sa *cards.SA) *CompiledCost {
+	raw := sa.ParamStr(cards.PKCost)
+	slot := sa.CostSlot()
+	if v, ok := slot.Load(raw); ok {
+		return v.(*CompiledCost)
+	}
+	c := CompiledCostOf(e, raw)
+	if slot == nil {
+		return c
+	}
+	return slot.Store(raw, c).(*CompiledCost)
+}
+
 // FaceCost is ParseCostOf(f.ManaCost) through the face's slot: a value copy
 // the caller may modify.
 func FaceCost(e Engine, f *cards.Face) Cost { return FaceCompiledCost(e, f).Cost }

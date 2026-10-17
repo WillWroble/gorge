@@ -273,7 +273,7 @@ func (e *Engine) answerNestedManaColor(ma *manaColorActivation, chosen []decisio
 	}
 	savedTap, savedProducer := e.manaFromTap, e.manaProducer
 	if ma.trigger == nil && ma.ability != nil {
-		e.manaFromTap = e.costRef(ma.ability.ParamStr(cards.PKCost)).Tap
+		e.manaFromTap = (&e.abilityCompiledCost(ma.ability).Cost).Tap
 		e.manaProducer = ma.source
 	}
 	template := *ma
@@ -316,7 +316,7 @@ func (e *Engine) answerNestedChooseColor(ma *manaColorActivation, chosen []decis
 	}
 	savedTap, savedProducer := e.manaFromTap, e.manaProducer
 	if ma.trigger == nil && ma.ability != nil {
-		e.manaFromTap = e.costRef(ma.ability.ParamStr(cards.PKCost)).Tap
+		e.manaFromTap = (&e.abilityCompiledCost(ma.ability).Cost).Tap
 		e.manaProducer = ma.source
 	}
 	template := *ma
@@ -587,7 +587,7 @@ func (e *Engine) appendAvailableManaAbilitiesGateCompute(out []*cards.SA, static
 				!e.activationConditionOK(p, id, ma) || !pay.ManaActivationGateHolds(asPayer(e), p, id, ma) {
 				continue
 			}
-			cc = e.compiledCostOf(ma.ParamStr(cards.PKCost))
+			cc = e.abilityCompiledCost(ma)
 		}
 		// The cost is looked up once for the CR 302.6 tap-sick gate and the
 		// payability gate (manaAbilityPayable's own tap-sick re-check is the
@@ -645,7 +645,7 @@ func (e *Engine) appendAvailableManaAbilitiesGateCompute(out []*cards.SA, static
 		// Face contexts are shared across abilities; never let one cost's
 		// elected candidates leak into a sibling ManaReflected ability.
 		c := *ctx()
-		cost := e.parseCost(ma.ParamStr(cards.PKCost))
+		cost := e.abilityCompiledCost(ma).Cost
 		if len(cost.UntapPermanent) > 0 {
 			claimed := map[state.ObjID]bool{}
 			if cost.Tap {
@@ -963,7 +963,7 @@ func (e *Engine) manaAbilityPayablePool(p state.PlayerID, source state.ObjID, ma
 	if o == nil || o.Face() == nil {
 		return false
 	}
-	cc := e.compiledCostOf(ma.ParamStr(cards.PKCost))
+	cc := e.abilityCompiledCost(ma)
 	if pay.TapFlagsSick(asPayer(e), source, cc.Tap, cc.Untap, activatesAsIfHaste(e, source)) {
 		return false
 	}
@@ -1460,7 +1460,7 @@ func (e *Engine) resolveManaAbilityRef(p state.PlayerID, source state.ObjID, ma 
 // on an immutable copy, but the limit census is keyed to the compiled ability
 // in the source pile, not that copy.
 func (e *Engine) resolveManaAbilityRefOriginal(p state.PlayerID, source state.ObjID, ma, original *cards.SA, gained pay.GainedManaRef, cast, payment, interactive bool) {
-	if !interactive && pay.CostHasDynamicXTap(e.costRef(ma.ParamStr(cards.PKCost))) {
+	if !interactive && pay.CostHasDynamicXTap((&e.abilityCompiledCost(ma).Cost)) {
 		return
 	}
 	if !e.manaAbilityPayable(p, source, ma) {
@@ -1495,7 +1495,7 @@ func (e *Engine) resolveManaAbilityRefOriginal(p state.PlayerID, source state.Ob
 			e.emit(events.Event{Kind: events.ManaActivate, Player: p, Obj: source, Amount: int32(idx)})
 		}
 	}
-	cc := e.compiledCostOf(ma.ParamStr(cards.PKCost))
+	cc := e.abilityCompiledCost(ma)
 	cost := cc.Cost
 	sacs, _ := pay.ManaSacrifices(asPayer(e), p, source, cost)
 	// The continuation owns EVERY non-mana cost part, so it must be entered
@@ -1614,7 +1614,7 @@ func (e *Engine) resolveManaEffect(p state.PlayerID, source state.ObjID, ma *car
 		}
 		return
 	}
-	if pay.CostHasDynamicXTap(e.costRef(ma.ParamStr(cards.PKCost))) && mp.AmountTrim == "0" {
+	if pay.CostHasDynamicXTap((&e.abilityCompiledCost(ma).Cost)) && mp.AmountTrim == "0" {
 		// X=0 produces no mana and therefore has no meaningful colour
 		// allocation decision.
 		e.finishManaEffect(p, source, ma, produced, gained, sacs, cast, cumulative, triggers)
@@ -2039,7 +2039,7 @@ func (e *Engine) resolveManaEffectColor(p state.PlayerID, source state.ObjID, ma
 	// replay chain head). A sacrifice-only KCI activation therefore identifies
 	// its source but is not tap-produced.
 	savedTap, savedProducer := e.manaFromTap, e.manaProducer
-	e.manaFromTap = e.costRef(ma.ParamStr(cards.PKCost)).Tap
+	e.manaFromTap = (&e.abilityCompiledCost(ma).Cost).Tap
 	e.manaProducer = source
 	// A gained mana ability's body resolves its SVars (Amount$ X) against
 	// the FOREIGN face it was compiled on, never the recipient's.

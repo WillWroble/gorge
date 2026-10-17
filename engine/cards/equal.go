@@ -19,7 +19,7 @@ import "slices"
 // node fails the build's tests until the function here compares it).
 
 const (
-	saFieldCount       = 13
+	saFieldCount       = 14
 	triggerFieldCount  = 6
 	staticFieldCount   = 5
 	replFieldCount     = 8
@@ -104,7 +104,7 @@ func SAEqual(a, b *SA) bool {
 		a.compiledCatalog == b.compiledCatalog && a.compiledID == b.compiledID &&
 		a.api == b.api && a.apiBound == b.apiBound && a.exhaust == b.exhaust && a.exhaustBound == b.exhaustBound &&
 		StringMapEqual(a.Params, b.Params) && paramSetEqual(a.ps, b.ps) && extSlotEqual(a.extSlot, b.extSlot) &&
-		SAEqual(a.Sub, b.Sub)
+		slotEqual(a.costSlot, b.costSlot) && SAEqual(a.Sub, b.Sub)
 }
 
 // TriggerEqual is reflect.DeepEqual(*a, *b) for two triggers.

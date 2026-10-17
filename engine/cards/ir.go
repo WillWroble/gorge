@@ -24,6 +24,9 @@ type SA struct {
 	// extSlot holds a downstream package's compiled facts about this
 	// ability (slot.go), allocated at load. Not serialized.
 	extSlot *ExtSlot
+	// costSlot holds a downstream compiled form of the ability's Cost$
+	// text (slot.go), allocated at load. Not serialized.
+	costSlot *Slot
 	// api is API resolved at load (apiBound); see APIKind.
 	api          APICode
 	apiBound     bool

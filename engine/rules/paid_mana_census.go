@@ -68,7 +68,7 @@ func (e *Engine) paidManaAbility(p state.PlayerID, id state.ObjID, o *state.Obje
 	if total <= 0 {
 		return 0, false
 	}
-	cost := e.parseCost(ma.ParamStr(cards.PKCost))
+	cost := e.abilityCompiledCost(ma).Cost
 	if pay.ActivationTapCostUnavailable(o, &cost) {
 		return 0, false
 	}
