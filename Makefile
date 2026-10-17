@@ -57,15 +57,6 @@ FORGE_REPO ?= https://github.com/adams-shaun/forge.git
 # 098b05531 = 1dc038bc6 + The Earth Crystal targets only creatures you control
 # (ValidTgts$ Creature.YouCtrl; Card-Forge/forge#12255/#12256).
 FORGE_REF  ?= 098b055313459c4b36c9e1f1d4e81a2c8aef815e
-# The XMage commit the compliance oracle (manifests, out-of-tree driver)
-# is pinned to. XMage is MIT; nothing from it is a build dependency.
-# docs/design/2026-10-02-xmage-compliance-oracle-design.md
-XMAGE_REF  ?= 6b602a1c85e8ed738a4b40b1ef44c54845b57f68
-XMAGE_ORACLE_DIR ?= /mnt/sata/gorge-training/xmageoracle
-# Forge oracle driver commit (fork, branch oracle-harness): a descendant of FORGE_REF with identical script trees.
-# da1c712c3 = e27d2bdb2 + fork gorge 098b05531 (restores the pin invariant, 2026-10-13).
-FORGE_ORACLE_REF ?= da1c712c31abec3063b0dbf3b517365f18951f89
-FORGE_ORACLE_DIR ?= /mnt/sata/gorge-training/forgeoracle
 
 .PHONY: help
 help:
@@ -77,12 +68,7 @@ help:
 	@echo "  make enginebench-pair BASE=main CAND=. — paired engine-speed comparison (cmd/enginebench)"
 	@echo "  make enginebench-profile [REV=.]       — CPU/alloc profiles of the bench rows, tops printed"
 	@echo "  make enginebench-verify [REV=.]        — memo-verify-mode smoke over the bench rows"
-	@echo "  make compliance-manifests — regenerate lab/oracle/compliance/manifests from XMage set classes at XMAGE_REF"
-	@echo "  make xmage-oracle-setup — build XMage at XMAGE_REF out of tree (heavy; run alone)"
-	@echo "  make compliance-pass SETS='FRA BLB' — XMage compliance pass over the sets (default: every printed list); reruns only stale verdicts, under the heavy-job lock"
-	@echo "  make compliance-status — generated per-set/per-format compliance status (lab/oracle/compliance/status.md, never committed) + ratchet check"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
-	@echo "  make draftsim       — build draftsim and play 2 verified draft events (SET/SEED override)"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
 	@echo "  make deploy-demo    — rebuild and (re)serve the demo on :8080 (bot tables omniscient)"
 	@echo "                        (PACE=1.5s / TABLES / SEATS / FORMATS / SEED override the defaults)"
@@ -118,21 +104,6 @@ $(BIN_DIR)/gorged: $(GO_SRC)
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -o $@ ./cmd/gorged
 
-$(BIN_DIR)/botbench: $(GO_SRC)
-	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -o $@ ./lab/cmd/botbench
-
-$(BIN_DIR)/draftsim: $(GO_SRC)
-	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -o $@ ./lab/cmd/draftsim
-
-.PHONY: draftsim
-# draftsim runs E0's headless limited lab: 4-bot draft pods over the two
-# embedded set specs, best-23 deck builds, and a Bo1 round-robin played
-# through the rules engine, with -verify replaying every game's chain.
-draftsim: $(BIN_DIR)/draftsim
-	$(BIN_DIR)/draftsim -set FDN -seed 1 -events 2 -verify
-
 .PHONY: gorged
 # gorged runs the M2a table server: perpetual bot tables served to a browser
 # at the listen address. make web builds the Svelte client it embeds first.
@@ -141,43 +112,8 @@ draftsim: $(BIN_DIR)/draftsim
 gorged: $(BIN_DIR)/gorged
 	$(BIN_DIR)/gorged -decks testkit/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
 
-# dzbroker is the experimental, tag-gated decision broker (lab/training/inferbroker).
-# It batches learner decisions from many independent games into one inference
-# call with no all-games barrier, and expands one deck matchup into -multiply
-# games with distinct shuffles. The tag keeps it, its seat wrapper and its
-# dependencies out of the default build, vet and the 32-bit gate; the package
-# has an untagged stub, so importing it is always safe.
-.PHONY: dzbroker test-broker
-BROKER_DECKS ?= testkit/testutil/decks
-dzbroker:
-	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -tags broker -o $(BIN_DIR)/dzbroker ./lab/cmd/dzbroker
-
-# gamepool is the experimental, tag-gated pooled-games driver. It is built
-# from the nested module lab/training/experimental/gamepool, which alone requires purego
-# (the GPU scorer's CUDA binding): the root go.mod has no require lines
-# (TestRootModuleHasNoRequires). Add gamepool_gpu to GAMEPOOL_TAGS for the GPU
-# scorer.
-.PHONY: gamepool
-GAMEPOOL_TAGS ?= gamepool
-gamepool:
-	@mkdir -p $(BIN_DIR)
-	cd lab/training/experimental/gamepool && CGO_ENABLED=0 go build -tags '$(GAMEPOOL_TAGS)' -o $(abspath $(BIN_DIR))/gamepool ./cmd/gamepool
-
-# test-broker runs the broker package's tests under the tag. Kept out of the
-# default `make test` for the same reason the build is.
-test-broker:
-	go test -tags broker -count=1 ./lab/training/inferbroker
-
-.PHONY: traindash
-# traindash serves the read-only live training dashboard over the policynet/PPO
-# runs under TRAIN_ROOT (lab/cmd/traindash). Port range 8082-8089, never 8080/8081.
-TRAIN_ROOT ?= /mnt/sata/gorge-training
-TRAINDASH_ADDR ?= 127.0.0.1:8086
-traindash:
-	go run ./lab/cmd/traindash -root $(TRAIN_ROOT) -addr $(TRAINDASH_ADDR)
-
 .PHONY: deploy-demo stop-demo
+FOURYAY_ROOT ?= $(abspath $(dir $(shell git rev-parse --path-format=absolute --git-common-dir))../four-yay)
 # deploy-demo refreshes the local demo: one server on 127.0.0.1:8080 whose
 # bot-only tables spectate omniscient (play-vs-bot tables stay public), four
 # 2-seat constructed tables at a 50ms pace, bots playing az-redeal (2026-09-29:
@@ -189,6 +125,10 @@ traindash:
 # game, so nothing runs it automatically any more (the post-merge hook and
 # the daemon's landing.deploy_cmd were removed on 2026-09-22).
 #
+# The demo serves four-yay's gorged (gorge's plus the draft events and the
+# research bots), built from the four-yay checkout next to gorge's main
+# checkout against this tree's server/gorged/webdist.
+#
 # The binary is rebuilt unconditionally rather than through
 # $(BIN_DIR)/gorged: that rule depends on the Go sources, but the client
 # reaches the server through //go:embed all:webdist, so a web-only change
@@ -196,7 +136,7 @@ traindash:
 # precisely the change a demo exists to show.
 deploy-demo: web
 	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -tags lab -o $(BIN_DIR)/gorged ./cmd/gorged
+	CGO_ENABLED=0 go build -C $(FOURYAY_ROOT) -o $(abspath $(BIN_DIR))/gorged ./cmd/gorged
 	ops/scripts/deploy-demo.sh
 
 # The durable card-art cache deploy-demo fills before it starts any server
@@ -234,41 +174,6 @@ fetch-cards: $(BIN_DIR)/forgec
 .PHONY: compile-cards
 compile-cards: $(BIN_DIR)/forgec
 	$(BIN_DIR)/forgec compile -dir $(CARDS_DIR)
-
-.PHONY: compliance-manifests
-compliance-manifests:
-	go run ./lab/cmd/compliance manifest -xmage $(XMAGE_ORACLE_DIR)/sets-only -ref $(XMAGE_REF) -out lab/oracle/compliance/manifests
-
-.PHONY: xmage-oracle-setup
-xmage-oracle-setup:
-	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) lab/scripts/xmage-oracle-setup.sh
-.PHONY: forge-oracle-setup
-forge-oracle-setup:
-	FORGE_REPO='$(FORGE_REPO)' FORGE_REF='$(FORGE_REF)' FORGE_ORACLE_REF='$(FORGE_ORACLE_REF)' FORGE_ORACLE_DIR='$(FORGE_ORACLE_DIR)' lab/scripts/forge-oracle-setup.sh
-
-# compliance-pass runs the XMage compliance pass (gen, plan, XMage replay of
-# the stale scenarios only, diff -write into lab/oracle/compliance/verdicts, summary)
-# over SETS, under the heavy-job lock. Needs the xmage-oracle-setup build.
-SETS ?=
-.PHONY: compliance-pass
-compliance-pass:
-	XMAGE_REF=$(XMAGE_REF) XMAGE_ORACLE_DIR=$(XMAGE_ORACLE_DIR) lab/scripts/compliance-pass.sh $(SETS)
-
-# compliance-status writes the generated per-set / per-format status page
-# (lab/oracle/compliance/status.md, gitignored: never committed) and checks the
-# certification ratchet (lab/oracle/compliance/ratchet.json). Spec 2026-10-03 11.3 C8.
-.PHONY: compliance-status
-compliance-status:
-	go run ./lab/cmd/oraclediff status -all -out lab/oracle/compliance/status.md
-
-# compliance-sets runs the compliance gate at BOTH levels over every
-# committed printed set and writes the per-set table to
-# .coverage/compliance-sets.md (gitignored, generated, never committed):
-# | SET | level A | level B | notes |, counting cards not problems.
-.PHONY: compliance-sets
-compliance-sets:
-	@mkdir -p .coverage
-	go run ./lab/cmd/oraclediff sets -out .coverage/compliance-sets.md
 
 .PHONY: report
 report: $(BIN_DIR)/forgec
@@ -355,22 +260,6 @@ fuzz:
 test-manabrew:
 	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./server/protocol/manabrew ./server/manabrew/... ./server/host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
 
-# test-spellbench-bridge builds and tests the parked SpellBench protocol v1/v2
-# bridge (build tag `spellbench_bridge`): lab/training/spellbench/{v1agent,kshadow,
-# v2agent,v2engine,v2shadow}, lab/training/v2front and the sbagent,
-# sbv1agent, kshadowcheck, sbv2engine, sbv2local and sbv2shadow commands. Like
-# test-manabrew it is excluded from `go test ./...`, `make test` and the
-# pipeline gates; the live bots' spellbench catalogs, builtins, sbsearch,
-# payexec and registry stay untagged.
-SPELLBENCH_BRIDGE_PKGS = ./lab/training/spellbench/v1agent ./lab/training/spellbench/kshadow \
-	./lab/training/spellbench/v2agent ./lab/training/spellbench/v2engine ./lab/training/spellbench/v2shadow \
-	./lab/training/v2front ./lab/cmd/sbagent ./lab/cmd/sbv1agent ./lab/cmd/kshadowcheck \
-	./lab/cmd/sbv2engine ./lab/cmd/sbv2local ./lab/cmd/sbv2shadow
-.PHONY: test-spellbench-bridge
-test-spellbench-bridge:
-	go vet -tags spellbench_bridge $(SPELLBENCH_BRIDGE_PKGS)
-	go test $(GO_TEST_FLAGS) -tags spellbench_bridge -count=1 $(SPELLBENCH_BRIDGE_PKGS)
-
 # Engine-speed benchmarking (cmd/enginebench; scripts in scripts/enginebench-*.sh,
 # workload decks committed in cmd/enginebench/testdata/decks). Every run is
 # capped in a systemd scope and serialised on HEAVY_LOCK; binaries, results
@@ -392,19 +281,8 @@ enginebench-profile:
 enginebench-verify:
 	scripts/enginebench-verify.sh $(REV)
 
-# smoke-perf is a <5 min, report-only throughput smoke of the whole-game path:
-# four botbench scenarios (random play, random decks, heuristics vs search,
-# search vs random) comparing BASE (default main) to CAND (default the working
-# tree), pinned to GOMAXPROCS=1 on core 9. It prints each revision's output
-# live and a base/cand summary table. No perf threshold; it fails only when a
-# game does not run to completion. Opt-in, never part of `make test`.
-# Knobs: SMOKE_PERF_GAMES SMOKE_PERF_SEED SMOKE_PERF_BUDGET SMOKE_PERF_DIR.
-.PHONY: smoke-perf
-smoke-perf: $(BIN_DIR)/botbench
-	BASE=$(BASE) CAND=$(CAND) scripts/smoke-perf.sh
-
 # nightly is the T3 tier (docs/agents/test-throughput-2026-10-12.md §4):
-# fuzz, conformance, test-manabrew, test-spellbench-bridge, a -race pass and
+# fuzz, conformance, test-manabrew, a -race pass and
 # an opt-in perf record (PERF_NIGHTLY=1), each in its own capped scope holding
 # a heavy lane, against a fresh detached worktree of origin/main. Heavy: the
 # ops/deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.

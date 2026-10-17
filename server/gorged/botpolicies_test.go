@@ -49,7 +49,7 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name: "unknown default", def: "nope", offeredRaw: "bot,cast-profile",
+			name: "unknown default", def: "nope", offeredRaw: "bot,lethal-pressure",
 			wantErr: "unknown bot policy",
 		},
 		{
@@ -57,10 +57,8 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 			wantErr: "unknown bot policy",
 		},
 		{
-			// "search" reads decklists now, so its own refusal names the
-			// ruling; a plain policy the offered set omits still tests the
-			// set gate.
-			name: "default not in the offered set", def: "cast-profile", offeredRaw: "bot",
+			// A plain policy the offered set omits tests the set gate.
+			name: "default not in the offered set", def: "lethal-pressure", offeredRaw: "bot",
 			wantErr: "is not in -bot-policies",
 		},
 		{
@@ -95,8 +93,8 @@ func TestBotPolicyFlagsValidateAtStartup(t *testing.T) {
 		wantOff    []string
 	}{
 		{
-			name: "explicit list", def: "bot", offeredRaw: "cast-profile,bot",
-			wantDef: "bot", wantOff: []string{"bot", "cast-profile"}, // registry order, not typed order
+			name: "explicit list", def: "bot", offeredRaw: "lethal-pressure,bot",
+			wantDef: "bot", wantOff: []string{"bot", "lethal-pressure"}, // registry order, not typed order
 		},
 		{
 			// The ruling of 2026-10-13: an empty list offers every registered
@@ -135,36 +133,36 @@ func TestBuildBotPolicyListFiltersAndOrders(t *testing.T) {
 	if e, _ := bots.Lookup(production); e.Tier != bots.Production {
 		t.Fatalf("%q is not production", production)
 	}
-	// "search" is experimental and constructed-only; use it as the second
+	// "az-redeal" is experimental and constructed-only; use it as the second
 	// offered name so both tier ordering and field carrying are observable.
-	src, ok := bots.Lookup("search")
+	src, ok := bots.Lookup("az-redeal")
 	if !ok || src.Tier != bots.Experimental {
-		t.Fatalf("\"search\" is not an experimental entry")
+		t.Fatalf("\"az-redeal\" is not an experimental entry")
 	}
 
-	list := buildBotPolicyList(production, []string{"search", production})
+	list := buildBotPolicyList(production, []string{"az-redeal", production})
 	if list.Default != production {
 		t.Fatalf("default = %q, want %q", list.Default, production)
 	}
 	if len(list.Policies) != 2 {
 		t.Fatalf("policies = %+v, want exactly the two offered names", list.Policies)
 	}
-	if list.Policies[0].Name != production || list.Policies[1].Name != "search" {
-		t.Fatalf("order = [%s %s], want [%s search]", list.Policies[0].Name, list.Policies[1].Name, production)
+	if list.Policies[0].Name != production || list.Policies[1].Name != "az-redeal" {
+		t.Fatalf("order = [%s %s], want [%s az-redeal]", list.Policies[0].Name, list.Policies[1].Name, production)
 	}
 	got := list.Policies[1]
 	if !got.Search || got.Tier != string(bots.Experimental) ||
 		len(got.Formats) != 1 || got.Formats[0] != "constructed" ||
 		len(got.Strength) == 0 || got.Strength[0].Claim == "" ||
 		got.CostScope == "" || got.MeanMS == 0 {
-		t.Fatalf("search entry lost fields in conversion: %+v", got)
+		t.Fatalf("az-redeal entry lost fields in conversion: %+v", got)
 	}
 
-	// A set that omits search must not leak it into the listing.
+	// A set that omits az-redeal must not leak it into the listing.
 	only := buildBotPolicyList(production, []string{production})
 	for _, p := range only.Policies {
-		if p.Name == "search" {
-			t.Fatalf("offered set without search still lists it: %+v", only.Policies)
+		if p.Name == "az-redeal" {
+			t.Fatalf("offered set without az-redeal still lists it: %+v", only.Policies)
 		}
 	}
 	if len(only.Policies) != 1 {
@@ -222,23 +220,23 @@ func TestCreateGameRefusesAnUnofferedPolicy(t *testing.T) {
 }
 
 // TestCreateGameRefusesAFormatThePolicyLacks proves the create flow refuses
-// a policy that cannot play the requested format, naming both. "search" is
+// a policy that cannot play the requested format, naming both. "az-redeal" is
 // constructed-only (asserted as a precondition), so a commander request must
 // be refused and create no table.
 func TestCreateGameRefusesAFormatThePolicyLacks(t *testing.T) {
-	search, ok := bots.Lookup("search")
+	search, ok := bots.Lookup("az-redeal")
 	if !ok {
-		t.Fatal("bots registry has no \"search\" entry")
+		t.Fatal("bots registry has no \"az-redeal\" entry")
 	}
 	if contains(search.Formats, host.FormatCommander.String()) {
-		t.Fatal("\"search\" unexpectedly supports commander; the test would be vacuous")
+		t.Fatal("\"az-redeal\" unexpectedly supports commander; the test would be vacuous")
 	}
 	r, gate := freshGameLock(t)
-	c := config{mulligans: 0, botPolicy: host.BotPolicy, botPolicies: []string{host.BotPolicy, "search"}}
+	c := config{mulligans: 0, botPolicy: host.BotPolicy, botPolicies: []string{host.BotPolicy, "az-redeal"}}
 	create := c.createGame(r, gate, []string{"a", "b"}, []string{"c", "d"}, view.Omniscient)
-	_, err := create(httpapi.CreateGameOptions{Format: host.FormatCommander, BotPolicy: "search"})
+	_, err := create(httpapi.CreateGameOptions{Format: host.FormatCommander, BotPolicy: "az-redeal"})
 	if err == nil {
-		t.Fatalf("search accepted on a commander request; want a refusal")
+		t.Fatalf("az-redeal accepted on a commander request; want a refusal")
 	}
 	if !strings.Contains(err.Error(), "does not support the commander format") {
 		t.Fatalf("error %q does not name the format refusal", err)

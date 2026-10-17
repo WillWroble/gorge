@@ -21,10 +21,10 @@ package does.
 |---|---|---|
 | `engine/` | The rules core: `cards`, `deck`, `state`, `decision`, `events`, `effects`, `rules` (+ sub-packages), `replay`, `view`, and `seat` (the `Seat` contract only). Imports nothing outside `engine/`. | [repo-map-engine.md](repo-map-engine.md#engine) |
 | `bots/` | `botpolicy`, the default `heuristic` bot, the bots registry and the hosted bots with their inference runtime. Imports `engine/` only. | [repo-map-engine.md](repo-map-engine.md#bots) |
-| `server/` | `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`. | [repo-map-engine.md](repo-map-engine.md#server) |
-| `internal/` | Architecture ratchets, test support, shared bench runner, generators. | [repo-map-internal.md](repo-map-internal.md) |
+| `server/` | `gorged` (the importable server: `Main`, `Extensions`, `RegisterNetBot`; `cmd/gorged` is its thin main), `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`. | [repo-map-engine.md](repo-map-engine.md#server) |
+| `internal/`, `testkit/`, `cli/` | `internal/`: architecture ratchets and generators. `testkit/` (test support, the shared bench runner, paymirror) and `cli/` (the command-line parser) are public so outside modules can use them. | [repo-map-internal.md](repo-map-internal.md) |
 | `cmd/` | Product and developer binaries. | [repo-map-paths.md](repo-map-paths.md#cmd) |
-| `lab/` | Fenced extensions: draft events, compliance oracles, training research, their commands and scripts. Nothing outside `lab/` may import it (ADR 0001 decision 3; enforced by `internal/archtest/lab_fence_test.go`; `cmd/gorged` composes `lab/draft` only under `-tags lab`). | [repo-map-research.md](repo-map-research.md) |
+| four-yay (not in this repo) | Moved to four-yay on 2026-10-16: the former `lab/` tree (draft events, compliance oracles, training research, their commands and scripts) and the research bots. A private module (`github.com/adams-shaun/four-yay`, checkout `../four-yay`) that imports gorge; gorge never imports it. Seams: `bots.Register`, `server/gorged.RegisterNetBot`, `server/gorged.Extensions` ([ADR 0001](../decisions/0001-repo-layout.md) amendment). | four-yay's `docs/agents/repo-map-research.md` (private) |
 | `ops/` | The agent pipeline: agentctl hooks, systemd units, pipeline and gate scripts. See [`ops/README.md`](../../ops/README.md). | [repo-map-paths.md](repo-map-paths.md#ops) |
 | `scripts/` | Contributor and CI helpers only. | [repo-map-paths.md](repo-map-paths.md#everything-else) |
 | `web/` | The Svelte + Vite client. | [repo-map-paths.md](repo-map-paths.md#everything-else) |
@@ -40,11 +40,11 @@ package does.
 | Add an event kind | Append to `engine/events/event.go` after the last constant and add its one `kindInfo` entry in `engine/events/kindinfo.go` (name, trigger class, optional Describe template). Behaviour (`events.Apply`, a custom `view.Describe` case) is separate. |
 | Add a decision kind | Don't, without an operator decision — the set is closed; every seat, bot, client and the protocol must answer it. |
 | Change the default bot's decisions | `bots/botpolicy/` (the one policy, reading a `Board`); its seat adapter is `bots/heuristic/bot.go`. |
-| Add a bot policy | Bench-only: `lab/cmd/botbench`. Hosted: register it in the `bots/` registry (`bots/registry.go`, linked by `bots/all`) and the host's closed vocabulary `server/host/bot_policy.go`. See the README's *Bot player training and adoption guidelines* and [`docs/design/2026-09-28-hosted-bot-packages.md`](../design/2026-09-28-hosted-bot-packages.md). |
+| Add a bot policy | Bench-only: a `seat.Seat` driven through `testkit/bench` (the `botbench` CLI moved to four-yay). Hosted: `bots.Register` in an `init()` (`bots/registry.go`), linked from `bots/all`. See [`docs/site/research/bots.md`](../site/research/bots.md) and [`docs/design/2026-09-28-hosted-bot-packages.md`](../design/2026-09-28-hosted-bot-packages.md). |
 | Add a repo deck | `testkit/testutil/decks/*.json` via `cmd/deckimport`; it must be fully supported (the acceptance ratchet). |
 | Turn a player report into a test | `go run ./cmd/repro -emit-test <pkg> <feedback-dir>`. |
 | Change the wire | `server/protocol/`, then `make gentypes`. |
-| Change an external file, wire or grammar (dzgorge outputs, `.dzgw`, visit corpus) | Its owner package, then `lab/contracts/registry.json`; the rules are in `docs/contracts.md`. |
+| Change an external file, wire or grammar (`.dzgw`, the azvisits corpus, the protocol goldens) | Its owner package (`bots/gonet`, `bots/policynet`, `server/protocol`). The contract registry and its rules moved to four-yay (`contracts/registry.json`, `docs/contracts.md`, private), which pins these goldens' hashes, so a golden change here needs a matching four-yay update. |
 | Change a seat's projected view | The family file for the seam: a card/battlefield projection in `engine/view/card.go`, a stack projection in `engine/view/stack.go`. Only an assembler change (`Project`/`project`) belongs in `engine/view/view.go`, which two projection tickets once collided on. |
 | Move or add a package | Classify it in `docs/site/architecture/packages.tiers.json` in the same commit (`go run ./cmd/pkgmap -check`, a pre-commit hook). |
 | Change the pipeline (gates, hooks, units, postmerge) | `ops/` — read [`ops/README.md`](../../ops/README.md) first; the gates fetch two of its scripts from the base commit. |

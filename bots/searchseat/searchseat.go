@@ -1,10 +1,10 @@
 // Package searchseat is the PIMC search teacher's decision function, shared by
-// the label-corpus generator (lab/cmd/searchteacher) and any seat that plays the
+// the label-corpus generator (four-yay cmd/searchteacher) and any seat that plays the
 // teacher's answer.
 //
 // It exists so the two cannot drift. Before it, the whole of candidate
 // building, world sampling, teacher scoring and root matching lived inside
-// lab/cmd/searchteacher's teach(), entangled with label emission -- so a seat that
+// four-yay cmd/searchteacher's teach(), entangled with label emission -- so a seat that
 // wanted to PLAY the teacher's answer had to reimplement it, and a
 // reimplementation that disagreed anywhere would invalidate the corpus the
 // student learns from. Here the decision is one function; the generator adds
@@ -22,7 +22,7 @@
 //     capture. A seat is handed a PROJECTED view.View and a decision.Decision
 //     -- never the engine, never the event log, never the burst.
 //   - Capture runs at EVERY decision, every player's, not just the actor's
-//     (lab/cmd/searchteacher's loop). A seat is invoked only at its own decisions,
+//     (four-yay cmd/searchteacher's loop). A seat is invoked only at its own decisions,
 //     so it could not assemble the same Frames list even with engine access.
 //
 // So the history must come from whoever drives the engine, which is why
@@ -51,7 +51,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/view"
 )
 
-// Options are the search knobs, defaulted by Defaults() to lab/cmd/searchteacher's
+// Options are the search knobs, defaulted by Defaults() to four-yay cmd/searchteacher's
 // own flag defaults so a seat and the generator search identically unless a
 // caller deliberately differs.
 type Options struct {
@@ -82,7 +82,7 @@ type Options struct {
 	// every non-terminal rollout leaf with the value head
 	// (searchprobe.TeacherOptions.Leaf) instead of the frozen material
 	// heuristic. Nil is off. A model WITHOUT a value head is a configuration
-	// error the caller must reject up front (lab/cmd/searchteacher does); Choose
+	// error the caller must reject up front (four-yay cmd/searchteacher does); Choose
 	// ignores it rather than score every leaf 0.5. It only matters with
 	// HorizonTurns > 0 or a MaxSubmits cap: a game-end rollout has no
 	// non-terminal leaf. The Model is shared read-only across rollout
@@ -110,7 +110,7 @@ type Options struct {
 	// is off, and today's search bit for bit.
 	OracleValue *policynet.Model
 	// SampleSeed is the fixed sampler seed base. The teacher's own seed is
-	// derived from it per decision exactly as lab/cmd/searchteacher derives it, so
+	// derived from it per decision exactly as four-yay cmd/searchteacher derives it, so
 	// a seat and the generator score a given decision identically.
 	SampleSeed uint64
 	// AfterSample and AfterSearch, when non-nil, are called immediately after
@@ -149,7 +149,7 @@ type Options struct {
 	Redeal bool
 	// Clairvoyant searches one clone of the ACTUAL engine instead of sampled
 	// worlds. It cheats by construction and exists only as a measurement
-	// ceiling (lab/cmd/searchteacher's -oracle); a playing seat must leave it
+	// ceiling (four-yay cmd/searchteacher's -oracle); a playing seat must leave it
 	// false.
 	Clairvoyant bool
 	// Prior, when non-nil, is a trained policynet checkpoint that chooses
@@ -168,7 +168,7 @@ type Options struct {
 	PriorWiden int
 }
 
-// Defaults are lab/cmd/searchteacher's flag defaults, which are also the knobs the
+// Defaults are four-yay cmd/searchteacher's flag defaults, which are also the knobs the
 // +5.80pp +/- 1.25 paired-dev measurement was taken with. A seat starts here
 // so "the seat plays the teacher" means the teacher that was measured.
 func Defaults() Options {
@@ -190,7 +190,7 @@ func Defaults() Options {
 //
 // Covered reports that the teacher actually scored the decision. Fallback
 // names why it did not, when it did not -- the strings are the same ones
-// lab/cmd/searchteacher has always written to its DecisionRecord, so its corpus
+// four-yay cmd/searchteacher has always written to its DecisionRecord, so its corpus
 // is unchanged by the extraction.
 type Trace struct {
 	Kind       string
@@ -427,7 +427,7 @@ func (o Options) Validate() error {
 }
 
 // teacherSeed derives the per-decision teacher seed. It is deliberately the
-// expression lab/cmd/searchteacher has always used, turn included, so extracting
+// expression four-yay cmd/searchteacher has always used, turn included, so extracting
 // this function changed no scored decision.
 func teacherSeed(base uint64, e *rules.Engine) uint64 {
 	return base ^ 0x5eed ^ uint64(e.G.Turn)

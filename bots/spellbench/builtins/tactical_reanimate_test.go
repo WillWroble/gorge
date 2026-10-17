@@ -6,7 +6,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 
 	"github.com/adams-shaun/gorge/engine/view"
-	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/bots/spellbench"
 	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 

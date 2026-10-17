@@ -13,7 +13,7 @@ never appear (see [invariants.md](invariants.md#1-dependency-direction)).
 
 | Package | What it owns |
 |---|---|
-| `engine/cards` | Compiles Forge card scripts into the card IR; keyword expanders (`engine/cards/kw_*.go`); `cards.Registry`, coverage. `cards.OpenCorpusFor` (`engine/cards/subset.go`) opens only a known card pool's cards from the per-card segment file, falling back to the whole corpus when the pool reads the name universe; botbench's deck and `-spellbench` modes use it. `cards.CompilerFingerprint` hashes every non-test `.go` file here, so **any edit in `engine/cards/` invalidates every IR cache** and forces a recompile. |
+| `engine/cards` | Compiles Forge card scripts into the card IR; keyword expanders (`engine/cards/kw_*.go`); `cards.Registry`, coverage. `cards.OpenCorpusFor` (`engine/cards/subset.go`) opens only a known card pool's cards from the per-card segment file, falling back to the whole corpus when the pool reads the name universe; four-yay's botbench deck and `-spellbench` modes use it. `cards.CompilerFingerprint` hashes every non-test `.go` file here, so **any edit in `engine/cards/` invalidates every IR cache** and forces a recompile. |
 | `engine/cards/oracletext` | Printed-card (Oracle) view for the Oracle audit. A subpackage on purpose so it does not move the fingerprint. |
 | `engine/state` | Objects, zones, players, `state.Game`, the `ContinuousEffect` vocabulary. Plain data; mutated only by `events.Apply`. |
 | `engine/decision` | `Decision` / `Option` / `Intent`, and the closed set of `decision.Kind`s (`decision.Kinds`). The whole engine↔seat contract. |
@@ -42,22 +42,22 @@ The layering design for `engine/rules` is
 |---|---|
 | `bots/botpolicy` | The one heuristic bot policy (`botpolicy.Decide`), in one copy, shared by `bots/heuristic` and rules' own fuzz driver. Reads a `Board`, never a view or an engine (archtest forbids `view`, `rules`, `seat`). Cast profiles in `bots/botpolicy/profiles/`. |
 | `bots/heuristic` | The default bot: `heuristic.Bot` (`NewBot`, `NewLethalPressureBot`, `NewAttackSimBot`, `NewExploreBot`, `NewCastProfileBot`, …), `heuristic.BoardSeat` (a seat that reads a `botpolicy.Board`), and `PolicyNetBot` (`NewPolicyNetBot`). |
-| `bots` | The closed registry of hosted policies (`bots/registry.go`, `bots.Factory`); built-ins register from `bots/bot`, `bots/lethalpressure` and `bots/castprofile`, linked together by `bots/all`. The hosted az policies `bots/azc3`, `bots/azc4` and `bots/azc5` register only when gorged's `-az-c*-net` flags enable them (`cmd/gorged/azc3.go`, `cmd/gorged/azclosed.go`). |
+| `bots` | The closed registry of hosted policies (`bots/registry.go`, `bots.Factory`); gorge's built-ins register from `bots/bot`, `bots/lethalpressure`, `bots/sbtactical` and `bots/azredeal`, linked together by `bots/all`. The research bots (`cast-profile`, `search`, `sb-heuristic`/`sb-uniform`/`sb-first`, `sb-search-lite-atk`) register from four-yay's packages; the hosted az nets (az-c3/c4/c5) are four-yay's too, linked through `server/gorged.RegisterNetBot` and enabled by gorged's `-az-c*-net` flags (`server/gorged/azc3.go`, `server/gorged/azclosed.go`). |
 | `bots/sanity` | Opt-in common-sense guard decorator over engine target hints (default off). |
-| `bots/search`, `bots/azredeal`, `bots/sbbuiltin`, `bots/sbtactical`, `bots/sbsearch` | Hosted adapters (BP-11..BP-14 of the hosted-bot-packages design) over the inference runtime below. |
-| `bots/azc3`, `bots/azc4`, `bots/azc5` | Hosted az networks; each package's doc names its operating report in `docs/design/`. |
-| `bots/azmcts` (+`clairvoyant`) | AlphaZero-style PUCT search ([`docs/design/2026-09-27-alphazero-mcts-design.md`](../design/2026-09-27-alphazero-mcts-design.md)). |
+| `bots/bot`, `bots/lethalpressure`, `bots/azredeal`, `bots/sbtactical` | The hosted policy packages (`az-redeal` and `sb-tactical` are BP adapters of the hosted-bot-packages design) over the inference runtime below. |
+| `bots/azmcts` | AlphaZero-style PUCT search ([`docs/design/2026-09-27-alphazero-mcts-design.md`](../design/2026-09-27-alphazero-mcts-design.md)). |
 | `bots/gonet` (+`gonettest`) | The `.dzgw` network forward pass the az bots evaluate. |
 | `bots/policynet` | Feature layer of the learned per-option policy: deterministic encoder from a seat's view, MLP, `.gpol` checkpoints. |
 | `bots/searchprobe` | Hidden-information world sampler (`Collector`, `Sample`, `Redealer`, known-card tracking). |
 | `bots/searchseat` | The PIMC search decision function (`Choose`) shared by the teacher corpus generator and `SearchBot`. |
-| `bots/spellbench/builtins`, `payexec`, `sbsearch` | Runtime halves of the SpellBench bots: the builtin and tactical policies, the payment-plan lowering, determinized search. |
-| `bots/traceboard` | The redacted, map-free decision-trace board schema (`lab/cmd/botbench -decision-trace`). |
+| `bots/spellbench` (+`builtins`, `payexec`) | The SpellBench benchmark deck catalogs (moved here from the old research tree; generator `bots/spellbench/fdn-catalog.py`), the builtin and tactical policies, and the payment-plan lowering. |
+| `bots/traceboard` | The redacted, map-free decision-trace board schema (four-yay's `botbench -decision-trace`). |
 
 ## `server/`
 
 | Package | What it owns |
 |---|---|
+| `server/gorged` | The importable server (`Main`, `Serve`): flags, persistence, demo tables, art prewarm. Extension seams: `Extensions{Events EventsPlugin}` (draft events under `/api/events`, refused without a plugin) and `RegisterNetBot` (the az-c3/c4/c5 network bots). `cmd/gorged` is its thin main. |
 | `server/host` | Tables (one goroutine each), sessions, snapshots, persistence, undo, the hosted bot-policy vocabulary (`server/host/bot_policy.go`). Its only clock is an injected sleep. |
 | `server/host/httpapi` | `net/http` JSON + SSE + the embedded web client. Every seat route goes through `claimForTable`. |
 | `server/host/manabrewhttp` | The ManaBrew HTTP surface. |
@@ -65,4 +65,4 @@ The layering design for `engine/rules` is
 | `server/manabrew` (+`mbtest`) | The ManaBrew translator: projects a seat's `view.View` into ManaBrew state, plus a mock client for tests. |
 | `server/divergence` (+`shadow`) | Human-divergence capture records (`divergence-v1`, `triage-v1` JSONL), the materiality predicate, the shadow seed and the shadow answer. Design: [`docs/design/2026-10-10-human-divergence-design.md`](../design/2026-10-10-human-divergence-design.md). |
 
-The draft stack (`lab/draft/…`) is in [repo-map-research.md](repo-map-research.md#labdraft).
+The draft stack moved to four-yay (private), which plugs it into `server/gorged` as an `EventsPlugin`.

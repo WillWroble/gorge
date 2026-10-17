@@ -7,7 +7,7 @@ import (
 )
 
 // A scenario's abstract "yes"/"no" answers an optional ask whose options
-// are labelled by what they do (lab/cmd/xmageport: XMage's setChoice(true)).
+// are labelled by what they do (four-yay cmd/xmageport: XMage's setChoice(true)).
 func TestOracleYesNoMatchesLabelledOptionalAsk(t *testing.T) {
 	r := &oracleRun{}
 	pick := func(d *decision.Decision, p string) int {

@@ -17,7 +17,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/state"
-	"github.com/adams-shaun/gorge/lab/training/spellbench"
+	"github.com/adams-shaun/gorge/bots/spellbench"
 	"github.com/adams-shaun/gorge/testkit/testutil"
 
 	gbench "github.com/adams-shaun/gorge/testkit/bench"

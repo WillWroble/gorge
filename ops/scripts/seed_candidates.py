@@ -415,8 +415,10 @@ parked, and every decision is one line in the commit message.
     # section 11.3 C4): the XMage oracle now covers whole sets, and its
     # findings are grouped into class tickets -- one per unsupported primitive
     # (with the primitives only its cards carry), gorge_wrong ruling or shape,
-    # and untriaged shape cluster -- by `go run ./lab/cmd/oraclediff tickets -out
-    # <state>/compliance-tickets`. Each candidate reuses the generator's stable
+    # and untriaged shape cluster -- by four-yay's `go run ./cmd/oraclediff
+    # tickets -out <state>/compliance-tickets` (the oracle moved to four-yay on
+    # 2026-10-16; gorge runs no compliance gate, and this reader just picks up
+    # whatever tickets four-yay wrote, none when the dir is absent). Each candidate reuses the generator's stable
     # id and complete brief, so the loop and an operator filing file.sh by hand
     # name the same ticket.
     for t in compliance_tickets(state_dir / "compliance-tickets"):
@@ -639,7 +641,8 @@ is to buy strength by making the engine cheaper, not by spending more of it.
 
 Profile the grind and remove the top hotspot:
 
-    go build -o /tmp/botbench ./lab/cmd/botbench
+    # botbench lives in four-yay; build it against this checkout's engine:
+    go build -C ../four-yay -o /tmp/botbench ./cmd/botbench
     ops/scripts/heavy.sh probe --name prof -- /tmp/botbench -grind mono-red-prowess \\
         -grind-seconds 30 -cpuprofile /tmp/cpu.prof
     go tool pprof -top /tmp/cpu.prof | head -30

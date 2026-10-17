@@ -56,8 +56,8 @@ metric.
 
 Planned metrics: random play (pairs A, B, Burn), bot play (pair A, manual and
 auto-pay), clone µs and allocation, MCTS at 100 sims, the sampler, and live
-heap. An optional separate series would track bot strength from
-`botbench -out json`.
+heap. An optional separate series would track bot strength, measured outside
+gorge.
 
 ## How the series is produced (plan)
 

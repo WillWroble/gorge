@@ -224,7 +224,7 @@ func roomHasLockedDoor(o *state.Object, controller state.PlayerID) bool {
 // UNLOCKED doors. CR 709.5j's card text ("different names among unlocked
 // doors of Rooms you control") supports this reading -- gorge is likely
 // right and XMage wrong -- but a compliance scenario will show the gap and
-// the controller owns the xmage_wrong verdict (lab/oracle/compliance/verdicts.go).
+// the controller owns the xmage_wrong verdict (four-yay oracle/compliance/verdicts.go).
 func countUnlockedDoors(g *state.Game, p state.PlayerID, distinct bool) int32 {
 	var n int32
 	names := make(map[string]struct{})

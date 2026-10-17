@@ -113,9 +113,9 @@ sharing the bug's shape, not just the reported one. The param census
 **Oracle text / oracle scenario.** A card's printed rules text (the script's
 `Oracle:` line). An *oracle scenario* is a JSON test under
 `engine/rules/testdata/oracle/` whose expectations come from the printed text
-and the CR, not from the script or the engine. (Separately, `lab/oracle/`
-holds *compliance oracles* that compare gorge with other engines, XMage and
-Forge.)
+and the CR, not from the script or the engine. (Separately,
+*compliance oracles* compare gorge with other engines, XMage and Forge; they
+run from a private companion repository, not from gorge.)
 
 **CR citation.** A reference to the
 [Magic: The Gathering Comprehensive Rules](https://magic.wizards.com/en/rules)

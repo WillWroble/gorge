@@ -1396,7 +1396,7 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 		//     six stored trigger#0.0 rows read `step 1 (resolve)
 		//     p0.graveyard: gorge "[]", xmage "[Wastes]"`). So the setup ask
 		//     keeps the card on top and the step-time ask answers empty.
-		// The recorded empty answer is transcribed by lab/oracle/compliance/oraclegen
+		// The recorded empty answer is transcribed by four-yay oracle/compliance/oraclegen
 		// into one name selection per looked-at card, which pins XMage to the
 		// same outcome (see its arrange arm).
 		if r.xmageFixture && (why == "setup") != r.revisitsUpkeep && d.Kind == decision.KArrange &&

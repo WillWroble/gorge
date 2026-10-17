@@ -19,7 +19,14 @@ import (
 //
 //  1. a *.java file declaring `package forge.`;
 //  2. a path under `forge-oracle/` (any depth);
-//  3. a path under `lab/oracle/compliance/forge*` (the result-row / request-file surface);
+//  3. a path with a `compliance` component immediately followed by a
+//     component beginning `forge` (the result-row / request-file surface).
+//     That surface was `lab/oracle/compliance/forge*` until the research tree
+//     moved to the private four-yay module (where it is
+//     `oracle/compliance/forge*`, guarded by four-yay's own
+//     internal/boundary); the rule is written by component so it still
+//     catches the surface if a compliance tree ever returns to gorge, at any
+//     depth;
 //  4. a file carrying the Forge GPL header line.
 //
 // forgeBoundaryAllowlist is the explicit, empty-by-default escape hatch for
@@ -52,6 +59,20 @@ func hasPathComponent(slash, name string) bool {
 	return false
 }
 
+// underComplianceForge reports whether slash (a slash-separated path) has a
+// "compliance" component immediately followed by a component that begins
+// with "forge": oracle/compliance/forge-verdicts/x and x/compliance/forge.jsonl
+// match; compliance/adjudication/x and cmd/oraclediff/forge.go do not.
+func underComplianceForge(slash string) bool {
+	parts := strings.Split(slash, "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] == "compliance" && strings.HasPrefix(parts[i+1], "forge") {
+			return true
+		}
+	}
+	return false
+}
+
 // forgeBoundaryOffender describes one tracked path that breaches the boundary,
 // with the rule that caught it, so a failure names the rule as well as the file.
 type forgeBoundaryOffender struct {
@@ -77,11 +98,11 @@ func forgeBoundaryViolations(p string, blob []byte) []forgeBoundaryOffender {
 		out = append(out, forgeBoundaryOffender{p, "path under forge-oracle/"})
 	}
 
-	// Rule 3: a path under lab/oracle/compliance/forge* (the result-row / request-file
+	// Rule 3: a compliance/forge* path (the result-row / request-file
 	// surface). The design's glob is a single component: a file or directory
-	// directly under lab/oracle/compliance/ whose name begins with "forge".
-	if rest, ok := strings.CutPrefix(slash, "lab/oracle/compliance/"); ok && strings.HasPrefix(rest, "forge") {
-		out = append(out, forgeBoundaryOffender{p, "path under lab/oracle/compliance/forge*"})
+	// directly under a compliance/ directory whose name begins with "forge".
+	if underComplianceForge(slash) {
+		out = append(out, forgeBoundaryOffender{p, "path under compliance/forge*"})
 	}
 
 	if blob != nil {
@@ -152,7 +173,7 @@ func readTrackedBlob(t *testing.T, repoDir, p string) []byte {
 }
 
 // TestForgeBoundary fails if any file tracked in this repository is a Forge
-// source file, a forge-oracle/ tree entry, a lab/oracle/compliance/forge* artifact, or a
+// source file, a forge-oracle/ tree entry, a compliance/forge* artifact, or a
 // file carrying the Forge GPL header.
 func TestForgeBoundary(t *testing.T) {
 	root := repoRoot(t)
@@ -219,10 +240,31 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "path under compliance forge prefix",
+			file:      "oracle/compliance/forge-verdicts/a.jsonl",
+			body:      "{}\n",
+			wantMatch: true,
+			reason:    "compliance/forge* is forbidden apart from the ledger",
+		},
+		{
+			name:      "old lab compliance forge path",
 			file:      "lab/oracle/compliance/forge-verdicts/a.jsonl",
 			body:      "{}\n",
 			wantMatch: true,
-			reason:    "lab/oracle/compliance/forge* is forbidden apart from the ledger",
+			reason:    "the rule matches a compliance/forge* pair at any depth",
+		},
+		{
+			name:      "forge file directly under compliance",
+			file:      "compliance/forge.jsonl",
+			body:      "{}\n",
+			wantMatch: true,
+			reason:    "a forge* file, not only a directory, is caught",
+		},
+		{
+			name:      "forge path outside a compliance tree",
+			file:      "cmd/oraclediff/testdata/forge/items.jsonl",
+			body:      "{}\n",
+			wantMatch: false,
+			reason:    "rule 3 is the compliance surface only, not every forge-named path",
 		},
 		{
 			name:      "file carrying the Forge GPL header",
@@ -240,7 +282,7 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "allowlisted forge path",
-			file:      "lab/oracle/compliance/forge-verdicts/a.jsonl",
+			file:      "oracle/compliance/forge-verdicts/a.jsonl",
 			body:      "{}\n",
 			allow:     true,
 			wantMatch: true,
@@ -248,7 +290,7 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "ledger path is not a forge-oracle artifact",
-			file:      "lab/oracle/compliance/adjudication/a.jsonl",
+			file:      "oracle/compliance/adjudication/a.jsonl",
 			body:      "{}\n",
 			wantMatch: false,
 			reason:    "the section 9 ledger lives under compliance/adjudication and is allowed",

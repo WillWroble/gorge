@@ -4,7 +4,7 @@ import "math"
 
 // This file is the on-policy PPO objective (ticket pn13): the clipped
 // surrogate plus a KL anchor, trained on the DEPLOYED seat's own games
-// (heuristic.PolicyNetBot recording, lab/cmd/botbench -onpolicy-corpus). It is the
+// (heuristic.PolicyNetBot recording, four-yay cmd/botbench -onpolicy-corpus). It is the
 // gorge port of the one multi-round recipe that compounded in mtgbld
 // ("self-distillation PPO"): corpus = the argmax policy's own decisions,
 // π_old = the probability the policy gave the answer it actually played,
@@ -12,7 +12,7 @@ import "math"
 //
 // A PPO example carries its target in Example.PPO; the supervised path
 // (lossFromScores) never sees one, so a corpus without PPO examples trains
-// exactly as before (lab/cmd/policytrain's TestSupervisedIsBitIdenticalToPrePPOTrainer).
+// exactly as before (four-yay cmd/policytrain's TestSupervisedIsBitIdenticalToPrePPOTrainer).
 //
 // The action distribution is defined over the example's LABELLED options
 // (the loader marks the decision's action space Labelled) and takes one of

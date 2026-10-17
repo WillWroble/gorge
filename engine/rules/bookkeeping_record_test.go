@@ -1,7 +1,7 @@
 package rules
 
 // bookkeeping_record_test.go pins the two engine halves the level-B
-// bookkeeping-trigger template (lab/oracle/compliance/oraclegen/templates/
+// bookkeeping-trigger template (four-yay oracle/compliance/oraclegen/templates/
 // trigger_bookkeeping.go) observes through a consumer:
 //
 //   - api:Play's RememberPlayed$ True records the played card on the source.

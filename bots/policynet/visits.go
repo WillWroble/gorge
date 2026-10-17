@@ -16,8 +16,8 @@ import (
 )
 
 // The visit corpus (M1b, AZ spec ticket 3's "azgen" corpus): one JSONL
-// record per decision the az seat SEARCHED, written by lab/cmd/botbench
-// -az-corpus and read by LoadVisits for lab/cmd/policytrain -visits-corpus. It
+// record per decision the az seat SEARCHED, written by four-yay cmd/botbench
+// -az-corpus and read by LoadVisits for four-yay cmd/policytrain -visits-corpus. It
 // is the teacher-student distillation corpus: the TARGET is the search's
 // visit distribution (whatever world source the teacher searched --
 // clairvoyant clones of the real engine, or honest sampled worlds), while

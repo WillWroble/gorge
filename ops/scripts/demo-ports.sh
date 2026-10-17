@@ -23,7 +23,7 @@
 # MB_PORT values, so this set is the complete history.
 # An EXPLICITLY empty value clears the history (so a test deploy sweeping
 # only its own ports cannot stop the live demo's :8080/:8081 gorged); an
-# unset one takes the default. cmd/gorged/deploy_test.go relies on this.
+# unset one takes the default. server/gorged/deploy_test.go relies on this.
 DEMO_PORT_HISTORY=${DEMO_PORT_HISTORY-"8080 8081"}
 
 # demo_sweep_ports <bind-port>... — every port the sweep must match, one per

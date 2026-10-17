@@ -173,8 +173,8 @@ lane_for() {
 	# statement is the whole classification.
 	case "$1" in
 		Makefile|AGENTS.md|go.mod|go.sum|engine/rules/heads_test.go|engine/rules/testdata/heads/*|engine/rules/acceptance_test.go) echo SHARED ;;
-		engine/rules/*|engine/effects/*|engine/state/*|engine/events/*|engine/cards/*|engine/decision/*|engine/view/*|engine/replay/*|server/protocol/*|server/host/*|web/*|cmd/gorged/*|cmd/gentypes/*|scripts/*|.githooks/*) echo engine ;;
-		bots/botpolicy/*|engine/seat/*|lab/cmd/botbench/*|testkit/testutil/*|distill/*) echo distill ;;
+		engine/rules/*|engine/effects/*|engine/state/*|engine/events/*|engine/cards/*|engine/decision/*|engine/view/*|engine/replay/*|server/protocol/*|server/host/*|server/gorged/*|web/*|cmd/gorged/*|cmd/gentypes/*|scripts/*|.githooks/*) echo engine ;;
+		bots/botpolicy/*|engine/seat/*|testkit/testutil/*|distill/*) echo distill ;;
 		*) echo unclaimed ;;
 	esac
 }

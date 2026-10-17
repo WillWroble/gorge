@@ -42,9 +42,7 @@ concurrency:
 
 env:
   SHARDS: 6
-  # -tags lab links the fenced lab/ extensions so their tests run; the
-  # "platform build" step proves the untagged build (docs/decisions/0001).
-  GOFLAGS: -p=4 -tags=lab
+  GOFLAGS: -p=4
 
 jobs:
   lint:
@@ -67,11 +65,6 @@ jobs:
           if [ -n "$out" ]; then echo "gofmt: files need formatting:"; echo "$out"; exit 1; fi
       - name: go vet
         run: go vet ./...
-      - name: platform build (no lab/)
-        run: |
-          GOFLAGS=-p=4 go build ./...
-          GOFLAGS=-p=4 go vet ./cmd/gorged ./server/...
-          GOFLAGS=-p=4 go test -run '^TestEventsNeedLabBuild$' ./cmd/gorged
       - name: generated types are current
         run: go run ./cmd/gentypes -check
       - name: Save the Go cache

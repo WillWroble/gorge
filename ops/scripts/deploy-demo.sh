@@ -11,12 +11,19 @@
 # MB_PORT= (empty) runs no ManaBrew server.
 #
 # Invoked by `make deploy-demo`, which builds the client and the binary
-# first. Run by hand by the operator only: stopping the servers aborts every
+# first. Since 2026-10-16 the demo binary is four-yay's gorged (the gorge
+# server plus the research bots, az-c3/c4/c5 among them, linked in through
+# server/gorged's RegisterNetBot seam): `make deploy-demo` builds it from
+# FOURYAY_ROOT, and this script builds it there itself when BIN is missing. Run by hand by the operator only: stopping the servers aborts every
 # in-flight vs-bot game, so since 2026-09-22 no hook or daemon runs it.
 set -euo pipefail
 
 BIN=${BIN:-bin/gorged}
-DECKS=${DECKS:-internal/testutil/decks}
+# four-yay's checkout: by default the sibling of the gorge MAIN checkout (the
+# Makefile's FOURYAY_ROOT default), so a task worktree under .worktrees/ finds
+# the same one.
+FOURYAY_ROOT=${FOURYAY_ROOT:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../four-yay}
+DECKS=${DECKS:-testkit/testutil/decks}
 # 2026-10-13: 2 tables, the operator's layout: t1 a 1v1 constructed table
 # (two bots, SEATS) and t2 a 4-bot commander pod (COMMANDER_SEATS), both
 # spectated omniscient ("clairvoyant": every hand shown). On-demand
@@ -74,7 +81,7 @@ VSBOT_SPECTATOR=${VSBOT_SPECTATOR:-public}
 # cheap manual policy. The search policies remain registered and offered for
 # on-demand play-vs-bot games a caller names explicitly.
 #
-# 2026-09-29 (retired): sb-search-lite-atk (bots/sbsearch), down from
+# 2026-09-29 (retired): sb-search-lite-atk (the sbsearch bot, now in four-yay), down from
 # az-redeal. az-redeal's honest MCTS froze the box when several tables'
 # searches piled up at once right at match-end. There is no bail-out yet for
 # EITHER search-based policy (tracked: cli-20260929T214831Z-6b1aaa71, a
@@ -177,7 +184,7 @@ OMNI_LOG=${OMNI_LOG:-/tmp/gorge-demo-omni.log}
 # fb-20260914T113850Z-682e875e). The `rm -rf` inside start_one stays: a stale
 # persistence config resuming with zero-valued fields is a correctness hazard
 # (ledger finding cp). The art cache has no such hazard — every cache key is
-# hashed under artKeyVersion (cmd/gorged/art.go), so a change in what a fetch
+# hashed under artKeyVersion (server/gorged/art.go), so a change in what a fetch
 # writes rotates every key at once and stale bytes can never come back
 # semantically wrong — which is why the wipe's rationale does NOT extend to
 # the art cache, and why it must not be re-added: wiping it used to destroy
@@ -382,7 +389,13 @@ if [ "${1:-}" = "--stop-only" ]; then
 	exit 0
 fi
 
-[ -x "$BIN" ] || { say "no binary at $BIN (run make deploy-demo, not this script)"; exit 1; }
+if [ ! -x "$BIN" ]; then
+	[ -f "$FOURYAY_ROOT/go.mod" ] || { say "no binary at $BIN and no four-yay checkout at $FOURYAY_ROOT (set FOURYAY_ROOT, or run make deploy-demo)"; exit 1; }
+	say "no binary at $BIN; building four-yay's gorged from $FOURYAY_ROOT"
+	mkdir -p "$(dirname "$BIN")"
+	bin_abs=$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")
+	CGO_ENABLED=0 go build -C "$FOURYAY_ROOT" -o "$bin_abs" ./cmd/gorged
+fi
 
 # Fill the card-art cache BEFORE any server is touched, so a deploy normally
 # never serves a cold-cache missing-art window and the two servers' startup

@@ -1,5 +1,5 @@
 # gorge nightly tier (T3, docs/agents/test-throughput-2026-10-12.md §4): make
-# fuzz, make conformance, make test-manabrew, make test-spellbench-bridge, a
+# fuzz, make conformance, make test-manabrew, a
 # -race pass, and (PERF_NIGHTLY=1) a perf record, against a fresh detached
 # worktree of origin/main. See ops/scripts/nightly.sh for the steps and knobs.
 #
@@ -17,7 +17,7 @@
 #   journalctl --user -u gorge-nightly.service -f        # tail .ds4/nightly.log too
 #   systemctl --user disable --now gorge-nightly.timer && rm ~/.config/systemd/user/gorge-nightly.*
 [Unit]
-Description=gorge nightly tier (fuzz, conformance, manabrew, spellbench bridge, race, perf)
+Description=gorge nightly tier (fuzz, conformance, manabrew, race, perf)
 Documentation=file:///home/sadams/projects/gorge/docs/agents/test-throughput-2026-10-12.md
 
 [Service]

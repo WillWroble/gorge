@@ -4,7 +4,7 @@
 #
 # The heaviest packages each get a shard of their own (index 0..H-1 of the
 # HEAVY list below), measured on the post-merge suite: rules ~170 s, host
-# ~155 s, eventhost ~143 s. Every other package goes to one of the remaining
+# ~155 s. Every other package goes to one of the remaining
 # shards by a stable hash of its import path, so adding a package never
 # reshuffles the others. Rebalance HEAVY from the CI run times when a light
 # shard outgrows the heavy ones.
@@ -18,7 +18,6 @@ count=${2:?usage: ci_shard.sh <index|all> <count>}
 HEAVY=(
 	github.com/adams-shaun/gorge/engine/rules
 	github.com/adams-shaun/gorge/server/host
-	github.com/adams-shaun/gorge/lab/draft/eventhost
 )
 nheavy=${#HEAVY[@]}
 if [ "$count" -le "$nheavy" ]; then
@@ -46,7 +45,7 @@ shard_of() {
 # tuned to the operator's box and fail on a GitHub runner). PRs and pushes skip
 # them; the nightly run sets CI_FULL=1 and runs everything. `go vet ./...` in
 # the lint job still compiles every one of them, so a build break is caught.
-EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|enginebench|keywordbench)|lab/cmd/(botbench|searchbench|encablate|policytrain|policytune|traindash|dzgorge|draftrl|cardval|searchteacher|labdemo|extagent|xmageport)|server/protocol/manabrew(/.*)?|server/host/manabrewhttp|server/manabrew(/.*)?|lab/training/(gamepool|inferbroker|spellbench(/.*)?|searchbench(/.*)?|mzenc)|bots/spellbench(/.*)?|internal/(corpusheap|bench)|lab/draft/draftlab/extern(/.*)?)$'
+EXCLUDE='^github\.com/adams-shaun/gorge/(cmd/(cardfuzz|mtgsim|enginebench|keywordbench)|server/protocol/manabrew(/.*)?|server/host/manabrewhttp|server/manabrew(/.*)?|bots/spellbench(/.*)?|internal/corpusheap|testkit/bench)$'
 
 pkgs=$(go list ./...)
 if [ "${CI_FULL:-0}" != 1 ]; then

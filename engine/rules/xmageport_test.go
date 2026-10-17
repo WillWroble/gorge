@@ -94,7 +94,7 @@ func TestXMagePortScenarios(t *testing.T) {
 			t.Run(fam+"/"+slug+"/"+sc.Name, func(t *testing.T) {
 				t.Parallel()
 				// XMage's addCard places setup permanents before the game
-				// with no zone-change triggers, and lab/cmd/xmageport validates
+				// with no zone-change triggers, and four-yay cmd/xmageport validates
 				// through RunOracleScenarioJSON: run in the same fixture mode.
 				osc := sc.oracleScenario
 				osc.xmageFixture = true

@@ -2,6 +2,8 @@
 
 No edits, no tests run (box at load 78–95/32 cores). **est.** / **hypothesis** where unmeasured. Verified by orchestrator: `ops/scripts/heavy_lock.sh:~162` does `kill -STOP`; `cmd/testbudget/check.go:221-228` returns 0 when wall exceptions are unseeded.
 
+*Note (2026-10-16): the `lab/` packages measured here moved to four-yay (the private companion module), so gorge's own gate and post-merge suite no longer run them; paths below are four-yay's.*
+
 ## TL;DR
 
 1. **Post-merge wall is the suite sitting SIGSTOPped.** `heavy_lock.sh` gate-yield (029087326, merged 2f3ba9c27 10-09 ~22:45) STOPs the post-merge process group whenever a gate bracket is active. Go's `-timeout` counts wall time while stopped → "test timed out after 10m" → FLAKY → pipeline pause. Post-merge wall jumped ~140–500 s → ~1,600–1,800 s exactly at that merge. 10-10 11:18 timeout RED deadlocked the pipeline **47 h**. In-flight run (764ea988e, 13:42) had 7 packages killed at 11 m; `templates.test` 1,425 s elapsed / 74 s CPU; scope ~1,112 CPU-s over ~1,750 s wall.
@@ -20,25 +22,25 @@ No edits, no tests run (box at load 78–95/32 cores). **est.** / **hypothesis**
 | Heavy-lane wait in affected gate | 1,500 s then exit 75 | 20/612 logs |
 | Post-merge (`postmerge_batch.sh` → `postmerge_full.sh`) | vet; `go test -p=8 -json ./...` + testbudget; TestHeads; sim; reward_loop smoke | mean 10-05 417 · 10-06 270 · 10-07 195 · 10-08 207 · 10-09 415 · **10-10 1,412** · 10-12 619 (max 1,819). 36 RED, 31 CULPRIT, 13 FLAKY | `.ds4/postmerge-batch.log`, `postmerge-culprits.log` |
 
-Gate failures since 10-05: go test (affected) 190, xmage driver 76, go build 3; **CR conformance 0, make sim 0, TestHeads 0**. Inside affected: lab/oracle/compliance/gate & adopt 54 FAIL lines each, rules 84.
+Gate failures since 10-05: go test (affected) 190, xmage driver 76, go build 3; **CR conformance 0, make sim 0, TestHeads 0**. Inside affected: four-yay oracle/compliance/gate & adopt 54 FAIL lines each, rules 84.
 
 ### Slowest (contended numbers)
 
 | # | Package / test | Number | Source |
 |---|---|---|---|
 | 1 | `cards` (when touched) | gate p50 166, max 236 s | gate logs |
-| 2 | `lab/oracle/compliance/oraclegen/templates` | 166.8 s clean cache | gate_affected.sh comment |
-| 3 | `lab/oracle/compliance/adopt` | 101 s; TestLevelBRatchet 51 s | same; events.json |
+| 2 | four-yay's `oracle/compliance/oraclegen/templates` | 166.8 s clean cache | gate_affected.sh comment |
+| 3 | four-yay's `oracle/compliance/adopt` | 101 s; TestLevelBRatchet 51 s | same; events.json |
 | 4 | `rules` (max of 6 shards) | gate p50 97.5, max 175; alone 15.5–25.6/shard; whole 66 s / 6,470 tests (10-06) | gate logs |
 | 5 | `testkit/paymirror` | 89 s; 0/53 cached | |
-| 6 | `lab/oracle/compliance/gate` | 89 s; TestDeclaredSetsCompliant 27–34 s | |
+| 6 | four-yay's `oracle/compliance/gate` | 89 s; TestDeclaredSetsCompliant 27–34 s | |
 | 7 | `effects` | 76 s; TestCompiledFilterMatchesTextualOracle 29 s | |
 | 8 | `cmd/repro` | 55 s; 0/56 cached | |
 | 9 | TestKr8WorldsInFuzzGames | 9.5 s alone; 46–69 s in gate | |
 | 10 | archtest TestEngineCompilesFor32Bit | 50.6 s | |
 | 11 | rules TestDecisionTextHasNoEngineSyntax | 43.7 s | |
 | 12 | rules TestAirbendIncrementalIndex… | 28.3 s | |
-| 13 | `lab/cmd/botbench` | 80.8 s (n=1) | |
+| 13 | four-yay's `cmd/botbench` | 80.8 s (n=1) | |
 | 14 | corpusheap TestCorpusHeapCensus | 19 s; pkg 60 s in gate | |
 | 15 | v2shadow TestShadowPlaysWholeGames | 22.6 s | |
 | 16 | `bots/searchprobe` | p50 29.5 s (always in gate) | |
@@ -47,7 +49,7 @@ Gate failures since 10-05: go test (affected) 190, xmage driver 76, go build 3; 
 | 19 | TestRepoDecksPlayAtEverySeatCount / ReplayExactly | **4.6 / 3.8 s — golden games are cheap** | |
 | 20 | `host` | p50 12.6, max 159 s; **RSS 7.16 GB** | |
 
-RSS peaks: host 7.16 GB, lab/oracle/compliance/gate 2.58, cards 2.39, cardfuzz 2.22, paymirror 1.99; rest ≤1.6.
+RSS peaks: host 7.16 GB, four-yay oracle/compliance/gate 2.58, cards 2.39, cardfuzz 2.22, paymirror 1.99; rest ≤1.6.
 
 Static: 4,002 test files; 11,941 tests; 672k test LOC. `rules` 6,714 tests, 418k test LOC / 2,148 files over 150k non-test; 5,784 `t.Parallel()`. 120 packages.
 
@@ -79,14 +81,14 @@ Static: 4,002 test files; 11,941 tests; 672k test LOC. `rules` 6,714 tests, 418k
 | 11 | Split heavy censuses (adopt TestLevelBRatchet, TestDeclaredSetsCompliant, TestCompiledFilter…, TestDecisionText…, paymirror findings) into partitioned chunks | 20–30 s pole shrink | none | |
 | 12 | Tidy dead `TestInvariantsUnderSeedFuzz` skip pattern (`//go:build fuzz`) | 0 | — | engine/rules/fuzz_test.go:1 |
 
-**Not recommended to omit:** golden/whole-game tests (4.6/3.8/~11/~12 s) are cheap and catch real moves; lab/oracle/compliance/gate & adopt earn their place (54 fails each). No strict-subset tests found; deletion would need per-candidate coverage diff.
+**Not recommended to omit:** golden/whole-game tests (4.6/3.8/~11/~12 s) are cheap and catch real moves; four-yay oracle/compliance/gate & adopt earn their place (54 fails each). No strict-subset tests found; deletion would need per-candidate coverage diff.
 
 ## 4. Tiered policy
 
 | Tier | When | Contents |
 |---|---|---|
 | T0 seat (≤2 min) | pre-commit | build, ratchet_gate.py, vet touched, focused `-run` |
-| T1 gate (p50 ≤150 s) | per ticket / merge train | build; vet affected + rdeps; rules 6 shards minus post-merge censuses; Kr8; touched + fast rdeps; always codeshape, view, lab/oracle/compliance/gate+adopt (sharded), searchprobe, host overshoot, testbudget/gentypes/levelb/policynet/archtest(−32-bit); engine change → paymirror, cmd/repro, cardfuzz findings; TestHeads + sim concurrent; **drop CR conformance gate** |
+| T1 gate (p50 ≤150 s) | per ticket / merge train | build; vet affected + rdeps; rules 6 shards minus post-merge censuses; Kr8; touched + fast rdeps; always codeshape, view, four-yay oracle/compliance/gate+adopt (sharded), searchprobe, host overshoot, testbudget/gentypes/levelb/policynet/archtest(−32-bit); engine change → paymirror, cmd/repro, cardfuzz findings; TestHeads + sim concurrent; **drop CR conformance gate** |
 | T2 post-merge (CPUWeight=idle, no STOP) | per landing burst | vet ./...; full go test incl. rules post-merge chunks, full target audit, 32-bit compile, searchseat/searchbench/spellbench/azmcts; seeded testbudget; heads, sim, reward smoke |
 | T3 nightly (new; no timer today) | daily on origin/main | `make fuzz`, `make conformance`, `make test-manabrew`, race pass, `make cover`, cold-cache run |
 | T4 on-demand | operator | set audits, broker/gamepool/policyexp tags, enginebench, oracle-audit, xmage/forge replays |

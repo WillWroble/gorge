@@ -45,7 +45,8 @@ go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 | `ops/scripts/` | the landing pipeline: post-merge suite, ratchet and affected-package gates, heavy-job lock, reward/seed agent, fleet and demo deploy | TOOL (live) |
 | `ops/orchestrator/` | `hooks.py` merge-gate hooks (`ops.orchestrator.hooks:*`) for agentctl | TOOL (live) |
 | `ops/deploy/` | systemd units installed by `ops/scripts/seed-install.sh` | TOOL |
-| `lab/scripts/` | oracle, training and SpellBench-arena drivers | EXT |
-| `lab/oracle/xmageoracle/` | Java XMage replay driver | EXT |
-| `lab/oracle/validation/oracle/` | verdict refresh runbook | EXT |
 | `docs/` | agent guide (`docs/agents/`), design docs (`docs/design/`), decisions (`docs/decisions/`), this site (`docs/site/`) | SUPP |
+
+The oracle drivers, training scripts and research packages that used to sit
+under `lab/` moved to a private companion repository on 2026-10-16 and are
+not listed here.

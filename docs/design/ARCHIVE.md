@@ -20,6 +20,13 @@ their original file names. Everything listed below was parked.
 A reference in code or docs to a parked file now reads
 `archived <file name> (docs/design/ARCHIVE.md)`.
 
+The 15 lab-only design docs that lived in `docs/design/` (the XMage
+compliance oracle and Level B, the XMage scenario port, the draft-events
+design and its E1/E3/E5/E5-d plans, draft RL, the az-c3/az-c4/az-c5 hosting
+notes and the PlayLines pl-3/pl-4/pl-8 notes) moved to four-yay's
+`docs/design/` (private) on 2026-10-16, under the same file names; see
+[ADR 0001](../decisions/0001-repo-layout.md)'s amendment.
+
 Outcomes are one-line summaries taken from each document's own status,
 summary or verdict lines; read the document before relying on one.
 
@@ -61,9 +68,9 @@ The `evidence/token-art/` directory also held 8 screenshots
 | `specs/2026-10-06-legal-walk-design.md` | 2026-10-06 | Priority legal-action walk: design and implementation plan | Priority legal-action walk design; steps S0-S4 landed. |
 | `specs/2026-10-06-pointer-free-corpus-design.md` | 2026-10-06 | Pointer-free card corpus: design and implementation plan | Pointer-free card corpus to shrink GC scan set; `internal/corpusheap` guards it. |
 | `specs/2026-10-07-mana-member-carry-design.md` | 2026-10-07 | Mana-member carry (legal-walk §S4) — design | Legal-walk S4 mana-member carry; landed (eb31d3f1a). |
-| `specs/2026-10-07-mzenc-design.md` | 2026-10-07 | mzenc: a byte-identical Go port of MageZero v0.2's `StateEncoder` | Byte-identical Go port of MageZero's StateEncoder; `lab/training/mzenc`. |
+| `specs/2026-10-07-mzenc-design.md` | 2026-10-07 | mzenc: a byte-identical Go port of MageZero v0.2's `StateEncoder` | Byte-identical Go port of MageZero's StateEncoder; now four-yay's `training/mzenc` (private). |
 | `specs/2026-10-07-searchprobe-engine-reset-design.md` | 2026-10-07 | Search-probe engine reset: pooled replay instead of clone | Pooled replay instead of clone; landed. |
-| `specs/2026-10-07-smoke-perf-target-design.md` | 2026-10-07 | Smoke perf target design | Opt-in base-vs-candidate smoke perf target (`scripts/smoke-perf.sh`). |
+| `specs/2026-10-07-smoke-perf-target-design.md` | 2026-10-07 | Smoke perf target design | Opt-in base-vs-candidate smoke perf target (`scripts/smoke-perf.sh`, since moved to four-yay). |
 
 ## Plans
 
@@ -92,9 +99,9 @@ The `evidence/token-art/` directory also held 8 screenshots
 | `plans/2026-09-28-ui-prompts.md` | 2026-09-28 | Prompt System (Lane C) Implementation Plan | Client lane C plan (prompt system); landed in `web/`. |
 | `plans/2026-09-30-searchbench-replication.md` | 2026-09-30 | Gorge-native replication of DraftZero experiment #3 (search benchmark) | Executed; results in the 2026-10-01 searchbench report. |
 | `plans/2026-10-02-magezero-style-training-checklist.md` | 2026-10-02 | Checklist: MageZero-style training on gorge | Checklist only; nothing scheduled (the work moved to the side branch `mzrepro`). |
-| `plans/2026-10-02-xmage-oracle-foundation.md` | 2026-10-02 | XMage Compliance Oracle — Foundation (X0–X3) Implementation Plan | Executed X0-X3; the oracle now lives in `lab/oracle/`. |
+| `plans/2026-10-02-xmage-oracle-foundation.md` | 2026-10-02 | XMage Compliance Oracle — Foundation (X0–X3) Implementation Plan | Executed X0-X3; the oracle now lives in four-yay's `oracle/` (private). |
 | `plans/2026-10-07-mana-member-carry.md` | 2026-10-07 | Mana-member carry (legal-walk §S4) Implementation Plan | Executed: legal-walk step S4 landed (eb31d3f1a). |
-| `plans/2026-10-07-mzenc-hash-port.md` | 2026-10-07 | mzenc hash-port Implementation Plan (Milestone 1) | Executed milestone 1: `lab/training/mzenc` hash port. |
+| `plans/2026-10-07-mzenc-hash-port.md` | 2026-10-07 | mzenc hash-port Implementation Plan (Milestone 1) | Executed milestone 1: the mzenc hash port (now four-yay's `training/mzenc`). |
 | `plans/2026-10-07-mzenc-state-walkers.md` | 2026-10-07 | mzenc StateEncoder walkers Implementation Plan (Milestones 2–3) | mzenc StateEncoder walkers (milestones 2-3); mzenc is used only for ablations. |
 | `plans/2026-10-07-searchprobe-engine-reset.md` | 2026-10-07 | Search-Probe Engine Reset Implementation Plan | Executed; see the 2026-10-07 measured-outcome report. |
 | `plans/autopay-v1-hardening/README.md` | 2026-09-26 | Auto-pay V1 hardening wave (2026-09-26) | Auto-pay V1 hardening wave of 17 ticket briefs (below); wave filed through agentctl. |
@@ -166,7 +173,7 @@ The `evidence/token-art/` directory also held 8 screenshots
 | `reports/2026-10-09-bot-consolidation-plan.md` | 2026-10-09 | Bot policy consolidation plan | Plan to consolidate heuristic bots into four tiers; not implemented. |
 | `reports/2026-10-09-common-sense-rules-evaluation.md` | 2026-10-09 | Common-sense rules for the heuristic bots: evaluation | A shared common-sense layer removes one large class of bad actions; became the opt-in `bots/sanity`. |
 | `reports/2026-10-09-dumb-choice-census.md` | 2026-10-09 | Dumb-choice census for the heuristic bots | Dumb-choice census of the heuristic bots; stopped early by the operator. |
-| `reports/2026-10-10-corpus-coverage-census.md` | 2026-10-10 | Corpus coverage census (2026-10-10) | Which (card, ability) pairs bot play reaches; `cmd/corpuscov` (now `lab/cmd/corpuscov`). |
+| `reports/2026-10-10-corpus-coverage-census.md` | 2026-10-10 | Corpus coverage census (2026-10-10) | Which (card, ability) pairs bot play reaches; `cmd/corpuscov` (now four-yay's `cmd/corpuscov`). |
 | `reports/2026-10-10-encoding-ablation.md` | 2026-10-10 | Encoding ablation: which state symbols carry signal (2026-10-10) | Ablation of which state symbols carry signal for the policy net. |
 | `reports/2026-10-10-mana-model-gap.md` | 2026-10-10 | Mana-model gap: how often the source census withholds a payable cast | How often the source census withheld a payable cast. |
 | `reports/2026-10-12-mana-model-ab.md` | 2026-10-12 | Mana-model A/B: do bots choose the newly offered options, and does the flag change results? | Bots do choose the newly offered mana options (5-23% of exposed windows). |

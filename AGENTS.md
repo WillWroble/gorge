@@ -15,10 +15,12 @@ primitives that IR references. See
 
 - `engine/`: the rules core (`cards state decision events effects rules view
   replay deck`, and `seat`, the `Seat` contract only). Imports nothing outside.
-- `server/`: `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`.
+- `server/`: `gorged` (the importable server; `cmd/gorged` is its thin main), `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`.
 - `bots/`: `botpolicy`, `heuristic` (the default bot), the registry, hosted bots and their inference runtime.
 - `cmd/`: product and developer tools. `internal/`: ratchets, test support, generators.
-- `lab/`: fenced extensions (draft, oracles, training; their `cmd/` and `scripts/`). Nothing outside imports it.
+- Draft events, compliance oracles, training research and the research bots live in the private
+  companion module four-yay (`github.com/adams-shaun/four-yay`, checkout `../four-yay`), which
+  imports gorge; gorge never imports it (ADR 0001 amendment, 2026-10-16).
 - `ops/`: agentctl hooks, systemd units, pipeline scripts ([`ops/README.md`](ops/README.md)). `scripts/`: contributor/CI only.
 - `docs/design/`: living designs; parked history is indexed in `docs/design/ARCHIVE.md`.
 
@@ -71,7 +73,7 @@ make conformance          # the focused CR conformance audit
 **Test budget (operator, 2026-10-05, doubled 2026-10-09 with the box's DRAM):**
 every test fits 4 GB RSS, 4 vCPU and 1 minute wall; one outside it is a defect
 to split, never to trim. Agents run tests focused and capped, never
-`go test ./...`, `./lab/oracle/compliance/...` or `-count=1`:
+`go test ./...` or `-count=1`:
 `systemd-run --user --scope -q -p MemoryMax=4G -p CPUQuota=400% env GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -timeout 2m -run X ./pkg`.
 The full suite is `ops/scripts/postmerge_batch.sh`'s (once per batch on main;
 red pauses the pipeline and bisects to a CULPRIT). Rules and rationale:

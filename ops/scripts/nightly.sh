@@ -2,8 +2,9 @@
 # nightly.sh — the T3 nightly tier (docs/agents/test-throughput-2026-10-12.md §4).
 #
 # The audit found a set of lanes nothing ran: `make fuzz`, `make conformance`,
-# `make test-manabrew`, `make test-spellbench-bridge`, a -race pass, and a
-# perf-tracking record. This script runs them once, sequentially, against a
+# `make test-manabrew`, a -race pass, and a perf-tracking record. (The
+# `make test-spellbench-bridge` step moved to four-yay's Makefile with the
+# SpellBench bridge on 2026-10-16.) This script runs them once, sequentially, against a
 # FRESH DETACHED worktree of origin/main, then removes that worktree.
 #
 #   ops/scripts/nightly.sh                               # every default step
@@ -11,7 +12,7 @@
 #   NIGHTLY_DRY_RUN=1 ops/scripts/nightly.sh             # print the plan, run nothing
 #   make nightly                                     # the same, from the Makefile
 #
-# Steps (default order): fuzz conformance manabrew spellbench race perf.
+# Steps (default order): fuzz conformance manabrew race perf.
 # Opt-in only (NIGHTLY_STEPS must name it): cover (`make cover`: the whole
 # suite again with coverage, so it is not in the default set).
 #
@@ -68,14 +69,14 @@ COMMON=$(git -C "$SELF_DIR" rev-parse --path-format=absolute --git-common-dir)
 ROOT=$(dirname "$COMMON") # the main checkout, even when run from a worktree copy
 . "$SELF_DIR/heavy_lock.sh"
 
-DEFAULT_STEPS=fuzz,conformance,manabrew,spellbench,race,perf
+DEFAULT_STEPS=fuzz,conformance,manabrew,race,perf
 STEPS=${NIGHTLY_STEPS:-$DEFAULT_STEPS}
 DRY=${NIGHTLY_DRY_RUN:-0}
 REF=${NIGHTLY_REF:-origin/main}
 LANE_WAIT=${NIGHTLY_LANE_WAIT:-7200}
 PM_WAIT=${NIGHTLY_PM_WAIT:-3600}
 SLICE=${NIGHTLY_SLICE:-gorge-heavy.slice}
-RACE_PKGS=${NIGHTLY_RACE_PKGS:-./state ./engine/decision ./engine/events ./engine/effects ./engine/rules/... ./engine/replay ./engine/view ./engine/seat ./server/host ./engine/cards}
+RACE_PKGS=${NIGHTLY_RACE_PKGS:-./engine/state ./engine/decision ./engine/events ./engine/effects ./engine/rules/... ./engine/replay ./engine/view ./engine/seat ./server/host ./engine/cards}
 RACE_TIMEOUT=${NIGHTLY_RACE_TIMEOUT:-45m}
 RACE_MEM=${NIGHTLY_RACE_MEM:-10G}
 SUMMARY=$ROOT/.ds4/nightly.log
@@ -106,10 +107,6 @@ step_spec() {
 	manabrew)
 		CAP=60m
 		CMD=(make test-manabrew "GO_TEST_FLAGS=-p=2 -timeout 30m")
-		;;
-	spellbench)
-		CAP=45m
-		CMD=(make test-spellbench-bridge "GO_TEST_FLAGS=-p=2 -timeout 30m")
 		;;
 	race)
 		MEM=$RACE_MEM QUOTA=400% CAP=240m
@@ -194,7 +191,7 @@ run_perf() {
 IFS=',' read -r -a step_list <<<"$STEPS"
 for s in "${step_list[@]}"; do
 	step_spec "$s" || {
-		printf 'nightly: unknown step %q (known: fuzz conformance manabrew spellbench race perf cover)\n' "$s" >&2
+		printf 'nightly: unknown step %q (known: fuzz conformance manabrew race perf cover)\n' "$s" >&2
 		exit 2
 	}
 done

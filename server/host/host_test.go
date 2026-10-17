@@ -142,11 +142,9 @@ func TestHostedPoliciesReplayDeterministically(t *testing.T) {
 		{name: "default", policy: ""},
 		{name: BotPolicy, policy: BotPolicy},
 		{name: LethalPressurePolicy, policy: LethalPressurePolicy},
-		{name: CastProfilePolicy, policy: CastProfilePolicy},
 		{name: "default-auto-pay", policy: "", autoPay: true},
 		{name: BotPolicy + "-auto-pay", policy: BotPolicy, autoPay: true},
 		{name: LethalPressurePolicy + "-auto-pay", policy: LethalPressurePolicy, autoPay: true},
-		{name: CastProfilePolicy + "-auto-pay", policy: CastProfilePolicy, autoPay: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -183,15 +181,9 @@ func TestHostedPoliciesReplayDeterministically(t *testing.T) {
 		if !reflect.DeepEqual(defaultRun.log.Events, explicitBot.log.Events) || !reflect.DeepEqual(defaultRun.log.Intents, explicitBot.log.Intents) || defaultRun.info.Head != explicitBot.info.Head || defaultRun.info.Result != explicitBot.info.Result || !reflect.DeepEqual(defaultRun.info.Winner, explicitBot.info.Winner) {
 			t.Fatalf("omitted policy and explicit %q differ: %+v vs %+v", BotPolicy, defaultRun.info, explicitBot.info)
 		}
-		// The cast-profile policy on the embedded default profile is
-		// intent-identical to the production bot over a whole hosted match (the
-		// same weights, pinned equal by botpolicy's profile tests) -- so its
-		// event log, intents, head, result and winner must all match the
-		// explicit-bot run exactly.
-		castProfileRun := results[CastProfilePolicy]
-		if !reflect.DeepEqual(castProfileRun.log.Events, explicitBot.log.Events) || !reflect.DeepEqual(castProfileRun.log.Intents, explicitBot.log.Intents) || castProfileRun.info.Head != explicitBot.info.Head || castProfileRun.info.Result != explicitBot.info.Result || !reflect.DeepEqual(castProfileRun.info.Winner, explicitBot.info.Winner) {
-			t.Fatalf("%q on the default profile and explicit %q differ: %+v vs %+v", CastProfilePolicy, BotPolicy, castProfileRun.info, explicitBot.info)
-		}
+		// The cast-profile rows (intent-identical to the explicit bot on the
+		// embedded default profile) moved with the policy to four-yay
+		// (bots/hosttest TestCastProfileReplaysLikeTheBot).
 	})
 }
 

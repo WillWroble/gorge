@@ -11,8 +11,8 @@ after-the-fact or by convention, the table says so. *As of 2026-10-16,
 | **Determinism** | No wall clock, a seeded PCG RNG (`engine/rules/rng.go`), and no `map` iteration whose order can reach an event. | `internal/archtest/arch_test.go`: `TestTimeIsImportedOnlyByTheHost`, `TestNoLegacyMathRand`. Map order is by convention and caught by the golden heads. |
 | **Append-only event kinds** | A new `events.Kind` is appended after the last constant, with a `kindinfo.go` entry, so ordinals and recorded hash chains never move. | `engine/events/kindinfo_test.go`, golden heads. |
 | **Closed decision kinds** | Every seat client must answer every `decision.Kind`; adding one is a deliberate decision. | `engine/decision/decision_test.go` `TestKindsListsEveryKindOnce`. |
-| **Dependency direction** | `effects`, `view`, `botpolicy` and `protocol` never import `rules`; `engine/` never imports `bots/`, `server/` or `lab/`; `engine/seat` imports only `decision` and `view`. | `arch_test.go` `TestDependencyOrderHolds` (named edges, e.g. `botpolicy` → `view`/`rules`/`seat`, `protocol` → `bots`), `layering*_test.go`. The group rule `engine/` ↛ `bots/`/`server/`/`lab/` holds in the measured import graph but is not yet pinned as one test. |
-| **Lab fence** | Nothing outside `lab/` imports `lab/` ([ADR 0001](https://github.com/adams-shaun/gorge/blob/main/docs/decisions/0001-repo-layout.md) decision 3). | `internal/archtest/lab_fence_test.go` (untagged build; platform tests limited to a shrink-only allowlist). The one composition point, `cmd/gorged`'s draft-event wiring, builds only with `-tags lab`. |
+| **Dependency direction** | `effects`, `view`, `botpolicy` and `protocol` never import `rules`; `engine/` never imports `bots/` or `server/`; `engine/seat` imports only `decision` and `view`. | `arch_test.go` `TestDependencyOrderHolds` (named edges, e.g. `botpolicy` → `view`/`rules`/`seat`, `protocol` → `bots`), `layering*_test.go`. The group rule `engine/` ↛ `bots/`/`server/` holds in the measured import graph but is not yet pinned as one test. |
+| **Extensions live outside** | Draft events, compliance oracles, training research and the research bots live in a private companion module, four-yay, that imports gorge; gorge never imports it. Extensions plug in through `bots.Register`, `server/gorged.RegisterNetBot` and `server/gorged.Extensions` ([ADR 0001](https://github.com/adams-shaun/gorge/blob/main/docs/decisions/0001-repo-layout.md), 2026-10-16 amendment). | Structural: the root `go.mod` has no `require` lines (`TestRootModuleHasNoRequires`), so nothing in gorge can import four-yay. This replaced the earlier in-tree fence. |
 | **Information boundary** | Seats see only a `view.View`, never the engine. Clairvoyant search never reaches a hosted or rated game. | `TestNoExportLeaksAnEngineGame`, the `view` redaction tests. |
 | **Forge GPL boundary** | Forge card scripts are never committed. | `engine/cards/boundary_test.go` `TestNoForgeScriptsTracked`. |
 | **No cgo, no third-party deps, 32-bit clean** | Pure Go in the card pipeline and rules core. | `TestEngineCompilesFor32Bit`, `CGO_ENABLED=0` in the `Makefile`, and `internal/archtest/gomod_test.go` `TestRootModuleHasNoRequires`. |
@@ -20,11 +20,10 @@ after-the-fact or by convention, the table says so. *As of 2026-10-16,
 | **Per-test budget** | Every test fits 4 GB RSS, 4 vCPU and 1 minute of wall time. | `cmd/testbudget` in the post-merge suite, with shrink-only exception inventories in `testkit/testutil/testdata/`. |
 | **Corpus or it didn't run** | Corpus-dependent tests skip when `.cards/` is absent. | Convention: a fast green run without the corpus has tested very little. |
 
-!!! note "The one third-party dependency is fenced in a nested module"
-    `github.com/ebitengine/purego` is used only by the experimental GPU game
-    pool, which is its own module under `lab/training/experimental/gamepool`.
-    The root `go.mod` has no `require` lines, and
-    `TestRootModuleHasNoRequires` keeps it that way.
+!!! note "No third-party dependency"
+    The experimental GPU game pool that needed `github.com/ebitengine/purego`
+    left gorge with the research tree. The root `go.mod` has no `require`
+    lines, and `TestRootModuleHasNoRequires` keeps it that way.
 
 ## Changing an invariant
 

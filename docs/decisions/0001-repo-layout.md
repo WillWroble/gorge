@@ -30,7 +30,7 @@ platform from the research, and the docs are written for agent seats.
 5. **Draft in gorged: seam + lab composition.** The seam is the `lab` build
    tag: `cmd/gorged/events.go` and `art_sets.go` (the draft runtime and set
    art prewarm) build only with `-tags lab`; the untagged binary links no
-   `lab/` package and refuses `-events` (`TestEventsNeedLabBuild`).
+   `lab/` package and refuses `-events` (`TestEventsNeedAPlugin`).
    `make deploy-demo`, the per-ticket gate, the full suite and CI build with
    `-tags lab`. `server/protocol/draftevent.go` stays: it is wire types the
    web client generates from and imports nothing from `lab/`.
@@ -126,3 +126,76 @@ rebased by re-running the script on it.
 
 Splitting the flat `engine/rules/` directory (the lasagna work owns it). Moving
 `lab/` to its own repository.
+
+## Amendment (2026-10-16): the lab tree moves to four-yay
+
+- **Status:** accepted 2026-10-16 (operator), the same day as the layout
+  above. Supersedes decision 2's "moved to another repo later", decisions 3
+  and 5, and the *Not in scope* line about moving `lab/`. Everything above
+  this section is the record as first written.
+
+**What moved.** The fenced `lab/` tree left gorge for a new **private**
+module and repository, four-yay (`github.com/adams-shaun/four-yay`, checked
+out beside gorge as `../four-yay`). Its `go.mod` requires gorge and replaces
+it with the sibling checkout. Paths drop the prefix: gorge's `lab/X` is
+four-yay's `X` (`draft/`, `oracle/`, `training/`, `contracts/`, `cmd/` with
+the 27 research binaries such as `botbench`, `draftsim`, `oraclediff`,
+`compliance` and `dzgorge`, and `scripts/`). With it went the hosted
+research bots: `az-c3`/`az-c4`/`az-c5` (`bots/azc3..5`), `cast-profile`
+(`bots/castprofile`), `sb-heuristic`/`sb-uniform`/`sb-first`
+(`bots/sbbuiltin`), `sb-search-lite-atk` (`bots/sbsearch`,
+`bots/spellbench/sbsearch`), `search` (`bots/search`), the clairvoyant world
+source (`bots/azmcts/clairvoyant`, now four-yay's `bots/clairvoyant`),
+`examples/extagent`, `NOTICE` (it covered only the XMage-derived compliance
+manifests), the 15 lab design docs (four-yay's `docs/design/`), and the
+agent docs that described only lab content (`docs/agents/repo-map-research.md`
+and `docs/contracts.md`, now under four-yay's `docs/`).
+
+**What gorge keeps.** The hosted bots `bot`, `lethal-pressure`,
+`sb-tactical` and `az-redeal` (with the `azmcts` search core) and their
+support packages: `botpolicy`, `heuristic`, `sanity`, `policynet`, `gonet`,
+`traceboard`, `searchseat`, `searchprobe`, `spellbench` (the SpellBench deck
+catalogs, moved from `lab/training/spellbench` to `bots/spellbench`, with
+their generator `bots/spellbench/fdn-catalog.py`), `spellbench/builtins`,
+`spellbench/payexec` and `bots/all`.
+
+**The seams that replace the fence.** gorge never imports four-yay; four-yay
+composes gorge from outside:
+
+- `server/gorged` is the importable server (`Main`, `Serve`). Its
+  `Extensions{Events EventsPlugin}` carries the draft-event runtime
+  (four-yay's `draft/gorgedevents`); with no plugin, `-events` is refused at
+  startup (`TestEventsNeedAPlugin`). `RegisterNetBot` links the az-c3/c4/c5
+  implementations in; gorged keeps their names, flags and closed deck-list
+  machinery. `cmd/gorged` is a thin main over it that links gorge's
+  `bots/all`; four-yay's `cmd/gorged` is the full demo server.
+- `bots.Register` is unchanged; four-yay's `bots/all` links gorge's
+  `bots/all` plus its own bots.
+- `testkit/` (`testutil`, `bench`, `paymirror`) and `cli/` moved out of
+  `internal/` so an outside module can import them.
+
+**What replaced the enforcement.** The fence is now structural: the root
+`go.mod` has no `require` lines (`TestRootModuleHasNoRequires`), so gorge
+cannot import four-yay. `internal/archtest/lab_fence_test.go` and the check
+that engine tests never import the compliance packages were deleted as
+vacuous, and the `lab` build tag is gone from gorge, its CI and its gates.
+
+**Process changes.**
+
+- The Makefile targets for the moved tools went with them (`botbench`,
+  `draftsim`, `dzbroker`, `test-broker`, `gamepool`, `traindash`,
+  `compliance-manifests`/`-pass`/`-status`/`-sets`, `xmage-oracle-setup`,
+  `forge-oracle-setup`, `test-spellbench-bridge`, `smoke-perf`;
+  `scripts/smoke-perf.sh` too, which now compares two gorge revisions through
+  four-yay's `botbench`). gorge's `make deploy-demo` builds four-yay's
+  `gorged` (`FOURYAY_ROOT`, default the `../four-yay` sibling of gorge's main
+  checkout).
+- gorge drops its compliance gate (operator decision); four-yay's CI checks
+  gorge for compliance.
+- The docs workflow no longer measures set support (`oraclediff` is
+  private); the public sets page shows its hand snapshot, and
+  `scripts/docs_sets.py` stays in gorge as the renderer.
+- Some contract goldens are owned by gorge packages (`bots/policynet`'s
+  azvisits, `bots/gonet`'s dzgw header, `server/protocol`'s frames) while
+  four-yay's contract registry pins their hashes, so changing one is a
+  coordinated change across both repositories.

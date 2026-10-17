@@ -80,7 +80,7 @@ generation-0 `az-redeal`), each named with its reason in
 registered bot answering false. As a backstop, an AutoPayment az seat whose
 bot still answers a mana tap searches the full payment vocabulary with no
 bot candidate (`Root.NoBot`) and counts `Stats.BotTapRerooted`
-(botbench's `tap-rerooted` line). Human seats are unchanged: the host builds
+(four-yay botbench's `tap-rerooted` line). Human seats are unchanged: the host builds
 their plans under `TableConfig.AutoMana` and the client only picks.
 
 The same build also leaves an engine-side cast census on the decision

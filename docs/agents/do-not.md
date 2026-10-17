@@ -36,7 +36,7 @@ so most of these hurt someone other than you.
   checkpoints.**
 - **Don't add a Go dependency or cgo.** The root `go.mod` has no `require`
   lines, and it stays that way (`TestRootModuleHasNoRequires`); a tag-gated
-  experiment that needs one is a nested module, like `lab/training/experimental/gamepool`.
+  experiment that needs one is a separate module that imports gorge, like four-yay's `training/experimental/gamepool`.
 - **Don't use maps or per-call string parsing on hot paths.** Use bitsets and
   dense slices, and compile strings to masks once.
 - **Don't hand-edit `web/src/protocol.ts`.** Run `make gentypes`.
@@ -72,8 +72,8 @@ so most of these hurt someone other than you.
 - **Don't add a row to `wall_exceptions.txt` / `rss_exceptions.txt`** (`testkit/testutil/testdata/`): they only shrink. Split the over-budget test instead.
 - **Don't write or run a test outside the budget** (4 GB RSS, 4 vCPU, 1 min
   wall; operator 2026-10-05, doubled 2026-10-09). Don't call `cards.LoadRegistry` in a test (use
-  `internal/testutil.CorpusRegistry`), don't pass `-count=1`, don't run
-  `go test ./...`, `./lab/oracle/compliance/...` or a whole package uncapped, and don't
+  `testkit/testutil.CorpusRegistry`), don't pass `-count=1`, don't run
+  `go test ./...` or a whole package uncapped, and don't
   run a known-heavy test whole "for a baseline": measure one chunk under the
   4 GB cap. Split a heavy test into chunk tests sharing fixtures; never
   delete assertions or shrink a census to make it fit.
@@ -102,9 +102,10 @@ so most of these hurt someone other than you.
 
 - **Don't let clairvoyant or oracle modes near a hosted table or a rated
   game.** They are measurement ceilings only.
-- **Don't add a policy to `server/host/bot_policy.go`'s hosted vocabulary** without
-  passing the adoption gate (see the README's *Bot player training and
-  adoption guidelines*).
+- **Don't register a hosted policy** (`bots.Register`, linked from `bots/all`) without
+  passing the adoption gate (see [`docs/site/research/bots.md`](../site/research/bots.md)).
+- **Don't import four-yay.** gorge is
+  public and four-yay is private; four-yay depends on gorge, never the reverse.
 - **Don't train through PyTorch or any out-of-tree runtime** for anything
   meant to ship. Learned policies are pure Go and deterministic.
 - **Don't commit neural checkpoints (`.gpol`)** without an operator decision.

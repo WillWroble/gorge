@@ -3,16 +3,17 @@
 # (operator, 2026-10-05; lanes 2026-10-09).
 #
 # Every heavy runner draws a lane from the same pool: ops/scripts/heavy.sh,
-# ops/scripts/postmerge_batch.sh (the full suite and every bisect step),
-# lab/scripts/sb-gauntlet.sh, lab/scripts/m1b-distill.sh, the agentctl "go test
-# (affected)" gate, scripts/driver_replay_batch.sh. (`make ledger` has its own
+# ops/scripts/postmerge_batch.sh (the full suite and every bisect step), the
+# agentctl "go test (affected)" gate, and four-yay's research drivers
+# (scripts/sb-gauntlet.sh, scripts/m1b-distill.sh and the XMage driver
+# replay batch, all moved there 2026-10-16). (`make ledger` has its own
 # lock, scripts/ledger-lane.sh.) Seats stay unlocked (they are capped
 # separately). The pool has GORGE_HEAVY_LANES lanes (default 3, raised from a
 # single lock when the box went from 64 to 120 GiB, so a per-ticket gate and
 # the post-merge suite — or a suite and a heavy lease — can run at the same
 # time; 2026-10-09 cli-20261009T224425Z-a610bfaf raised 2 -> 3: the batch
 # cadence runs the full suite back to back with ~60 s gaps (each holding a
-# lane 235-452 s), so a second heavy job (driver_replay_batch, another seat's
+# lane 235-452 s), so a second heavy job (a batch replay, another seat's
 # gate) already made both lanes busy and the per-ticket gate paid its wait
 # inside its own gate wall — the measured gate_wall_s pole was the WAIT, not
 # the gate's test work: 3 of 5 gate runs on 2026-10-09 16:14-16:50 spent
@@ -210,7 +211,7 @@ gorge_heavy_supervise() {
 			if [ "$_hl_mode" = weight ]; then
 				# No grace: a lowered weight loses no work, and the gate wants the
 				# CPU now. Rescan every pass so a scope the job starts mid-bracket
-				# (driver_replay_batch runs one per `go test`) is lowered too.
+				# (a batch replay runs one per `go test`) is lowered too.
 				_hl_weight_lower
 				if [ "$_hl_parked" = 0 ]; then
 					_hl_parked=1

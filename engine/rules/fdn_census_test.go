@@ -12,7 +12,7 @@ import (
 
 // TestFDNParamCensusReport runs the parameter census (paramcensus_test.go)
 // over the SpellBench FDN Limited card universe
-// (lab/training/spellbench/fdn-cards.tsv) instead of the repo decks: the FDN
+// (four-yay training/spellbench/fdn-cards.tsv) instead of the repo decks: the FDN
 // cards whose registered primitives leave a parameter unread or whose cost
 // carries an unmodelled token, weighted by 17lands wr60 deck copies. A
 // report only -- it never fails on a finding; the FDN backlog tickets
@@ -21,7 +21,7 @@ import (
 func TestFDNParamCensusReport(t *testing.T) {
 	_, d := measureParamCensus(t, nil)
 	reg := testutil.CorpusRegistry(t)
-	raw, err := os.ReadFile("../../lab/training/spellbench/fdn-cards.tsv")
+	raw, err := os.ReadFile("../../bots/spellbench/fdn-cards.tsv")
 	if err != nil {
 		t.Skipf("no FDN universe: %v", err)
 	}

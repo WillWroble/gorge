@@ -46,9 +46,9 @@ func (r *DeckImportReport) ignore(field string, n int) {
 // diacriticFold strips the Latin-1 diacritics a ManaBrew client's name field
 // may carry that cards.NormalizeName does not (it folds case, whitespace and
 // punctuation, but a marked vowel is still a distinct letter to it). It
-// mirrors lab/training/spellbench/v2shadow's fold helper (spec §6.1: "borrow ...
+// mirrors four-yay training/spellbench/v2shadow's fold helper (spec §6.1: "borrow ...
 // the diacritic fold"); duplicated here rather than imported, since
-// lab/training/spellbench is an unrelated tier this package has no business
+// four-yay training/spellbench is an unrelated tier this package has no business
 // depending on.
 var diacriticFold = strings.NewReplacer(
 	"á", "a", "à", "a", "â", "a", "ä", "a", "ã", "a", "å", "a",

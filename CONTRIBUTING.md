@@ -57,7 +57,7 @@ with what enforces each one, is in
    every golden replay stay valid.
 5. **Never commit Forge card scripts** (the GPL boundary above).
 6. **The engine never imports the server or the application.** `engine/`
-   packages do not import `server/`, `bots/`, `cmd/` or `lab/`; within the
+   packages do not import `server/`, `bots/` or `cmd/`; within the
    engine, `effects` never imports `rules`. `internal/archtest` enforces the
    forbidden edges (`TestDependencyOrderHolds`).
 
@@ -145,13 +145,19 @@ example of the shape we like.
 | Add a decision kind | Don't, without a maintainer decision: the set is closed and every seat, bot, client and the wire must answer it. |
 | Change a seat's projected view | `engine/view/card.go` (cards, battlefield), `engine/view/stack.go` (stack); `engine/view/view.go` only for the assembler. |
 | Change the wire | `server/protocol/`, then `make gentypes`. |
-| Add a bot policy | Bench-only: `lab/cmd/botbench`. Hosted: `server/host/bot_policy.go`. Read [docs/site/research/bots.md](docs/site/research/bots.md) first. |
+| Add a bot policy | Bench-only: a `seat.Seat` driven through `testkit/bench`. Hosted: `bots.Register` in an `init()` (`bots/registry.go`), linked from `bots/all`. Read [docs/site/research/bots.md](docs/site/research/bots.md) first. |
 | Add a repo deck | `testkit/testutil/decks/*.json` via `cmd/deckimport`; every card in it must be fully supported. |
 | Turn a player's feedback report into a test | `go run ./cmd/repro -emit-test <pkg> <feedback-dir>` (see `AGENTS.md`, "Reproduce a feedback report"). |
 | Add a package | Anywhere it fits the tiers, plus an entry in `docs/site/architecture/packages.tiers.json`. |
 
 The per-package map is [docs/agents/repo-map.md](docs/agents/repo-map.md)
 and `go run ./cmd/pkgmap` prints every package with its purpose and tier.
+Draft events, the compliance oracles, training and the research bots are not
+in this repository: they live in four-yay, a private companion module that
+imports gorge (README, "four-yay, the private companion module"). A change in
+gorge never needs it, but a change to a seam it uses (`bots.Register`,
+`server/gorged.Extensions`, `server/gorged.RegisterNetBot`, `testkit/`, `cli/`)
+is an API change for it.
 Behaviour that looks like a bug but is deliberate is recorded in
 `docs/design/2026-09-22-engine-contracts.md` and in `AGENTS.md`'s
 "Known approximations" table; read both before filing.

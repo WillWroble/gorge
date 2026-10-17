@@ -2,8 +2,8 @@
 
 What runs gorge's landing pipeline from this repository. agentctl itself
 (daemon, dashboard, seats) lives in `~/projects/agentctl`; this directory holds
-what it calls. Contributor tooling is in `scripts/`, research drivers in
-`lab/scripts/`.
+what it calls. Contributor tooling is in `scripts/`; the research drivers moved to the
+four-yay module (its `scripts/` and `ops/scripts/`) on 2026-10-16.
 
 | Path | What it holds |
 |---|---|
@@ -32,8 +32,7 @@ what it calls. Contributor tooling is in `scripts/`, research drivers in
   here changes nothing until it is re-installed and `systemctl --user
   daemon-reload` runs.
 - **Transient units run scripts from here.** `gorge-postmerge-batch`
-  (`ops/scripts/postmerge_batch.sh`), `gorge-driver-replay-batch`
-  (`ops/scripts/driver_replay_batch.sh`) and `gpu-fault-watch`
+  (`ops/scripts/postmerge_batch.sh`) and `gpu-fault-watch`
   (`ops/scripts/gpu-fault-watch.sh`) are started with `systemd-run --user
   --unit=…` and keep the path they were launched with; relaunch them after a
   move. `gorge-supervisor` (agentctl's supervisor, also a `systemd-run`
@@ -42,7 +41,8 @@ what it calls. Contributor tooling is in `scripts/`, research drivers in
   `git rev-parse --show-toplevel`; a few use `dirname "$0"` (siblings they
   source, or `/../..` to the root in `seed-ask.sh` and `start-autonomous.sh`),
   so moving one a level changes its root.
-- **The demo is the operator's.** Never run `deploy-demo.sh` or bind ports
+- **The demo is the operator's.** Its binary is four-yay's gorged (built from
+  `FOURYAY_ROOT`, default the sibling `../four-yay`). Never run `deploy-demo.sh` or bind ports
   8080-8081.
 - **Post-merge red pauses the pipeline.** `postmerge_batch.sh` writes the
   pause file on red and bisects; it is what pushes `main`.

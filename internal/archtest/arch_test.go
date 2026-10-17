@@ -136,94 +136,37 @@ func set(s string) map[string]bool {
 // only clocks in the system. Every other package must be a pure function
 // of its inputs.
 //
-// lab/cmd/botbench is exempt because it is a build-time developer tool, not part
-// of the engine or the server: its grind mode reads the wall clock only to
-// bound its own run window (deadline) and report per-deck elapsed time — how long the BENCH chose to run, not anything a game,
-// event, view or replay depends on. cmd/ledger is exempt likewise: it stamps
-// the ledger document's Generated: field for the dashboard, a docs tool
-// output, never engine state.
-// lab/cmd/searchprobe is another diagnostic tool: it measures corpus load, total
-// elapsed time and per-root sampling/search cost. It injects a clock into the
-// experimental harness only for returned metrics; fixed work counts, explicit
-// seeds and ordinary engine execution govern every proposal and action.
-// lab/cmd/searchteacher (the 2026-09-19 search-teacher spike) is exempt on the
-// same terms: it reads the clock only to report per-decision sampling and
-// search milliseconds; no proposal, rollout, label or game reads it.
-// cmd/cardfuzz reads it only for its per-game hang watchdog and its
-// games/s progress line; every deck and game is a pure function of its seed.
-// lab/cmd/exitloop (the L10 expert-iteration loop) reads it only to report each
-// stage's wall seconds in timing.tsv; the stages are separate processes and no
-// label, checkpoint, game or summary.tsv byte reads it.
-// lab/cmd/traindash (the live read-only training dashboard) reads it only to
-// stamp Generated:/last-modified fields and to decide a run's live/stale
-// status from file mtimes; it scans a training output tree and never drives
-// the engine, so no game, event, view or replay depends on its clock.
-// The paymirror A/B harness reads the clock only in
-// its cmd/paymirror CLI: the per-game wall-time budget is injected to the
-// library as a paymirror.DriverOptions.BudgetExceeded predicate the CLI
-// builds from time.Now, and the CLI's progress line prints per-game elapsed
-// seconds. The testkit/paymirror library itself imports no time and is a
-// pure function of its seeds and the corpus for a completed game; every
-// spec, game, report and trace byte is either that pure result or a game the
-// CLI's own budget truncated (Err "truncated: budget"), never something the
-// library's clock changed; elapsed time cannot affect engine choices, events,
-// replays or verdicts.
-// lab/cmd/sbv1agent (the SpellBench v1 agent) reads it only to report each
-// shadow-policy decision's wall milliseconds in its -stats line; every
-// answer is a pure function of the decision stream and its seed.
-// lab/cmd/kshadowcheck (the kernel-shadow fidelity tool) reads it only to report
-// staging cost; it plays no game.
-// lab/cmd/sbagent (the SpellBench v2 agent) reads it to report each shadow
-// policy decision's wall milliseconds in its -stats line and for the
-// search's per-decision clock guard (counted when it fires); lab/cmd/sbv2local
-// (the in-process v2 runner) only reports latency. lab/cmd/searchbench reads it
-// only at the command boundary: a run's per-item CoreSeconds and progress
-// lines, a build's stage seconds (build.json, never the manifest); every
-// answer and every manifest byte is a pure function of the items, seeds and
-// corpus. cmd/enginebench (the docs/015 engine-speed rows) reads it only to
-// report each row's elapsed wall time beside its CPU time; every game and
-// seed is fixed by its flags. server/host/manabrewhttp uses time only for SSE
-// keep-alive and write deadlines. lab/cmd/dzgorge (the DraftZero driver) reads
-// it only for its remote-batch flush timer, retry back-off and per-call
-// timing counters; every game is a pure function of its seed.
-// lab/training/gamepool and lab/training/inferbroker (both tag-gated schedulers) use
-// timers only to decide WHEN a ready batch is flushed and to report queue and
-// serve nanoseconds; which decisions are answered, and every answer, is a
-// pure function of the games' seeds. eventhost (the draft-event runtime,
-// docs/design/2026-10-13-draft-events-design.md) uses time only
-// for pick-timer deadlines and SSE keep-alive; a timeout reaches the pure
-// event package as a logged auto-pick entry, so replaying an event's log
-// never reads the clock. lab/cmd/draftrl (the draft-RL driver) reads it only
-// for rollout's throughput line (stdout, never a record) and for the
-// GORGE_PAUSE_FILE poll's sleep; every pick, deck and game record is a pure
-// function of its seed. No game, event, view or
-// replay reads the clock, and intents reach the engine only through
-// SubmitIntent.
+// The other allowed packages are developer tools that read the clock only to
+// bound or report their own run, never anything a game, event, view or replay
+// depends on. cmd/ledger stamps the ledger document's Generated: field.
+// cmd/cardfuzz reads it only for its per-game hang watchdog and its games/s
+// progress line; every deck and game is a pure function of its seed. The
+// paymirror A/B harness reads the clock only in its cmd/paymirror CLI: the
+// per-game wall-time budget is injected to the library as a
+// paymirror.DriverOptions.BudgetExceeded predicate the CLI builds from
+// time.Now, and the CLI's progress line prints per-game elapsed seconds. The
+// testkit/paymirror library itself imports no time and is a pure function of
+// its seeds and the corpus for a completed game; a game the CLI's budget
+// truncated says so (Err "truncated: budget"). cmd/enginebench (the docs/015
+// engine-speed rows) reads it only to report each row's elapsed wall time
+// beside its CPU time; every game and seed is fixed by its flags.
+// server/host/manabrewhttp uses time only for SSE keep-alive and write
+// deadlines. No game, event, view or replay reads the clock, and intents reach
+// the engine only through SubmitIntent.
+//
+// The research tools that also read the clock (botbench, searchteacher, the
+// SpellBench agents, the draft-event runtime and the rest) moved to four-yay
+// with the lab tree (docs/decisions/0001-repo-layout.md).
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
 		module + "/server/host":              true,
 		module + "/server/host/httpapi":      true,
-		module + "/cmd/gorged":               true,
-		module + "/lab/cmd/botbench":         true,
+		module + "/server/gorged":            true,
 		module + "/cmd/ledger":               true,
-		module + "/lab/cmd/searchprobe":      true,
-		module + "/lab/cmd/searchteacher":    true,
 		module + "/cmd/cardfuzz":             true,
-		module + "/lab/cmd/exitloop":         true,
-		module + "/lab/cmd/traindash":        true,
 		module + "/cmd/paymirror":            true,
-		module + "/lab/cmd/sbv1agent":        true,
-		module + "/lab/cmd/kshadowcheck":     true,
-		module + "/lab/cmd/sbagent":          true,
-		module + "/lab/cmd/sbv2local":        true,
-		module + "/lab/cmd/searchbench":      true,
 		module + "/cmd/enginebench":          true,
-		module + "/lab/cmd/dzgorge":          true,
-		module + "/lab/cmd/draftrl":          true,
-		module + "/lab/training/gamepool":    true,
-		module + "/lab/training/inferbroker": true,
 		module + "/server/host/manabrewhttp": true,
-		module + "/lab/draft/eventhost":      true,
 	}
 	for path, p := range packages(t) {
 		if p.imports["time"] && !allowed[path] {
@@ -246,28 +189,15 @@ func TestDependencyOrderHolds(t *testing.T) {
 		{module + "/server/protocol", module + "/bots"},
 		{module + "/server/host", module + "/testkit/testutil"},
 		{module + "/server/host/httpapi", module + "/testkit/testutil"},
-		{module + "/cmd/gorged", module + "/testkit/testutil"},
+		{module + "/server/gorged", module + "/testkit/testutil"},
 		{module + "/engine/cards", module + "/engine/state"},
 		{module + "/engine/deck", module + "/engine/rules"},
-		// The az search seat's clairvoyant world clones the REAL engine,
-		// hidden zones and future chance included (spec 2026-09-27 §1). It
-		// lives in bots/azmcts/clairvoyant and is bench and training only
-		// (botbench injects it as azmcts.SeatConfig.Source), so nothing that
-		// seats a non-bench opponent may link it. The honest azmcts core
-		// never pulls the clone back in, and neither do the hosted search
-		// packages or any bots/ entry.
 		// The shadow answer (HD-3, human-divergence design §5.4) is computed by
 		// a package the host calls and the offline triage tool recomputes
 		// through: it may not depend on the host that calls it, nor on test
 		// scaffolding.
 		{module + "/server/divergence/shadow", module + "/server/host"},
 		{module + "/server/divergence/shadow", module + "/testkit/testutil"},
-		{module + "/server/host", module + "/bots/azmcts/clairvoyant"},
-		{module + "/server/host/httpapi", module + "/bots/azmcts/clairvoyant"},
-		{module + "/cmd/gorged", module + "/bots/azmcts/clairvoyant"},
-		{module + "/bots/azmcts", module + "/bots/azmcts/clairvoyant"},
-		{module + "/bots/spellbench/sbsearch", module + "/bots/azmcts/clairvoyant"},
-		{module + "/bots/searchseat", module + "/bots/azmcts/clairvoyant"},
 		// The lasagna layering (spec 2026-10-03 §3): engine/rules/cost is the L2
 		// cost vocabulary leaf. It sits below effects and below every rules
 		// subsystem package, so none of them -- and never rules itself -- may
@@ -326,7 +256,7 @@ func TestDependencyOrderHolds(t *testing.T) {
 	}
 	for path, p := range pkgs {
 		if strings.HasPrefix(path, module+"/bots") {
-			for _, target := range []string{module + "/server/host", module + "/testkit/testutil", module + "/bots/azmcts/clairvoyant"} {
+			for _, target := range []string{module + "/server/host", module + "/testkit/testutil"} {
 				if p.deps[target] {
 					t.Errorf("%s depends on %s (transitively); bots packages may not", path, target)
 				}

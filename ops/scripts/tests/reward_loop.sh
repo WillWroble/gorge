@@ -29,13 +29,9 @@ run "seed_gorged_reap_smoke.sh" bash "$ROOT/ops/scripts/tests/seed_gorged_reap_s
 run "seed_smoke.sh" bash "$ROOT/ops/scripts/tests/seed_smoke.sh"
 run "postmerge_batch_smoke.sh" bash "$ROOT/ops/scripts/tests/postmerge_batch_smoke.sh"
 run "seed_hotspot_sequenced_smoke.sh" bash "$ROOT/ops/scripts/tests/seed_hotspot_sequenced_smoke.sh"
-run "sb_gauntlet_retain_smoke.sh" bash "$ROOT/ops/scripts/tests/sb_gauntlet_retain_smoke.sh"
 run "gorged_reap_smoke.sh" bash "$ROOT/ops/scripts/tests/gorged_reap_smoke.sh"
 run "ledger_lane_smoke.sh" bash "$ROOT/ops/scripts/tests/ledger_lane_smoke.sh"
-run "driver_replay_batch_smoke.sh" bash "$ROOT/ops/scripts/tests/driver_replay_batch_smoke.sh"
 run "gate_affected_smoke.sh" bash "$ROOT/ops/scripts/tests/gate_affected_smoke.sh"
-run "forge_pass_smoke.sh" bash "$ROOT/ops/scripts/tests/forge_pass_smoke.sh"
-run "forge_oracle_pin_smoke.sh" bash "$ROOT/ops/scripts/tests/forge_oracle_pin_smoke.sh"
 run "park_branch_registry_only_smoke.sh" bash "$ROOT/ops/scripts/tests/park_branch_registry_only_smoke.sh"
 run "park_idle_scheduled_smoke.sh" bash "$ROOT/ops/scripts/tests/park_idle_scheduled_smoke.sh"
 run "seed_brief_premise.sh" bash "$ROOT/ops/scripts/tests/seed_brief_premise.sh"
@@ -52,7 +48,7 @@ run "storm_brief_asserts_endpoint.sh" bash "$ROOT/ops/scripts/tests/storm_brief_
 #   exits 1. Registering a red smoke would turn every post-merge batch red.
 #   Delete this opt-out entry when that smoke is fixed and registered.
 opt_out="reward_loop.sh heavy_lock_smoke.sh"
-for smoke in "$ROOT"/scripts/tests/*.sh; do
+for smoke in "$ROOT"/ops/scripts/tests/*.sh; do
 	name=$(basename "$smoke")
 	skip=0
 	for o in $opt_out; do

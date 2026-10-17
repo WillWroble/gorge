@@ -24,11 +24,6 @@
       "id": "cmd",
       "title": "Commands (`cmd/`)",
       "intro": "Product and developer binaries. No package imports a command."
-    },
-    {
-      "id": "lab",
-      "title": "Lab (`lab/`)",
-      "intro": "Fenced extensions: draft events, compliance oracles and training research; nothing outside lab/ may import them; slated to move to their own repository."
     }
   ],
   "packages": {
@@ -40,23 +35,7 @@
       "tier": "bots",
       "status": "SUPP"
     },
-    "bots/azc3": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/azc4": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/azc5": {
-      "tier": "bots",
-      "status": "EXT"
-    },
     "bots/azmcts": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/azmcts/clairvoyant": {
       "tier": "bots",
       "status": "EXT"
     },
@@ -72,11 +51,6 @@
     "bots/botpolicy": {
       "tier": "bots",
       "status": "CORE"
-    },
-    "bots/castprofile": {
-      "tier": "bots",
-      "status": "SUPP",
-      "purpose": "Thin registration of a built-in policy in the bots registry."
     },
     "bots/gonet": {
       "tier": "bots",
@@ -104,19 +78,7 @@
       "status": "EXT",
       "purpose": "Opt-in common-sense guard decorator over engine target hints (default off)."
     },
-    "bots/sbbuiltin": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/sbsearch": {
-      "tier": "bots",
-      "status": "EXT"
-    },
     "bots/sbtactical": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/search": {
       "tier": "bots",
       "status": "EXT"
     },
@@ -128,15 +90,15 @@
       "tier": "bots",
       "status": "EXT (linked into host)"
     },
+    "bots/spellbench": {
+      "tier": "bots",
+      "status": "EXT"
+    },
     "bots/spellbench/builtins": {
       "tier": "bots",
       "status": "EXT"
     },
     "bots/spellbench/payexec": {
-      "tier": "bots",
-      "status": "EXT"
-    },
-    "bots/spellbench/sbsearch": {
       "tier": "bots",
       "status": "EXT"
     },
@@ -313,280 +275,6 @@
     "internal/tsgen": {
       "tier": "tooling",
       "status": "TOOL"
-    },
-    "lab/cmd/botbench": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/cardval": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/compliance": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/corpuscov": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/draftrl": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/draftsim": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/dzbroker": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/dzgorge": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/encablate": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/exitloop": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/extagent": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/kshadowcheck": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/labdemo": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/oraclediff": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/oraclepacket": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/cmd/policytrain": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/policytune": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/sbagent": {
-      "tier": "lab",
-      "status": "SUSP/EXT"
-    },
-    "lab/cmd/sbv1agent": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/sbv2engine": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/sbv2local": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/sbv2shadow": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/cmd/searchbench": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/searchprobe": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/searchteacher": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/traindash": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/cmd/xmageport": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/contracts": {
-      "tier": "lab",
-      "status": "SUPP",
-      "purpose": "Registry of external contracts (file layouts, wires, grammars): name, major version and pinned golden hashes."
-    },
-    "lab/draft/draftlab": {
-      "tier": "lab",
-      "status": "EXT",
-      "purpose": "Training composition API over the draft stack: open packs, draft, build, play, gauntlet and whole events with named, versioned built-in agents; every call a pure function of inputs and seed; 17Lands-shaped artifacts."
-    },
-    "lab/draft/draftlab/extern": {
-      "tier": "lab",
-      "status": "EXT",
-      "purpose": "Out-of-process agents for draftlab: dial an agent over a child's stdio or a Unix socket, batch its requests across concurrent games, and expose it as a Drafter, Builder and Player."
-    },
-    "lab/draft/draftlab/extern/refagent": {
-      "tier": "lab",
-      "status": "TOOL",
-      "purpose": "Reference gorge-agent/1 agent (uniform random, first legal) for tests, benchmarks and as a worked example."
-    },
-    "lab/draft/draftlab/extern/wire": {
-      "tier": "lab",
-      "status": "EXT",
-      "purpose": "The gorge-agent/1 wire: JSON-lines messages an out-of-process drafter, builder or player speaks, carrying view.View, decision.Intent and protocol.DraftCard."
-    },
-    "lab/draft/event": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/eventhost": {
-      "tier": "lab",
-      "status": "SUPP",
-      "purpose": "Hosted draft events inside gorged: event store, lobby and join, draft with synchronous bots, per-event SSE frames; build and games land in later tickets."
-    },
-    "lab/draft/limited": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/booster": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/build": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/draft": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/draftbelief": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/draft/limited/draftfeat": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/draft/limited/draftnet": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/draft/limited/pickbot": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/setdata": {
-      "tier": "lab",
-      "status": "CORE"
-    },
-    "lab/draft/limited/setdata/internal/gen": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/adopt": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/gate": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/levelb": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/oraclediff": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/oraclegen": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/oraclegen/templates": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/oracle/compliance/shape": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/training/corpuscov": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/training/gamepool": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/inferbroker": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/memcap": {
-      "tier": "lab",
-      "status": "TOOL"
-    },
-    "lab/training/mzenc": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/searchbench": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/searchbench/statespec": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/spellbench": {
-      "tier": "lab",
-      "status": "EXT"
-    },
-    "lab/training/spellbench/kshadow": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/training/spellbench/registry": {
-      "tier": "lab",
-      "status": "EXT (2nd registry)"
-    },
-    "lab/training/spellbench/v1agent": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/training/spellbench/v2agent": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/training/spellbench/v2engine": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/training/spellbench/v2shadow": {
-      "tier": "lab",
-      "status": "SUSP"
-    },
-    "lab/training/v2front": {
-      "tier": "lab",
-      "status": "SUSP"
     },
     "server/divergence": {
       "tier": "server",

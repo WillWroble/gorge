@@ -2,15 +2,15 @@
 
 Part of the [repo map](repo-map.md) index. The platform chain is in
 [repo-map-engine.md](repo-map-engine.md), `internal/` in
-[repo-map-internal.md](repo-map-internal.md), and `lab/` in
-[repo-map-research.md](repo-map-research.md).
+[repo-map-internal.md](repo-map-internal.md). The former `lab/` tree is in
+four-yay (private); its map is four-yay's `docs/agents/repo-map-research.md`.
 
 ## `cmd/`
 
 | Command | Purpose |
 |---|---|
 | `forgec` | Fetch and compile the Forge corpus; `report`, `coverage`. |
-| `gorged` | The server: perpetual bot tables, vs-bot games, web client. |
+| `gorged` | The server's thin main over `server/gorged` (perpetual bot tables, vs-bot games, web client), linking gorge's `bots/all`. four-yay's `cmd/gorged` is the full demo server (draft events, research bots); `make deploy-demo` builds that one. |
 | `mtgsim` | Headless self-play over the repo decks with replay verification (`make sim`). |
 | `repro` | Replays a player feedback snapshot; `-emit-test` writes a failing test. |
 | `headdiff` | Plays the `TestHeads` acceptance games; `-dump` records their event streams, `-against` names the first divergent event between two builds. |
@@ -24,7 +24,7 @@ Part of the [repo map](repo-map.md) index. The platform chain is in
 | `ledger` | Rebuilds the derived issue ledger (`.ds4/ledger.json`). |
 | `keywordbench` / `paymirror` | Keyword presence stats / payment A/B CLI. |
 
-Research and draft commands are in `lab/cmd/` ([repo-map-research.md](repo-map-research.md#labcmd-and-labscripts)).
+Research and draft commands (`botbench`, `draftsim`, `oraclediff`, `compliance`, `dzgorge`, `policytrain`, …) moved to four-yay's `cmd/` (private).
 
 ## `ops/`
 
@@ -49,10 +49,8 @@ changing anything here.
 | `docs/decisions/` | Numbered architecture decisions (`0001-repo-layout.md`). |
 | `docs/site/` | The public MkDocs site (`mkdocs.yml`); `docs/site/architecture/packages.tiers.json` classifies every package. |
 | `docs/agents/` | This guide. |
-| `docs/contracts.md` | Rules for external contracts (`lab/contracts`). |
 | `.githooks/` | pre-commit (runs `pkgmap-check`), commit-msg, pre-merge-commit, pre-push (`core.hooksPath=.githooks`). |
-| `scripts/` | Contributor/CI only: `agent-worktree.sh` (the only sanctioned worktree creator), `ci_shard.sh`, `smoke.sh`, `smoke-perf.sh`, `enginebench-*.sh`, `docs_sets.py`. |
-| `examples/extagent/` | A Python `gorge-agent/1` example agent. |
+| `scripts/` | Contributor/CI only: `agent-worktree.sh` (the only sanctioned worktree creator), `ci_shard.sh`, `smoke.sh`, `enginebench-*.sh`, `docs_sets.py`. (`smoke-perf.sh` moved to four-yay.) |
 | `.github/workflows/` | `ci.yml`; `docs.yml` (builds the site, regenerates the package map); `coverage.yml` (on push to main: `make coverage`, publishes `.coverage/` as the `card-coverage` artifact; commits nothing). |
 | `testkit/testutil/testdata/wall_exceptions.txt`, `rss_exceptions.txt` | Shrink-only inventories of tests over the per-test wall / RSS budget. |
 

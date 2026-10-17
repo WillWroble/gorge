@@ -26,7 +26,7 @@ import (
 // the same idea bots/spellbench/builtins/tactical_archetype.go applies
 // inside the SpellBench type-gauntlet, reimplemented here because the view
 // tier is BELOW that package in the dependency order (view may not import
-// lab/training/spellbench) and because a view-shaped posterior must not depend
+// four-yay training/spellbench) and because a view-shaped posterior must not depend
 // on a policy tier that can be switched off.
 
 // Archetype names, dense and stable. The wire string is the name itself; no

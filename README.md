@@ -44,22 +44,34 @@ two servers at one `-dir`.
 | Directory | What it holds | Who it is for |
 |---|---|---|
 | `engine/` | The deterministic rules core: `cards` (script → IR compiler), `state`, `decision`, `events`, `effects`, `rules`, `view`, `replay`, `deck`, and `seat` (the `Seat` contract only) | Anyone fixing a card or a rule |
-| `server/` | The reference server: `host` (tables, sessions, persistence) with `host/httpapi` and `host/manabrewhttp`, `protocol` (the wire types), `manabrew`, `divergence` | Server and client work |
-| `bots/` | Bot players: `botpolicy`, `heuristic` (the default bot), the `registry`, and the hosted search/learned bots with their inference code | Bot authors |
+| `server/` | The reference server: `gorged` (the importable server, with an `Extensions` seam and `RegisterNetBot`), `host` (tables, sessions, persistence) with `host/httpapi` and `host/manabrewhttp`, `protocol` (the wire types), `manabrew`, `divergence` | Server and client work |
+| `bots/` | Bot players: `botpolicy`, `heuristic` (the default bot), the `registry`, and the hosted bots (`bot`, `lethal-pressure`, `sb-tactical`, `az-redeal`) with their inference code | Bot authors |
 | `web/` | The TypeScript/Svelte browser client | Front-end work |
 | `cmd/` | Product and developer binaries: `gorged`, `forgec`, `repro`, `mtgsim`, `gentypes`, `pkgmap`, `headdiff`, `enginebench`, `cardfuzz`, `deckimport`, … | Everyone |
-| `internal/` | Shared test and tooling packages: `archtest` (import-graph rules), `testutil` (fixtures, corpus registry), `codeshape`, `testbudget`, `tsgen`, `bench`, … | Contributors |
-| `lab/` | Fenced extensions that will move to another repo: draft events, compliance oracles, training, research binaries and scripts | Researchers |
+| `testkit/`, `cli/` | Public support packages for outside modules: `testkit/testutil` (fixtures, corpus registry), `testkit/bench` (the game runner), `testkit/paymirror`, and `cli` (command-line flags, env and config) | Contributors, downstream modules |
+| `internal/` | Ratchets and generators: `archtest` (import-graph rules), `codeshape`, `testbudget`, `tsgen`, `corpusheap`, `botobs` | Contributors |
 | `ops/` | The maintainers' agent pipeline: `ops/orchestrator` (agentctl gate hooks), deploy and pipeline scripts | Maintainers only |
 | `scripts/` | Contributor and CI scripts (`agent-worktree.sh`, `smoke.sh`, `enginebench-*`, `ci_shard.sh`) | Contributors, CI |
 | `docs/` | `decisions/` (ADRs), `site/` (the public docs site), `agents/` (the guide for AI coding agents) | Everyone |
 
 Dependencies run one way, in tiers: `engine/` imports nothing above it,
-`server/` and `bots/` build on `engine/`, and `cmd/` and `lab/` sit on top.
+`server/` and `bots/` build on `engine/`, and `cmd/` sits on top.
 What is actually enforced is a list of forbidden import edges (for example,
 `effects` never imports `rules`, `view` and `protocol` never import `rules`)
 in `internal/archtest`'s `TestDependencyOrderHolds`, not a total order. The
 layout and its reasons are in [ADR 0001](docs/decisions/0001-repo-layout.md).
+
+### four-yay, the private companion module
+
+Draft events, the compliance oracles, training research, the research
+binaries (`botbench`, `draftsim`, `oraclediff`, `dzgorge`, …) and the
+research bots live in four-yay (`github.com/adams-shaun/four-yay`), a
+**private** module that imports gorge; gorge never imports it. It plugs in
+through three seams: `bots.Register` (its bots join the registry),
+`server/gorged.RegisterNetBot` (network-backed hosted bots) and
+`server/gorged.Extensions` (draft events under `/api/events`). Its own
+`cmd/gorged` is the full demo server. Nothing in gorge needs four-yay to
+build or test.
 
 ## Where to go next
 
@@ -83,8 +95,7 @@ plays real users.
 
 ## License
 
-gorge is licensed under Apache-2.0 (see [LICENSE](LICENSE) and
-[NOTICE](NOTICE)). Forge's card scripts are GPL-3.0, so gorge ships a
+gorge is licensed under Apache-2.0 (see [LICENSE](LICENSE)). Forge's card scripts are GPL-3.0, so gorge ships a
 *compiler* for the script format and never the scripts themselves:
 `make fetch-cards` downloads them into the gitignored `.cards/` directory,
 pinned to a commit (`FORGE_REF` in the `Makefile`) of the

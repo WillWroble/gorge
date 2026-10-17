@@ -38,8 +38,6 @@ into a commit, a test or an issue.
 - `engine/rules/testdata/oracle/*/known-divergent/` lists audit scenarios
   already known to fail.
 
-(`docs/contracts.md` is about external file formats, not card behaviour.)
-
 **Decide whose bug it is.** Compare the script with the printed card (the
 Oracle text on the card's `Oracle:` line, or Scryfall) and the
 [Comprehensive Rules](https://magic.wizards.com/en/rules) ("CR"):

@@ -18,6 +18,11 @@ SCORE=$STATE/scoreboard.jsonl
 # Measure the CHECKOUT the loop actually lands on, not the probe's own
 # worktree: the scoreboard's git_head must be a head that exists on main.
 TARGET=${GORGE_TARGET_REPO:-$ROOT}
+# botbench (the grind driver) moved to four-yay on 2026-10-16. eff builds it
+# from FOURYAY_ROOT (default: the sibling of the gorge MAIN checkout) through
+# a throwaway go.work that pins gorge to TARGET, so the grind still measures
+# the checkout the loop lands on, not whatever four-yay's own go.work names.
+FOURYAY_ROOT=${FOURYAY_ROOT:-$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)")/../four-yay}
 GRIND_DECK=${GRIND_DECK:-mono-red-prowess}
 GRIND_SECONDS=${GRIND_SECONDS:-20}
 
@@ -49,7 +54,21 @@ probe_eff() {
 	out=$(mktemp -d "${TMPDIR:-/tmp}/reward-eff.XXXXXX")
 	trap 'rm -rf "$out"' RETURN
 	t0=$(date +%s)
-	if ! go build -o "$out/botbench" ./lab/cmd/botbench 2>"$out/build.err"; then
+	if [ ! -f "$FOURYAY_ROOT/go.mod" ]; then
+		say "no four-yay checkout at $FOURYAY_ROOT (set FOURYAY_ROOT); eff not measured"
+		return 1
+	fi
+	local gover m
+	gover=$(sed -n 's/^go //p' "$FOURYAY_ROOT/go.mod" | head -1)
+	{
+		printf 'go %s\n\nuse (\n' "$gover"
+		for m in "$FOURYAY_ROOT" "$FOURYAY_ROOT"/training/*/*/ "$TARGET"; do
+			m=${m%/}
+			[ -f "$m/go.mod" ] && printf '\t%s\n' "$(cd "$m" && pwd)"
+		done
+		printf ')\n'
+	} >"$out/go.work"
+	if ! GOWORK="$out/go.work" go build -C "$FOURYAY_ROOT" -o "$out/botbench" ./cmd/botbench 2>"$out/build.err"; then
 		say "botbench build failed; eff not measured"
 		sed -n 1,5p "$out/build.err" >&2
 		return 1

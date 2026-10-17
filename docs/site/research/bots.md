@@ -1,6 +1,11 @@
 # Bot player training and adoption guidelines
 
-*Moved verbatim from the repository README on 2026-10-16; only paths were updated. Measurements are as they were recorded.*
+*Moved from the repository README on 2026-10-16, then trimmed the same day to what gorge ships. Measurements are as they were recorded.*
+
+gorge ships the engine-side interfaces, the hosted bots (`bot`,
+`lethal-pressure`, `sb-tactical`, `az-redeal`) and their inference code; the
+research bots, the training tools and the benchmark harness live in a private
+companion repository.
 
 This section is for anyone building, searching with, training or shipping a
 bot policy. It covers:
@@ -8,9 +13,6 @@ bot policy. It covers:
 - the interfaces the engine offers a bot;
 - what has been tried and measured so far;
 - the gate a policy must pass before it plays real users.
-
-Paths marked **(spellbench-prep)** are on the `spellbench-prep` branch, which
-is about to land on `main`. Everything else is on `main` today.
 
 ## The decision contract
 
@@ -39,13 +41,10 @@ opt-in extensions:
   view.
 - `seat.PaymentPlanConsumer` asks for the engine's mana-payment plans.
 
-External processes can play a seat in three ways:
+External processes can play a seat in two ways:
 
 - over HTTP, through `server/host/httpapi`: `…/pending`, `…/intent`, `…/view`,
   `…/events`, SSE `/api/stream`;
-- **(spellbench-prep)** as a SpellBench v2 agent, in NDJSON over stdio
-  (`lab/training/spellbench/v2agent`, `lab/cmd/sbagent`; built only with
-  `-tags spellbench_bridge`, see `make test-spellbench-bridge`);
 - **(manabrew)** as a ManaBrew protocol client, over SSE + POST
   (`server/host/manabrewhttp`, `server/manabrew`). Opt-in and off by default;
   `gorged -manabrew` mounts it (`-manabrew-addr` for a separate listener),
@@ -57,14 +56,14 @@ External processes can play a seat in three ways:
 |---|---|---|
 | Step environment | `rules.New(Config)`, `Pending()`, `Submit(Intent)`, `Advance()` | Deterministic: same `Config.Seed` plus same intents gives the same events. |
 | Legal actions | `Decision.Options`; `decision.PotentialAction` | The action space *is* the option list. Mana taps are options too, unless auto-pay is on. `PotentialAction` lists the plays that would become castable after floating mana. |
-| Intent-level mana | bot auto-pay (`EnableAutoPayMana`); **(spellbench-prep)** `rules.(*Engine).PotentialPaymentPlans` plus `bots/spellbench/payexec` | Plan "cast X / activate Y" and lower the payment witness to taps afterwards, so taps never enter a search tree. Naive manual-tap bots lose about 190–230 Elo. |
+| Intent-level mana | bot auto-pay (`EnableAutoPayMana`); `rules.(*Engine).PotentialPaymentPlans` plus `bots/spellbench/payexec` | Plan "cast X / activate Y" and lower the payment witness to taps afterwards, so taps never enter a search tree. Naive manual-tap bots lose about 190–230 Elo. |
 | Fork / simulate | `(*Engine).Clone()`, `CloneInto(*Spare)` / `Release()` | Clone at an intent boundary only. Recycle spares on hot paths. |
 | Chance-honest worlds | `rules.NewHypothetical`, `(*Engine).CloneHypothetical(seed)`, `SubmitHypothetical`, `AdvanceHypothetical` | A search clone gets a fresh chance stream, so it cannot peek at the real game's future shuffles and draws. |
-| Hidden-information sampling | `bots/searchprobe`: `NewCollector` / `Capture`, `Sample`, `Redealer`, known-card tracking | Determinization. `Sample` never sees the real engine, log, seed or hidden hash. **(spellbench-prep)** `azmcts.NewRedeal` wraps it for search. |
+| Hidden-information sampling | `bots/searchprobe`: `NewCollector` / `Capture`, `Sample`, `Redealer`, known-card tracking | Determinization. `Sample` never sees the real engine, log, seed or hidden hash. `azmcts.NewRedeal` wraps it for search. |
 | Observation | `view.Project` / `ProjectFor` (`Seat` / `Public` / `Omniscient`); `policynet.EncodeState` / `EncodeOption` | Hidden zones are counts. Omniscient never exposes library order. |
 | Terminal / reward | `View.Over`, `View.Winner`; `searchprobe.LeafValue` (heuristic leaf); `policynet` value head | No shaped reward is built in. Win/loss is the ground truth. |
 | Replay and audit | `events.Log` (sha256 chain, `Head()`), `replay.Replay` / `ReplayTo` | Any game a policy plays can be re-run and checked event for event. |
-| Game runner | `testkit/bench`: `PlayGame`, `RunPairs` | Watchdogs, livelock recovery, no clock. Shared by `botbench` and `policytune`. |
+| Game runner | `testkit/bench`: `PlayGame`, `RunPairs` | Watchdogs, livelock recovery, no clock. |
 | Throughput | measured | About 17.5 ms per bot-vs-bot game on one core (`archived 2026-09-06-gorge-learned-policy-research.md (docs/design/ARCHIVE.md)`). About 20–23 duel games/s/core after the hotspot work (`archived 2026-09-17-hotspot-resume.md (docs/design/ARCHIVE.md)`). |
 
 ## Engine speed
@@ -94,9 +93,8 @@ opens the shared imaged registry.
 
 ## Search
 
-- **PIMC teacher and seat (main).** `bots/searchseat` and
-  `bots/searchprobe`, used by `lab/cmd/searchteacher` and `botbench -a
-  search`. The method is ensemble determinization:
+- **PIMC seat.** `bots/searchseat` and `bots/searchprobe`. The method is
+  ensemble determinization:
   - sample K hidden-information worlds;
   - roll every candidate out with the default policy;
   - pick the best mean.
@@ -106,9 +104,9 @@ opens the shared imaged registry.
   gate. It costs **664 ms mean / 2.2 s p95 per asked decision**, and its
   coverage falls to 4.8% after turn 13
   (`archived 2026-09-24-training-approaches-summary.md (docs/design/ARCHIVE.md)`). It
-  is merged opt-in and has not been promoted.
-- **AlphaZero-style PUCT (spellbench-prep).** `bots/azmcts`, used by
-  `botbench -a az` and `-a az-redeal`:
+  is not a hosted policy in gorge.
+- **AlphaZero-style PUCT.** `bots/azmcts`, hosted as `az-redeal`
+  (`bots/azredeal`):
   - The search is single-perspective: tree nodes are only the seat's own
     searched decisions, and `botpolicy.Decide` plays everything else.
   - There are no rollouts. A leaf is scored by a value function on the
@@ -117,9 +115,8 @@ opens the shared imaged registry.
     entry point is `azmcts.Search(root, worldSource, net, opts)`.
   - Defaults: 100 sims, c_puct 1.5, first-play urgency 0.1. Exploration noise
     (Dirichlet α 0.3, ε 0.25) applies only during generation.
-  - Clairvoyant worlds are refused unless `AllowClairvoyant()` is called,
-    which only botbench does. An archtest rule keeps `azmcts` out of `host`
-    and `cmd/gorged`.
+  - Clairvoyant worlds are refused unless the driving command opts in, and
+    no hosted path does; gorge ships no clairvoyant world source.
   - Measured with honest redeal worlds at generation 0 (uniform prior,
     heuristic leaf): az25 **64.7% [63.2, 66.2] vs `bot`, +14.7pp, 45 ms mean
     per searched decision**, and az100 +20.5pp at about 250 ms
@@ -135,18 +132,9 @@ opens the shared imaged registry.
 - hand-derived gradients, no autodiff;
 - binary `.gpol` checkpoints that refuse to load on an encoder-hash mismatch.
 
-The tools around it:
-
-- `lab/cmd/policytrain` trains it with single-threaded, deterministic SGD. The
-  same seed and corpus produce a byte-identical checkpoint, which is why it
-  has no `-workers` flag. It supports CE, hybrid, PPO and value-only losses.
-- `lab/cmd/searchteacher` produces label corpora.
-- `lab/cmd/exitloop` runs the teacher → train → bench generations.
-- `lab/cmd/policytune` SPSA-fits the small JSON cast profiles in
-  `bots/botpolicy/profiles/`.
-- `lab/cmd/traindash` is a read-only dashboard.
-- `heuristic.NewPolicyNetBot` (`bots/heuristic`) plays a checkpoint. Any kind the net does not answer
-  goes to the default bot.
+`heuristic.NewPolicyNetBot` (`bots/heuristic`) plays a checkpoint. Any kind
+the net does not answer goes to the default bot. The trainer and the label
+generators around it are not part of gorge.
 
 What has been measured (all against `bot`; details in
 `archived 2026-09-24-training-approaches-summary.md (docs/design/ARCHIVE.md)`):
@@ -161,12 +149,9 @@ What has been measured (all against `bot`; details in
 | Value head | Log loss 0.244 vs 0.460 base rate, but no win-rate gain on its own. |
 
 The durable lesson: **decision-time search beats the bot, and compressing
-search into a cheap policy has so far only reproduced the bot.** The intended
-direction on `spellbench-prep` follows from that. The network *serves search*:
-
-- a value head first, then an entity encoder;
-- visit-count targets (the planned `cmd/azgen`, `policytrain -loss visits`,
-  `exitloop -mode az`).
+search into a cheap policy has so far only reproduced the bot.** The
+direction that follows: the network *serves search*, a value head first and
+then an entity encoder, trained on search visit-count targets.
 
 This is staged: clairvoyant AZ loop, then honest sampled worlds, with kill
 criteria at each stage (`docs/design/2026-09-27-alphazero-mcts-design.md`,
@@ -174,12 +159,12 @@ criteria at each stage (`docs/design/2026-09-27-alphazero-mcts-design.md`,
 
 ## Evaluating a policy
 
-`lab/cmd/botbench` is the only evaluation harness.
+`testkit/bench` is gorge's game runner: `PlayGame` plays one seeded game
+between any `seat.Seat` implementations, and `RunPairs` runs a deck-pair
+matrix with seats traded.
 
-- Game *i* is seeded `base + i`, seats trade policies every game, and
-  `-pairs all` runs the full deck-pair matrix with per-pair and pooled 95% CIs.
-- Always run `-a bot -b bot` on the same seeds as the control.
-- `-decision-trace` writes redacted per-decision JSONL for diagnosis.
+- Game *i* is seeded `base + i`, and seats trade policies every game.
+- Always run `bot` against `bot` on the same seeds as the control.
 
 Sample size decides what a result can show:
 
@@ -190,27 +175,19 @@ Sample size decides what a result can show:
 | 1,792 | about +23 Elo (3.3pp) |
 
 A 200-game run is about ±7pp: a smoke test, not a verdict
-(`archived 2026-09-28-spellbench-theory-and-references.md (docs/design/ARCHIVE.md)` §7, on
-spellbench-prep).
-
-**(spellbench-prep)** `lab/scripts/sb-gauntlet.sh <spec>` rates candidates on the
-SpellBench scale. It plays them against sb-uniform (the 1000-Elo anchor),
-sb-heuristic, `bot` and the promoted champions, and reports anchored
-Bradley–Terry Elo with bootstrap CIs. Policies are registered by name in
-`lab/training/spellbench/registry`, with the `base+decorator+decorator` spec
-grammar; `passguard` is the worked example of a decorator.
+(`archived 2026-09-28-spellbench-theory-and-references.md (docs/design/ARCHIVE.md)` §7).
 
 ## Adoption ladder
 
 A policy moves up one rung at a time. Each rung has a gate.
 
-1. **Bench-only.** Wire it into `lab/cmd/botbench` (`-a <name>`) or, after
-   spellbench-prep lands, register it in `lab/training/spellbench/registry`. No
-   gate beyond the rules below. Research modes (clairvoyant, oracle, `search`,
-   `az`, `policynet`) stay here.
-2. **Hosted, opt-in.** Add it to `server/host/bot_policy.go`'s closed vocabulary
-   (today: `bot`, `lethal-pressure`, `cast-profile`), so that `POST /api/games`
-   can select it with `bot_policy`. Requirements:
+1. **Bench-only.** A `seat.Seat` you drive through `testkit/bench`. No gate
+   beyond the rules below. Research modes (clairvoyant, oracle, learned
+   policies) stay here.
+2. **Hosted, opt-in.** Register it in the `bots` registry (`bots.Register`
+   from an `init`, `bots/registry.go`) and link its package from `bots/all`,
+   so that `POST /api/games` can select it with `bot_policy` (today: `bot`,
+   `lethal-pressure`, `sb-tactical`, `az-redeal`). Requirements:
    - It must be seat-honest (no clairvoyance, nothing the view does not
      show).
    - It must be deterministic from `(match seed, seat)`.
@@ -232,24 +209,12 @@ A policy moves up one rung at a time. Each rung has a gate.
      (`archived 2026-09-19-learned-cast-profile.md (docs/design/ARCHIVE.md)`,
      "Operator decisions").
 
-**(spellbench-prep)** An agent that enters SpellBench-rated play must also
-pass the agent spec's kill criteria (§12.3):
-
-- K1: honest search beats `bot` by ≥ 3pp at ≥ 2,000 games, with the CI clear
-  of 0. This has passed.
-- K2: ≥ 95% of decisions pass the fidelity gates.
-- K3: ≥ 90% candidate agreement with the engine.
-- K4: zero timeout forfeits.
-- Specialist checkpoints are admitted only if they beat the generic agent in
-  their own matchup.
-
-## Rules for training code
+## Rules for bot code
 
 - **Determinism.** Seeded `math/rand/v2` only, and no map order in anything
   that reaches a decision or a checkpoint. No `time` in library code: inject a
-  `Millis` hook the way `searchseat` and `azmcts` do. Only the allowlisted
-  CLIs (`botbench`, `searchteacher`, `exitloop`, …) may read a clock, and
-  only for reporting.
+  `Millis` hook the way `searchseat` and `azmcts` do. Only allowlisted
+  commands may read a clock, and only for reporting.
 - **Pure Go, in-repo.** No cgo, no dependencies, and no PyTorch or other
   external runtime for anything that ships.
 - **Honesty.** A policy or value model that will play must read the redacted

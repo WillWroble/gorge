@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"reflect"
-	"slices"
 	"testing"
 	"weak"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/adams-shaun/gorge/bots/searchprobe"
 	"github.com/adams-shaun/gorge/bots/searchseat"
 	"github.com/adams-shaun/gorge/engine/decision"
-	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/replay"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
@@ -43,28 +41,6 @@ type spyEnvSeat struct {
 	// test ended -- 2.7 GB peak RSS for a single test, the bulk of the
 	// host package's 7 GB peak.
 	retainRoots bool
-}
-
-// envRecord is what one DecideEnv call was handed and answered.
-type envRecord struct {
-	seq     uint64
-	rootRef string // env.RootRefused (empty when the root built)
-	// engineID and gID are the root engine's and its game's identities
-	// (zero when the root was refused). A weak pointer compares equal only
-	// to one made from the same live object, even after that object is
-	// reclaimed, so identity checks (never the live engine, never reused)
-	// hold without keeping the root alive.
-	engineID  weak.Pointer[rules.Engine]
-	gID       weak.Pointer[state.Game]
-	engine    *rules.Engine // env.Search.Engine, only under retainRoots (envSpySeat/envViewSpySeat always set it)
-	g         *state.Game   // the root's own game; never the live engine's (same retention rule)
-	feed      *searchseat.Feed
-	viewRound int32    // env.View.Round
-	actorHand []string // the ROOT's hand for the deciding seat (slot 0)
-	oppHand   []string // the ROOT's hand for the opponent (slot 1)
-	actorLib  []string // the ROOT's library for slot 0, in order
-	oppLib    []string // the ROOT's library for slot 1, in order
-	in        decision.Intent
 }
 
 func (s *spyEnvSeat) WantsEnv(d *decision.Decision) bool { return true }
@@ -99,42 +75,6 @@ func (s *spyEnvSeat) recorded(seq uint64) *envRecord {
 		}
 	}
 	return nil
-}
-
-// zoneNames names the objects of one zone, in zone order. Face-down or
-// face-less objects contribute nothing rather than panicking.
-func zoneNames(ids []state.ObjID, e *rules.Engine) []string {
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if o := e.G.Obj(id); o != nil && o.Card != nil && len(o.Card.Faces) > 0 && o.Card.Faces[0] != nil {
-			out = append(out, o.Card.Faces[0].Name)
-		}
-	}
-	return out
-}
-
-// sortedEqual compares two name lists as multisets.
-func sortedEqual(a, b []string) bool {
-	x, y := slices.Clone(a), slices.Clone(b)
-	slices.Sort(x)
-	slices.Sort(y)
-	return slices.Equal(x, y)
-}
-
-// hiddenWorldsEqual reports whether two engines hold the same hidden card
-// arrangement: hand name MULTISETS and library name ORDERS per player. It is
-// the comparison both uses below are built on: the leak test's roots must
-// satisfy it name-for-name, and the swap fixture's two live engines must NOT.
-func hiddenWorldsEqual(a, b *rules.Engine) bool {
-	for pl := state.PlayerID(0); int(pl) < len(a.G.Players); pl++ {
-		if !sortedEqual(zoneNames(a.G.Zone(state.ZHand, pl), a), zoneNames(b.G.Zone(state.ZHand, pl), b)) {
-			return false
-		}
-		if !slices.Equal(zoneNames(a.G.Zone(state.ZLibrary, pl), a), zoneNames(b.G.Zone(state.ZLibrary, pl), b)) {
-			return false
-		}
-	}
-	return true
 }
 
 // matchFor returns a finished match's engine and feeds after r.Wait. It is the
@@ -296,123 +236,6 @@ func TestNoEnvSeatNoFeed(t *testing.T) {
 	if n := testing.AllocsPerRun(1000, func() { nilFeeds.observe(nil) }); n != 0 {
 		t.Fatalf("nil matchFeeds.observe allocated %v per call, want 0", n)
 	}
-}
-
-// envTestTable is the 2-seat table every BP-08 test seats: a spy EnvSeat at
-// slot 0, a plain bot at slot 1, fixed seed and fixed repo decks.
-func envTestTable(id TableID, seed uint64) TableConfig {
-	return TableConfig{ID: id, Name: "env" + string(id), Seats: 2, Decks: []string{"a", "b"},
-		Seed: seed, Pace: 0, Spectator: view.Public}
-}
-
-// driveEnvStep advances one decision through the REAL host path — projectNext
-// under the match's exclusive lock (which observes the feeds and builds the
-// Env), parkSeat outside it. beforeProject, when non-nil, runs under the lock
-// right before projectNext whenever the pending decision is the EnvSeat's
-// (slot 0): the swap fixture and the feed-stop use it to act at a boundary the
-// host path is about to read.
-func driveEnvStep(t *testing.T, m *match, seats []seat.Seat, brd *botpolicy.Board,
-	beforeProject func(m *match, d *decision.Decision)) (*parkedData, *parkedDecision) {
-	t.Helper()
-	m.mu.Lock()
-	if beforeProject != nil {
-		if d := m.e.Pending(); d != nil && d.Player == 0 {
-			beforeProject(m, d)
-		}
-	}
-	data := projectNext(m, seats, brd)
-	m.mu.Unlock()
-	if data == nil {
-		return nil, nil
-	}
-	pd := parkSeat(context.Background(), seats, data, m.undo.signal, nil, nil)
-	if pd.err != nil {
-		t.Fatalf("seat %d: DecideEnv/Decide error: %v", pd.p, pd.err)
-	}
-	return data, pd
-}
-
-// submitEnvStep submits one parked answer through the same exclusive section
-// play's attempt uses (minus persistence and the refusal ladder: the spy plays
-// the wrapped bot's own answer, which the engine accepts).
-func submitEnvStep(t *testing.T, r *Registry, tbl *table, m *match, pd *parkedDecision) {
-	t.Helper()
-	err := m.locked(func() error {
-		before := len(m.e.L.Events)
-		d := m.e.Pending()
-		// A posed decision is valid only until the next Submit on the engine
-		// that posed it (decision_arena_live.go); the feed is recorded after
-		// the Submit, so it needs an owned copy taken here, exactly as the
-		// production play loop's feed does (server/host/match.go).
-		var drec *decision.Decision
-		if d != nil {
-			drec = d.Clone()
-		}
-		if e := m.e.Submit(pd.in); e != nil {
-			return e
-		}
-		m.afterSubmit(before)
-		m.feeds.record(drec, pd.in)
-		return r.afterBurst(tbl, m, before)
-	})
-	if err != nil {
-		t.Fatalf("submit at seq %d: %v", pd.in.Seq, err)
-	}
-}
-
-// swapOpponentHidden is the swap fixture of TestRedealWorldsIgnoreTheRealHiddenCards
-// (bots/azmcts/redeal_test.go), applied to a LIVE host engine: every
-// unpinned player-1 hand card is exchanged with a same-named-DIFFERENT library
-// card, then player 1's library is reversed — all through SECRET events, so
-// the public projection the actor's feed captures is byte-identical while the
-// hidden arrangement is different. It returns the number of hand cards
-// swapped; zero means nothing could be swapped (a fixture failure the caller
-// must report).
-func swapOpponentHidden(t *testing.T, e *rules.Engine, feed *searchseat.Feed) int {
-	t.Helper()
-	pinned := map[string]bool{}
-	if feed != nil {
-		known, err := feed.Known()
-		if err != nil {
-			t.Fatalf("known projection: %v", err)
-		}
-		for _, kh := range known.Hands {
-			if kh.Player == 1 {
-				for _, c := range kh.Cards {
-					pinned[c.Name] = true
-				}
-			}
-		}
-	}
-	hand, lib := e.G.Zone(state.ZHand, 1), e.G.Zone(state.ZLibrary, 1)
-	swapped := 0
-	used := map[state.ObjID]bool{}
-	for _, h := range append([]state.ObjID(nil), hand...) {
-		hn := e.G.Obj(h).Card.Faces[0].Name
-		if pinned[hn] {
-			continue
-		}
-		for _, l := range lib {
-			if used[l] || e.G.Obj(l).Card.Faces[0].Name == hn {
-				continue
-			}
-			used[l] = true
-			events.Emit(e.G, e.L, events.Event{Kind: events.MoveZone, Player: 1, Obj: h, From: state.ZHand, To: state.ZLibrary, Secret: true})
-			events.Emit(e.G, e.L, events.Event{Kind: events.MoveZone, Player: 1, Obj: l, From: state.ZLibrary, To: state.ZHand, Secret: true})
-			swapped++
-			break
-		}
-	}
-	if swapped == 0 {
-		return 0
-	}
-	cur := e.G.Zone(state.ZLibrary, 1)
-	rev := make([]state.ObjID, len(cur))
-	for i, id := range cur {
-		rev[len(cur)-1-i] = id
-	}
-	events.Emit(e.G, e.L, events.Event{Kind: events.LibraryOrder, Player: 1, IDs: rev, Secret: true})
-	return swapped
 }
 
 // TestHostedEnvSeatsNeverSeeTheLiveEngine is BP-08's central claim (spec §5.4),

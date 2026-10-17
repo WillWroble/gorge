@@ -14,7 +14,7 @@ package mbtest
 //
 // The two games must finish with the same event-log chain head, the same
 // outcome and the same intent stream. On any mismatch, firstDivergence
-// (mirroring lab/training/spellbench/v2engine/parity_test.go's helper) replays
+// (mirroring four-yay training/spellbench/v2engine/parity_test.go's helper) replays
 // the common intent prefix on a fresh engine and names the decision where
 // the runs part. The census of the wire run must also record zero unmapped
 // prompts and zero rejections: a game that never got an answer onto the
@@ -163,7 +163,7 @@ func TestManaBrewNativeParity(t *testing.T) {
 
 // firstDivergence replays the common prefix of two intent streams on a fresh
 // engine and describes the decision where they part. Mirrors
-// lab/training/spellbench/v2engine/parity_test.go's helper of the same name; the
+// four-yay training/spellbench/v2engine/parity_test.go's helper of the same name; the
 // spellbench copy is test-only, so the shape is reproduced here rather than
 // imported.
 func firstDivergence(cfg rules.Config, a, b []decision.Intent) string {

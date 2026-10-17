@@ -205,7 +205,7 @@ func playFormatTurns(b *testing.B, e *Engine, bot *testBot, targetTurn int32) (i
 }
 
 // spendPace is the gorged default per-decision sleep the round-0 report named
-// as the demonstrator's pacing knob (cmd/gorged/main.go `-pace` default). A
+// as the demonstrator's pacing knob (server/gorged/gorged.go `-pace` default). A
 // step's wall time in the served-game model is its decision count x this pace;
 // the only thing that varies between the two windows below is which steps the
 // user watched, so the pace constant cancels out of their ratio. Kept as a

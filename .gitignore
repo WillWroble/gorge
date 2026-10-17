@@ -3,7 +3,7 @@ bin/
 # scripts are GPL-3.0 and mtgcore is Apache-2.0.
 .cards/
 
-# Oracle-audit author packets (lab/cmd/oraclepacket output): corpus-derived
+# Oracle-audit author packets (four-yay cmd/oraclepacket output): corpus-derived
 # printed card text handed to a scenario-writing seat. Never committed.
 .oracle-packets/
 
@@ -62,16 +62,12 @@ __pycache__/
 /searchbench
 /testbudget
 
-# The generated compliance status page (make compliance-status). Never
-# committed: it moves with every engine change (spec 2026-10-03 section 6).
-/lab/oracle/compliance/status.md
-
 # `make coverage` output (cmd/forgec coverage): generated card-support tables,
 # published by the `card coverage` CI job, never committed.
 .coverage/
 
 # Operator-local scratch (the CUDA game-pool PoC, since ported to
-# lab/training/gamepool). Never committed.
+# four-yay training/gamepool). Never committed.
 /scratch/
 
 # MkDocs build output (mkdocs.yml site_dir) and the docs workflow's
@@ -82,7 +78,7 @@ docs/site/support/_generated_sets.md
 docs/site/architecture/_generated_packages.md
 docs/site/perf/history.jsonl
 
-# The cards.IR cache's single-flight lock: a lab run whose test cwd is a
-# command package (lab/cmd/labdemo) can drop one next to the sources. Never
+# The cards.IR cache's single-flight lock: a run whose test cwd is a
+# command package can drop one next to the sources. Never
 # committed (the cache itself lives under the gitignored .cards/).
 ir-*.gob.gz.lock

@@ -29,9 +29,9 @@ type DeckInfo struct {
 	Commander string `json:"commander,omitempty"`
 	// Pool names the bot policy this deck is reserved for ("" for an ordinary
 	// deck). A reserved deck is dealt only to games against that policy, and
-	// that policy deals nothing else (cmd/gorged/azc3.go). A deck reserved
+	// that policy deals nothing else (server/gorged/azc3.go). A deck reserved
 	// for several policies (az-c3 and az-c4 sharing one deck directory,
-	// cmd/gorged/azclosed.go) names them all, comma-separated (JoinPools).
+	// server/gorged/azclosed.go) names them all, comma-separated (JoinPools).
 	Pool string `json:"pool,omitempty"`
 }
 
@@ -58,7 +58,7 @@ func PoolHas(pool, policy string) bool {
 
 // decks serves GET /api/decks: every deck, so a client that knows nothing of
 // reserved pools offers them all (a deck reserved for a bot policy is dealt
-// against that policy: see cmd/gorged/azc3.go). ?policy=NAME narrows the list
+// against that policy: see server/gorged/azc3.go). ?policy=NAME narrows the list
 // to what a game against that policy may use: the decks reserved for it when
 // it has a pool, the unreserved decks otherwise.
 func (h *handler) decks(w http.ResponseWriter, r *http.Request) {

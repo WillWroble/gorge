@@ -6,7 +6,7 @@ so it can stay out of every turn's context.
 
 | Read | When |
 |---|---|
-| [repo-map.md](repo-map.md) (the index) and its per-domain files (`repo-map-engine.md`, `repo-map-internal.md`, `repo-map-research.md`, `repo-map-paths.md`) | Finding where something lives, or where a kind of change goes. |
+| [repo-map.md](repo-map.md) (the index) and its per-domain files (`repo-map-engine.md`, `repo-map-internal.md`, `repo-map-paths.md`; the research map moved to four-yay) | Finding where something lives, or where a kind of change goes. |
 | `go run ./cmd/pkgmap` (classification: `docs/site/architecture/packages.tiers.json`) | Every package with its purpose, LOC, reverse importers, tier and status, plus the tier-dependency graph; `-check` fails on an unclassified package. |
 | [invariants.md](invariants.md) | Before changing engine code. It lists each design invariant, what enforces it, and the legitimate way to change it, and ends with the contributor workflow. |
 | [do-not.md](do-not.md) | Before you touch git, run a server, or merge. Every entry has happened here. |

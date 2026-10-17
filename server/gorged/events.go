@@ -62,7 +62,7 @@ type EventRuntime interface {
 	Close() error
 }
 
-var errEventsNeedLab = errors.New("-events needs a binary with draft events linked in (four-yay's gorged)")
+var errEventsNeedPlugin = errors.New("-events needs a binary with draft events linked in (four-yay's gorged)")
 
 // eventsWiring is serve's handle on a prepared runtime; the zero value means
 // -events is off.
@@ -77,7 +77,7 @@ func (c config) prepareEvents(reg *cards.Registry, load func(string) (host.Deck,
 		return eventsWiring{}, load, nil
 	}
 	if c.ext.Events == nil {
-		return eventsWiring{}, load, errEventsNeedLab
+		return eventsWiring{}, load, errEventsNeedPlugin
 	}
 	w, l, err := c.ext.Events.Prepare(filepath.Join(c.dir, "events"), reg, load)
 	if err != nil {

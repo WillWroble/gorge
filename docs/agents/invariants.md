@@ -14,20 +14,24 @@ engine/: cards → state → decision → events → effects → rules → repla
                                   events → view → seat
 bots/:   botpolicy (→ effects) → heuristic (→ seat) → searchprobe/searchseat/azmcts (→ rules) → bots registry
 server/: protocol (→ view) → host (→ rules, bots registry) → server/host/httpapi
-cmd/*, then lab/** (fenced: nothing outside lab/ imports it)
+server/gorged (→ host, httpapi, bots/all) → cmd/gorged
+cmd/*
+(outside the repo: four-yay imports gorge; gorge never imports four-yay)
 ```
 
 A package imports only packages to its left or in an earlier group. `deck`
 sits beside the engine chain: it imports `cards` only and is imported by
 `rules`, `view`, `host` and the test fixtures. `engine/seat` is the contract
 only and imports just `decision` and `view`. That is the measured import graph
-(`go list`, 2026-10-16, after the ADR 0001 restructure); `cmd/gorged` links
-`lab/draft` only under `-tags lab` (internal/archtest/lab_fence_test.go
-enforces the untagged fence). The enforced contract is the set of
+(`go list`, 2026-10-16, after the ADR 0001 restructure). Draft events and
+the research bots are four-yay's (private) and reach gorge only through
+`server/gorged.Extensions`, `server/gorged.RegisterNetBot` and
+`bots.Register`; nothing in gorge can import four-yay, because the root
+`go.mod` has no `require` lines (invariant 7). The enforced contract is the set of
 edges that must never appear: `effects` never imports `rules` (effects reaches
 the engine only through `effects.Host`). `view`, `protocol` and `deck` never
-import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host`, `testkit/testutil` or `bots/azmcts/clairvoyant`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
-and `cmd/gorged` never import `testkit/testutil`. Inside the engine, the
+import `rules`; `protocol` never imports `bots`. No `bots/` package reaches `server/host` or `testkit/testutil`. `botpolicy` never imports `view`, `rules` or `seat`. `host`, `server/host/httpapi`
+and `server/gorged` never import `testkit/testutil`. Inside the engine, the
 lasagna packages (spec [`docs/design/2026-10-03-rules-engine-lasagna-design.md`](../design/2026-10-03-rules-engine-lasagna-design.md) §3) are
 pinned as they land: `engine/rules/cost`, the cost vocabulary leaf, imports only
 `state` (`TestCostVocabularyIsALeaf`) and never `rules`, `effects` or a rules
@@ -68,22 +72,20 @@ The engine is a pure function of `(Config, intents)`.
 
 - No wall clock. The authority on who may import `time` is the `allowed`
   map in `internal/archtest/arch_test.go` (`TestTimeIsImportedOnlyByTheHost`),
-  not this page. It holds four classes, each argued in that test's doc
+  not this page. It holds two classes, each argued in that test's doc
   comment:
   - the host/server tier: `host`, `server/host/httpapi`, `server/host/manabrewhttp`,
-    `cmd/gorged` (injected sleep, SSE keep-alive, write and shutdown
+    `server/gorged` (injected sleep, SSE keep-alive, write and shutdown
     deadlines);
   - measurement and developer CLIs that read the clock only to bound a run or
-    report elapsed time (`lab/cmd/botbench`, `cmd/enginebench`, `lab/cmd/searchbench`,
-    `cmd/cardfuzz`, `cmd/paymirror`, `cmd/ledger`, `lab/cmd/traindash`, the
-    search/SpellBench agents and probes, and similar);
-  - a few batching/scheduling libraries whose timers decide only WHEN work is
-    flushed, never what a game sees: `lab/training/gamepool` and the
-    inference-batching decision broker;
+    report elapsed time (`cmd/enginebench`, `cmd/cardfuzz`, `cmd/paymirror`,
+    `cmd/ledger`); the research CLIs that also read the clock (`botbench`,
+    `searchteacher`, the SpellBench agents, the draft-event runtime) moved to
+    four-yay;
   - nothing in the engine, card pipeline, effects, view or bot policies.
 
   Research libraries that need timing take an injected `Millis` hook instead
-  (`searchseat.Millis`, `sbsearch.Millis`, `azmcts.Millis`, installed by the
+  (`searchseat.Millis`, `azmcts.Millis`, installed by the
   CLI).
 - No ambient randomness. Use `math/rand/v2` with a seeded source; the engine
   has one seeded PCG with a draw counter (`engine/rules/rng.go`). A bot's rng is
@@ -174,11 +176,10 @@ absent. The card pipeline, the rules core and the learned-policy stack
 (`bots/policynet`: hand-derived gradients, no autodiff) are pure Go. The
 engine must also build for 32-bit, so it cannot depend on packed 64-bit ints.
 
-An experiment that genuinely needs a third-party module goes in its own nested
-module that imports the root through a `replace`, never the other way round:
-`lab/training/experimental/gamepool` (the tag-gated GPU scorer and the `gamepool` command)
-requires purego for its CUDA binding; the pool scheduler it drives stays in
-the root's `lab/training/gamepool`.
+An experiment that genuinely needs a third-party module goes in its own module
+that imports gorge through a `replace`, never the other way round: four-yay's
+`training/experimental/gamepool` (the GPU scorer) requires purego for its CUDA
+binding.
 
 **Enforced by:**
 - `internal/archtest` `TestRootModuleHasNoRequires` (parses the root `go.mod`
@@ -291,7 +292,7 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
      suite is `ops/scripts/postmerge_batch.sh`'s: it runs once per batch of
      landings on main, pauses the pipeline on red, bisects and logs `CULPRIT`
      lines to `.ds4/postmerge-culprits.log`. Never run an uncapped
-     `go test ./...` or `./lab/oracle/compliance/...` by hand.
+     `go test ./...` by hand.
    - `make lint`: gofmt, vet, `gentypes -check`, plus web lint.
    - `make sim`: 20/20 `replay OK`.
    - If you touched `web/` or changed when a decision is posed, also run the

@@ -120,7 +120,8 @@ that gap:
   parameters no code reads;
 - the oracle scenarios under `engine/rules/testdata/oracle/`, which check
   behaviour against the printed text;
-- the compliance oracles in `lab/oracle/`, which compare gorge with XMage and
-  Forge.
+- the compliance oracles, which compare gorge with XMage and Forge (they
+  run from a private companion repository; the results are summarised on the
+  sets page).
 
 The per-set figures are on [Support by set](../support/sets.md).

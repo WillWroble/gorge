@@ -20,10 +20,6 @@
 # module suite on main after landings, and a red there is bisected and fixed
 # at once (main red is never pre-existing).
 set -euo pipefail
-# Test with the lab extensions linked (docs/decisions/0001-repo-layout.md):
-# the draft-event wiring in cmd/gorged and its e2e tests build only with
-# -tags lab; postmerge_full.sh covers the platform (untagged) build.
-export GOFLAGS="-tags=lab${GOFLAGS:+ $GOFLAGS}"
 
 # Default-build packages in a list of candidate directories, one per line.
 #
@@ -130,52 +126,6 @@ test_name_packs_from_list() {
       for (j = 1; j <= nb; j++) print "^(" g[j] ")$"
     }'
 }
-# The four lab/oracle/compliance/oraclegen/templates shard selectors (tpl=1 in the gate
-# body), one per line: three anchored -run patterns plus the -skip remainder.
-# The remainder is the ANCHORED union of the other three, so h4 runs exactly
-# what the named patterns miss -- a future name that merely extends one of
-# the prefixes (TestSameNameAnswerCensusChunk00Extra) runs in h4 instead of
-# being skipped by it and matched by no shard (r2 review of
-# cli-20261009T182406Z-a616bfea: the unanchored skip that used to sit in the
-# gate body deleted it from every shard silently). The smoke test
-# (ops/scripts/tests/gate_affected_smoke.sh) pins the partition against the
-# package's real `go test -list` output.
-templates_shard_patterns() {
-  local even='^TestSameNameAnswerCensusChunk[0-9][02468]$'
-  local odd='^TestSameNameAnswerCensusChunk[0-9][13579]$'
-  local named='^TestSetup(Colour|CreatureType)Census$'
-  local bare_even bare_odd bare_named rest
-  bare_even="${even#?}"; bare_odd="${odd#?}"; bare_named="${named#?}"
-  rest="${bare_even%?}|${bare_odd%?}|${bare_named%?}"
-  printf '%s\n' "$even" "$odd" "$named" "^(${rest})$"
-}
-
-# gate_affected_cert_stale_only reads a certification package's `go test`
-# output -- ./lab/oracle/compliance/gate and ./lab/oracle/compliance/adopt are the two packs that
-# notice a moved scenario sha -- on stdin and exits 0 iff EVERY failing test in
-# it logged "GORGE-CERT-RESULT <name> stale-only" (the line gate.CertVerdict
-# and adopt's ratchetVerdict emit). A stale-only certification is a host XMage
-# replay's to clear (lab/scripts/compliance-pass.sh), not a defect the ticket can
-# fix, so the pool returns the gate's requeue exit instead of a fix round.
-# Any failing test with a non-stale verdict, any t.Fatal before the verdict, a
-# package-level failure (build/panic), or no failing test at all exits 1: the
-# gate then fails closed and the ticket takes the ordinary path. The tests
-# classify each problem exactly (gate.Stale), so the gate never re-parses
-# problem wording.
-gate_affected_cert_stale_only() {
-  awk '
-    /^--- FAIL: / { n = $3; sub(/\(.*/, "", n); fail[n] = 1; nf++ }
-    /GORGE-CERT-RESULT / {
-      for (i = 1; i <= NF; i++)
-        if ($i == "GORGE-CERT-RESULT") res[$(i + 1)] = $(i + 2)
-    }
-    END {
-      if (nf == 0) exit 1
-      for (n in fail) if (res[n] != "stale-only") exit 1
-      exit 0
-    }'
-}
-
 # --- selection gaps (docs/agents/test-throughput-2026-10-12.md §2.7) --------
 # Most post-merge RED culprits on .ds4/postmerge-culprits.log (2026-10-05..12)
 # were cheap tests in packages this gate never selected: structural censuses
@@ -194,7 +144,6 @@ gate_affected_cert_stale_only() {
 #      cmd/testbudget       ~4 s   /  ~5 cpu-s  (exec cache guard: two nested go test runs)
 #      cmd/pkgmap           0.40 s /  0.5 cpu-s  (TestClassificationIsComplete)
 #      cmd/gentypes         6.6 s  / 10.0 cpu-s  (protocol.ts freshness)
-#      lab/oracle/compliance/levelb    6.0 s  /  7.6 cpu-s  (TestLevelBRequirementCensus)
 #      bots/policynet   6.8 s  /  8.4 cpu-s  (pinned real-game features)
 #    plus internal/archtest with -skip TestEngineCompilesFor32Bit (3.2 s /
 #    4.4 cpu-s; the 32-bit compile alone is ~50 s and stays post-merge only,
@@ -206,32 +155,24 @@ gate_affected_cert_stale_only() {
 #    each just to open the corpus and ~20 of them depend on ./engine/rules, so they
 #    keep the existing selection (touched dir, the triggers below, or
 #    post-merge).
-# 3. Cheap triggers for the two expensive culprit classes:
+# 3. A cheap trigger for the expensive corpus-loader culprit class:
 #    - a non-test Go change under engine/cards/ or testkit/testutil/ (the corpus
-#      loader) runs internal/corpusheap whole (10.8 s / 14.0 cpu-s) and
-#      lab/cmd/botbench's TestSpellbenchSubsetCorpusMatchesFull (5.5 s / 6.9 cpu-s);
-#    - a non-test Go change under rules|effects|events|state|cards, or any
-#      change under lab/oracle/compliance/oraclegen/, runs the templates REMAINDER shard
-#      (everything but the SameNameAnswer chunks and the two Setup censuses:
-#      41 s / 50.5 cpu-s; every one of the 8 templates culprits was a
-#      remainder test). It is the exact h4 invocation of the tpl=1 path, so it
-#      shares that path's result-cache entry.
+#      loader) runs internal/corpusheap whole (10.8 s / 14.0 cpu-s).
+#    (The compliance censuses -- oraclegen/templates, the botbench subset
+#    corpus -- moved to the four-yay module on 2026-10-16; four-yay's CI checks
+#    gorge for compliance, so this gate no longer runs them.)
 gate_structural_pkgs() {
   printf '%s\n' ./cmd/testbudget ./cmd/pkgmap \
-    ./cmd/gentypes ./lab/oracle/compliance/levelb ./bots/policynet
+    ./cmd/gentypes ./bots/policynet
 }
 
 gate_fast_rdep_pkgs() {
   printf '%s\n' ./engine/state ./engine/events ./server/protocol ./internal/tsgen ./engine/rules/chars \
     ./engine/rules/combat ./engine/rules/pay ./engine/rules/scriptfacts ./engine/rules/trigmatch \
     ./engine/effects/params ./engine/cards/oracletext ./cmd/keywordbench ./internal/botobs \
-    ./lab/training/mzenc ./lab/oracle/compliance/shape ./lab/oracle/compliance/oraclediff ./lab/cmd/xmageport \
-    ./server/divergence ./bots ./bots/azredeal ./bots/search ./cmd/codeshape \
-    ./lab/cmd/compliance ./cmd/paymirror ./lab/training/corpuscov ./lab/cmd/exitloop \
-    ./cmd/forgec ./lab/cmd/searchbench ./lab/training/spellbench/registry \
-    ./bots/azmcts/clairvoyant ./cmd/ledger ./cmd/gcgate ./lab/cmd/traindash \
-    ./server/protocol/manabrew/internal/schemagen \
-    ./lab/training/searchbench/statespec ./lab/training/inferbroker ./lab/training/gamepool
+    ./server/divergence ./bots ./bots/azredeal ./cmd/codeshape \
+    ./cmd/paymirror ./cmd/forgec ./cmd/ledger ./cmd/gcgate \
+    ./server/protocol/manabrew/internal/schemagen
 }
 
 # Input: touched package dirs (./dir form) on stdin. Output: every
@@ -263,15 +204,12 @@ gate_fast_rdeps() {
 # one repo-relative path per line, as `git diff --name-only` prints it).
 # Output, one record per line:
 #   others <./pkg>    a package the gate runs (batch, or heavy packs)
-#   tpl 0|1           templates touched: run its four shards
-#   tplrest 0|1       run only the templates remainder shard (trigger 3)
 #   traj 0|1          trajectory-pinned packages + cardfuzz findings
 #   archtest_lean 0|1 run internal/archtest minus the 32-bit compile
-#   botbench_subset 0|1  run lab/cmd/botbench's subset-corpus test (trigger 3)
 # The gate body and `gate_affected.sh --list <base>` both read it, and
 # ops/scripts/tests/gate_affected_smoke.sh feeds it synthetic lists.
 gate_affected_plan() {
-  local files pkgs src others tpl=0 traj=0 tplrest=0 corpus=0 nontest p
+  local files pkgs src others traj=0 nontest p
   files=$(cat)
   pkgs=$(printf '%s\n' "$files" | while read -r f; do
     [ -n "$f" ] || continue
@@ -283,13 +221,6 @@ gate_affected_plan() {
     pkgs=$(printf '%s\n' $pkgs | gate_affected_default_build_pkgs)
   fi
   others=$(printf '%s\n' $pkgs ./internal/codeshape ./engine/view | sort -u)
-  # Any change can move compliance verdicts: generator/harness edits did
-  # (a407ddeff, FDN:A) and so did rules edits that reshape target asks
-  # (40c7823d7/c97355932 staled FRA:A). lab/oracle/compliance/gate and lab/oracle/compliance/adopt
-  # are the two tests that notice; they run on every ticket, in parallel with
-  # ./engine/rules, so a stale verdict parks the ticket for a host replay instead of
-  # turning main red.
-  others=$(printf '%s\n' $others ./lab/oracle/compliance/gate ./lab/oracle/compliance/adopt | sort -u)
   # Non-test, non-testdata files: what can change an importer's binary.
   nontest=$(printf '%s\n' "$files" | /usr/bin/grep -v -E '_test\.go$|(^|/)testdata/' || true)
   # Mechanism 2: the fast reverse-dependency closure. Its sources are the
@@ -306,18 +237,7 @@ gate_affected_plan() {
   others=$(printf '%s\n' $others $(gate_structural_pkgs) | sort -u)
   # Mechanism 3, corpus loader trigger: corpusheap runs whole (it is one test).
   if printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/cards|testkit/testutil)/([^/]+/)*[^/]+\.go$'; then
-    corpus=1
     others=$(printf '%s\n' $others ./internal/corpusheap | sort -u)
-  fi
-  # lab/oracle/compliance/oraclegen/templates is the touched-package long pole when a
-  # generator ticket lands; it is sharded four ways in the gate body (see
-  # templates_shard_patterns), so it is pulled out of $others here.
-  if printf '%s\n' $others | /usr/bin/grep -qx './lab/oracle/compliance/oraclegen/templates'; then
-    others=$(printf '%s\n' $others | /usr/bin/grep -vx './lab/oracle/compliance/oraclegen/templates')
-    tpl=1
-  elif printf '%s\n' "$nontest" | /usr/bin/grep -q -E '^(engine/rules|engine/effects|engine/events|engine/state|engine/cards)/([^/]+/)*[^/]+\.go$' \
-    || printf '%s\n' "$files" | /usr/bin/grep -q -E '^lab/oracle/compliance/oraclegen/'; then
-    tplrest=1
   fi
   # Trajectory-pinned packages: tests that replay seeded bot games and pin a
   # finding by (seed, event seq), or replay a committed recorded game event for
@@ -333,18 +253,11 @@ gate_affected_plan() {
     others=$(printf '%s\n' $others ./testkit/paymirror ./cmd/repro | sort -u)
   fi
   for p in $others; do echo "others $p"; done
-  echo "tpl $tpl"
-  echo "tplrest $tplrest"
   echo "traj $traj"
   if printf '%s\n' $others | /usr/bin/grep -qx './internal/archtest'; then
     echo "archtest_lean 0"
   else
     echo "archtest_lean 1"
-  fi
-  if [ "$corpus" = 1 ] && ! printf '%s\n' $others | /usr/bin/grep -qx './lab/cmd/botbench'; then
-    echo "botbench_subset 1"
-  else
-    echo "botbench_subset 0"
   fi
 }
 
@@ -375,40 +288,16 @@ kr8='TestKr8WorldsInFuzzGames|TestKr8HeadsCheckpointAll'
 postmerge='TestCloneFidelityShort[0-9A-Za-z]*|TestCostStaticPlannedCastsNeverCostChange[0-9]*|TestChainTargetOfferCensusAgreesWithCastFlow[0-9]*|TestPaymentPlanOnePassMatchesReferenceOverAutoPayGameKernel[0-9A-Za-z]*'
 
 # The selection itself is gate_affected_plan (above), a pure function of the
-# touched file list. In the tpl=1 case:
-# lab/oracle/compliance/oraclegen/templates is the touched-package long pole when a
-# generator ticket lands (3 of 8 gate runs on 2026-10-09 measured it at
-# 79-93 s vs the ~50 s Kr8Worlds pole): measured standalone under the gate
-# env (this worktree, 2026-10-09, MemoryMax=4G CPUQuota=400% GOMAXPROCS=4
-# GOMEMLIMIT=3GiB) the whole package is 80.3 s over 454 tests whose times sum
-# to 106 s -- the SameNameAnswer census chunks (55.2 s over 9) and the two
-# Setup censuses (26.3 s over 11) carry 81 s of it. It is pulled out of the
-# `$others` run and sharded four ways below, next to the rules shards. The
-# split is a PARITY/complement partition, so it covers every test by
-# construction and needs no listing step: the odd/even chunk index handles a
-# future Chunk05+ automatically, a new Setup census falls to the -skip
-# remainder (which runs everything the other three do not), and no test can
-# be dropped. The remainder's skip is anchored to the exact union of the
-# three named patterns (templates_shard_patterns), so a future name that
-# merely extends one of the prefixes runs in the remainder instead of being
-# dropped from every shard. Perf drift is the only failure mode: a heavy
-# test the named patterns miss lands in the remainder and the pole creeps up
-# -- never a coverage hole.
+# touched file list.
 others=$(printf '%s\n' "$plan" | awk '$1 == "others" { print $2 }')
-tpl=0; plan_flag tpl && tpl=1
-tplrest=0; plan_flag tplrest && tplrest=1
 traj=0; plan_flag traj && traj=1
 archlean=0; plan_flag archtest_lean && archlean=1
-bbsub=0; plan_flag botbench_subset && bbsub=1
-echo "gate_affected: rules + $(echo $others)$( [ "$tpl" = 1 ] && echo ' + oraclegen/templates shards' )$( [ "$tplrest" = 1 ] && echo ' + oraclegen/templates remainder shard' )$( [ "$archlean" = 1 ] && echo ' + archtest (no 32-bit)' )$( [ "$bbsub" = 1 ] && echo ' + botbench subset-corpus test' )$([ $traj = 1 ] && echo ' + cardfuzz findings')"
+echo "gate_affected: rules + $(echo $others)$( [ "$archlean" = 1 ] && echo ' + archtest (no 32-bit)' )$([ $traj = 1 ] && echo ' + cardfuzz findings')"
 
 # Heavy $others packages. Measured 2026-10-09 (this worktree, the gate's own
 # concurrent phase re-run with -json after `go clean -testcache`): each of
 # these runs whole inside ONE test binary and its slowest tests are serial, so
 # the phase's wall is the slowest single package's wall:
-#   lab/oracle/compliance/oraclegen/templates 166.8s (TestSameNameAnswerCensusChunk00 27.7s)
-#   lab/oracle/compliance/adopt                101.1s (TestLevelBRatchet 51.1s serial)
-#   lab/oracle/compliance/gate                 88.9s  (TestDeclaredSetsCompliant 26.8s serial)
 #   testkit/paymirror              89.1s  (TestRoundTenFindingsMirror 31.6s serial)
 #   effects                         76.2s  (TestCompiledFilterMatchesTextualOracle 29.2s serial)
 #   cmd/repro                       55.4s  (TestReproEmitTestIntoRulesCompilesAndFailsOnTODO 26.4s)
@@ -423,7 +312,7 @@ echo "gate_affected: rules + $(echo $others)$( [ "$tpl" = 1 ] && echo ' + oracle
 # invocation (measured: the same -run/-skip rerun cache-hits, a whole-package
 # run after pack runs does not), so a fresh package's batch line would pay
 # the full package again to repopulate a differently-keyed entry.
-heavy='^\./lab/oracle/compliance/adopt$|^\./lab/oracle/compliance/gate$|^\./testkit/paymirror$|^\./cmd/repro$|^\./engine/effects$|^\./lab/oracle/compliance/oraclegen/templates$'
+heavy='^\./testkit/paymirror$|^\./cmd/repro$|^\./engine/effects$'
 heavy_pkgs=$(printf '%s\n' $others | /usr/bin/grep -E "$heavy" || true)
 heavy_bins=
 build_pids=
@@ -462,14 +351,6 @@ fi
 # took 18.8 s / 68 cpu-s, peak RSS 3.7 GiB (under the 8 GiB scope). The quota,
 # not the flag, is the ceiling -- at 800% the extra -p is real parallelism.
 vet_pkgs="$others ./engine/rules"
-if [ "$tpl" = 1 ]; then
-  # templates was pulled out of $others for the sharding below; vet it here
-  # anyway, so a vet-only defect (copylocks, unusedresult, lostcancel, ...)
-  # still fails the per-ticket gate (r2 review of
-  # cli-20261009T182406Z-a616bfea; postmerge's `go vet ./...` only catches
-  # it on main after the batch).
-  vet_pkgs="$vet_pkgs ./lab/oracle/compliance/oraclegen/templates"
-fi
 GOMAXPROCS=6 go vet -p=6 $vet_pkgs & v=$!
 # Build the ./engine/rules test binary ONCE before the concurrent rules runs.
 # They are separate `go test` processes, and a process does not see a compile
@@ -587,7 +468,6 @@ heavy_shard_pool() (
   }
   local jobs=("$@")
   for job in "${jobs[@]}"; do
-    printf '%s\n' "$job" >"$WORK/hjob-$i"
     ( dispatch_heavy_shard "$job" ) >"$WORK/hshard-$i.log" 2>&1 &
     i=$((i + 1))
     running=$((running + 1))
@@ -609,32 +489,6 @@ heavy_shard_pool() (
       echo "gate_affected: failed heavy pack log $f:"
       cat "$f"
     done || true
-  fi
-  # A stale-only certification failure (./lab/oracle/compliance/gate + ./lab/oracle/compliance/adopt,
-  # the only packs that notice a moved scenario sha) is a host XMage replay's
-  # to clear, not a defect: return the gate's requeue exit so the ticket is
-  # retried without a fix round (lab/scripts/compliance-pass.sh refreshes the
-  # verdicts; operator-compliance-refresh.md). Any other failed pack, or a
-  # certification pack whose failure is not stale-only, keeps the ordinary
-  # nonzero exit and the fix round.
-  if [ "$bad" = 1 ]; then
-    local cert_logs=() other_fail=0 jf idx pkg log
-    for jf in "$WORK"/hjob-*; do
-      [ -e "$jf" ] || continue
-      idx=${jf##*-}
-      pkg=$(cut -f2 "$jf")
-      log="$WORK/hshard-$idx.log"
-      /usr/bin/grep -qE '^(FAIL|panic)|--- FAIL' "$log" || continue
-      case $pkg in
-        ./lab/oracle/compliance/gate | ./lab/oracle/compliance/adopt) cert_logs+=("$log") ;;
-        *) other_fail=1 ;;
-      esac
-    done
-    if [ "$other_fail" = 0 ] && [ "${#cert_logs[@]}" -gt 0 ] \
-      && cat "${cert_logs[@]}" | gate_affected_cert_stale_only; then
-      echo "gate_affected: heavy certification failure is stale-only (a moved scenario sha; see the GORGE-CERT-RESULT lines) -- a host XMage replay clears it, not a fix round. Requeuing (exit 76)."
-      return 76
-    fi
   fi
   return "$bad"
 )
@@ -668,59 +522,17 @@ go test -p=1 -run '^TestCommittedOvershootCaptureReplaysToTheParkedAsk$' ./serve
 # post-merge. ~1 s alone; always run.
 go test -p=1 -run '^TestNoNewSubSecondWallClockThresholdInTests$' ./testkit/testutil/ & wc=$!
 pids="$a1 $a2 $a3 $a4 $a5 $a6 $b $c $d $e $f $wc${hp:+ $hp}"
-# The four templates shards (tpl=1, extracted above): three named -run
-# patterns plus the -skip remainder, read one per line from
-# templates_shard_patterns. Each stays under the operator's 1-minute
-# per-test budget (measured split below, whole package 80.3 s), and the
-# remainder's skip is anchored to the exact union of the other three, so the
-# union is the whole package whatever a future generator ticket adds -- a
-# name extending a prefix runs in the remainder, never in no shard.
-if [ "$tpl" = 1 ]; then
-  { read -r tpl1; read -r tpl2; read -r tpl3; read -r tpl4; } \
-    < <(templates_shard_patterns)
-  go test -p=1 -run "$tpl1" ./lab/oracle/compliance/oraclegen/templates & h1=$!
-  go test -p=1 -run "$tpl2" ./lab/oracle/compliance/oraclegen/templates & h2=$!
-  go test -p=1 -run "$tpl3" ./lab/oracle/compliance/oraclegen/templates & h3=$!
-  go test -p=1 -skip "$tpl4" ./lab/oracle/compliance/oraclegen/templates & h4=$!
-  pids="$pids $h1 $h2 $h3 $h4"
-elif [ "$tplrest" = 1 ]; then
-  # Trigger 3 (engine or generator change, templates untouched): only the
-  # remainder shard, byte-identical to h4 above so the two share a
-  # result-cache entry. 41 s / 50.5 cpu-s measured alone (2026-10-12).
-  tpl4=$(templates_shard_patterns | sed -n 4p)
-  go test -p=1 -skip "$tpl4" ./lab/oracle/compliance/oraclegen/templates & h4=$!
-  pids="$pids $h4"
-fi
 # internal/archtest without its ~50 s 32-bit compile (post-merge keeps it).
 # A branch that touches internal/archtest runs it whole in the batch instead.
 if [ "$archlean" = 1 ]; then
   go test -p=1 -skip '^TestEngineCompilesFor32Bit$' ./internal/archtest/ & i=$!
   pids="$pids $i"
 fi
-# Trigger 3 (corpus loader change): lab/cmd/botbench's subset-corpus census only,
-# 5.5 s / 6.9 cpu-s alone; the rest of the package (~80 s) stays post-merge.
-if [ "$bbsub" = 1 ]; then
-  go test -p=1 -run '^TestSpellbenchSubsetCorpusMatchesFull$' ./lab/cmd/botbench/ & j=$!
-  pids="$pids $j"
-fi
 if [ "$traj" = 1 ]; then
   go test -p=1 -run '^(TestRoundTenFindings|TestForbiddenRitualRepeatYesFinding)$' ./cmd/cardfuzz/ & g=$!
   pids="$pids $g"
 fi
 for p in $pids; do
-  # The heavy pool is waited separately so its stale-only requeue exit (76)
-  # can be told from an ordinary failure (see heavy_shard_pool).
-  [ -n "${hp:-}" ] && [ "$p" = "$hp" ] && continue
   wait "$p" || rc=1
 done
-if [ -n "${hp:-}" ]; then
-  hp_rc=0
-  wait "$hp" || hp_rc=$?
-  if [ "$hp_rc" = 76 ] && [ "$rc" = 0 ]; then
-    # A stale-only certification failure: the pool already printed the note.
-    # 76 is the config's requeue exit (a non-charging retry), not a fix round.
-    exit 76
-  fi
-  [ "$hp_rc" = 0 ] || rc=1
-fi
 exit "$rc"

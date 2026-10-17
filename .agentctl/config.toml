@@ -242,22 +242,6 @@ ignore_uncommitted = []
 # than an empty, passing stdin. There is no escape trailer: the operator
 # raises a ratchet by landing it by hand. Deliberately NOT a [mechanical]
 # pattern: a raised ratchet is never bookkeeping.
-# 2026-10-05: an XMage driver change is landed by a host operator, never by
-# the pipeline. Seats cannot run XMage, and 7883f6b25 merged a driver change
-# that turned every Standard scenario into a harness failure (4944 rows) until
-# a host full replay caught it. A branch touching lab/oracle/xmageoracle/ fails here
-# and parks; ops/scripts/driver_replay_batch.sh (unit gorge-driver-replay-batch)
-# batches every parked ticket, runs ONE lab/oracle/validation/oracle/full-replay.sh,
-# compares verdicts against main and lands them (2026-10-06; before that an
-# operator did this by hand, .ds4/operator-compliance-refresh.md).
-[[gates]]
-name = "xmage driver needs host replay"
-cmd = ["bash", "-c", "set -o pipefail; changed=$(git diff --name-only $(git merge-base {base} HEAD) HEAD -- lab/oracle/xmageoracle/); if [ -n \"$changed\" ]; then echo \"XMAGE DRIVER CHANGED -- parked for ops/scripts/driver_replay_batch.sh (gorge-driver-replay-batch):\"; echo \"$changed\"; exit 1; fi; echo 'xmage driver untouched'"]
-timeout = 60
-# Only an operator host full replay + hand landing clears this gate; a seat
-# fix round cannot (2026-10-05: four tickets looped 8-10 paid sol rounds on it).
-on_fail = "park"
-
 [[gates]]
 name = "ratchets only fall"
 cmd = ["bash", "-c", "set -o pipefail; git show {base}:ops/scripts/ratchet_gate.py | python3 - {base}"]
@@ -360,15 +344,11 @@ cmd = ["bash", "-c", "set -o pipefail; if [ -n \"${GORGE_HEAVY_LOCK:-}\" ]; then
 # 2026-10-12 (operator): exit 75 is "every heavy lane still held" -- an
 # infrastructure wait, not the ticket's defect. Requeue it with no fix round
 # (18 of 45 gate_fails 10-09..10-12 were this, each billed a paid round).
-# 2026-10-14: exit 76 is the same shape for a stale-only certification failure
-# (ops/scripts/gate_affected.sh's heavy pool: every failing ./lab/oracle/compliance/gate or
-# ./lab/oracle/compliance/adopt test logged GORGE-CERT-RESULT <name> stale-only, a moved
-# scenario sha a host XMage replay clears, not the ticket's defect -- 69 of 74
-# certification-only gate_fails 10-05..10-14 were stale-only, each billed a
-# paid round). Requeue it too; a non-stale certification failure still exits 1
-# and still bills the fix round.
+# (2026-10-14..16 exit 76 also requeued a stale-only compliance certification
+# failure; gorge dropped its compliance gate on 2026-10-16 when the research
+# tree moved to four-yay, whose CI checks gorge for compliance.)
 on_fail = "requeue"
-requeue_exit = [75, 76]
+requeue_exit = [75]
 requeue_max = 3
 # 2026-10-05 (operator): this gate is HEAVY-class work, so it takes a lane of
 # the repo heavy pool like postmerge_batch.sh and heavy.sh. The lane
@@ -380,7 +360,7 @@ requeue_max = 3
 # and the post-merge full suite can run at the same time; later the same day
 # cli-20261009T224425Z-a610bfaf raised the pool to 3 lanes: the batch cadence
 # runs the full suite back to back with ~60 s gaps, and a second heavy job
-# (driver_replay_batch, another seat's gate) then made BOTH lanes busy — 3 of
+# (a batch replay, another seat's gate) then made BOTH lanes busy — 3 of
 # 5 gate runs 2026-10-09 16:14-16:50 spent 245-330 s waiting for a lane before
 # 20-125 s of work, which is the gate_wall_s pole. The third lane lets the
 # gate run beside the suite AND one heavy job; heavy_lock.sh's default and

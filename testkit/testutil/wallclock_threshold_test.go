@@ -29,14 +29,14 @@ var subSecondMs = regexp.MustCompile(`\b(\d{1,3})\s*\*\s*time\.Millisecond\b`)
 // p99 under load, with a comment saying why.
 var subSecondAllow = map[string]int{
 	"engine/cards/cache_lock_flock_test.go":               2,
-	"cmd/gorged/artbounds_test.go":                        5,
-	"cmd/gorged/artfill_test.go":                          2,
-	"cmd/gorged/artprewarm_test.go":                       2,
-	"cmd/gorged/artwait_test.go":                          3,
-	"cmd/gorged/deploy_test.go":                           4,
-	"cmd/gorged/main_test.go":                             12,
-	"cmd/gorged/manabrew_cardtext_test.go":                4,
-	"cmd/gorged/manabrew_test.go":                         1,
+	"server/gorged/artbounds_test.go":                     5,
+	"server/gorged/artfill_test.go":                       2,
+	"server/gorged/artprewarm_test.go":                    2,
+	"server/gorged/artwait_test.go":                       3,
+	"server/gorged/deploy_test.go":                        4,
+	"server/gorged/main_test.go":                          12,
+	"server/gorged/manabrew_cardtext_test.go":             4,
+	"server/gorged/manabrew_test.go":                      1,
 	"server/host/caretaker_test.go":                       6,
 	"server/host/httpapi/rest_test.go":                    1,
 	"server/host/httpapi/sse_test.go":                     6,
@@ -49,7 +49,6 @@ var subSecondAllow = map[string]int{
 	"server/host/publishanswer_test.go":                   2,
 	"server/host/slots_test.go":                           2,
 	"server/host/stall_test.go":                           1,
-	"lab/training/inferbroker/broker_test.go":             1,
 }
 
 func TestNoNewSubSecondWallClockThresholdInTests(t *testing.T) {
