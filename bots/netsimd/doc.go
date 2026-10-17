@@ -8,4 +8,10 @@
 // faster can one evaluation be without changing the network, its inputs or
 // the search. The hot path allocates nothing after the first call per
 // scratch; the package reads no clock (timing lives in the benchmark).
+//
+// A caller that knows which cards are unchanged between evaluations can
+// precompute them (cards.go): CardIdentity is a card's per-identity half,
+// CardVector its whole vector, CardStore a fixed, concurrent-safe table of
+// either by a caller-owned slot, and EvalCards the network over a mix of
+// precomputed and computed cards -- bit-identical to Eval.
 package netsimd

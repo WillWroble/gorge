@@ -12,15 +12,15 @@ import (
 )
 
 const (
-	magic    = "DZGW0001"
-	align    = 64
-	groups   = 4
-	poolW    = 2 * groups
-	rows     = policynet.TableRows
-	slotRows = policynet.OptionSlotWidth
-	rawW     = policynet.EntityRawWidth
-	denseW   = policynet.DenseWidth
-	optDense = policynet.OptionDenseWidth
+	magic     = "DZGW0001"
+	align     = 64
+	groups    = 4
+	poolW     = 2 * groups
+	tableRows = policynet.TableRows
+	slotRows  = policynet.OptionSlotWidth
+	rawW      = policynet.EntityRawWidth
+	denseW    = policynet.DenseWidth
+	optDense  = policynet.OptionDenseWidth
 )
 
 // lin is one Linear layer, transposed and padded: wt[i*outPad+o] = W[o][i]
@@ -66,6 +66,7 @@ type Net struct {
 	val2b               float32
 
 	cache *cardCache
+	zero  []float32 // d zeros (an accumulator for a bias-free gemv)
 }
 
 // Scratch is one evaluation's working storage; grown on first use, then
@@ -85,6 +86,8 @@ type Scratch struct {
 	paOK, pbOK []bool
 	keys       []uint64
 	hbuf       []byte
+	groups     []uint8   // per card: its pooling group
+	ent1       []float32 // CardVector's output
 }
 
 // aligned returns n float32s starting on a 64-byte boundary.
@@ -97,6 +100,13 @@ func aligned(n int) []float32 {
 func growF(s []float32, n int) []float32 {
 	if cap(s) < n {
 		return aligned(n + n/4)[:n]
+	}
+	return s[:n]
+}
+
+func growG(s []uint8, n int) []uint8 {
+	if cap(s) < n {
+		return make([]uint8, n, n+n/4)
 	}
 	return s[:n]
 }
@@ -148,7 +158,7 @@ func Load(path string, cardCache int) (*Net, error) {
 	if h.Format != "dzgw-1" || h.Arch != "mlp" {
 		return nil, fmt.Errorf("netsimd %s: format %q arch %q, want dzgw-1 mlp", path, h.Format, h.Arch)
 	}
-	want := map[string]int{"DENSE_W": denseW, "RAW_W": rawW, "OPT_DENSE_W": optDense, "TABLE_ROWS": rows, "SLOT_ROWS": slotRows, "GROUPS": groups}
+	want := map[string]int{"DENSE_W": denseW, "RAW_W": rawW, "OPT_DENSE_W": optDense, "TABLE_ROWS": tableRows, "SLOT_ROWS": slotRows, "GROUPS": groups}
 	for k, v := range want {
 		if h.Consts[k] != v {
 			return nil, fmt.Errorf("netsimd %s: %s = %d, this build has %d", path, k, h.Consts[k], v)
@@ -233,7 +243,7 @@ func Load(path string, cardCache int) (*Net, error) {
 		return norm{w: get(name+".weight", d), b: get(name+".bias", d), eps: float32(eps)}
 	}
 	d, e, cd, hh := g.d, g.e, g.cd, g.hh
-	g.table = get("table.weight", rows, e)
+	g.table = get("table.weight", tableRows, e)
 	g.cardRaw = linear("card_raw", rawW, cd, true)
 	g.cardRows = linear("card_rows", e, cd, false)
 	g.cardPhi = linear("card_phi", cd, cd, true)
@@ -279,9 +289,10 @@ func Load(path string, cardCache int) (*Net, error) {
 	g.pol0s = mk(ws, d, hh, p0b)
 	g.pol0o = mk(wo, d, hh, nil)
 	// hproj(table[r]) for every row, and the none projections
-	g.htab = aligned(rows * d)
+	g.htab = aligned(tableRows * d)
 	zero := aligned(d)
-	for r := 0; r < rows; r++ {
+	g.zero = zero
+	for r := 0; r < tableRows; r++ {
 		gemvT(&hproj.wt[0], &g.table[r*e], &zero[0], &g.htab[r*d], e, d, false)
 	}
 	g.noneA, g.noneB = aligned(d), aligned(d)
@@ -296,14 +307,12 @@ func Load(path string, cardCache int) (*Net, error) {
 // Eval runs the network on st, writes each option's logit into scores
 // (len(opts)) and returns the value logit — gonet.Net.Eval's contract.
 func (g *Net) Eval(sc *Scratch, st *policynet.State, opts []policynet.Option, scores []float32) float32 {
-	d, cd, e := g.d, g.cd, g.e
+	cd := g.cd
 	nc := len(st.Cards)
 
 	// card vectors
 	sc.ent = growF(sc.ent, max(nc, 1)*cd)
-	sc.raw = growF(sc.raw, rawW)
-	sc.u = growF(sc.u, cd)
-	sc.bag32 = growF(sc.bag32, e)
+	sc.groups = growG(sc.groups, nc)
 	if g.cache != nil {
 		if cap(sc.keys) < nc {
 			sc.keys = make([]uint64, nc, nc+nc/4)
@@ -313,33 +322,51 @@ func (g *Net) Eval(sc *Scratch, st *policynet.State, opts []policynet.Option, sc
 	for k := range st.Cards {
 		c := &st.Cards[k]
 		ent := &sc.ent[k*cd]
+		sc.groups[k] = c.Group
 		if g.cache != nil {
 			sc.keys[k] = hashCard(&sc.hbuf, c)
 			if g.cache.get(sc.keys[k], ent) {
 				continue
 			}
 		}
-		n := copy(sc.raw, c.Raw)
-		clear(sc.raw[n:])
-		// u = relu(card_raw(raw) + card_rows(bag(rows))); c = relu(card_phi(u))
-		gemvT(&g.cardRaw.wt[0], &sc.raw[0], &g.cardRaw.b[0], &sc.u[0], rawW, cd, false)
-		clear(sc.bag32)
-		if len(c.Rows) > 0 {
-			bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&c.Rows[0])), len(c.Rows), rows, e)
-		}
-		gemvT(&g.cardRows.wt[0], &sc.bag32[0], &sc.u[0], &sc.u[0], e, cd, true)
-		gemvT(&g.cardPhi.wt[0], &sc.u[0], &g.cardPhi.b[0], ent, cd, cd, true)
+		g.cardFull(sc, c.Raw, c.Rows, ent)
 		if g.cache != nil {
 			g.cache.put(sc.keys[k], ent)
 		}
 	}
+	return g.trunk(sc, nc, st.Dense, st.Sparse, opts, scores)
+}
+
+// cardFull writes the card vector of (raw, rows) to ent:
+// u = relu(card_raw(raw) + card_rows(bag(rows))); c = relu(card_phi(u)).
+func (g *Net) cardFull(sc *Scratch, raw []float32, rows []policynet.Feature, ent *float32) {
+	cd, e := g.cd, g.e
+	sc.raw = growF(sc.raw, rawW)
+	sc.u = growF(sc.u, cd)
+	sc.bag32 = growF(sc.bag32, e)
+	n := copy(sc.raw, raw)
+	clear(sc.raw[n:])
+	gemvT(&g.cardRaw.wt[0], &sc.raw[0], &g.cardRaw.b[0], &sc.u[0], rawW, cd, false)
+	clear(sc.bag32)
+	if len(rows) > 0 {
+		bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&rows[0])), len(rows), tableRows, e)
+	}
+	gemvT(&g.cardRows.wt[0], &sc.bag32[0], &sc.u[0], &sc.u[0], e, cd, true)
+	gemvT(&g.cardPhi.wt[0], &sc.u[0], &g.cardPhi.b[0], ent, cd, cd, true)
+}
+
+// trunk is the network after the card vectors: sc.ent holds nc card
+// vectors and sc.groups their groups.
+func (g *Net) trunk(sc *Scratch, nc int, dense []float32, sparse []policynet.Feature, opts []policynet.Option, scores []float32) float32 {
+	d, cd, e := g.d, g.cd, g.e
+	sc.bag32 = growF(sc.bag32, e)
 
 	// pools = [0.25·sum per group ‖ max per group] (an empty group's max is 0:
 	// card vectors are post-relu, so max(0, c) = max over the group)
 	sc.pool = growF(sc.pool, poolW*cd)
 	clear(sc.pool)
-	for k := range st.Cards {
-		if gr := int(st.Cards[k].Group); gr < groups {
+	for k := 0; k < nc; k++ {
+		if gr := int(sc.groups[k]); gr < groups {
 			poolAcc(&sc.pool[gr*cd], &sc.pool[(groups+gr)*cd], &sc.ent[k*cd])
 		}
 	}
@@ -349,13 +376,13 @@ func (g *Net) Eval(sc *Scratch, st *policynet.State, opts []policynet.Option, sc
 
 	// state trunk: s += dense_in(dense) + sparse_proj(bag(sparse))
 	sc.dense = growF(sc.dense, denseW)
-	n := copy(sc.dense, st.Dense)
+	n := copy(sc.dense, dense)
 	clear(sc.dense[n:])
 	gemvT(&g.denseIn.wt[0], &sc.dense[0], s, s, denseW, d, false)
 	addv64(s, &g.denseIn.b[0])
 	clear(sc.bag32)
-	if len(st.Sparse) > 0 {
-		bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&st.Sparse[0])), len(st.Sparse), rows, e)
+	if len(sparse) > 0 {
+		bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&sparse[0])), len(sparse), tableRows, e)
 	}
 	gemvT(&g.sparseProj.wt[0], &sc.bag32[0], s, s, e, d, false)
 	// block: s += fc2(relu(fc1(LN(s))))
@@ -398,7 +425,7 @@ func (g *Net) Eval(sc *Scratch, st *policynet.State, opts []policynet.Option, sc
 			bag(o, &g.slots[0], (*feat)(unsafe.Pointer(&op.Slots[0])), len(op.Slots), slotRows, d)
 		}
 		if len(op.Hashed) > 0 {
-			bag(o, &g.htab[0], (*feat)(unsafe.Pointer(&op.Hashed[0])), len(op.Hashed), rows, d)
+			bag(o, &g.htab[0], (*feat)(unsafe.Pointer(&op.Hashed[0])), len(op.Hashed), tableRows, d)
 		}
 		if op.BotPick {
 			addv64(o, &g.bot[0])

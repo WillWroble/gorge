@@ -68,14 +68,14 @@ func BenchmarkStageSparseBag(b *testing.B) {
 	// 200 distinct states' worth of rows so the gathers are not all hot
 	sets := make([][]feat, 200)
 	for i := range sets {
-		sets[i] = randFeats(r, 140, rows)
+		sets[i] = randFeats(r, 140, tableRows)
 	}
 	y := aligned(32)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		fs := sets[i%len(sets)]
 		clear(y)
-		bag(&y[0], &g.table[0], &fs[0], len(fs), rows, 32)
+		bag(&y[0], &g.table[0], &fs[0], len(fs), tableRows, 32)
 	}
 }
 
@@ -87,12 +87,12 @@ func BenchmarkStageCard(b *testing.B) {
 	for i := range raw {
 		raw[i] = float32(r.NormFloat64())
 	}
-	fs := randFeats(r, 1, rows)
+	fs := randFeats(r, 1, tableRows)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gemvT(&g.cardRaw.wt[0], &raw[0], &g.cardRaw.b[0], &u[0], rawW, 32, false)
 		clear(bg)
-		bag(&bg[0], &g.table[0], &fs[0], 1, rows, 32)
+		bag(&bg[0], &g.table[0], &fs[0], 1, tableRows, 32)
 		gemvT(&g.cardRows.wt[0], &bg[0], &u[0], &u[0], 32, 32, true)
 		gemvT(&g.cardPhi.wt[0], &u[0], &g.cardPhi.b[0], &ent[0], 32, 32, true)
 	}
@@ -129,13 +129,13 @@ func BenchmarkStageOption(b *testing.B) {
 	r := rand.New(rand.NewPCG(7, 8))
 	od, o, hs, oh, oh2 := aligned(optDense), aligned(64), aligned(64), aligned(64), aligned(64)
 	slots := randFeats(r, 6, slotRows)
-	hashed := randFeats(r, 2, rows)
+	hashed := randFeats(r, 2, tableRows)
 	var v float32
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gemvT(&g.odense.wt[0], &od[0], &g.odense.b[0], &o[0], optDense, 64, false)
 		bag(&o[0], &g.slots[0], &slots[0], len(slots), slotRows, 64)
-		bag(&o[0], &g.htab[0], &hashed[0], len(hashed), rows, 64)
+		bag(&o[0], &g.htab[0], &hashed[0], len(hashed), tableRows, 64)
 		addv64(&o[0], &g.noneA[0])
 		addv64(&o[0], &g.noneB[0])
 		ln64(&o[0], &o[0], &g.onorm.w[0], &g.onorm.b[0], g.onorm.eps)
