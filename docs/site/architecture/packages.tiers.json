@@ -596,6 +596,10 @@
       "tier": "server",
       "status": "EXT (linked into host)"
     },
+    "server/gorged": {
+      "tier": "server",
+      "status": "CORE"
+    },
     "server/host": {
       "tier": "server",
       "status": "SUPP"

@@ -29,8 +29,8 @@ coverage.html
 .ds4/
 
 # web/ (Svelte + Vite spectator client) build artefacts and tooling state.
-cmd/gorged/webdist/*
-!cmd/gorged/webdist/.keep
+server/gorged/webdist/*
+!server/gorged/webdist/.keep
 web/node_modules/
 web/dist/
 web/test-results/

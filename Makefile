@@ -89,7 +89,7 @@ help:
 	@echo "  make stop-demo      — stop every running gorged, start nothing"
 	@echo "  make gentypes       — regenerate web/src/protocol.ts from package protocol"
 	@echo "  make seed-ask PROMPT=\"...\" — queue a one-off research/planning ask into the pipeline (PRIORITY, KIND override)"
-	@echo "  make web            — npm ci and build the spectator client into cmd/gorged/webdist"
+	@echo "  make web            — npm ci and build the spectator client into server/gorged/webdist"
 	@echo "  make web-dev        — run the Vite dev server for web/"
 	@echo "  make test-web       — run web/'s Vitest suite"
 	@echo "  make lint-web       — svelte-check and eslint over web/"

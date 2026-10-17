@@ -5,7 +5,7 @@ It holds no rules knowledge: it renders what the server sends over
 `web/src/protocol.ts` (generated from the Go `protocol` package; never hand-edit
 it — `make lint` / `go run ./cmd/gentypes -check` fails the build if it drifts)
 and the SSE stream in `web/src/lib/stream.ts`. `npm run build` writes to
-`../cmd/gorged/webdist`, which `cmd/gorged` embeds and serves.
+`../server/gorged/webdist`, which `server/gorged` embeds and serves.
 
 ## Node requirement
 

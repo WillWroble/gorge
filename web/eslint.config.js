@@ -48,5 +48,5 @@ export default ts.config(
       }],
     },
   },
-  { ignores: ['dist/', 'node_modules/', '../cmd/gorged/webdist/', 'src/protocol.ts'] },
+  { ignores: ['dist/', 'node_modules/', '../server/gorged/webdist/', 'src/protocol.ts'] },
 );

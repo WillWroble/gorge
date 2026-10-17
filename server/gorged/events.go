@@ -1,0 +1,150 @@
+package gorged
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
+
+	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/state"
+	"github.com/adams-shaun/gorge/server/host"
+	"github.com/adams-shaun/gorge/server/host/httpapi"
+)
+
+// Extensions are what a binary links into gorged beyond the platform. The
+// zero value is gorge's own server: no draft events.
+type Extensions struct {
+	// Events, when set, serves draft events under /api/events with -events
+	// (four-yay's draft runtime). Without it -events is refused at startup.
+	Events EventsPlugin
+}
+
+// EventsPlugin is a draft-event runtime: it owns a store under the server's
+// persistence directory, may front the deck loader (an event's saved decks),
+// and once the registry exists it starts the /api/events backend.
+type EventsPlugin interface {
+	// Prepare opens the store under dir and returns the wiring plus load,
+	// wrapped so an event deck id resolves before the ordinary loaders.
+	Prepare(dir string, reg *cards.Registry, load func(string) (host.Deck, error)) (EventsWiring, func(string) (host.Deck, error), error)
+	// ArtNames lists card names the art prewarm should fill beyond the
+	// deck files (every card of every draftable set).
+	ArtNames() (label string, names []string, err error)
+}
+
+// EventsWiring is a prepared runtime: Hook installs its host callbacks
+// (match results, series plans) before host.New; Start builds the backend.
+type EventsWiring interface {
+	Hook(o *host.Options)
+	Start(env EventsEnv) (EventRuntime, error)
+}
+
+// EventsEnv is what gorged hands a starting events runtime.
+type EventsEnv struct {
+	Registry       *host.Registry
+	Cards          *cards.Registry
+	Policies       []string // the offered policy set minus decklist readers and reserved-pool policies
+	DefaultPolicy  string
+	MaxLiveEvents  int
+	Mulligans      int
+	AutoMana       bool
+	BotAutoPayMana bool
+	BotCommonSense bool
+	// MintSeat mints the game token for a human seat of an event table.
+	MintSeat func(t host.TableID, seat int) (string, error)
+}
+
+// EventRuntime is the /api/events backend, closed before the registry on
+// shutdown.
+type EventRuntime interface {
+	httpapi.EventService
+	Close() error
+}
+
+var errEventsNeedLab = errors.New("-events needs a binary with draft events linked in (four-yay's gorged)")
+
+// eventsWiring is serve's handle on a prepared runtime; the zero value means
+// -events is off.
+type eventsWiring struct{ w EventsWiring }
+
+// prepareEvents opens the runtime's store under <dir>/events and chains its
+// deck loader in front of load. With -events off it returns load unchanged
+// and a zero wiring, so a server that never turned events on keeps its old
+// deck loader and options exactly.
+func (c config) prepareEvents(reg *cards.Registry, load func(string) (host.Deck, error)) (eventsWiring, func(string) (host.Deck, error), error) {
+	if !c.events {
+		return eventsWiring{}, load, nil
+	}
+	if c.ext.Events == nil {
+		return eventsWiring{}, load, errEventsNeedLab
+	}
+	w, l, err := c.ext.Events.Prepare(filepath.Join(c.dir, "events"), reg, load)
+	if err != nil {
+		return eventsWiring{}, load, err
+	}
+	return eventsWiring{w: w}, l, nil
+}
+
+// hook routes host callbacks through the runtime; a no-op for a zero wiring.
+func (w eventsWiring) hook(o *host.Options) {
+	if w.w != nil {
+		w.w.Hook(o)
+	}
+}
+
+// startEvents starts the runtime, which resumes every stored event. The
+// offered policy set is the server's -bot-policies set minus decklist
+// readers (an Env policy never seats in a draft event) and reserved-pool
+// policies (they play only their own decks; an event deals its own), and the
+// default is -bot-policy unless it reads decklists, else bots.Default.
+// Returns nil when -events is off.
+func (c config) startEvents(w eventsWiring, r *host.Registry, reg *cards.Registry, gate *seatGate) (EventRuntime, error) {
+	if w.w == nil {
+		return nil, nil
+	}
+	if gate == nil {
+		return nil, fmt.Errorf("gorged: draft events need a seat gate to mint game tokens")
+	}
+	reserved := c.reservedPolicyNames()
+	policies := make([]string, 0, len(c.botPolicies))
+	for _, p := range c.botPolicies {
+		if !bots.ReadsDecklists(p) && !containsString(reserved, p) {
+			policies = append(policies, p)
+		}
+	}
+	def := c.botPolicy
+	if bots.ReadsDecklists(def) {
+		def = bots.Default
+	}
+	return w.w.Start(EventsEnv{
+		Registry:       r,
+		Cards:          reg,
+		Policies:       policies,
+		DefaultPolicy:  def,
+		MaxLiveEvents:  c.maxEvents,
+		Mulligans:      c.mulligans,
+		AutoMana:       c.autoMana,
+		BotAutoPayMana: c.botAutoPayMana,
+		BotCommonSense: c.botCommonSense,
+		MintSeat: func(t host.TableID, seat int) (string, error) {
+			return gate.mint(t, state.PlayerID(seat))
+		},
+	})
+}
+
+// prewarmExtensionArt fills the cache for the names the events runtime
+// lists (every card of every draftable set), after the deck prewarm: no deck
+// file names most of them, so without it a draft pack is the first request
+// for its art and renders blank until the fetches settle.
+func prewarmExtensionArt(ctx context.Context, ac *artCache, ext Extensions, logf func(string, ...any)) {
+	if ext.Events == nil {
+		return
+	}
+	label, names, err := ext.Events.ArtNames()
+	if err != nil {
+		logf("art prewarm (%s): %v", label, err)
+		return
+	}
+	_, _ = fillNames(ctx, ac, names, label, "art prewarm ("+label+")", logf, fillLimits{})
+}
