@@ -313,7 +313,7 @@ func Search(ctx context.Context, root Root, src WorldSource, net *policynet.Mode
 }
 
 // DecisionSeed is the per-decision seed of spec §2: a mix of the seat's seed
-// (itself derived from the game seed, internal/bench.RunPairs) and the
+// (itself derived from the game seed, testkit/bench.RunPairs) and the
 // decision's sequence number.
 func DecisionSeed(seatSeed, seq uint64) uint64 { return splitmix(seatSeed ^ splitmix(seq)) }
 

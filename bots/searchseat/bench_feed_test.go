@@ -1,6 +1,6 @@
 package searchseat_test
 
-// The driver-side pins: internal/bench.PlayGame must feed a search seat
+// The driver-side pins: testkit/bench.PlayGame must feed a search seat
 // EXACTLY the observation stream the teacher's own loop assembles (the same
 // capture points, the same recorded answers), and a search seat with no
 // covered kinds must play byte-identically to the plain bot it wraps. The

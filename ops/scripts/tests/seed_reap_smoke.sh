@@ -65,7 +65,7 @@ git -C "$TARGET" init -q 2>/dev/null
 printf 'x\n' >"$TARGET/README.md"
 git -C "$TARGET" add README.md >/dev/null 2>&1
 git -C "$TARGET" -c user.email=t@t -c user.name=t commit -qm init >/dev/null 2>&1
-printf '{"name":"D","cards":["Lightning Bolt","Mountain"]}\n' >"$TARGET/internal/testutil/decks/d.json"
+printf '{"name":"D","cards":["Lightning Bolt","Mountain"]}\n' >"$TARGET/testkit/testutil/decks/d.json"
 : >"$TARGET/engine/rules/acceptance_test.go"
 : >"$TARGET/engine/rules/paramcensus_test.go"
 # One healthy transition: no provider storm, no candidate to file.

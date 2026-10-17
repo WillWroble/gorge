@@ -55,7 +55,7 @@ type SearchBot struct {
 	sampleMS, searchMS float64
 }
 
-// SearchSeat is the driver-side contract internal/bench.PlayGame type-asserts
+// SearchSeat is the driver-side contract testkit/bench.PlayGame type-asserts
 // (the heuristic.BoardSeat branch, mirrored): a seat that answers from the driver's
 // feed at its own decisions. DecideBoard is the plain-bot path the driver
 // falls back to when the seat's feed has stopped observing (a capture error

@@ -12,7 +12,7 @@
 // Compatibility: the harness uses only APIs that exist at a4af596 (the pin
 // docs/015 measured) and at today's main: rules.New/Advance/Pending/Submit/
 // Clone, decision.Decision/Intent, heuristic.NewBot(+EnableAutoPayMana),
-// botpolicy.BoardFromGameInto, internal/bench.PlayGame, bots/searchseat
+// botpolicy.BoardFromGameInto, testkit/bench.PlayGame, bots/searchseat
 // (Feed, NewSearchBot, Watch) and testutil.OpenCorpusRegistry. The azmcts
 // row lives behind the build tag enginebench_az (az.go), because
 // bots/azmcts does not exist at a4af596; built without the tag, -row az
@@ -23,7 +23,7 @@
 //
 // Baseline break, 2026-10-06: the random and bot rows now recycle a finished
 // game's log and object arrays into the next game through a shared
-// internal/bench.SparePool (rules.Spare), the way production self-play does.
+// testkit/bench.SparePool (rules.Spare), the way production self-play does.
 // The rows therefore no longer include a per-game events.NewLogInto /
 // state.NewGameInto allocation, so their turns/s and games/s are not
 // comparable to runs before this date; re-measure a baseline rather than

@@ -66,7 +66,7 @@ persistence failures inside the callback.
 
 ## Payment plans for bot seats
 
-A driver (`internal/bench.PlayGame`, `server/host/match.go`, cmd tools) builds a
+A driver (`testkit/bench.PlayGame`, `server/host/match.go`, cmd tools) builds a
 decision's mana-payment plans (`Engine.EnsurePaymentActions`) only for a
 seat that implements `seat.PaymentPlanConsumer` and answers true. Bots
 default to true; a wrapper forwards to what it wraps. Without plans the

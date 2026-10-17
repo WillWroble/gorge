@@ -110,7 +110,7 @@ func report() heapSample {
 // LoadRegistry serves from it, so the census is deterministic -- independent
 // of which ir-<fingerprint>.gob.gz files .cards happens to hold, of .cards
 // being writable, and of where the checkout lives. It skips when there is no
-// .cards/ corpus, the same way internal/testutil.CorpusRegistry does, so a
+// .cards/ corpus, the same way testkit/testutil.CorpusRegistry does, so a
 // clean clone with no fetched corpus still passes.
 func TestCorpusHeapCensus(t *testing.T) {
 	dir := testutil.CorpusDirOrSkip(t)
@@ -123,7 +123,7 @@ func TestCorpusHeapCensus(t *testing.T) {
 	// was the defect: it served the shared cache when one existed and an
 	// embedded, eager compiled registry when the Save back into a read-only
 	// .cards failed, and the two measured 37 MB vs 165 MB. The census measures
-	// the registry itself, so it cannot use internal/testutil.CorpusRegistry's
+	// the registry itself, so it cannot use testkit/testutil.CorpusRegistry's
 	// shared cache either (that would reintroduce the same dependence).
 	//
 	// Compile from a RELATIVE root (t.Chdir into the corpus dir, then

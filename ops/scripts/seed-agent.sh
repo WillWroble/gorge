@@ -110,7 +110,7 @@ file_ticket() {
 		printf '%s\n' '  Never `go test ./...`, a whole package, `-count=1`, `ops/scripts/gate_affected.sh`, full sweeps or long seeded runs.'
 		printf '%s\n' '  The full suite is `ops/scripts/postmerge_batch.sh`'"'"'s, once per batch on main.'
 		printf '%s\n' '- A cap OOM-kill or timeout is the measurement: the test is over budget. Split it into chunk tests sharing fixtures; never cut coverage.'
-		printf '%s\n' '- Tests load the corpus only via `internal/testutil.CorpusRegistry`, never `cards.LoadRegistry`.'
+		printf '%s\n' '- Tests load the corpus only via `testkit/testutil.CorpusRegistry`, never `cards.LoadRegistry`.'
 		printf '%s\n' '- Anything this brief states without a command and a number behind it is a hypothesis: re-measure it before relying on it.'
 	} >>"$body"
 	if [ "$DRY" = 1 ]; then

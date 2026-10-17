@@ -304,7 +304,7 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
    test cache). A test outside the budget is a defect: split it into chunk
    tests that share fixtures, never cut coverage, and never run it whole "for
    a baseline". Tests load the corpus only via
-   `internal/testutil.CorpusRegistry`, never `cards.LoadRegistry` (~600 MB per
+   `testkit/testutil.CorpusRegistry`, never `cards.LoadRegistry` (~600 MB per
    fresh registry). A sweep too big for the budget is split into fixed index
    chunks with a partition test (e.g. `TestTargetAuditChunk00..11`,
    `TestCensusChunksCoverEverySubject`). Never set

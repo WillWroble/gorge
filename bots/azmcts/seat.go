@@ -105,7 +105,7 @@ var Watch func(Diag)
 // Seat is the az policy: the default bot (heuristic.NewBot, the same PCG
 // derivation, so its delegation consumes exactly the bot's stream) with
 // Search answering the searched kinds. It is a searchseat.SearchSeat, so
-// internal/bench.PlayGame hands it the live engine at its own decisions --
+// testkit/bench.PlayGame hands it the live engine at its own decisions --
 // the route the L10 search seat takes. Stage 1 reads only the engine; the
 // driver's observation feed is for ticket 5's sampled worlds.
 type Seat struct {

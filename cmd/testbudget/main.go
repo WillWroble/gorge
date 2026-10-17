@@ -26,7 +26,7 @@
 // heaviest subtest is named so the split is obvious). RSS can only be probed
 // per test BINARY, which is an upper bound on any test inside it; a package
 // over budget is attributed to a test by a capped `-run '^T$'` run and the
-// pinned inventory lives in internal/testutil/testdata/rss_exceptions.txt.
+// pinned inventory lives in testkit/testutil/testdata/rss_exceptions.txt.
 // CPU is not probed: the 4 vCPU budget is a property of the scope the suite
 // runs in, not of a single test.
 package main

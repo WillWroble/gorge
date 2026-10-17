@@ -20,7 +20,7 @@ type Seat interface {
 }
 
 // PaymentPlanConsumer opts into the lazy payment-action extension: a driver
-// (internal/bench.PlayGame, server/host/match.go, cmd tools) calls
+// (testkit/bench.PlayGame, server/host/match.go, cmd tools) calls
 // Engine.EnsurePaymentActions before a decision is handed to a seat that
 // answers true, so Decision.PaymentActions carries the engine's mana-payment
 // plans. A seat that does not implement it, or answers false, gets no plans.

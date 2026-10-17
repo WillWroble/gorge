@@ -947,7 +947,7 @@ var acceptanceHeads = map[int]string{
 	// four old heads standing, and the remaining botpolicy bits (the required
 	// set, the hold-back exclusion, the ceiling cap) are inert in these games
 	// because the 12 legacy decks carry no goad, encore, MustAttack or
-	// MaxAttackers card (deck census over internal/testutil/decks.go's list).
+	// MaxAttackers card (deck census over testkit/testutil/decks.go's list).
 	// The 2-seat head is unchanged: its game never reaches a Dismember pip
 	// ask before the old and new streams would part.
 	// Auto-accepted: CR conformance lane 0 FAIL and `make sim` 20/20 replay OK,

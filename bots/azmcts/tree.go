@@ -20,7 +20,7 @@
 //   - world.go, env.go: where a simulation's world comes from (the
 //     Clairvoyant source) and how it is walked (engineEnv);
 //   - search.go: Search, the entry point;
-//   - seat.go: the az seat, a searchseat.SearchSeat fed by internal/bench.
+//   - seat.go: the az seat, a searchseat.SearchSeat fed by testkit/bench.
 package azmcts
 
 import (

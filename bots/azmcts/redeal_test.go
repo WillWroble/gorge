@@ -25,7 +25,7 @@ import (
 
 // fedPosition is a real bot-vs-bot game stopped at a searchable seat-0
 // decision, with seat 0's observation feed maintained exactly as
-// internal/bench.PlayGame maintains it (a capture at every decision of every
+// testkit/bench.PlayGame maintains it (a capture at every decision of every
 // player, seat 0's answers recorded back).
 type fedPosition struct {
 	e     *rules.Engine

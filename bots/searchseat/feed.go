@@ -22,7 +22,7 @@ import (
 // own. So the driver owns one Feed per search seat, calls Observe at every
 // decision of every player, and the seat reads the accumulated History back
 // through HistoryRef at its own decisions. four-yay cmd/searchteacher's game loop and
-// internal/bench.PlayGame (the seat-driving bench) both go through this one
+// testkit/bench.PlayGame (the seat-driving bench) both go through this one
 // type, so the two capture paths cannot drift -- and because the extraction
 // is behaviour-identical to the loop the teacher always ran, the label corpus
 // the generator emits is byte-for-byte what it emitted before the Feed
