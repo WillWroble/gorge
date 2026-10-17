@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
 	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/host/httpapi"
@@ -29,7 +27,7 @@ func enableAZ(t *testing.T) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
-	path, err := gonettest.Write(dir, "net.dzgw")
+	path, err := writeStubNet(dir, "net.dzgw")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +36,7 @@ func enableAZ(t *testing.T) string {
 			t.Fatal(err)
 		}
 	})
-	if _, ok := bots.Lookup(azc3.Policy); !ok {
+	if _, ok := bots.Lookup(policyAZC3); !ok {
 		t.Fatal("az-c3 is not registered")
 	}
 	return path
@@ -69,13 +67,13 @@ func TestAZC3FlagsValidate(t *testing.T) {
 			t.Errorf("%s: error %v, want one containing %q", c.name, err, c.want)
 		}
 	}
-	if _, found := bots.Lookup(azc3.Policy); found {
+	if _, found := bots.Lookup(policyAZC3); found {
 		t.Error("a refused configuration left az-c3 registered")
 	}
 	if err := (config{}).enableAZC3(); err != nil {
 		t.Errorf("no az-c3 flags: %v", err)
 	}
-	if _, found := bots.Lookup(azc3.Policy); found {
+	if _, found := bots.Lookup(policyAZC3); found {
 		t.Error("a server that never asked for az-c3 has it registered")
 	}
 	// A network the loader refuses is a startup error, not a half-served policy.
@@ -88,14 +86,14 @@ func TestAZC3FlagsValidate(t *testing.T) {
 	if err := cfg.enableAZC3(); err == nil {
 		t.Error("a bad network file was accepted")
 	}
-	if _, found := bots.Lookup(azc3.Policy); found {
+	if _, found := bots.Lookup(policyAZC3); found {
 		t.Error("a bad network left az-c3 registered")
 	}
 }
 
 func azConfig() config {
 	return config{mulligans: 0, autoMana: true, botAutoPayMana: true,
-		policyPools: map[string][]string{azc3.Policy: {"a", "b"}}}
+		policyPools: map[string][]string{policyAZC3: {"a", "b"}}}
 }
 
 // Operator ruling 2026-10-13: az-c3 reads opponents' decklists, so the
@@ -108,7 +106,7 @@ func TestCreateGameRefusesAZC3AndKeepsItsPoolReserved(t *testing.T) {
 	create := azConfig().createGame(r, gate, nil, []string{"c", "d"}, view.Omniscient)
 
 	for i := 0; i < 2; i++ {
-		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy})
+		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: policyAZC3})
 		if err == nil || !strings.Contains(err.Error(), "reads opponents' decklists") {
 			t.Fatalf("explicit az-c3 pick: error %v, want the decklist refusal", err)
 		}
@@ -164,7 +162,7 @@ func TestCreateGameRefusesAZC3BeforeItsPaymentPlans(t *testing.T) {
 		c := azConfig()
 		mut(&c)
 		create := c.createGame(r, gate, nil, []string{"c", "d"}, view.Omniscient)
-		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy})
+		_, err := create(httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: policyAZC3})
 		if err == nil || !strings.Contains(err.Error(), "reads opponents' decklists") {
 			t.Errorf("error %v, want the decklist refusal", err)
 		}
@@ -233,7 +231,7 @@ func TestAZC3PoolLoading(t *testing.T) {
 		if !reflect.DeepEqual(ids, []string{"FDN_a", "FDN_b"}) {
 			t.Errorf("pool %v", ids)
 		}
-		if len(cat) != 2 || cat[0].Pool != azc3.Policy || cat[1].Pool != azc3.Policy || cat[0].Format != "constructed" ||
+		if len(cat) != 2 || cat[0].Pool != policyAZC3 || cat[1].Pool != policyAZC3 || cat[0].Format != "constructed" ||
 			!strings.Contains(cat[0].Archetype, "az-c3") || cat[1].Archetype != "test" {
 			t.Errorf("catalogue %+v", cat)
 		}
@@ -325,7 +323,7 @@ func TestAZC3DemoTable(t *testing.T) {
 	if got == nil {
 		t.Fatal("no demo table")
 	}
-	if got.ID != "t5" || got.Seats != 2 || got.BotPolicy != azc3.Policy || got.Format != host.FormatConstructed ||
+	if got.ID != "t5" || got.Seats != 2 || got.BotPolicy != policyAZC3 || got.Format != host.FormatConstructed ||
 		!reflect.DeepEqual(got.Decks, pool) || len(got.Humans) != 0 || !got.Perpetual || !got.AutoMana || !got.BotAutoPayMana ||
 		!got.AllowDecklistBots {
 		t.Errorf("demo table %+v", got)
@@ -349,7 +347,7 @@ func TestAZC3DemoTable(t *testing.T) {
 // -az-c3-belief-pool names) and refuses a directory with none.
 func TestAZC3BeliefLoading(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
-	t.Cleanup(func() { azc3.SetBelief(nil) })
+	t.Cleanup(func() { stubNetBots[policyAZC3].setBelief(nil) })
 	if err := (config{}).azc3Belief(reg); err != nil {
 		t.Fatalf("no flag: %v", err)
 	}
@@ -358,6 +356,9 @@ func TestAZC3BeliefLoading(t *testing.T) {
 	writeDeck(t, dir, "FDN_b", "")
 	if err := (config{az3Belief: dir}).azc3Belief(reg); err != nil {
 		t.Fatal(err)
+	}
+	if s := stubNetBots[policyAZC3]; s.belief == nil {
+		t.Fatal("-az-c3-belief did not reach the linked policy's SetBelief")
 	}
 	pool := filepath.Join(t.TempDir(), "pool.tsv")
 	if err := os.WriteFile(pool, []byte("name\tsplit\tcolors\nFDN_a\ttrain\tRG\nFDN_b\teval\tRG\n"), 0o644); err != nil {

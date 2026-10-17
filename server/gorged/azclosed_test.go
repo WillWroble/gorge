@@ -9,10 +9,6 @@ import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/bots/azc4"
-	"github.com/adams-shaun/gorge/bots/azc5"
-	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
 	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/server/host"
 	"github.com/adams-shaun/gorge/server/host/httpapi"
@@ -20,16 +16,16 @@ import (
 )
 
 // closedPolicies is every closed-list az policy gorged serves.
-var closedPolicies = []string{azc4.Policy, azc5.Policy}
+var closedPolicies = []string{policyAZC4, policyAZC5}
 
-var closedAZOnce = map[string]*sync.Once{azc4.Policy: {}, azc5.Policy: {}}
+var closedAZOnce = map[string]*sync.Once{policyAZC4: {}, policyAZC5: {}}
 
 // withClosedAZ returns c with policy's flags set to a.
 func withClosedAZ(c config, policy string, a closedAZ) config {
 	switch policy {
-	case azc4.Policy:
+	case policyAZC4:
 		c.az4 = a
-	case azc5.Policy:
+	case policyAZC5:
 		c.az5 = a
 	default:
 		panic(policy)
@@ -47,7 +43,7 @@ func enableClosed(t *testing.T, policy string) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(dir)
-		path, err := gonettest.Write(dir, "net.dzgw")
+		path, err := writeStubNet(dir, "net.dzgw")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +110,7 @@ func TestClosedAZFlagsRegister(t *testing.T) {
 		"-az-c4-net", "c4.dzgw", "-az-c4-demo-table=false"}); err != nil {
 		t.Fatal(err)
 	}
-	a5, a4 := c.closedAZ(azc5.Policy), c.closedAZ(azc4.Policy)
+	a5, a4 := c.closedAZ(policyAZC5), c.closedAZ(policyAZC4)
 	if a5.net != "c5.dzgw" || a5.decks != "d5" || a5.belief != "b5" || a5.beliefPool != "p5" || !a5.demoTable {
 		t.Errorf("az-c5 flags %+v", a5)
 	}
@@ -168,8 +164,8 @@ func TestCreateGameSeatsAHumanAgainstAClosedPolicy(t *testing.T) {
 // explicit az-c3 pick.
 func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 	enableAZ(t)
-	enableClosed(t, azc4.Policy)
-	enableClosed(t, azc5.Policy)
+	enableClosed(t, policyAZC4)
+	enableClosed(t, policyAZC5)
 	reg := testutil.CorpusRegistry(t)
 	dir := t.TempDir()
 	writeDeck(t, dir, "FDN_a", "")
@@ -179,15 +175,15 @@ func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prior := []reservedDir{{policy: azc3.Policy, dir: c.az3Decks, pool: az3}}
-	az4, cat4, err := c.closedAZ(azc4.Policy).loadPool(reg, nil, nil, prior, cat)
+	prior := []reservedDir{{policy: policyAZC3, dir: c.az3Decks, pool: az3}}
+	az4, cat4, err := c.closedAZ(policyAZC4).loadPool(reg, nil, nil, prior, cat)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(az3, az4) || len(cat4) != 2 {
 		t.Fatalf("pools %v / %v, catalogue %d: want one shared pool catalogued once", az3, az4, len(cat4))
 	}
-	if cat[0].Pool != azc3.Policy {
+	if cat[0].Pool != policyAZC3 {
 		t.Fatalf("loadPool wrote through to its catalogue argument: pool %q", cat[0].Pool)
 	}
 	for _, d := range cat4 {
@@ -195,8 +191,8 @@ func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 			t.Errorf("deck %s pool %q archetype %q after az-c4", d.ID, d.Pool, d.Archetype)
 		}
 	}
-	prior = append(prior, reservedDir{policy: azc4.Policy, dir: c.az4.decks, pool: az4})
-	az5, cat5, err := c.closedAZ(azc5.Policy).loadPool(reg, nil, nil, prior, cat4)
+	prior = append(prior, reservedDir{policy: policyAZC4, dir: c.az4.decks, pool: az4})
+	az5, cat5, err := c.closedAZ(policyAZC5).loadPool(reg, nil, nil, prior, cat4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,14 +203,14 @@ func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 		if d.Pool != "az-c3,az-c4,az-c5" || d.Archetype != "test" {
 			t.Errorf("deck %s pool %q archetype %q after az-c5", d.ID, d.Pool, d.Archetype)
 		}
-		for _, p := range []string{azc3.Policy, azc4.Policy, azc5.Policy} {
+		for _, p := range []string{policyAZC3, policyAZC4, policyAZC5} {
 			if !httpapi.PoolHas(d.Pool, p) {
 				t.Errorf("deck %s pool %q lacks %s", d.ID, d.Pool, p)
 			}
 		}
 	}
-	c.policyPools = map[string][]string{azc3.Policy: az3, azc4.Policy: az4, azc5.Policy: az5}
-	if got := c.reservedPick("FDN_a"); got != azc4.Policy {
+	c.policyPools = map[string][]string{policyAZC3: az3, policyAZC4: az4, policyAZC5: az5}
+	if got := c.reservedPick("FDN_a"); got != policyAZC4 {
 		t.Errorf("a shared deck picks %q, want az-c4 (the first owner that may play a human)", got)
 	}
 	if got := c.reservedFor("FDN_a"); got != "az-c3, az-c4, az-c5" {
@@ -224,26 +220,26 @@ func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 	// the earlier pool's flag.
 	other := t.TempDir()
 	writeDeck(t, other, "FDN_a", "")
-	if _, _, err := (closedAZ{policy: azc4.Policy, decks: other}).loadPool(reg, nil, nil, prior[:1], cat); err == nil || !strings.Contains(err.Error(), "-az-c3-decks") {
+	if _, _, err := (closedAZ{policy: policyAZC4, decks: other}).loadPool(reg, nil, nil, prior[:1], cat); err == nil || !strings.Contains(err.Error(), "-az-c3-decks") {
 		t.Errorf("az-c4: an id in both directories: error %v", err)
 	}
-	if _, _, err := (closedAZ{policy: azc5.Policy, decks: other}).loadPool(reg, nil, nil, prior[1:], cat4); err == nil ||
+	if _, _, err := (closedAZ{policy: policyAZC5, decks: other}).loadPool(reg, nil, nil, prior[1:], cat4); err == nil ||
 		!strings.Contains(err.Error(), "-az-c5-decks") || !strings.Contains(err.Error(), "-az-c4-decks") {
 		t.Errorf("az-c5: an id in az-c4's directory and its own: error %v", err)
 	}
 	// A closed-list pool alone: its decks are catalogued for it only.
-	solo, catSolo, err := (closedAZ{policy: azc5.Policy, decks: other}).loadPool(reg, nil, nil, nil, nil)
-	if err != nil || len(solo) != 1 || len(catSolo) != 1 || catSolo[0].Pool != azc5.Policy {
+	solo, catSolo, err := (closedAZ{policy: policyAZC5, decks: other}).loadPool(reg, nil, nil, nil, nil)
+	if err != nil || len(solo) != 1 || len(catSolo) != 1 || catSolo[0].Pool != policyAZC5 {
 		t.Errorf("az-c5 alone: pool %v catalogue %+v, %v", solo, catSolo, err)
 	}
 	// A deck with the default archetype names every owner; one with its own
 	// ("test", above) keeps it.
-	def := []httpapi.DeckInfo{{ID: "FDN_a", Pool: azc3.Policy, Archetype: "FDN limited, plays vs az-c3"}}
-	_, def4, err := c.closedAZ(azc4.Policy).loadPool(reg, nil, nil, prior[:1], def)
+	def := []httpapi.DeckInfo{{ID: "FDN_a", Pool: policyAZC3, Archetype: "FDN limited, plays vs az-c3"}}
+	_, def4, err := c.closedAZ(policyAZC4).loadPool(reg, nil, nil, prior[:1], def)
 	if err != nil || def4[0].Archetype != "FDN limited, plays vs az-c3 or az-c4" {
 		t.Errorf("default archetype after az-c4: %+v, %v", def4, err)
 	}
-	_, def5, err := c.closedAZ(azc5.Policy).loadPool(reg, nil, nil, prior, def4[:1])
+	_, def5, err := c.closedAZ(policyAZC5).loadPool(reg, nil, nil, prior, def4[:1])
 	if err != nil || def5[0].Archetype != "FDN limited, plays vs az-c3, az-c4 or az-c5" {
 		t.Errorf("default archetype after az-c5: %+v, %v", def5, err)
 	}
@@ -256,7 +252,7 @@ func TestReservedPoliciesShareADeckDirectory(t *testing.T) {
 		t.Errorf("load(FDN_b) = %d cards, %v", len(d.Cards), err)
 	}
 	// Draft events never offer a policy with a reserved pool.
-	if got := c.reservedPolicyNames(); !reflect.DeepEqual(got, []string{azc3.Policy, azc4.Policy, azc5.Policy}) {
+	if got := c.reservedPolicyNames(); !reflect.DeepEqual(got, []string{policyAZC3, policyAZC4, policyAZC5}) {
 		t.Errorf("reserved policies %v", got)
 	}
 }

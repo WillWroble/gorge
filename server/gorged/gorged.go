@@ -21,9 +21,6 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
-	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/bots/azc4"
-	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -388,8 +385,8 @@ func serveFlags() (*flag.FlagSet, *config) {
 	fs.StringVar(&c.az3Belief, "az-c3-belief", "", "with -az-c3-net: close the opponents' deck lists -- az-c3 deals each opponent's unknown cards from lists drawn from the decks in this directory (the TRAIN split of its pool), never from the opponent's real list")
 	fs.StringVar(&c.az3BeliefPool, "az-c3-belief-pool", "", "with -az-c3-belief: a pool.tsv naming the belief decks; only its train split is read (default: every deck file in -az-c3-belief)")
 	fs.StringVar(&c.az3Decks, "az-c3-decks", "", "directory of the decks az-c3 may play: the FDN limited decks it was trained on. They are reserved for it, and it plays nothing else")
-	c.az4.registerFlags(fs, azc4.Policy, "its .dzgw network")
-	c.az5.registerFlags(fs, azc5.Policy, "its .dzgw network (the C5 net, trained after the payment-plan fixes)")
+	c.az4.registerFlags(fs, policyAZC4, "its .dzgw network")
+	c.az5.registerFlags(fs, policyAZC5, "its .dzgw network (the C5 net, trained after the payment-plan fixes)")
 	fs.BoolVar(&c.allowDecklistBots, "allow-decklist-bots", false, "let the server's own bot-only tables run a bot policy that reads every seat's real decklist (today only the az-c3 demo table, which needs it before -az-c3-net is accepted); such a policy never seats against a human")
 	fs.BoolVar(&c.manabrew, "manabrew", false, "mount the ManaBrew protocol adapter (server/host/manabrewhttp) on the main listener; requires -humans or -vsbot")
 	fs.StringVar(&c.manabrewAddr, "manabrew-addr", "", "serve the ManaBrew routes on a separate listen address instead of the main one (implies -manabrew; refuses :8080/:8081)")
@@ -499,7 +496,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	reservedCatalogue := az3Catalogue
 	var reserved []reservedDir
 	if len(az3Pool) > 0 {
-		reserved = append(reserved, reservedDir{policy: azc3.Policy, dir: c.az3Decks, pool: az3Pool})
+		reserved = append(reserved, reservedDir{policy: policyAZC3, dir: c.az3Decks, pool: az3Pool})
 	}
 	for _, a := range c.closedAZs() {
 		pool, cat, err := a.loadPool(reg, cmdPool, conPool, reserved, reservedCatalogue)

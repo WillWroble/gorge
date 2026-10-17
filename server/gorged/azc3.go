@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/adams-shaun/gorge/bots/azc3"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/server/host"
@@ -44,7 +43,11 @@ func (c config) enableAZC3() error {
 	case !c.autoMana || !c.botAutoPayMana:
 		return errors.New("-az-c3-net needs -auto-mana and -bot-auto-mana (both default on): az-c3 pays its mana through the engine's automatic payment plans")
 	}
-	return azc3.Enable(c.az3Net)
+	nb, ok := netBot(policyAZC3)
+	if !ok {
+		return notLinked("-az-c3-net", policyAZC3)
+	}
+	return nb.Enable(c.az3Net, nil)
 }
 
 // azc3Pool loads the decks az-c3 may play from -az-c3-decks: their ids (the
@@ -76,7 +79,7 @@ func (c config) azc3Pool(reg *cards.Registry, cmdPool, conPool []string) ([]stri
 		return nil, nil, fmt.Errorf("-az-c3-decks: %w", err)
 	}
 	for i := range catalogue {
-		catalogue[i].Pool = azc3.Policy
+		catalogue[i].Pool = policyAZC3
 		// The picker shows "name - archetype": without one these decks look like
 		// ids among the hand-named ones, and they sort after them.
 		if catalogue[i].Archetype == "" {
@@ -119,7 +122,7 @@ func (c config) azc3Table(pool []string, vis view.Visibility) *host.TableConfig 
 	return &host.TableConfig{
 		ID: host.TableID(fmt.Sprintf("t%d", c.tables+1)), Name: "az-c3 vs az-c3 (FDN)", Seats: 2, Decks: pool,
 		Seed: c.seed + uint64(c.tables), Pace: c.pace, Spectator: vis, Perpetual: c.perpetual,
-		Mulligans: c.mulligans, Format: host.FormatConstructed, BotPolicy: azc3.Policy,
+		Mulligans: c.mulligans, Format: host.FormatConstructed, BotPolicy: policyAZC3,
 		BotAutoPayMana: c.botAutoPayMana, AutoMana: c.autoMana,
 		// The table exists only when az-c3 is enabled, and enabling az-c3
 		// required -allow-decklist-bots (enableAZC3): this is the opt-in's
@@ -140,6 +143,13 @@ func (c config) azc3Belief(reg *cards.Registry) error {
 	if err != nil {
 		return err
 	}
-	azc3.SetBelief(b)
+	nb, ok := netBot(policyAZC3)
+	if !ok {
+		return notLinked("-az-c3-belief", policyAZC3)
+	}
+	if nb.SetBelief == nil {
+		return fmt.Errorf("-az-c3-belief: this binary's %s cannot close its opponents' lists", policyAZC3)
+	}
+	nb.SetBelief(b)
 	return nil
 }

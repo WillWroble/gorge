@@ -17,8 +17,6 @@ import (
 	"github.com/adams-shaun/gorge/bots/heuristic"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/bots/azc3"
-	"github.com/adams-shaun/gorge/bots/gonet/gonettest"
 	"github.com/adams-shaun/gorge/engine/seat"
 	"github.com/adams-shaun/gorge/engine/view"
 	"github.com/adams-shaun/gorge/server/host"
@@ -142,18 +140,18 @@ func TestAZC3NeedsAllowDecklistBots(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
-	path, err := gonettest.Write(dir, "net.dzgw")
+	path, err := writeStubNet(dir, "net.dzgw")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Precondition: az-c3 is registered (this test or azc3_test's enableAZ
 	// enabled it over the synthetic network).
-	if _, ok := bots.Lookup(azc3.Policy); !ok {
+	if _, ok := bots.Lookup(policyAZC3); !ok {
 		if err := (config{az3Net: path, az3Decks: dir, autoMana: true, botAutoPayMana: true, allowDecklistBots: true}).enableAZC3(); err != nil {
 			t.Fatalf("with -allow-decklist-bots the flags should pass and register: %v", err)
 		}
 	}
-	if _, ok := bots.Lookup(azc3.Policy); !ok {
+	if _, ok := bots.Lookup(policyAZC3); !ok {
 		t.Fatal("az-c3 is not registered")
 	}
 	// Without the opt-in the flags are refused, naming the rule, even though
@@ -179,7 +177,7 @@ func TestAZC3NotReachableFromVsBot(t *testing.T) {
 		name string
 		req  httpapi.CreateGameOptions
 	}{
-		{"explicit pick", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: azc3.Policy}},
+		{"explicit pick", httpapi.CreateGameOptions{Format: host.FormatConstructed, BotPolicy: policyAZC3}},
 		// An FDN deck reserved for az-c3 used to pick the policy; now it
 		// must refuse rather than seat a human against it.
 		{"reserved-deck pick", httpapi.CreateGameOptions{Format: host.FormatConstructed, HumanDeck: "a"}},

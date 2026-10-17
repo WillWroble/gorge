@@ -24,8 +24,6 @@ import (
 	"strings"
 
 	"github.com/adams-shaun/gorge/bots"
-	"github.com/adams-shaun/gorge/bots/azc4"
-	"github.com/adams-shaun/gorge/bots/azc5"
 	"github.com/adams-shaun/gorge/bots/searchprobe"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/view"
@@ -39,7 +37,8 @@ import (
 type closedAZ struct {
 	// policy is the registry key and the flags' prefix ("az-c4").
 	policy string
-	// register is the policy package's Enable.
+	// register is the linked implementation's Enable (RegisterNetBot); nil
+	// when the binary does not carry the policy.
 	register func(path string, b *searchprobe.Belief) error
 
 	net, decks         string
@@ -51,9 +50,14 @@ type closedAZ struct {
 // (and demo-table) order: az-c4, then az-c5.
 func (c config) closedAZs() []closedAZ {
 	a4, a5 := c.az4, c.az5
-	a4.policy, a4.register = azc4.Policy, azc4.Enable
-	a5.policy, a5.register = azc5.Policy, azc5.Enable
-	return []closedAZ{a4, a5}
+	a4.policy, a5.policy = policyAZC4, policyAZC5
+	out := []closedAZ{a4, a5}
+	for i := range out {
+		if nb, ok := netBot(out[i].policy); ok {
+			out[i].register = nb.Enable
+		}
+	}
+	return out
 }
 
 // closedAZ returns the named closed-list policy's flags.
@@ -94,6 +98,8 @@ func (a closedAZ) checkFlags(autoMana, botAutoPayMana bool) error {
 		return fmt.Errorf("-%s-net needs -%s-belief: %s plays humans only because it guesses the opponent's list from a belief corpus instead of reading it", p, p, p)
 	case !autoMana || !botAutoPayMana:
 		return fmt.Errorf("-%s-net needs -auto-mana and -bot-auto-mana (both default on): %s pays its mana through the engine's automatic payment plans", p, p)
+	case a.register == nil:
+		return notLinked("-"+p+"-net", p)
 	}
 	return nil
 }
