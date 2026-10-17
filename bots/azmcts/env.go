@@ -265,8 +265,13 @@ type engineEnv struct {
 // uniformPrior) -- so Leaf at that point is the same network on the same
 // encoded state.
 func (c *walkConfig) leafShared() bool {
-	return c.net != nil && !c.heuristicLeaf && !c.uniformPrior
+	return c.net != nil && !c.heuristicLeaf && !c.uniformPrior && !noSharedLeaf
 }
+
+// noSharedLeaf turns leafShared off: the test that pins shared leaves to
+// leaves projected and encoded again (TestSharedLeafMatchesSeparate) runs
+// both.
+var noSharedLeaf bool
 
 func newEngineEnv(w World, cfg *walkConfig) (*engineEnv, error) {
 	if w.Engine == nil || w.Observer == nil {
