@@ -51,6 +51,12 @@ func TestFirstStrikeDiesTriggerResolvesBeforeRegularDamage(t *testing.T) {
 			}
 		}
 		if e.G.Step > state.StepCombatDamage {
+			// CR 117.3a: the end of combat step opens with the active
+			// player holding priority.
+			if d.Kind != decision.KPriority || d.Player != e.G.Active || e.G.Passes != 0 {
+				t.Fatalf("end of combat opened with %s for seat %d (passes %d), want priority for active seat %d with no passes",
+					d.Kind, d.Player, e.G.Passes, e.G.Active)
+			}
 			break
 		}
 		switch d.Kind {
@@ -76,4 +82,34 @@ func TestFirstStrikeDiesTriggerResolvesBeforeRegularDamage(t *testing.T) {
 		t.Fatalf("myr zone %v, want graveyard", o.Zone)
 	}
 	replayCheck(t, e, cfg)
+}
+
+// CR 508.8 + 117.3a: a combat with no attackers skips to the end of combat
+// step after the declare-attackers priority round, and that step still
+// opens with the ACTIVE player holding priority, no pass counted.
+func TestNoAttackersEndOfCombatOpensWithActivePriority(t *testing.T) {
+	t.Parallel()
+	reg := testutil.CorpusRegistry(t)
+	e, _ := combatTriggerBoard(t, reg, nil,
+		[]string{"Name:Striker\nManaCost:1 W\nTypes:Creature Human\nPT:3/3\nOracle:x\n"}, nil, nil)
+	e.emit(events.Event{Kind: events.TurnChange, Player: 0, Amount: 2})
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepDeclareAttackers})
+	e.askAttackers()
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KAttackers {
+		t.Fatalf("expected an attackers decision, got %+v", d)
+	}
+	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player}); err != nil {
+		t.Fatalf("declare no attackers: %v", err)
+	}
+	for i := 0; i < 8 && e.G.Step == state.StepDeclareAttackers; i++ {
+		submitPass(t, e)
+	}
+	if e.G.Step != state.StepEndCombat {
+		t.Fatalf("step %v, want end of combat", e.G.Step)
+	}
+	d = e.Pending()
+	if d == nil || d.Kind != decision.KPriority || d.Player != 0 || e.G.Passes != 0 {
+		t.Fatalf("end of combat opened with %+v (passes %d), want priority for active seat 0 with no passes", d, e.G.Passes)
+	}
 }

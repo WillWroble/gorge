@@ -1105,7 +1105,7 @@ func (e *Engine) advanceStep() {
 		if !attacked {
 			// CR 508.8 skips blockers and combat damage, but only after the
 			// CR 508.2 priority round in the declare-attackers step finishes.
-			e.setStep(state.StepEndCombat)
+			e.enterEndCombat()
 			return
 		}
 	}

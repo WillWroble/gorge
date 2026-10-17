@@ -1466,7 +1466,28 @@ func (e *Engine) combatStep() {
 	// SBA decision: completeCombatPass returned before the transition. Finish
 	// it now, exactly as the undeferred path would have.
 	e.combatRound = combatRound{}
+	e.enterEndCombat()
+}
+
+// enterEndCombat moves a finished combat into the end of combat step (CR
+// 511). Every other step is entered through finishEnteredStep, whose tail
+// hands priority to the active player with no passes counted (CR 117.3a);
+// these combat-internal transitions bypass it, so a step entered from the
+// tail of a priority round (the between-passes round of a first-strike
+// combat, CR 510.4, or the declare-attackers round of a combat with no
+// attackers, CR 508.8) would otherwise open with the last passer holding
+// priority and its pass already counted, and the active player would never
+// act in it. The reset is emitted only when the holder or the count is
+// stale, so a combat whose damage step ran no priority round (its entry
+// already reset both) logs exactly what it did before.
+func (e *Engine) enterEndCombat() {
 	e.setStep(state.StepEndCombat)
+	if e.pending != nil {
+		return // a BeginPhase replacement parked the entry; its answer finishes it
+	}
+	if e.G.Priority != e.G.Active || e.G.Passes != 0 {
+		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+	}
 }
 
 // beginCombatPass starts a combat damage pass: it collects the attackers that
@@ -1785,7 +1806,7 @@ func (e *Engine) completeCombatPass(pass bool) {
 		return
 	}
 	e.combatRound = combatRound{}
-	e.setStep(state.StepEndCombat)
+	e.enterEndCombat()
 }
 
 // handleDamageDivision applies an answered damage-division decision (CR
