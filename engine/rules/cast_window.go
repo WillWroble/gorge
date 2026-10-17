@@ -164,15 +164,14 @@ func (e *Engine) castWindowProbeUnits(pc *pendingCast, windowUnits []windowManaU
 			// offers R/G only, never the raw parser's WUBRG superset. Without
 			// a record it produces no colour and stays out of this window
 			// (the same fail-closed direction the shared walk takes).
-			produced := mp.Produced
-			if producedNeedsChosen(produced) {
+			counts, any := mp.Counts, mp.CountsAny
+			if mp.NeedsChosen {
 				chosen := pay.ChosenProducedColour(e.G, id)
 				if chosen == "" {
 					continue
 				}
-				produced = pay.SubstituteChosenProduced(produced, chosen)
+				counts, any = cards.ProducedCounts(pay.SubstituteChosenProduced(mp.Produced, chosen))
 			}
-			counts, any := cards.ProducedCounts(produced)
 			total := int32(0)
 			for _, n := range counts {
 				total += n
@@ -257,15 +256,14 @@ func (e *Engine) castWindowSourceExcluded(p state.PlayerID, id state.ObjID) bool
 		if _, ok := e.castWindowAmount(p, id, o, ma); !ok {
 			return true
 		}
-		produced := mp.Produced
-		if producedNeedsChosen(produced) {
+		counts, any := mp.Counts, mp.CountsAny
+		if mp.NeedsChosen {
 			chosen := pay.ChosenProducedColour(e.G, id)
 			if chosen == "" {
 				return true
 			}
-			produced = pay.SubstituteChosenProduced(produced, chosen)
+			counts, any = cards.ProducedCounts(pay.SubstituteChosenProduced(mp.Produced, chosen))
 		}
-		counts, any := cards.ProducedCounts(produced)
 		total := int32(0)
 		for _, n := range counts {
 			total += n

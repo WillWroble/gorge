@@ -242,16 +242,22 @@ func (e *Engine) windowManaUnitsWith(p state.PlayerID, only []state.ObjID, pre [
 // the substitution here is what supplies the source-aware answer.
 func addAvailable(m *state.Mana, ma *cards.SA, chosen string) {
 	mp := effects.ManaOf(ma)
-	raw := mp.Produced
-	produced := pay.SubstituteChosenProduced(raw, chosen)
-	// ProducedCounts intentionally has no source and therefore exposes the
-	// WUBRG superset for a raw Chosen token. This source-aware projection has
-	// one: without its recorded as-enters choice the activation fails closed,
-	// so it must advertise nothing rather than that hypothetical superset.
-	if producedNeedsChosen(raw) && produced == raw {
-		return
+	// Without a Chosen token the substitution is the identity, and the
+	// counts are the compiled ProducedCounts(Produced$).
+	counts := mp.Counts
+	if mp.NeedsChosen {
+		raw := mp.Produced
+		produced := pay.SubstituteChosenProduced(raw, chosen)
+		// ProducedCounts intentionally has no source and therefore exposes
+		// the WUBRG superset for a raw Chosen token. This source-aware
+		// projection has one: without its recorded as-enters choice the
+		// activation fails closed, so it must advertise nothing rather than
+		// that hypothetical superset.
+		if produced == raw {
+			return
+		}
+		counts, _ = cards.ProducedCounts(produced)
 	}
-	counts, _ := cards.ProducedCounts(produced)
 	amt := availableAmountOf(mp)
 	for i, n := range counts {
 		m[state.ManaIndex(cards.ManaSymbol(i))] += n * amt

@@ -36,6 +36,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/effects/params"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/rules/combat"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
@@ -1228,14 +1229,14 @@ func (e *Engine) attackChoiceManaSources(p state.PlayerID) []attackManaSource {
 			// Combo R Chosen land recorded as G has only R/G slots, never the
 			// raw parser's source-agnostic WUBRG superset. Without a valid record
 			// it cannot produce a colour and stays out of this payment window.
-			if producedNeedsChosen(produced) {
+			counts, choice := mp.Counts, mp.CountsAny
+			if mp.NeedsChosen {
 				chosen := pay.ChosenProducedColour(e.G, id)
 				if chosen == "" {
 					continue
 				}
-				produced = pay.SubstituteChosenProduced(produced, chosen)
+				counts, choice = cards.ProducedCounts(pay.SubstituteChosenProduced(produced, chosen))
 			}
-			counts, choice := cards.ProducedCounts(produced)
 			units := int32(0)
 			if choice {
 				// A choice-shaped production produces exactly ONE unit of mana
@@ -1282,16 +1283,8 @@ func (e *Engine) attackChoiceManaSources(p state.PlayerID) []attackManaSource {
 // R-9) and colourless only when no colour is on offer, so a blank ability's
 // one colourless unit round-trips to "C". The caller has already established
 // at least one non-zero slot.
-// producedNeedsChosen reports whether a Produced$ grammar token needs the
-// source's recorded as-enters colour before it can be priced.
-func producedNeedsChosen(produced string) bool {
-	for tok := range strings.FieldsSeq(produced) {
-		if producedNeedsChosenSet.Has(strings.Trim(tok, "{}")) {
-			return true
-		}
-	}
-	return false
-}
+// producedNeedsChosen is params.ProducedNeedsChosen.
+func producedNeedsChosen(produced string) bool { return params.ProducedNeedsChosen(produced) }
 
 func oneColourProduced(counts [6]int32) string {
 	for i := range counts {
@@ -1922,12 +1915,6 @@ func (e *Engine) attackPayAnswer(d *decision.Decision, in decision.Intent) {
 		e.completeAttackPay(st.chosen, plan)
 	}
 }
-
-var producedNeedsChosenSet = state.NewNameSet(
-	"Chosen",
-	"ChosenColor",
-	"ComboChosen",
-)
 
 type chargeObjPlanCode uint16
 
