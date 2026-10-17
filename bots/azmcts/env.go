@@ -79,6 +79,12 @@ type walkConfig struct {
 	// OpponentMirror, 0 otherwise (oppEnumLimit).
 	oppAutoPay bool
 	oppTopK    int
+	// lazyPrior defers an in-walk point's network prior (Point.resolve)
+	// when it cannot change the point's keys (no top-k cut): the tree reads
+	// it only for a child it does not hold yet, so a replayed point whose
+	// children all exist never projects, encodes or scores. Off under the
+	// node cache, which compares a replayed point's key order.
+	lazyPrior bool
 }
 
 // priorNet is the network in-walk priors read: nil under uniformPrior.
@@ -474,6 +480,15 @@ func (e *engineEnv) advance() (*Point, error) {
 				}
 				// Under priorTopK the network keeps the point's best
 				// candidates (after nameKeys, which may merge two).
+				if res := e.deferPrior(pd, in, kind, cands, e.cfg.priorTopK); res != nil {
+					e.cur, e.cands = pd, cands
+					if e.cfg.priorTopK > 0 {
+						countTopK(e.cfg.stats, true, 0)
+					}
+					pt := &Point{Keys: candKeys(cands), cut: cut, ranked: e.cfg.priorTopK > 0, extra: extraOf(kind), resolve: res}
+					countPoint(e.cfg.stats, pt)
+					return pt, nil
+				}
 				cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), e.cfg.priorTopK, e.e, pd, in, kind, cands, e.cfg.priorView())
 				e.cur, e.cands = pd, cands
 				if fell {
@@ -561,6 +576,19 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 	if cut {
 		e.cfg.stats.Truncated++
 	}
+	if res := e.deferPrior(pd, in, kind, cands, topK); res != nil {
+		for i := range cands {
+			cands[i].key = Key(oppKeyPrefix + string(cands[i].key))
+		}
+		e.cur, e.cands = pd, cands
+		pt := &Point{Keys: candKeys(cands), cut: cut, Opp: true, extra: extraOf(kind), oppPay: autoPay && kind == "priority", resolve: res}
+		if topK > 0 {
+			countTopK(e.cfg.stats, true, 0)
+			pt.ranked = true
+		}
+		countPoint(e.cfg.stats, pt)
+		return pt
+	}
 	cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), topK, e.e, pd, in, kind, cands, e.cfg.priorView())
 	keys := make([]Key, len(cands))
 	for i := range cands {
@@ -578,6 +606,26 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 	}
 	countPoint(e.cfg.stats, pt)
 	return pt
+}
+
+// deferPrior is lazyPrior's deferred prior for the point pd with candidates
+// cands, or nil when the prior must be computed now: lazyPrior off, no
+// network (the uniform prior costs nothing), or a top-k cut that may drop
+// candidates. The closure ranks cands as rankedPrior does (it reads their
+// intents, never their keys, and modifies neither) and returns the ranked
+// keys and prior; it counts PriorFallbacks when it runs.
+func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int) func() ([]Key, []float64) {
+	net := e.cfg.priorNet()
+	if !e.cfg.lazyPrior || net == nil || (topK > 0 && len(cands) > topK) {
+		return nil
+	}
+	return func() ([]Key, []float64) {
+		kept, prior, fell, _ := rankedPrior(net, topK, e.e, pd, in, kind, cands, e.cfg.priorView())
+		if fell {
+			e.cfg.stats.PriorFallbacks++
+		}
+		return candKeys(kept), prior
+	}
 }
 
 // oppBot is seat p's auto-pay walk bot under oppAutoPay, nil otherwise.
