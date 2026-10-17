@@ -178,7 +178,7 @@ func FaceEqual(a, b *Face) bool {
 		a.kwHeads != b.kwHeads || a.kwHeadsLen != b.kwHeadsLen || a.kwHeadsBound != b.kwHeadsBound ||
 		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound ||
 		a.printed.facts != b.printed.facts || a.printed.typesLen != b.printed.typesLen ||
-		a.printed.cost != b.printed.cost || a.printed.bound != b.printed.bound {
+		a.printed.cost != b.printed.cost || a.printed.line != b.printed.line || a.printed.bound != b.printed.bound {
 		return false
 	}
 	if !sliceEq(a.Types, b.Types) || !sliceEq(a.Keywords, b.Keywords) || !sliceEq(a.Aliases, b.Aliases) ||

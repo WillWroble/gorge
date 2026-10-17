@@ -25,7 +25,9 @@ type PrintedFacts struct {
 }
 
 type printedFacts struct {
-	facts      PrintedFacts
+	facts PrintedFacts
+	// line is strings.Join(Types, " "), the type line the view projects.
+	line       string
 	typesFirst *string
 	typesLen   int
 	cost       string
@@ -160,23 +162,25 @@ func (f *Face) derivePrintedFacts() {
 	if len(f.Types) > 0 {
 		p.typesFirst = &f.Types[0]
 	}
-	p.facts.TypeFold, p.facts.TypeExact = TypeLineMasks(strings.Join(f.Types, " "))
+	p.line = strings.Join(f.Types, " ")
+	p.facts.TypeFold, p.facts.TypeExact = TypeLineMasks(p.line)
 	p.facts.CostColours, p.facts.ManaValue = ManaCostPips(f.ManaCost)
 	f.printed = p
 }
 
-// PrintedFacts returns the face's compiled type-line and mana-cost facts,
-// and false when they are not bound to its current Types and ManaCost (a
-// face never derived, or a struct copy whose text was replaced): the caller
-// then reads the text itself.
-func (f *Face) PrintedFacts() (PrintedFacts, bool) {
+// PrintedFacts returns the face's compiled type-line and mana-cost facts
+// and its joined type line (strings.Join(Types, " ")), and false when they
+// are not bound to its current Types and ManaCost (a face never derived, or
+// a struct copy whose text was replaced): the caller then reads the text
+// itself.
+func (f *Face) PrintedFacts() (PrintedFacts, string, bool) {
 	p := &f.printed
 	if !p.bound || p.typesLen != len(f.Types) || len(p.cost) != len(f.ManaCost) ||
 		len(p.cost) > 0 && unsafe.StringData(p.cost) != unsafe.StringData(f.ManaCost) {
-		return PrintedFacts{}, false
+		return PrintedFacts{}, "", false
 	}
 	if len(f.Types) > 0 && p.typesFirst != &f.Types[0] {
-		return PrintedFacts{}, false
+		return PrintedFacts{}, "", false
 	}
-	return p.facts, true
+	return p.facts, p.line, true
 }

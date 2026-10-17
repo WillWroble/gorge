@@ -530,11 +530,13 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 				cv.CardName = printed
 			}
 		}
-		cv.Types = p.typeLine(types, f.Types)
-		cv.ManaCost = f.ManaCost
-		if pf, ok := f.PrintedFacts(); ok {
+		if pf, line, ok := f.PrintedFacts(); ok {
+			cv.Types = line
 			cv.Facts = CardFacts{PrintedFacts: pf, OK: true}
+		} else {
+			cv.Types = p.typeLine(types, f.Types)
 		}
+		cv.ManaCost = f.ManaCost
 		cv.PrintedPT = f.PT
 		cv.Printing = Printing{Name: f.Name}
 		// The spell-ability API projection: the card's own SP$ line, the
