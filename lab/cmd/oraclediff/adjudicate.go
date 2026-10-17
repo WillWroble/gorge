@@ -65,7 +65,7 @@ import (
 // adjudicationDir is the D1=C ledger directory (DESIGN section 9.1, option
 // C), relative to the repo root. The Forge licence boundary test allows
 // exactly this path for the ledger shards and nothing else.
-const adjudicationDir = "compliance/adjudication"
+const adjudicationDir = "lab/oracle/compliance/adjudication"
 
 // ledgerRow is one line of the D1=C compact ledger (DESIGN section 9.1,
 // option C). ForgeRef is FORGE_ORACLE_REF[:12], the same pin the cache

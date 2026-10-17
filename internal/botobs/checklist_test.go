@@ -353,7 +353,7 @@ func TestRoutingProbeReflectsSource(t *testing.T) {
 		t.Fatal("precondition: the real botpolicy source has no KArrange routing site, so this test cannot observe a removal")
 	}
 	dir := t.TempDir()
-	sub := filepath.Join(dir, "botpolicy")
+	sub := filepath.Join(dir, "bots", "botpolicy")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}

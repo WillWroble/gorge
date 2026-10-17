@@ -219,7 +219,7 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "path under compliance forge prefix",
-			file:      "compliance/forge-verdicts/a.jsonl",
+			file:      "lab/oracle/compliance/forge-verdicts/a.jsonl",
 			body:      "{}\n",
 			wantMatch: true,
 			reason:    "lab/oracle/compliance/forge* is forbidden apart from the ledger",
@@ -240,7 +240,7 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "allowlisted forge path",
-			file:      "compliance/forge-verdicts/a.jsonl",
+			file:      "lab/oracle/compliance/forge-verdicts/a.jsonl",
 			body:      "{}\n",
 			allow:     true,
 			wantMatch: true,
@@ -248,7 +248,7 @@ func TestForgeBoundaryDetection(t *testing.T) {
 		},
 		{
 			name:      "ledger path is not a forge-oracle artifact",
-			file:      "compliance/adjudication/a.jsonl",
+			file:      "lab/oracle/compliance/adjudication/a.jsonl",
 			body:      "{}\n",
 			wantMatch: false,
 			reason:    "the section 9 ledger lives under compliance/adjudication and is allowed",

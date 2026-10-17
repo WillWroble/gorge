@@ -4,13 +4,12 @@ package searchprobe
 
 import (
 	"encoding/binary"
-	"slices"
-
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/deck"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
+	"slices"
 )
 
 // encodeView appends v's canonical encoding (canon.go).

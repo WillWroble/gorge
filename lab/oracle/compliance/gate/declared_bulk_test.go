@@ -18,7 +18,7 @@ import (
 func TestCheckDeclaredMatchesCheckPerSet(t *testing.T) {
 	t.Parallel()
 	root := "../../../.."
-	declared, err := compliance.LoadDeclared(root + "/compliance/declared.json")
+	declared, err := compliance.LoadDeclared(root + "/lab/oracle/compliance/declared.json")
 	if err != nil {
 		t.Fatal(err)
 	}

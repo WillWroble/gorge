@@ -123,7 +123,7 @@ func TestBookkeepingClassCensus(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..", "..")
 	has := func(n string) bool { _, ok := reg.Lookup(n); return ok }
 	folded := compliance.FoldedNames(reg)
-	paths, err := filepath.Glob(filepath.Join(root, "compliance", "printed", "*.json"))
+	paths, err := filepath.Glob(filepath.Join(root, "lab", "oracle", "compliance", "printed", "*.json"))
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("no printed sets (err %v)", err)
 	}

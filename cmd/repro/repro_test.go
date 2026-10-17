@@ -474,7 +474,7 @@ func TestReproEmitTestIntoRulesCompilesAndFailsOnTODO(t *testing.T) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
 			continue
 		}
-		src, err := os.ReadFile(filepath.Join(root, "rules", e.Name()))
+		src, err := os.ReadFile(filepath.Join(root, "engine", "rules", e.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}

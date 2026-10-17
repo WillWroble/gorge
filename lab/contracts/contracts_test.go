@@ -17,7 +17,7 @@ import (
 )
 
 // repoRoot is the module root: this package sits one directory below it.
-const repoRoot = ".."
+const repoRoot = "../.."
 
 // TestGoldensMatchRegistry hashes every golden registry.json lists. The
 // owner package's own test reproduces the golden byte for byte, so a hash

@@ -165,7 +165,7 @@ func Build(reg *cards.Registry, root string) (*Census, error) {
 	}
 	cs := &Census{Config: cfg, Sets: map[string]compliance.Manifest{}, SetFormats: map[string][]string{},
 		byName: map[string]*Card{}, setCards: map[string][]*Card{}}
-	paths, err := filepath.Glob(filepath.Join(root, "compliance", "manifests", "*.json"))
+	paths, err := filepath.Glob(filepath.Join(root, "lab", "oracle", "compliance", "manifests", "*.json"))
 	if err != nil {
 		return nil, err
 	}

@@ -30,7 +30,7 @@ func cardAPI(reg *cards.Registry, name string) string {
 // sets that print it.
 func printedSets(root string) map[string][]string {
 	out := map[string][]string{}
-	paths, _ := filepath.Glob(filepath.Join(root, "compliance", "printed", "*.json"))
+	paths, _ := filepath.Glob(filepath.Join(root, "lab", "oracle", "compliance", "printed", "*.json"))
 	for _, p := range paths {
 		code := strings.TrimSuffix(filepath.Base(p), ".json")
 		pr, err := compliance.LoadPrinted(filepath.Dir(p), code)

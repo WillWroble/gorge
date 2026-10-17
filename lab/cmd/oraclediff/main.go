@@ -788,7 +788,7 @@ func xmageSpelling(reg *cards.Registry, card string) (string, bool) {
 		}
 		want[compliance.FoldName(strings.Join(names, " // "))] = true
 	}
-	paths, _ := filepath.Glob(filepath.Join("compliance", "manifests", "*.json"))
+	paths, _ := filepath.Glob(filepath.Join("lab", "oracle", "compliance", "manifests", "*.json"))
 	sort.Strings(paths)
 	for _, p := range paths {
 		raw, err := os.ReadFile(p)
