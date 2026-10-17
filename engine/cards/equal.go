@@ -178,13 +178,13 @@ func FaceEqual(a, b *Face) bool {
 		a.kwHeads != b.kwHeads || a.kwHeadsLen != b.kwHeadsLen || a.kwHeadsBound != b.kwHeadsBound ||
 		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound ||
 		a.printed.facts != b.printed.facts || a.printed.typesLen != b.printed.typesLen ||
-		a.printed.cost != b.printed.cost || a.printed.line != b.printed.line || a.printed.bound != b.printed.bound {
+		a.printed.costData != b.printed.costData || a.printed.costLen != b.printed.costLen ||
+		a.printed.typesFirst != b.printed.typesFirst || a.printed.line != b.printed.line || a.printed.bound != b.printed.bound {
 		return false
 	}
 	if !sliceEq(a.Types, b.Types) || !sliceEq(a.Keywords, b.Keywords) || !sliceEq(a.Aliases, b.Aliases) ||
 		!StringMapEqual(a.SVars, b.SVars) ||
 		!stringPtrEqual(a.typeWordsFirst, b.typeWordsFirst) || !stringPtrEqual(a.kwHeadsFirst, b.kwHeadsFirst) ||
-		!stringPtrEqual(a.printed.typesFirst, b.printed.typesFirst) ||
 		!slotEqual(a.manaCostSlot, b.manaCostSlot) || !extSlotEqual(a.extSlot, b.extSlot) ||
 		!StaticEqual(a.typeStaticsFirst, b.typeStaticsFirst) {
 		return false

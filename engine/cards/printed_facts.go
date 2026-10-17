@@ -27,10 +27,15 @@ type PrintedFacts struct {
 type printedFacts struct {
 	facts PrintedFacts
 	// line is strings.Join(Types, " "), the type line the view projects.
-	line       string
-	typesFirst *string
+	line string
+	// typesFirst/typesLen and costData/costLen are the identity of the
+	// Types slice and ManaCost bytes the facts were derived over, held as
+	// addresses so the guard adds nothing for the collector to scan (the
+	// face's own fields keep that text alive, and the heap does not move).
+	typesFirst uintptr
 	typesLen   int
-	cost       string
+	costData   uintptr
+	costLen    int
 	bound      bool
 }
 
@@ -158,9 +163,9 @@ func pipColour(c byte) ColourMask {
 // derivePrintedFacts binds the face's PrintedFacts to its current Types and
 // ManaCost.
 func (f *Face) derivePrintedFacts() {
-	p := printedFacts{typesLen: len(f.Types), cost: f.ManaCost, bound: true}
+	p := printedFacts{typesLen: len(f.Types), costData: stringAddr(f.ManaCost), costLen: len(f.ManaCost), bound: true}
 	if len(f.Types) > 0 {
-		p.typesFirst = &f.Types[0]
+		p.typesFirst = uintptr(unsafe.Pointer(&f.Types[0]))
 	}
 	p.line = strings.Join(f.Types, " ")
 	p.facts.TypeFold, p.facts.TypeExact = TypeLineMasks(p.line)
@@ -175,12 +180,14 @@ func (f *Face) derivePrintedFacts() {
 // itself.
 func (f *Face) PrintedFacts() (PrintedFacts, string, bool) {
 	p := &f.printed
-	if !p.bound || p.typesLen != len(f.Types) || len(p.cost) != len(f.ManaCost) ||
-		len(p.cost) > 0 && unsafe.StringData(p.cost) != unsafe.StringData(f.ManaCost) {
+	if !p.bound || p.typesLen != len(f.Types) || p.costLen != len(f.ManaCost) ||
+		p.costLen > 0 && p.costData != stringAddr(f.ManaCost) {
 		return PrintedFacts{}, "", false
 	}
-	if len(f.Types) > 0 && p.typesFirst != &f.Types[0] {
+	if len(f.Types) > 0 && p.typesFirst != uintptr(unsafe.Pointer(&f.Types[0])) {
 		return PrintedFacts{}, "", false
 	}
 	return p.facts, p.line, true
 }
+
+func stringAddr(s string) uintptr { return uintptr(unsafe.Pointer(unsafe.StringData(s))) }

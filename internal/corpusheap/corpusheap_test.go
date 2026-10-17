@@ -61,7 +61,13 @@ const (
 	// The compile is OUTSIDE the measured window: it builds an eager *Card tree
 	// that is dropped before the baseline, so the delta is the imaged registry
 	// alone, exactly what a server that hits a cache holds.
-	ceilingScanBytes   int64 = 1_500_000  // 1.4 MB: /gc/scan/heap:bytes
+	//
+	// Raised 2026-10-17 (wt/no-strings), scan only: each face now carries its
+	// compiled PrintedFacts (type-line masks, joined line, cost pips) and each
+	// ability a Cost$ slot, so the engine and the policy encoder test bits
+	// instead of re-parsing that text per object per walk. Measured 1.56 MB
+	// scan (develop: 1.30 MB), 35.6 MB heap, 18,020 objects.
+	ceilingScanBytes   int64 = 1_650_000  // 1.56 MB: /gc/scan/heap:bytes
 	ceilingHeapBytes   int64 = 39_200_000 // 35.5 MB measured + ~5% headroom: HeapAlloc
 	ceilingHeapObjects int64 = 18_400     // /gc/heap/objects:objects
 )
