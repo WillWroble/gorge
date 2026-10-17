@@ -10,7 +10,7 @@ import (
 
 // quietStatsFlag is a link-time switch for the quiet-seat counters:
 //
-//	go build -ldflags "-X github.com/adams-shaun/gorge/rules.quietStatsFlag=1"
+//	go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.quietStatsFlag=1"
 //
 // When it is empty AND verify mode is off, the observer in priorityOptions
 // does not run at all, so the default build pays one predictable branch.

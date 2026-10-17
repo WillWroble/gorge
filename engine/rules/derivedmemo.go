@@ -162,7 +162,7 @@ func (e *Engine) EndDerivedReads() {
 }
 
 // derivedMemoVerifyFlag turns verify mode on in a non-test binary:
-// go build -ldflags "-X github.com/adams-shaun/gorge/rules.derivedMemoVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.derivedMemoVerifyFlag=1".
 var derivedMemoVerifyFlag string
 
 var derivedMemoVerify = derivedMemoVerifyFlag != ""

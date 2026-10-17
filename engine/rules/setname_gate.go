@@ -4,7 +4,7 @@ package rules
 // no-SetName gate below skips is recomputed in full and the engine panics on
 // any difference. Enabled for the rules test binary by
 // setname_gate_verify_test.go; for a built binary, pass
-// go build -ldflags "-X github.com/adams-shaun/gorge/rules.renameGateVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.renameGateVerifyFlag=1".
 var renameGateVerifyFlag string
 
 var renameGateVerify = renameGateVerifyFlag != ""

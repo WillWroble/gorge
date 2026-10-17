@@ -44,7 +44,7 @@ import (
 // any difference, entry order included.
 
 // boardIncVerifyFlag turns verify mode on in a non-test binary:
-// go build -ldflags "-X github.com/adams-shaun/gorge/botpolicy.boardIncVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/bots/botpolicy.boardIncVerifyFlag=1".
 var boardIncVerifyFlag string
 
 var boardIncVerify = boardIncVerifyFlag != ""

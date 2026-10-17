@@ -228,7 +228,7 @@ An empty `inertHeldOut` is **not** required, because the tail filter is applied 
 
 - **`quietOff`:** `os.Getenv("GORGE_QUIET_SKIP") == "0"` once Q2 flips the default. Before that, the path is on only when `GORGE_QUIET_SKIP=1`. This is the prio memo's flag pattern (`engine/rules/prio_memo.go:81`).
 - **`quietVerify`:** `derivedMemoVerifyFlag != ""` (`engine/rules/derivedmemo.go:166`; set by `make enginebench-verify` and the rules test binary), or `GORGE_QUIET_VERIFY=1`.
-- **`quietStats`:** counters (proved, pass-only, bare-mana, sole blocker, ns) behind a link-time flag `-X github.com/adams-shaun/gorge/rules.quietStatsFlag=1`, so the default build pays one predictable branch. This is S0's pattern.
+- **`quietStats`:** counters (proved, pass-only, bare-mana, sole blocker, ns) behind a link-time flag `-X github.com/adams-shaun/gorge/engine/rules.quietStatsFlag=1`, so the default build pays one predictable branch. This is S0's pattern.
 
 ## 4. Correctness
 

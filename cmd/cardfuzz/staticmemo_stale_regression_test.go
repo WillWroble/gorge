@@ -30,7 +30,7 @@ import (
 // This runs the recorded failure through cardfuzz's own playGame, so the
 // decks, seed and seats are identical to the report. Run with verify mode:
 //
-// go test -ldflags '-X github.com/adams-shaun/gorge/rules.derivedMemoVerifyFlag=1 -X github.com/adams-shaun/gorge/rules.layerInertVerifyFlag=1' -run '^TestStaticMemoRefreshAtUnmovedLogHeadIsNotServedStale$' ./cmd/cardfuzz/
+// go test -ldflags '-X github.com/adams-shaun/gorge/engine/rules.derivedMemoVerifyFlag=1 -X github.com/adams-shaun/gorge/engine/rules.layerInertVerifyFlag=1' -run '^TestStaticMemoRefreshAtUnmovedLogHeadIsNotServedStale$' ./cmd/cardfuzz/
 //
 // Verify mode is essential: without it the stale list can leave this game
 // seemingly successful. The other derived-memo verifiers are set up from the

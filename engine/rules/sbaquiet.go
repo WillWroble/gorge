@@ -70,7 +70,7 @@ type sbaQuietKey struct {
 }
 
 // sbaQuietVerifyFlag turns verify mode on in a non-test binary:
-// go build -ldflags "-X github.com/adams-shaun/gorge/rules.sbaQuietVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.sbaQuietVerifyFlag=1".
 var sbaQuietVerifyFlag string
 
 var sbaQuietVerify = sbaQuietVerifyFlag != ""

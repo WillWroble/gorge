@@ -63,7 +63,7 @@ import (
 // redealProbeVerify (on in this package's test binary, settable through
 // SetRedealProbeVerify by other test binaries, or at link time) runs the
 // probe anyway on every skip and panics if it would have refused the world.
-// go build -ldflags "-X github.com/adams-shaun/gorge/internal/searchprobe.redealProbeVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/bots/searchprobe.redealProbeVerifyFlag=1".
 var redealProbeVerifyFlag string
 
 var redealProbeVerify = redealProbeVerifyFlag != ""

@@ -46,7 +46,7 @@ import (
 // layerInertVerify (set by the rules test binary, or at link time through
 // layerInertVerifyFlag) recomputes on every reuse and panics on a difference,
 // so the whole rules suite checks that argument empirically.
-// go build -ldflags "-X github.com/adams-shaun/gorge/rules.layerInertVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.layerInertVerifyFlag=1".
 var layerInertVerifyFlag string
 
 var layerInertVerify = layerInertVerifyFlag != ""

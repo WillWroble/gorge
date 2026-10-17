@@ -875,7 +875,7 @@ func sameTypeWordSet(a, b []string) bool {
 // layer4PrecheckVerifyFlag for a botbench run) re-derives active() whenever
 // the fast path answers "no" and panics if it holds a layer-4 effect, so the
 // whole rules suite checks the precheck's conservativeness empirically.
-// go build -ldflags "-X github.com/adams-shaun/gorge/rules.layer4PrecheckVerifyFlag=1".
+// go build -ldflags "-X github.com/adams-shaun/gorge/engine/rules.layer4PrecheckVerifyFlag=1".
 var layer4PrecheckVerifyFlag string
 
 var layer4PrecheckVerify = layer4PrecheckVerifyFlag != ""

@@ -4,7 +4,7 @@
 # included); anything else is a git revision, exported with git archive into
 # $BENCH_DIR/src/<sha> and built there, so no checkout or worktree is touched.
 # Extra arguments go to go build (for example -tags enginebench_az, or
-# -ldflags "-X github.com/adams-shaun/gorge/rules.derivedMemoVerifyFlag=1").
+# -ldflags "-X github.com/adams-shaun/gorge/engine/rules.derivedMemoVerifyFlag=1").
 # A git-archive build has no .git, so the toolchain cannot stamp vcs.revision;
 # it is built with -X main.commit=<sha> instead (merged into any -ldflags the
 # caller passed), which enginebench reports as "commit". A revision older than

@@ -257,7 +257,12 @@ TOKEN_RE = re.compile(r"(?<![\w.@/$-])((?:\./)?(?:" + "|".join(sorted(FIRST, key
 
 def rewrite_import(m):
     rest = m.group(1)
-    return MOD + "/" + map_path(rest)
+    # A linker -X target or a stack frame names pkg.Symbol: map the package.
+    sym = ""
+    mm = re.match(r"^(.*?)(\.[A-Za-z_]\w*.*)$", rest)
+    if mm and "/" not in mm.group(2):
+        rest, sym = mm.group(1), mm.group(2)
+    return MOD + "/" + map_path(rest) + sym
 
 
 def norm(p):
