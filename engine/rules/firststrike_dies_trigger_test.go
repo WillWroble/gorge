@@ -113,3 +113,66 @@ func TestNoAttackersEndOfCombatOpensWithActivePriority(t *testing.T) {
 		t.Fatalf("end of combat opened with %+v (passes %d), want priority for active seat 0 with no passes", d, e.G.Passes)
 	}
 }
+
+// CR 510.4: any action in the between-passes priority round -- here the
+// active player tapping a land for mana -- keeps the round open. It used to
+// re-enter combatStep, which ran the regular damage pass and moved to end of
+// combat, emptying the mana the player had just made (CR 500.4): a payment
+// walked through that window (kfuzz gorge-vs-gorge seed 1, an instant cast
+// in the first-strike window) stopped halfway with an empty pool.
+func TestFirstStrikeWindowManaAbilityKeepsTheStep(t *testing.T) {
+	t.Parallel()
+	reg := testutil.CorpusRegistry(t)
+	e, cfg := combatTriggerBoard(t, reg, []string{"Plains"},
+		[]string{"Name:Striker\nManaCost:1 W\nTypes:Creature Human\nPT:3/3\nK:First Strike\nOracle:x\n"},
+		nil, nil)
+	e.emit(events.Event{Kind: events.TurnChange, Player: 0, Amount: 2})
+	e.emit(events.Event{Kind: events.StepChange, Step: state.StepDeclareAttackers})
+	striker := findBattlefield(t, e, 0, "Striker", 0)
+	plains := findBattlefield(t, e, 0, "Plains", 0)
+	e.askAttackers()
+	submitAttackersOnly(t, e, striker)
+	for i := 0; i < 16 && e.G.Step != state.StepCombatDamage; i++ {
+		d := e.Pending()
+		if d.Kind == decision.KBlockers {
+			if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player}); err != nil {
+				t.Fatalf("no blocks: %v", err)
+			}
+			continue
+		}
+		submitPass(t, e)
+	}
+	d := e.Pending()
+	if e.G.Step != state.StepCombatDamage || d == nil || d.Kind != decision.KPriority || d.Player != 0 {
+		t.Fatalf("not at the active player's between-passes priority: step %v, %+v", e.G.Step, d)
+	}
+	if got := e.G.Players[1].Life; got != 17 {
+		t.Fatalf("defender life %d after first-strike damage, want 17", got)
+	}
+	idx := -1
+	for _, o := range d.Options {
+		if o.Kind == "activate" && o.Obj == plains {
+			idx = o.Index
+		}
+	}
+	if idx < 0 {
+		t.Fatalf("Plains mana ability not offered: %+v", d.Options)
+	}
+	if err := e.Submit(decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{idx}}); err != nil {
+		t.Fatalf("activate Plains: %v", err)
+	}
+	if e.G.Step != state.StepCombatDamage {
+		t.Fatalf("a mana ability in the between-passes round moved the game to %v", e.G.Step)
+	}
+	if d := e.Pending(); d == nil || d.Kind != decision.KPriority || d.Player != 0 {
+		t.Fatalf("after the mana ability: %+v, want the active player's priority", d)
+	}
+	if w := e.G.Players[0].Pool[state.MW]; w != 1 {
+		t.Fatalf("pool W = %d after tapping Plains, want 1", w)
+	}
+	drainCombatDamagePriority(t, e)
+	if e.G.Step != state.StepEndCombat {
+		t.Fatalf("step %v after the round, want end of combat", e.G.Step)
+	}
+	replayCheck(t, e, cfg)
+}
