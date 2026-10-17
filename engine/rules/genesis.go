@@ -190,6 +190,37 @@ func (e *Engine) Release() Spare {
 	return sp
 }
 
+// Fits reports whether sp's event array would be the clone's own under
+// e.CloneInto(sp) (events.Log.RecycleFits): it holds e's history plus the
+// fork slack. A caller that pools several Spares picks a fitting one for
+// each clone; a Spare that does not fit still recycles its other storage,
+// and the clone's log allocates on its first append exactly as a plain
+// Clone's does.
+func (sp *Spare) Fits(e *Engine) bool { return sp.events != nil && e.L.RecycleFits(sp.events) }
+
+// EventCap is the capacity of sp's event array (0 for none): the size a
+// pool ranks its Spares by.
+func (sp *Spare) EventCap() int { return cap(sp.events) }
+
+// Detach drops sp's event-array provenance (evFrom/evN, see Spare): the
+// claim that events[:evN] are the parent array's first evN events holds only
+// while that parent array is never written again, which a Spare pooled past
+// the life of the search tree it came from cannot promise -- the parent's
+// own array may be the next Spare consumed, and overwritten by a clone of a
+// different history. Detached, CloneIntoFrom copies the whole history into
+// the array (never skipping a prefix it cannot trust), and the Spare no
+// longer pins the parent array. The stale history the array still holds
+// (evDirty) is kept: the consumer zeroes it past what it overwrites.
+func (sp *Spare) Detach() { sp.evFrom, sp.evN = nil, 0 }
+
+// Provenance reports sp's event-array provenance (evFrom/evN; nil, 0 once
+// Detached or for a Spare with none).
+func (sp *Spare) Provenance() (from *events.Event, n int) { return sp.evFrom, sp.evN }
+
+// Empty reports whether sp carries no storage at all (the zero Spare, or
+// one CloneInto consumed).
+func (sp *Spare) Empty() bool { return sp.engine == nil && sp.events == nil && sp.objs == nil }
+
 // clearDirty zeroes the spent history a lazily released Spare still holds
 // in its event and object arrays, for a consumer that fills them from empty
 // (genesis): afterwards both are zero throughout, as Release used to leave

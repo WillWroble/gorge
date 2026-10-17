@@ -248,6 +248,24 @@ type engineEnv struct {
 	// seat's entry nil.
 	oppBots []*heuristic.Bot
 	oppPCGs []*rand.PCG
+	// leafV is the searching seat's network leaf value at the point the
+	// walk stands on, read off the point's own prior (priorsWithLeaf) when
+	// the point is the seat's and the leaf is the same network's value head
+	// (leafShared); leafOK says it holds. The walk evaluates a leaf right
+	// after producing a point (RunTree's simulate, the cached walk), so the
+	// value is the one leafValue would project and encode again; every
+	// submit clears it (Play, advance).
+	leafV  float64
+	leafOK bool
+}
+
+// leafShared reports whether a point's prior can carry the leaf value
+// (engineEnv.leafV): the leaf is the value head of the network the prior
+// reads -- a network leaf (no heuristicLeaf) under the network prior (no
+// uniformPrior) -- so Leaf at that point is the same network on the same
+// encoded state.
+func (c *walkConfig) leafShared() bool {
+	return c.net != nil && !c.heuristicLeaf && !c.uniformPrior
 }
 
 func newEngineEnv(w World, cfg *walkConfig) (*engineEnv, error) {
@@ -390,6 +408,7 @@ func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 	if e.cur == nil {
 		return nil, fmt.Errorf("%w: play after the walk ended", ErrSubmit)
 	}
+	e.leafOK = false
 	i := -1
 	for j, c := range e.cands {
 		if c.key == k {
@@ -422,6 +441,7 @@ func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 // goes, so a simulation discarded later still contributes them.
 func (e *engineEnv) advance() (*Point, error) {
 	for {
+		e.leafOK = false
 		g := e.e.G
 		if g.Over {
 			e.cur, e.cands = nil, nil
@@ -489,8 +509,16 @@ func (e *engineEnv) advance() (*Point, error) {
 					countPoint(e.cfg.stats, pt)
 					return pt, nil
 				}
-				cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), e.cfg.priorTopK, e.e, pd, in, kind, cands, e.cfg.priorView())
+				// The point's prior and the walk's next leaf read the same
+				// network on the same encoded state (the seat's own view at
+				// pd): the prior carries the value out (leafShared).
+				var leaf *float64
+				if e.cfg.leafShared() {
+					leaf = &e.leafV
+				}
+				cands, prior, fell, before := rankedPriorLeaf(e.cfg.priorNet(), e.cfg.priorTopK, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
 				e.cur, e.cands = pd, cands
+				e.leafOK = leaf != nil
 				if fell {
 					e.cfg.stats.PriorFallbacks++
 				}
@@ -770,6 +798,11 @@ func (e *engineEnv) Leaf() (l Leaf) {
 		}
 		return Leaf{V: v, Terminal: true}
 	}
+	if e.leafOK {
+		// Read off this point's prior (engineEnv.leafV): the same value
+		// leafValue would compute again.
+		return Leaf{V: e.leafV, Capped: e.capped}
+	}
 	leafNet := e.cfg.net
 	if e.cfg.heuristicLeaf {
 		leafNet = nil
@@ -795,6 +828,12 @@ func leafValue(net *policynet.Model, e *rules.Engine, actor state.PlayerID, sc *
 	sb := policynet.AcquireStateBuf()
 	x := float64(net.Value(policynet.EncodeStateWithInto(sb, net.Features, v, actor, nil)))
 	policynet.ReleaseStateBuf(sb)
+	return clampValue(x)
+}
+
+// clampValue is the leaf's reading of the value head: clamped into [0,1],
+// NaN reads 0.5.
+func clampValue(x float64) float64 {
 	switch {
 	case math.IsNaN(x):
 		return 0.5

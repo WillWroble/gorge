@@ -321,6 +321,9 @@ func RunTree(ctx context.Context, root *Point, src EnvSource, opts Options, st *
 		}
 		st.Completed++
 	}
+	if cache != nil {
+		cache.reclaim()
+	}
 	res := TreeResult{
 		Visits: make([]int, len(root.Keys)), Q: make([]float64, len(root.Keys)),
 		Avail: make([]int, len(root.Keys)), RootValue: top.q(),

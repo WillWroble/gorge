@@ -344,7 +344,7 @@ func (l *Log) CloneInto(events []Event, intents []decision.Intent) *Log {
 // reader can observe is identical to Clone's.
 func (l *Log) CloneIntoFrom(events []Event, from *Event, n, dirty int, intents []decision.Intent) *Log {
 	c := l.Clone()
-	if L := len(l.Events); cap(events) >= L+forkMinSlack {
+	if L := len(l.Events); l.RecycleFits(events) {
 		k := 0
 		if L > 0 && from == &l.Events[0] && n <= L && n <= dirty {
 			k = n
@@ -359,6 +359,13 @@ func (l *Log) CloneIntoFrom(events []Event, from *Event, n, dirty int, intents [
 	}
 	return c
 }
+
+// RecycleFits reports whether CloneInto would copy l's history into the
+// recycled array events: it must hold the history plus forkMinSlack appends,
+// the one condition CloneIntoFrom checks. A caller holding several recycled
+// arrays picks one that fits before cloning, instead of handing over one the
+// clone would ignore (and then allocate past).
+func (l *Log) RecycleFits(events []Event) bool { return cap(events) >= len(l.Events)+forkMinSlack }
 
 // Forked reports whether l was made by Clone or CloneInto. A forked log's
 // Events and Intents may still be its parent's backing arrays: they are the

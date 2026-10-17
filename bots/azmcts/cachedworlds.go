@@ -46,7 +46,7 @@ func runCachedWorlds(ctx context.Context, root *Point, rs *RedealSource, cfg *wa
 		local.Sims = share
 		var envs EnvSource = &worldEnvs{src: fc, cfg: cfg}
 		if opts.NodeCache > 0 {
-			envs = &fixedEnvs{worldEnvs: envs.(*worldEnvs)}
+			envs = &fixedEnvs{worldEnvs: envs.(*worldEnvs), pool: rs.pool}
 		}
 		tr, err := RunTree(ctx, root, envs, local, st)
 		if err != nil {
