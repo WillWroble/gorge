@@ -172,3 +172,46 @@ func BenchmarkSIMDPrecomputedCards(b *testing.B) {
 	}
 	report(b, recs)
 }
+
+// EvalBag over the bag summed in one part is Eval bit for bit; summed in
+// parts (here: halves, added) it agrees to float rounding.
+func TestEvalBagMatchesEval(t *testing.T) {
+	recs := corpus(t)
+	g := loadSIMD(t, 0)
+	var sc netsimd.Scratch
+	w := g.BagWidth()
+	var maxd float64
+	for i := range recs {
+		r := &recs[i]
+		want := make([]float32, len(r.opts))
+		wv := g.Eval(&sc, &r.st, r.opts, want)
+		in := make([]netsimd.CardIn, len(r.st.Cards))
+		for k := range r.st.Cards {
+			c := &r.st.Cards[k]
+			in[k] = netsimd.CardIn{Group: c.Group, Raw: c.Raw, Rows: c.Rows}
+		}
+		one := make([]float32, w)
+		g.BagAdd(one, r.st.Sparse)
+		got := make([]float32, len(r.opts))
+		gv := g.EvalBag(&sc, in, r.st.Dense, one, r.opts, got)
+		if math.Float32bits(gv) != math.Float32bits(wv) || !sameBits(got, want) {
+			t.Fatalf("rec %d: one-part bag differs from Eval", i)
+		}
+		h := len(r.st.Sparse) / 2
+		a, b := make([]float32, w), make([]float32, w)
+		g.BagAdd(a, r.st.Sparse[:h])
+		g.BagAdd(b, r.st.Sparse[h:])
+		for j := range a {
+			a[j] += b[j]
+		}
+		gv = g.EvalBag(&sc, in, r.st.Dense, a, r.opts, got)
+		maxd = math.Max(maxd, math.Abs(float64(gv-wv)))
+		for j := range got {
+			maxd = math.Max(maxd, math.Abs(float64(got[j]-want[j])))
+		}
+	}
+	t.Logf("two-part bag: max |logit - Eval| = %.3g", maxd)
+	if maxd > 1e-4 {
+		t.Fatalf("two-part bag logits differ by %v", maxd)
+	}
+}

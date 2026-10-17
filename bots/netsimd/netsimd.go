@@ -358,6 +358,12 @@ func (g *Net) cardFull(sc *Scratch, raw []float32, rows []policynet.Feature, ent
 // trunk is the network after the card vectors: sc.ent holds nc card
 // vectors and sc.groups their groups.
 func (g *Net) trunk(sc *Scratch, nc int, dense []float32, sparse []policynet.Feature, opts []policynet.Option, scores []float32) float32 {
+	return g.trunkBag(sc, nc, dense, sparse, nil, opts, scores)
+}
+
+// trunkBag is trunk with the sparse bag's row sum given (bagIn, e wide)
+// instead of computed from sparse when bagIn is non-nil.
+func (g *Net) trunkBag(sc *Scratch, nc int, dense []float32, sparse []policynet.Feature, bagIn []float32, opts []policynet.Option, scores []float32) float32 {
 	d, cd, e := g.d, g.cd, g.e
 	sc.bag32 = growF(sc.bag32, e)
 
@@ -380,9 +386,13 @@ func (g *Net) trunk(sc *Scratch, nc int, dense []float32, sparse []policynet.Fea
 	clear(sc.dense[n:])
 	gemvT(&g.denseIn.wt[0], &sc.dense[0], s, s, denseW, d, false)
 	addv64(s, &g.denseIn.b[0])
-	clear(sc.bag32)
-	if len(sparse) > 0 {
-		bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&sparse[0])), len(sparse), tableRows, e)
+	if bagIn != nil {
+		copy(sc.bag32, bagIn[:e])
+	} else {
+		clear(sc.bag32)
+		if len(sparse) > 0 {
+			bag(&sc.bag32[0], &g.table[0], (*feat)(unsafe.Pointer(&sparse[0])), len(sparse), tableRows, e)
+		}
 	}
 	gemvT(&g.sparseProj.wt[0], &sc.bag32[0], s, s, e, d, false)
 	// block: s += fc2(relu(fc1(LN(s))))

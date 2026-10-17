@@ -85,6 +85,12 @@ type CardIn struct {
 // the next evaluation on sc (a caller stores them for the next call). The
 // card cache Load was given is not consulted.
 func (g *Net) EvalCards(sc *Scratch, cards []CardIn, dense []float32, sparse []policynet.Feature, opts []policynet.Option, scores []float32) float32 {
+	nc := g.cardsIn(sc, cards)
+	return g.trunk(sc, nc, dense, sparse, opts, scores)
+}
+
+// cardsIn fills sc's card vectors and groups from cards.
+func (g *Net) cardsIn(sc *Scratch, cards []CardIn) int {
 	cd := g.cd
 	nc := len(cards)
 	sc.ent = growF(sc.ent, max(nc, 1)*cd)
@@ -102,7 +108,29 @@ func (g *Net) EvalCards(sc *Scratch, cards []CardIn, dense []float32, sparse []p
 			g.cardFull(sc, c.Raw, c.Rows, &ent[0])
 		}
 	}
-	return g.trunk(sc, nc, dense, sparse, opts, scores)
+	return nc
+}
+
+// BagWidth is the width of the sparse bag's row sum (the table width).
+func (g *Net) BagWidth() int { return g.e }
+
+// BagAdd adds the sparse rows' table sum, Σ value·table[row] over rows
+// below the table size, to dst (BagWidth floats): the bag Eval computes
+// over a state's sparse entries, which is linear, so a caller may sum it
+// in parts (each part's rows summed in order, the parts then added).
+func (g *Net) BagAdd(dst []float32, rows []policynet.Feature) {
+	if len(rows) > 0 {
+		bag(&dst[0], &g.table[0], (*feat)(unsafe.Pointer(&rows[0])), len(rows), tableRows, g.e)
+	}
+}
+
+// EvalBag is EvalCards with the state's sparse bag given as its row sum
+// (BagWidth floats, BagAdd's) instead of its entries. Summed in another
+// order than Eval sums the sorted entries, the logits agree with Eval's to
+// float rounding, not bit for bit.
+func (g *Net) EvalBag(sc *Scratch, cards []CardIn, dense, bagSum []float32, opts []policynet.Option, scores []float32) float32 {
+	nc := g.cardsIn(sc, cards)
+	return g.trunkBag(sc, nc, dense, nil, bagSum, opts, scores)
 }
 
 // CardVec is card k's vector from the last evaluation on sc (CardWidth
