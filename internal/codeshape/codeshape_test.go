@@ -85,7 +85,7 @@ func f(m map[string]string, s string) {
 func TestMeasureSyntheticTree(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"engine/effects/registry.go": effectsSrc,
-		"engine/effects/long.go":            "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
+		"engine/effects/long.go":     "package effects\n\n" + longFunc("long300", 298) + longFunc("long301", 299),
 		"engine/rules/engine.go": `package rules
 
 type Engine struct{}

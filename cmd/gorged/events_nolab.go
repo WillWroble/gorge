@@ -24,7 +24,7 @@ type eventRuntime interface {
 	Close() error
 }
 
-var errEventsNeedLab = errors.New("gorged: -events needs a binary built with -tags lab (draft events live in lab/draft)")
+var errEventsNeedLab = errors.New("-events needs a binary built with -tags lab (draft events live in lab/draft)")
 
 type eventsWiring struct{}
 
