@@ -297,6 +297,10 @@
       "tier": "tooling",
       "status": "TOOL"
     },
+    "internal/cli": {
+      "tier": "tooling",
+      "status": "TOOL"
+    },
     "internal/codeshape": {
       "tier": "tooling",
       "status": "TOOL"
