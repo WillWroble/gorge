@@ -1445,6 +1445,20 @@ func (e *Engine) combatStep() {
 			e.priorityRound()
 			return
 		}
+		if e.combatRound.hasFirst && !e.combatRound.active {
+			// The between-passes priority round (CR 510.4) is in progress:
+			// a pass that did not end it (priority moved on to the next
+			// player) or a resolution (priority returned to the active
+			// player) re-enters the step loop here, and the round must go
+			// on. Only all players passing in succession with an empty
+			// stack ends it (CR 117.4), and that path starts the regular
+			// pass through advanceStep's StepCombatDamage arm. Starting the
+			// regular pass here instead ended the round on the active
+			// player's first pass, with any trigger the first-strike damage
+			// put on the stack still unresolved.
+			e.priorityRound()
+			return
+		}
 		e.beginCombatPass(false)
 		return
 	}
