@@ -36,7 +36,7 @@ above it in this table.
 | `bots/` | `botpolicy`, `heuristic` (the default `Bot`, `BoardSeat`, `PolicyNetBot`), the registry (`bots`, `bots/all`), hosted bots (`bot`, `lethalpressure`, `sbtactical`, `azredeal`) and their inference runtime (`azmcts`, `gonet`, `policynet`, `sanity`, `searchprobe`, `searchseat`, `traceboard`, `spellbench/{builtins,payexec}`) | every bot a table can seat |
 | `server/` | `gorged` (the importable server: `Main`, `Extensions`, `RegisterNetBot`), `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence` | tables, persistence, HTTP + SSE, the wire protocols |
 | `testkit/`, `cli/` | `testkit/{testutil,bench,paymirror}` (test support and the game runner) and `cli` (the flag/env/config parser), public so outside modules can use them | test support, command-line plumbing |
-| `internal/` | `archtest`, `corpusheap`, `codeshape`, `testbudget`, `tsgen`, `botobs` | architecture ratchets, generators |
+| `internal/` | `archtest`, `corpusheap`, `codeshape`, `testbudget`, `tsgen` | architecture ratchets, generators |
 | `cmd/` | `gorged` (a thin main over `server/gorged`), `forgec`, `repro`, `mtgsim`, `pkgmap`, `codeshape`, `testbudget`, ... | product and developer binaries; nothing imports a command |
 | `web/` | the Svelte+Vite client | embedded into `cmd/gorged` |
 

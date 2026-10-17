@@ -64,7 +64,8 @@ func TestHeads(t *testing.T) {
 				return
 			}
 			// The "<n> seats: chain head <got>, golden <want>" prefix is parsed by
-			// ops/orchestrator/hooks.py (_HEAD_RE); keep it.
+			// the maintainers' gate hook (four-yay's ops/orchestrator/hooks.py,
+			// _HEAD_RE); keep it.
 			if want := pinnedHead(t, seats); got != want {
 				t.Errorf("%d seats: chain head %s, golden %s -- if this move is intended, re-pin with `%s` "+
 					"and name the first diverging event and its cause in the COMMIT MESSAGE (not in a file). "+

@@ -33,7 +33,6 @@ var subSecondAllow = map[string]int{
 	"server/gorged/artfill_test.go":                       2,
 	"server/gorged/artprewarm_test.go":                    2,
 	"server/gorged/artwait_test.go":                       3,
-	"server/gorged/deploy_test.go":                        4,
 	"server/gorged/main_test.go":                          12,
 	"server/gorged/manabrew_cardtext_test.go":             4,
 	"server/gorged/manabrew_test.go":                      1,

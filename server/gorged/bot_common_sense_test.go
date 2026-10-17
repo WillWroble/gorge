@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -85,21 +84,5 @@ func TestBotCommonSenseFlagPlumbsToTables(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("on-demand table %s not found in tables.json:\n%s", resp.Table, raw)
-	}
-}
-
-// TestDeployScriptPassesBotCommonSense pins the deploy's default: the script
-// carries COMMON_SENSE=${COMMON_SENSE:-false} and passes it as
-// -bot-common-sense, and the default the script would serve is false.
-func TestDeployScriptPassesBotCommonSense(t *testing.T) {
-	if got, want := deployScriptDefault(t, "COMMON_SENSE"), "false"; got != want {
-		t.Fatalf("deploy-demo.sh COMMON_SENSE default %q, want %q", got, want)
-	}
-	script, err := os.ReadFile(filepath.Join("..", "..", "ops", "scripts", "deploy-demo.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(script), `-bot-common-sense="$COMMON_SENSE"`) {
-		t.Fatalf("deploy-demo.sh does not pass -bot-common-sense=\"$COMMON_SENSE\" to the servers:\n%s", script)
 	}
 }

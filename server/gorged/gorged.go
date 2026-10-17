@@ -163,7 +163,8 @@ type config struct {
 	seatToken string
 	// feedback is the -feedback flag: where a player's own bug reports are
 	// written (feedback.go). It is deliberately NOT under -dir. The
-	// persistence directory is disposable by design — ops/scripts/deploy-demo.sh
+	// persistence directory is disposable by design — the demo deploy script
+	// (four-yay's ops/scripts/deploy-demo.sh)
 	// `rm -rf`s it on every deploy so a config written by an older binary
 	// cannot come back with zero-valued fields — which would mean a report
 	// filed against a bug was destroyed by the deploy that shipped its fix.
@@ -171,7 +172,7 @@ type config struct {
 	feedback string
 	// artDir is the -art-dir flag: where the card-art cache (art.go) lives.
 	// Empty keeps the historical <dir>/art so every existing deployment, test
-	// and local run is byte-for-byte unchanged; a durable path — deploy-demo.sh
+	// and local run is byte-for-byte unchanged; a durable path — the demo deploy
 	// passes /mnt/sata/gorge-data/art — survives the persistence dir's
 	// deploy-time wipe. A stale durable cache can never come back semantically
 	// wrong: every key is hashed under artKeyVersion (art.go), so a change in
@@ -192,8 +193,8 @@ type config struct {
 	prewarm bool
 	// prewarmArtOnly is the -prewarm-art-only flag: fill the card-art cache
 	// from -decks into artCacheDir() and exit, before any listener opens —
-	// what ops/scripts/deploy-demo.sh runs ahead of both servers so a deploy
-	// never serves a cold cache, and what `make prewarm-art` runs by hand.
+	// what the demo deploy script runs ahead of both servers so a deploy
+	// never serves a cold cache, and what four-yay's `make prewarm-art` runs by hand.
 	// Exit code 1 when any name FAILED (a genuine 404 is not a failure) or
 	// the pass was stopped by one of the two bounds below.
 	prewarmArtOnly bool
@@ -637,7 +638,7 @@ func serve(ctx context.Context, c config, ln net.Listener) error {
 	// net/http/pprof's init registers its handlers on http.DefaultServeMux,
 	// which gorged never serves (both listeners use their own mux), so the
 	// import alone publishes nothing. The routes exist only when -pprof
-	// mounts them on topMux here. ops/scripts/deploy-demo.sh passes it only when
+	// mounts them on topMux here. The demo deploy script passes it only when
 	// the operator sets PPROF=true for that deploy.
 	if c.pprof {
 		topMux.HandleFunc("GET /debug/pprof/", pprof.Index)
@@ -974,7 +975,7 @@ func (g config) hostOptions(reg *cards.Registry, load func(string) (host.Deck, e
 // artCacheDir resolves where the card-art cache lives: -art-dir when set,
 // else the historical <dir>/art. The empty default is pinned by a test so
 // every existing deployment and test keeps its exact location; only a caller
-// that explicitly asks for durability (deploy-demo.sh) moves the cache out
+// that explicitly asks for durability (the demo deploy) moves the cache out
 // from under the wiped persistence dir.
 func (c config) artCacheDir() string {
 	if c.artDir != "" {

@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-// The steward metric ops/scripts/reward.py tracked until 2026-10-03
+// The steward metric the maintainers' reward loop (reward.py, now in four-yay)
+// tracked until 2026-10-03
 // (`oversized_files`, since replaced by cmd/codeshape's funcs_over_300)
 // flagged every .go file at or over 1500 lines.
 // Until now nothing in the suite enforced that threshold, so the Engine

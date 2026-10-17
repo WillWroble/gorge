@@ -1,5 +1,5 @@
 # Top-level tests whose wall time exceeds the 1-minute per-test budget as
-# measured by `testbudget check` in ops/scripts/postmerge_full.sh (go test -p=8
+# measured by `testbudget check` in the post-merge full suite (go test -p=8
 # under the post-merge scope: GOMAXPROCS=2, GOMEMLIMIT=1536MiB). SHRINK-ONLY:
 # rows are deleted when the test is fixed, never added; the exact
 # package/test pairs are pinned by wallExceptionPins in

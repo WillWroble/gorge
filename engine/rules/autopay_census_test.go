@@ -138,7 +138,7 @@ func TestAutopayManaCensus(t *testing.T) {
 		t.Fatalf("census: could not resolve the repo root")
 	}
 	if _, err := os.Stat(cards.CorpusDir(corpus)); err != nil {
-		t.Fatalf("census: no .cards corpus in this checkout (%v); run scripts/agent-worktree.sh or make fetch-cards", err)
+		t.Fatalf("census: no .cards corpus in this checkout (%v); link the main checkout's .cards into this worktree or run make fetch-cards", err)
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		t.Fatal(err)

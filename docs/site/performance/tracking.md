@@ -71,7 +71,7 @@ ROWS="-row random -pair A;-row random -pair B;-row random -pair burn;-row bot -p
   scripts/enginebench-pair.sh "$ANCHOR" "$REV" "$OUT"
 ```
 
-A small converter (planned: `ops/scripts/perf-record.py`) turns the pair output
+A small converter (the maintainers' `perf-record.py`, outside this repo) turns the pair output
 into the schema above and appends it to `history.jsonl` on the orphan
 `perf-data` branch, so performance data never lands on `main`.
 

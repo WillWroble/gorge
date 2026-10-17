@@ -78,8 +78,8 @@ go test -run 'TestOracleAudit/Balefire_Dragon' ./engine/rules/
   `testutil.CorpusRegistry`, which **skips** when `.cards/` is absent. The
   package then prints `ok` in about 2 ms having tested almost nothing. If
   a run looks suspiciously fast, re-run with `-v` and look for `SKIP`. A
-  git worktree does not carry `.cards/`; `scripts/agent-worktree.sh` creates
-  one with the corpus linked.
+  git worktree does not carry `.cards/`: link the main checkout's into it
+  (`ln -s <main checkout>/.cards .cards`).
 - **Per-test budget.** Every single test must fit 4 GB RSS, 4 vCPU and one
   minute of wall time. `cmd/testbudget` enforces it in the post-merge full
   suite. A test over budget is a defect: split it into chunk tests, never trim
@@ -96,12 +96,15 @@ What each ratchet and golden test means when it fails is in
 git config core.hooksPath .githooks
 ```
 
-- `commit-msg` rejects attribution trailers (`Co-Authored-By:`, "Generated
-  with …") and issue-tracker references. Write plain commit messages.
 - `pre-commit` (and `pre-merge-commit`) runs `go run ./cmd/pkgmap -check`
   when you add, delete or rename a Go file. A **new package** needs a tier and
   status entry in `docs/site/architecture/packages.tiers.json`, or the hook
   fails.
+- `pre-push` runs the race detector one package at a time when you push
+  `main` with `RACE=1` set; otherwise it does nothing.
+
+Write plain commit messages: no attribution trailers (`Co-Authored-By:`,
+"Generated with …") and no issue-tracker references.
 
 ## PR checklist
 

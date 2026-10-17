@@ -18,7 +18,7 @@
     {
       "id": "tooling",
       "title": "Tooling (`internal/`)",
-      "intro": "Ratchets, test support, benchmarks and code generators. Shell and Python helpers live in `scripts/` (contributor/CI) and `ops/scripts/` (pipeline); they are not Go packages."
+      "intro": "Ratchets, test support, benchmarks and code generators. Shell and Python helpers live in `scripts/` (contributor/CI); they are not Go packages."
     },
     {
       "id": "cmd",
@@ -150,10 +150,6 @@
       "tier": "cmd",
       "status": "TOOL"
     },
-    "cmd/ledger": {
-      "tier": "cmd",
-      "status": "TOOL"
-    },
     "cmd/mtgsim": {
       "tier": "cmd",
       "status": "TOOL"
@@ -254,10 +250,6 @@
     "internal/archtest": {
       "tier": "tooling",
       "status": "TOOL (load-bearing)"
-    },
-    "internal/botobs": {
-      "tier": "tooling",
-      "status": "TOOL"
     },
     "internal/codeshape": {
       "tier": "tooling",

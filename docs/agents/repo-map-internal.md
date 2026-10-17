@@ -13,7 +13,6 @@ four-yay and other outside modules can import them.
 | `testkit/testutil` | Corpus registry (`CorpusRegistry` — **skips when `.cards/` is absent**), repo decks (`testkit/testutil/decks/*.json`), shared invariants, the per-test budget exception inventories (`testkit/testutil/testdata/`), and the AGENTS.md ratchet (`agentsdoc_test.go`). |
 | `testkit/testutil/feedback` | Loads player feedback snapshots; `feedback.EngineAt`. |
 | `testkit/bench` | Policy-agnostic game runner: `PlayGame`, `RunPairs`, watchdogs, livelock recovery. Shared by four-yay's `botbench` and `policytune`. |
-| `internal/botobs` | The observability checklist the reward loop's obs axis scores against ([`docs/design/2026-09-29-reward-loop-and-seed-agent-design.md`](../design/2026-09-29-reward-loop-and-seed-agent-design.md) §6). |
 | `internal/codeshape` | Code-shape metrics and ratchets for `engine/rules` and `engine/effects` (function length, interface width); `cmd/codeshape` prints them. |
 | `internal/corpusheap` | Heap-footprint ratchet for the opened corpus (tests only). |
 | `testkit/paymirror` | A/B check of planned vs manual cast payment; `cmd/paymirror` drives it. |

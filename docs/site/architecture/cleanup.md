@@ -15,7 +15,8 @@ not a commitment: each item is decided on its own.
 [ADR 0001](https://github.com/adams-shaun/gorge/blob/main/docs/decisions/0001-repo-layout.md)
 replaced the flat root with `engine/`, `bots/`, `server/`, `internal/`,
 `cmd/` and `ops/` (plus a fenced `lab/` research tree that left gorge the
-same day; see below), and closed these items:
+same day; see below; `ops/`, the agent pipeline, followed it to the private
+four-yay repository the same day too), and closed these items:
 
 - **Flat root**: done. The root now holds only the group directories and the
   top-level files.
@@ -81,12 +82,12 @@ named one of those paths is closed in gorge by that move, and is marked
 | Four hidden-information search stacks (PIMC `searchprobe`+`searchseat`, PUCT `azmcts`, `spellbench/sbsearch`, `searchbench`; ~22k lines) | Overlapping functionality. | `sbsearch` and `searchbench` moved out; gorge keeps `searchprobe`+`searchseat` and `azmcts`. |
 | `kshadow` vs `v2shadow` | Both rebuild engine state from observations. | Both moved out. |
 | `policynet` features vs `mzenc` | Two state encoders; `mzenc` is used only for ablations and the GPU pool. | `mzenc` moved out. |
-| Two "brokers" | `ops/scripts/broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package was renamed `inferbroker`, and has since moved out. |
+| Two "brokers" | The pipeline's `broker.sh` (a cgroup CPU arbiter) and the inference-batching package. | **Done 2026-10-12:** the package was renamed `inferbroker`; both have since moved out to four-yay. |
 
 ## Legitimately unimported
 
 These have no importers by design and are **not** cleanup candidates:
-`internal/archtest`, `internal/corpusheap` and `internal/botobs` (test-only
+`internal/archtest` and `internal/corpusheap` (test-only
 ratchets) and `server/protocol/manabrew/internal/schemagen` (a generator).
 
 ## Commands with no Makefile or script reference

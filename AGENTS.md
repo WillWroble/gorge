@@ -21,7 +21,8 @@ primitives that IR references. See
 - Draft events, compliance oracles, training research and the research bots live in the private
   companion module four-yay (`github.com/adams-shaun/four-yay`, checkout `../four-yay`), which
   imports gorge; gorge never imports it (ADR 0001 amendment, 2026-10-16).
-- `ops/`: agentctl hooks, systemd units, pipeline scripts ([`ops/README.md`](ops/README.md)). `scripts/`: contributor/CI only.
+- `scripts/`: contributor and CI scripts. gorge carries no agent-pipeline or demo-deploy
+  machinery; the maintainers' pipeline, its hooks and the demo deploy live in four-yay's `ops/`.
 - `docs/design/`: living designs; parked history is indexed in `docs/design/ARCHIVE.md`.
 
 ## Agent guide
@@ -75,9 +76,8 @@ every test fits 4 GB RSS, 4 vCPU and 1 minute wall; one outside it is a defect
 to split, never to trim. Agents run tests focused and capped, never
 `go test ./...` or `-count=1`:
 `systemd-run --user --scope -q -p MemoryMax=4G -p CPUQuota=400% env GOMAXPROCS=4 GOMEMLIMIT=3GiB go test -timeout 2m -run X ./pkg`.
-The full suite is `ops/scripts/postmerge_batch.sh`'s (once per batch on main;
-red pauses the pipeline and bisects to a CULPRIT). Rules and rationale:
-[invariants.md](docs/agents/invariants.md#workflow).
+The full suite runs after merge (CI, and the maintainers' post-merge batch).
+Rules and rationale: [invariants.md](docs/agents/invariants.md#workflow).
 
 `make conformance` is the focused CR 601/733 audit. I-2 (mandatory-target
 feasibility), I-7 (targets before payment), and the CR 733.1 illegal-cast
@@ -275,14 +275,14 @@ matching, host observer hooks, or seat-authorised HTTP/session handling.
 
 ## Running a gorged server while you work
 
-Two orchestrator sessions share this box, and one of them serves a live demo
-that the operator redeploys by hand (`make deploy-demo`; a redeploy aborts
-every in-flight vs-bot game, so nothing does it automatically). So ports are
+On the maintainers' shared box several sessions run servers at once, and a
+live demo (deployed by hand from four-yay, `make deploy-demo` there; a
+redeploy aborts every in-flight vs-bot game) holds 8080-8081. So ports are
 allocated, not first-come:
 
 | range | who |
 |---|---|
-| 8080-8081 | the demo. **Never bind these**, and never run `make deploy-demo` |
+| 8080-8081 | the demo. **Never bind these**, and never run the demo deploy |
 | 8082-8089 | the bot-policy / botbench workstream |
 | 8090-8099 | task agents on the engine side — pick one of these |
 
@@ -300,75 +300,18 @@ and it has killed a session here. Find the server by its listening socket
 is the BINARY's name -- if you built `gorged-after`, its `comm` is
 `gorged-after`, not `gorged` -- so match on the port rather than the name.
 
-`ops/scripts/fleet.sh ports` prints the current allocation, and `ops/scripts/fleet.sh
-port` prints a free one in your range.
+(four-yay's `ops/scripts/fleet.sh ports` prints the current allocation, and
+`fleet.sh port` a free one in your range.)
 
-## Working in a task worktree
+## Working in a worktree
 
-**Every change is made in its own worktree, and `main`'s checkout is left
-clean.** This is not only for dispatched seats -- it applies to an operator
-session's own hand work too, including a one-line fix. Merge into `main`, then
-remove the worktree immediately: a stale worktree is what makes the next
-agent's `git grep` and `find` return duplicate hits from a sibling checkout.
+Make each change in its own git worktree and keep the main checkout clean;
+several sessions may share one checkout, so never `git checkout`, `git
+switch`, `git reset` or bare `git stash` in it, and stage explicit paths
+(never `git add -A`). A worktree carries only tracked files: link the
+`.cards` corpus into it (`ln -s <main>/.cards .cards`; four-yay's
+`ops/scripts/agent-worktree.sh` does this and verifies it), or every
+corpus-dependent test SKIPS through `testutil.CorpusRegistry` and the package
+still prints `ok` in about 2ms. If you find yourself in a worktree with no
+`.cards`, stop and say so rather than reporting a green suite.
 
-The reason is that several sessions share the one `/home/sadams/projects/gorge`
-checkout, and a working tree has exactly ONE HEAD, so anything done to it
-happens to everyone:
-
-- `git checkout -b` in the main checkout to commit your own work switches the
-  shared tree. A peer switching back to `main` then reverts your edited files
-  out from under you mid-task.
-- `git reset` and branch switches are worse than dirty files: they move HEAD
-  for the other session too, so a peer's next commit lands on a base it never
-  chose.
-- A peer mid-refactor leaves the shared tree not compiling. That has produced
-  19 build failures in `go test ./...` belonging to nobody in the room. **In a
-  shared checkout a red suite is not evidence about your own change**: check
-  `git status` for untracked or modified files you did not write, and their
-  mtimes -- a file seconds old is a peer mid-edit, not a defect to fix, and not
-  yours to fix. (Red that is genuinely committed on `main` is still yours to
-  bisect and fix in the same turn.)
-
-So, in the main checkout: never `git checkout`, `git switch`, `git reset` or
-bare `git stash`, and never `git checkout` inside another worktree either (it
-discards that seat's uncommitted work). Stage explicit paths and never
-`git add -A`, which sweeps up a peer's in-flight files.
-
-Task worktrees are created with `scripts/agent-worktree.sh <id> [base] [--web]`,
-never with a bare `git worktree add`. A worktree carries only tracked files, and
-this repo needs one untracked thing to test honestly: the `.cards` corpus. Without
-it `testkit/testutil`'s `CorpusRegistry` calls `t.Skip`, so every
-corpus-dependent test SKIPS instead of running, the package still prints `ok` --
-in about 2ms -- and the run reads green to you, to the review pre-filter and to
-the gate while having executed almost nothing. If you find yourself in a worktree
-with no `.cards`, stop and say so rather than reporting a green suite.
-
-Which agent seats exist, what they cost and when to escalate between them is
-the `[[tiers]]` table in `.agentctl/config.toml`.
-
-## Hot files: a branch that touches one of these is sequenced, not parallel
-
-Measured by `ops/scripts/reward_collect.py hotspots --repo .`: one merge in four
-(199 of 802 tickets, 7d) needed a resolver round, and one ticket burned 48 of
-them. The cause is always the same shape — two or three live branches editing
-the same file, each rebasing onto the other's landing. If your brief touches a
-file below, keep the change as small as the brief allows; prefer adding a new
-file next to it over growing it.
-
-**This table is generated; do not hand-edit it.** Regenerate with:
-`python3 ops/scripts/reward_collect.py hotspots --repo . --format md` (add
-`--max-rows N` for this embedded cut). The durable "why it collides" prose
-lives only in `ops/scripts/hotfiles-notes.json` (tracked): a seat filing a new
-contended pair adds one note entry there in its own commit and never mirrors
-the prose here.
-Rendered 2026-10-01 at merge of main@0b368ba80 into 078f1bb3d, with `--max-rows 5`:
-| file | why it collides |
-|---|---|
-| `docs/agents/repo-map.md` | the per-package map table: every workstream that adds or re-describes a package appends a row here, so the file collides by construction while a docs-heavy workstream is live. The 2026-10-01 set (eng-board tip a27a125db, enginecmp tip 6db84d459, sbrep-fast tip 683b3cf69) is NOT a resolver round: an in-memory `git merge-tree --write-tree` of every pairwise tip AUTO-MERGES docs/agents/repo-map.md clean, and the file is one markdown table with no seam a split could cut — a main-side split would only fragment the agent-facing package map and move the very lines a live branch is rebasing onto. eng-board's whole change to this file (the `cards` and `.cards/` rows) is a STRICT SUBSET of sbrep-fast's (the same two rows plus the `rules` row and the `searchbench` / `searchbench/statespec` rows), i.e. duplicate work carried from the shared ancestor wt/perf-tip (e43cde989), whose blob at that merge-base is eng-board's blob BYTE-IDENTICALLY (599e565c6); enginecmp adds the unrelated one-row `enginebench` entry. The script's carrier pass keeps eng-board because it is a carrier against sbrep-fast but not against enginecmp, and dropping it would still leave the two real editors, so no script fix removes this row — the resolution is this note plus sequencing. SEQUENCE: land sbrep-fast first (it already contains eng-board's repo-map rows), then enginecmp (its one-row append rebases trivially), then eng-board (whose file change is then already present and drops out); the branches carry no ticket file, so no Depends-On chain is expressible and the ordering is a controller action. A durable package-map seam is filed as a follow-up so the next docs-heavy workstream does not re-collide. Re-briefed after cli-20261001T042757Z-fcbaaa35; dedupe against that id. |
-| `engine/view/card.go` | the card projection: every projection-perf ticket and every exposed-card-fact ticket edits cardViews/cardView. The 2026-10-01 pair is a GENUINE intra-function collision — cpu-redeal rewrites cardViews/cardView into a pooled projector method while libcomp inserts the printed CardName assignment inside the old cardView body (main line 250) — so the second branch to rebase re-applies its hunk in the new shape; no file split can separate edits inside one function. Land libcomp first (its other four files merge clean on rebase); cpu-redeal's rewrite folds the 5-line assignment in as it goes |
-| `bots/botpolicy/combat.go` | the Board refill: combat.go's BoardFromGameInto fills the fields policy.go's Board declares, so every own-state exposure ticket extends one function and one struct and the edits are adjacent by construction — no file split can separate them. The 2026-10-01 pair (cpu-redeal's shared-manifest read, OwnDeckShared, at combat.go lines 187-194 vs libcomp's fillOwnLibrary insert and its OwnLibrary field) is line-disjoint and merges clean on rebase; only the per-file hotspot granularity flags it. Keep each exposure to its own field + fill lines RECURRED: the cpu workstream and libcomp were briefed again as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) already recorded this exact pair; dedupe against that id. The cpu head's name rotates (cpu-redeal / cpu-emit / cpu-maps); the note is keyed by FILE and applies to whichever cpu head is the live representative, so a new cpu head is not a new collision. |
-| `bots/botpolicy/policy.go` | the Board refill: combat.go's BoardFromGameInto fills the fields policy.go's Board declares, so every own-state exposure ticket extends one function and one struct and the edits are adjacent by construction — no file split can separate them. The 2026-10-01 pair (cpu-redeal's shared-manifest read, OwnDeckShared, at combat.go lines 187-194 vs libcomp's fillOwnLibrary insert and its OwnLibrary field) is line-disjoint and merges clean on rebase; only the per-file hotspot granularity flags it. Keep each exposure to its own field + fill lines RECURRED: the cpu workstream and libcomp were briefed again as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) already recorded this exact pair; dedupe against that id. The cpu head's name rotates (cpu-redeal / cpu-emit / cpu-maps); the note is keyed by FILE and applies to whichever cpu head is the live representative, so a new cpu head is not a new collision. |
-| `lab/cmd/botbench/azcost.go` | the az policy flag block: every az workstream ticket registers a flag in registerAZFlags or rewords one in azFrontDoor — one function, so edits are adjacent by construction. The 2026-10-01 pair (cpu-redeal adds -az-node-cache; libcomp rewords -az-corpus-features' help and error) is line-disjoint and merges clean on rebase. Append new flags to the registration list; no split is honest inside one flag block RECURRED: re-briefed as cli-20261001T024615Z-caad3047 after cli-20261001T020456Z-751ccaf0 (merged, commit e6ab2d08d) recorded it; dedupe against that id. The cpu head's name rotates; the note is keyed by FILE and covers whichever cpu head is live. |
-… and 11 more; run the command for the live list
-
-Durable per-file notes, including those for files not shown above, live only in `ops/scripts/hotfiles-notes.json`; they are not mirrored here.

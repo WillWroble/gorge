@@ -199,3 +199,32 @@ vacuous, and the `lab` build tag is gone from gorge, its CI and its gates.
   azvisits, `bots/gonet`'s dzgw header, `server/protocol`'s frames) while
   four-yay's contract registry pins their hashes, so changing one is a
   coordinated change across both repositories.
+
+## Amendment 2 (2026-10-16): pipeline ops move to four-yay
+
+- **Status:** accepted 2026-10-16 (operator). Supersedes decision 1's "Agent-seat
+  operating rules move under `ops/`" and the `ops/` line of *Target root*.
+
+gorge, the public module, carries **no agent-pipeline or demo-deploy
+machinery**. Moved to four-yay (plain copies, relative layout kept under its
+`ops/`): `ops/` entire (the scripts and their smokes, `orchestrator/hooks.py`,
+the systemd units, `restructure/`), `.agentctl/config.toml` (now
+`ops/agentctl/config.toml`, parked: agentctl reads `<repo>/.agentctl/` and
+must be re-pointed), `scripts/agent-worktree.sh` (`ops/scripts/`),
+`cmd/ledger`, `internal/botobs`, the operator-policy git hooks (`commit-msg`
+and the trailer checks of `pre-commit`/`pre-push`, now `ops/githooks/`), the
+pipeline docs (`docs/agents/seed-rubric.md`,
+`docs/agents/test-throughput-2026-10-12.md`, the reward-loop/seed-agent
+design), the Makefile targets `nightly`, `seed-ask`, `ledger`, `clean-seats`,
+`clean-worktrees`, `readopt-worktree`, `deploy-demo`, `stop-demo` and
+`prewarm-art`, and the deploy-script tests (`server/gorged`'s
+`deploy_test.go` and `TestDeployScriptPassesBotCommonSense`, now four-yay's
+`cmd/gorged`, through the new `gorged.ServeFlagSet`). The scripts resolve the
+gorge checkout they drive through four-yay's `ops/scripts/roots.sh`.
+
+gorge keeps its contributor tooling: `.githooks/` (the package-classification
+check and the opt-in `RACE=1` race gate), `scripts/` (`ci_shard.sh`,
+`smoke.sh`, `enginebench-*`, `docs_sets.py`; enginebench takes a lock only
+when `HEAVY_LOCK` is set), `cmd/testbudget`, the ratchets in `internal/`, and
+CI. The P3 hazards above now concern four-yay's copy. The pipeline is parked
+until it is re-pointed.

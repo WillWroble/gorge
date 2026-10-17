@@ -4,7 +4,8 @@
 // per-package TEST_HISTORY.md / ALLOC_HISTORY.md budgets, which nothing
 // enforced.
 //
-// It has three subcommands, wired together by ops/scripts/postmerge_full.sh:
+// It has three subcommands, wired together by the post-merge full suite (the
+// maintainers' postmerge_full.sh, in four-yay's ops/scripts since 2026-10-16):
 //
 //	go test -exec "/abs/testbudget exec" ...
 //	    Runs each test binary, records its peak RSS (KiB, from wait4's

@@ -78,10 +78,10 @@ The engine is a pure function of `(Config, intents)`.
     `server/gorged` (injected sleep, SSE keep-alive, write and shutdown
     deadlines);
   - measurement and developer CLIs that read the clock only to bound a run or
-    report elapsed time (`cmd/enginebench`, `cmd/cardfuzz`, `cmd/paymirror`,
-    `cmd/ledger`); the research CLIs that also read the clock (`botbench`,
-    `searchteacher`, the SpellBench agents, the draft-event runtime) moved to
-    four-yay;
+    report elapsed time (`cmd/enginebench`, `cmd/cardfuzz`, `cmd/paymirror`);
+    the research and pipeline CLIs that also read the clock (`botbench`,
+    `searchteacher`, the SpellBench agents, the draft-event runtime, the
+    issue `ledger`) moved to four-yay;
   - nothing in the engine, card pipeline, effects, view or bot policies.
 
   Research libraries that need timing take an injected `Millis` hook instead
@@ -207,14 +207,13 @@ Adding an entry means a regression, and a branch cannot land one (see below).
 **A ratchet is never raised by a branch.** That covers the coverage tables
 above, the shrink-only constants and `longFuncCeilings` in
 `internal/codeshape`, the constants and allow-lists of `internal/archtest`,
-and `testkit/testutil/agentsdoc_test.go`. The pipeline's first gate,
-"ratchets only fall" (`ops/scripts/ratchet_gate.py`), enforces this. It runs from
-the BASE copy (`git show <base>:ops/scripts/ratchet_gate.py | python3 - <base>`),
-so a branch cannot weaken the gate that judges it. Measured against the
-merge-base, it fails a raised or deleted constant, an added allow-list entry,
-a removed or rewired `TestCodeShapeOnlyShrinks` row, a new or grown
-`longFuncCeilings` entry, a new known-unsupported file, and any edit to the
-gate itself. There is no escape trailer: an operator raise is landed by hand.
+and `testkit/testutil/agentsdoc_test.go`. Review enforces this (the
+maintainers' landing pipeline, which lives outside this repo, also runs a
+"ratchets only fall" gate from the base commit): a raised or deleted
+constant, an added allow-list entry, a removed or rewired
+`TestCodeShapeOnlyShrinks` row, a new or grown `longFuncCeilings` entry or a
+new known-unsupported file is refused. There is no escape trailer: an
+operator raise is landed by hand.
 
 ### 9. Golden chain heads move only with a named cause
 
@@ -272,26 +271,26 @@ by millions.
 
 **Enforced by:** convention, plus `make gc-gate` (by hand). The per-test
 resource budget (4 GB RSS, 4 vCPU, 1 min wall; doubled 2026-10-09) is enforced by `cmd/testbudget`
-in `ops/scripts/postmerge_full.sh`: any test over budget that
+in the post-merge full suite: any test over budget that
 `testkit/testutil/testdata/wall_exceptions.txt` / `rss_exceptions.txt` (both
-shrink-only) do not list fails the post-merge batch. Peak RSS is measured per test binary by
+shrink-only) do not list fails it. Peak RSS is measured per test binary by
 `go test -exec "testbudget exec"`; a new test package needs no TestMain for it.
 
 ## Contributor guidelines
 
 ### Workflow
 
-1. **Work in a task worktree.** Create it with `scripts/agent-worktree.sh <id>
-   [base]`. It links `.cards/`, so corpus tests really run. Leave `main`'s
-   checkout clean. Merge into `main`, then remove the worktree.
+1. **Work in a task worktree** with the main checkout's `.cards/` linked into
+   it, so corpus tests really run (four-yay's `ops/scripts/agent-worktree.sh`
+   sets one up). Leave `main`'s checkout clean. Merge into `main`, then
+   remove the worktree.
 2. **Prove the corpus ran.** A package that prints `ok` in about 2 ms with
    `.cards/` missing executed nothing. If `.cards/` is absent, say so. Do not
    report green.
 3. **Run the right gates before merging.**
    - Focused, capped tests of the packages you touched (step 4). The full
-     suite is `ops/scripts/postmerge_batch.sh`'s: it runs once per batch of
-     landings on main, pauses the pipeline on red, bisects and logs `CULPRIT`
-     lines to `.ds4/postmerge-culprits.log`. Never run an uncapped
+     suite runs after merge (CI and the maintainers' post-merge batch, which
+     bisects a red main to its culprit). Never run an uncapped
      `go test ./...` by hand.
    - `make lint`: gofmt, vet, `gentypes -check`, plus web lint.
    - `make sim`: 20/20 `replay OK`.
@@ -318,8 +317,8 @@ shrink-only) do not list fails the post-merge batch. Peak RSS is measured per te
 ### Commits
 
 - **No attribution trailers.** `Co-Authored-By:` and "Generated with …" lines
-  are rejected by `.githooks/commit-msg` and `pre-push`. This holds even if
-  your harness tells you to add them.
+  are rejected by the maintainers' commit hooks. This holds even if your
+  harness tells you to add them.
 - No issue-tracker trailers or references (`Ref:` and the like).
 - Stage explicit paths. Never `git add -A`: it sweeps in peers' in-flight
   files.

@@ -70,11 +70,7 @@ help:
 	@echo "  make enginebench-verify [REV=.]        — memo-verify-mode smoke over the bench rows"
 	@echo "  make sim            — build mtgsim and play 20 verified 4-seat games"
 	@echo "  make gorged         — run the M2a table server (browser client at the addr)"
-	@echo "  make deploy-demo    — rebuild and (re)serve the demo on :8080 (bot tables omniscient)"
-	@echo "                        (PACE=1.5s / TABLES / SEATS / FORMATS / SEED override the defaults)"
-	@echo "  make stop-demo      — stop every running gorged, start nothing"
 	@echo "  make gentypes       — regenerate web/src/protocol.ts from package protocol"
-	@echo "  make seed-ask PROMPT=\"...\" — queue a one-off research/planning ask into the pipeline (PRIORITY, KIND override)"
 	@echo "  make web            — npm ci and build the spectator client into server/gorged/webdist"
 	@echo "  make web-dev        — run the Vite dev server for web/"
 	@echo "  make test-web       — run web/'s Vitest suite"
@@ -82,11 +78,7 @@ help:
 	@echo "  make smoke          — headless-browser smoke gate vs two real gorged servers (public+omniscient); fails on any browser error or a hung loading state"
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
-	@echo "  make nightly        — the T3 nightly tier on a fresh origin/main worktree (NIGHTLY_STEPS, NIGHTLY_DRY_RUN=1; ops/scripts/nightly.sh)"
 	@echo "  make oracle-audit   — run the Oracle-text card audit (engine/rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
-	@echo "  make clean-seats    — delete finished pi-agent seat dirs (~/.cache/pi-agent); dry run unless APPLY=1"
-	@echo "  make clean-worktrees — remove merged, clean .worktrees/* and their branches; dry run unless APPLY=1"
-	@echo "  make readopt-worktree NAME=<name> — re-register an orphaned .worktrees/<name> (branch wt/<name>); dry run unless APPLY=1"
 	@echo "  NOTE: make test-web / npm test needs Node >=22 (vitest 5); see web/README.md"
 
 .PHONY: build
@@ -111,52 +103,6 @@ $(BIN_DIR)/gorged: $(GO_SRC)
 # the server is spectator-only, exactly as before the feature existed.
 gorged: $(BIN_DIR)/gorged
 	$(BIN_DIR)/gorged -decks testkit/testutil/decks -tables 4 -seats 4 -pace 1.5s -format commander,constructed -vsbot
-
-.PHONY: deploy-demo stop-demo
-FOURYAY_ROOT ?= $(abspath $(dir $(shell git rev-parse --path-format=absolute --git-common-dir))../four-yay)
-# deploy-demo refreshes the local demo: one server on 127.0.0.1:8080 whose
-# bot-only tables spectate omniscient (play-vs-bot tables stay public), four
-# 2-seat constructed tables at a 50ms pace, bots playing az-redeal (2026-09-29:
-# the strongest measured hosted policy, +20.5pp vs the production bot --
-# ops/scripts/deploy-demo.sh has the full rationale and the override to restore
-# the previous 4-seat two-Commander-two-constructed/lethal-pressure shape)
-# (ops/scripts/deploy-demo.sh; the :8081 omniscient server retired 2026-09-28). Run BY HAND, by the operator, when the demo should pick up
-# main: it stops the running servers, which aborts every in-flight vs-bot
-# game, so nothing runs it automatically any more (the post-merge hook and
-# the daemon's landing.deploy_cmd were removed on 2026-09-22).
-#
-# The demo serves four-yay's gorged (gorge's plus the draft events and the
-# research bots), built from the four-yay checkout next to gorge's main
-# checkout against this tree's server/gorged/webdist.
-#
-# The binary is rebuilt unconditionally rather than through
-# $(BIN_DIR)/gorged: that rule depends on the Go sources, but the client
-# reaches the server through //go:embed all:webdist, so a web-only change
-# leaves every .go file untouched and the embedded client stale -- which is
-# precisely the change a demo exists to show.
-deploy-demo: web
-	@mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 go build -C $(FOURYAY_ROOT) -o $(abspath $(BIN_DIR))/gorged ./cmd/gorged
-	ops/scripts/deploy-demo.sh
-
-# The durable card-art cache deploy-demo fills before it starts any server
-# (gorged -prewarm-art-only, called from ops/scripts/deploy-demo.sh).
-ART_DIR ?= /mnt/sata/gorge-data/art
-
-# prewarm-art fills the durable card-art cache from the repo's deck files and
-# exits — the fill the deploy runs ahead of both demo servers, usable by hand
-# or from cron. A no-op (zero Scryfall fetches) when the cache is already
-# complete; exits non-zero if any name failed. Run by hand it is strict and
-# unbounded; the deploy adds -prewarm-art-budget and a failure-streak limit
-# and starts its servers whatever the fill's exit.
-.PHONY: prewarm-art
-prewarm-art:
-	go run ./cmd/gorged -prewarm-art-only -decks testkit/testutil/decks -art-dir $(ART_DIR)
-
-# stop-demo takes the demo down without starting it again. Same socket
-# lookup as the deploy: never `pkill -f`.
-stop-demo:
-	ops/scripts/deploy-demo.sh --stop-only
 
 .PHONY: sim
 sim: $(BIN_DIR)/mtgsim
@@ -185,18 +131,6 @@ report: $(BIN_DIR)/forgec
 .PHONY: gentypes
 gentypes:
 	go run ./cmd/gentypes -o web/src/protocol.ts
-
-# seed-ask queues a one-off research/planning ask through the same agentctl
-# pipeline the reward-loop seed agent and the operator both use -- see
-# ops/scripts/seed-ask.sh for what the brief wraps around the raw prompt. The seed
-# agent itself (ops/scripts/seed-agent.sh, the 20-minute timer) is deterministic
-# and takes no prompt; this is the door for an ad-hoc ask.
-PRIORITY ?= 2
-KIND     ?= research
-.PHONY: seed-ask
-seed-ask:
-	@test -n "$(PROMPT)" || { echo 'usage: make seed-ask PROMPT="<your question>" [PRIORITY=2] [KIND=research]' >&2; exit 1; }
-	ops/scripts/seed-ask.sh "$(PROMPT)" --priority "$(PRIORITY)" --kind "$(KIND)"
 
 .PHONY: test
 # GOGC=200: rules.test measured 104 s vs 112 s CPU (28.3 s vs 30.4 s wall) for 1.2-1.4 GB vs 0.9 GB RSS.
@@ -248,23 +182,24 @@ gc-gate:
 # fuzz runs the opt-in fuzz tests (build tag `fuzz`): the rules seed-fuzz
 # acceptance sweep, the ManaBrew decoder fuzz target's seed corpus, and the
 # ManaBrew response translator fuzz target. They are excluded from `make
-# test` and the pipeline gates; run by hand or at night.
+# test` and CI; run by hand or at night.
 .PHONY: fuzz
 fuzz:
 	go test $(GO_TEST_FLAGS) -tags fuzz,manabrew -count=1 -run 'Fuzz' ./engine/rules ./server/protocol/manabrew ./server/manabrew
 
 # test-manabrew runs the ManaBrew wire/translator tests (build tag `manabrew`).
 # ManaBrew work is deprioritised (operator, 2026-10-02), so these test files
-# are excluded from `go test ./...`, `make test` and the pipeline gates.
+# are excluded from `go test ./...`, `make test` and CI.
 .PHONY: test-manabrew
 test-manabrew:
 	go test $(GO_TEST_FLAGS) -tags manabrew -count=1 ./server/protocol/manabrew ./server/manabrew/... ./server/host/manabrewhttp ./cmd/gorged ./cmd/cardfuzz
 
 # Engine-speed benchmarking (cmd/enginebench; scripts in scripts/enginebench-*.sh,
 # workload decks committed in cmd/enginebench/testdata/decks). Every run is
-# capped in a systemd scope and serialised on HEAVY_LOCK; binaries, results
-# and profiles go to BENCH_DIR (rebuildable scratch). Throughput is per
-# CPU-second so a loaded box still compares.
+# capped in a systemd scope when one is available (and serialised on
+# HEAVY_LOCK only if you set it); binaries, results and profiles go to
+# BENCH_DIR (rebuildable scratch). Throughput is per CPU-second so a loaded
+# box still compares.
 #   make enginebench-pair BASE=main CAND=.     paired base-vs-candidate rows
 #   make enginebench-profile [REV=.]           CPU + allocation profiles, tops printed
 #   make enginebench-verify [REV=.]            memo-verify-mode smoke (cache changes)
@@ -280,15 +215,6 @@ enginebench-profile:
 	scripts/enginebench-profile.sh $(REV)
 enginebench-verify:
 	scripts/enginebench-verify.sh $(REV)
-
-# nightly is the T3 tier (docs/agents/test-throughput-2026-10-12.md §4):
-# fuzz, conformance, test-manabrew, a -race pass and
-# an opt-in perf record (PERF_NIGHTLY=1), each in its own capped scope holding
-# a heavy lane, against a fresh detached worktree of origin/main. Heavy: the
-# ops/deploy/gorge-nightly.timer runs it at 03:30; by hand, NIGHTLY_DRY_RUN=1 first.
-.PHONY: nightly
-nightly:
-	ops/scripts/nightly.sh
 
 COVER_OUT  ?= coverage.out
 COVER_HTML ?= coverage.html
@@ -308,8 +234,9 @@ tidy:
 # so lint-web/test-web/web (and web-dev) install first instead of dying with
 # "eslint: not found" / "vite: not found".
 web/node_modules/.package-lock.json: web/package-lock.json
-	@# REFUSE to install through a symlink. Task worktrees get web/node_modules
-	@# as a symlink to the main checkout's install (agent-worktree.sh --web), so
+	@# REFUSE to install through a symlink. Task worktrees may get web/node_modules
+	@# as a symlink to the main checkout's install (four-yay's
+	@# ops/scripts/agent-worktree.sh --web moved there 2026-10-16), so
 	@# ~166MB is shared instead of copied. `npm ci` DELETES node_modules before
 	@# installing, and through a symlink that delete lands on the SHARED
 	@# directory -- wiping web tooling for the main checkout and every other
@@ -377,33 +304,6 @@ clean:
 .PHONY: clean-cards
 clean-cards:
 	rm -rf $(CARDS_DIR)
-
-# clean-seats / clean-worktrees reclaim disk from finished agent work. Both
-# are dry runs that only list what they would delete; pass APPLY=1 to delete.
-# See ops/scripts/cleanup.sh for exactly what is kept.
-.PHONY: clean-seats clean-worktrees readopt-worktree
-clean-seats:
-	@APPLY=$(APPLY) ops/scripts/cleanup.sh seat-cache
-clean-worktrees:
-	@APPLY=$(APPLY) ops/scripts/cleanup.sh worktrees
-# Re-register an orphaned worktree whose branch still exists: recreate its
-# .git/worktrees/<name> metadata so a seat can commit again. Dry run unless
-# APPLY=1. NAME=<worktree-name> (the branch is wt/<name>). See
-# ops/scripts/readopt-worktree.sh.
-readopt-worktree:
-	@[ -n "$(NAME)" ] || { echo "usage: make readopt-worktree NAME=<worktree-name> [APPLY=1]" >&2; exit 2; }
-	@APPLY=$(APPLY) ops/scripts/readopt-worktree.sh "$(NAME)"
-
-.PHONY: ledger
-## ledger: rebuild the judge-lane issue ledger the agent dashboard renders
-# Derived, never hand-maintained: the conformance lane's own -v output, AGENTS.md's
-# approximations table, and the orchestrator's tracked issue files (.ds4/issues/*,
-# top level only — inbox/ is the un-triaged drop zone). Writes .ds4/ledger.json
-# (git-excluded). The lane runs cached (no -count=1), capped and under its own
-# lock: see ops/scripts/ledger-lane.sh.
-ledger:
-	ops/scripts/ledger-lane.sh .ds4/lane-rules.txt
-	go run ./cmd/ledger -lane .ds4/lane-rules.txt -out .ds4/ledger.json
 
 # coverage writes the card-support tables -- .coverage/summary.md and
 # .coverage/coverage.md -- into the gitignored .coverage/. They are generated,

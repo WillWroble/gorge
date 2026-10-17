@@ -8,7 +8,7 @@ import (
 )
 
 // This file is the CR-visible half of the observability checklist's
-// opp_archetype_posterior fact (internal/botobs/checklist.json): a per-seat
+// opp_archetype_posterior fact (four-yay's internal/botobs/checklist.json): a per-seat
 // posterior over what an opponent's deck is trying to do, inferred purely
 // from the cards REVEALED about that seat.
 //

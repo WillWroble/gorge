@@ -138,8 +138,7 @@ func set(s string) map[string]bool {
 //
 // The other allowed packages are developer tools that read the clock only to
 // bound or report their own run, never anything a game, event, view or replay
-// depends on. cmd/ledger stamps the ledger document's Generated: field.
-// cmd/cardfuzz reads it only for its per-game hang watchdog and its games/s
+// depends on. cmd/cardfuzz reads it only for its per-game hang watchdog and its games/s
 // progress line; every deck and game is a pure function of its seed. The
 // paymirror A/B harness reads the clock only in its cmd/paymirror CLI: the
 // per-game wall-time budget is injected to the library as a
@@ -156,13 +155,13 @@ func set(s string) map[string]bool {
 //
 // The research tools that also read the clock (botbench, searchteacher, the
 // SpellBench agents, the draft-event runtime and the rest) moved to four-yay
-// with the lab tree (docs/decisions/0001-repo-layout.md).
+// with the lab tree, and the pipeline's issue ledger (cmd/ledger) with the ops
+// tree (docs/decisions/0001-repo-layout.md and its amendments).
 func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 	allowed := map[string]bool{
 		module + "/server/host":              true,
 		module + "/server/host/httpapi":      true,
 		module + "/server/gorged":            true,
-		module + "/cmd/ledger":               true,
 		module + "/cmd/cardfuzz":             true,
 		module + "/cmd/paymirror":            true,
 		module + "/cmd/enginebench":          true,

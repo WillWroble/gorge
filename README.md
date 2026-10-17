@@ -49,9 +49,8 @@ two servers at one `-dir`.
 | `web/` | The TypeScript/Svelte browser client | Front-end work |
 | `cmd/` | Product and developer binaries: `gorged`, `forgec`, `repro`, `mtgsim`, `gentypes`, `pkgmap`, `headdiff`, `enginebench`, `cardfuzz`, `deckimport`, … | Everyone |
 | `testkit/`, `cli/` | Public support packages for outside modules: `testkit/testutil` (fixtures, corpus registry), `testkit/bench` (the game runner), `testkit/paymirror`, and `cli` (command-line flags, env and config) | Contributors, downstream modules |
-| `internal/` | Ratchets and generators: `archtest` (import-graph rules), `codeshape`, `testbudget`, `tsgen`, `corpusheap`, `botobs` | Contributors |
-| `ops/` | The maintainers' agent pipeline: `ops/orchestrator` (agentctl gate hooks), deploy and pipeline scripts | Maintainers only |
-| `scripts/` | Contributor and CI scripts (`agent-worktree.sh`, `smoke.sh`, `enginebench-*`, `ci_shard.sh`) | Contributors, CI |
+| `internal/` | Ratchets and generators: `archtest` (import-graph rules), `codeshape`, `testbudget`, `tsgen`, `corpusheap` | Contributors |
+| `scripts/` | Contributor and CI scripts (`smoke.sh`, `enginebench-*`, `ci_shard.sh`, `docs_sets.py`) | Contributors, CI |
 | `docs/` | `decisions/` (ADRs), `site/` (the public docs site), `agents/` (the guide for AI coding agents) | Everyone |
 
 Dependencies run one way, in tiers: `engine/` imports nothing above it,

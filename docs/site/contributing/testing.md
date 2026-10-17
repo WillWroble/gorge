@@ -21,8 +21,7 @@ go test -v -run '^TestHeads$/^4seats$' ./engine/rules/
   `testutil.CorpusRegistry(t)` (`testkit/testutil/decks.go`), which calls
   `t.Skip` when `.cards/` is missing. A package that prints `ok` in about
   2 ms has run almost nothing. Use `-v` and look for `SKIP` if in doubt. In
-  a git worktree, link the main checkout's `.cards/` (that is what
-  `scripts/agent-worktree.sh` does).
+  a git worktree, link the main checkout's `.cards/` into it.
 - Load the corpus only through `testutil.CorpusRegistry`, never
   `cards.LoadRegistry`: the shared registry is opened once per test binary,
   while a fresh one costs hundreds of MB.
@@ -30,8 +29,8 @@ go test -v -run '^TestHeads$/^4seats$' ./engine/rules/
 ## The per-test budget
 
 Every single test must fit **4 GB RSS, 4 vCPU and 1 minute of wall time**.
-`cmd/testbudget` enforces it in the post-merge suite
-(`ops/scripts/postmerge_full.sh`). It names every test over 60 s and every
+`cmd/testbudget` enforces it in the post-merge full suite
+(`go test -exec "testbudget exec"`, then `testbudget check`). It names every test over 60 s and every
 test binary whose peak RSS is over 4 GiB, and fails the batch on any not
 already listed in the shrink-only files
 `testkit/testutil/testdata/wall_exceptions.txt` and `rss_exceptions.txt`.
