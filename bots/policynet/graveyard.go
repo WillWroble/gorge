@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
 )
@@ -42,19 +43,20 @@ func graveyardState(v view.View, seat state.PlayerID, push func(string, float32)
 			continue
 		}
 		typeN := map[string]float32{}
-		for _, cv := range gy {
+		for j := range gy {
+			cv := &gy[j]
 			for _, t := range strings.Fields(cv.Types) {
 				push("mz|"+z+"|type|"+t, 1)
 				typeN[t]++
 			}
-			push("mz|"+z+"|mv"+mzBucket(int32(mvOf(cv.ManaCost)), 8), 1)
+			push("mz|"+z+"|mv"+mzBucket(int32(cardManaValue(cv)), 8), 1)
 			if cv.SpellAPI != "" {
 				push("mz|"+z+"|api|"+cv.SpellAPI, 1)
 			}
 			for _, k := range cv.Keywords {
 				push("mz|"+z+"|kw|"+strings.ToLower(k), 1)
 			}
-			if hasTypeWord(cv.Types, "Creature") {
+			if hasType(cv, cards.TypeCreature) {
 				push("mz|"+z+"|cr|p"+mzBucket(cv.Power, 9)+"|t"+mzBucket(cv.Toughness, 9), 1)
 			}
 		}
@@ -64,7 +66,8 @@ func graveyardState(v view.View, seat state.PlayerID, push func(string, float32)
 		// output order that matters, but iterate the type words in card order
 		// anyway for a stable emission.
 		seen := map[string]bool{}
-		for _, cv := range gy {
+		for j := range gy {
+			cv := &gy[j]
 			for _, t := range strings.Fields(cv.Types) {
 				if !seen[t] {
 					seen[t] = true

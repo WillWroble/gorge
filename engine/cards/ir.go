@@ -181,6 +181,10 @@ type Face struct {
 	// guard). Not serialized.
 	cmcSrc   string
 	cmcBound bool
+	// printed is the face's PrintedFacts, guarded by the identity of the
+	// Types and ManaCost text it was derived over (printed_facts.go). Not
+	// serialized.
+	printed printedFacts
 	// manaCostSlot holds a downstream compiled form of ManaCost (slot.go),
 	// allocated at load. Not serialized.
 	manaCostSlot *Slot

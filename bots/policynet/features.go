@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
@@ -277,7 +278,7 @@ func mzState(v view.View, seat state.PlayerID, sk *sink) {
 	perm := func(z string, cv *view.CardView, a *agg) {
 		zh := fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), z), "|") // "mz|<z>|"
 		eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "type|"), t), 1) })
-		creature := hasTypeWord(cv.Types, "Creature")
+		creature := hasType(cv, cards.TypeCreature)
 		if cv.Tapped {
 			sk.h(fnvAdd(zh, "tapped"), 1)
 		} else {
@@ -454,14 +455,14 @@ func eachCounterSorted(m map[string]int32, f func(string, int32)) {
 // colours are not checked).
 func handCard(z string, cv *view.CardView, avail int32, sk *sink) {
 	zh := fnvAdd(fnvAdd(fnvAdd(fnvOffset, "mz|"), z), "|") // "mz|<z>|"
-	mv := int32(mvOf(cv.ManaCost))
+	mv := int32(cardManaValue(cv))
 	eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "type|"), t), 1) })
 	sk.h(fnvAddInt(fnvAdd(zh, "mv"), mzClamp(mv, 8)), 1)
-	instant := hasTypeWord(cv.Types, "Instant") || hasKeyword(cv, "Flash")
+	instant := hasType(cv, cards.TypeInstant) || hasKeyword(cv, "Flash")
 	if instant {
 		sk.h(fnvAdd(zh, "instant-speed"), 1)
 	}
-	land := hasTypeWord(cv.Types, "Land")
+	land := hasType(cv, cards.TypeLand)
 	if !land && mv <= avail {
 		sk.h(fnvAdd(zh, "castable"), 1)
 		eachField(cv.Types, func(t string) { sk.h(fnvAdd(fnvAdd(zh, "castable|type|"), t), 1) })
@@ -476,7 +477,7 @@ func handCard(z string, cv *view.CardView, avail int32, sk *sink) {
 	for _, k := range cv.Keywords {
 		sk.h(fnvAddLower(kwh, k), 1)
 	}
-	if hasTypeWord(cv.Types, "Creature") {
+	if hasType(cv, cards.TypeCreature) {
 		sk.h(fnvAddInt(fnvAdd(fnvAddInt(fnvAdd(zh, "cr|p"), mzClamp(cv.Power, 9)), "|t"), mzClamp(cv.Toughness, 9)), 1)
 	}
 }

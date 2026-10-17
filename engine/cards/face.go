@@ -428,6 +428,7 @@ func (f *Face) derive() {
 	f.colourIdentity = f.deriveColourIdentity()
 	f.deriveTypeStatics()
 	f.deriveWordSets()
+	f.derivePrintedFacts()
 	f.deriveParamSets()
 }
 

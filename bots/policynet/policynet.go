@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
 )
@@ -286,17 +287,18 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 }
 
 // zoneTotals folds one battlefield list into the six per-seat scalars.
-func zoneTotals(cards []view.CardView) (bf, creatures, power, toughness, untapped, untappedLands int) {
-	for _, cv := range cards {
+func zoneTotals(cvs []view.CardView) (bf, creatures, power, toughness, untapped, untappedLands int) {
+	for i := range cvs {
+		cv := &cvs[i]
 		bf++
-		if hasTypeWord(cv.Types, "Creature") {
+		if hasType(cv, cards.TypeCreature) {
 			creatures++
 			power += int(cv.Power)
 			toughness += int(cv.Toughness)
 		}
 		if !cv.Tapped {
 			untapped++
-			if hasTypeWord(cv.Types, "Land") {
+			if hasType(cv, cards.TypeLand) {
 				untappedLands++
 			}
 		}

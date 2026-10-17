@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
@@ -233,16 +234,15 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 	}
 
 	// Card-type bits.
-	types := ""
+	var fold cards.TypeMask
 	token := false
 	if card != nil {
-		types = card.cv.Types
+		fold, _ = typeMasks(card.cv)
 		token = card.cv.Token != ""
 	}
 	any := false
-	fold, _ := typeMasks(types)
-	for i := range cardTypeBits {
-		if fold&(1<<i) != 0 {
+	for i, m := range cardTypeMasks {
+		if fold&m != 0 {
 			set(typeOffset + i)
 			any = true
 		}
@@ -256,19 +256,21 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 	}
 
 	// Colour bits off the mana cost's symbols; mana-value bucket.
-	cost := ""
+	var colours cards.ColourMask
+	mv := 0
 	if card != nil {
-		cost = card.cv.ManaCost
+		if card.cv.Facts.OK {
+			colours, mv = card.cv.Facts.CostColours, card.cv.Facts.ManaValue
+		} else {
+			colours, mv = cards.ManaCostPips(card.cv.ManaCost)
+		}
 	}
-	colours, mv := manaCostBits(cost)
-	for c := 0; c < 5; c++ {
-		if colours[c] {
+	for c := 0; c < 6; c++ { // WUBRG, then colourless {C}
+		if colours&(1<<c) != 0 {
 			set(colourOffset + c)
 		}
 	}
-	if colours[5] { // colourless {C}
-		set(colourOffset + 5)
-	}
+	cardMV := mv
 	if mv > 8 {
 		mv = 8
 	}
@@ -320,7 +322,7 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 		dense[odTapped] = float32(boolInt(card.cv.Tapped))
 		dense[odSummonSick] = float32(boolInt(card.cv.SummonSick))
 		dense[odAttacking] = float32(boolInt(card.cv.Attacking))
-		dense[odManaValue] = float32(mvOf(cost))
+		dense[odManaValue] = float32(cardMV)
 		dense[odActivated] = float32(card.cv.ActivatedThisTurn)
 		for _, v := range card.cv.Counters {
 			dense[odCounters] += float32(v)
@@ -354,7 +356,7 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 	// reads the mana tokens out of the marker and ignores every non-mana
 	// component, so the cost triple reflects only mana the payment actually
 	// charges.
-	costTotal := float32(mvOf(cost))
+	costTotal := float32(cardMV)
 	if o.Kind == "activate" {
 		costTotal = float32(manaOnlyPips(o.Cost))
 	}
@@ -412,106 +414,25 @@ func decKindIndex(d decision.Kind) int {
 	return -1
 }
 
-// hasTypeWord reports whether the space-separated Types string carries the
-// word (case-insensitive).
-func hasTypeWord(types, word string) bool {
-	if !isASCII(types) {
-		for _, t := range strings.Fields(types) {
-			if strings.EqualFold(t, word) {
-				return true
-			}
-		}
-		return false
-	}
-	for i := 0; ; {
-		t, next := nextField(types, i)
-		if t == "" {
-			return false
-		}
-		if strings.EqualFold(t, word) {
-			return true
-		}
-		i = next
-	}
-}
-
 // manaBraceForm normalises a brace-form mana cost ("{2}{U}{U}") to the
 // space-separated Forge notation this parser reads. It mirrors
 // cards.manaBraceForm exactly (engine/cards/face.go), so a view that ever projects
 // brace-form costs is priced identically to the engine.
 var manaBraceForm = strings.NewReplacer("{", " ", "}", " ")
 
-// manaCostBits parses a Forge-notation mana cost ("1 W", "X G", "G/W",
-// "2/W", "UP") into six colour booleans (WUBRG; index 5 = colourless {C})
-// and the mana value. It is an exact mirror of the engine's canonical
-// conversion, cards/cmcFromManaCost (engine/cards/face.go), because policynet must
-// not import rules and there is no exported entry point: the value rule is
-// repeated here, character for character, so the two cannot drift silently
-// -- and TestManaCostBitsMirrorsEngine pins the parity on the shapes the
-// corpus carries. A view's "no cost" (every land) or empty ManaCost is mana
-// value 0 with no colours, exactly as cards.Face.ManaValue reports it.
+// manaCostBits is cards.ManaCostPips as six colour booleans (WUBRG;
+// index 5 = colourless {C}) and the mana value: a Forge-notation cost ("1 W",
+// "X G", "G/W", "2/W", "UP") read the engine's way, cards/cmcFromManaCost's
+// value rule over tokens that keep each <...> group atomic. A view's "no
+// cost" (every land) or empty ManaCost is mana value 0 with no colours,
+// exactly as cards.Face.ManaValue reports it.
 func manaCostBits(cost string) ([6]bool, int) {
-	cost = strings.TrimSpace(manaBraceForm.Replace(cost))
+	m, mv := cards.ManaCostPips(cost)
 	var colours [6]bool
-	if cost == "" || strings.EqualFold(cost, "no cost") {
-		return colours, 0
-	}
-	mv := 0
-	for _, tok := range costTokens(cost) {
-		// Colour bits come from the token's own colour letters: a plain pip,
-		// each '/'-separated face of a hybrid ("G/W"), or a twobrid's colour
-		// half ("2/W" -> W). X/Y/Z and pure-generic tokens carry none.
-		addColour(costTokenColours(tok), &colours)
-
-		if tok == "X" { // {X} is 0 off the stack
-			continue
-		}
-		if len(tok) == 1 && strings.ContainsRune("WUBRGC", rune(tok[0])) {
-			mv++
-			continue
-		}
-		if n, err := strconv.Atoi(tok); err == nil && n >= 0 {
-			mv += n
-			continue
-		}
-		if v, ok := twobridManaValue(tok); ok {
-			// CR 202.4b: a monocolour hybrid's mana value is its generic
-			// face. {2/W} is mana value 2 whether it is paid with two mana
-			// or one white mana.
-			mv += v
-			continue
-		}
-		// Hybrid ("W/U"), Phyrexian ("UP"), and any other symbolic token:
-		// one generic pip.
-		mv++
+	for c := range colours {
+		colours[c] = m&(1<<c) != 0
 	}
 	return colours, mv
-}
-
-// costTokenColours returns the WUBRG C colour letters a mana-cost token
-// names: a plain pip ("W"), each face of a hybrid ("G/W" -> G,W), a
-// Phyrexian single colour ("UP" -> U), or a twobrid's colour half
-// ("2/W" -> W, "2W" -> W). Generic digits and X/Y/Z yield nothing.
-func costTokenColours(tok string) string {
-	var b strings.Builder
-	add := func(r rune) {
-		if strings.ContainsRune("WUBRGC", r) {
-			b.WriteRune(r)
-		}
-	}
-	if strings.ContainsRune(tok, '/') {
-		for _, p := range strings.Split(tok, "/") {
-			if len(p) == 1 {
-				add(rune(p[0]))
-			}
-		}
-		return b.String()
-	}
-	// Phyrexian: a GC/WUBRG-first, P-second spelling ("UP"); or a bare pip.
-	for i := 0; i < len(tok); i++ {
-		add(rune(tok[i]))
-	}
-	return b.String()
 }
 
 // addColour ORs a token's colour letters into the WUBRG C mask.

@@ -24,7 +24,7 @@ const (
 	staticFieldCount   = 5
 	replFieldCount     = 8
 	paramSetFieldCount = 6
-	faceFieldCount     = 47
+	faceFieldCount     = 48
 )
 
 func sliceEq[T comparable](a, b []T) bool {
@@ -176,12 +176,15 @@ func FaceEqual(a, b *Face) bool {
 		a.contStaticsOffBF != b.contStaticsOffBF || a.anyStaticEZ != b.anyStaticEZ ||
 		a.typeWords != b.typeWords || a.typeWordsLen != b.typeWordsLen || a.typeWordsBound != b.typeWordsBound ||
 		a.kwHeads != b.kwHeads || a.kwHeadsLen != b.kwHeadsLen || a.kwHeadsBound != b.kwHeadsBound ||
-		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound {
+		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound ||
+		a.printed.facts != b.printed.facts || a.printed.typesLen != b.printed.typesLen ||
+		a.printed.cost != b.printed.cost || a.printed.bound != b.printed.bound {
 		return false
 	}
 	if !sliceEq(a.Types, b.Types) || !sliceEq(a.Keywords, b.Keywords) || !sliceEq(a.Aliases, b.Aliases) ||
 		!StringMapEqual(a.SVars, b.SVars) ||
 		!stringPtrEqual(a.typeWordsFirst, b.typeWordsFirst) || !stringPtrEqual(a.kwHeadsFirst, b.kwHeadsFirst) ||
+		!stringPtrEqual(a.printed.typesFirst, b.printed.typesFirst) ||
 		!slotEqual(a.manaCostSlot, b.manaCostSlot) || !extSlotEqual(a.extSlot, b.extSlot) ||
 		!StaticEqual(a.typeStaticsFirst, b.typeStaticsFirst) {
 		return false
