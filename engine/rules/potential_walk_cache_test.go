@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
@@ -12,13 +13,19 @@ import (
 // on the engine, the offer builder, the PotentialActions projection and
 // PotentialPaymentPlans together open exactly ONE legal-action walk per
 // decision, and each answers exactly what an engine that never cached
-// answers (a Clone, whose cache starts empty, at every read).
+// answers (a Clone with its cache emptied, at every read: a clone carries
+// its parent's current entry, adoptPotentialWalk, so the cold reference
+// drops it).
 func TestPotentialWalkSharedAcrossReaders(t *testing.T) {
 	prevPriced, prevCasts, prevWalk := pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify
 	pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify = false, false, false
 	defer func() { pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify = prevPriced, prevCasts, prevWalk }()
 	e := onePassBenchBoard(t)
-	fresh := func() *Engine { return e.Clone() }
+	fresh := func() *Engine {
+		c := e.Clone()
+		c.potentialWalk = potentialWalkCache{}
+		return c
+	}
 	wantActs := fresh().PotentialActions(0)
 	wantPlans := fresh().PotentialPaymentPlans(0)
 
@@ -70,5 +77,87 @@ func TestPotentialWalkSharedAcrossReaders(t *testing.T) {
 	cold := fresh().PotentialActions(0)
 	if got := e.PotentialActions(0); !reflect.DeepEqual(got, cold) {
 		t.Fatalf("after a pool write PotentialActions = %+v, want %+v", got, cold)
+	}
+}
+
+// TestPotentialWalkCarriesAcrossClone pins adoptPotentialWalk: a clone of an
+// engine whose potential walk is current at the posed decision carries it,
+// so the clone's first potential readers open no walk and re-plan nothing,
+// and answer exactly what a cold clone (its cache emptied) computes; a
+// clone taken once the parent's entry is stale (a later decision) starts
+// cold, as before.
+func TestPotentialWalkCarriesAcrossClone(t *testing.T) {
+	prevPriced, prevCasts, prevWalk := pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify
+	pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify = false, false, false
+	defer func() { pricedCandidatesVerify, castsOnlyWalkVerify, walkCacheVerify = prevPriced, prevCasts, prevWalk }()
+	e := onePassBenchBoard(t)
+	cold := func() *Engine {
+		c := e.Clone()
+		c.potentialWalk = potentialWalkCache{}
+		return c
+	}
+	// The parent's builder and projection fill the entry (the full walk and
+	// every plain cast's plan).
+	acts := e.EnsurePaymentActions()
+	if len(acts) < 4 {
+		t.Fatalf("precondition: the board offers %d payment actions, want >= 4", len(acts))
+	}
+	wantActs := e.PotentialActions(0)
+	if !e.potentialWalkCarries() {
+		t.Fatal("the parent's entry is not current at its posed decision")
+	}
+	c := e.Clone()
+	if c.potentialWalk.opts == nil || !c.potentialWalkHit(0, true) {
+		t.Fatal("the clone did not carry the parent's current entry")
+	}
+	if &c.potentialWalk.opts[0] == &e.potentialWalk.opts[0] {
+		t.Fatal("the clone shares the parent's option array")
+	}
+	walks := c.legalActionWalks
+	if got := c.PotentialActions(0); !reflect.DeepEqual(got, wantActs) {
+		t.Fatalf("carried PotentialActions = %+v, want %+v", got, wantActs)
+	}
+	if n := c.legalActionWalks - walks; n != 0 {
+		t.Fatalf("the clone's projection opened %d walks, want 0", n)
+	}
+	if got, want := c.PotentialPaymentPlans(0), cold().PotentialPaymentPlans(0); !reflect.DeepEqual(got, want) {
+		t.Fatalf("carried PotentialPaymentPlans = %+v, want %+v", got, want)
+	}
+	// The submitted plan's validation is served the carried plan: no walk.
+	var a *decision.PaymentAction
+	for i := range acts {
+		if len(acts[i].Plans) > 0 {
+			a = &acts[i]
+			break
+		}
+	}
+	if a == nil {
+		t.Fatal("precondition: no payable cast")
+	}
+	c2 := e.Clone()
+	walks = c2.legalActionWalks
+	if err := c2.ValidateCastPayment(0, a.Cast, a.Plans[0]); err != nil {
+		t.Fatalf("carried validation: %v", err)
+	}
+	if n := c2.legalActionWalks - walks; n != 0 {
+		t.Fatalf("the clone's validation opened %d walks, want 0", n)
+	}
+	if err := cold().ValidateCastPayment(0, a.Cast, a.Plans[0]); err != nil {
+		t.Fatalf("cold validation: %v", err)
+	}
+	// A new decision on the parent: its entry is stale, so a clone starts
+	// cold and its projection opens a walk.
+	onePassReask(e, 0)
+	if e.potentialWalkCarries() {
+		t.Fatal("a stale entry reported as carriable")
+	}
+	c3 := e.Clone()
+	if c3.potentialWalk.opts != nil {
+		t.Fatal("a clone of a stale entry carried it")
+	}
+	walks = c3.legalActionWalks
+	c3.PotentialActions(0)
+	if n := c3.legalActionWalks - walks; n == 0 {
+		t.Fatal("a cold clone's projection opened no walk")
 	}
 }

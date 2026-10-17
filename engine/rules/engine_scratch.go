@@ -87,7 +87,9 @@ type engineScratch struct {
 	// (potential_walk_cache.go). potentialAskSerial (bumped by every ask and
 	// every Submit) keys it to the decision; potentialWalkDepth bypasses it
 	// inside its own computation; potentialFullDemand records that a
-	// full-walk reader asked on this engine. Pure scratch: Clone copies none.
+	// full-walk reader asked on this engine. Pure scratch: the generated
+	// clone copies none, but cloneWith then carries an entry that is exact
+	// for the state being cloned, re-stamped (adoptPotentialWalk).
 	potentialWalk       potentialWalkCache `clone:"reset"`
 	potentialAskSerial  uint64             `clone:"reset"`
 	potentialWalkDepth  int                `clone:"reset"`

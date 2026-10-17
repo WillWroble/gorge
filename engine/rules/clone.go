@@ -86,6 +86,9 @@ func cloneCarriesCast(e *Engine) bool { return e.cast != nil }
 // from the fields' clone tags) copies every field but the few below, whose
 // copy recycles bespoke Spare storage or re-records a key.
 func (e *Engine) cloneWith(sp Spare) *Engine {
+	// Decided before anything is copied: the check may bring e's layer
+	// caches up to date, which the copy below then carries.
+	carryWalk := e.potentialWalkCarries()
 	c := sp.engine
 	if c == nil {
 		c = new(Engine)
@@ -108,6 +111,12 @@ func (e *Engine) cloneWith(sp Spare) *Engine {
 	// only when there is something to copy.
 	var remap cloneRemap
 	cloneEngineFields(c, e, &sp, &remap)
+	// The posed priority decision's potential walk and cast plans
+	// (potential_walk_cache.go), exact for this state, so the clone's first
+	// potential read -- a search's Submit of a planned cast -- is served.
+	if carryWalk {
+		c.adoptPotentialWalk(e)
+	}
 	// The offer walk's object classes (walk_objclass.go) are exact as of
 	// the static catch-up's watermark; the clone's log is a copy of this
 	// one, so it carries both and catches up the rest itself.
