@@ -1720,7 +1720,7 @@ export interface BotMeasurement {
    * BotPolicyInfo is one selectable hosted bot policy (GET /api/bot-policies).
    * It is the wire twin of bots.Info, carrying only what a client needs to
    * render a picker and disclose the measurement; protocol never imports bots,
-   * so gorged converts one to the other at startup (cmd/gorged/botpolicies.go).
+   * so gorged converts one to the other at startup (server/gorged/botpolicies.go).
    */
 export interface BotPolicyInfo {
   name: string;

@@ -14,11 +14,11 @@ import (
 	"github.com/adams-shaun/gorge/bots/heuristic"
 
 	"github.com/adams-shaun/gorge/bots"
+	"github.com/adams-shaun/gorge/bots/spellbench"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/bots/spellbench"
 	"github.com/adams-shaun/gorge/testkit/bench"
 	"github.com/adams-shaun/gorge/testkit/testutil"
 )
