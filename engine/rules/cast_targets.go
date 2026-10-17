@@ -1487,7 +1487,7 @@ func (e *Engine) recheckIllegal(pc *pendingCast) bool {
 		if face == nil {
 			return false
 		}
-		printed := ParseCost(face.ManaCost)
+		printed := &e.faceCompiledCost(face).Cost
 		mv := printed.CMC()
 		if printed.X > 0 {
 			mv = printed.WithX(pc.x).CMC()

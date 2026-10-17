@@ -152,6 +152,30 @@ func AbilityCompiledCost(e Engine, sa *cards.SA) *CompiledCost {
 	return slot.Store(raw, c).(*CompiledCost)
 }
 
+// FaceCostOf is FaceCompiledCost for a caller without an engine: a slot miss
+// compiles the text fresh (the configured parse's content, frozen). The
+// result is READ-ONLY.
+func FaceCostOf(f *cards.Face) *CompiledCost {
+	return slotCost(f.ManaCostSlot(), f.ManaCost)
+}
+
+// AbilityCostOf is AbilityCompiledCost for a caller without an engine, on
+// FaceCostOf's terms.
+func AbilityCostOf(sa *cards.SA) *CompiledCost {
+	return slotCost(sa.CostSlot(), sa.ParamStr(cards.PKCost))
+}
+
+func slotCost(slot *cards.Slot, raw string) *CompiledCost {
+	if v, ok := slot.Load(raw); ok {
+		return v.(*CompiledCost)
+	}
+	c := CompiledCostFor(nil, raw)
+	if slot == nil {
+		return c
+	}
+	return slot.Store(raw, c).(*CompiledCost)
+}
+
 // FaceCost is ParseCostOf(f.ManaCost) through the face's slot: a value copy
 // the caller may modify.
 func FaceCost(e Engine, f *cards.Face) Cost { return FaceCompiledCost(e, f).Cost }

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
@@ -143,11 +142,11 @@ func stackXAnnounced(o *state.Object) bool {
 	if o.X != 0 {
 		return true
 	}
-	if o.Face() != nil && costAnnouncesX(ParseCost(o.Face().ManaCost)) {
+	if o.Face() != nil && costAnnouncesXRef(&pay.FaceCostOf(o.Face()).Cost) {
 		return true
 	}
 	if o.Ability != nil {
-		return costAnnouncesX(ParseCost(o.Ability.ParamStr(cards.PKCost)))
+		return costAnnouncesXRef(&pay.AbilityCostOf(o.Ability).Cost)
 	}
 	return false
 }
