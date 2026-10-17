@@ -2,8 +2,9 @@
 # to GitHub Pages.
 #
 # The set-support table is no longer measured here: the compliance oracle
-# that measures it (oraclediff) moved to four-yay with the lab tree, so the
-# set page shows its hand snapshot (docs/decisions/0001-repo-layout.md).
+# that measures it (oraclediff) lives in gorge-compliance
+# (github.com/adams-shaun/gorge-compliance), so the set page shows its hand
+# snapshot (docs/decisions/0001-repo-layout.md, amendment 3).
 #
 # The engine-speed chart reads history.jsonl from the orphan `perf-data`
 # branch when that branch exists; perf data never lands on main.

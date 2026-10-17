@@ -35,7 +35,9 @@ Draft events, the compliance oracles, training research, the research
 binaries and scripts, and the research bots moved to a private companion
 repository that imports gorge (gorge never imports it). Every item below that
 named one of those paths is closed in gorge by that move, and is marked
-*moved out*.
+*moved out*. The compliance oracles and the oracle-scenario corpora moved on
+again the same day, to the public
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance).
 
 ## Priorities
 

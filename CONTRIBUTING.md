@@ -67,7 +67,7 @@ Run tests **focused**: one package, one `-run` pattern.
 
 ```sh
 go test -run 'TestOmniscienceInHandGrantsNothing' ./engine/rules/
-go test -run 'TestOracleAudit/Balefire_Dragon' ./engine/rules/
+go test -run 'TestOracleRunnerContract' ./engine/rules/
 ```
 
 - **Do not run `go test ./...`** as your inner loop. The suite is large and
@@ -155,9 +155,14 @@ example of the shape we like.
 
 The per-package map is [docs/agents/repo-map.md](docs/agents/repo-map.md)
 and `go run ./cmd/pkgmap` prints every package with its purpose and tier.
-Draft events, the compliance oracles, training and the research bots are not
-in this repository: they live in four-yay, a private companion module that
-imports gorge (README, "four-yay, the private companion module"). A change in
+Draft events, training and the research bots are not in this repository:
+they live in four-yay, a private companion module that imports gorge (README,
+"four-yay, the private companion module"). The compliance oracles and the
+oracle-scenario corpora (the hand Oracle-text audit, the XMage ports) live in
+the public [gorge-compliance](https://github.com/adams-shaun/gorge-compliance),
+which measures a pinned gorge revision; gorge keeps the oracle runner
+(`engine/rules/oracle_*.go`) and a small residual scenario set as its
+contract check (`engine/rules/oracle_contract_test.go`). A change in
 gorge never needs it, but a change to a seam it uses (`bots.Register`,
 `server/gorged.Extensions`, `server/gorged.RegisterNetBot`, `testkit/`, `cli/`)
 is an API change for it.

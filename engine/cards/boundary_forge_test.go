@@ -22,9 +22,8 @@ import (
 //  3. a path with a `compliance` component immediately followed by a
 //     component beginning `forge` (the result-row / request-file surface).
 //     That surface was `lab/oracle/compliance/forge*` until the research tree
-//     moved to the private four-yay module (where it is
-//     `oracle/compliance/forge*`, guarded by four-yay's own
-//     internal/boundary); the rule is written by component so it still
+//     moved out (it is now gorge-compliance's `oracle/compliance/forge*`,
+//     guarded by that repository's own internal/boundary); the rule is written by component so it still
 //     catches the surface if a compliance tree ever returns to gorge, at any
 //     depth;
 //  4. a file carrying the Forge GPL header line.

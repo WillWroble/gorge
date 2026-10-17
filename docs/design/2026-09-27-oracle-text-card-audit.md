@@ -5,6 +5,16 @@ cards and the ratchet are in `engine/rules/oracle_audit_test.go` and
 `engine/rules/testdata/oracle/`. This document states the decisions; the pilot
 section records what the pilot measured on `main @ 1ffb080ff`.
 
+**Moved (2026-10-16, ADR 0001 amendment 3).** The scenario corpus, its
+ratchets and the drivers (`TestOracleAudit`,
+`TestOracleScenarioFilesWellFormed`) now live in
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance)
+(`scenarios/oracle/`, `audit/`); gorge keeps the runner
+(`engine/rules/oracle_run.go` and siblings), the exported entry points
+(`oracle_export.go`, `oracle_audit_export.go`) and nine residual scenario
+files its card tests load, played by `engine/rules/oracle_contract_test.go`.
+Paths below are as written at the time.
+
 ## 1. Problem
 
 Card behaviour is compiled from Forge scripts. Almost every card test we
@@ -412,11 +422,15 @@ Pilot rates for calibration:
 
 ## 11. Commands
 
+In a gorge-compliance checkout (since 2026-10-16):
+
 ```sh
 make oracle-audit                              # all scenarios, -v
 make oracle-audit ORACLE_RUN='Relic_Vial'      # one card
-go test ./engine/rules -run TestOracleScenarioFilesWellFormed   # corpus-free schema check
-ORACLE_AUDIT_TRACE=1 go test ./engine/rules -run TestOracleAudit -v   # transcripts for passes too
-go run ./lab/cmd/oraclepacket "Fatal Push"         # the author's view of a card
-go run ./lab/cmd/oraclepacket -decks testkit/testutil/decks -grep '(?i)as long as' -names
+go test ./audit -run TestOracleScenarioFilesWellFormed   # corpus-free schema check
+ORACLE_AUDIT_TRACE=1 go test ./audit -run TestOracleAudit -v   # transcripts for passes too
+go run ./cmd/oraclepacket "Fatal Push"         # the author's view of a card
+go run ./cmd/oraclepacket -decks ../gorge/testkit/testutil/decks -grep '(?i)as long as' -names
 ```
+
+In gorge: `go test ./engine/rules -run 'TestOracleRunnerContract|TestOracleScenarioShapeCheck'`.

@@ -78,7 +78,6 @@ help:
 	@echo "  make smoke          — headless-browser smoke gate vs two real gorged servers (public+omniscient); fails on any browser error or a hung loading state"
 	@echo "  make test lint cover"
 	@echo "  make conformance    — run the CR 601/733 conformance suites (see the target's comment)"
-	@echo "  make oracle-audit   — run the Oracle-text card audit (engine/rules/testdata/oracle; ORACLE_RUN=<Card> to filter)"
 	@echo "  NOTE: make test-web / npm test needs Node >=22 (vitest 5); see web/README.md"
 
 .PHONY: build
@@ -155,15 +154,11 @@ conformance:
 	@echo "== CR 601/733 conformance: all audited leaves fixed; ordinary-suite assertions =="
 	go test $(GO_TEST_FLAGS) -count=1 ./engine/rules -run TestCR -v
 
-# oracle-audit runs the Oracle-text card audit: scenarios whose expected
-# outcomes were written from printed card text and the CR, never the Forge
-# script (docs/design/2026-09-27-oracle-text-card-audit.md). It is
-# also part of the ordinary rules suite; this lane is for a focused run and a
-# per-card filter, e.g. `make oracle-audit ORACLE_RUN='Fatal_Push'`.
-ORACLE_RUN ?=
-.PHONY: oracle-audit
-oracle-audit:
-	go test $(GO_TEST_FLAGS) -count=1 ./engine/rules -run 'TestOracleAudit/$(ORACLE_RUN)' -v
+# The Oracle-text card audit (scenarios written from printed card text and
+# the CR, docs/design/2026-09-27-oracle-text-card-audit.md) and the XMage
+# ports live in gorge-compliance (github.com/adams-shaun/gorge-compliance,
+# `make oracle-audit` there). gorge keeps the runner and its contract check:
+# go test ./engine/rules -run 'TestOracleRunnerContract|TestOracleScenarioShapeCheck'.
 
 # gc-gate budgets the share of consumed CPU a package's tests spend collecting
 # garbage. GC_PROCS pins GOMAXPROCS so the figure is a property of the code

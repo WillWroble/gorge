@@ -35,8 +35,9 @@ into a commit, a test or an issue.
   that is a deliberate contract, not a bug.
 - `engine/rules/testdata/known-unsupported/` names repo-deck cards the build
   does not fully support.
-- `engine/rules/testdata/oracle/*/known-divergent/` lists audit scenarios
-  already known to fail.
+- gorge-compliance's `scenarios/oracle/*/known-divergent/` lists audit
+  scenarios already known to fail (and `known_bug` rows in its
+  `scenarios/xmageport/` the XMage-ported ones).
 
 **Decide whose bug it is.** Compare the script with the printed card (the
 Oracle text on the card's `Oracle:` line, or Scryfall) and the
@@ -62,16 +63,18 @@ your fix and passes after.
 
 The Oracle-text audit runs JSON scenarios that state what a card does
 according to its **printed text and the CR**. You write the expected outcome
-without reading the engine's opinion. The runner builds a real two-seat game
-around real corpus cards, drives it only through player actions, and checks
-observable state. The contract is in the header of
-`engine/rules/oracle_audit_test.go`. The schema (`oracleFile`,
-`oracleScenario`) is in `engine/rules/oracle_run.go`.
+without reading the engine's opinion. The runner (gorge's
+`engine/rules/oracle_run.go`, which also holds the schema: `oracleFile`,
+`oracleScenario`) builds a real two-seat game around real corpus cards,
+drives it only through player actions, and checks observable state. The
+scenario corpus and its driver live in
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance): the
+contract is in the header of its `audit/oracle_audit_test.go`.
 
-One file per card per family:
-`engine/rules/testdata/oracle/<family>/<card-slug>.json`. Families are the
-existing directories (`combat-damage`, `keywords`, `replacement`, …). Copy a
-neighbour such as `engine/rules/testdata/oracle/combat-damage/balefire-dragon.json` (trimmed
+One file per card per family, in a gorge-compliance checkout:
+`scenarios/oracle/<family>/<card-slug>.json`. Families are the existing
+directories (`combat-damage`, `keywords`, `replacement`, …). Copy a
+neighbour such as `scenarios/oracle/combat-damage/balefire-dragon.json` (trimmed
 here to one scenario and two expectations):
 
 ```json
@@ -102,22 +105,26 @@ here to one scenario and two expectations):
 ```
 
 - `why` and `cr` are required: every scenario states its reasoning.
-- The step ops are a closed set (`oracleOps`): `mana`, `cast`, `activate`,
+- The step ops are a closed set (`oracleAuditOps` in gorge's
+  `engine/rules/oracle_audit_export.go`): `mana`, `cast`, `activate`,
   `play`, `resolve`, `attack`, `block`, `pass`, `pass_to`, `move`, `life`.
   Unknown fields are rejected.
 - `oracle_sha` is optional. When present it pins the card's printed text
   (`oracletext.Digest` in `engine/cards/oracletext`) so the scenario fails if the text changes.
 
-Run it (subtest names replace spaces with `_`):
+Run it in gorge-compliance, with a `go.work` pointing at your gorge checkout
+so it plays your engine change (subtest names replace spaces with `_`):
 
 ```sh
 make oracle-audit ORACLE_RUN=Balefire_Dragon
-# or: go test -run 'TestOracleAudit/Balefire_Dragon' ./engine/rules/
+# or: go test -run 'TestOracleAudit/Balefire_Dragon' ./audit/
 ```
 
 `TestOracleScenarioFilesWellFormed` checks the schema without the corpus.
 Every scenario must also replay from its event log alone, so the runner
-doubles as a replay check.
+doubles as a replay check. The scenario lands in gorge-compliance (its own
+PR); the engine fix lands in gorge with a Go test (Option B) so gorge's own
+suite holds it.
 
 ### Option B: a Go test in `engine/rules`
 

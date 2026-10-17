@@ -2,9 +2,11 @@
 
 The per-set figures on [Support by set](sets.md) come from the compliance
 oracle, which compares gorge with XMage scenario by scenario. Since
-2026-10-16 that oracle runs from a private companion repository, not from
-gorge, so the docs build no longer measures sets: the page shows its hand
-snapshot.
+2026-10-16 that oracle runs from the public companion repository
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance), not from gorge, so the docs build no
+longer measures sets: the page shows its hand snapshot. The status JSONL the
+renderer reads is `go run ./cmd/oraclediff status -all -json -level A` in a
+gorge-compliance checkout.
 
 ## What stays in gorge
 

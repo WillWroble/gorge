@@ -1,9 +1,6 @@
 package rules
 
 import (
-	"fmt"
-	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -824,97 +821,14 @@ func TestAttacksTriggerRemembersTheDefendingPlayer(t *testing.T) {
 	}
 }
 
-// replayFromLog reconstructs a Game from cfg's decks (replicating rules.New's
-// own unlogged genesis AddObject calls, in the same per-deck order) plus
-// every event in log, applied via events.Apply directly -- no rules.Engine
-// involved, exactly what a real replay-from-log-alone would do. Tokens is
-// wired the same way New itself wires it (g.Tokens = cfg.Tokens), so a
-// TokenCreate event in the log resolves against the same table live play
-// used -- previously missing here, latent until Task 9's cast_test.go
-// fixture helper (newFixtureDeck's own doc comment already named the
-// general hazard: an object introduced any way other than via cfg.Decks is
-// invisible to this function) started relying on it for replay fidelity.
-// Starting life, commander identity/cast counters and the match-wide commander
-// damage-vector size are genesis bookkeeping rather than logged state, so they
-// are reconstructed from Config and the event stream just as New initializes
-// them. Commander seating uses legalCommandersFor, the same gate as New.
+// replayFromLog is logReplayGame (oracle_audit_export.go) for a test: the
+// game cfg's genesis plus every event in log rebuilds, through events.Apply
+// alone.
 func replayFromLog(t *testing.T, cfg Config, log []events.Event) *state.Game {
 	t.Helper()
-	life := int32(20)
-	if cfg.StartingLife > 0 {
-		life = cfg.StartingLife
-	}
-	g := state.NewGameLife(cfg.Names, life)
-	g.Tokens = cfg.Tokens
-	cmdIDs := make([][]state.ObjID, len(cfg.Names))
-	totalCmd := 0
-	for i := range cfg.Names {
-		if i >= len(cfg.Decks) {
-			continue
-		}
-		deck := cfg.Decks[i]
-		p := state.PlayerID(i)
-		ids := make([]state.ObjID, 0, len(deck))
-		for _, c := range deck {
-			ids = append(ids, g.AddObject(c, p).ID)
-		}
-		for _, idx := range cfg.legalCommandersFor(i, len(deck), deck) {
-			cmdIDs[i] = append(cmdIDs[i], ids[idx])
-		}
-		totalCmd += len(cmdIDs[i])
-		g.SetZone(state.ZLibrary, p, ids)
-		if i < len(cfg.Sideboards) {
-			sb := make([]state.ObjID, 0, len(cfg.Sideboards[i]))
-			for _, c := range cfg.Sideboards[i] {
-				o := g.AddObject(c, p)
-				o.Zone = state.ZSideboard
-				sb = append(sb, o.ID)
-			}
-			g.SetZone(state.ZSideboard, p, sb)
-		}
-		if i < len(cfg.PlanarDecks) {
-			for _, c := range cfg.PlanarDecks[i] {
-				g.AddObject(c, p)
-			}
-		}
-	}
-	// events.Apply's CmdDamage case resolves a dense index from Commanders
-	// and folds into CmdDamage, so both must exist before applying the log.
-	for p := range g.Players {
-		if len(cmdIDs[p]) > 0 {
-			g.Players[p].Commanders = append([]state.ObjID(nil), cmdIDs[p]...)
-		}
-		if totalCmd > 0 {
-			g.Players[p].CmdDamage = make([]int32, totalCmd)
-		}
-	}
-	for _, ev := range log {
-		events.Apply(g, ev)
-	}
-	for p := range g.Players {
-		if len(cmdIDs[p]) > 0 {
-			g.Players[p].CmdCasts = make([]int32, len(cmdIDs[p]))
-			for _, ev := range log {
-				if ev.Kind != events.PutOnStack || ev.Player != state.PlayerID(p) || ev.From != state.ZCommand {
-					continue
-				}
-				for k, id := range cmdIDs[p] {
-					if id == ev.Obj {
-						g.Players[p].CmdCasts[k]++
-						break
-					}
-				}
-			}
-		}
-	}
-	return g
+	return logReplayGame(cfg, log)
 }
 
-// diffGames reports every structural difference between two games, or ""
-// if they match exactly. Mirrors events.TestApplyIsPure's own comparison
-// shape (Players, Objs, Stack, each zone, and the turn-structure scalars)
-// rather than a whole-struct reflect.DeepEqual, so a mismatch is reported
-// with enough detail to diagnose.
 // stripTransientAbilities removes from g the footprint a triggered ability's
 // own came-and-gone stack object leaves relative to base: the transient Objs
 // slot(s) appended after the base snapshot, their zone membership, and the
@@ -966,64 +880,6 @@ func stripTransientAbilities(base, g *state.Game) {
 	g.NextID = base.NextID
 }
 
-func diffGames(a, b *state.Game) string {
-	var diffs []string
-	// Players compare by value with nil and empty slices alike (the
-	// formatted text): a spent RestrictedMana batch list is an empty slice
-	// after events.Apply and nil after a Clone, and the resolution kernel's
-	// restore is a clone.
-	if ap, bp := fmt.Sprintf("%+v", a.Players), fmt.Sprintf("%+v", b.Players); ap != bp {
-		diffs = append(diffs, fmt.Sprintf("players: %s vs %s", ap, bp))
-	}
-	n := len(a.Objs)
-	if len(b.Objs) > n {
-		n = len(b.Objs)
-	}
-	for i := 0; i < n; i++ {
-		var ao, bo any
-		if i < len(a.Objs) {
-			ao = a.Objs[i]
-		}
-		if i < len(b.Objs) {
-			bo = b.Objs[i]
-		}
-		if !reflect.DeepEqual(ao, bo) {
-			diffs = append(diffs, fmt.Sprintf("obj[%d]: %+v vs %+v", i+1, ao, bo))
-		}
-	}
-	// Stack and per-zone ID lists use slices.Equal, not reflect.DeepEqual.
-	// events.remove (engine/events/apply.go) always allocates via make, even for a
-	// zero-length result, so a zone that just lost its last object holds a
-	// non-nil empty slice; state.Game.Clone's append-based copy normalises
-	// that same empty zone to nil. slices.Equal compares length and elements
-	// only, so it correctly treats nil and empty as the same zone; DeepEqual
-	// does not.
-	if !slices.Equal(a.Stack, b.Stack) {
-		diffs = append(diffs, fmt.Sprintf("stack: %v vs %v", a.Stack, b.Stack))
-	}
-	for p := state.PlayerID(0); int(p) < len(a.Players); p++ {
-		for _, z := range []state.Zone{state.ZLibrary, state.ZHand, state.ZBattlefield, state.ZGraveyard, state.ZExile} {
-			az, bz := a.Zone(z, p), b.Zone(z, p)
-			if !slices.Equal(az, bz) {
-				diffs = append(diffs, fmt.Sprintf("p%d:%s: %v vs %v", p, z, az, bz))
-			}
-		}
-	}
-	// Ruling F6 (Task 27 fix round 1): Winner, Draw and NextID are compared
-	// too. They were missing, so "a whole-game diff of empty" claimed more
-	// than this helper delivered -- most sharply for Draw, which Task 22
-	// added precisely because Winner's zero value is a real seat, so a game
-	// that ended in a draw compared equal to one seat 0 won. Task 24 is the
-	// replay task and inherits this harness; a replay comparison that cannot
-	// see who won is a bad foundation to hand it.
-	if a.Turn != b.Turn || a.Active != b.Active || a.Clock != b.Clock ||
-		a.Priority != b.Priority || a.Passes != b.Passes || a.Step != b.Step ||
-		a.Over != b.Over || a.Winner != b.Winner || a.Draw != b.Draw || a.NextID != b.NextID {
-		diffs = append(diffs, fmt.Sprintf(
-			"scalars: turn=%d/%d active=%d/%d clock=%d/%d priority=%d/%d passes=%d/%d step=%s/%s over=%v/%v winner=%d/%d draw=%v/%v nextid=%d/%d",
-			a.Turn, b.Turn, a.Active, b.Active, a.Clock, b.Clock,
-			a.Priority, b.Priority, a.Passes, b.Passes, a.Step, b.Step, a.Over, b.Over,
-			a.Winner, b.Winner, a.Draw, b.Draw, a.NextID, b.NextID))
-	}
-	return strings.Join(diffs, "\n")
-}
+// diffGames is gameStateDiff (oracle_audit_export.go): every structural
+// difference between two games, or "" if they match exactly.
+func diffGames(a, b *state.Game) string { return gameStateDiff(a, b) }

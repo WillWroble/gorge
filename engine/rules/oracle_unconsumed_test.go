@@ -1,12 +1,12 @@
 package rules
 
-// Regression test for the harness self-check in engine/rules/oracle_audit_test.go:
-// a step's `answers` queue is consumed lazily by (*oracleRun).answer, so an
-// entry no decision on that step matched used to be dropped silently and the
-// scenario passed on the engine's fallback. runOracleScenario now fails such
-// a step loudly, tagged with oracleUnconsumedMarker, and TestOracleAudit
-// excuses exactly the rows the shrinking testdata/oracle/<family>/known-unconsumed
-// ratchet lists.
+// Regression test for the runner's leftover-answer self-check: a step's
+// `answers` queue is consumed lazily by (*oracleRun).answer, so an entry no
+// decision on that step matched used to be dropped silently and the scenario
+// passed on the engine's fallback. runOracleScenario now fails such a step
+// loudly, tagged with oracleUnconsumedMarker (exported as
+// OracleUnconsumedMarker), and gorge-compliance's TestOracleAudit excuses
+// exactly the rows its shrinking <family>/known-unconsumed ratchet lists.
 
 import (
 	"strings"

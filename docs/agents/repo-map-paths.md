@@ -23,7 +23,7 @@ four-yay (private); its map is four-yay's `docs/agents/repo-map-research.md`.
 | `deckimport` | Plain-text decklist → repo deck JSON. |
 | `keywordbench` / `paymirror` | Keyword presence stats / payment A/B CLI. |
 
-Research and draft commands (`botbench`, `draftsim`, `oraclediff`, `compliance`, `dzgorge`, `policytrain`, …) and the pipeline's issue `ledger` moved to four-yay's `cmd/` (private).
+Research and draft commands (`botbench`, `draftsim`, `dzgorge`, `policytrain`, …) and the pipeline's issue `ledger` moved to four-yay's `cmd/` (private); the compliance commands (`oraclediff`, `compliance`, `xmageport`, `oraclepacket`) to gorge-compliance's `cmd/` (public).
 
 ## The agent pipeline (not in this repo)
 

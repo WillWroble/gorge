@@ -18,9 +18,13 @@ primitives that IR references. See
 - `server/`: `gorged` (the importable server; `cmd/gorged` is its thin main), `host` (+`httpapi`, `manabrewhttp`), `protocol`, `manabrew`, `divergence`.
 - `bots/`: `botpolicy`, `heuristic` (the default bot), the registry, hosted bots and their inference runtime.
 - `cmd/`: product and developer tools. `internal/`: ratchets, test support, generators.
-- Draft events, compliance oracles, training research and the research bots live in the private
+- Draft events, training research and the research bots live in the private
   companion module four-yay (`github.com/adams-shaun/four-yay`, checkout `../four-yay`), which
   imports gorge; gorge never imports it (ADR 0001 amendment, 2026-10-16).
+- The compliance oracles and the oracle-scenario corpora (hand Oracle-text audit, XMage ports)
+  live in the public gorge-compliance (`github.com/adams-shaun/gorge-compliance`), which pins
+  gorge and plays the corpora through `engine/rules`' exported oracle runner (ADR 0001
+  amendment 3). gorge keeps the runner and `oracle_contract_test.go`'s residual scenarios.
 - `scripts/`: contributor and CI scripts. gorge carries no agent-pipeline or demo-deploy
   machinery; the maintainers' pipeline, its hooks and the demo deploy live in four-yay's `ops/`.
 - `docs/design/`: living designs; parked history is indexed in `docs/design/ARCHIVE.md`.

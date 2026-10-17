@@ -1,6 +1,0 @@
-{
-  "card": "Wooded Foothills",
-  "rows": {
-    "no-mountain-or-forest-fetches-nothing": "step 1 (resolve): [{\"kind\":\"choose\",\"pick\":[]}]"
-  }
-}

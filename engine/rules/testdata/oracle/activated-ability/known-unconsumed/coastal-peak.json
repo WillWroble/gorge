@@ -1,6 +1,0 @@
-{
-  "card": "Coastal Peak",
-  "rows": {
-    "cycling-draws-a-card": "step 2 (resolve): [{\"kind\":\"choose\",\"pick\":[\"p0:Coastal Peak\"]}]"
-  }
-}

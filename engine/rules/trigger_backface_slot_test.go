@@ -11,7 +11,7 @@ import (
 // CR 712.8a reset put the card front face up. The reset means the source no
 // longer shows the face whose line matched, so a slot lookup against the live
 // face alone comes back empty and the level-B generator reads the trigger as
-// never having fired (four-yay oracle/compliance/oraclegen/templates
+// never having fired (gorge-compliance oracle/compliance/oraclegen/templates
 // TestFaceOneTemplatesServeBackFaceSetup/Vincent_Valentine/trigger#1.0).
 func TestGalianBeastTriggerKeepsSnapshotSlot(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)

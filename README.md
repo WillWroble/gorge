@@ -62,15 +62,28 @@ layout and its reasons are in [ADR 0001](docs/decisions/0001-repo-layout.md).
 
 ### four-yay, the private companion module
 
-Draft events, the compliance oracles, training research, the research
-binaries (`botbench`, `draftsim`, `oraclediff`, `dzgorge`, …) and the
-research bots live in four-yay (`github.com/adams-shaun/four-yay`), a
+Draft events, training research, the research binaries (`botbench`,
+`draftsim`, `dzgorge`, …) and the research bots live in four-yay (`github.com/adams-shaun/four-yay`), a
 **private** module that imports gorge; gorge never imports it. It plugs in
 through three seams: `bots.Register` (its bots join the registry),
 `server/gorged.RegisterNetBot` (network-backed hosted bots) and
 `server/gorged.Extensions` (draft events under `/api/events`). Its own
 `cmd/gorged` is the full demo server. Nothing in gorge needs four-yay to
 build or test.
+
+### gorge-compliance, the public compliance repository
+
+The compliance oracles (gorge vs XMage vs Forge, card by card), the
+hand-authored Oracle-text scenario audit, the XMage-ported interaction
+scenarios and their coverage targets live in
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance)
+(`github.com/adams-shaun/gorge-compliance`, public). It measures a **pinned**
+gorge revision through gorge's exported oracle runner
+(`rules.RunOracleScenarioJSON`, `rules.RunOracleAuditScenarioJSON`,
+`rules.CheckOracleScenarioJSON`); gorge never imports it and does not gate on
+it. gorge keeps the runner, its unit tests and nine residual scenario files
+its own card tests load (`engine/rules/testdata/oracle/`), played by
+`engine/rules/oracle_contract_test.go` as the runner's contract check.
 
 ## Where to go next
 

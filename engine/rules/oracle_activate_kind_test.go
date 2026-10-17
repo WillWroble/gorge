@@ -7,9 +7,9 @@ import "testing"
 // kinds were added, a scenario could assert one of those special actions was
 // OFFERED (the `offered` observable matches an arbitrary kind exactly) but
 // could never SELECT it, so it could never observe the action's effect. This
-// is the focused unit proof for that membership; TestOracleAudit's scenarios
-// (Exploration Broodship, Meat Locker, Belltoll Dragon) prove the end-to-end
-// selection.
+// is the focused unit proof for that membership; gorge-compliance's
+// TestOracleAudit scenarios (Exploration Broodship, Meat Locker, Belltoll
+// Dragon) prove the end-to-end selection.
 func TestOracleActivateKindCoversSpecialActions(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []string{"ability", "activate", "station", "unlock", "turn_face_up"} {

@@ -118,10 +118,11 @@ that gap:
 
 - the param census (`TestEveryRepoDeckParamsAreRead`), which tracks
   parameters no code reads;
-- the oracle scenarios under `engine/rules/testdata/oracle/`, which check
-  behaviour against the printed text;
-- the compliance oracles, which compare gorge with XMage and Forge (they
-  run from a private companion repository; the results are summarised on the
-  sets page).
+- the oracle scenarios, which check behaviour against the printed text;
+- the compliance oracles, which compare gorge with XMage and Forge.
+
+Both live in the public companion repository [gorge-compliance](https://github.com/adams-shaun/gorge-compliance),
+which measures a pinned gorge revision; the results are summarised on the
+sets page.
 
 The per-set figures are on [Support by set](../support/sets.md).

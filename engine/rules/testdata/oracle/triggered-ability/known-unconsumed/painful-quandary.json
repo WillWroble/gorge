@@ -1,6 +1,0 @@
-{
-  "card": "Painful Quandary",
-  "rows": {
-    "discarding-avoids-the-loss": "step 2 (resolve): [{\"kind\":\"any\",\"pick\":[\"p1:Forest\"]}]"
-  }
-}

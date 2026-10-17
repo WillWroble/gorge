@@ -228,3 +228,52 @@ check and the opt-in `RACE=1` race gate), `scripts/` (`ci_shard.sh`,
 when `HEAVY_LOCK` is set), `cmd/testbudget`, the ratchets in `internal/`, and
 CI. The P3 hazards above now concern four-yay's copy. The pipeline is parked
 until it is re-pointed.
+
+## Amendment 3 (2026-10-16): compliance oracles move to gorge-compliance
+
+- **Status:** accepted 2026-10-16 (operator); lands with PR #10.
+  Supersedes the first amendment's "compliance oracles" in four-yay's list
+  and its "four-yay's CI checks gorge for compliance".
+
+**What moved.** A new **public** module and repository, gorge-compliance
+(`github.com/adams-shaun/gorge-compliance`), backs up the rules engine: it
+runs the three-way oracle (hand-authored Oracle-text scenarios, XMage,
+Forge) and holds the coverage targets for a **pinned** gorge revision
+(`GORGE_PIN`; a pin bump is a pull request there that reruns and updates the
+targets, and a nightly job reports drift against gorge `main` without
+failing). It has no functional use to engine users beyond confidence.
+
+- From four-yay (moved, layout kept): `oracle/` (`compliance/**`,
+  `validation/**`, `xmageoracle/**`), `cmd/oraclediff`, `cmd/compliance`,
+  `cmd/xmageport`, `cmd/oraclepacket`, the `xmage-oracle-*`, `forge-*` and
+  `compliance-pass` scripts, `driver_replay_batch.sh` and the oracle smokes,
+  the three compliance designs, the `compliance-*`/`*-oracle-setup` Makefile
+  targets with the XMage/Forge-oracle pins, and the CI `compliance` job.
+  `internal/gorgedir` and `internal/boundary` are copied (both repositories
+  run the licence guards).
+- From gorge: the scenario corpora `engine/rules/testdata/oracle/**` (1,103
+  of 1,112 files) and `engine/rules/testdata/xmageport/**` (220 files, with
+  their XMage NOTICE), now gorge-compliance's `scenarios/oracle/` and
+  `scenarios/xmageport/`; their drivers `oracle_audit_test.go`,
+  `xmageport_test.go` and `oracle_unconsumed_filter_test.go`, rewritten as
+  gorge-compliance's external `audit/` tests; and `make oracle-audit`.
+
+**What gorge keeps.** The runner (`engine/rules/oracle_*.go`), every runner
+unit test (including `oracle_unconsumed_test.go`, the leftover-answer
+regression), the set audits, and the nine scenario files its own card tests
+load (Wizard's Staff, Heirloom Epic, Gray Merchant of Asphodel, Rhovanion
+Rampager, Supper for Spiders, Uncover the Moon-Letters, and the census
+carriers Witness Protection, Purphoros and Bard's Company).
+`oracle_contract_test.go` plays them through the exported API as the
+runner's contract check. A scenario file lives in exactly one repository;
+gorge-compliance's audit and gate read the union.
+
+**The seam.** gorge-compliance uses only exported API. The hand audit needs
+its own run mode and the log-only replay check the in-package driver had, so
+`engine/rules/oracle_audit_export.go` adds `RunOracleAuditScenarioJSON(reg,
+raw, fixture)` (returning `OracleAuditResult{Fails, Transcript,
+ReplayDiff}`), `CheckOracleScenarioJSON(raw)` (corpus-free shape check) and
+`OracleUnconsumedMarker`; the test helpers `replayFromLog`/`diffGames` became
+thin wrappers over the non-test `logReplayGame`/`gameStateDiff` they now
+share with it. Changing these is an API change for gorge-compliance.
+gorge never imports gorge-compliance.

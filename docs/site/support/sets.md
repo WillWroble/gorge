@@ -7,8 +7,8 @@ measured card by card against an oracle; every other set is an estimate.
     The tables on this page are a hand snapshot **as of 2026-10-12, `main` @
     `f1ac002c4`** (Forge pin `25a608a4fc5f`, XMage pin `6b602a1c85e8`, verdicts
     last written at `e606fe616`). The compliance oracle that produces these
-    figures runs from a private companion repository, so the docs build no
-    longer re-measures them. See [Regenerating the tables](regenerating.md).
+    figures runs from [gorge-compliance](https://github.com/adams-shaun/gorge-compliance),
+    so the docs build no longer re-measures them. See [Regenerating the tables](regenerating.md).
 
 **Headline.** All 20 Standard sets pass **Level A** (5,331 / 5,331 cards).
 **Level B** stands at 5,002 / 5,331 (**93.8%**), with 329 cards outstanding;

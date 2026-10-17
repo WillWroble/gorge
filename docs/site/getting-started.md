@@ -68,7 +68,7 @@ Run tests focused: one package and a `-run` pattern at a time.
 
 ```sh
 go test -run 'TestHeads$' ./engine/rules/
-go test -run 'TestOracleAudit/Balefire_Dragon' ./engine/rules/
+go test -run 'TestOracleRunnerContract' ./engine/rules/
 ```
 
 Avoid `make test` (`go test ./...`) as an everyday command. The full suite is

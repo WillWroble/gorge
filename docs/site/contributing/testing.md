@@ -8,7 +8,7 @@ the handful of ratchet and golden tests that guard the whole engine.
 
 ```sh
 go test -run 'TestOmniscienceInHandGrantsNothing' ./engine/rules/
-go test -run 'TestOracleAudit/Balefire_Dragon' ./engine/rules/
+go test -run 'TestOracleRunnerContract' ./engine/rules/
 go test -v -run '^TestHeads$/^4seats$' ./engine/rules/
 ```
 
@@ -57,13 +57,22 @@ their locations in
 
 ## Oracle scenarios
 
-`TestOracleAudit` (`engine/rules/oracle_audit_test.go`) runs every JSON
-scenario under `engine/rules/testdata/oracle/<family>/`. Each one states what
-a card does according to its printed text and the CR, sets up a real game,
-drives it through player actions only, and asserts observable state. Run one
-card with `make oracle-audit ORACLE_RUN=<Card_Name>`.
+An oracle scenario is a JSON file that states what a card does according to
+its printed text and the CR; gorge's runner (`engine/rules/oracle_run.go`)
+sets up a real game, drives it through player actions only, and asserts
+observable state. The scenario corpora (about 3,200 hand-authored audit
+scenarios and 540 XMage-ported ones) live in
+[gorge-compliance](https://github.com/adams-shaun/gorge-compliance)
+(`scenarios/oracle/`, `scenarios/xmageport/`), whose `audit/` drivers
+`TestOracleAudit` and `TestXMagePortScenarios` play them against a pinned
+gorge. Run one card there with `make oracle-audit ORACLE_RUN=<Card_Name>`.
 
-Two per-card ratchets sit beside the scenarios:
+gorge keeps the runner and the few scenario files its own card tests load
+(`engine/rules/testdata/oracle/<family>/`); `TestOracleRunnerContract`
+(`engine/rules/oracle_contract_test.go`) plays them through the exported API
+gorge-compliance uses, so a runner change that would break it fails here.
+
+Two per-card ratchets sit beside the scenarios in gorge-compliance:
 
 - `<family>/known-divergent/<slug>.json`: scenarios known to fail. A listed
   scenario that now passes is stale and fails the build until you delete its
@@ -71,7 +80,9 @@ Two per-card ratchets sit beside the scenarios:
 - `<family>/known-unconsumed/<slug>.json`: scenarios with a scripted answer
   no decision used. Rows are only ever deleted.
 
-`TestOracleScenarioFilesWellFormed` checks the schema and needs no corpus.
+gorge-compliance's `TestOracleScenarioFilesWellFormed` checks the schema and
+needs no corpus; in gorge, `TestOracleScenarioShapeCheck` does the same for
+the residual files.
 
 ## Ratchets and goldens: what a failure means
 

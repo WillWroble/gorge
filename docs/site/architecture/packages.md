@@ -44,6 +44,6 @@ go run ./cmd/pkgmap > docs/site/architecture/_generated_packages.md
 | `scripts/` | contributor and CI helpers: CI sharding, smokes, enginebench, the docs sets renderer | TOOL |
 | `docs/` | agent guide (`docs/agents/`), design docs (`docs/design/`), decisions (`docs/decisions/`), this site (`docs/site/`) | SUPP |
 
-The oracle drivers, training scripts and research packages that used to sit
-under `lab/` moved to a private companion repository on 2026-10-16 and are
-not listed here.
+The training scripts and research packages that used to sit under `lab/`
+moved to a private companion repository on 2026-10-16, and the oracle drivers
+to the public [gorge-compliance](https://github.com/adams-shaun/gorge-compliance); neither is listed here.
