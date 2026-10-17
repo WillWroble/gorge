@@ -505,7 +505,7 @@ func (e *engineEnv) advance() (*Point, error) {
 				}
 				// Under priorTopK the network keeps the point's best
 				// candidates (after nameKeys, which may merge two).
-				if res := e.deferPrior(pd, in, kind, cands, e.cfg.priorTopK); res != nil {
+				if res := e.deferPrior(pd, in, kind, cands, e.cfg.priorTopK, true); res != nil {
 					e.cur, e.cands = pd, cands
 					if e.cfg.priorTopK > 0 {
 						countTopK(e.cfg.stats, true, 0)
@@ -609,7 +609,7 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 	if cut {
 		e.cfg.stats.Truncated++
 	}
-	if res := e.deferPrior(pd, in, kind, cands, topK); res != nil {
+	if res := e.deferPrior(pd, in, kind, cands, topK, false); res != nil {
 		for i := range cands {
 			cands[i].key = Key(oppKeyPrefix + string(cands[i].key))
 		}
@@ -647,13 +647,21 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 // candidates. The closure ranks cands as rankedPrior does (it reads their
 // intents, never their keys, and modifies neither) and returns the ranked
 // keys and prior; it counts PriorFallbacks when it runs.
-func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int) func() ([]Key, []float64) {
+func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int, seat bool) func() ([]Key, []float64) {
 	net := e.cfg.priorNet()
 	if !e.cfg.lazyPrior || net == nil || (topK > 0 && len(cands) > topK) {
 		return nil
 	}
 	return func() ([]Key, []float64) {
-		kept, prior, fell, _ := rankedPrior(net, topK, e.e, pd, in, kind, cands, e.cfg.priorView())
+		// Resolved while the walk still stands at the searching seat's
+		// point, the prior carries the walk's next leaf out too
+		// (leafShared), as advance's eager prior does.
+		var leaf *float64
+		if seat && e.cur == pd && e.cfg.leafShared() {
+			leaf = &e.leafV
+		}
+		kept, prior, fell, _ := rankedPriorLeaf(net, topK, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
+		e.leafOK = leaf != nil
 		if fell {
 			e.cfg.stats.PriorFallbacks++
 		}

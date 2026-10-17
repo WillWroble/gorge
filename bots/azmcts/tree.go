@@ -429,11 +429,14 @@ func simulate(top *node, env Env, opts Options, st *Stats) error {
 			return nil
 		}
 		if sel.next == nil {
+			// The node first: a deferred prior resolved at the point can
+			// carry the leaf out (deferPrior).
+			nn := newNode(next)
 			l := env.Leaf()
 			if l.Err != nil {
 				return l.Err
 			}
-			sel.next = newNode(next)
+			sel.next = nn
 			sel.next.n, sel.next.w = 1, l.V
 			st.Expanded++
 			if next.Opp {
