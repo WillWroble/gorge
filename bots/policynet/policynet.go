@@ -277,7 +277,11 @@ func encodeState(buf *StateBuf, vp *view.View, seat state.PlayerID) State {
 
 	if me := seats[0]; me != nil {
 		for c, key := range poolKeys {
-			dense[densePool0+c] = float32(me.Pool[key])
+			if me.Mana.OK {
+				dense[densePool0+c] = float32(me.Mana.Pool[c])
+			} else {
+				dense[densePool0+c] = float32(me.Pool[key])
+			}
 		}
 	}
 

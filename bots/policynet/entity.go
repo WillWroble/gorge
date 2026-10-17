@@ -307,17 +307,7 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 		set(entDamaged, 1)
 	}
 	for _, k := range cv.Keywords {
-		hit := false
-		for i, w := range keywordBits {
-			if strings.EqualFold(k, w) {
-				set(entKwOff+i, 1)
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			set(entKwOff+len(keywordBits), 1)
-		}
+		set(entKwOff+keywordBit(k), 1) // len(keywordBits) is "other"
 	}
 	if zone == entZoneBf {
 		if cv.Tapped {
@@ -327,7 +317,7 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 			set(entSick, 1)
 		}
 		if creature {
-			if !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, "Haste")) && !hasKeyword(cv, "Defender") {
+			if !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, kwHaste)) && !hasKeyword(cv, kwDefender) {
 				set(entCanAttack, 1)
 			}
 			if !cv.Tapped {
@@ -381,7 +371,7 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 	}
 	mv := int32(cardManaValue(cv))
 	set(entManaValue, float32(mv)/5)
-	if fold&cards.TypeInstant != 0 || hasKeyword(cv, "Flash") {
+	if fold&cards.TypeInstant != 0 || hasKeyword(cv, kwFlash) {
 		set(entInstant, 1)
 	}
 	if zone == entZoneHand && fold&cards.TypeLand == 0 && mv <= avail {

@@ -3,6 +3,8 @@ package policynet
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
@@ -140,6 +142,53 @@ var keywordBits = [...]string{
 	"Protection", "Undying", "Persist", "Evolve", "Exalted", "Dethrone",
 	"Prowess", "Storm", "Affinity", "Kicker", "Flashback", "Convoke",
 	"Cycling",
+}
+
+// keywordBits indices the encoders test by name.
+const (
+	kwFlying   = 0
+	kwHaste    = 2
+	kwFlash    = 9
+	kwDefender = 12
+)
+
+// keywordBit is the index of the keywordBits word k equals under
+// strings.EqualFold, or len(keywordBits) for any other keyword. A
+// CardView's keywords are the engine's compiled keyword strings -- the same
+// few every encode -- so the answer is memoised by the string's identity
+// (its bytes' address and length, which fix its content): after the first
+// sight a keyword is one compare, not a fold against every word. A
+// collision only recomputes.
+func keywordBit(k string) int {
+	if len(k) == 0 {
+		return keywordBitOf(k)
+	}
+	p := unsafe.StringData(k)
+	slot := &keywordBitMemo[(uintptr(unsafe.Pointer(p))>>3^uintptr(len(k)))%uintptr(len(keywordBitMemo))]
+	if en := slot.Load(); en != nil && unsafe.StringData(en.s) == p && len(en.s) == len(k) {
+		return int(en.bit)
+	}
+	en := &keywordBitEntry{s: k, bit: int8(keywordBitOf(k))}
+	slot.Store(en)
+	return int(en.bit)
+}
+
+func keywordBitOf(k string) int {
+	for i, w := range keywordBits {
+		if strings.EqualFold(k, w) {
+			return i
+		}
+	}
+	return len(keywordBits)
+}
+
+// keywordBitMemo is keywordBit's direct-mapped memo of immutable entries;
+// an entry holds its string, so the bytes cannot be reused while cached.
+var keywordBitMemo [512]atomic.Pointer[keywordBitEntry]
+
+type keywordBitEntry struct {
+	s   string
+	bit int8
 }
 
 // Zone classes for the zone/ownership bits: (mine?0:4) + zoneIndex.
@@ -290,15 +339,9 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 	kwOther := false
 	if card != nil {
 		for _, k := range card.cv.Keywords {
-			hit := false
-			for i, w := range keywordBits {
-				if strings.EqualFold(k, w) {
-					set(kwOffset + i)
-					hit = true
-					break
-				}
-			}
-			if !hit {
+			if i := keywordBit(k); i < len(keywordBits) {
+				set(kwOffset + i)
+			} else {
 				kwOther = true
 			}
 		}
@@ -376,29 +419,29 @@ func (x *OptionEncoder) encodeV1(d decision.Kind, o decision.Option, idx, n int)
 	}
 	dense[odGroup] = float32(boolInt(o.Group != ""))
 
-	// Hashed ids, in the fixed order documented at Option.Hashed.
+	// Hashed ids, in the fixed order documented at Option.Hashed: hashID of
+	// "card|<name>" (or "card|player"), of that id + "\x1f" + the attacker
+	// description, and of "optkind|<kind>", streamed (hashstream.go) rather
+	// than concatenated.
 	var hashed []Feature
-	cardID := ""
-	if isPlayer {
-		cardID = "card|player"
-	} else if card != nil {
-		cardID = "card|" + card.cv.Name
-	}
-	if cardID != "" {
-		desc := "none"
-		if o.Attacker != 0 {
-			if aref, ok := x.lookup(o.Attacker); ok {
-				desc = "atk|" + aref.cv.Name
-			} else {
-				desc = "atk|unknown"
-			}
+	if isPlayer || card != nil {
+		var cardH uint64
+		if isPlayer {
+			cardH = fnvAdd(fnvOffset, "card|player")
+		} else {
+			cardH = fnvAdd(fnvAdd(fnvOffset, "card|"), card.cv.Name)
 		}
-		hashed = append(hashed,
-			Feature{Row: hashID(cardID), Value: 1},
-			Feature{Row: hashID(cardID + "\x1f" + desc), Value: 1},
-		)
+		descH := fnvAdd(cardH, "\x1f")
+		if o.Attacker == 0 {
+			descH = fnvAdd(descH, "none")
+		} else if aref, ok := x.lookup(o.Attacker); ok {
+			descH = fnvAdd(fnvAdd(descH, "atk|"), aref.cv.Name)
+		} else {
+			descH = fnvAdd(descH, "atk|unknown")
+		}
+		hashed = append(hashed, Feature{Row: fnvRow(cardH), Value: 1}, Feature{Row: fnvRow(descH), Value: 1})
 	}
-	hashed = append(hashed, Feature{Row: hashID("optkind|" + o.Kind), Value: 1})
+	hashed = append(hashed, Feature{Row: fnvRow(fnvAdd(fnvAdd(fnvOffset, "optkind|"), o.Kind)), Value: 1})
 
 	return Option{Slots: slots, Hashed: hashed, Dense: dense}
 }
@@ -660,6 +703,12 @@ func availableTotal(v view.View, seat state.PlayerID) float32 {
 			continue
 		}
 		var total int64
+		if pv.Mana.OK {
+			for c := range poolKeys {
+				total += int64(pv.Mana.Pool[c]) + int64(pv.Mana.Available[c])
+			}
+			return float32(total)
+		}
 		for _, key := range poolKeys {
 			total += int64(pv.Pool[key]) + int64(pv.Available[key])
 		}
