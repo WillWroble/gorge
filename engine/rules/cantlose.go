@@ -7,7 +7,9 @@
 // loss simply does not happen: the condition (0 or less life, ten poison, an
 // empty-library draw, an "you lose the game" effect) stays true and the player
 // loses the moment the replacement is gone and state-based actions are next
-// checked (CR 704.5a-c).
+// checked (CR 704.5a, c). An attempted empty-library draw is the exception: it
+// is a one-shot condition (CR 704.5b, "since the last time state-based actions
+// were checked"), consumed by the check the replacement stopped.
 //
 // This file is the ONE gate every loss and alternate win funnels through:
 //
@@ -117,6 +119,16 @@ func (e *Engine) playerWins(p state.PlayerID, text string) bool {
 	}
 	e.emit(events.Event{Kind: events.GameOver, Player: p, Text: text})
 	return true
+}
+
+// markDrawEmpty records p's attempted draw from an empty library (CR 121.4).
+// The loss is CR 704.5b's, emitted by the next state-based check; a second
+// attempt before that check adds nothing.
+func (e *Engine) markDrawEmpty(p state.PlayerID) {
+	if int(p) < 0 || int(p) >= len(e.G.Players) || e.G.Players[p].Lost || e.G.Players[p].DrewFromEmpty {
+		return
+	}
+	e.emit(events.Event{Kind: events.DrawEmpty, Player: p})
 }
 
 // EmitPlayerLost implements effects.Host: effects reaches the one loss gate

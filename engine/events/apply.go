@@ -307,6 +307,8 @@ func applyKind(g *state.Game, e *Event) {
 		foldSpellCastReversed(g, e)
 	case HiddenIdentity:
 		foldHiddenIdentity(g, e)
+	case DrawEmpty:
+		foldDrawEmpty(g, e)
 	case ChaosEnsues:
 		// The chaos-ensues marker (CR 901.9, task planar-verbs) is a pure
 		// marker, exactly like PlanarRoll: no state folds. The current plane's

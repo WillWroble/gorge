@@ -28,6 +28,7 @@ func TestHeraldPreventsEmptyLibraryLossInCastDrawPaths(t *testing.T) {
 			}
 
 			draw.call(e)
+			e.checkStateBased()
 			if e.G.Players[0].Lost {
 				t.Fatal("Herald did not prevent the cast-flow empty-library loss")
 			}
@@ -38,9 +39,11 @@ func TestHeraldPreventsEmptyLibraryLossInCastDrawPaths(t *testing.T) {
 			}
 
 			// Negative control: the same attempted empty-library draw must lose
-			// as soon as Herald leaves and the next draw proposes the loss.
+			// as soon as Herald leaves and the next check after a new attempt
+			// proposes the loss (CR 704.5b is one-shot per check).
 			e.emit(events.Event{Kind: events.MoveZone, Obj: hid, From: state.ZBattlefield, To: state.ZGraveyard})
 			draw.call(e)
+			e.checkStateBased()
 			if !e.G.Players[0].Lost {
 				t.Fatal("seat 0 must lose to the empty library once Herald is gone")
 			}

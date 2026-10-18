@@ -15,6 +15,7 @@ import (
 func foldPlayerLost(g *state.Game, e *Event) {
 	if validPlayer(g, e.Player) {
 		g.Players[e.Player].Lost = true
+		g.Players[e.Player].DrewFromEmpty = false
 		// CR 723.4/723.5: a player-controlling effect ends when either
 		// participant leaves the game, so a lost seat's control folds are
 		// cleared here, in the one fold that observes the loss. Clear both
@@ -39,6 +40,15 @@ func foldPlayerLost(g *state.Game, e *Event) {
 			delete(g.ControlledBy, subj)
 			delete(g.ControlArmedTurn, subj)
 		}
+	}
+}
+
+// foldDrawEmpty folds Kind DrawEmpty: Amount 0 marks Player's attempted
+// draw from an empty library (CR 121.4), Amount 1 is the state-based check
+// consuming a mark whose loss a replacement stopped (CR 704.5b).
+func foldDrawEmpty(g *state.Game, e *Event) {
+	if validPlayer(g, e.Player) {
+		g.Players[e.Player].DrewFromEmpty = e.Amount == 0
 	}
 }
 

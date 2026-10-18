@@ -9,6 +9,11 @@ type Player struct {
 	Life        int32
 	Lost        bool
 	LandsPlayed int32
+	// DrewFromEmpty is set when this player attempted to draw from an empty
+	// library since state-based actions were last checked (CR 704.5b);
+	// rules' next check turns it into the loss. Folded only by events.Apply
+	// (DrawEmpty sets or clears it, PlayerLost clears it); clone copies it.
+	DrewFromEmpty bool
 	// CoinFlipsThisTurn counts canonical flip-result Notes. Folded by
 	// events.Apply and cleared at TurnChange; clone copies this scalar.
 	CoinFlipsThisTurn int32

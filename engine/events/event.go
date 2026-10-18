@@ -1205,10 +1205,23 @@ const (
 	// golden game. Appended after SpellCastReversed so every earlier ordinal,
 	// hash chain and golden replay is unchanged.
 	HiddenIdentity
+	// DrawEmpty records that Player attempted to draw a card from an empty
+	// library (CR 121.4). The draw itself does not end the game: CR 704.5b
+	// makes the loss a state-based action, so the fold only sets
+	// state.Player.DrewFromEmpty (Amount 0) and rules' next state-based
+	// check emits the ordinary PlayerLost for a flagged player, or -- when a
+	// GameLoss CantHappen replacement stops that loss -- this event again
+	// with Amount 1, which clears the flag (the condition is "since the last
+	// time state-based actions were checked", so it is consumed either way).
+	// The rest of the resolution that attempted the draw still happens, and
+	// a player who loses for another reason before that check loses at the
+	// same time (CR 704.3). Appended after HiddenIdentity so every earlier
+	// ordinal, hash chain and golden replay is unchanged.
+	DrawEmpty
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(HiddenIdentity) + 1
+	NumKinds = int(DrawEmpty) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving

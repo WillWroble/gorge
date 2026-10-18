@@ -81,7 +81,12 @@ func drawFor(h Host, p state.PlayerID, cursor int, resumeSA *cards.SA, upto draw
 	g := h.Game()
 	lib := zoneOf(g, state.ZLibrary, p)
 	if len(lib) == 0 {
-		h.EmitPlayerLost(p, "Milled", "drew from an empty library")
+		// CR 121.4, 704.5b: the attempted draw marks the player; the loss
+		// is the next state-based check's, so the rest of this resolution
+		// still happens. One mark per check is enough.
+		if int(p) < len(g.Players) && !g.Players[p].Lost && !g.Players[p].DrewFromEmpty {
+			h.Emit(events.Event{Kind: events.DrawEmpty, Player: p})
+		}
 		return false
 	}
 	// A DrawFor reached while the resolution is already suspended: a caller

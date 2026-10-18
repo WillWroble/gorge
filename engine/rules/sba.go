@@ -11,12 +11,10 @@
 // eliminated player's permanents leave the battlefield; the game ends in a
 // win when exactly one seat remains and a draw (CR 104.4a) when none do --
 // not, as stubs.go's own checkGameOver used to, an unconditional win for
-// seat 0 when nobody survived. Drawing from an empty library (CR 704.5c) is
-// already a loss as of Task 14 (effects.DrawFor emits PlayerLost directly at
-// the moment of the failed draw, which checkStateBased's own permanent-
-// removal pass below picks up on its next run regardless of how a player
-// came to be Lost); this build has no poison-counter mechanic, so CR
-// 704.5b's poison loss is checked with life and commander damage below.
+// seat 0 when nobody survived. An attempted draw from an empty library
+// (CR 121.4) only marks the player (events.DrawEmpty); the CR 704.5b loss is
+// emitted here, at the next check, beside 704.5a's life loss and 704.5c's
+// poison loss, so simultaneous losses end the game in a draw (CR 104.4a).
 
 package rules
 
@@ -807,10 +805,10 @@ func (e *Engine) annihilateOppositeCounters() bool {
 // checkLoseConditions applies CR 704.5a (life 0 or less) to every player not
 // already marked Lost, in fixed seat order (Players is a slice walked by
 // index, never a map, so simultaneous eliminations always emit in the same
-// order run to run). It then separately sweeps every Lost player -- from
-// life loss just above, from an empty-library draw (effects.DrawFor, which
-// emits PlayerLost directly, independent of this loop, at the moment the
-// draw fails), or from any future cause -- and applies CR 800.4a: their
+// order run to run), then CR 704.5b (an attempted draw from an empty
+// library since the last check) and 704.5c (poison). It then separately
+// sweeps every Lost player -- from the losses just above, from an effect's
+// "you lose the game", or from any future cause -- and applies CR 800.4a: their
 // owned cards and controlled battlefield/stack objects cease to exist.
 // Doing this generically, keyed only on p.Lost rather than on which branch
 // just set it, gives every kind of departure the same cleanup path.
@@ -853,7 +851,23 @@ func (e *Engine) checkLoseConditions(tried *sbaAttempts) bool {
 			}
 		}
 	}
-	// CR 704.5b: a player with ten or more poison counters loses. Ward's
+	// CR 704.5b: a player who attempted to draw from an empty library since
+	// the last check loses. The mark (state.Player.DrewFromEmpty, set by
+	// markDrawEmpty / effects' drawFor) is consumed either way: a loss a
+	// GameLoss replacement stops is not retried by a later check unless the
+	// player attempts another such draw.
+	for i := range e.G.Players {
+		p := &e.G.Players[i]
+		if p.Lost || !p.DrewFromEmpty {
+			continue
+		}
+		if e.playerLoses(p.ID, loseReasonMilled, "drew from an empty library") {
+			changed = true
+		} else {
+			e.emit(events.Event{Kind: events.DrawEmpty, Player: p.ID, Amount: 1})
+		}
+	}
+	// CR 704.5c: a player with ten or more poison counters loses. Ward's
 	// AddCounterYou<N/POISON> cost emits PlayerCounterChange, so this belongs
 	// in the shared SBA pass rather than in Ward's payment implementation.
 	for i := range e.G.Players {
