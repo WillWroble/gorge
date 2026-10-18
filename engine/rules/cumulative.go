@@ -161,6 +161,10 @@ type triggeredEffectCost struct {
 	// removes (RemoveAnyCounter<N/Any/CARDNAME>), recorded in cost order by
 	// subCounterKindAsk and settled by subCounterSettle.
 	counterPicks []string
+	// counterObjs is the permanent each unit of a filtered fixed-kind part
+	// (RemoveAnyCounter<3/QUEST/Permanent>) comes off, one entry per counter,
+	// recorded by subCounterAmongAsk and settled by subCounterSettle.
+	counterObjs []state.ObjID
 	// res is the pay-first funding state (respay.go): the pay/decline
 	// election is posed before any mana window, and a pay the pool does not
 	// cover is funded afterwards, by the planner or the manual window.
@@ -1643,6 +1647,11 @@ func (e *Engine) triggeredCostAnswer(chosen []decision.Option) {
 		tc.xPaid = x
 		e.triggeredCostPaymentAsk()
 		return
+	case triggeredCostAnswerTriggerCostAmong:
+		// The permanent pick of one unit of a filtered counter-removal part.
+		tc.counterObjs = append(tc.counterObjs, chosen[0].Obj)
+		e.triggeredCostAnswer([]decision.Option{{Kind: "trigger_cost_pay", Obj: tc.source}})
+		return
 	case triggeredCostAnswerTriggerCostCounter:
 		// The counter-kind pick of an "Any" SubCounter unit: record it and
 		// re-enter the pay arm, which asks for the next unit or settles.
@@ -2443,6 +2452,7 @@ const (
 	triggeredCostAnswerTriggerCostX
 	triggeredCostAnswerPayPip
 	triggeredCostAnswerTriggerCostCounter
+	triggeredCostAnswerTriggerCostAmong
 )
 
 var triggeredCostAnswerCodes = state.NewStrCodes(
@@ -2452,6 +2462,7 @@ var triggeredCostAnswerCodes = state.NewStrCodes(
 	state.StrEntry[triggeredCostAnswerCode]{Key: "trigger_cost_blight", Val: triggeredCostAnswerTriggerCostBlight},
 	state.StrEntry[triggeredCostAnswerCode]{Key: "trigger_cost_x", Val: triggeredCostAnswerTriggerCostX},
 	state.StrEntry[triggeredCostAnswerCode]{Key: "trigger_cost_counter", Val: triggeredCostAnswerTriggerCostCounter},
+	state.StrEntry[triggeredCostAnswerCode]{Key: "trigger_cost_among", Val: triggeredCostAnswerTriggerCostAmong},
 	state.StrEntry[triggeredCostAnswerCode]{Key: "pay_W", Val: triggeredCostAnswerPayPip},
 	state.StrEntry[triggeredCostAnswerCode]{Key: "pay_U", Val: triggeredCostAnswerPayPip},
 	state.StrEntry[triggeredCostAnswerCode]{Key: "pay_B", Val: triggeredCostAnswerPayPip},

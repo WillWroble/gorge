@@ -180,3 +180,60 @@ func TestTriggeredCostSubCounterPayable(t *testing.T) {
 		}
 	})
 }
+
+// TestTriggeredCostSubCounterAmongPermanents is the filtered counter-removal
+// trigger cost: Overseer of Vault 76's `ImmediateTrigger | Cost$
+// RemoveAnyCounter<3/QUEST/Permanent/permanents>` ("remove three quest
+// counters from among permanents you control") is a TOTAL across the
+// payer's permanents (CR 118.3), not three counters on the source or on any
+// one permanent. Before the fix the window offered only the decline unless
+// the source itself held all three.
+func TestTriggeredCostSubCounterAmongPermanents(t *testing.T) {
+	// Overseer holds one quest counter and a Grizzly Bears two: no single
+	// permanent holds three, three are held in total.
+	e, overseer := subCounterFixture(t, "Overseer of Vault 76", "QUEST", 1, "Grizzly Bears")
+	bear := searchMoveByName(t, e, "Grizzly Bears", state.ZBattlefield)
+	// The Bears' own entry fires Overseer's First Contact trigger: let it
+	// resolve, then set the exact counts the scenario needs.
+	passUntilStackEmpty(t, e, 30)
+	e.emit(events.Event{Kind: events.CounterChange, Obj: bear, Counter: "QUEST", Amount: 2})
+	if have := e.G.Obj(overseer).Counter("QUEST"); have != 1 {
+		e.emit(events.Event{Kind: events.CounterChange, Obj: overseer, Counter: "QUEST", Amount: 1 - have})
+	}
+	e.pending = nil
+	e.priorityRound()
+	d := subCounterCostAsk(t, e)
+	payIdx := subCounterPayIndex(d)
+	if payIdx < 0 {
+		t.Fatalf("RemoveAnyCounter<3/QUEST/Permanent> with three quest counters among two permanents offers no pay: %+v", d.Options)
+	}
+	submitChoices(t, e, payIdx)
+	// Each unit with more than one holder left is asked; take the bear's
+	// counters first, then the overseer's last one needs no ask.
+	for i := 0; i < 3; i++ {
+		p := e.Pending()
+		if p == nil || p.Kind != decision.KChoose {
+			break
+		}
+		pick := -1
+		for _, o := range p.Options {
+			if o.Obj == bear && pick < 0 {
+				pick = o.Index
+			}
+		}
+		if pick < 0 {
+			pick = 0
+		}
+		submitChoices(t, e, pick)
+	}
+	passUntilStackEmpty(t, e, 30)
+	if got := e.G.Obj(overseer).Counter("QUEST"); got != 0 {
+		t.Errorf("Overseer QUEST = %d after paying, want 0", got)
+	}
+	if got := e.G.Obj(bear).Counter("QUEST"); got != 0 {
+		t.Errorf("Grizzly Bears QUEST = %d after paying, want 0", got)
+	}
+	if got := e.G.Obj(bear).Counter("P1P1"); got != 1 {
+		t.Errorf("the reflexive trigger did not put a +1/+1 counter on the Bears: P1P1 = %d", got)
+	}
+}
