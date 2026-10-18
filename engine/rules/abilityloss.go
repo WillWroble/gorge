@@ -37,11 +37,13 @@ import (
 // earlier layer keeps applying even though the ability generating it is
 // removed in layer 6. The static scan records each static ability's first
 // layer on the effects it emits (state.ContinuousEffect.SourceAbilityLayer):
-// one beginning in layers 1-5 is never dropped; one beginning in layer 6 is
-// dropped only by a removal with an EARLIER timestamp (the removal applied
-// first, so the effect never began -- which is also what orders two removers
-// against each other); one beginning in layer 7, or a rules modification
-// that is no layer effect at all, is dropped by any removal.
+// one beginning in layers 1-5 is never dropped; a REMOVER beginning in layer
+// 6 is dropped only by a removal with an EARLIER timestamp (two removers that
+// can remove each other's abilities are a dependency loop, CR 613.8b, so
+// timestamp order decides); any other effect beginning in layer 6 depends on
+// the removal of its source's abilities (CR 613.8a) and is dropped by any
+// removal, as is one beginning in layer 7 or a rules modification that is no
+// layer effect at all.
 
 // ruleModAbilityLayer is the SourceAbilityLayer of a static-generated rules
 // modification that is not a layer effect (Layer zero: MayPlay,
@@ -187,10 +189,13 @@ func (e *Engine) pruneLostSourceAbilities(list []ContinuousEffect) []ContinuousE
 		case ce.SourceAbilityLayer < LAbilities:
 			// A registered effect (zero), or a static ability that began
 			// applying before layer 6.
-		case ce.SourceAbilityLayer == LAbilities:
-			ts, ok := lossOf(ce.Source)
-			drop = ok && ts < ce.Timestamp
 		default:
+			// A layer-6 effect that is not itself a remover (a keyword grant:
+			// Gnarlid Colony's "creatures you control with a +1/+1 counter
+			// have trample") depends on a removal of its source's abilities
+			// (CR 613.8a: the removal changes its existence), so the removal
+			// applies first whatever the timestamps and the effect never
+			// begins -- the same as an effect beginning in layer 7.
 			_, drop = lossOf(ce.Source)
 		}
 		if isRemover {
