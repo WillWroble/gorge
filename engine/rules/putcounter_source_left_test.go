@@ -82,3 +82,37 @@ func TestPutCounterOnTriggeredLKICopyThatLeftDoesNothing(t *testing.T) {
 		t.Fatalf("the Bears in the graveyard has %d +1/+1 counters, want 0", got)
 	}
 }
+
+// Youthful Valkyrie's "whenever another Angel you control enters, put a
+// +1/+1 counter on this creature" acts on the permanent that triggered. If
+// the Valkyrie leaves the battlefield after the Angel enters but before the
+// trigger is put on the stack (Abyssal Harvester's copy enters, then the same
+// resolution exiles the other Nightmare tokens), the trigger has no
+// battlefield push stamp; it must still do nothing to the new object in the
+// graveyard (CR 400.7; census pair 3285). A Valkyrie that stays gets its
+// counter.
+func TestPutCounterOnSourceThatLeftBeforeItsTriggerWasPushedDoesNothing(t *testing.T) {
+	for _, leaves := range []bool{false, true} {
+		e, _ := fdnCensusEngine(t, "Youthful Valkyrie", "Vanguard Seraph")
+		valk := moveByName(t, e, 0, "Youthful Valkyrie", state.ZBattlefield)
+		e.pending = nil
+		moveByName(t, e, 0, "Vanguard Seraph", state.ZBattlefield)
+		if len(e.pendingTriggers) == 0 {
+			t.Fatal("precondition: the Angel's entry queued no Valkyrie trigger")
+		}
+		if leaves {
+			e.emit(events.Event{Kind: events.MoveZone, Obj: valk, From: state.ZBattlefield, To: state.ZGraveyard})
+		}
+		e.putTriggersOnStack()
+		for i := 0; i < 5 && len(e.G.Stack) > 0; i++ {
+			e.resolveTop()
+		}
+		want := int32(1)
+		if leaves {
+			want = 0
+		}
+		if got := e.G.Obj(valk).Counter("P1P1"); got != want {
+			t.Fatalf("leaves=%v: Youthful Valkyrie in %s has %d +1/+1 counters, want %d", leaves, e.G.Obj(valk).Zone, got, want)
+		}
+	}
+}

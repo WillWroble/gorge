@@ -295,7 +295,7 @@ func effPutCounter(h Host, c *Ctx, sa *cards.SA) {
 		if o == nil {
 			continue
 		}
-		if putCounterReferentLeft(h.Game(), c, sa, o) {
+		if putCounterReferentLeft(h, c, sa, o) {
 			continue
 		}
 		// Adapt$'s put is itself conditional (CR 702.35a: "If this creature has
@@ -1286,8 +1286,8 @@ var putCounterChooserForCodes = state.NewStrCodes(
 //     +1/+1 counters on it -- it must survive"), whose trigger-time object
 //     is the last-known battlefield permanent, when it is no longer on the
 //     battlefield.
-func putCounterReferentLeft(g *state.Game, c *Ctx, sa *cards.SA, o *state.Object) bool {
-	if sourceLeftSincePush(g, c, o) {
+func putCounterReferentLeft(h Host, c *Ctx, sa *cards.SA, o *state.Object) bool {
+	if sourceLeftSincePush(h, c, o) {
 		return true
 	}
 	if o.Zone == state.ZBattlefield || sa == nil {
@@ -1303,11 +1303,29 @@ func putCounterReferentLeft(g *state.Game, c *Ctx, sa *cards.SA, o *state.Object
 // as a later incarnation: the permanent the ability names no longer exists
 // (CR 400.7), and an effect acting on "this permanent" does nothing to the
 // card in its new zone.
-func sourceLeftSincePush(g *state.Game, c *Ctx, o *state.Object) bool {
+//
+// A triggered ability whose source left the battlefield after it triggered
+// but before it was put on the stack (Youthful Valkyrie exiled by the same
+// Abyssal Harvester resolution whose token copy triggered it) has no
+// battlefield push stamp; the host's departure record answers that case
+// (rules: the source-characteristic LKI captured when a source with a
+// waiting ability leaves the battlefield, carried onto the stack object at
+// TriggerPush).
+func sourceLeftSincePush(h Host, c *Ctx, o *state.Object) bool {
 	if o.ID != c.Source || c.ResolvingObj == 0 {
 		return false
 	}
-	ro := g.Obj(c.ResolvingObj)
-	return ro != nil && ro.PushSourceOnBattlefield && ro.Source == o.ID &&
-		(o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation)
+	ro := h.Game().Obj(c.ResolvingObj)
+	if ro == nil || ro.Source != o.ID {
+		return false
+	}
+	if ro.PushSourceOnBattlefield {
+		return o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation
+	}
+	if dh, ok := h.(interface {
+		SourceLeftBattlefieldSince(stack state.ObjID) bool
+	}); ok {
+		return dh.SourceLeftBattlefieldSince(c.ResolvingObj)
+	}
+	return false
 }

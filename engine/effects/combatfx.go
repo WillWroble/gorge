@@ -494,7 +494,7 @@ func effAnimate(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := h.Game().Obj(t.Obj)
-		if o == nil || sourceLeftSincePush(h.Game(), c, o) {
+		if o == nil || sourceLeftSincePush(h, c, o) {
 			// "This land becomes a 3/3 creature" names the permanent that
 			// activated it: a Soulstone Sanctuary put into its library in
 			// response is a new object the animation never reaches (CR

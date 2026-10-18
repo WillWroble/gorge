@@ -8062,17 +8062,14 @@
     },
     {
       "seq": 1466,
-      "kind": 15,
-      "obj": 41,
-      "amount": 1,
-      "counter": "P1P1"
-    },
-    {
-      "seq": 1467,
       "kind": 2,
       "obj": 85,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 1467,
+      "kind": 10
     },
     {
       "seq": 1468,
@@ -8080,17 +8077,19 @@
     },
     {
       "seq": 1469,
-      "kind": 10
-    },
-    {
-      "seq": 1470,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1471,
+      "seq": 1470,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1471,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1472,
@@ -8100,26 +8099,24 @@
     },
     {
       "seq": 1473,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1474,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1475,
+      "seq": 1474,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1476,
+      "seq": 1475,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 1476,
+      "kind": 10
     },
     {
       "seq": 1477,
@@ -8127,17 +8124,19 @@
     },
     {
       "seq": 1478,
-      "kind": 10
-    },
-    {
-      "seq": 1479,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1480,
+      "seq": 1479,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1480,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1481,
@@ -8147,30 +8146,28 @@
     },
     {
       "seq": 1482,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1483,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1484,
+      "seq": 1483,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1485,
+      "seq": 1484,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 1486,
+      "seq": 1485,
       "kind": 28
+    },
+    {
+      "seq": 1486,
+      "kind": 10
     },
     {
       "seq": 1487,
@@ -8178,17 +8175,19 @@
     },
     {
       "seq": 1488,
-      "kind": 10
-    },
-    {
-      "seq": 1489,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1490,
+      "seq": 1489,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1490,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1491,
@@ -8198,26 +8197,24 @@
     },
     {
       "seq": 1492,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1493,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1494,
+      "seq": 1493,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1495,
+      "seq": 1494,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 1495,
+      "kind": 10
     },
     {
       "seq": 1496,
@@ -8225,17 +8222,19 @@
     },
     {
       "seq": 1497,
-      "kind": 10
-    },
-    {
-      "seq": 1498,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1499,
+      "seq": 1498,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1499,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1500,
@@ -8245,70 +8244,69 @@
     },
     {
       "seq": 1501,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1502,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1503,
+      "seq": 1502,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1504,
+      "seq": 1503,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 1505,
+      "seq": 1504,
       "kind": 10
     },
     {
-      "seq": 1506,
+      "seq": 1505,
       "kind": 9,
       "player": 1,
       "amount": 12
     },
     {
-      "seq": 1507,
+      "seq": 1506,
       "kind": 8
     },
     {
-      "seq": 1508,
+      "seq": 1507,
       "kind": 7,
       "obj": 67
     },
     {
-      "seq": 1509,
+      "seq": 1508,
       "kind": 7,
       "obj": 70
     },
     {
-      "seq": 1510,
+      "seq": 1509,
       "kind": 7,
       "obj": 62
     },
     {
-      "seq": 1511,
+      "seq": 1510,
       "kind": 7,
       "obj": 74
     },
     {
-      "seq": 1512,
+      "seq": 1511,
       "kind": 7,
       "obj": 65
     },
     {
-      "seq": 1513,
+      "seq": 1512,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 1513,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1514,
@@ -8317,20 +8315,20 @@
     },
     {
       "seq": 1515,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1516,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1517,
+      "seq": 1516,
       "kind": 21,
       "player": 1,
       "text": "priority:[5]"
+    },
+    {
+      "seq": 1517,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1518,
@@ -8339,31 +8337,31 @@
     },
     {
       "seq": 1519,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1520,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1521,
+      "seq": 1520,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1522,
+      "seq": 1521,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 1523,
+      "seq": 1522,
       "kind": 3,
       "player": 1,
       "obj": 59,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 1523,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1524,
@@ -8372,20 +8370,20 @@
     },
     {
       "seq": 1525,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1526,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1527,
+      "seq": 1526,
       "kind": 21,
       "player": 1,
       "text": "priority:[5]"
+    },
+    {
+      "seq": 1527,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1528,
@@ -8394,23 +8392,23 @@
     },
     {
       "seq": 1529,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1530,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1531,
+      "seq": 1530,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1532,
+      "seq": 1531,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 1532,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1533,
@@ -8419,164 +8417,159 @@
     },
     {
       "seq": 1534,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1535,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1536,
+      "seq": 1535,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1537,
+      "seq": 1536,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1538,
+      "seq": 1537,
       "kind": 6,
       "obj": 67
     },
     {
-      "seq": 1539,
+      "seq": 1538,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 1540,
+      "seq": 1539,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1541,
+      "seq": 1540,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1542,
+      "seq": 1541,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1543,
+      "seq": 1542,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1544,
+      "seq": 1543,
       "kind": 6,
       "obj": 70
     },
     {
-      "seq": 1545,
+      "seq": 1544,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1546,
+      "seq": 1545,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1547,
+      "seq": 1546,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1548,
+      "seq": 1547,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1549,
+      "seq": 1548,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1550,
+      "seq": 1549,
       "kind": 6,
       "obj": 62
     },
     {
-      "seq": 1551,
+      "seq": 1550,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 1552,
+      "seq": 1551,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1553,
+      "seq": 1552,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1554,
+      "seq": 1553,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1555,
+      "seq": 1554,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1556,
+      "seq": 1555,
       "kind": 6,
       "obj": 74
     },
     {
-      "seq": 1557,
+      "seq": 1556,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1558,
+      "seq": 1557,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1559,
+      "seq": 1558,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1560,
+      "seq": 1559,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 1561,
+      "seq": 1560,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1562,
+      "seq": 1561,
       "kind": 11,
       "player": 1,
       "obj": 49,
@@ -8585,35 +8578,40 @@
       "text": "Goblin Boarders"
     },
     {
-      "seq": 1563,
+      "seq": 1562,
       "kind": 13,
       "player": 1,
       "amount": -2,
       "counter": "W"
     },
     {
-      "seq": 1564,
+      "seq": 1563,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "R"
     },
     {
-      "seq": 1565,
+      "seq": 1564,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1566,
+      "seq": 1565,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1567,
+      "seq": 1566,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1567,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1568,
@@ -8622,31 +8620,31 @@
     },
     {
       "seq": 1569,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1570,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1571,
+      "seq": 1570,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1572,
+      "seq": 1571,
       "kind": 12,
       "obj": 49,
       "text": "Goblin Boarders"
     },
     {
-      "seq": 1573,
+      "seq": 1572,
       "kind": 2,
       "obj": 49,
       "from": 5,
       "to": 2
+    },
+    {
+      "seq": 1573,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1574,
@@ -8655,20 +8653,20 @@
     },
     {
       "seq": 1575,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1576,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1577,
+      "seq": 1576,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1577,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1578,
@@ -8677,27 +8675,27 @@
     },
     {
       "seq": 1579,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1580,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1581,
+      "seq": 1580,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1582,
+      "seq": 1581,
       "kind": 8,
       "step": 4
     },
     {
-      "seq": 1583,
+      "seq": 1582,
       "kind": 14,
+      "player": 1
+    },
+    {
+      "seq": 1583,
+      "kind": 10,
       "player": 1
     },
     {
@@ -8707,20 +8705,20 @@
     },
     {
       "seq": 1585,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1586,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1587,
+      "seq": 1586,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1587,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1588,
@@ -8729,49 +8727,49 @@
     },
     {
       "seq": 1589,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1590,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1591,
+      "seq": 1590,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1592,
+      "seq": 1591,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 1593,
+      "seq": 1592,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1594,
+      "seq": 1593,
       "kind": 16
     },
     {
-      "seq": 1595,
+      "seq": 1594,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1596,
+      "seq": 1595,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1597,
+      "seq": 1596,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1597,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1598,
@@ -8780,23 +8778,23 @@
     },
     {
       "seq": 1599,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1600,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1601,
+      "seq": 1600,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1602,
+      "seq": 1601,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 1602,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1603,
@@ -8805,20 +8803,20 @@
     },
     {
       "seq": 1604,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1605,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1606,
+      "seq": 1605,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1606,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1607,
@@ -8827,27 +8825,27 @@
     },
     {
       "seq": 1608,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1609,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1610,
+      "seq": 1609,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1611,
+      "seq": 1610,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 1612,
+      "seq": 1611,
       "kind": 28
+    },
+    {
+      "seq": 1612,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1613,
@@ -8856,20 +8854,20 @@
     },
     {
       "seq": 1614,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1615,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1616,
+      "seq": 1615,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1616,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1617,
@@ -8878,23 +8876,23 @@
     },
     {
       "seq": 1618,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1619,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1620,
+      "seq": 1619,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1621,
+      "seq": 1620,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 1621,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1622,
@@ -8903,20 +8901,20 @@
     },
     {
       "seq": 1623,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1624,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1625,
+      "seq": 1624,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1625,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1626,
@@ -8925,57 +8923,56 @@
     },
     {
       "seq": 1627,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1628,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1629,
+      "seq": 1628,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 1630,
+      "seq": 1629,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 1631,
+      "seq": 1630,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1632,
+      "seq": 1631,
       "kind": 9,
       "amount": 13
     },
     {
-      "seq": 1633,
+      "seq": 1632,
       "kind": 8
     },
     {
-      "seq": 1634,
+      "seq": 1633,
       "kind": 7,
       "obj": 28
     },
     {
-      "seq": 1635,
+      "seq": 1634,
       "kind": 7,
       "obj": 29
     },
     {
-      "seq": 1636,
+      "seq": 1635,
       "kind": 7,
       "obj": 5
     },
     {
-      "seq": 1637,
+      "seq": 1636,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 1637,
+      "kind": 10
     },
     {
       "seq": 1638,
@@ -8983,17 +8980,19 @@
     },
     {
       "seq": 1639,
-      "kind": 10
-    },
-    {
-      "seq": 1640,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1641,
+      "seq": 1640,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1641,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1642,
@@ -9003,33 +9002,31 @@
     },
     {
       "seq": 1643,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1644,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1645,
+      "seq": 1644,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1646,
+      "seq": 1645,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 1647,
+      "seq": 1646,
       "kind": 3,
       "obj": 15,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 1647,
+      "kind": 10
     },
     {
       "seq": 1648,
@@ -9037,17 +9034,19 @@
     },
     {
       "seq": 1649,
-      "kind": 10
-    },
-    {
-      "seq": 1650,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1651,
+      "seq": 1650,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1651,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1652,
@@ -9057,26 +9056,24 @@
     },
     {
       "seq": 1653,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1654,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1655,
+      "seq": 1654,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1656,
+      "seq": 1655,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 1656,
+      "kind": 10
     },
     {
       "seq": 1657,
@@ -9084,24 +9081,20 @@
     },
     {
       "seq": 1658,
-      "kind": 10
-    },
-    {
-      "seq": 1659,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1660,
+      "seq": 1659,
       "kind": 21,
-      "text": "priority:[];announce:b6f0b5e950395587f439cd512f2753417c3850cb862252eed86d847ea614d1d2"
+      "text": "priority:[];announce:d0e6dc5f587639fee83b8cdbea1602bbb35833a61a2871ef0c3fc2cb7a904b7e"
     },
     {
-      "seq": 1661,
+      "seq": 1660,
       "kind": 10
     },
     {
-      "seq": 1662,
+      "seq": 1661,
       "kind": 11,
       "obj": 14,
       "from": 1,
@@ -9109,56 +9102,62 @@
       "text": "Hare Apparent"
     },
     {
-      "seq": 1663,
+      "seq": 1662,
       "kind": 20,
       "text": "choose"
     },
     {
-      "seq": 1664,
+      "seq": 1663,
       "kind": 21,
       "text": "choose:[4]"
     },
     {
-      "seq": 1665,
+      "seq": 1664,
       "kind": 6,
       "obj": 29
     },
     {
-      "seq": 1666,
+      "seq": 1665,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1667,
+      "seq": 1666,
       "kind": 6,
       "obj": 31
     },
     {
-      "seq": 1668,
+      "seq": 1667,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1669,
+      "seq": 1668,
       "kind": 13,
       "amount": -2,
       "counter": "W"
     },
     {
-      "seq": 1670,
+      "seq": 1669,
       "kind": 10
     },
     {
-      "seq": 1671,
+      "seq": 1670,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1672,
+      "seq": 1671,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1672,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1673,
@@ -9168,41 +9167,35 @@
     },
     {
       "seq": 1674,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1675,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1676,
+      "seq": 1675,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1677,
+      "seq": 1676,
       "kind": 12,
       "obj": 14,
       "text": "Hare Apparent"
     },
     {
-      "seq": 1678,
+      "seq": 1677,
       "kind": 2,
       "obj": 14,
       "from": 5,
       "to": 2
     },
     {
-      "seq": 1679,
+      "seq": 1678,
       "kind": 10
     },
     {
-      "seq": 1680,
+      "seq": 1679,
       "kind": 27,
       "obj": 14,
       "text": "triggered ability",
@@ -9211,18 +9204,24 @@
       ]
     },
     {
-      "seq": 1681,
+      "seq": 1680,
       "kind": 10
     },
     {
-      "seq": 1682,
+      "seq": 1681,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1683,
+      "seq": 1682,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1683,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1684,
@@ -9232,33 +9231,31 @@
     },
     {
       "seq": 1685,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1686,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1687,
+      "seq": 1686,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1688,
+      "seq": 1687,
       "kind": 12,
       "obj": 86
     },
     {
-      "seq": 1689,
+      "seq": 1688,
       "kind": 2,
       "obj": 86,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 1689,
+      "kind": 10
     },
     {
       "seq": 1690,
@@ -9266,24 +9263,20 @@
     },
     {
       "seq": 1691,
-      "kind": 10
-    },
-    {
-      "seq": 1692,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1693,
+      "seq": 1692,
       "kind": 21,
-      "text": "priority:[];announce:6290efa5821cd906b72d01135b978822f23b5915954a18eabb20be9066e6f97c"
+      "text": "priority:[];announce:1b350b0f5586effb21afd7ac36a8752f1ae79f221fe536cdb67dcd2fae7768af"
     },
     {
-      "seq": 1694,
+      "seq": 1693,
       "kind": 10
     },
     {
-      "seq": 1695,
+      "seq": 1694,
       "kind": 11,
       "obj": 15,
       "from": 1,
@@ -9291,45 +9284,51 @@
       "text": "Healer's Hawk"
     },
     {
-      "seq": 1696,
+      "seq": 1695,
       "kind": 20,
       "text": "choose"
     },
     {
-      "seq": 1697,
+      "seq": 1696,
       "kind": 21,
       "text": "choose:[2]"
     },
     {
-      "seq": 1698,
+      "seq": 1697,
       "kind": 6,
       "obj": 32
     },
     {
-      "seq": 1699,
+      "seq": 1698,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1700,
+      "seq": 1699,
       "kind": 13,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 1701,
+      "seq": 1700,
       "kind": 10
     },
     {
-      "seq": 1702,
+      "seq": 1701,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1703,
+      "seq": 1702,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1703,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1704,
@@ -9339,34 +9338,32 @@
     },
     {
       "seq": 1705,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1706,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1707,
+      "seq": 1706,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1708,
+      "seq": 1707,
       "kind": 12,
       "obj": 15,
       "text": "Healer's Hawk"
     },
     {
-      "seq": 1709,
+      "seq": 1708,
       "kind": 2,
       "obj": 15,
       "from": 5,
       "to": 2
+    },
+    {
+      "seq": 1709,
+      "kind": 10
     },
     {
       "seq": 1710,
@@ -9374,17 +9371,19 @@
     },
     {
       "seq": 1711,
-      "kind": 10
-    },
-    {
-      "seq": 1712,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1713,
+      "seq": 1712,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1713,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1714,
@@ -9394,26 +9393,24 @@
     },
     {
       "seq": 1715,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1716,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1717,
+      "seq": 1716,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1718,
+      "seq": 1717,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 1718,
+      "kind": 10
     },
     {
       "seq": 1719,
@@ -9421,17 +9418,19 @@
     },
     {
       "seq": 1720,
-      "kind": 10
-    },
-    {
-      "seq": 1721,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1722,
+      "seq": 1721,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1722,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1723,
@@ -9441,43 +9440,37 @@
     },
     {
       "seq": 1724,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1725,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1726,
+      "seq": 1725,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1727,
+      "seq": 1726,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 1728,
+      "seq": 1727,
       "kind": 10
     },
     {
-      "seq": 1729,
+      "seq": 1728,
       "kind": 20,
       "text": "attackers"
     },
     {
-      "seq": 1730,
+      "seq": 1729,
       "kind": 21,
       "text": "attackers:[0]"
     },
     {
-      "seq": 1731,
+      "seq": 1730,
       "kind": 16,
       "player": 1,
       "ids": [
@@ -9485,23 +9478,29 @@
       ]
     },
     {
-      "seq": 1732,
+      "seq": 1731,
       "kind": 6,
       "obj": 5
     },
     {
-      "seq": 1733,
+      "seq": 1732,
       "kind": 10
     },
     {
-      "seq": 1734,
+      "seq": 1733,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1735,
+      "seq": 1734,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1735,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1736,
@@ -9511,45 +9510,39 @@
     },
     {
       "seq": 1737,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1738,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1739,
+      "seq": 1738,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1740,
+      "seq": 1739,
       "kind": 8,
       "step": 6
     },
     {
-      "seq": 1741,
+      "seq": 1740,
       "kind": 10
     },
     {
-      "seq": 1742,
+      "seq": 1741,
       "kind": 20,
       "player": 1,
       "text": "blockers"
     },
     {
-      "seq": 1743,
+      "seq": 1742,
       "kind": 21,
       "player": 1,
       "text": "blockers:[0]"
     },
     {
-      "seq": 1744,
+      "seq": 1743,
       "kind": 17,
       "player": 1,
       "pairs": [
@@ -9560,18 +9553,24 @@
       ]
     },
     {
-      "seq": 1745,
+      "seq": 1744,
       "kind": 10
     },
     {
-      "seq": 1746,
+      "seq": 1745,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1747,
+      "seq": 1746,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1747,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1748,
@@ -9581,39 +9580,33 @@
     },
     {
       "seq": 1749,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1750,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1751,
+      "seq": 1750,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1752,
+      "seq": 1751,
       "kind": 8,
       "step": 7
     },
     {
-      "seq": 1753,
+      "seq": 1752,
       "kind": 10
     },
     {
-      "seq": 1754,
+      "seq": 1753,
       "kind": 5,
       "obj": 49,
       "amount": 2
     },
     {
-      "seq": 1755,
+      "seq": 1754,
       "kind": 93,
       "obj": 5,
       "amount": 2,
@@ -9623,18 +9616,18 @@
       ]
     },
     {
-      "seq": 1756,
+      "seq": 1755,
       "kind": 4,
       "amount": 2
     },
     {
-      "seq": 1757,
+      "seq": 1756,
       "kind": 5,
       "obj": 5,
       "amount": 3
     },
     {
-      "seq": 1758,
+      "seq": 1757,
       "kind": 93,
       "obj": 49,
       "amount": 3,
@@ -9644,7 +9637,7 @@
       ]
     },
     {
-      "seq": 1759,
+      "seq": 1758,
       "kind": 2,
       "obj": 5,
       "from": 2,
@@ -9652,7 +9645,7 @@
       "text": "lethal damage"
     },
     {
-      "seq": 1760,
+      "seq": 1759,
       "kind": 2,
       "obj": 49,
       "from": 2,
@@ -9660,18 +9653,24 @@
       "text": "lethal damage"
     },
     {
-      "seq": 1761,
+      "seq": 1760,
       "kind": 10
     },
     {
-      "seq": 1762,
+      "seq": 1761,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1763,
+      "seq": 1762,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1763,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1764,
@@ -9681,26 +9680,24 @@
     },
     {
       "seq": 1765,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1766,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1767,
+      "seq": 1766,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1768,
+      "seq": 1767,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 1768,
+      "kind": 10
     },
     {
       "seq": 1769,
@@ -9708,17 +9705,19 @@
     },
     {
       "seq": 1770,
-      "kind": 10
-    },
-    {
-      "seq": 1771,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1772,
+      "seq": 1771,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1772,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1773,
@@ -9728,30 +9727,28 @@
     },
     {
       "seq": 1774,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1775,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1776,
+      "seq": 1775,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1777,
+      "seq": 1776,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 1778,
+      "seq": 1777,
       "kind": 28
+    },
+    {
+      "seq": 1778,
+      "kind": 10
     },
     {
       "seq": 1779,
@@ -9759,17 +9756,19 @@
     },
     {
       "seq": 1780,
-      "kind": 10
-    },
-    {
-      "seq": 1781,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1782,
+      "seq": 1781,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1782,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1783,
@@ -9779,26 +9778,24 @@
     },
     {
       "seq": 1784,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1785,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1786,
+      "seq": 1785,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1787,
+      "seq": 1786,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 1787,
+      "kind": 10
     },
     {
       "seq": 1788,
@@ -9806,17 +9803,19 @@
     },
     {
       "seq": 1789,
-      "kind": 10
-    },
-    {
-      "seq": 1790,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1791,
+      "seq": 1790,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 1791,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1792,
@@ -9826,65 +9825,64 @@
     },
     {
       "seq": 1793,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1794,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1795,
+      "seq": 1794,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1796,
+      "seq": 1795,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 1797,
+      "seq": 1796,
       "kind": 10
     },
     {
-      "seq": 1798,
+      "seq": 1797,
       "kind": 9,
       "player": 1,
       "amount": 14
     },
     {
-      "seq": 1799,
+      "seq": 1798,
       "kind": 8
     },
     {
-      "seq": 1800,
+      "seq": 1799,
       "kind": 7,
       "obj": 67
     },
     {
-      "seq": 1801,
+      "seq": 1800,
       "kind": 7,
       "obj": 70
     },
     {
-      "seq": 1802,
+      "seq": 1801,
       "kind": 7,
       "obj": 62
     },
     {
-      "seq": 1803,
+      "seq": 1802,
       "kind": 7,
       "obj": 74
     },
     {
-      "seq": 1804,
+      "seq": 1803,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 1804,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1805,
@@ -9893,20 +9891,20 @@
     },
     {
       "seq": 1806,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1807,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1808,
+      "seq": 1807,
       "kind": 21,
       "player": 1,
       "text": "priority:[5]"
+    },
+    {
+      "seq": 1808,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1809,
@@ -9915,31 +9913,31 @@
     },
     {
       "seq": 1810,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1811,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1812,
+      "seq": 1811,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1813,
+      "seq": 1812,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 1814,
+      "seq": 1813,
       "kind": 3,
       "player": 1,
       "obj": 63,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 1814,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1815,
@@ -9948,20 +9946,20 @@
     },
     {
       "seq": 1816,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1817,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1818,
+      "seq": 1817,
       "kind": 21,
       "player": 1,
       "text": "priority:[5]"
+    },
+    {
+      "seq": 1818,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1819,
@@ -9970,23 +9968,23 @@
     },
     {
       "seq": 1820,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1821,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1822,
+      "seq": 1821,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1823,
+      "seq": 1822,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 1823,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1824,
@@ -9995,198 +9993,193 @@
     },
     {
       "seq": 1825,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1826,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1827,
+      "seq": 1826,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1828,
+      "seq": 1827,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1829,
+      "seq": 1828,
       "kind": 6,
       "obj": 67
     },
     {
-      "seq": 1830,
+      "seq": 1829,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 1831,
+      "seq": 1830,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1832,
+      "seq": 1831,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1833,
+      "seq": 1832,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1834,
+      "seq": 1833,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1835,
+      "seq": 1834,
       "kind": 6,
       "obj": 62
     },
     {
-      "seq": 1836,
+      "seq": 1835,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 1837,
+      "seq": 1836,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1838,
+      "seq": 1837,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1839,
+      "seq": 1838,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1840,
+      "seq": 1839,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1841,
+      "seq": 1840,
       "kind": 6,
       "obj": 70
     },
     {
-      "seq": 1842,
+      "seq": 1841,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1843,
+      "seq": 1842,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1844,
+      "seq": 1843,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1845,
+      "seq": 1844,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1846,
+      "seq": 1845,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1847,
+      "seq": 1846,
       "kind": 6,
       "obj": 74
     },
     {
-      "seq": 1848,
+      "seq": 1847,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 1849,
+      "seq": 1848,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1850,
+      "seq": 1849,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1851,
+      "seq": 1850,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1852,
+      "seq": 1851,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1853,
+      "seq": 1852,
       "kind": 2,
       "obj": 63,
       "from": 1,
       "to": 2
     },
     {
-      "seq": 1854,
+      "seq": 1853,
       "kind": 23,
       "player": 1
     },
     {
-      "seq": 1855,
+      "seq": 1854,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1856,
+      "seq": 1855,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1857,
+      "seq": 1856,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 1858,
+      "seq": 1857,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1859,
+      "seq": 1858,
       "kind": 11,
       "player": 1,
       "obj": 59,
@@ -10195,35 +10188,40 @@
       "text": "Krenko, Mob Boss"
     },
     {
-      "seq": 1860,
+      "seq": 1859,
       "kind": 13,
       "player": 1,
       "amount": -2,
       "counter": "W"
     },
     {
-      "seq": 1861,
+      "seq": 1860,
       "kind": 13,
       "player": 1,
       "amount": -2,
       "counter": "R"
     },
     {
-      "seq": 1862,
+      "seq": 1861,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1863,
+      "seq": 1862,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1864,
+      "seq": 1863,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1864,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1865,
@@ -10232,31 +10230,31 @@
     },
     {
       "seq": 1866,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1867,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1868,
+      "seq": 1867,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1869,
+      "seq": 1868,
       "kind": 12,
       "obj": 59,
       "text": "Krenko, Mob Boss"
     },
     {
-      "seq": 1870,
+      "seq": 1869,
       "kind": 2,
       "obj": 59,
       "from": 5,
       "to": 2
+    },
+    {
+      "seq": 1870,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1871,
@@ -10265,20 +10263,20 @@
     },
     {
       "seq": 1872,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1873,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1874,
+      "seq": 1873,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1874,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1875,
@@ -10287,23 +10285,23 @@
     },
     {
       "seq": 1876,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1877,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1878,
+      "seq": 1877,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1879,
+      "seq": 1878,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 1879,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1880,
@@ -10312,20 +10310,20 @@
     },
     {
       "seq": 1881,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1882,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1883,
+      "seq": 1882,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1883,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1884,
@@ -10334,49 +10332,49 @@
     },
     {
       "seq": 1885,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1886,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1887,
+      "seq": 1886,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1888,
+      "seq": 1887,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 1889,
+      "seq": 1888,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1890,
+      "seq": 1889,
       "kind": 16
     },
     {
-      "seq": 1891,
+      "seq": 1890,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1892,
+      "seq": 1891,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1893,
+      "seq": 1892,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1893,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1894,
@@ -10385,23 +10383,23 @@
     },
     {
       "seq": 1895,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1896,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1897,
+      "seq": 1896,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1898,
+      "seq": 1897,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 1898,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1899,
@@ -10410,20 +10408,20 @@
     },
     {
       "seq": 1900,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1901,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1902,
+      "seq": 1901,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1902,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1903,
@@ -10432,27 +10430,27 @@
     },
     {
       "seq": 1904,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1905,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1906,
+      "seq": 1905,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1907,
+      "seq": 1906,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 1908,
+      "seq": 1907,
       "kind": 28
+    },
+    {
+      "seq": 1908,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1909,
@@ -10461,20 +10459,20 @@
     },
     {
       "seq": 1910,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1911,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1912,
+      "seq": 1911,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1912,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1913,
@@ -10483,23 +10481,23 @@
     },
     {
       "seq": 1914,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1915,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1916,
+      "seq": 1915,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1917,
+      "seq": 1916,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 1917,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 1918,
@@ -10508,20 +10506,20 @@
     },
     {
       "seq": 1919,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 1920,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1921,
+      "seq": 1920,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 1921,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 1922,
@@ -10530,57 +10528,56 @@
     },
     {
       "seq": 1923,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 1924,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1925,
+      "seq": 1924,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 1926,
+      "seq": 1925,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 1927,
+      "seq": 1926,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 1928,
+      "seq": 1927,
       "kind": 9,
       "amount": 15
     },
     {
-      "seq": 1929,
+      "seq": 1928,
       "kind": 8
     },
     {
-      "seq": 1930,
+      "seq": 1929,
       "kind": 7,
       "obj": 32
     },
     {
-      "seq": 1931,
+      "seq": 1930,
       "kind": 7,
       "obj": 29
     },
     {
-      "seq": 1932,
+      "seq": 1931,
       "kind": 7,
       "obj": 31
     },
     {
-      "seq": 1933,
+      "seq": 1932,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 1933,
+      "kind": 10
     },
     {
       "seq": 1934,
@@ -10588,17 +10585,19 @@
     },
     {
       "seq": 1935,
-      "kind": 10
-    },
-    {
-      "seq": 1936,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1937,
+      "seq": 1936,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1937,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1938,
@@ -10608,33 +10607,31 @@
     },
     {
       "seq": 1939,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1940,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1941,
+      "seq": 1940,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1942,
+      "seq": 1941,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 1943,
+      "seq": 1942,
       "kind": 3,
       "obj": 4,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 1943,
+      "kind": 10
     },
     {
       "seq": 1944,
@@ -10642,17 +10639,19 @@
     },
     {
       "seq": 1945,
-      "kind": 10
-    },
-    {
-      "seq": 1946,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1947,
+      "seq": 1946,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1947,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1948,
@@ -10662,26 +10661,24 @@
     },
     {
       "seq": 1949,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1950,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1951,
+      "seq": 1950,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1952,
+      "seq": 1951,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 1952,
+      "kind": 10
     },
     {
       "seq": 1953,
@@ -10689,17 +10686,19 @@
     },
     {
       "seq": 1954,
-      "kind": 10
-    },
-    {
-      "seq": 1955,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1956,
+      "seq": 1955,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1956,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1957,
@@ -10709,26 +10708,24 @@
     },
     {
       "seq": 1958,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1959,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1960,
+      "seq": 1959,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1961,
+      "seq": 1960,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 1961,
+      "kind": 10
     },
     {
       "seq": 1962,
@@ -10736,17 +10733,19 @@
     },
     {
       "seq": 1963,
-      "kind": 10
-    },
-    {
-      "seq": 1964,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1965,
+      "seq": 1964,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1965,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1966,
@@ -10756,43 +10755,37 @@
     },
     {
       "seq": 1967,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1968,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1969,
+      "seq": 1968,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1970,
+      "seq": 1969,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 1971,
+      "seq": 1970,
       "kind": 10
     },
     {
-      "seq": 1972,
+      "seq": 1971,
       "kind": 20,
       "text": "attackers"
     },
     {
-      "seq": 1973,
+      "seq": 1972,
       "kind": 21,
       "text": "attackers:[0 1]"
     },
     {
-      "seq": 1974,
+      "seq": 1973,
       "kind": 16,
       "player": 1,
       "ids": [
@@ -10801,28 +10794,34 @@
       ]
     },
     {
-      "seq": 1975,
+      "seq": 1974,
       "kind": 6,
       "obj": 14
     },
     {
-      "seq": 1976,
+      "seq": 1975,
       "kind": 6,
       "obj": 15
     },
     {
-      "seq": 1977,
+      "seq": 1976,
       "kind": 10
     },
     {
-      "seq": 1978,
+      "seq": 1977,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1979,
+      "seq": 1978,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1979,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1980,
@@ -10832,45 +10831,39 @@
     },
     {
       "seq": 1981,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1982,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1983,
+      "seq": 1982,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1984,
+      "seq": 1983,
       "kind": 8,
       "step": 6
     },
     {
-      "seq": 1985,
+      "seq": 1984,
       "kind": 10
     },
     {
-      "seq": 1986,
+      "seq": 1985,
       "kind": 20,
       "player": 1,
       "text": "blockers"
     },
     {
-      "seq": 1987,
+      "seq": 1986,
       "kind": 21,
       "player": 1,
       "text": "blockers:[0]"
     },
     {
-      "seq": 1988,
+      "seq": 1987,
       "kind": 17,
       "player": 1,
       "pairs": [
@@ -10881,18 +10874,24 @@
       ]
     },
     {
-      "seq": 1989,
+      "seq": 1988,
       "kind": 10
     },
     {
-      "seq": 1990,
+      "seq": 1989,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 1991,
+      "seq": 1990,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 1991,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 1992,
@@ -10902,39 +10901,33 @@
     },
     {
       "seq": 1993,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 1994,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 1995,
+      "seq": 1994,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 1996,
+      "seq": 1995,
       "kind": 8,
       "step": 7
     },
     {
-      "seq": 1997,
+      "seq": 1996,
       "kind": 10
     },
     {
-      "seq": 1998,
+      "seq": 1997,
       "kind": 5,
       "obj": 59,
       "amount": 2
     },
     {
-      "seq": 1999,
+      "seq": 1998,
       "kind": 93,
       "obj": 14,
       "amount": 2,
@@ -10944,13 +10937,13 @@
       ]
     },
     {
-      "seq": 2000,
+      "seq": 1999,
       "kind": 5,
       "obj": 14,
       "amount": 3
     },
     {
-      "seq": 2001,
+      "seq": 2000,
       "kind": 93,
       "obj": 59,
       "amount": 3,
@@ -10960,13 +10953,13 @@
       ]
     },
     {
-      "seq": 2002,
+      "seq": 2001,
       "kind": 5,
       "player": 1,
       "amount": 1
     },
     {
-      "seq": 2003,
+      "seq": 2002,
       "kind": 93,
       "obj": 15,
       "amount": 1,
@@ -10976,18 +10969,18 @@
       ]
     },
     {
-      "seq": 2004,
+      "seq": 2003,
       "kind": 4,
       "amount": 1
     },
     {
-      "seq": 2005,
+      "seq": 2004,
       "kind": 127,
       "obj": 14,
       "amount": 1
     },
     {
-      "seq": 2006,
+      "seq": 2005,
       "kind": 2,
       "obj": 14,
       "from": 2,
@@ -10995,18 +10988,24 @@
       "text": "lethal damage"
     },
     {
-      "seq": 2007,
+      "seq": 2006,
       "kind": 10
     },
     {
-      "seq": 2008,
+      "seq": 2007,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2009,
+      "seq": 2008,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2009,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2010,
@@ -11016,26 +11015,24 @@
     },
     {
       "seq": 2011,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2012,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2013,
+      "seq": 2012,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 2014,
+      "seq": 2013,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 2014,
+      "kind": 10
     },
     {
       "seq": 2015,
@@ -11043,17 +11040,19 @@
     },
     {
       "seq": 2016,
-      "kind": 10
-    },
-    {
-      "seq": 2017,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2018,
+      "seq": 2017,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2018,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2019,
@@ -11063,30 +11062,28 @@
     },
     {
       "seq": 2020,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2021,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2022,
+      "seq": 2021,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 2023,
+      "seq": 2022,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 2024,
+      "seq": 2023,
       "kind": 28
+    },
+    {
+      "seq": 2024,
+      "kind": 10
     },
     {
       "seq": 2025,
@@ -11094,17 +11091,19 @@
     },
     {
       "seq": 2026,
-      "kind": 10
-    },
-    {
-      "seq": 2027,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2028,
+      "seq": 2027,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2028,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2029,
@@ -11114,26 +11113,24 @@
     },
     {
       "seq": 2030,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2031,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2032,
+      "seq": 2031,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 2033,
+      "seq": 2032,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 2033,
+      "kind": 10
     },
     {
       "seq": 2034,
@@ -11141,17 +11138,19 @@
     },
     {
       "seq": 2035,
-      "kind": 10
-    },
-    {
-      "seq": 2036,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2037,
+      "seq": 2036,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2037,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2038,
@@ -11161,71 +11160,70 @@
     },
     {
       "seq": 2039,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2040,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2041,
+      "seq": 2040,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 2042,
+      "seq": 2041,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 2043,
+      "seq": 2042,
       "kind": 10
     },
     {
-      "seq": 2044,
+      "seq": 2043,
       "kind": 5,
       "obj": 59,
       "amount": -2
     },
     {
-      "seq": 2045,
+      "seq": 2044,
       "kind": 9,
       "player": 1,
       "amount": 16
     },
     {
-      "seq": 2046,
+      "seq": 2045,
       "kind": 8
     },
     {
-      "seq": 2047,
+      "seq": 2046,
       "kind": 7,
       "obj": 67
     },
     {
-      "seq": 2048,
+      "seq": 2047,
       "kind": 7,
       "obj": 70
     },
     {
-      "seq": 2049,
+      "seq": 2048,
       "kind": 7,
       "obj": 62
     },
     {
-      "seq": 2050,
+      "seq": 2049,
       "kind": 7,
       "obj": 74
     },
     {
-      "seq": 2051,
+      "seq": 2050,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 2051,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2052,
@@ -11234,20 +11232,20 @@
     },
     {
       "seq": 2053,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2054,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2055,
+      "seq": 2054,
       "kind": 21,
       "player": 1,
       "text": "priority:[7]"
+    },
+    {
+      "seq": 2055,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2056,
@@ -11256,31 +11254,31 @@
     },
     {
       "seq": 2057,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2058,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2059,
+      "seq": 2058,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2060,
+      "seq": 2059,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 2061,
+      "seq": 2060,
       "kind": 3,
       "player": 1,
       "obj": 54,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 2061,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2062,
@@ -11289,20 +11287,20 @@
     },
     {
       "seq": 2063,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2064,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2065,
+      "seq": 2064,
       "kind": 21,
       "player": 1,
       "text": "priority:[7]"
+    },
+    {
+      "seq": 2065,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2066,
@@ -11311,23 +11309,23 @@
     },
     {
       "seq": 2067,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2068,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2069,
+      "seq": 2068,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2070,
+      "seq": 2069,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 2070,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2071,
@@ -11336,96 +11334,91 @@
     },
     {
       "seq": 2072,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2073,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2074,
+      "seq": 2073,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 2075,
+      "seq": 2074,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2076,
+      "seq": 2075,
       "kind": 6,
       "obj": 70
     },
     {
-      "seq": 2077,
+      "seq": 2076,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2078,
+      "seq": 2077,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2079,
+      "seq": 2078,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2080,
+      "seq": 2079,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 2081,
+      "seq": 2080,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2082,
+      "seq": 2081,
       "kind": 6,
       "obj": 67
     },
     {
-      "seq": 2083,
+      "seq": 2082,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 2084,
+      "seq": 2083,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2085,
+      "seq": 2084,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2086,
+      "seq": 2085,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2087,
+      "seq": 2086,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2088,
+      "seq": 2087,
       "kind": 11,
       "player": 1,
       "obj": 55,
@@ -11434,68 +11427,73 @@
       "text": "Helpful Hunter"
     },
     {
-      "seq": 2089,
+      "seq": 2088,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 2090,
+      "seq": 2089,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "R"
     },
     {
-      "seq": 2091,
+      "seq": 2090,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2092,
+      "seq": 2091,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2093,
+      "seq": 2092,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2094,
+      "seq": 2093,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2095,
+      "seq": 2094,
       "kind": 6,
       "obj": 59
     },
     {
-      "seq": 2096,
+      "seq": 2095,
       "kind": 34,
       "player": 1,
       "obj": 59
     },
     {
-      "seq": 2097,
+      "seq": 2096,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2098,
+      "seq": 2097,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2099,
+      "seq": 2098,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2099,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2100,
@@ -11504,36 +11502,36 @@
     },
     {
       "seq": 2101,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2102,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2103,
+      "seq": 2102,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2104,
+      "seq": 2103,
       "kind": 12,
       "obj": 87
     },
     {
-      "seq": 2105,
+      "seq": 2104,
       "kind": 31,
       "player": 1,
       "text": "r_1_1_goblin"
     },
     {
-      "seq": 2106,
+      "seq": 2105,
       "kind": 2,
       "obj": 87,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2106,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2107,
@@ -11542,20 +11540,20 @@
     },
     {
       "seq": 2108,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2109,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2110,
+      "seq": 2109,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2110,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2111,
@@ -11564,39 +11562,34 @@
     },
     {
       "seq": 2112,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2113,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2114,
+      "seq": 2113,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2115,
+      "seq": 2114,
       "kind": 12,
       "obj": 55,
       "text": "Helpful Hunter"
     },
     {
-      "seq": 2116,
+      "seq": 2115,
       "kind": 2,
       "obj": 55,
       "from": 5,
       "to": 2
     },
     {
-      "seq": 2117,
+      "seq": 2116,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2118,
+      "seq": 2117,
       "kind": 27,
       "player": 1,
       "obj": 55,
@@ -11606,21 +11599,26 @@
       ]
     },
     {
-      "seq": 2119,
+      "seq": 2118,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2120,
+      "seq": 2119,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2121,
+      "seq": 2120,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2121,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2122,
@@ -11629,26 +11627,21 @@
     },
     {
       "seq": 2123,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2124,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2125,
+      "seq": 2124,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2126,
+      "seq": 2125,
       "kind": 12,
       "obj": 89
     },
     {
-      "seq": 2127,
+      "seq": 2126,
       "kind": 3,
       "player": 1,
       "obj": 68,
@@ -11656,11 +11649,16 @@
       "secret": true
     },
     {
-      "seq": 2128,
+      "seq": 2127,
       "kind": 2,
       "obj": 89,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2128,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2129,
@@ -11669,96 +11667,91 @@
     },
     {
       "seq": 2130,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2131,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2132,
+      "seq": 2131,
       "kind": 21,
       "player": 1,
       "text": "priority:[2]"
     },
     {
-      "seq": 2133,
+      "seq": 2132,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2134,
+      "seq": 2133,
       "kind": 6,
       "obj": 74
     },
     {
-      "seq": 2135,
+      "seq": 2134,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2136,
+      "seq": 2135,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2137,
+      "seq": 2136,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2138,
+      "seq": 2137,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 2139,
+      "seq": 2138,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2140,
+      "seq": 2139,
       "kind": 2,
       "obj": 68,
       "from": 1,
       "to": 2
     },
     {
-      "seq": 2141,
+      "seq": 2140,
       "kind": 23,
       "player": 1
     },
     {
-      "seq": 2142,
+      "seq": 2141,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2143,
+      "seq": 2142,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2144,
+      "seq": 2143,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2145,
+      "seq": 2144,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2146,
+      "seq": 2145,
       "kind": 11,
       "player": 1,
       "obj": 54,
@@ -11767,28 +11760,33 @@
       "text": "Healer's Hawk"
     },
     {
-      "seq": 2147,
+      "seq": 2146,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 2148,
+      "seq": 2147,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2149,
+      "seq": 2148,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2150,
+      "seq": 2149,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2150,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2151,
@@ -11797,31 +11795,31 @@
     },
     {
       "seq": 2152,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2153,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2154,
+      "seq": 2153,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2155,
+      "seq": 2154,
       "kind": 12,
       "obj": 54,
       "text": "Healer's Hawk"
     },
     {
-      "seq": 2156,
+      "seq": 2155,
       "kind": 2,
       "obj": 54,
       "from": 5,
       "to": 2
+    },
+    {
+      "seq": 2156,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2157,
@@ -11830,20 +11828,20 @@
     },
     {
       "seq": 2158,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2159,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2160,
+      "seq": 2159,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2160,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2161,
@@ -11852,23 +11850,23 @@
     },
     {
       "seq": 2162,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2163,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2164,
+      "seq": 2163,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2165,
+      "seq": 2164,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 2165,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2166,
@@ -11877,20 +11875,20 @@
     },
     {
       "seq": 2167,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2168,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2169,
+      "seq": 2168,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2169,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2170,
@@ -11899,49 +11897,49 @@
     },
     {
       "seq": 2171,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2172,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2173,
+      "seq": 2172,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2174,
+      "seq": 2173,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 2175,
+      "seq": 2174,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2176,
+      "seq": 2175,
       "kind": 16
     },
     {
-      "seq": 2177,
+      "seq": 2176,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2178,
+      "seq": 2177,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2179,
+      "seq": 2178,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2179,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2180,
@@ -11950,23 +11948,23 @@
     },
     {
       "seq": 2181,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2182,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2183,
+      "seq": 2182,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2184,
+      "seq": 2183,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 2184,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2185,
@@ -11975,20 +11973,20 @@
     },
     {
       "seq": 2186,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2187,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2188,
+      "seq": 2187,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2188,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2189,
@@ -11997,27 +11995,27 @@
     },
     {
       "seq": 2190,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2191,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2192,
+      "seq": 2191,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2193,
+      "seq": 2192,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 2194,
+      "seq": 2193,
       "kind": 28
+    },
+    {
+      "seq": 2194,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2195,
@@ -12026,20 +12024,20 @@
     },
     {
       "seq": 2196,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2197,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2198,
+      "seq": 2197,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2198,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2199,
@@ -12048,23 +12046,23 @@
     },
     {
       "seq": 2200,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2201,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2202,
+      "seq": 2201,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2203,
+      "seq": 2202,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 2203,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2204,
@@ -12073,20 +12071,20 @@
     },
     {
       "seq": 2205,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2206,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2207,
+      "seq": 2206,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2207,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2208,
@@ -12095,47 +12093,46 @@
     },
     {
       "seq": 2209,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2210,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2211,
+      "seq": 2210,
       "kind": 21,
       "text": "priority:[4]"
     },
     {
-      "seq": 2212,
+      "seq": 2211,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 2213,
+      "seq": 2212,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2214,
+      "seq": 2213,
       "kind": 9,
       "amount": 17
     },
     {
-      "seq": 2215,
+      "seq": 2214,
       "kind": 8
     },
     {
-      "seq": 2216,
+      "seq": 2215,
       "kind": 7,
       "obj": 15
     },
     {
-      "seq": 2217,
+      "seq": 2216,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 2217,
+      "kind": 10
     },
     {
       "seq": 2218,
@@ -12143,17 +12140,19 @@
     },
     {
       "seq": 2219,
-      "kind": 10
-    },
-    {
-      "seq": 2220,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2221,
+      "seq": 2220,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2221,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2222,
@@ -12163,33 +12162,31 @@
     },
     {
       "seq": 2223,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2224,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2225,
+      "seq": 2224,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2226,
+      "seq": 2225,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 2227,
+      "seq": 2226,
       "kind": 3,
       "obj": 37,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 2227,
+      "kind": 10
     },
     {
       "seq": 2228,
@@ -12197,17 +12194,19 @@
     },
     {
       "seq": 2229,
-      "kind": 10
-    },
-    {
-      "seq": 2230,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2231,
+      "seq": 2230,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2231,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2232,
@@ -12217,26 +12216,24 @@
     },
     {
       "seq": 2233,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2234,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2235,
+      "seq": 2234,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2236,
+      "seq": 2235,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 2236,
+      "kind": 10
     },
     {
       "seq": 2237,
@@ -12244,24 +12241,20 @@
     },
     {
       "seq": 2238,
-      "kind": 10
-    },
-    {
-      "seq": 2239,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2240,
+      "seq": 2239,
       "kind": 21,
-      "text": "priority:[];announce:5774a7efb6cc220b6963040481c3e3876c415a179810457a9cb4b8fce9d90d22"
+      "text": "priority:[];announce:5c526cec4314b757e11ff586b7e2a63cad95cf9a709e6874819f4a671008f7e2"
     },
     {
-      "seq": 2241,
+      "seq": 2240,
       "kind": 10
     },
     {
-      "seq": 2242,
+      "seq": 2241,
       "kind": 11,
       "obj": 37,
       "from": 1,
@@ -12269,67 +12262,73 @@
       "text": "Prideful Parent"
     },
     {
-      "seq": 2243,
+      "seq": 2242,
       "kind": 20,
       "text": "choose"
     },
     {
-      "seq": 2244,
+      "seq": 2243,
       "kind": 21,
       "text": "choose:[4]"
     },
     {
-      "seq": 2245,
+      "seq": 2244,
       "kind": 6,
       "obj": 32
     },
     {
-      "seq": 2246,
+      "seq": 2245,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2247,
+      "seq": 2246,
       "kind": 6,
       "obj": 29
     },
     {
-      "seq": 2248,
+      "seq": 2247,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2249,
+      "seq": 2248,
       "kind": 6,
       "obj": 31
     },
     {
-      "seq": 2250,
+      "seq": 2249,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2251,
+      "seq": 2250,
       "kind": 13,
       "amount": -3,
       "counter": "W"
     },
     {
-      "seq": 2252,
+      "seq": 2251,
       "kind": 10
     },
     {
-      "seq": 2253,
+      "seq": 2252,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2254,
+      "seq": 2253,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2254,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2255,
@@ -12339,41 +12338,35 @@
     },
     {
       "seq": 2256,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2257,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2258,
+      "seq": 2257,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2259,
+      "seq": 2258,
       "kind": 12,
       "obj": 37,
       "text": "Prideful Parent"
     },
     {
-      "seq": 2260,
+      "seq": 2259,
       "kind": 2,
       "obj": 37,
       "from": 5,
       "to": 2
     },
     {
-      "seq": 2261,
+      "seq": 2260,
       "kind": 10
     },
     {
-      "seq": 2262,
+      "seq": 2261,
       "kind": 27,
       "obj": 37,
       "text": "triggered ability",
@@ -12382,18 +12375,24 @@
       ]
     },
     {
-      "seq": 2263,
+      "seq": 2262,
       "kind": 10
     },
     {
-      "seq": 2264,
+      "seq": 2263,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2265,
+      "seq": 2264,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2265,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2266,
@@ -12403,38 +12402,36 @@
     },
     {
       "seq": 2267,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2268,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2269,
+      "seq": 2268,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2270,
+      "seq": 2269,
       "kind": 12,
       "obj": 90
     },
     {
-      "seq": 2271,
+      "seq": 2270,
       "kind": 31,
       "text": "w_1_1_cat"
     },
     {
-      "seq": 2272,
+      "seq": 2271,
       "kind": 2,
       "obj": 90,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2272,
+      "kind": 10
     },
     {
       "seq": 2273,
@@ -12442,17 +12439,19 @@
     },
     {
       "seq": 2274,
-      "kind": 10
-    },
-    {
-      "seq": 2275,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2276,
+      "seq": 2275,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2276,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2277,
@@ -12462,26 +12461,24 @@
     },
     {
       "seq": 2278,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2279,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2280,
+      "seq": 2279,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2281,
+      "seq": 2280,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 2281,
+      "kind": 10
     },
     {
       "seq": 2282,
@@ -12489,17 +12486,19 @@
     },
     {
       "seq": 2283,
-      "kind": 10
-    },
-    {
-      "seq": 2284,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2285,
+      "seq": 2284,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2285,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2286,
@@ -12509,59 +12508,59 @@
     },
     {
       "seq": 2287,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2288,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2289,
+      "seq": 2288,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2290,
+      "seq": 2289,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 2291,
+      "seq": 2290,
       "kind": 10
     },
     {
-      "seq": 2292,
+      "seq": 2291,
       "kind": 20,
       "text": "attackers"
     },
     {
-      "seq": 2293,
+      "seq": 2292,
       "kind": 21,
       "text": "attackers:[]"
     },
     {
-      "seq": 2294,
+      "seq": 2293,
       "kind": 16,
       "player": 1
     },
     {
-      "seq": 2295,
+      "seq": 2294,
       "kind": 10
     },
     {
-      "seq": 2296,
+      "seq": 2295,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2297,
+      "seq": 2296,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2297,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2298,
@@ -12571,26 +12570,24 @@
     },
     {
       "seq": 2299,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2300,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2301,
+      "seq": 2300,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2302,
+      "seq": 2301,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 2302,
+      "kind": 10
     },
     {
       "seq": 2303,
@@ -12598,17 +12595,19 @@
     },
     {
       "seq": 2304,
-      "kind": 10
-    },
-    {
-      "seq": 2305,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2306,
+      "seq": 2305,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2306,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2307,
@@ -12618,30 +12617,28 @@
     },
     {
       "seq": 2308,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2309,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2310,
+      "seq": 2309,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2311,
+      "seq": 2310,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 2312,
+      "seq": 2311,
       "kind": 28
+    },
+    {
+      "seq": 2312,
+      "kind": 10
     },
     {
       "seq": 2313,
@@ -12649,17 +12646,19 @@
     },
     {
       "seq": 2314,
-      "kind": 10
-    },
-    {
-      "seq": 2315,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2316,
+      "seq": 2315,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2316,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2317,
@@ -12669,26 +12668,24 @@
     },
     {
       "seq": 2318,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2319,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2320,
+      "seq": 2319,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2321,
+      "seq": 2320,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 2321,
+      "kind": 10
     },
     {
       "seq": 2322,
@@ -12696,17 +12693,19 @@
     },
     {
       "seq": 2323,
-      "kind": 10
-    },
-    {
-      "seq": 2324,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2325,
+      "seq": 2324,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2325,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2326,
@@ -12716,65 +12715,64 @@
     },
     {
       "seq": 2327,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2328,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2329,
+      "seq": 2328,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2330,
+      "seq": 2329,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 2331,
+      "seq": 2330,
       "kind": 10
     },
     {
-      "seq": 2332,
+      "seq": 2331,
       "kind": 9,
       "player": 1,
       "amount": 18
     },
     {
-      "seq": 2333,
+      "seq": 2332,
       "kind": 8
     },
     {
-      "seq": 2334,
+      "seq": 2333,
       "kind": 7,
       "obj": 67
     },
     {
-      "seq": 2335,
+      "seq": 2334,
       "kind": 7,
       "obj": 70
     },
     {
-      "seq": 2336,
+      "seq": 2335,
       "kind": 7,
       "obj": 74
     },
     {
-      "seq": 2337,
+      "seq": 2336,
       "kind": 7,
       "obj": 59
     },
     {
-      "seq": 2338,
+      "seq": 2337,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 2338,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2339,
@@ -12783,20 +12781,20 @@
     },
     {
       "seq": 2340,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2341,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2342,
+      "seq": 2341,
       "kind": 21,
       "player": 1,
       "text": "priority:[8]"
+    },
+    {
+      "seq": 2342,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2343,
@@ -12805,31 +12803,31 @@
     },
     {
       "seq": 2344,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2345,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2346,
+      "seq": 2345,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2347,
+      "seq": 2346,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 2348,
+      "seq": 2347,
       "kind": 3,
       "player": 1,
       "obj": 51,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 2348,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2349,
@@ -12838,20 +12836,20 @@
     },
     {
       "seq": 2350,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2351,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2352,
+      "seq": 2351,
       "kind": 21,
       "player": 1,
       "text": "priority:[8]"
+    },
+    {
+      "seq": 2352,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2353,
@@ -12860,23 +12858,23 @@
     },
     {
       "seq": 2354,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2355,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2356,
+      "seq": 2355,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2357,
+      "seq": 2356,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 2357,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2358,
@@ -12885,130 +12883,125 @@
     },
     {
       "seq": 2359,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2360,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2361,
+      "seq": 2360,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2362,
+      "seq": 2361,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2363,
+      "seq": 2362,
       "kind": 6,
       "obj": 67
     },
     {
-      "seq": 2364,
+      "seq": 2363,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 2365,
+      "seq": 2364,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2366,
+      "seq": 2365,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2367,
+      "seq": 2366,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2368,
+      "seq": 2367,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2369,
+      "seq": 2368,
       "kind": 6,
       "obj": 70
     },
     {
-      "seq": 2370,
+      "seq": 2369,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2371,
+      "seq": 2370,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2372,
+      "seq": 2371,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2373,
+      "seq": 2372,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2374,
+      "seq": 2373,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2375,
+      "seq": 2374,
       "kind": 6,
       "obj": 62
     },
     {
-      "seq": 2376,
+      "seq": 2375,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 2377,
+      "seq": 2376,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2378,
+      "seq": 2377,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2379,
+      "seq": 2378,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2380,
+      "seq": 2379,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2381,
+      "seq": 2380,
       "kind": 11,
       "player": 1,
       "obj": 51,
@@ -13017,87 +13010,92 @@
       "text": "Goblin Surprise"
     },
     {
-      "seq": 2382,
+      "seq": 2381,
       "kind": 20,
       "player": 1,
       "text": "modes"
     },
     {
-      "seq": 2383,
+      "seq": 2382,
       "kind": 21,
       "player": 1,
       "text": "modes:[0]"
     },
     {
-      "seq": 2384,
+      "seq": 2383,
       "kind": 35,
       "player": 1,
       "obj": 51,
       "text": "Creatures you control get +2/+0 until end of turn."
     },
     {
-      "seq": 2385,
+      "seq": 2384,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 2386,
+      "seq": 2385,
       "kind": 13,
       "player": 1,
       "amount": -2,
       "counter": "R"
     },
     {
-      "seq": 2387,
+      "seq": 2386,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2388,
+      "seq": 2387,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2389,
+      "seq": 2388,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2390,
+      "seq": 2389,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2391,
+      "seq": 2390,
       "kind": 6,
       "obj": 59
     },
     {
-      "seq": 2392,
+      "seq": 2391,
       "kind": 34,
       "player": 1,
       "obj": 59
     },
     {
-      "seq": 2393,
+      "seq": 2392,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2394,
+      "seq": 2393,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2395,
+      "seq": 2394,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2395,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2396,
@@ -13106,23 +13104,24 @@
     },
     {
       "seq": 2397,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2398,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2399,
+      "seq": 2398,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2400,
+      "seq": 2399,
       "kind": 12,
       "obj": 92
+    },
+    {
+      "seq": 2400,
+      "kind": 31,
+      "player": 1,
+      "text": "r_1_1_goblin"
     },
     {
       "seq": 2401,
@@ -13132,16 +13131,15 @@
     },
     {
       "seq": 2402,
-      "kind": 31,
-      "player": 1,
-      "text": "r_1_1_goblin"
-    },
-    {
-      "seq": 2403,
       "kind": 2,
       "obj": 92,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2403,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2404,
@@ -13150,20 +13148,20 @@
     },
     {
       "seq": 2405,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2406,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2407,
+      "seq": 2406,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2407,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2408,
@@ -13172,24 +13170,23 @@
     },
     {
       "seq": 2409,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2410,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2411,
+      "seq": 2410,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2412,
+      "seq": 2411,
       "kind": 12,
       "obj": 51,
       "text": "Goblin Surprise"
+    },
+    {
+      "seq": 2412,
+      "kind": 26
     },
     {
       "seq": 2413,
@@ -13213,14 +13210,15 @@
     },
     {
       "seq": 2418,
-      "kind": 26
-    },
-    {
-      "seq": 2419,
       "kind": 2,
       "obj": 51,
       "from": 5,
       "to": 3
+    },
+    {
+      "seq": 2419,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2420,
@@ -13229,20 +13227,20 @@
     },
     {
       "seq": 2421,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2422,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2423,
+      "seq": 2422,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2423,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2424,
@@ -13251,23 +13249,23 @@
     },
     {
       "seq": 2425,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2426,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2427,
+      "seq": 2426,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2428,
+      "seq": 2427,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 2428,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2429,
@@ -13276,20 +13274,20 @@
     },
     {
       "seq": 2430,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2431,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2432,
+      "seq": 2431,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2432,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2433,
@@ -13298,61 +13296,61 @@
     },
     {
       "seq": 2434,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2435,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2436,
+      "seq": 2435,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2437,
+      "seq": 2436,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 2438,
+      "seq": 2437,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2439,
+      "seq": 2438,
       "kind": 20,
       "player": 1,
       "text": "attackers"
     },
     {
-      "seq": 2440,
+      "seq": 2439,
       "kind": 21,
       "player": 1,
       "text": "attackers:[]"
     },
     {
-      "seq": 2441,
+      "seq": 2440,
       "kind": 16
     },
     {
-      "seq": 2442,
+      "seq": 2441,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2443,
+      "seq": 2442,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2444,
+      "seq": 2443,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2444,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2445,
@@ -13361,23 +13359,23 @@
     },
     {
       "seq": 2446,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2447,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2448,
+      "seq": 2447,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2449,
+      "seq": 2448,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 2449,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2450,
@@ -13386,20 +13384,20 @@
     },
     {
       "seq": 2451,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2452,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2453,
+      "seq": 2452,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2453,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2454,
@@ -13408,27 +13406,27 @@
     },
     {
       "seq": 2455,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2456,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2457,
+      "seq": 2456,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2458,
+      "seq": 2457,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 2459,
+      "seq": 2458,
       "kind": 28
+    },
+    {
+      "seq": 2459,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2460,
@@ -13437,20 +13435,20 @@
     },
     {
       "seq": 2461,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2462,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2463,
+      "seq": 2462,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2463,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2464,
@@ -13459,23 +13457,23 @@
     },
     {
       "seq": 2465,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2466,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2467,
+      "seq": 2466,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2468,
+      "seq": 2467,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 2468,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2469,
@@ -13484,20 +13482,20 @@
     },
     {
       "seq": 2470,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2471,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2472,
+      "seq": 2471,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2472,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2473,
@@ -13506,57 +13504,56 @@
     },
     {
       "seq": 2474,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2475,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2476,
+      "seq": 2475,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2477,
+      "seq": 2476,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 2478,
+      "seq": 2477,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2479,
+      "seq": 2478,
       "kind": 9,
       "amount": 19
     },
     {
-      "seq": 2480,
+      "seq": 2479,
       "kind": 8
     },
     {
-      "seq": 2481,
+      "seq": 2480,
       "kind": 7,
       "obj": 32
     },
     {
-      "seq": 2482,
+      "seq": 2481,
       "kind": 7,
       "obj": 29
     },
     {
-      "seq": 2483,
+      "seq": 2482,
       "kind": 7,
       "obj": 31
     },
     {
-      "seq": 2484,
+      "seq": 2483,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 2484,
+      "kind": 10
     },
     {
       "seq": 2485,
@@ -13564,17 +13561,19 @@
     },
     {
       "seq": 2486,
-      "kind": 10
-    },
-    {
-      "seq": 2487,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2488,
+      "seq": 2487,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2488,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2489,
@@ -13584,33 +13583,31 @@
     },
     {
       "seq": 2490,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2491,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2492,
+      "seq": 2491,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2493,
+      "seq": 2492,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 2494,
+      "seq": 2493,
       "kind": 3,
       "obj": 8,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 2494,
+      "kind": 10
     },
     {
       "seq": 2495,
@@ -13618,17 +13615,19 @@
     },
     {
       "seq": 2496,
-      "kind": 10
-    },
-    {
-      "seq": 2497,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2498,
+      "seq": 2497,
       "kind": 21,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2498,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2499,
@@ -13638,26 +13637,24 @@
     },
     {
       "seq": 2500,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2501,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2502,
+      "seq": 2501,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2503,
+      "seq": 2502,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 2503,
+      "kind": 10
     },
     {
       "seq": 2504,
@@ -13665,24 +13662,20 @@
     },
     {
       "seq": 2505,
-      "kind": 10
-    },
-    {
-      "seq": 2506,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2507,
+      "seq": 2506,
       "kind": 21,
-      "text": "priority:[];announce:e055c18064b130bc731ab7986616f3c0246d9a5652655a9edb090e4423022a5d"
+      "text": "priority:[];announce:c76efa08b8f75961a7607ba1e25f3efd2dc74527cef20019d39e0b5acdef3067"
     },
     {
-      "seq": 2508,
+      "seq": 2507,
       "kind": 10
     },
     {
-      "seq": 2509,
+      "seq": 2508,
       "kind": 11,
       "obj": 8,
       "from": 1,
@@ -13690,56 +13683,62 @@
       "text": "Goldvein Pick"
     },
     {
-      "seq": 2510,
+      "seq": 2509,
       "kind": 20,
       "text": "choose"
     },
     {
-      "seq": 2511,
+      "seq": 2510,
       "kind": 21,
       "text": "choose:[4]"
     },
     {
-      "seq": 2512,
+      "seq": 2511,
       "kind": 6,
       "obj": 29
     },
     {
-      "seq": 2513,
+      "seq": 2512,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2514,
+      "seq": 2513,
       "kind": 6,
       "obj": 31
     },
     {
-      "seq": 2515,
+      "seq": 2514,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2516,
+      "seq": 2515,
       "kind": 13,
       "amount": -2,
       "counter": "W"
     },
     {
-      "seq": 2517,
+      "seq": 2516,
       "kind": 10
     },
     {
-      "seq": 2518,
+      "seq": 2517,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2519,
+      "seq": 2518,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 2519,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2520,
@@ -13749,34 +13748,32 @@
     },
     {
       "seq": 2521,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2522,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2523,
+      "seq": 2522,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2524,
+      "seq": 2523,
       "kind": 12,
       "obj": 8,
       "text": "Goldvein Pick"
     },
     {
-      "seq": 2525,
+      "seq": 2524,
       "kind": 2,
       "obj": 8,
       "from": 5,
       "to": 2
+    },
+    {
+      "seq": 2525,
+      "kind": 10
     },
     {
       "seq": 2526,
@@ -13784,74 +13781,70 @@
     },
     {
       "seq": 2527,
-      "kind": 10
-    },
-    {
-      "seq": 2528,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2529,
+      "seq": 2528,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2530,
+      "seq": 2529,
       "kind": 10
     },
     {
-      "seq": 2531,
+      "seq": 2530,
       "kind": 6,
       "obj": 32
     },
     {
-      "seq": 2532,
+      "seq": 2531,
       "kind": 13,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2533,
+      "seq": 2532,
       "kind": 10
     },
     {
-      "seq": 2534,
+      "seq": 2533,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2535,
+      "seq": 2534,
       "kind": 21,
       "text": "priority:[1]"
     },
     {
-      "seq": 2536,
+      "seq": 2535,
       "kind": 10
     },
     {
-      "seq": 2537,
+      "seq": 2536,
       "kind": 20,
       "text": "target"
     },
     {
-      "seq": 2538,
+      "seq": 2537,
       "kind": 21,
       "text": "target:[0]"
     },
     {
-      "seq": 2539,
+      "seq": 2538,
       "kind": 13,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 2540,
+      "seq": 2539,
       "kind": 34,
       "obj": 8
     },
     {
-      "seq": 2541,
+      "seq": 2540,
       "kind": 24,
       "obj": 95,
       "ids": [
@@ -13859,22 +13852,28 @@
       ]
     },
     {
+      "seq": 2541,
+      "kind": 10
+    },
+    {
       "seq": 2542,
       "kind": 10
     },
     {
       "seq": 2543,
-      "kind": 10
-    },
-    {
-      "seq": 2544,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2545,
+      "seq": 2544,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2545,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2546,
@@ -13884,29 +13883,23 @@
     },
     {
       "seq": 2547,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2548,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2549,
+      "seq": 2548,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2550,
+      "seq": 2549,
       "kind": 12,
       "obj": 95
     },
     {
-      "seq": 2551,
+      "seq": 2550,
       "kind": 33,
       "obj": 8,
       "ids": [
@@ -13914,11 +13907,15 @@
       ]
     },
     {
-      "seq": 2552,
+      "seq": 2551,
       "kind": 2,
       "obj": 95,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2552,
+      "kind": 10
     },
     {
       "seq": 2553,
@@ -13926,17 +13923,19 @@
     },
     {
       "seq": 2554,
-      "kind": 10
-    },
-    {
-      "seq": 2555,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2556,
+      "seq": 2555,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2556,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2557,
@@ -13946,26 +13945,24 @@
     },
     {
       "seq": 2558,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2559,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2560,
+      "seq": 2559,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2561,
+      "seq": 2560,
       "kind": 8,
       "step": 4
+    },
+    {
+      "seq": 2561,
+      "kind": 10
     },
     {
       "seq": 2562,
@@ -13973,17 +13970,19 @@
     },
     {
       "seq": 2563,
-      "kind": 10
-    },
-    {
-      "seq": 2564,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2565,
+      "seq": 2564,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2565,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2566,
@@ -13993,43 +13992,37 @@
     },
     {
       "seq": 2567,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2568,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2569,
+      "seq": 2568,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2570,
+      "seq": 2569,
       "kind": 8,
       "step": 5
     },
     {
-      "seq": 2571,
+      "seq": 2570,
       "kind": 10
     },
     {
-      "seq": 2572,
+      "seq": 2571,
       "kind": 20,
       "text": "attackers"
     },
     {
-      "seq": 2573,
+      "seq": 2572,
       "kind": 21,
       "text": "attackers:[0]"
     },
     {
-      "seq": 2574,
+      "seq": 2573,
       "kind": 16,
       "player": 1,
       "ids": [
@@ -14037,23 +14030,29 @@
       ]
     },
     {
-      "seq": 2575,
+      "seq": 2574,
       "kind": 6,
       "obj": 15
     },
     {
-      "seq": 2576,
+      "seq": 2575,
       "kind": 10
     },
     {
-      "seq": 2577,
+      "seq": 2576,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2578,
+      "seq": 2577,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2578,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2579,
@@ -14063,61 +14062,61 @@
     },
     {
       "seq": 2580,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2581,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2582,
+      "seq": 2581,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2583,
+      "seq": 2582,
       "kind": 8,
       "step": 6
     },
     {
-      "seq": 2584,
+      "seq": 2583,
       "kind": 10
     },
     {
-      "seq": 2585,
+      "seq": 2584,
       "kind": 20,
       "player": 1,
       "text": "blockers"
     },
     {
-      "seq": 2586,
+      "seq": 2585,
       "kind": 21,
       "player": 1,
       "text": "blockers:[]"
     },
     {
-      "seq": 2587,
+      "seq": 2586,
       "kind": 17,
       "player": 1
     },
     {
-      "seq": 2588,
+      "seq": 2587,
       "kind": 10
     },
     {
-      "seq": 2589,
+      "seq": 2588,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2590,
+      "seq": 2589,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2590,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2591,
@@ -14127,39 +14126,33 @@
     },
     {
       "seq": 2592,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2593,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2594,
+      "seq": 2593,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2595,
+      "seq": 2594,
       "kind": 8,
       "step": 7
     },
     {
-      "seq": 2596,
+      "seq": 2595,
       "kind": 10
     },
     {
-      "seq": 2597,
+      "seq": 2596,
       "kind": 5,
       "player": 1,
       "amount": 2
     },
     {
-      "seq": 2598,
+      "seq": 2597,
       "kind": 93,
       "obj": 15,
       "amount": 2,
@@ -14169,12 +14162,12 @@
       ]
     },
     {
-      "seq": 2599,
+      "seq": 2598,
       "kind": 4,
       "amount": 2
     },
     {
-      "seq": 2600,
+      "seq": 2599,
       "kind": 27,
       "obj": 8,
       "text": "triggered ability",
@@ -14183,18 +14176,24 @@
       ]
     },
     {
-      "seq": 2601,
+      "seq": 2600,
       "kind": 10
     },
     {
-      "seq": 2602,
+      "seq": 2601,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2603,
+      "seq": 2602,
       "kind": 21,
       "text": "priority:[1]"
+    },
+    {
+      "seq": 2603,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2604,
@@ -14204,38 +14203,36 @@
     },
     {
       "seq": 2605,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2606,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2607,
+      "seq": 2606,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2608,
+      "seq": 2607,
       "kind": 12,
       "obj": 96
     },
     {
-      "seq": 2609,
+      "seq": 2608,
       "kind": 31,
       "text": "c_a_treasure_sac"
     },
     {
-      "seq": 2610,
+      "seq": 2609,
       "kind": 2,
       "obj": 96,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2610,
+      "kind": 10
     },
     {
       "seq": 2611,
@@ -14243,17 +14240,19 @@
     },
     {
       "seq": 2612,
-      "kind": 10
-    },
-    {
-      "seq": 2613,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2614,
+      "seq": 2613,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 2614,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2615,
@@ -14263,26 +14262,24 @@
     },
     {
       "seq": 2616,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2617,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2618,
+      "seq": 2617,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2619,
+      "seq": 2618,
       "kind": 8,
       "step": 8
+    },
+    {
+      "seq": 2619,
+      "kind": 10
     },
     {
       "seq": 2620,
@@ -14290,17 +14287,19 @@
     },
     {
       "seq": 2621,
-      "kind": 10
-    },
-    {
-      "seq": 2622,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2623,
+      "seq": 2622,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 2623,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2624,
@@ -14310,30 +14309,28 @@
     },
     {
       "seq": 2625,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2626,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2627,
+      "seq": 2626,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2628,
+      "seq": 2627,
       "kind": 8,
       "step": 9
     },
     {
-      "seq": 2629,
+      "seq": 2628,
       "kind": 28
+    },
+    {
+      "seq": 2629,
+      "kind": 10
     },
     {
       "seq": 2630,
@@ -14341,17 +14338,19 @@
     },
     {
       "seq": 2631,
-      "kind": 10
-    },
-    {
-      "seq": 2632,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2633,
+      "seq": 2632,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 2633,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2634,
@@ -14361,26 +14360,24 @@
     },
     {
       "seq": 2635,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2636,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2637,
+      "seq": 2636,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2638,
+      "seq": 2637,
       "kind": 8,
       "step": 10
+    },
+    {
+      "seq": 2638,
+      "kind": 10
     },
     {
       "seq": 2639,
@@ -14388,17 +14385,19 @@
     },
     {
       "seq": 2640,
-      "kind": 10
-    },
-    {
-      "seq": 2641,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2642,
+      "seq": 2641,
       "kind": 21,
       "text": "priority:[2]"
+    },
+    {
+      "seq": 2642,
+      "kind": 10,
+      "player": 1,
+      "amount": 1
     },
     {
       "seq": 2643,
@@ -14408,65 +14407,64 @@
     },
     {
       "seq": 2644,
-      "kind": 10,
-      "player": 1,
-      "amount": 1
-    },
-    {
-      "seq": 2645,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2646,
+      "seq": 2645,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2647,
+      "seq": 2646,
       "kind": 8,
       "step": 11
     },
     {
-      "seq": 2648,
+      "seq": 2647,
       "kind": 10
     },
     {
-      "seq": 2649,
+      "seq": 2648,
       "kind": 9,
       "player": 1,
       "amount": 20
     },
     {
-      "seq": 2650,
+      "seq": 2649,
       "kind": 8
     },
     {
-      "seq": 2651,
+      "seq": 2650,
       "kind": 7,
       "obj": 67
     },
     {
-      "seq": 2652,
+      "seq": 2651,
       "kind": 7,
       "obj": 70
     },
     {
-      "seq": 2653,
+      "seq": 2652,
       "kind": 7,
       "obj": 62
     },
     {
-      "seq": 2654,
+      "seq": 2653,
       "kind": 7,
       "obj": 59
     },
     {
-      "seq": 2655,
+      "seq": 2654,
       "kind": 8,
       "step": 1
+    },
+    {
+      "seq": 2655,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2656,
@@ -14475,20 +14473,20 @@
     },
     {
       "seq": 2657,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2658,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2659,
+      "seq": 2658,
       "kind": 21,
       "player": 1,
       "text": "priority:[8]"
+    },
+    {
+      "seq": 2659,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2660,
@@ -14497,31 +14495,31 @@
     },
     {
       "seq": 2661,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2662,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2663,
+      "seq": 2662,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 2664,
+      "seq": 2663,
       "kind": 8,
       "step": 2
     },
     {
-      "seq": 2665,
+      "seq": 2664,
       "kind": 3,
       "player": 1,
       "obj": 75,
       "to": 1,
       "secret": true
+    },
+    {
+      "seq": 2665,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2666,
@@ -14530,20 +14528,20 @@
     },
     {
       "seq": 2667,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2668,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2669,
+      "seq": 2668,
       "kind": 21,
       "player": 1,
       "text": "priority:[8]"
+    },
+    {
+      "seq": 2669,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2670,
@@ -14552,23 +14550,23 @@
     },
     {
       "seq": 2671,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2672,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2673,
+      "seq": 2672,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 2674,
+      "seq": 2673,
       "kind": 8,
       "step": 3
+    },
+    {
+      "seq": 2674,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2675,
@@ -14577,130 +14575,125 @@
     },
     {
       "seq": 2676,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2677,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2678,
+      "seq": 2677,
       "kind": 21,
       "player": 1,
       "text": "priority:[1]"
     },
     {
-      "seq": 2679,
+      "seq": 2678,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2680,
+      "seq": 2679,
       "kind": 6,
       "obj": 70
     },
     {
-      "seq": 2681,
+      "seq": 2680,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "W"
     },
     {
-      "seq": 2682,
+      "seq": 2681,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2683,
+      "seq": 2682,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2684,
+      "seq": 2683,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2685,
+      "seq": 2684,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2686,
+      "seq": 2685,
       "kind": 6,
       "obj": 67
     },
     {
-      "seq": 2687,
+      "seq": 2686,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 2688,
+      "seq": 2687,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2689,
+      "seq": 2688,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2690,
+      "seq": 2689,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2691,
+      "seq": 2690,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2692,
+      "seq": 2691,
       "kind": 6,
       "obj": 62
     },
     {
-      "seq": 2693,
+      "seq": 2692,
       "kind": 13,
       "player": 1,
       "amount": 1,
       "counter": "R"
     },
     {
-      "seq": 2694,
+      "seq": 2693,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2695,
+      "seq": 2694,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2696,
+      "seq": 2695,
       "kind": 21,
       "player": 1,
       "text": "priority:[0]"
     },
     {
-      "seq": 2697,
+      "seq": 2696,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2698,
+      "seq": 2697,
       "kind": 11,
       "player": 1,
       "obj": 75,
@@ -14709,68 +14702,73 @@
       "text": "Prideful Parent"
     },
     {
-      "seq": 2699,
+      "seq": 2698,
       "kind": 13,
       "player": 1,
       "amount": -1,
       "counter": "W"
     },
     {
-      "seq": 2700,
+      "seq": 2699,
       "kind": 13,
       "player": 1,
       "amount": -2,
       "counter": "R"
     },
     {
-      "seq": 2701,
+      "seq": 2700,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2702,
+      "seq": 2701,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2703,
+      "seq": 2702,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
     },
     {
-      "seq": 2704,
+      "seq": 2703,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2705,
+      "seq": 2704,
       "kind": 6,
       "obj": 59
     },
     {
-      "seq": 2706,
+      "seq": 2705,
       "kind": 34,
       "player": 1,
       "obj": 59
     },
     {
-      "seq": 2707,
+      "seq": 2706,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2708,
+      "seq": 2707,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2709,
+      "seq": 2708,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2709,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2710,
@@ -14779,23 +14777,24 @@
     },
     {
       "seq": 2711,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2712,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2713,
+      "seq": 2712,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 2714,
+      "seq": 2713,
       "kind": 12,
       "obj": 98
+    },
+    {
+      "seq": 2714,
+      "kind": 31,
+      "player": 1,
+      "text": "r_1_1_goblin"
     },
     {
       "seq": 2715,
@@ -14817,16 +14816,15 @@
     },
     {
       "seq": 2718,
-      "kind": 31,
-      "player": 1,
-      "text": "r_1_1_goblin"
-    },
-    {
-      "seq": 2719,
       "kind": 2,
       "obj": 98,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2719,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2720,
@@ -14835,20 +14833,20 @@
     },
     {
       "seq": 2721,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2722,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2723,
+      "seq": 2722,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2723,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2724,
@@ -14857,39 +14855,34 @@
     },
     {
       "seq": 2725,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2726,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2727,
+      "seq": 2726,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 2728,
+      "seq": 2727,
       "kind": 12,
       "obj": 75,
       "text": "Prideful Parent"
     },
     {
-      "seq": 2729,
+      "seq": 2728,
       "kind": 2,
       "obj": 75,
       "from": 5,
       "to": 2
     },
     {
-      "seq": 2730,
+      "seq": 2729,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2731,
+      "seq": 2730,
       "kind": 27,
       "player": 1,
       "obj": 75,
@@ -14899,21 +14892,26 @@
       ]
     },
     {
-      "seq": 2732,
+      "seq": 2731,
       "kind": 10,
       "player": 1
     },
     {
-      "seq": 2733,
+      "seq": 2732,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2734,
+      "seq": 2733,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2734,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2735,
@@ -14922,36 +14920,36 @@
     },
     {
       "seq": 2736,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2737,
       "kind": 20,
       "text": "priority"
     },
     {
-      "seq": 2738,
+      "seq": 2737,
       "kind": 21,
       "text": "priority:[2]"
     },
     {
-      "seq": 2739,
+      "seq": 2738,
       "kind": 12,
       "obj": 103
     },
     {
-      "seq": 2740,
+      "seq": 2739,
       "kind": 31,
       "player": 1,
       "text": "w_1_1_cat"
     },
     {
-      "seq": 2741,
+      "seq": 2740,
       "kind": 2,
       "obj": 103,
       "from": 5,
       "to": 4
+    },
+    {
+      "seq": 2741,
+      "kind": 10,
+      "player": 1
     },
     {
       "seq": 2742,
@@ -14960,20 +14958,20 @@
     },
     {
       "seq": 2743,
-      "kind": 10,
-      "player": 1
-    },
-    {
-      "seq": 2744,
       "kind": 20,
       "player": 1,
       "text": "priority"
     },
     {
-      "seq": 2745,
+      "seq": 2744,
       "kind": 21,
       "player": 1,
       "text": "priority:[4]"
+    },
+    {
+      "seq": 2745,
+      "kind": 10,
+      "amount": 1
     },
     {
       "seq": 2746,
@@ -14982,11 +14980,6 @@
     },
     {
       "seq": 2747,
-      "kind": 10,
-      "amount": 1
-    },
-    {
-      "seq": 2748,
       "kind": 20,
       "text": "priority"
     }
@@ -16964,674 +16957,674 @@
       ]
     },
     {
-      "seq": 1470,
+      "seq": 1469,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1474,
+      "seq": 1473,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1479,
+      "seq": 1478,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1483,
+      "seq": 1482,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1489,
+      "seq": 1488,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1493,
+      "seq": 1492,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1498,
+      "seq": 1497,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1502,
+      "seq": 1501,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1516,
+      "seq": 1515,
       "player": 1,
       "choices": [
         5
       ]
     },
     {
-      "seq": 1520,
+      "seq": 1519,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1526,
+      "seq": 1525,
       "player": 1,
       "choices": [
         5
       ]
     },
     {
-      "seq": 1530,
+      "seq": 1529,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1535,
+      "seq": 1534,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1541,
+      "seq": 1540,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1547,
+      "seq": 1546,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1553,
+      "seq": 1552,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1559,
+      "seq": 1558,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1566,
+      "seq": 1565,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1570,
+      "seq": 1569,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1576,
+      "seq": 1575,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1580,
+      "seq": 1579,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1586,
+      "seq": 1585,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1590,
+      "seq": 1589,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1596,
+      "seq": 1595,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1600,
+      "seq": 1599,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1605,
+      "seq": 1604,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1609,
+      "seq": 1608,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1615,
+      "seq": 1614,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1619,
+      "seq": 1618,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1624,
+      "seq": 1623,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1628,
+      "seq": 1627,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1640,
+      "seq": 1639,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1644,
+      "seq": 1643,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1650,
+      "seq": 1649,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1654,
+      "seq": 1653,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1659,
+      "seq": 1658,
       "player": 0,
       "choices": null,
       "announce": {
-        "action_id": "b6f0b5e950395587f439cd512f2753417c3850cb862252eed86d847ea614d1d2"
+        "action_id": "d0e6dc5f587639fee83b8cdbea1602bbb35833a61a2871ef0c3fc2cb7a904b7e"
       }
     },
     {
-      "seq": 1663,
+      "seq": 1662,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1671,
+      "seq": 1670,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1675,
+      "seq": 1674,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1682,
+      "seq": 1681,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1686,
+      "seq": 1685,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1692,
+      "seq": 1691,
       "player": 0,
       "choices": null,
       "announce": {
-        "action_id": "6290efa5821cd906b72d01135b978822f23b5915954a18eabb20be9066e6f97c"
+        "action_id": "1b350b0f5586effb21afd7ac36a8752f1ae79f221fe536cdb67dcd2fae7768af"
       }
     },
     {
-      "seq": 1696,
+      "seq": 1695,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1702,
+      "seq": 1701,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1706,
+      "seq": 1705,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1712,
+      "seq": 1711,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1716,
+      "seq": 1715,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1721,
+      "seq": 1720,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1725,
+      "seq": 1724,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1729,
+      "seq": 1728,
       "player": 0,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1734,
+      "seq": 1733,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1738,
+      "seq": 1737,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1742,
+      "seq": 1741,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1746,
+      "seq": 1745,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1750,
+      "seq": 1749,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1762,
+      "seq": 1761,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1766,
+      "seq": 1765,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1771,
+      "seq": 1770,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1775,
+      "seq": 1774,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1781,
+      "seq": 1780,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1785,
+      "seq": 1784,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1790,
+      "seq": 1789,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1794,
+      "seq": 1793,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1807,
+      "seq": 1806,
       "player": 1,
       "choices": [
         5
       ]
     },
     {
-      "seq": 1811,
+      "seq": 1810,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1817,
+      "seq": 1816,
       "player": 1,
       "choices": [
         5
       ]
     },
     {
-      "seq": 1821,
+      "seq": 1820,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1826,
+      "seq": 1825,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1832,
+      "seq": 1831,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1838,
+      "seq": 1837,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1844,
+      "seq": 1843,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1850,
+      "seq": 1849,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1856,
+      "seq": 1855,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1863,
+      "seq": 1862,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1867,
+      "seq": 1866,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1873,
+      "seq": 1872,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1877,
+      "seq": 1876,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1882,
+      "seq": 1881,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1886,
+      "seq": 1885,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1892,
+      "seq": 1891,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1896,
+      "seq": 1895,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1901,
+      "seq": 1900,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1905,
+      "seq": 1904,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1911,
+      "seq": 1910,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1915,
+      "seq": 1914,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1920,
+      "seq": 1919,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1924,
+      "seq": 1923,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 1936,
+      "seq": 1935,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1940,
+      "seq": 1939,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1946,
+      "seq": 1945,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1950,
+      "seq": 1949,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1955,
+      "seq": 1954,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1959,
+      "seq": 1958,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1964,
+      "seq": 1963,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1968,
+      "seq": 1967,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1972,
+      "seq": 1971,
       "player": 0,
       "choices": [
         0,
@@ -17639,1004 +17632,1004 @@
       ]
     },
     {
-      "seq": 1978,
+      "seq": 1977,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1982,
+      "seq": 1981,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 1986,
+      "seq": 1985,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 1990,
+      "seq": 1989,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 1994,
+      "seq": 1993,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2008,
+      "seq": 2007,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2012,
+      "seq": 2011,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2017,
+      "seq": 2016,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2021,
+      "seq": 2020,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2027,
+      "seq": 2026,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2031,
+      "seq": 2030,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2036,
+      "seq": 2035,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2040,
+      "seq": 2039,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2054,
+      "seq": 2053,
       "player": 1,
       "choices": [
         7
       ]
     },
     {
-      "seq": 2058,
+      "seq": 2057,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2064,
+      "seq": 2063,
       "player": 1,
       "choices": [
         7
       ]
     },
     {
-      "seq": 2068,
+      "seq": 2067,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2073,
+      "seq": 2072,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2079,
+      "seq": 2078,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2085,
+      "seq": 2084,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2092,
+      "seq": 2091,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2098,
+      "seq": 2097,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2102,
+      "seq": 2101,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2109,
+      "seq": 2108,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2113,
+      "seq": 2112,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2120,
+      "seq": 2119,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2124,
+      "seq": 2123,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2131,
+      "seq": 2130,
       "player": 1,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2137,
+      "seq": 2136,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2143,
+      "seq": 2142,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2149,
+      "seq": 2148,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2153,
+      "seq": 2152,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2159,
+      "seq": 2158,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2163,
+      "seq": 2162,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2168,
+      "seq": 2167,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2172,
+      "seq": 2171,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2178,
+      "seq": 2177,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2182,
+      "seq": 2181,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2187,
+      "seq": 2186,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2191,
+      "seq": 2190,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2197,
+      "seq": 2196,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2201,
+      "seq": 2200,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2206,
+      "seq": 2205,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2210,
+      "seq": 2209,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2220,
+      "seq": 2219,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2224,
+      "seq": 2223,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2230,
+      "seq": 2229,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2234,
+      "seq": 2233,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2239,
+      "seq": 2238,
       "player": 0,
       "choices": null,
       "announce": {
-        "action_id": "5774a7efb6cc220b6963040481c3e3876c415a179810457a9cb4b8fce9d90d22"
+        "action_id": "5c526cec4314b757e11ff586b7e2a63cad95cf9a709e6874819f4a671008f7e2"
       }
     },
     {
-      "seq": 2243,
+      "seq": 2242,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2253,
-      "player": 0,
-      "choices": [
-        1
-      ]
-    },
-    {
-      "seq": 2257,
-      "player": 1,
-      "choices": [
-        4
-      ]
-    },
-    {
-      "seq": 2264,
+      "seq": 2252,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2268,
+      "seq": 2256,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2275,
+      "seq": 2263,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2279,
+      "seq": 2267,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2284,
+      "seq": 2274,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2288,
+      "seq": 2278,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2292,
+      "seq": 2283,
+      "player": 0,
+      "choices": [
+        1
+      ]
+    },
+    {
+      "seq": 2287,
+      "player": 1,
+      "choices": [
+        4
+      ]
+    },
+    {
+      "seq": 2291,
       "player": 0,
       "choices": null
     },
     {
-      "seq": 2296,
+      "seq": 2295,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2300,
+      "seq": 2299,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2305,
+      "seq": 2304,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2309,
+      "seq": 2308,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2315,
+      "seq": 2314,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2319,
+      "seq": 2318,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2324,
+      "seq": 2323,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2328,
+      "seq": 2327,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2341,
+      "seq": 2340,
       "player": 1,
       "choices": [
         8
       ]
     },
     {
-      "seq": 2345,
+      "seq": 2344,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2351,
+      "seq": 2350,
       "player": 1,
       "choices": [
         8
       ]
     },
     {
-      "seq": 2355,
+      "seq": 2354,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2360,
+      "seq": 2359,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2366,
+      "seq": 2365,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2372,
+      "seq": 2371,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2378,
+      "seq": 2377,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2382,
+      "seq": 2381,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2388,
+      "seq": 2387,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2394,
+      "seq": 2393,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2398,
+      "seq": 2397,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2406,
+      "seq": 2405,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2410,
+      "seq": 2409,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2422,
+      "seq": 2421,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2426,
+      "seq": 2425,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2431,
+      "seq": 2430,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2435,
+      "seq": 2434,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2439,
+      "seq": 2438,
       "player": 1,
       "choices": null
     },
     {
-      "seq": 2443,
+      "seq": 2442,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2447,
+      "seq": 2446,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2452,
+      "seq": 2451,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2456,
+      "seq": 2455,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2462,
+      "seq": 2461,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2466,
+      "seq": 2465,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2471,
+      "seq": 2470,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2475,
+      "seq": 2474,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2487,
+      "seq": 2486,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2491,
+      "seq": 2490,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2497,
+      "seq": 2496,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2501,
+      "seq": 2500,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2506,
+      "seq": 2505,
       "player": 0,
       "choices": null,
       "announce": {
-        "action_id": "e055c18064b130bc731ab7986616f3c0246d9a5652655a9edb090e4423022a5d"
+        "action_id": "c76efa08b8f75961a7607ba1e25f3efd2dc74527cef20019d39e0b5acdef3067"
       }
     },
     {
-      "seq": 2510,
+      "seq": 2509,
       "player": 0,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2518,
+      "seq": 2517,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2522,
+      "seq": 2521,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2528,
+      "seq": 2527,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2534,
+      "seq": 2533,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2537,
+      "seq": 2536,
       "player": 0,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2544,
+      "seq": 2543,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2548,
+      "seq": 2547,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2555,
+      "seq": 2554,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2559,
+      "seq": 2558,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2564,
+      "seq": 2563,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2568,
+      "seq": 2567,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2572,
+      "seq": 2571,
       "player": 0,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2577,
+      "seq": 2576,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2581,
+      "seq": 2580,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2585,
+      "seq": 2584,
       "player": 1,
       "choices": null
     },
     {
-      "seq": 2589,
+      "seq": 2588,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2593,
+      "seq": 2592,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2602,
+      "seq": 2601,
       "player": 0,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2606,
+      "seq": 2605,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2613,
+      "seq": 2612,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2617,
+      "seq": 2616,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2622,
+      "seq": 2621,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2626,
+      "seq": 2625,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2632,
+      "seq": 2631,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2636,
+      "seq": 2635,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2641,
+      "seq": 2640,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2645,
+      "seq": 2644,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2658,
+      "seq": 2657,
       "player": 1,
       "choices": [
         8
       ]
     },
     {
-      "seq": 2662,
+      "seq": 2661,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2668,
+      "seq": 2667,
       "player": 1,
       "choices": [
         8
       ]
     },
     {
-      "seq": 2672,
+      "seq": 2671,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2677,
+      "seq": 2676,
       "player": 1,
       "choices": [
         1
       ]
     },
     {
-      "seq": 2683,
+      "seq": 2682,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2689,
+      "seq": 2688,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2695,
+      "seq": 2694,
       "player": 1,
       "choices": [
         0
       ]
     },
     {
-      "seq": 2702,
+      "seq": 2701,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2708,
+      "seq": 2707,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2712,
+      "seq": 2711,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2722,
+      "seq": 2721,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2726,
+      "seq": 2725,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2733,
+      "seq": 2732,
       "player": 1,
       "choices": [
         4
       ]
     },
     {
-      "seq": 2737,
+      "seq": 2736,
       "player": 0,
       "choices": [
         2
       ]
     },
     {
-      "seq": 2744,
+      "seq": 2743,
       "player": 1,
       "choices": [
         4
       ]
     }
   ],
-  "head": "a0aa62a24ca7fbda",
+  "head": "47ad2e8585c666f1",
   "intent_count": 515,
   "turn": 20,
   "step": "main1",

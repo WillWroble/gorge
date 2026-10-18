@@ -1674,13 +1674,10 @@
           },
           "token": "#41",
           "tapped": false,
-          "power": 3,
-          "toughness": 3,
+          "power": 2,
+          "toughness": 2,
           "damage": 0,
           "attacking": false,
-          "counters": {
-            "P1P1": 1
-          },
           "controller": 1,
           "owner": 1,
           "summon_sick": false

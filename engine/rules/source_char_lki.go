@@ -94,6 +94,17 @@ func (e *Engine) captureSourceCharLKI(src state.ObjID) {
 	}
 }
 
+// SourceLeftBattlefieldSince reports whether the source of the stack object
+// stack left the battlefield after that ability was created -- triggered
+// (the snapshot a pending trigger took is moved onto its stack object at
+// TriggerPush) or activated (including a self-sacrifice cost, seeded by
+// payCast). effects reads it so "this permanent" effects of an ability whose
+// source became a new object do nothing (CR 400.7).
+func (e *Engine) SourceLeftBattlefieldSince(stack state.ObjID) bool {
+	_, ok := e.sourceCharLKI[stack]
+	return ok
+}
+
 // setSourceCharLKI records snap for the stack object id.
 func (e *Engine) setSourceCharLKI(id state.ObjID, snap sourceCharSnapshot) {
 	if e.sourceCharLKI == nil {
