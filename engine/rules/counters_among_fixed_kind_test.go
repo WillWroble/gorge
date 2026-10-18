@@ -112,3 +112,72 @@ func TestFixedKindCountersOnOnePermanentStillOffered(t *testing.T) {
 		t.Fatalf("Novijen Sages' draw not offered with two counters on the Sages: pending=%+v", e.Pending())
 	}
 }
+
+// TestJetfireManaAbilityRemovesCountersFromAmongArtifacts: Jetfire,
+// Ingenious Scientist's `Cost$ RemoveAnyCounter<X1+/P1P1/Artifact>` mana
+// ability removes X +1/+1 counters from among ARTIFACTS you control (CR
+// 118.3: a total across permanents), so the Jetfire and an Ornithopter
+// carrying one counter each can pay X = 2, adding {C}{C}.
+func TestJetfireManaAbilityRemovesCountersFromAmongArtifacts(t *testing.T) {
+	t.Parallel()
+	e := handEngine(t,
+		corpusAlternativeCard(t, "Jetfire, Ingenious Scientist"),
+		corpusAlternativeCard(t, "Ornithopter"),
+		corpusAlternativeCard(t, "Grizzly Bears"),
+	)
+	hand := e.G.Zone(state.ZHand, 0)
+	jet, orni := hand[0], hand[1]
+	placeOnBattlefield(t, e, orni)
+	placeOnBattlefield(t, e, jet)
+	for _, id := range []state.ObjID{jet, orni} {
+		if d := 1 - e.G.Obj(id).Counter("P1P1"); d != 0 {
+			e.emit(events.Event{Kind: events.CounterChange, Obj: id, Counter: "P1P1", Amount: d})
+		}
+	}
+	e.pending = nil
+	toMain1(t, e)
+	e.priorityRound()
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KPriority {
+		t.Fatalf("no priority decision: %+v", d)
+	}
+	idx := -1
+	for _, o := range d.Options {
+		if (o.Kind == "ability" || o.Kind == "mana") && o.Obj == jet {
+			idx = o.Index
+		}
+	}
+	if idx < 0 {
+		t.Fatalf("Jetfire's counter-removal mana ability is not offered with one counter on each of two artifacts: %+v", d.Options)
+	}
+	submitChoices(t, e, idx)
+	for i := 0; i < 12; i++ {
+		d := e.Pending()
+		if d == nil || (d.Kind != decision.KChoose && d.Kind != decision.KTarget) {
+			break
+		}
+		pick := 0
+		// The X announcement offers amounts; take the largest (2).
+		for _, o := range d.Options {
+			if o.Kind == "x" || o.Kind == "number" {
+				pick = o.Index
+			}
+		}
+		for _, o := range d.Options {
+			if o.Kind == "subcounter" {
+				pick = o.Index
+				break
+			}
+		}
+		submitChoices(t, e, pick)
+	}
+	// The ability targets a player, so it is not a mana ability (CR 605.1a):
+	// it resolves from the stack.
+	passUntilStackEmpty(t, e, 30)
+	if got := e.G.Obj(jet).Counter("P1P1") + e.G.Obj(orni).Counter("P1P1"); got != 0 {
+		t.Errorf("counters left on the two artifacts = %d, want 0 (pending %+v)", got, e.Pending())
+	}
+	if got := e.G.Players[0].Pool.Total(); got != 2 {
+		t.Errorf("mana floating = %d, want 2", got)
+	}
+}

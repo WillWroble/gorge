@@ -762,7 +762,9 @@ func isolatePreviewMemos(p *Engine) {
 // the preview may read is copied; pure scratch buffers and caches, which a
 // clone also starts empty (their clone tags are reset), start empty.
 // TestEntryPreviewSharesNoAppendableSlice holds the list complete. The
-// engine's maps are still shared by reference.
+// engine's maps are still shared by reference: no preview path writes one
+// (TestEntryPreviewNeverWritesALiveMap holds that), so a preview that starts
+// to needs a private copy here.
 func isolatePreviewScratch(p *Engine) {
 	// Live state: copied.
 	p.continuous = slices.Clone(p.continuous)

@@ -304,6 +304,13 @@ func (e *Engine) finishUntapStep(next int) bool {
 		if !o.Tapped {
 			continue
 		}
+		if e.untapDenied(ids[i]) {
+			// CR 611.2b: an Effect's "don't untap during their next untap
+			// step" grant (Misstep, Exhaustion, Mana Vapors, Icebreaker
+			// Kraken) holds the permanent tapped. Nothing is consumed here;
+			// the Effect's own Phase$ Untap self-exile ends the restriction.
+			continue
+		}
 		if hasUntapStepChoice(o) && o.UntapChoice == "" {
 			// CR 502.2: the controller may elect not to untap this
 			// permanent. Option 0 is the deterministic untap/default path;
