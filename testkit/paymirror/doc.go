@@ -137,7 +137,7 @@
 //	                                   compared); clones restart it at zero
 //	triggerEventMasks, triggerObject-  immutable-syntax lookup caches keyed by face pointer
 //	Masks, trigZones/Ep, trigFaceZones,
-//	phaseSpecs, faceScans
+//	phaseSpecs
 //	trigFaceKinds, trigZoneGen,        trigger-walk signature cache, summary generation,
 //	trigPlan, trigWalkUnion/OK,        board plan, last walk's union, granted-trigger proof
 //	trigGrant, trigZeroNoopKinds       and the zero-interest memo's kind set

@@ -163,9 +163,8 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "trigWalkUnionOK"}: true,
 	{"rules.Engine", "trigGrant"}:       true,
 	{"rules.Engine", "phaseSpecs"}:      true,
-	// The per-face text-scan memo (face_scan_memo.go) and active()'s
-	// per-build digest (active_summary.go): pure caches, Clone copies none.
-	{"rules.Engine", "faceScans"}: true,
+	// active()'s per-build digest (active_summary.go): a pure cache, Clone
+	// copies none.
 	{"rules.Engine", "activeSum"}: true,
 	// Characteristics' printed fast-path digest (derived_printed.go), the
 	// activeSum shape.
