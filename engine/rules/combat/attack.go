@@ -200,7 +200,7 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 		if ce.Restriction != "MustAttack" {
 			continue
 		}
-		if !mustAttackLineSelects(b, ce.RestrictParam(cards.PKValidCreature), id, ce.Source, ce.Controller, ce.Remembered) {
+		if !mustAttackLineSelects(b, ce.RestrictParam(cards.PKValidCreature), id, ce.Source, ce.Controller, ce.Remembered, ce.RememberedPlayers) {
 			continue
 		}
 		spec := strings.TrimSpace(ce.RestrictParam(cards.PKMustAttack))
@@ -216,7 +216,7 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 		if !effects.MustAttackParamsReadableForRules(sv.Params) || !b.StaticGateHolds(sv) {
 			continue
 		}
-		if !mustAttackLineSelects(b, sv.ParamStr(cards.PKValidCreature), id, sv.Source, sv.Controller, nil) {
+		if !mustAttackLineSelects(b, sv.ParamStr(cards.PKValidCreature), id, sv.Source, sv.Controller, nil, nil) {
 			continue
 		}
 		spec := strings.TrimSpace(sv.ParamStr(cards.PKMustAttack))
@@ -237,15 +237,20 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 // mustAttackLineSelects resolves a MustAttack line's ValidCreature$ against
 // the candidate creature, with the registration's remembered set bound for
 // the Card.IsRemembered family (Knight Rampager, Ursine Monstrosity, Raving
-// Dead, Ruhan of the Fomori all scope the requirement to a remembered self).
+// Dead, Ruhan of the Fomori all scope the requirement to a remembered self)
+// and its captured PLAYERS bound for Creature.RememberedPlayerCtrl (Rowan
+// Kenrith's "each creature that player controls attacks if able"). Both halves
+// are the registration's own bindings, the same ones requirementDefender reads
+// for the MustAttack$ reference, so a line that scopes BOTH sides to a
+// captured player (Gideon Jura's DelayedTrigger Effect) resolves both.
 // An absent ValidCreature$ is Forge's Card.Self default, the same default
 // AttackRequirements applies.
-func mustAttackLineSelects(b Board, spec string, id state.ObjID, source state.ObjID, controller state.PlayerID, remembered []state.ObjID) bool {
+func mustAttackLineSelects(b Board, spec string, id state.ObjID, source state.ObjID, controller state.PlayerID, remembered []state.ObjID, rememberedPlayers []state.PlayerID) bool {
 	v := strings.TrimSpace(spec)
 	if v == "" {
 		v = "Card.Self"
 	}
-	return b.MatchesSpec(v, id, source, controller, remembered, nil)
+	return b.MatchesSpec(v, id, source, controller, remembered, rememberedPlayers)
 }
 
 // requirementDefender resolves a MustAttack$ player reference to the
