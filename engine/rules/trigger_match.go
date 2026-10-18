@@ -964,6 +964,9 @@ func (e *Engine) checkTriggers(ev *events.Event, lki *state.Object,
 		e.checkAttackerBlockedTriggers(*ev)
 		e.checkBlocksTriggers(*ev)
 	}
+	if ev.Kind == events.BlockedByEffect {
+		e.checkAttackerBlockedTriggers(*ev)
+	}
 	// Rooms (CR 309.5): the unlocked half's "When you unlock this door"
 	// trigger queues off the DoorUnlock event itself -- its face is the
 	// alternate face (FaceIdx 1), which the ordinary face scan above does

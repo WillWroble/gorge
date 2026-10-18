@@ -315,6 +315,8 @@ func applyKind(g *state.Game, e *Event) {
 		foldHiddenIdentity(g, e)
 	case DrawEmpty:
 		foldDrawEmpty(g, e)
+	case BlockedByEffect:
+		foldBlockedByEffect(g, e)
 	case SetupSettled:
 		// The oracle harness's staged permanent counts as continuously
 		// controlled since before the scenario's first turn (CR 302.6).

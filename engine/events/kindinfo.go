@@ -226,6 +226,7 @@ var kindInfo = [NumKinds]KindInfo{
 	HiddenIdentity:        {Name: "hidden_identity", Trigger: TriggerNone, Describe: "{player}'s hidden card is re-identified"},
 	DrawEmpty:             {Name: "draw_empty", Trigger: TriggerNone, Describe: "{player} attempts to draw from an empty library"},                       // CR 704.5b bookkeeping, consumed by the next state-based check
 	SetupSettled:          {Name: "setup_settled", Trigger: TriggerNone, Describe: "{obj} has been under its controller's control since the game began"}, // oracle harness setup (CR 302.6); no trigger
+	BlockedByEffect:       {Name: "blocked_by_effect", Trigger: TriggerAttackDeclaration, Describe: "{obj} becomes blocked"},                             // CR 509.1h; fires "becomes blocked" (CR 509.3c)
 }
 
 // Info returns k's descriptor; ok is false for a value past the enum.

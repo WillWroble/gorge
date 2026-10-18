@@ -1230,10 +1230,22 @@ const (
 	// of one or a golden game. Appended after DrawEmpty so every earlier
 	// ordinal, hash chain and golden replay is unchanged.
 	SetupSettled
+	// BlockedByEffect records that an effect made an unblocked attacking
+	// creature become blocked (CR 509.1h; api:BecomesBlocked -- Trap Runner,
+	// Fog Patch, Choking Vines). Obj is the attacker and Player its
+	// defending player. The fold records a blocked creature with no blocker:
+	// one zero entry in Object.BlockedBy, the same tombstone a blocker that
+	// left combat leaves (Ruling T21-d), so it deals no combat damage unless
+	// it has trample. It is a no-op for a creature that is not attacking or is
+	// already blocked. Its "becomes blocked" triggers fire off this event
+	// (CR 509.3c); "becomes blocked by a creature" ones do not (CR 509.3d).
+	// Appended after SetupSettled so every earlier ordinal, hash chain and
+	// golden replay is unchanged.
+	BlockedByEffect
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(SetupSettled) + 1
+	NumKinds = int(BlockedByEffect) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving
