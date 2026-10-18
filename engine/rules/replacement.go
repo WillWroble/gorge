@@ -1321,15 +1321,15 @@ func selfEntryTapLine(r *cards.Repl) bool {
 		switch k {
 		case "Event", "Description", "ReplaceWith":
 		case "ValidCard":
-			if strings.TrimSpace(v) != "Card.Self" {
+			if v != "Card.Self" {
 				return false
 			}
 		case "Destination":
-			if strings.TrimSpace(v) != "Battlefield" {
+			if v != "Battlefield" {
 				return false
 			}
 		case "ReplacementResult":
-			if strings.TrimSpace(v) != "Updated" {
+			if v != "Updated" {
 				return false
 			}
 		default:
