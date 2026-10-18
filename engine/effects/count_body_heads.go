@@ -470,7 +470,12 @@ func evalCountBodyDotted(h Host, c *Ctx, g *state.Game, head, arg string, depth 
 					if en.To != state.ZGraveyard || en.From != state.ZBattlefield {
 						continue
 					}
-					if o := g.Obj(en.Obj); o != nil && hasType(o, "Creature") {
+					// CR 603.10a, 700.4: "a creature died" reads the
+					// permanent as it last existed on the battlefield --
+					// the entry's departure-time creature bit -- not the
+					// card now in the graveyard (an animated land that died
+					// counts; a creature made a land does not).
+					if en.WasCreature {
 						holds = true
 						break
 					}
