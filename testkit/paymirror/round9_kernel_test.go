@@ -17,7 +17,8 @@ import "testing"
 //     3246 until botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moved the
 //     bots' trajectory, same card and verdict; then 4637 until the combat
 //     priority fixes (rules e7aaf1530 and 93b6057e4, CR 510.4/117.3a: more
-//     priority windows in combat) moved it to seq 4897, same card and
+//     priority windows in combat) moved it to seq 4897, and the CR 510.3
+//     post-damage round (rules 24bbba791) to seq 4929, same card and
 //     verdict);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
@@ -32,7 +33,7 @@ import "testing"
 //
 // roundNineWant holds those pins.
 var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-	10860: {4897: ""},
+	10860: {4929: ""},
 	11056: {},
 	10056: {},
 	8175:  {},

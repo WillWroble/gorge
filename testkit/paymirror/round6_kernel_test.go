@@ -41,8 +41,9 @@ import (
 //     seq 5797 to 5740 (confirmed by reverting the planner hunk: 5797 returns);
 //     the paid-cost census default-on flip (cli-20261012T170859Z) then moved it
 //     to seq 5755, and botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans)
-//     to seq 3318, and the combat priority fixes (rules e7aaf1530,
-//     93b6057e4) to seq 3500, verdict still equivalent.
+//     to seq 3318, the combat priority fixes (rules e7aaf1530,
+//     93b6057e4) to seq 3500, and the CR 510.3 post-damage round (rules
+//     24bbba791) to seq 3532, verdict still equivalent.
 func TestRoundSixFindingsMirrorKernel(t *testing.T) {
 	t.Parallel()
 	reg := testutil.CorpusRegistry(t)
@@ -60,7 +61,7 @@ func TestRoundSixFindingsMirrorKernel(t *testing.T) {
 		{2138, []string{"vivi-ornitier-cedh", "hearthhull-worldseed-landfall", "pro-shaper", "foundations-keen-engineering"}, 0, ""},
 		{25, []string{"foundations-reign-of-dragons", "hearthhull-worldseed-landfall", "avengers-assemble", "rakdos-muscle-scam-exe"}, 282, ""},
 		{4139, []string{"foundations-wretched-ranks", "deadly-disguise", "foundations-reign-of-dragons", "ulalek-eldrazi"}, 0, ""},
-		{4129, []string{"rakdos-muscle-scam-exe", "pro-shaper", "foundations-reign-of-dragons", "foundations-wretched-ranks"}, 3500, ""},
+		{4129, []string{"rakdos-muscle-scam-exe", "pro-shaper", "foundations-reign-of-dragons", "foundations-wretched-ranks"}, 3532, ""},
 	} {
 		reports := round6Game(t, d, GameSpec{Seed: tc.seed, Decks: tc.decks, Commander: true, Policy: "bot"})
 		if len(reports) == 0 {
