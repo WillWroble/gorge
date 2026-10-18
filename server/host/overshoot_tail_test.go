@@ -62,8 +62,12 @@ const (
 	// with the census on, so that game no longer reaches a commander_zone
 	// overshoot burst; the fixture was re-measured across the pure-bot
 	// course to the first seed whose burst carries the shape, seed 2,
-	// parked at intent 526.
-	overshootIntents = 526 // intents recorded when parked on the overshoot burst's pending ask
+	// parked at intent 526. CR 117.3a (rules 93b6057e4): the end of combat
+	// step opens with the active player holding priority, so every
+	// end-of-combat entry from a round's tail (the CR 508.8 no-attackers
+	// skip) poses one more pass before the burst: the same turn-21 burst
+	// now parks at intent 541 (526 -> 541, re-measured on seed 2).
+	overshootIntents = 541 // intents recorded when parked on the overshoot burst's pending ask
 )
 
 // gateSeat is a bot behind a test gate: every decision is signalled to the
@@ -643,6 +647,16 @@ func TestCrashedMatchFeedbackCaptureStillTrims(t *testing.T) {
 // StepChange and both seats' priority ask/answer pairs (9 events) and two
 // intents. Re-recorded via TestGenerateOvershootCapture: 2138 events, 376
 // intents, head f54a225e6073bbfa; overshootIntents 378 -> 376.
+// End-of-combat priority (2026-10-17, rules 93b6057e4, CR 117.3a): the
+// step now opens with the active player holding priority, so the capture
+// diverged at turn 1's no-attackers end of combat (event 90). NOT
+// regenerated through TestGenerateOvershootCapture, which would tape the
+// live fixture's current game (seed 2 since the paid-cost census flip)
+// instead of this one: the recorded intents were replayed in order through
+// the fixed engine, with a pass inserted for each of the four end-of-combat
+// windows the old engine never posed (turns 1-4); no other answer changed.
+// 2158 events, 380 intents, head 57b79c439f48eaea; the parked
+// commander_zone ask and its lethal-damage tail are unchanged.
 const committedCaptureRel = "../../cmd/repro/testdata/feedback/20260915T094418Z-e484f1db"
 
 // requireCommittedCapture skips when the worktree has no .cards/ corpus:
@@ -668,8 +682,8 @@ func TestCommittedOvershootCaptureReplaysToTheParkedAsk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("feedback.Load: %v", err)
 	}
-	if n := len(l.Events); n != 2138 {
-		t.Fatalf("capture carries %d events, want the full 2138-event stream (re-recorded)", n)
+	if n := len(l.Events); n != 2158 {
+		t.Fatalf("capture carries %d events, want the full 2158-event stream (re-recorded)", n)
 	}
 	e, err := replay.Replay(l, cfg)
 	if err != nil {
