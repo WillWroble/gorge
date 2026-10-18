@@ -763,10 +763,17 @@ func TestMayFlashSacCleanupWindowDrawTriggersRepeatedDiscard(t *testing.T) {
 	if e.G.Step != state.StepCleanup {
 		t.Fatalf("discard asked in step %s, want cleanup (CR 514.1 is a cleanup action)", e.G.Step)
 	}
+	// CR 514.3b: the repeated cleanup begins only once the stack is empty
+	// and all players passed (the sacrifice trigger below the probe has
+	// resolved too), and with nothing left to do the answer ends the turn.
+	if len(e.G.Stack) != 0 {
+		t.Fatalf("repeated-cleanup discard asked with %d object(s) on the stack, want an empty stack (CR 514.3b)", len(e.G.Stack))
+	}
 	// Answer it and finish the turn; the hand must be back at the limit.
+	turn, next := e.G.Turn, e.G.NextAlive(e.G.Active)
 	handNow := e.G.Zone(state.ZHand, 0)
 	submitDiscard(t, e, handNow[len(handNow)-1])
-	driveToNextTurnMain1(t, e)
+	driveToStep(t, e, turn+1, next, state.StepMain1)
 	if got := len(e.G.Zone(state.ZHand, 0)); got != 7 {
 		t.Fatalf("hand after the repeated cleanup = %d, want 7", got)
 	}

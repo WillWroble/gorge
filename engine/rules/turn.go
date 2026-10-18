@@ -608,6 +608,7 @@ func (e *Engine) setStep(s state.Step) {
 	leaving := e.G.Step
 	previous, previousSet := e.stepLeaving, e.stepLeavingSet
 	e.stepLeaving, e.stepLeavingSet = leaving, true
+	e.cleanupWindow = false
 	e.emit(events.Event{Kind: events.StepChange, Step: s})
 	e.stepLeaving, e.stepLeavingSet = previous, previousSet
 	if e.pending != nil {
@@ -785,8 +786,12 @@ func (e *Engine) declarationMadeThisStep(kind events.Kind) bool {
 
 func (e *Engine) priorityRound() {
 	// Nobody receives priority during untap or cleanup -- except on the
-	// CR 514.3 grounds cleanupStep's caller below spells out.
-	if e.G.Step == state.StepUntap || e.G.Step == state.StepCleanup {
+	// CR 514.3 grounds cleanupStep's caller below spells out. Once a cleanup
+	// priority window is open (e.cleanupWindow), the round is an ordinary
+	// one: after a resolution the active player receives priority (CR
+	// 117.3b), and the step repeats only from handlePriority's empty-stack
+	// pass (CR 514.3a/b).
+	if e.G.Step == state.StepUntap || (e.G.Step == state.StepCleanup && !e.cleanupWindow) {
 		if e.G.Step == state.StepCleanup {
 			// CR 514.1 (Task D1): the discard-down-to-maximum-hand-size
 			// turn-based action runs FIRST, then CR 514.2. cleanupStep asks a
@@ -870,6 +875,9 @@ func (e *Engine) grantPriority() {
 	if priorityFlowVerify && (e.cast != nil || e.choosing != chooseNone) {
 		panic(fmt.Sprintf("rules: priority granted to seat %d mid-flow (cast pending=%v, choosing=%d)", holder, e.cast != nil, e.choosing))
 	}
+	if e.G.Step == state.StepCleanup {
+		e.cleanupWindow = true
+	}
 	e.emit(events.Event{Kind: events.Priority, Player: holder, Amount: e.G.Passes})
 	e.askPriority(holder)
 }
@@ -901,6 +909,7 @@ var priorityFlowVerify bool
 // here rather than straight to advanceStep is what makes that happen;
 // without it the next turn simply begins.
 func (e *Engine) repeatCleanup() {
+	e.cleanupWindow = false
 	e.cleanupStep()
 	if e.pending != nil {
 		return

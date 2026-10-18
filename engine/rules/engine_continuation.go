@@ -21,6 +21,16 @@ type engineContinuation struct {
 	// miracle cases in their own files.
 	choosing chooseFor `clone:"deep"`
 
+	// cleanupWindow is true while a cleanup step's CR 514.3a priority
+	// window is open: grantPriority sets it whenever it hands out priority
+	// during the cleanup step, and repeatCleanup and setStep clear it (a
+	// new cleanup step begins, CR 514.3b, or the step is left). While it is
+	// set, priorityRound runs the ordinary round instead of the cleanup
+	// procedure, so the active player receives priority after a resolution
+	// (CR 117.3b) and the step repeats only once all players pass in
+	// succession with the stack empty (handlePriority's empty-stack pass).
+	cleanupWindow bool `clone:"deep"`
+
 	// oppSel (engine/rules/stack.go) is the TargetingPlayer$ Opponent
 	// controller-selection ask's flow record: set when poseOpponentPick
 	// posts the which-opponent ask at a rules-tier ask site, flipped to done
