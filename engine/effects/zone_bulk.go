@@ -42,7 +42,7 @@ func effDestroy(h Host, c *Ctx, sa *cards.SA) {
 	// bearer's LKI depend on battlefield order), so the snapshot covers all
 	// of them before the first move.
 	var victims []state.ObjID
-	for _, t := range Defined(h, c, sa) {
+	for _, t := range definedDelayRememberedTargets(h, c, sa) {
 		o := h.Game().Obj(t.Obj)
 		if t.IsPlayer || o == nil || o.Zone != state.ZBattlefield {
 			continue
