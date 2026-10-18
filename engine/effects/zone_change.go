@@ -445,7 +445,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 	// counters (suspend). The CounterChange is emitted AFTER the MoveZone, so it
 	// lands on the moved (new) object's back at its destination, exactly as Move
 	// waiting to run first would want, and the counter survives onto the object
-	// because it is added post-move. Counter (not the Move carrying it along) is
+	// because it is added post-move. A battlefield move instead carries the counters
+	// IN the MoveZone (entryWithCounters): the permanent enters with them
+	// (CR 122.6, 614.1c), so its entry triggers see them. Counter (not the Move carrying it along) is
 	// what keeps engine/events/apply.go's Move from knowing anything about counters.
 	// counterDestination is the one gate every mover shares: a destination that
 	// cannot carry the counters neither parses the amount nor emits anything.
@@ -725,6 +727,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			applyTransformed(h, c, cz.Riders.Transformed, o.ID)
 		}
 		markChangeZoneAttach(h, c, sa, cz, &ev)
+		entryCounters := withKind != "" && counterDestination(to) && entryWithCounters(&ev, to, withKind, withAmt)
 		emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 		moved = append(moved, o.ID)
 		exiledWithAssociation(h, c, o.ID, to)
@@ -744,7 +747,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			eventRemember(h, c, o.ID)
 		}
 		eventForgetChanged(h, c, sa, o.ID)
-		if withKind != "" && counterDestination(to) {
+		if withKind != "" && counterDestination(to) && !entryCounters {
 			emitChangeZoneCounters(h, o.ID, withKind, withAmt)
 		}
 		// GainControl$ hands the moved object to the named player (Reanimate:
@@ -1507,6 +1510,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 		applyTransformed(h, c, cz.Riders.Transformed, id)
 	}
 	markChangeZoneAttach(h, c, sa, cz, &ev)
+	entryCounters := withKind != "" && counterDestination(to) && entryWithCounters(&ev, to, withKind, withAmt)
 	emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 	if to == state.ZExile {
 		recordExileReturnFor(h, c, cz.Riders.Duration, id, from, to)
@@ -1547,7 +1551,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 	if cz.RememberChanged {
 		c.Remembered = append(c.Remembered, state.Target{Obj: id})
 	}
-	if withKind != "" && counterDestination(to) {
+	if withKind != "" && counterDestination(to) && !entryCounters {
 		emitChangeZoneCounters(h, id, withKind, withAmt)
 	}
 	// GainControl$ hands the moved object to the named player. Only a

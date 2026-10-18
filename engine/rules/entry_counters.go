@@ -150,6 +150,11 @@ func (e *Engine) entryCounterGrants(ev *events.Event) []events.EntryCounterGrant
 			return nil
 		}
 		grants := events.EntryCounterGrants(o, events.IsFaceDownEntry(ev.Counter))
+		// The counters the moving effect says the permanent enters WITH
+		// (ChangeZone's WithCountersType$, effects.entryWithCounters): CR
+		// 122.6 makes them part of the entry, so they settle and fold here
+		// with the intrinsic grants, after them.
+		_, requested := events.SplitEntryCounterPairs(ev.Pairs)
 		// CR 702.176a: paid-Impending provenance is still on the stack object
 		// immediately before the move folds. Include its time counters in the
 		// common entry plan so AddCounter replacements are settled before entry.
@@ -158,7 +163,7 @@ func (e *Engine) entryCounterGrants(ev *events.Event) []events.EntryCounterGrant
 				grants = append(grants, events.EntryCounterGrant{Kind: "TIME", Amount: n})
 			}
 		}
-		return grants
+		return append(grants, requested...)
 	case events.TokenCreate:
 		return events.EntryCounterGrants(e.tokenSnapshot(*ev), false)
 	case events.CardToken:
@@ -712,6 +717,7 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	// spell or ability moved the object, and the EffectOnly class (Doubling
 	// Season) reads that cause. Live engines never carry a pin.
 	preview.causePin = e.actionCause()
+	stripEntryRequests(&ev)
 	events.Apply(preview.G, ev)
 	preview.replArenaNoteApplied(ev)
 	return preview, entrant
@@ -990,12 +996,14 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 	}
 	intrinsic := e.entryCounterGrants(ev)
 	if len(intrinsic) == 0 && !e.entryBodyCandidates(ev) && !e.entryRiderCandidates(ev) {
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		return nil
 	}
 	preview, entrant := e.entryPreview(*ev)
 	if o := preview.G.Obj(entrant); o == nil || o.Zone != state.ZBattlefield {
 		e.releaseEntryPreview(preview)
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		return nil
 	}
@@ -1009,6 +1017,7 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 		// resume, and the placements follow the move (the pre-staging
 		// behaviour this task's pre-pass replaces for ordinary entries).
 		// No body is absorbed here: its own placement run owns the park.
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		for _, grant := range intrinsic {
 			e.emit(events.Event{Kind: events.CounterChange, Obj: entrant, Counter: grant.Kind, Amount: grant.Amount})
@@ -1024,6 +1033,7 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 // CounterChange (EntryCounterNotice) through the ordinary emit path so
 // trig:CounterAdded and the per-turn ledger see the placement exactly once.
 func (e *Engine) foldEntryWithPlaced(ev *events.Event, placed []events.EntryCounterGrant) {
+	stripEntryRequests(ev)
 	for _, g := range placed {
 		ev.Pairs = append(ev.Pairs, events.EntryCounterPairs(g)...)
 	}
@@ -1043,5 +1053,15 @@ func (e *Engine) foldEntryWithPlaced(ev *events.Event, placed []events.EntryCoun
 			Counter: g.Kind, Amount: g.Amount, Text: events.EntryCounterNotice})
 		e.applyingReplacement, e.counterReplacementFold = savedApplying, savedFold
 		e.SetCounterAdder(savedAdder)
+	}
+}
+
+// stripEntryRequests drops the entry counters an effect REQUESTED on a move
+// (effects.entryWithCounters) from the event about to fold: entryCounterGrants
+// already read them into the entry's grant plan, and the plan's settled
+// amounts are what the fold installs, so the request must not fold too.
+func stripEntryRequests(ev *events.Event) {
+	if ev.Kind == events.MoveZone {
+		ev.Pairs, _ = events.SplitEntryCounterPairs(ev.Pairs)
 	}
 }
