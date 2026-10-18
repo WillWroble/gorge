@@ -696,6 +696,23 @@ func effectRememberedPlayers(h Host, c *Ctx, sa *cards.SA) []state.PlayerID {
 					add(t.Player)
 				}
 			}
+		case effectRememberedPlayersDelayTriggerRemembered:
+			// The players the firing delayed trigger remembered (Gideon
+			// Jura's +2: the DelayedTrigger's RememberObjects$ Targeted names
+			// the opponent, and the Effect its Execute$ creates captures that
+			// player with RememberObjects$ DelayTriggerRemembered, so its
+			// MustAttack's Creature.RememberedPlayerCtrl selects that
+			// player's creatures). The registration's own capture, with the
+			// same Remembered fallback definedSpec's LKI arm keeps.
+			rem := c.DelayedRemembered
+			if len(rem) == 0 {
+				rem = c.Remembered
+			}
+			for _, t := range rem {
+				if t.IsPlayer {
+					add(t.Player)
+				}
+			}
 		}
 	}
 	return out
@@ -769,6 +786,7 @@ const (
 	effectRememberedPlayersTriggeredTarget
 	effectRememberedPlayersPlayerIsRemembered
 	effectRememberedPlayersRememberedPlayer
+	effectRememberedPlayersDelayTriggerRemembered
 )
 
 var effectRememberedPlayersCodes = state.NewStrCodes(
@@ -782,6 +800,7 @@ var effectRememberedPlayersCodes = state.NewStrCodes(
 	state.StrEntry[effectRememberedPlayersCode]{Key: "RememberedPlayer", Val: effectRememberedPlayersRememberedPlayer},
 	state.StrEntry[effectRememberedPlayersCode]{Key: "RememberedPlayers", Val: effectRememberedPlayersRememberedPlayer},
 	state.StrEntry[effectRememberedPlayersCode]{Key: "Remembered", Val: effectRememberedPlayersRememberedPlayer},
+	state.StrEntry[effectRememberedPlayersCode]{Key: "DelayTriggerRemembered", Val: effectRememberedPlayersDelayTriggerRemembered},
 )
 
 type loyaltyFlashParamCode uint16
