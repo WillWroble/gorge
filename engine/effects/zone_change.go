@@ -240,6 +240,44 @@ func sourceReturnedSincePush(h Host, c *Ctx, o *state.Object) bool {
 	return o.Incarnation != ro.PushSourceIncarnation
 }
 
+// dropDelayedRememberedMoved removes from a Defined$
+// DelayTriggerRemembered[LKI] mover's list every object whose Incarnation
+// differs from the delayed trigger registration's stamp
+// (TriggerContext.DelayedRememberedStamps): that object left its zone and
+// came back, so it is a new object the delayed trigger cannot find (CR
+// 400.7). Nine-Lives Familiar died, was returned by another effect and died
+// again: its first death's "return it at the beginning of the next end step"
+// returns nothing. An object without a stamp is kept.
+func dropDelayedRememberedMoved(h Host, c *Ctx, targets []state.Target) []state.Target {
+	stamps := c.DelayedRememberedStamps
+	if len(stamps) == 0 {
+		return targets
+	}
+	var out []state.Target
+	for i, t := range targets {
+		moved := false
+		if !t.IsPlayer {
+			if o := h.Game().Obj(t.Obj); o != nil {
+				for _, s := range stamps {
+					if s.Obj == t.Obj {
+						moved = s.Incarnation != o.Incarnation
+						break
+					}
+				}
+			}
+		}
+		if moved && out == nil {
+			out = append(make([]state.Target, 0, len(targets)), targets[:i]...)
+		} else if !moved && out != nil {
+			out = append(out, t)
+		}
+	}
+	if out == nil {
+		return targets
+	}
+	return out
+}
+
 func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
 	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
 		return true
@@ -685,6 +723,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		originZones[0] == state.ZCommand &&
 		cz.DefinedImprinted {
 		h.EndImprintedEffects(c.Source)
+	}
+	if cz.DefinedDelayRemembered {
+		targets = dropDelayedRememberedMoved(h, c, targets)
 	}
 	// The battlefield departures of the move loop below are one simultaneous
 	// departure batch; see changeZoneDepartureBatch.

@@ -66,6 +66,22 @@ func rememberedFrom(ids []state.ObjID) []state.Target {
 	return out
 }
 
+// rememberedStampsFrom records each remembered object's Incarnation at a
+// delayed trigger's registration (state.DelayedTrigger.RememberedStamps,
+// CR 400.7). Player references and unknown ids carry no stamp.
+func rememberedStampsFrom(g *state.Game, ids []state.ObjID) []state.TargetStamp {
+	var out []state.TargetStamp
+	for _, id := range ids {
+		if _, ok := id.PlayerRef(); ok {
+			continue
+		}
+		if o := g.Obj(id); o != nil {
+			out = append(out, state.TargetStamp{Obj: id, Incarnation: o.Incarnation})
+		}
+	}
+	return out
+}
+
 // ringEmblemAbility rebuilds one of the Ring emblem's four level abilities
 // (CR 701.54c) from its level alone. The emblem has no corpus script text
 // and no object in any zone, so these bodies are hand-built here in events,

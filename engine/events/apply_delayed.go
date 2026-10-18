@@ -193,6 +193,7 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 		Controller:        e.Player,
 		Execute:           e.Counter,
 		Remembered:        rememberedFrom(e.IDs),
+		RememberedStamps:  rememberedStampsFrom(g, e.IDs),
 		MinTurn:           e.Amount,
 		MaxTurn:           maxTurn,
 		SourceIncarnation: src.Incarnation,

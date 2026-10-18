@@ -55,6 +55,11 @@ type TriggerContext struct {
 	// capture a printed trigger of that mode makes -- so the two referents
 	// cannot share one slot.
 	DelayedRemembered []state.Target
+	// DelayedRememberedStamps is the registration's Incarnation stamp of
+	// each DelayedRemembered object (state.DelayedTrigger.RememberedStamps):
+	// ChangeZone's Defined$ DelayTriggerRemembered[LKI] mover skips an object
+	// that has become a new object since (CR 400.7).
+	DelayedRememberedStamps []state.TargetStamp
 	// Reflexive marks a CR 603.12 reflexive triggered ability ("When you do,
 	// ...") minted by effImmediateTrigger through Host.QueueReflexiveTrigger.
 	// Its stack object's Remembered is the instance's OWN remembered set --

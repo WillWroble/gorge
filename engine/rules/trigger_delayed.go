@@ -299,8 +299,9 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 				// A phase registration has no firing event, so its capture
 				// is both Remembered and the DelayTriggerRemembered referent.
 				TriggerContext: effects.TriggerContext{
-					DelayedRemembered: append([]state.Target(nil), dt.Remembered...),
-					OptionalSpec:      dt.OptionalSpec,
+					DelayedRemembered:       append([]state.Target(nil), dt.Remembered...),
+					DelayedRememberedStamps: dt.RememberedStamps,
+					OptionalSpec:            dt.OptionalSpec,
 					// RememberNumber$ True's remembered Integer (Mana
 					// Drain): Count$TriggerRememberAmount reads it.
 					TriggerRememberedAmount: dt.RememberedAmount,
@@ -574,6 +575,7 @@ func (e *Engine) checkEventDelayedTriggers(ev events.Event, lki *state.Object) {
 			remembered = append([]state.Target(nil), dt.Remembered...)
 		}
 		refs.DelayedRemembered = append([]state.Target(nil), dt.Remembered...)
+		refs.DelayedRememberedStamps = dt.RememberedStamps
 		// The registration's OptionalDecider$ election rides the referent
 		// context to the minted stack object, where resolveTop's CR 603.5
 		// gate poses it. It cannot be recovered from the trigger body for a

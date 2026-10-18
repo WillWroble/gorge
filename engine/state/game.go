@@ -553,6 +553,15 @@ type DelayedTrigger struct {
 	Controller PlayerID
 	Execute    string // the SVar name of the ability to run when it fires
 	Remembered []Target
+	// RememberedStamps holds, for every object in Remembered at
+	// registration, its Incarnation then (events' DelayedRegister fold). A
+	// body that acts on the remembered objects (ChangeZone's Defined$
+	// DelayTriggerRemembered[LKI]) skips one whose Incarnation has moved
+	// since: Nine-Lives Familiar's "return it" finds nothing once the card
+	// was returned by another effect and died again, because the card in the
+	// graveyard is a new object (CR 400.7). Keyed by Obj, so DelayedForget's
+	// removal from Remembered leaves it consistent.
+	RememberedStamps []TargetStamp
 	// MinTurn is the earliest game turn the trigger may fire in (zero = no
 	// bound). rules' delayed-trigger scan skips an entry whose MinTurn is
 	// still ahead of the current turn, which is how an extra-turn grant's
@@ -921,6 +930,7 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 		c.Delayed = make([]DelayedTrigger, len(g.Delayed))
 		for i, dt := range g.Delayed {
 			dt.Remembered = append([]Target(nil), dt.Remembered...)
+			dt.RememberedStamps = append([]TargetStamp(nil), dt.RememberedStamps...)
 			c.Delayed[i] = dt
 		}
 	}

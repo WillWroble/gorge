@@ -207,6 +207,7 @@ type changeZoneTargeting struct {
 	DefinedImprinted       bool // Defined$ Imprinted
 	DefinedRemembered      bool // Defined$ Remembered
 	DefinedLibraryPosition bool // Defined$ TopOfLibrary / BottomOfLibrary
+	DefinedDelayRemembered bool // Defined$ DelayTriggerRemembered[LKI]
 }
 
 // changeZoneKnownKeys is every parameter key a ChangeZone ability's
@@ -552,6 +553,10 @@ func compileChangeZoneTargeting(tp *TargetParams, dp *DefinedParams) changeZoneT
 	t.DefinedImprinted = dp.Defined.Is(RefImprinted)
 	t.DefinedRemembered = dp.Defined.Is(RefRemembered)
 	t.DefinedLibraryPosition = definedSpecCodes.Code(dp.Defined.Text) == definedSpecTopOrBottomOfLibrary
+	switch definedSpecCodes.Code(dp.Defined.Text) {
+	case definedSpecDelayTriggerRemembered, definedSpecDelayTriggerRememberedLKI:
+		t.DefinedDelayRemembered = true
+	}
 	t.ValidTgts = ParamText{Text: tp.ValidTgts, Present: tp.Has(TgtValidPresent)}
 	t.TargetMin = paramText(tp.Min.Text, tp.Min.Present)
 	t.TargetMax = paramText(tp.Max.Text, tp.Max.Present)
