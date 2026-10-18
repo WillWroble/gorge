@@ -96,3 +96,27 @@ func TestDamagedByTypeFormsMatchTheSource(t *testing.T) {
 		t.Fatal("negated bare DamagedBy without a bound source must fail closed")
 	}
 }
+
+// CR 400.7: a creature that leaves the battlefield and comes back is a new
+// object, so neither the per-turn nor the game-long record of who damaged
+// it follows it (Kumano's Pupils must not exile a recast creature it
+// damaged earlier this turn, nor wasDealtDamageByThisGame match it).
+func TestDamagedByRecordsDoNotFollowANewObject(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	h := newHost(t, 2)
+	src := putOnBattlefield(t, h.g, reg, "Hawkeye, Avenging Archer", 0)
+	victim := putOnBattlefield(t, h.g, reg, "Grizzly Bears", 1)
+	recordDamageProvenance(h, src.ID, victim.ID)
+	sc := SpecContext{Source: src.ID, You: 0}
+	if !MatchesObjectCtx(h.g, "Creature.DamagedBy", victim, sc) || !MatchesObjectCtx(h.g, "Creature.wasDealtDamageByThisGame", victim, sc) {
+		t.Fatal("precondition: the damaged creature matches both predicates")
+	}
+	events.Apply(h.g, events.Event{Kind: events.MoveZone, Obj: victim.ID, From: state.ZBattlefield, To: state.ZHand})
+	events.Apply(h.g, events.Event{Kind: events.MoveZone, Obj: victim.ID, From: state.ZHand, To: state.ZBattlefield})
+	if MatchesObjectCtx(h.g, "Creature.DamagedBy", victim, sc) {
+		t.Fatal("DamagedBy matched a creature that left the battlefield and returned (CR 400.7)")
+	}
+	if MatchesObjectCtx(h.g, "Creature.wasDealtDamageByThisGame", victim, sc) {
+		t.Fatal("wasDealtDamageByThisGame matched a creature that left the battlefield and returned (CR 400.7)")
+	}
+}

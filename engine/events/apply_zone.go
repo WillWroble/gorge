@@ -739,6 +739,15 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		// blocked/blocked-by nothing this turn.
 		o.BlockedByThisTurn = nil
 		o.BlockedThisTurn = nil
+		// CR 400.7: likewise the records of who dealt THIS object damage
+		// (the DamagedBy / wasDealtDamageByThisGame predicates' recipient
+		// side). A creature dealt damage by Kumano's Pupils, bounced and
+		// recast is a new object the Pupils never damaged. The source-side
+		// DamageDealtThisTurn ledger stays: the damage was still dealt this
+		// turn, and the turn-wide damage counts read it after the source
+		// is gone.
+		o.DamageTakenThisTurnBy = nil
+		o.DamageTakenByGame = nil
 		if !countersRemain || to == state.ZHand || to == state.ZLibrary {
 			o.Counters = nil
 		}
