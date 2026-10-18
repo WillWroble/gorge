@@ -1381,6 +1381,15 @@ func Clamp(d *decision.Decision, in decision.Intent) decision.Intent {
 	// affordable required picks, then the arm's own picks, in its order, are
 	// swapped or appended while they fit.
 	in.Choices = d.FitRequired(in.Choices)
+	// CR 506.5: a KAttackers/KBlockers answer that declares a creature
+	// restricted from attacking (blocking) alone as the WHOLE declaration is
+	// repaired to the empty declaration -- the always-legal answer -- through
+	// the one rule Decision.Validate enforces (Decision.FitAlone). Without it
+	// the deterministic bot re-submits the same refused safest answer forever
+	// (the livelock the one-home rule exists to prevent). A no-op on every
+	// other kind and on every unrestricted declaration, so ordinary answers
+	// are byte-identical.
+	in.Choices = d.FitAlone(in.Choices)
 	if d.DistinctTypePicks {
 		kept := make([]int, 0, len(in.Choices))
 		for _, c := range in.Choices {
