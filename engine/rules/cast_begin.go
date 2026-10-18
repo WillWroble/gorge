@@ -607,7 +607,12 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 	if !ok {
 		return
 	}
-	if opt.AltCostIndex == 0 && opt.Mode == "" {
+	// An either-or additional cost (AlternateAdditionalCost, CR 601.2b/f)
+	// applies however the spell is cast: a may-play permission (Tinybones'
+	// stash casting an opponent's Eaten Alive) and a may-play alternative
+	// cost replace the mana cost only (CR 118.9), so the cast still asks for
+	// the sacrifice or the {3}{B}.
+	if (opt.AltCostIndex == 0 && opt.Mode == "") || opt.Mode == "mayplay" {
 		pcAlt := altAddCostParts(f)
 		e.cast = e.newCast(p, id, from, opt.Mode, -1)
 		e.cast.cost, e.cast.faceBefore, e.cast.mods, e.cast.taxGeneric, e.cast.altAddParts, e.cast.optionalCost =

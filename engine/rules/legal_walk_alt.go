@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -163,7 +164,7 @@ func (w *legalWalk) mayPlaySpellWalk() {
 				}
 				base = base.Plus(off.raise)
 			}
-			if printed && w.affordable(p, id, pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, base, spellScope("mayplay"))), false) {
+			if printed && w.mayPlayAffordable(p, id, f, base) {
 				label := "Cast " + f.Name
 				if off.text != "" {
 					// MayPlayText$ is the permission's label, so a card matching
@@ -203,8 +204,7 @@ func (w *legalWalk) mayPlaySpellWalk() {
 					raise = r
 				}
 				for i, alt := range e.mayPlayCastAlts(p, id, printed) {
-					altCost := pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, alt.Plus(raise), spellScope("mayplay")))
-					if w.affordable(p, id, altCost, false) {
+					if w.mayPlayAffordable(p, id, f, alt.Plus(raise)) {
 						*out = append(*out, decision.Option{Index: len(*out), Kind: "cast",
 							Label: altCostLabel(f.Name, i), Obj: id, Mode: "mayplay", AltCostIndex: i + 1})
 					}
@@ -787,4 +787,22 @@ func (w *legalWalk) exileCastsWalk() {
 				Label: "Cast " + f.Name + " (from warp exile)", Obj: id, Mode: "warp_recast"})
 		}
 	}
+}
+
+// mayPlayAffordable is a may-play cast's offer gate at the given raw base: the
+// composed cost is affordable, and for a face with an either-or additional
+// cost (AlternateAdditionalCost) at least one of its parts is affordable with
+// it, the existential gate the plain hand cast uses. beginCast's "mayplay"
+// case asks which part (CR 601.2b).
+func (w *legalWalk) mayPlayAffordable(p state.PlayerID, id state.ObjID, f *cards.Face, base Cost) bool {
+	parts := altAddCostParts(f)
+	if len(parts) == 0 {
+		return w.affordable(p, id, pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, base, spellScope("mayplay"))), false)
+	}
+	for _, part := range parts {
+		if w.affordable(p, id, pay.WithSpellAbilityExtras(f, w.offerCostFor(p, id, base.Plus(w.e.parseCost(part)), spellScope("mayplay"))), false) {
+			return true
+		}
+	}
+	return false
 }
