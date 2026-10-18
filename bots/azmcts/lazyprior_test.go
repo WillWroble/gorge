@@ -34,7 +34,15 @@ func TestLazyPriorMatchesEager(t *testing.T) {
 	opts.Sims, opts.Seed = 100, 7
 	opts.AutoPayment, opts.OpponentNodes, opts.OpponentMirror, opts.PriorTopK = true, true, true, 6
 	opts.Kinds = FullKinds()
-	for _, s := range []uint64{testSeed, testSeed + 1} {
+	for _, c := range []struct {
+		s       uint64
+		rankMax int
+	}{{testSeed, 0}, {testSeed + 1, 0}, {testSeed, 3}} {
+		s := c.s
+		opts := opts
+		// rankMax 3 skips the ranking at most points (rankSkips), in the
+		// deferred closure as in the eager prior.
+		opts.PriorRankMaxOptions = c.rankMax
 		p := feedPosition(t, testConfig(t, "mono-red-prowess", "mono-blue-tempo", s), 5, 1, nil)
 		run := func(eager bool) Result {
 			defer func(old bool) { eagerPrior = old }(eagerPrior)
@@ -54,8 +62,11 @@ func TestLazyPriorMatchesEager(t *testing.T) {
 		if eager.Stats.Completed == 0 {
 			t.Fatalf("seed %d: no simulation completed", s)
 		}
+		if c.rankMax > 0 && eager.Stats.PriorFallbacks == 0 {
+			t.Fatalf("seed %d: rankMax %d skipped no ranking", s, c.rankMax)
+		}
 		if !reflect.DeepEqual(eager, lazy) {
-			t.Fatalf("seed %d: lazy prior changed the search\neager %+v\nlazy  %+v", s, eager, lazy)
+			t.Fatalf("seed %d rankMax %d: lazy prior changed the search\neager %+v\nlazy  %+v", s, c.rankMax, eager, lazy)
 		}
 	}
 }

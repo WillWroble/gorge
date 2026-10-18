@@ -40,6 +40,9 @@ type walkConfig struct {
 	// candidates rankedPrior keeps at every in-walk point of the searching
 	// seat, which then enumerates past limit (enumLimit).
 	priorTopK int
+	// rankMax is Options.PriorRankMaxOptions: above that many options a
+	// point skips the network ranking (rankedPrior).
+	rankMax int
 	// rootPerWorld re-derives the root candidates in every world
 	// (Options.RootPerWorld).
 	rootPerWorld bool
@@ -521,9 +524,9 @@ func (e *engineEnv) advance() (*Point, error) {
 				if e.cfg.leafShared() {
 					leaf = &e.leafV
 				}
-				cands, prior, fell, before := rankedPriorLeaf(e.cfg.priorNet(), e.cfg.priorTopK, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
+				cands, prior, fell, before := rankedPriorLeaf(e.cfg.priorNet(), e.cfg.priorTopK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
 				e.cur, e.cands = pd, cands
-				e.leafOK = leaf != nil
+				e.leafOK = leaf != nil && !rankSkips(e.cfg.priorTopK, e.cfg.rankMax, pd)
 				if fell {
 					e.cfg.stats.PriorFallbacks++
 				}
@@ -622,7 +625,7 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 		countPoint(e.cfg.stats, pt)
 		return pt
 	}
-	cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), topK, e.e, pd, in, kind, cands, e.cfg.priorView())
+	cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), topK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView())
 	keys := make([]Key, len(cands))
 	for i := range cands {
 		cands[i].key = Key(oppKeyPrefix + string(cands[i].key))
@@ -643,7 +646,8 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 
 // deferPrior is lazyPrior's deferred prior for the point pd with candidates
 // cands, or nil when the prior must be computed now: lazyPrior off, no
-// network (the uniform prior costs nothing), a top-k cut that may drop
+// network or a point whose ranking is skipped (rankSkips: the uniform prior
+// costs nothing, and its fallback is counted now), a top-k cut that may drop
 // candidates, or two candidates sharing a key. The closure ranks cands as
 // rankedPrior does (it reads their intents, never their keys, and modifies
 // neither) and returns the ranked keys and prior; it counts PriorFallbacks
@@ -656,7 +660,7 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 // candidates hold three keys), and such a point is ranked now.
 func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int, seat bool) func() ([]Key, []float64) {
 	net := e.cfg.priorNet()
-	if !e.cfg.lazyPrior || net == nil || (topK > 0 && len(cands) > topK) || sharedKey(cands) {
+	if !e.cfg.lazyPrior || net == nil || rankSkips(topK, e.cfg.rankMax, pd) || (topK > 0 && len(cands) > topK) || sharedKey(cands) {
 		return nil
 	}
 	return func() ([]Key, []float64) {
@@ -667,7 +671,7 @@ func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind s
 		if seat && e.cur == pd && e.cfg.leafShared() {
 			leaf = &e.leafV
 		}
-		kept, prior, fell, _ := rankedPriorLeaf(net, topK, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
+		kept, prior, fell, _ := rankedPriorLeaf(net, topK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
 		e.leafOK = leaf != nil
 		if fell {
 			e.cfg.stats.PriorFallbacks++

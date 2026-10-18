@@ -62,9 +62,9 @@ func TestSharedLeafMatchesLeafValue(t *testing.T) {
 				obs := searchprobe.NewCollector(d.Player)
 				if cands, kind, _, ok, _ := enumerateCutInto(obs, e, d, in, FullKinds(), BenchCandidateLimit, true, &scratch); ok {
 					want := leafValue(net, e, d.Player, sc)
-					_, p0, fell0, b0 := rankedPrior(net, 6, e, d, in, kind, cands, &sc.prior)
+					_, p0, fell0, b0 := rankedPrior(net, 6, 0, e, d, in, kind, cands, &sc.prior)
 					var got float64
-					_, p1, fell1, b1 := rankedPriorLeaf(net, 6, e, d, in, kind, cands, &sc.prior, &got)
+					_, p1, fell1, b1 := rankedPriorLeaf(net, 6, 0, e, d, in, kind, cands, &sc.prior, &got)
 					if math.Float64bits(got) != math.Float64bits(want) {
 						t.Fatalf("%s seed %d step %d seat %d: shared leaf %v, leafValue %v", name, s, steps, d.Player, got, want)
 					}
@@ -100,12 +100,15 @@ func TestSharedLeafMatchesSeparate(t *testing.T) {
 		opts.Kinds = FullKinds()
 		for _, s := range []uint64{testSeed, testSeed + 1} {
 			p := feedPosition(t, testConfig(t, "mono-red-prowess", "mono-blue-tempo", s), 5, 1, nil)
-			for _, cw := range []int{0, 1} {
+			// rankMax 3 skips the ranking at most points (rankSkips): those
+			// never read the leaf, so they must not claim it.
+			for _, c := range []struct{ cw, rankMax int }{{0, 0}, {1, 0}, {0, 3}, {1, 3}} {
+				cw := c.cw
 				run := func(shared bool) Result {
 					defer func(old bool) { noSharedLeaf = old }(noSharedLeaf)
 					noSharedLeaf = !shared
 					o := opts
-					o.CachedWorlds = cw
+					o.CachedWorlds, o.PriorRankMaxOptions = cw, c.rankMax
 					obs := searchprobe.NewCollector(0)
 					src, err := NewRedeal(p.input(t, p.e), obs, s, 0)
 					if err != nil {
@@ -121,8 +124,11 @@ func TestSharedLeafMatchesSeparate(t *testing.T) {
 				if separate.Stats.Completed == 0 || separate.Stats.Expanded == 0 {
 					t.Fatalf("%s seed %d cw %d: no simulation completed", name, s, cw)
 				}
+				if c.rankMax > 0 && separate.Stats.PriorFallbacks == 0 {
+					t.Fatalf("%s seed %d cw %d: rankMax %d skipped no ranking", name, s, cw, c.rankMax)
+				}
 				if !reflect.DeepEqual(separate, shared) {
-					t.Fatalf("%s seed %d cw %d: the shared leaf changed the search\nseparate %+v\nshared   %+v", name, s, cw, separate, shared)
+					t.Fatalf("%s seed %d cw %d rankMax %d: the shared leaf changed the search\nseparate %+v\nshared   %+v", name, s, cw, c.rankMax, separate, shared)
 				}
 			}
 		}
