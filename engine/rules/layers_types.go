@@ -144,6 +144,24 @@ func (e *Engine) matchesWithCharsPTSlow(ce *ContinuousEffect, id state.ObjID, ty
 		sc.DerivedPower, sc.DerivedToughness, sc.HasDerivedPT = power, toughness, true
 		sc.BasePower, sc.BaseToughness, sc.HasBasePT = basePower, baseToughness, true
 	}
+	// CR 613.1e before 613.4c: a layer-7 Affected$ that names a colour
+	// (Heraldic Banner's Creature.ChosenColor) reads the object's finished
+	// layer-5 colours, not the printed ones -- a creature Witness Protection
+	// made green and white is pumped by a green Banner, not a black one. The
+	// published layer-5 table is unreadable mid-walk (derivedColorTable
+	// returns nil while charsWalk.Depth != 0), but the walk stashes this
+	// object's layer-5 answer before its P/T walk; bind it as a one-entry
+	// table when it differs from the printed colours, so the common board
+	// keeps the compiled colour predicates.
+	var colorsBuf [1]effects.ObjectColors
+	if e.charsWalk.ColorsSet && e.charsWalk.ColorsID == id {
+		if o := e.G.Obj(id); o != nil {
+			if m := effects.ColorMaskFromLetters(e.charsWalk.Colors); m != effects.ColorMaskOf(o) {
+				colorsBuf[0] = effects.ObjectColors{ID: id, Mask: m}
+				sc.Layers.DerivedColors = colorsBuf[:]
+			}
+		}
+	}
 	// The walk's types-so-far list above is authoritative for this match, so
 	// the published layer-4 table (layer4types.go's DerivedTypes, bound by
 	// specCtx) must not be consulted as a fallback: it may carry a type a
