@@ -1040,8 +1040,11 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 // creatures is always a declaration) and the scenario continues, as XMage's
 // test harness drops an illegal attacker or blocker and plays on. The refused
 // declaration's decision record is dropped with it; a refusal of the empty
-// declaration too is still a harness failure.
+// declaration too is still a harness failure. Both the scripted and the
+// reversed declaration are first completed with the creatures that must
+// attack (forceRequiredAttackers, CR 508.1d).
 func (r *oracleRun) submitDeclaration(d *decision.Decision, choices []int, why string) error {
+	choices = r.forceRequiredAttackers(d, choices, why)
 	recorded := len(r.decisions)
 	err := r.submit(d, choices, why)
 	if err == nil || len(choices) == 0 {
@@ -1052,7 +1055,24 @@ func (r *oracleRun) submitDeclaration(d *decision.Decision, choices []int, why s
 	}
 	r.decisions = r.decisions[:recorded]
 	r.logf("  [%s] refused, reversed to the empty declaration (CR 733.1): %v", why, err)
-	return r.submit(d, nil, why)
+	return r.submit(d, r.forceRequiredAttackers(d, nil, why), why)
+}
+
+// forceRequiredAttackers completes a scripted attackers declaration with the
+// creatures that must attack (CR 508.1d: a goaded creature, a MustAttack
+// static, Gideon Jura's +2), the way XMage's game declares a forced attacker
+// whatever its test script says. The completion is decision.FitRequired, the
+// engine-side repair every seat uses, so the harness never weakens
+// validateAttackDeclaration; it is noted in the transcript. Any other
+// decision, or a declaration that already meets the requirement, is returned
+// unchanged.
+func (r *oracleRun) forceRequiredAttackers(d *decision.Decision, choices []int, why string) []int {
+	if d.Kind != decision.KAttackers || d.RequiredChosen(choices) >= d.RequiredQuota() {
+		return choices
+	}
+	fit := d.FitRequired(choices)
+	r.logf("  [%s] the required attackers added (CR 508.1d): %v -> %v", why, choices, fit)
+	return fit
 }
 
 // arrangeSharedKind is the option Kind every option of a KArrange shares (its
@@ -1466,6 +1486,7 @@ func (r *oracleRun) answer(d *decision.Decision, why string) error {
 			choices = []int{}
 		}
 	}
+	choices = r.forceRequiredAttackers(d, choices, why+" fallback")
 	return r.submit(d, choices, why+" fallback")
 }
 
