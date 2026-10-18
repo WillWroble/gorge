@@ -1322,7 +1322,13 @@ func (e *Engine) finishTargetedCast(pc *pendingCast, player state.PlayerID) {
 	if e.drainAwaitsTarget {
 		e.drainAwaitsTarget = false
 		e.resumeTriggerDrain()
-	} else if e.pending == nil {
+	} else if e.pending == nil && e.resolvingObj == 0 && !e.answerInResolution {
+		// A cast made while a spell or ability resolves (Etali, Primal
+		// Storm's "cast any number of spells from among them") gives nobody
+		// priority: no player has priority during a resolution (CR 117.1,
+		// 608.2), and CR 601.2i returns priority only to a player who had
+		// it. The resolution's own tail grants priority to the active player
+		// once it finishes (CR 117.3b).
 		e.emit(events.Event{Kind: events.Priority, Player: player, Amount: 0})
 	}
 }
