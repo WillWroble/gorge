@@ -29,25 +29,31 @@ func (e *Engine) ViewCharacteristics(id state.ObjID) (name string, nameSet bool,
 
 // ViewTypes is the view's derived type line: ok is true, with the layer-4
 // type list, when a type-changing effect left id with a different set of
-// CARD types (CR 205.2a) than its face prints -- Imprisoned in the Moon's
-// "is a colorless land ... and loses all other card types" on a creature,
-// an animated land. Otherwise ok is false and the printed type line stands:
-// the printed fast path never walks, and a change confined to supertypes or
-// subtypes keeps the printed spelling. types aliases Engine scratch storage
-// as Derived's lists do: use it before the next characteristics query.
+// type words than its face prints -- Imprisoned in the Moon's "is a
+// colorless land ... and loses all other card types" on a creature, an
+// animated land, Infernal Vessel's returned Demon. It reads the layer-4
+// table the filter tier already binds (layer4types.go: refreshed after every
+// event, an entry only for an object whose derived list differs from its
+// face), so an unchanged board costs one empty-slice scan. An
+// all-creature-types grant changes the line only with a card-type change: a
+// printed changeling keeps its printed spelling. The returned slice is the
+// table's own: use it before the next event.
 func (e *Engine) ViewTypes(id state.ObjID) (types []string, ok bool) {
-	if _, f := e.printedReach(id); f != nil {
-		return nil, false
+	for i := range e.layer4Types {
+		ot := &e.layer4Types[i]
+		if ot.ID != id {
+			continue
+		}
+		o := e.G.Obj(id)
+		if o == nil || o.Face() == nil {
+			return nil, false
+		}
+		if ot.AllCreatureTypes && sameCardTypes(ot.Types, o.Face().Types) {
+			return nil, false
+		}
+		return ot.Types, true
 	}
-	o := e.G.Obj(id)
-	if o == nil || o.Face() == nil {
-		return nil, false
-	}
-	d := e.Derived(id)
-	if sameCardTypes(d.Types, o.Face().Types) {
-		return nil, false
-	}
-	return d.Types, true
+	return nil, false
 }
 
 // sameCardTypes reports whether a and b name the same set of card types.
