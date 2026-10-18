@@ -239,6 +239,12 @@ type projector struct {
 	vchars interface {
 		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	}
+	// vtypes is ch's optional derived type line (rules.Engine.ViewTypes):
+	// ok only when a layer-4 effect changed the object's card types, nil
+	// when ch lacks it (the printed line then stands).
+	vtypes interface {
+		ViewTypes(state.ObjID) ([]string, bool)
+	}
 	noTokens bool
 	// hideHand is the CR 103.5 blind: true while the CR 103.1 play/draw
 	// choice is unresolved, when no player may see any hand. It is probed
@@ -263,6 +269,9 @@ func newProjector(g *state.Game, ch Chars, viewer state.PlayerID, sc *projScratc
 	p.namer, _ = ch.(interface{ Name(state.ObjID) string })
 	p.vchars, _ = ch.(interface {
 		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
+	})
+	p.vtypes, _ = ch.(interface {
+		ViewTypes(state.ObjID) ([]string, bool)
 	})
 	if s, ok := ch.(tokenSuppressor); ok && s.SuppressCardTokens() {
 		p.noTokens = true
@@ -516,7 +525,17 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 				cv.CardName = printed
 			}
 		}
-		cv.Types = p.typeLine(types, f.Types)
+		// Types is a layer-4 characteristic (CR 613.1d): a permanent whose
+		// card types an effect changed (Imprisoned in the Moon makes a
+		// creature a land and nothing else) shows the derived line, not its
+		// printed one.
+		line := f.Types
+		if !p.noDerived && p.vtypes != nil {
+			if dt, ok := p.vtypes.ViewTypes(id); ok {
+				line = dt
+			}
+		}
+		cv.Types = p.typeLine(types, line)
 		cv.ManaCost = f.ManaCost
 		cv.PrintedPT = f.PT
 		cv.Printing = Printing{Name: f.Name}
