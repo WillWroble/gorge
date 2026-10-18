@@ -1270,7 +1270,10 @@ func effGainControl(h Host, c *Ctx, sa *cards.SA) {
 		h.Emit(events.Event{Kind: events.ControlChange, Obj: o.ID, Player: p})
 		h.RegisterControl(gr)
 		if strings.EqualFold(sa.ParamStr(cards.PKUntap), "True") {
-			h.Emit(events.Event{Kind: events.Untap, Obj: o.ID})
+			// TryUntap: an untapped permanent cannot untap (CR 701.26b), so
+			// no Untap event (and no "becomes untapped" trigger) follows for
+			// one, and a stun counter is removed instead (CR 122.1d).
+			TryUntap(h, o.ID)
 		}
 		if strings.EqualFold(sa.ParamStr(cards.PKRememberControlled), "True") {
 			// Forge (ControlGainEffect): source.addRemembered(tgtC) once per
