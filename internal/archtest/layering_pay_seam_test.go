@@ -143,9 +143,11 @@ func TestPayHoldsNoHost(t *testing.T) {
 // per-source alternatives and tiers): 3 -> 6. Slice 7 added ManaUnits (the
 // planner's source census): 6 -> 7. E7 flow slice 2 moved Conv,
 // MayPlayRider and PayLifeInsteadOfB (static-pricing evaluations) off
-// pay.Engine onto it: 7 -> 10.
+// pay.Engine onto it: 7 -> 10. ds1017-cantchangelife added
+// LifeChangeForbidden (the CR 119.7/119.8 CantChangeLife read every life
+// payment gate consults): 10 -> 11.
 const (
-	payEvalMethods = 10
+	payEvalMethods = 11
 	payEvalCeiling = 20
 )
 

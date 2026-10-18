@@ -60,6 +60,22 @@ func (e *Engine) applyLifeReplacements(ev events.Event) (events.Event, bool) {
 		e.consumeExchangeLifeSide(ev)
 		return e.emit(events.Event{Kind: events.Note, Player: ev.Player, Text: "prevented: cannot gain life"}), true
 	}
+	// A CantChangeLife static ("your life total can't change") is CR 119.7's
+	// "can't gain life" AND CR 119.8's "can't lose life" at once, so it is
+	// consulted beside the gain gate above and covers every life event this
+	// pass carries: a positive LifeChange (a GainLife effect, SetLife's
+	// positive delta, lifelink, a life-exchange receipt), a negative one (a
+	// LoseLife effect, SetLife's negative delta, a life COST), and damage
+	// dealt to a player (applyReplacements routes a seat Damage through here
+	// too, because lifeLoss classifies it as that much life lost). Both
+	// directions are swallowed whole -- no LifeChange, no Damage -- exactly
+	// the prevention shape a CantGainLife lock takes for a gain, so no
+	// damage/life-loss/life-gain trigger fires from a change that never
+	// happened and LifeLostThisTurn does not move.
+	if e.lifeChangeForbidden(ev) {
+		e.consumeExchangeLifeSide(ev)
+		return e.emit(events.Event{Kind: events.Note, Player: ev.Player, Text: "prevented: life total can't change"}), true
+	}
 	return e.continueLifeReplacements(ev, nil)
 }
 
@@ -364,13 +380,75 @@ func (e *Engine) lifeGainForbidden(p state.PlayerID) bool {
 		if ce.Restriction != "CantGainLife" {
 			continue
 		}
-		if spec := strings.TrimSpace(ce.RestrictParam(cards.PKValidPlayer)); spec != "" &&
-			!restrictionPlayerSpecMatches(e.G, spec, p, ce.Controller, ce.Source, ce.RememberedPlayers) {
+		if !e.restrictionScopesPlayer(ce, p) {
 			continue
 		}
 		return true
 	}
 	return false
+}
+
+// lifeChangeForbidden reports whether a CantChangeLife static applies to the
+// player whose life total ev would change. It is lifeGainForbidden's
+// two-direction sibling (CR 119.7 and CR 119.8 are the same static read from
+// the gain and the loss side), so the lookup shape is identical: the printed
+// static is read from the battlefield-active list in the static's own
+// parameter bucket, and the REGISTERED ContinuousEffect the Effect-delivered
+// route creates (effEffect's StaticAbilities$ case -- the corpus bodies are
+// Flare of Fortitude, Perch Protection, Teferi's Protection and Teferi's
+// Reproach, all DB$ Effect delivered) is read through the same
+// restrictionPlayerSpecMatches choke point, so the two paths cannot drift.
+//
+// A Damage event to a player is a life loss (trigmatch.LifeLoss) and this pass
+// sees it, so damage is covered here too; damage to an object has no player
+// and is never a life change, so it is never swallowed.
+func (e *Engine) lifeChangeForbidden(ev events.Event) bool {
+	var p state.PlayerID
+	switch {
+	case ev.Kind == events.LifeChange && ev.Amount != 0:
+		p = ev.Player
+	case ev.Kind == events.Damage:
+		q, _, ok := lifeLoss(ev)
+		if !ok {
+			return false
+		}
+		p = q
+	default:
+		return false
+	}
+	return e.playerLifeChangeForbidden(p)
+}
+
+// playerLifeChangeForbidden is lifeChangeForbidden's player form, the read
+// every offer gate takes (the payment layer's payEval.LifeChangeForbidden and
+// the attack/block charge gates).
+func (e *Engine) playerLifeChangeForbidden(p state.PlayerID) bool {
+	for _, sv := range e.activeStatics("CantChangeLife") {
+		if spec := sv.ParamStr(cards.PKValidPlayer); spec == "" ||
+			effects.MatchesPlayerSpec(e.G, spec, p, sv.Controller) {
+			return true
+		}
+	}
+	for _, ce := range e.active() {
+		if ce.Restriction != "CantChangeLife" {
+			continue
+		}
+		if !e.restrictionScopesPlayer(ce, p) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// restrictionScopesPlayer reports whether a registered restriction's
+// ValidPlayer$ scope admits p: an empty spec means every player (the printed
+// loop's convention), otherwise the spec is read through
+// restrictionPlayerSpecMatches, the one choke point the CantGainLife and
+// CantChangeLife readers share so the two cannot drift.
+func (e *Engine) restrictionScopesPlayer(ce ContinuousEffect, p state.PlayerID) bool {
+	spec := strings.TrimSpace(ce.RestrictParam(cards.PKValidPlayer))
+	return spec == "" || restrictionPlayerSpecMatches(e.G, spec, p, ce.Controller, ce.Source, ce.RememberedPlayers)
 }
 
 // drawForbidden checks active CantDraw statics against the player who would
