@@ -183,6 +183,11 @@ func effUntap(h Host, c *Ctx, sa *cards.SA) {
 				}
 				continue
 			}
+			// "Untap this permanent" never reaches the new object a
+			// flickered source became (CR 400.7).
+			if o := h.Game().Obj(t.Obj); o != nil && sourceLeftSincePush(h, c, o) {
+				continue
+			}
 			TryUntap(h, t.Obj)
 		}
 		return

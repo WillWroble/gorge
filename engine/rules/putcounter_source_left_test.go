@@ -116,3 +116,35 @@ func TestPutCounterOnSourceThatLeftBeforeItsTriggerWasPushedDoesNothing(t *testi
 		}
 	}
 }
+
+// Beast-Kin Ranger's "whenever another creature you control enters, this
+// creature gets +1/+0 until end of turn" pumps the permanent that triggered.
+// A Ranger flickered with the trigger on the stack is a new object (CR
+// 400.7): the pump must not reach it. Untouched, it gets the pump.
+func TestPumpOnAFlickeredSourceDoesNothing(t *testing.T) {
+	for _, flicker := range []bool{false, true} {
+		e, _ := fdnCensusEngine(t, "Beast-Kin Ranger", "Grizzly Bears")
+		ranger := moveByName(t, e, 0, "Beast-Kin Ranger", state.ZBattlefield)
+		e.pending = nil
+		moveByName(t, e, 0, "Grizzly Bears", state.ZBattlefield)
+		e.putTriggersOnStack()
+		if len(e.G.Stack) == 0 {
+			t.Fatal("precondition: no Ranger trigger on the stack")
+		}
+		if flicker {
+			e.emit(events.Event{Kind: events.MoveZone, Obj: ranger, From: state.ZBattlefield, To: state.ZExile})
+			e.emit(events.Event{Kind: events.MoveZone, Obj: ranger, From: state.ZExile, To: state.ZBattlefield})
+			e.putTriggersOnStack()
+		}
+		for i := 0; i < 5 && len(e.G.Stack) > 0; i++ {
+			e.resolveTop()
+		}
+		want := int32(4)
+		if flicker {
+			want = 3
+		}
+		if got := e.Power(ranger); got != want {
+			t.Fatalf("flicker=%v: Beast-Kin Ranger power %d, want %d", flicker, got, want)
+		}
+	}
+}

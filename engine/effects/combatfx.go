@@ -211,7 +211,9 @@ func effTap(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := h.Game().Obj(t.Obj)
-		if o == nil || o.Zone != state.ZBattlefield || o.Tapped {
+		// sourceLeftSincePush: "tap this permanent" never reaches the new
+		// object a flickered source became (CR 400.7).
+		if o == nil || o.Zone != state.ZBattlefield || o.Tapped || sourceLeftSincePush(h, c, o) {
 			continue
 		}
 		h.EmitTap(o.ID, tapper, entering)
