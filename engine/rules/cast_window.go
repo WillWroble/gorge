@@ -430,8 +430,19 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 	}
 	nodes := 0
 	used := make([]bool, len(ordered))
-	var rec func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32) bool
-	rec = func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32) bool {
+	// prevFree is the ordered index of the unit the previous step activated
+	// through a FREE alternative (no generic fee, no life), or -1. Two free
+	// activations in a row commute: neither spends anything, so either order
+	// reaches the same pools at every later step. The search therefore takes
+	// adjacent free activations in ascending index order only. Without this
+	// the walk enumerated every ORDER of the payer's lands, and with ten
+	// untapped sources whose first unit's first alternative is the wrong
+	// colour (Blossoming Sands' {W} ahead of its {G}) the 1<<18 node cap
+	// ran out before the right production was tried: a payable {G}{U}
+	// activation was judged unreachable and every target dropped off its
+	// Min 0 ask (lockstep pairs 1509 3986, Zimone, Paradox Sculptor).
+	var rec func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32, prevFree int) bool
+	rec = func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32, prevFree int) bool {
 		if payable(pool, spellSnow, lifeLeft) {
 			return true
 		}
@@ -444,6 +455,10 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 				continue
 			}
 			for _, a := range ordered[i].Alts {
+				freeAlt := a.CostGeneric == 0 && a.Life == 0
+				if freeAlt && prevFree > i {
+					continue
+				}
 				// A positive life debit must be present before the tap; a
 				// zero-debit alt is unaffected by the payer's life total,
 				// even when the game has carried the payer below 0 (the
@@ -469,9 +484,13 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 				nextActivation := activationFee.Pool
 				nextActivationSnow := activationFee.Snow
 				produced := a.Mana()
+				next := -1
+				if freeAlt {
+					next = i
+				}
 				used[i] = true
 				found := rec(pay.ManaAdd(nextPool, produced), nextSpellSnow,
-					pay.ManaAdd(nextActivation, produced), nextActivationSnow, lifeLeft-a.Life)
+					pay.ManaAdd(nextActivation, produced), nextActivationSnow, lifeLeft-a.Life, next)
 				used[i] = false
 				if found {
 					return true
@@ -480,7 +499,7 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 		}
 		return false
 	}
-	return rec(spellPool, snow, free, snow, life)
+	return rec(spellPool, snow, free, snow, life, -1)
 }
 
 func manaSub(a, b state.Mana) state.Mana {
