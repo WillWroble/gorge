@@ -13,9 +13,16 @@ import (
 // candidate must be the object that field names. Only a battlefield source
 // is a possible attachment (an Aura/Equipment that is not a permanent cannot
 // be "attached" to anything), so a non-battlefield src matches no candidate.
+// The candidate must be a permanent too (CR 303.4, 301.5): an object that
+// left the battlefield is a new object (CR 400.7) the source is not attached
+// to, even while the source's AttachedTo still names its ObjID in the window
+// before the state-based check (CR 704.5m/n) settles the attachment -- so
+// Witness Protection's layer-3 rename stops at the graveyard. A trigger that
+// looks back at the bearer ("when enchanted creature dies") matches against
+// the leave-the-battlefield LKI, whose zone is still the battlefield.
 func attachedBy(g *state.Game, o *state.Object, _ state.PlayerID, src state.ObjID) bool {
 	s := g.Obj(src)
-	return s != nil && s.AttachedTo == o.ID && s.Zone == state.ZBattlefield
+	return s != nil && s.AttachedTo == o.ID && s.Zone == state.ZBattlefield && o.Zone == state.ZBattlefield
 }
 
 // canEnchantEquippedBy is the CanEnchantEquippedBy predicate body; see the

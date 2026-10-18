@@ -296,3 +296,61 @@ func TestPsychicPaperIgnoresAnotherAttach(t *testing.T) {
 	}
 	replayCheck(t, e, cfg)
 }
+
+// TestWitnessProtectionNameEndsWhenTheBearerLeaves pins CR 400.7 / 611.3a /
+// 303.4: an Aura's "enchanted creature ... named Legitimate Businessperson"
+// applies only to the permanent it enchants. Once the bearer moves to the
+// graveyard it is a new object the Aura is not attached to, even in the
+// window before the state-based check puts the Aura away (the Aura's
+// AttachedTo still names the moved card's ObjID then). Before the fix the
+// attachedBy predicate matched the graveyard card through that stale field
+// and chars.Name renamed it there (dirty-dirac pairs 36914 45727: Liliana,
+// Dreadhorde General's -4 sacrifice ask named the card by the Aura's name).
+func TestWitnessProtectionNameEndsWhenTheBearerLeaves(t *testing.T) {
+	t.Parallel()
+	witness := corpusAlternativeCard(t, "Witness Protection")
+	bear := card(t, "Name:Grizzly Bears\nManaCost:1 G\nTypes:Creature Bear\nPT:2/2\nOracle:x\n")
+	e, _, witnessID := corpusDeckEngine(t, []*cards.Card{witness}, []*cards.Card{bear})
+
+	var bearID state.ObjID
+	for i := range e.G.Objs {
+		if e.G.Objs[i].Card == bear && e.G.Objs[i].Zone == state.ZBattlefield {
+			bearID = e.G.Objs[i].ID
+		}
+	}
+	if witnessID == 0 || bearID == 0 {
+		t.Fatalf("setup: witness=%d bear=%d", witnessID, bearID)
+	}
+	toMain1(t, e)
+	addMana(t, e, 0, "U")
+	submitChoices(t, e, castCardOption(t, e, witnessID).Index)
+	d := e.Pending()
+	if d == nil || d.Kind != decision.KTarget {
+		t.Fatalf("aura target decision: %+v", d)
+	}
+	ti := indexOfObjOption(d, bearID)
+	if ti < 0 {
+		t.Fatalf("aura target ask does not offer the bear: %+v", d.Options)
+	}
+	submitChoices(t, e, ti)
+	passUntilStackEmpty(t, e, 20)
+	if got := e.Name(bearID); got != "Legitimate Businessperson" {
+		t.Fatalf("precondition: enchanted bear name = %q, want Legitimate Businessperson", got)
+	}
+
+	// The bearer leaves; no state-based check has run yet, so the Aura is
+	// still on the battlefield naming the moved card.
+	e.emit(events.Event{Kind: events.MoveZone, Obj: bearID, From: state.ZBattlefield, To: state.ZGraveyard})
+	if w := e.G.Obj(witnessID); w.Zone != state.ZBattlefield || w.AttachedTo != bearID {
+		t.Fatalf("precondition: the Aura must still be on the battlefield naming the moved card (zone %v, attached %d)", w.Zone, w.AttachedTo)
+	}
+	if got := e.Name(bearID); got != "Grizzly Bears" {
+		t.Fatalf("graveyard card name = %q, want its printed Grizzly Bears (CR 400.7)", got)
+	}
+	if !effects.MatchesSpecCtx(e.G, "Card.namedGrizzly_Bears", bearID, e.specCtx(0, 0)) {
+		t.Fatal("filter: the graveyard card must match its printed name")
+	}
+	if effects.MatchesSpecCtx(e.G, "Creature.EnchantedBy", bearID, e.specCtx(witnessID, 0)) {
+		t.Fatal("filter: a graveyard card is not enchanted by the Aura (CR 303.4)")
+	}
+}
