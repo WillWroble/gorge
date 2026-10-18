@@ -111,7 +111,7 @@ func drawFor(h Host, p state.PlayerID, cursor int, resumeSA *cards.SA, upto draw
 	// draw, so it is posed as a mid-resolution KModes choice over every legal
 	// dredger in graveyard scan order plus the ordinary draw. A fluff/no-host
 	// host declines and draws normally.
-	if candidates := dredgeCandidates(g, p); len(candidates) > 0 {
+	if candidates := dredgeCandidates(h, p); len(candidates) > 0 {
 		// Pose every legal replacement plus the ordinary draw. A player with
 		// several dredgers chooses which replacement applies (CR 616.1).
 		d := &decision.Decision{Player: p, Kind: decision.KModes, Min: 1, Max: 1,
@@ -144,21 +144,55 @@ type dredgeCandidate struct {
 // dredgeCandidates returns every graveyard Dredge replacement that is legal:
 // CR 702.55 requires enough cards to mill the full number. Graveyard scan
 // order is deterministic and becomes the decision's stable option order.
-func dredgeCandidates(g *state.Game, p state.PlayerID) []dredgeCandidate {
-	library := g.Zone(state.ZLibrary, p)
+//
+// The keyword is read through the DERIVED list (graveyardDredge), never the
+// printed face: CR 613.1f's "loses all abilities" (Yixlid Jailer's
+// RemoveAllAbilities$ static, AffectedZone$ Graveyard) must take a card's
+// dredge away, and a layer-6 grant (Underworld Breach's AddKeyword$ Escape
+// shape) must be able to give one.
+func dredgeCandidates(h Host, p state.PlayerID) []dredgeCandidate {
+	g := h.Game()
+	library := zoneOf(g, state.ZLibrary, p)
 	var out []dredgeCandidate
-	for _, id := range g.Zone(state.ZGraveyard, p) {
-		o := g.Obj(id)
-		if o == nil || o.Face() == nil {
+	for _, id := range zoneOf(g, state.ZGraveyard, p) {
+		if g.Obj(id) == nil {
 			continue
 		}
-		if n, ok := o.Face().KeywordParam("Dredge"); ok {
+		if n, ok := graveyardDredge(h, id); ok {
 			if v, err := strconv.Atoi(strings.TrimSpace(n)); err == nil && v > 0 && len(library) >= v {
 				out = append(out, dredgeCandidate{id: id, n: int32(v)})
 			}
 		}
 	}
 	return out
+}
+
+// graveyardDredge returns the Dredge number of a card in a graveyard from its
+// CURRENT keyword list rather than its printed face, so CR 613.1f's "loses
+// all abilities" (Yixlid Jailer) takes dredge away and a layer-6 keyword
+// grant can give it. effects cannot import rules, and the engine's
+// board-wide derived table (SpecContext.Layers.DerivedKeywords) covers
+// battlefield objects only, so the graveyard object's own derivation
+// arrives through the graveyardDredgeHost capability rules' Engine implements
+// -- the same optional-capability shape castProhibitedHost uses. A host
+// without it (an effects test double) keeps the printed read.
+func graveyardDredge(h Host, id state.ObjID) (string, bool) {
+	if gh, ok := h.(graveyardDredgeHost); ok {
+		return gh.GraveyardKeywordParam(id, "Dredge")
+	}
+	o := h.Game().Obj(id)
+	if o == nil || o.Face() == nil {
+		return "", false
+	}
+	return o.Face().KeywordParam("Dredge")
+}
+
+// graveyardDredgeHost is implemented by the rules engine to expose a
+// graveyard card's derived keyword parameter (rules' derivedKeywordParam, the
+// current layer-derived list). Optional, like castProhibitedHost, so the
+// effects test doubles stay small.
+type graveyardDredgeHost interface {
+	GraveyardKeywordParam(id state.ObjID, head string) (string, bool)
 }
 
 func objName(g *state.Game, id state.ObjID) string {

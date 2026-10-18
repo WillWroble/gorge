@@ -538,6 +538,20 @@ func (e *Engine) staticEffectsWalk(dst []ContinuousEffect, skip bool) []Continuo
 							ra := base
 							ra.Layer = LAbilities
 							ra.RemoveAbilities = true
+							// AffectedZone$ (CR 613.1f scoped to a zone: Yixlid
+							// Jailer's "Cards in graveyards lose all abilities").
+							// Tri-state, as the ADDITIONS below carry it: the
+							// removal applies everywhere unless the static names one
+							// zone ("Battlefield" when it names the battlefield), so
+							// an unscoped Humility keeps clearing every zone and a
+							// graveyard-scoped Jailer stops reaching the battlefield.
+							if st.HasParam(cards.PKAffectedZone) {
+								if ra.AffectedZone = st.ParamStr(cards.PKAffectedZone); ra.AffectedZone == "" {
+									// An empty named zone still excludes every OTHER
+									// zone, so it must not read as "unscoped".
+									ra.AffectedZone = "Battlefield"
+								}
+							}
 							out = append(out, ra)
 						}
 						// A may-play-from-zone grant (M2d?): the "You may play lands from
