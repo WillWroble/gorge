@@ -380,8 +380,7 @@ func (e *Engine) lifeGainForbidden(p state.PlayerID) bool {
 		if ce.Restriction != "CantGainLife" {
 			continue
 		}
-		if spec := strings.TrimSpace(ce.RestrictParam(cards.PKValidPlayer)); spec != "" &&
-			!restrictionPlayerSpecMatches(e.G, spec, p, ce.Controller, ce.Source, ce.RememberedPlayers) {
+		if !e.restrictionScopesPlayer(ce, p) {
 			continue
 		}
 		return true
@@ -434,13 +433,22 @@ func (e *Engine) playerLifeChangeForbidden(p state.PlayerID) bool {
 		if ce.Restriction != "CantChangeLife" {
 			continue
 		}
-		if spec := strings.TrimSpace(ce.RestrictParam(cards.PKValidPlayer)); spec != "" &&
-			!restrictionPlayerSpecMatches(e.G, spec, p, ce.Controller, ce.Source, ce.RememberedPlayers) {
+		if !e.restrictionScopesPlayer(ce, p) {
 			continue
 		}
 		return true
 	}
 	return false
+}
+
+// restrictionScopesPlayer reports whether a registered restriction's
+// ValidPlayer$ scope admits p: an empty spec means every player (the printed
+// loop's convention), otherwise the spec is read through
+// restrictionPlayerSpecMatches, the one choke point the CantGainLife and
+// CantChangeLife readers share so the two cannot drift.
+func (e *Engine) restrictionScopesPlayer(ce ContinuousEffect, p state.PlayerID) bool {
+	spec := strings.TrimSpace(ce.RestrictParam(cards.PKValidPlayer))
+	return spec == "" || restrictionPlayerSpecMatches(e.G, spec, p, ce.Controller, ce.Source, ce.RememberedPlayers)
 }
 
 // drawForbidden checks active CantDraw statics against the player who would
