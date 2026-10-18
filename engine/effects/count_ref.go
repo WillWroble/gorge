@@ -293,7 +293,13 @@ func rememberedLKIGroup(h Host, c *Ctx) []state.Target {
 	out := make([]state.Target, 0, len(c.Remembered))
 	seen := make(map[state.ObjID]bool, len(c.Remembered))
 	if o := h.Game().Obj(c.Source); o != nil {
-		for _, t := range o.Remembered {
+		// effectiveSourceRemembered, not o.Remembered raw: a pending trigger
+		// resolves the OLD object's fire-time snapshot when its source
+		// re-entered the battlefield while the trigger waited (CR 400.7) --
+		// the Skyclave Apparition "return the exiled card" body, whose
+		// ConditionDefined$ Remembered gate and Defined$ Remembered mover
+		// both resolve through this group.
+		for _, t := range effectiveSourceRemembered(h.Game(), c.TriggerContext, o) {
 			if !t.IsPlayer && !seen[t.Obj] {
 				seen[t.Obj] = true
 				out = append(out, t)

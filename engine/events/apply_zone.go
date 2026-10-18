@@ -833,14 +833,21 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		o.Targets = nil
 		o.SubTargets = nil
 		o.TargetStamps = nil
-		// o.Remembered is deliberately NOT reset here: a card's remembered
-		// list is CARD memory, not permanent state -- Forge preserves it
-		// across zone changes, which is the whole O-Ring premise (the return
-		// trigger on a card in the graveyard reads the exile its
-		// battlefield-stint remembered) and the reason its ForgetOtherTargets$
-		// exists at all (the deliberate clear on a re-exile). The list stays
-		// event-backed (Choose "remembered"/"clear-remembered"), so live play
-		// and replay derive it identically either way.
+		// o.Remembered is deliberately NOT reset on the DEPARTURE: a pending
+		// referent read belongs to the object that queued it (CR 400.7), and
+		// a leave trigger's body resolves only after the fold -- the source
+		// has already left when the trigger is even matched, so the reset has
+		// to wait for the next entry (below). Forge's host card list also
+		// spans zone changes, which is the O-Ring premise and the reason its
+		// ForgetOtherTargets$ exists at all (the deliberate clear on a
+		// re-exile). A trigger body that resolves its remembered set through
+		// this list does not read it live, though: its fire-time queue
+		// (rules' triggerReferents) snapshots the list with an Incarnation
+		// stamp, so a source that re-enters the battlefield before the
+		// trigger resolves answers the pending read with the OLD object's
+		// list (effects' sourceRemembered). The list stays event-backed
+		// (Choose "remembered"/"clear-remembered"), so live play and replay
+		// derive it identically either way.
 		if wasBattlefield {
 			// Room door designations belong to this battlefield incarnation.
 			o.Unlocked = false
