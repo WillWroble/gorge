@@ -248,7 +248,11 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 			}
 		}
 	}
+	sawEntrant := false
 	e.forEachReplacementSourceFor(replEventBits[eventKind], func(id state.ObjID) {
+		if id == ev.Obj {
+			sawEntrant = true
+		}
 		f := e.replacementFace(id, ev)
 		if f == nil {
 			return
@@ -276,6 +280,29 @@ func (e *Engine) applyReplacementsDispatch(ev events.Event) (events.Event, bool)
 			}
 		}
 	})
+	// A copy token's entry MoveZone moves an object the CopyToken fold minted
+	// outside every zone list (events/apply_copy.go), so the scan above never
+	// visits it and its own copied lines are never read: a token copy of
+	// Diregraf Ghoul entered untapped (CR 707.2, 614.12: the copy has the
+	// "enters tapped" replacement and it applies to its own entry). Read the
+	// entrant's own "enters tapped" line here; its other self-entry lines
+	// (counters, as-enters choices) are not read on this path yet.
+	if ev.Kind == events.MoveZone && ev.To == state.ZBattlefield && !sawEntrant && event == "Moved" {
+		if o := e.G.Obj(ev.Obj); o != nil && o.IsToken {
+			if f := e.replacementFace(ev.Obj, ev); f != nil {
+				for i := range f.Repls {
+					r := &f.Repls[i]
+					// The full matcher does not admit the minted object yet
+					// (it is in no zone list, so a Card.Self spec fails), so
+					// the line's own shape is checked: an Updated self-entry
+					// to the battlefield with no other qualifier.
+					if r.Event == "Moved" && r.With != nil && r.With.APIKind() == cards.APITap && selfEntryTapLine(r) {
+						matches = append(matches, replMatch{id: ev.Obj, face: f, repl: r})
+					}
+				}
+			}
+		}
+	}
 	// kw:Bloodthirst (CR 702.54): the entering permanent's own bloodthirst --
 	// printed or layer-6 granted -- is one more Updated entry replacement,
 	// collected AFTER the face-Repl scan so the deterministic composition
@@ -1284,4 +1311,30 @@ func (e *Engine) replacementMatchesRemembered(r cards.Repl, source state.ObjID, 
 		return false
 	}
 	return e.replacementMatchesRememberedUngated(r, source, ev, remembered, rememberedPlayers, nil)
+}
+
+// selfEntryTapLine reports whether r is the plain "CARDNAME enters tapped"
+// shape: R:Event$ Moved | ValidCard$ Card.Self | Destination$ Battlefield |
+// ReplacementResult$ Updated with no Origin$, condition or other qualifier.
+func selfEntryTapLine(r *cards.Repl) bool {
+	for k, v := range r.Params {
+		switch k {
+		case "Event", "Description", "ReplaceWith":
+		case "ValidCard":
+			if strings.TrimSpace(v) != "Card.Self" {
+				return false
+			}
+		case "Destination":
+			if strings.TrimSpace(v) != "Battlefield" {
+				return false
+			}
+		case "ReplacementResult":
+			if strings.TrimSpace(v) != "Updated" {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
