@@ -1546,7 +1546,10 @@ func (e *Engine) attackOffersCompute() []attackOffer {
 		var walkerTargets []state.ObjID
 		for _, wid := range e.G.Zone(state.ZBattlefield, d) {
 			o := e.G.Obj(wid)
-			if o != nil && !o.FaceDown && o.Face() != nil && o.Face().IsPlaneswalker() {
+			// CR 506.3, 508.1b: only a planeswalker can be attacked, by its
+			// CURRENT types (layer 4) -- a planeswalker Imprisoned in the
+			// Moon is a land and no longer one.
+			if o != nil && !o.FaceDown && o.Face() != nil && e.hasType(o, "Planeswalker") {
 				walkerTargets = append(walkerTargets, wid)
 			}
 		}
@@ -1693,7 +1696,7 @@ func (e *Engine) battleDefenders(p state.PlayerID) []battleTarget {
 	for _, ctrl := range e.G.AliveFrom(0) {
 		for _, id := range e.G.Zone(state.ZBattlefield, ctrl) {
 			o := e.G.Obj(id)
-			if o == nil || o.FaceDown || o.Face() == nil || !o.Face().IsBattle() {
+			if o == nil || o.FaceDown || o.Face() == nil || !e.hasType(o, "Battle") {
 				continue
 			}
 			if !o.ProtectorValid || o.Protector == p ||
@@ -1720,7 +1723,7 @@ func (e *Engine) canAttackBattle(id state.ObjID, p state.PlayerID) bool {
 		}
 	}
 	o := e.G.Obj(id)
-	if o != nil && !o.FaceDown && o.Zone == state.ZBattlefield && o.Face() != nil && o.Face().IsPlaneswalker() {
+	if o != nil && !o.FaceDown && o.Zone == state.ZBattlefield && o.Face() != nil && e.hasType(o, "Planeswalker") {
 		return o.Controller != p
 	}
 	return false
