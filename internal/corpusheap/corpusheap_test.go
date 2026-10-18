@@ -66,7 +66,9 @@ const (
 	// compiled PrintedFacts (type-line masks, joined line, cost pips) and each
 	// ability a Cost$ slot, so the engine and the policy encoder test bits
 	// instead of re-parsing that text per object per walk. Measured 1.56 MB
-	// scan (develop: 1.30 MB), 35.6 MB heap, 18,020 objects.
+	// scan (develop: 1.30 MB), 35.6 MB heap, 18,020 objects. origin/develop's
+	// 1_380_000 (1.34 MB, CI 2026-10-17 nightly) predates this change and
+	// is superseded here.
 	ceilingScanBytes   int64 = 1_650_000  // 1.56 MB: /gc/scan/heap:bytes
 	ceilingHeapBytes   int64 = 39_200_000 // 35.5 MB measured + ~5% headroom: HeapAlloc
 	ceilingHeapObjects int64 = 18_400     // /gc/heap/objects:objects
