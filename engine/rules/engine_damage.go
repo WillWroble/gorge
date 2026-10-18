@@ -152,11 +152,23 @@ func (e *Engine) damageKeywordsOf(id state.ObjID) damageKeywordLKI {
 // discipline the state-based batches in sba.go already follow. An outer
 // window (a state-based batch, a parked replacement) keeps winning; nested
 // batches share the outermost board.
+//
+// The bracket is also ONE zone batch (openZoneBatch/closeZoneBatch): the moves
+// it covers are one simultaneous event for CR 603.2c, so a Mode$ ChangesZoneAll
+// line ("whenever one or more other creatures you control die") must queue
+// ONCE for the whole bracket instead of once per member -- and its
+// Remembered/Captured patch is the bracket's deduplicated moved set. Opening it
+// here rather than at each caller is what makes every simultaneous departure
+// batch consistent: DestroyAll, Sacrifice Amount$ N, Destroy, SacrificeAll,
+// ChangeZoneAll and ChangeZone all enter through this one function. A
+// one-member bracket (or the no-id sweep form) is a batch of one, which queues
+// exactly as a lone zone change always did.
 func (e *Engine) BatchDepartures(ids []state.ObjID) {
 	e.batchDamageKeywords = make(map[state.ObjID]damageKeywordLKI, len(ids))
 	for _, id := range ids {
 		e.batchDamageKeywords[id] = e.damageKeywordsOf(id)
 	}
+	e.openZoneBatch()
 	e.beginReplBatch()
 	e.openBatchWindow()
 }
@@ -168,6 +180,7 @@ func (e *Engine) EndBatchDepartures() {
 	e.batchDamageKeywords = nil
 	e.closeBatchWindow()
 	e.endReplBatch()
+	e.closeZoneBatch()
 }
 
 // captureSourceLifelinkLKI preserves CR 608.2h's pre-departure derived
