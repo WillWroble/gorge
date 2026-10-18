@@ -257,8 +257,9 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		// sets -- is what TriggeredTargetLKICopy (Enormous Energy Blade's
 		// "tap that creature") resolves, so the bearer never masquerades as
 		// another mode's TriggerTarget provenance (a BecomesTarget trigger's
-		// TriggerTarget is its own source permanent; reading it as a bearer
-		// would make Horobi destroy himself on every targeting).
+		// TriggerTarget is the TARGETED permanent, becomesTargetReferent;
+		// reading it as a bearer would make Horobi destroy himself on every
+		// targeting).
 		c.TriggerCard = ev.Obj
 		if len(ev.IDs) > 0 {
 			c.TriggerTarget = state.Target{Obj: ev.IDs[0]}

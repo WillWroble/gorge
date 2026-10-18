@@ -141,12 +141,12 @@ type TriggerContext struct {
 	// event: ev.Obj is the attachment, ev.IDs[0] the bearer). It is the
 	// exact referent Defined$ TriggeredTargetLKICopy resolves for an
 	// Attached execute (Enormous Energy Blade's "tap that creature"). Only
-	// the Attached capture sets it, so the spelling's Remembered fallback
-	// for every other mode is untouched -- in particular a BecomesTarget
-	// trigger's Remembered entry (the targeting spell) stays exactly as it
-	// always resolved, and the mode-agnostic TriggerTarget role (which for
-	// BecomesTarget is the trigger's own source permanent) is never read
-	// through this spelling. Zero outside an Attached trigger.
+	// the Attached capture sets it, so it can never masquerade as another
+	// mode's provenence: a BecomesTarget trigger's "that permanent" is the
+	// TARGETED object, which the BecomesTarget arm records as TriggerTarget
+	// beside the TriggerStack marker, and the LKI-copy resolver reads that
+	// role through the marker rather than through this field. Zero outside
+	// an Attached trigger.
 	TriggerBearer state.ObjID
 	// TriggerAbility is the minted ability STACK OBJECT an AbilityCast /
 	// SpellAbilityCast trigger fired on (abcopy1). An AbilityPush event's Obj
