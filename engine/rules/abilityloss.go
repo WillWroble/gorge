@@ -177,7 +177,18 @@ func (e *Engine) pruneLostSourceAbilities(list []ContinuousEffect) []ContinuousE
 		losses = append(losses, sourceLoss{id: source, lost: ok, first: ts})
 		return ts, ok
 	}
-	kept := list[:0]
+	// Every verdict is decided before the list is compacted: lossOf reads
+	// list (the removers by their original index, and layer 4 through
+	// typeCharacteristicsActive), so compacting while deciding would hand a
+	// later source's check a shifted entry -- a Witness Protection that
+	// silenced one Gnarlid Colony then "removed" a second Colony's abilities
+	// through whatever grant had slid into the remover's slot.
+	var dropBuf [64]bool
+	drops := dropBuf[:0]
+	if len(list) > len(dropBuf) {
+		drops = make([]bool, 0, len(list))
+	}
+	drops = drops[:len(list)]
 	next := 0
 	for i := range list {
 		ce := &list[i]
@@ -201,7 +212,12 @@ func (e *Engine) pruneLostSourceAbilities(list []ContinuousEffect) []ContinuousE
 		if isRemover {
 			next++
 		}
-		if !drop {
+		drops[i] = drop
+	}
+	kept := list[:0]
+	for i := range list {
+		ce := &list[i]
+		if !drops[i] {
 			if len(kept) != i {
 				kept = append(kept, *ce)
 			} else {
