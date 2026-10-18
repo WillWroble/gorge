@@ -72,13 +72,21 @@ func (e *Engine) activationPhasesOK(p state.PlayerID, sa *cards.SA) bool {
 		}
 	}
 
-	// ActivationAfterBlockers$ True: the offer exists only AFTER the declare
-	// blockers step (curtain_of_light's "only during combat after blockers
-	// are declared", always paired with Declare Blockers->EndCombat, whose
-	// range would otherwise include the declare-blockers step itself). The
-	// step enum walks in turn order, so a plain comparison clamps the set.
+	// ActivationAfterBlockers$ True: the offer exists only during combat
+	// AFTER blockers are declared (trap_runner's "only during combat after
+	// blockers are declared", always paired with
+	// Declare Blockers->EndCombat). A priority window IN
+	// StepDeclareBlockers is by construction after blockers are declared:
+	// CR 509.1 makes declaring blockers a turn-based action at the START of
+	// the step, and turn.go's StepDeclareBlockers arm asks it (e.askBlockers)
+	// before it grants any priority -- e.priorityRound() runs only once
+	// declarationMadeThisStep(events.DeclareBlockers) holds (CR 509.4, "then
+	// the active player gets priority"). So the step itself must be
+	// INCLUDED; comparing with <= excluded it and withheld the offer from
+	// every window the paired range actually has. The step enum walks in
+	// turn order, so a plain comparison clamps the set.
 	if raw, ok := params["ActivationAfterBlockers"]; ok {
-		if !strings.EqualFold(strings.TrimSpace(raw), "True") || e.G.Step <= state.StepDeclareBlockers {
+		if !strings.EqualFold(strings.TrimSpace(raw), "True") || e.G.Step < state.StepDeclareBlockers {
 			return false
 		}
 	}
