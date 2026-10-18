@@ -162,9 +162,15 @@ func stampPushedAbilitySources(g *state.Game, n int) {
 			continue
 		}
 		o.PushSourceStamped = true
-		if src := g.Obj(o.Source); src != nil && src.Zone == state.ZBattlefield {
-			o.PushSourceOnBattlefield = true
+		if src := g.Obj(o.Source); src != nil {
+			// The incarnation is stamped whatever the source's zone: an
+			// ability activated from a graveyard ("return this card from
+			// your graveyard") must not find the card once it has been to
+			// the battlefield and back (CR 400.7).
 			o.PushSourceIncarnation = src.Incarnation
+			if src.Zone == state.ZBattlefield {
+				o.PushSourceOnBattlefield = true
+			}
 		}
 	}
 }

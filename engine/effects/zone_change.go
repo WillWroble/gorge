@@ -221,6 +221,25 @@ func hasRememberedDestroyedLand(g *state.Game, ts []state.Target) bool {
 // mover, and effChangeZone's departure-batch pre-pass
 // (changeZoneDepartureBatch) shares this predicate so its victim list cannot
 // drift from the moves.
+// sourceReturnedSincePush reports that o is the resolving ability's own
+// source, the ability went on the stack while that source was OFF the
+// battlefield (Reassembling Skeleton's "{1}{B}: Return this card from your
+// graveyard to the battlefield tapped"), and the source has crossed the
+// battlefield boundary since: the card back in the graveyard is a new object
+// (CR 400.7) the ability cannot find, so a second activation that resolves
+// after the first returned the card and it died again moves nothing. The
+// battlefield-push case is sourceLeftSincePush's.
+func sourceReturnedSincePush(h Host, c *Ctx, o *state.Object) bool {
+	if o.ID != c.Source || c.ResolvingObj == 0 {
+		return false
+	}
+	ro := h.Game().Obj(c.ResolvingObj)
+	if ro == nil || ro.Source != o.ID || !ro.PushSourceStamped || ro.PushSourceOnBattlefield {
+		return false
+	}
+	return o.Incarnation != ro.PushSourceIncarnation
+}
+
 func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
 	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
 		return true
@@ -692,7 +711,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		}
 		// Origin$ precondition and CantExile guard, shared with the
 		// departure-batch pre-pass above: see changeZoneMoveSkip.
-		if changeZoneMoveSkip(h, cz, o, to, originAll) {
+		if changeZoneMoveSkip(h, cz, o, to, originAll) || sourceReturnedSincePush(h, c, o) {
 			continue
 		}
 		// Inlined rather than routed through settleChangeZoneMove: this loop
