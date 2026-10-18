@@ -512,7 +512,14 @@ func (e *Engine) parkLegendChoice(g legendGroup, dead []casualty) {
 // the original never offered.
 func (e *Engine) askLegendChoice() {
 	g := e.legendBatch.group
-	if int(g.player) < len(e.G.Players) && e.G.Players[g.player].Lost {
+	// CR 104.2a: a pass whose losses leave one player (or none) ends the
+	// game, so the legend choice is not posed in it either -- the duplicate
+	// can appear in that very pass when the loser's departure returns a
+	// card (Banishing Light leaving with its controller). The batch settles
+	// as the departed-controller decline does, keeping the pass's other
+	// simultaneous SBAs (CR 704.3), and checkGameOver ends the game at the
+	// pass's end.
+	if (int(g.player) < len(e.G.Players) && e.G.Players[g.player].Lost) || e.gameEndsNow() {
 		// CR 800.4a: a player who has left the game makes no choices. The
 		// departed controller's CR 704.5j choice is therefore unexercised and
 		// declines deterministically to the battlefield-order first member --
@@ -1406,6 +1413,23 @@ func (e *Engine) ceaseDeadTokens(tried *sbaAttempts) bool {
 			From: c.from, To: state.ZCeased, Text: "ceased to exist"})
 	}
 	return len(dead) > 0
+}
+
+// gameEndsNow reports whether checkGameOver would end the game on the
+// current board: no player left (a draw), or one left whom no CR 104.3
+// "can't win" effect stops (CR 104.2a). It changes nothing.
+func (e *Engine) gameEndsNow() bool {
+	if e.deferGameOver || e.G.Over {
+		return false
+	}
+	alive := e.G.AliveFrom(0)
+	switch len(alive) {
+	case 0:
+		return true
+	case 1:
+		return !e.gameWinPrevented(alive[0])
+	}
+	return false
 }
 
 // checkGameOver ends the game once at most one seat remains (CR 104.2a's
