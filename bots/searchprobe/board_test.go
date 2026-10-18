@@ -47,18 +47,21 @@ import (
 // one-frame prefix moves with a later answer's index). The view's derived
 // type line (26ea2ed4f) moves none of them: measured with Engine.ViewTypes
 // unwired from the projector, the same digests.
+//
+// Re-pinned again for the CR 510.3 post-damage priority round (rules
+// 24bbba791): two more frames before the root (124 -> 126).
 func TestHistoryDigestMatchesTheJSONBoardEncoding(t *testing.T) {
 	f := benchRoot(t)
 	golden := map[int]string{
-		1:   "c696a90caf0d873e90ee60d234e2e42aae02952aa749b92ca50a99f1845e2afd",
-		2:   "225d5a5804371e696915f91c94a1ef42ed0abf6d43f8e8be27d688ee1fc411ff",
-		17:  "f3d4124b0a020a13b2700bdcedcb88078fd1c81d86d1d8945f1a319153905958",
-		124: "9f34d7a599d821a8d4e4a5a12837660a0e20a56f676656ac252eacb5a9cad2cd",
+		1:   "01af48f15127234a2a74f396fd1b0878e64356bb362ddcb75b271282acbabaa3",
+		2:   "771d865df19b14d15e700af0aea41df73502a054c9f81737e51d2acbac186d8a",
+		17:  "7753023f1a1383a3b3ca2fffff94e22e861740be7a396c82995c1502523a5edd",
+		126: "ce4487fe426b55fd01df1a30d2bc9cb03b6547a78e81b1ce503f4823726e12a2",
 	}
-	if len(f.h.Frames) != 124 {
-		t.Fatalf("bench fixture has %d frames, the goldens were measured on 124", len(f.h.Frames))
+	if len(f.h.Frames) != 126 {
+		t.Fatalf("bench fixture has %d frames, the goldens were measured on 126", len(f.h.Frames))
 	}
-	for _, n := range []int{1, 2, 17, 124} {
+	for _, n := range []int{1, 2, 17, 126} {
 		h := f.h
 		h.Frames = h.Frames[:n]
 		if chainState(h) == nil {

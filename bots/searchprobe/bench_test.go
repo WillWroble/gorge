@@ -179,14 +179,17 @@ func TestSampleRealDeckGolden(t *testing.T) {
 		// view's derived type line (26ea2ed4f; same digests with ViewTypes
 		// unwired). Measured after: frames 124, attempts 64, accepted 7,
 		// worlds 8, ESS 7 (land exclusion: accepted 23, ESS 23).
-		{"pre-optimisation sampler", true, "a5277a0fb9edd0157ac0251462a798bf4ef479eb625b659a273351862842d4b4"},
+		// Re-measured for the CR 510.3 post-damage priority round (rules
+		// 24bbba791): 124 -> 126 frames. Measured after: attempts 64,
+		// accepted 7, worlds 8, ESS 7 (land exclusion: accepted 31, ESS 31).
+		{"pre-optimisation sampler", true, "ad676a29cfa6b3c6d758cfdf972ec56711e46a38eec5989ea13150951c9f4c1b"},
 		// With the declined-land-drop exclusion: different proposals (so
 		// different worlds for a seed), same target distribution -- see
 		// TestLandExclusionRemovesOnlyRejectedWorlds. Re-measured for the
 		// Mausoleum Wanderer unless-cost ask label (see the test comment) and
 		// again for the damage-provenance fact (see above); see the
 		// pre-optimisation entry for the archetype-posterior re-measure.
-		{"land exclusion", false, "45b3f6587a3b8e2dde49e030b0c880f599cdea46babae3a3fcac0aa1bf2bee71"},
+		{"land exclusion", false, "949d19344ff788c9907b6e48ea1adac0205414893165328e47bd51f242773d03"},
 	} {
 		opts := benchSampleOptions()
 		opts.MinESS = 1 // resample worlds from the thin pool so the digest covers them
@@ -385,7 +388,11 @@ func TestTeacherChoiceRealDeckGolden(t *testing.T) {
 	// [1,1,1,1], Rollouts 32, Submits 3939, Terminal 32, Capped 0,
 	// WinsByCandidate [8,8,8,8], TerminalByCandidate [8,8,8,8],
 	// WinsOverBaseline [0,0,0,0], LossesToBaseline [0,0,0,0].
-	const want = "763f065013d8c68886fef160462c405ba52efc295373daf3ed46c6b37350f064"
+	// Re-measured for the CR 510.3 post-damage priority round (rules
+	// 24bbba791), the sampled worlds again: Submits 3939 -> 3529; Index,
+	// Values [1,1,1,1], Rollouts 32, Terminal 32, Capped 0 and the 8/8/8/8
+	// splits unchanged.
+	const want = "1eb0d00c500134889aaf25be808ef0d2ae3e51dc5a8d9079a039b73c358624b2"
 	for _, parallelism := range []int{0, 4} {
 		res, err := TeacherChoice(worlds, cands, TeacherOptions{Seed: 99, MaxSubmits: 5000, Parallelism: parallelism})
 		if err != nil {
