@@ -240,7 +240,12 @@ var potentialMembersVerify = derivedMemoVerifyFlag != ""
 // potentialProducedStrip strips the braces and spaces from a Produced$
 // value. A strings.Replacer is safe for concurrent use, so one serves every
 // call instead of building a replacer per folded ability.
-var potentialProducedStrip = strings.NewReplacer("{", "", "}", "", " ", "")
+// "Combo" is stripped too: a "Combo W U" source (Tranquil Cove) makes one of
+// the listed colours, so it bounds each of them like a dual's two abilities;
+// pricing it unbounded in every colour offered a "pay {R}" no red source
+// could fund (CR 118.3). "Combo Any" stays open through producedOpenSet, and
+// any other Combo word (ColorIdentity, Chosen) keeps a non-colour rune.
+var potentialProducedStrip = strings.NewReplacer("{", "", "}", "", " ", "", "Combo", "")
 
 // addPotentialMana folds one mana ability into the potential accumulator. The
 // amount and production parsing mirrors AvailableMana's addAvailable (the
