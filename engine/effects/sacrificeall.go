@@ -59,7 +59,7 @@ func effSacrificeAll(h Host, c *Ctx, sa *cards.SA) {
 	if DefinedRefOf(sa).Raw != "" || TargetsOf(sa).Targeted() {
 		h.BatchDepartures(nil)
 		defer h.EndBatchDepartures()
-		for _, t := range Defined(h, c, sa) {
+		for _, t := range definedDelayRememberedTargets(h, c, sa) {
 			if !t.IsPlayer {
 				// A Defined$-named object that is no longer on the battlefield
 				// is skipped LOUDLY rather than silently: this is the shape

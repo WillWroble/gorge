@@ -404,12 +404,17 @@ func appendCastWindowAlt(units []windowManaUnit, id state.ObjID, ma *cards.SA, c
 // descriptor would hide (unrestrictedWindowPool), never from spell-restricted
 // mana, so the sequence is executable under the live activation gate. Every
 // produced unit is unrestricted (both probe walks exclude RestrictValid$
-// abilities).
+// abilities). rider is the cast's recorded may-play payment rider
+// (pendingCast.mayPlayIgnore/mayPlayIgnoreType, captured at CR 601.2a while
+// the card was still in the granted zone): "mana of any type can be spent to
+// cast that spell" governs the whole payment, the window's productions
+// included (CR 601.2g-h), exactly as the pool-only feasibility check beside
+// each caller already applies it.
 func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, snow state.Mana,
-	typed [7]state.Mana, life int32, conv *manaConv, units []windowManaUnit) bool {
+	typed [7]state.Mana, life int32, conv *manaConv, rider pipRider, units []windowManaUnit) bool {
 	payable := func(pool, snowPool state.Mana, lifeNow int32) bool {
 		_, ok := resolveManaWith(cost, pool, snowPool, typed, lifeNow,
-			asEval(e).PayLifeInsteadOfB(p), pipRider{}, conv)
+			asEval(e).PayLifeInsteadOfB(p), rider, conv)
 
 		return ok
 	}
@@ -611,7 +616,7 @@ func (e *Engine) striveAffordableTargets(pc *pendingCast, max int) int {
 		}
 		av := pay.AvailableFor(asPayer(e), pc.player, desc)
 		return e.castWindowReachable(pc.player, convoked, av.Pool, pl.Snow, av.Typed, pl.Life,
-			asEval(e).Conv(pc.player, desc.ID, desc.Class == paymentActivated), units)
+			asEval(e).Conv(pc.player, desc.ID, desc.Class == paymentActivated), rider, units)
 	}
 	// Ascending: the price is monotone in n, so the first unaffordable count
 	// ends the walk and at most one exhaustive (failing) window search runs.

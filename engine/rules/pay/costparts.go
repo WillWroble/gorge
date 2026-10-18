@@ -377,12 +377,16 @@ var castFlowDrawPlayerCodes = state.NewStrCodes(
 	state.StrEntry[castFlowDrawPlayerCode]{Key: "Player.Activator", Val: castFlowDrawPlayerPayer},
 )
 
+// SubCounterAnyKind reports a counter-removal part's wildcard "Any" kind
+// (Forge's Any removes that many counters regardless of kind).
+func SubCounterAnyKind(spec string) bool { return strings.EqualFold(spec, "Any") }
+
 // SubCounterAvailable reports how many counters of the part's kind the object
 // could give up: the kind's own count, or the object's TOTAL counter count
 // for the "Any" kind (Forge's Any removes that many counters regardless of
 // kind). Used by the offer gate, the X bound and the candidate walk.
 func SubCounterAvailable(o *state.Object, kind string) int32 {
-	if strings.EqualFold(kind, "Any") {
+	if SubCounterAnyKind(kind) {
 		total := int32(0)
 		for _, c := range o.Counters {
 			if c.N > 0 {
@@ -423,6 +427,35 @@ func SubCounterRemovalCandidates(e Engine, p state.PlayerID, source state.ObjID,
 		}
 	}
 	return out
+}
+
+// SubCounterPartPayers reports whether a fixed (non-announced), filtered
+// counter-removal part is payable from the payer's unreserved candidates,
+// and returns the permanents a payment would draw on, in zone order. A
+// wildcard "Any" part ("remove N counters from among creatures you
+// control", Quilled Greatwurm) is a TOTAL across permanents (CR 118.3,
+// 601.2h): the walk sums every candidate's counters until N is reached, the
+// shape the unit-at-a-time wildcard asks settle. Any other kind keeps the
+// single-permanent read (the first candidate carrying all N), the shape the
+// one-permanent ask settles.
+func SubCounterPartPayers(e Engine, p state.PlayerID, source state.ObjID, part costvocab.CostPart, reserved map[state.ObjID]bool) ([]state.ObjID, bool) {
+	if !SubCounterAnyKind(part.Spec) || costvocab.SubCounterTargetsSource(part.Target) {
+		cands := SubCounterRemovalCandidates(e, p, source, part, part.N, reserved)
+		if len(cands) == 0 {
+			return nil, false
+		}
+		return cands[:1], true
+	}
+	var used []state.ObjID
+	have := int32(0)
+	for _, oid := range SubCounterRemovalCandidates(e, p, source, part, 1, reserved) {
+		if have >= part.N {
+			break
+		}
+		have += SubCounterAvailable(e.Game().Obj(oid), part.Spec)
+		used = append(used, oid)
+	}
+	return used, have >= part.N
 }
 
 // ExistsOnBattlefield reports whether o is a permanent the engine treats as
@@ -636,7 +669,7 @@ func ManaSubCounterXBound(e Engine, p state.PlayerID, o *state.Object, source st
 					continue
 				}
 				n := SubCounterAvailable(co, part.Spec)
-				if strings.EqualFold(part.Spec, "Any") {
+				if SubCounterAnyKind(part.Spec) {
 					have += n
 				} else if n > have {
 					have = n

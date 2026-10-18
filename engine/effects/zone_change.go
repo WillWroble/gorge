@@ -278,6 +278,20 @@ func dropDelayedRememberedMoved(h Host, c *Ctx, targets []state.Target) []state.
 	return out
 }
 
+// definedDelayRememberedTargets is Defined(sa) with dropDelayedRememberedMoved
+// applied when the selector is Defined$ DelayTriggerRemembered[LKI]: the
+// Destroy and SacrificeAll movers ("destroy/sacrifice that creature at the
+// beginning of the next end step") find only the remembered object, as
+// ChangeZone's mover does (CR 400.7).
+func definedDelayRememberedTargets(h Host, c *Ctx, sa *cards.SA) []state.Target {
+	targets := Defined(h, c, sa)
+	switch definedSpecCodes.Code(DefinedRefOf(sa).Text) {
+	case definedSpecDelayTriggerRemembered, definedSpecDelayTriggerRememberedLKI:
+		return dropDelayedRememberedMoved(h, c, targets)
+	}
+	return targets
+}
+
 func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
 	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
 		return true

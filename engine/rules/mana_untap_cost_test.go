@@ -53,7 +53,7 @@ func TestTappedQManaSourceAcrossAvailabilityAndCastWindow(t *testing.T) {
 
 	castUnits := e.castWindowUnits(&pendingCast{player: 0})
 	if !e.castWindowReachable(0, ParseCost("G"), e.G.Players[0].Pool, e.G.Players[0].Snow,
-		e.G.Players[0].ManaUnits(), e.G.Players[0].Life, nil, castUnits) {
+		e.G.Players[0].ManaUnits(), e.G.Players[0].Life, nil, pipRider{}, castUnits) {
 		t.Fatal("cast-window reachability did not count the tapped Q source")
 	}
 }

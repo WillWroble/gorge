@@ -679,6 +679,7 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	pp := e.previewStruct()
 	*pp = *e
 	preview := pp
+	isolatePreviewMemos(preview)
 	preview.G = e.G.CloneInto(e.takeSnapshotObjs())
 	// The livelock watcher's window and candidate index are slices: the
 	// preview copies them on its first observed event rather than writing
@@ -721,6 +722,34 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	events.Apply(preview.G, ev)
 	preview.replArenaNoteApplied(ev)
 	return preview, entrant
+}
+
+// isolatePreviewMemos gives an entry preview -- a shallow struct copy of the
+// live engine -- private storage for the layer caches its reads rebuild in
+// place, so a preview read can never write into the live engine's arrays.
+// Without it the preview's static-memo rebuild (refreshStaticContinuous, over
+// the post-entry board) overwrote the live memo's entries under the live
+// engine's unchanged key: a lord destroyed earlier in the same resolution
+// lost its entry, the live refresh then judged the lord's departure cold and
+// re-stamped the memo, and the live active list kept the lord's buff (CR
+// 611.3a; Stroke of Midnight on Empyrean Eagle, dirty-dirac K1l pairs 21961
+// 37823 66869 74406). The served lists are copied, so every cache hit the
+// preview inherits stays valid; the pure scratch buffers start empty; the
+// per-object memo tables start empty exactly as a clone's do (their clone
+// tags are reset).
+func isolatePreviewMemos(p *Engine) {
+	p.staticContinuous = slices.Clone(p.staticContinuous)
+	p.staticGates = slices.Clone(p.staticGates)
+	p.activeBuf = slices.Clone(p.activeBuf)
+	p.activeKWHeads = slices.Clone(p.activeKWHeads)
+	p.typesProbe = slices.Clone(p.typesProbe)
+	p.typesSrcs = slices.Clone(p.typesSrcs)
+	p.typesMayDiffer = slices.Clone(p.typesMayDiffer)
+	p.renames = slices.Clone(p.renames)
+	p.activeBufAlt, p.activeSrc = nil, nil
+	p.typesTouch, p.typesAct, p.derivedTouched, p.boardScanBuf = nil, nil, nil, nil
+	p.derivedMemo, p.derivedMemoStack = derivedMemoTable{}, derivedMemoTable{}
+	p.lossMemo, p.manaGate = abilityLossMemo{}, manaGateMemo{}
 }
 
 // settleEntryGrants walks the entry's grants in order against the previewed
