@@ -94,7 +94,7 @@ func (e *Engine) beginActivationPaid(p state.PlayerID, opt decision.Option, auto
 	// and the gate agree; a stale option whose rider vanished falls back to
 	// the printed cost rather than stranding. Scoped to the Equip/Fortify
 	// SAs (isAttachCostSA): no other activation family reads AlternateCost$.
-	raw := e.parseCost(ab.ParamStr(cards.PKCost))
+	raw := e.abilityCompiledCost(ab).Cost
 	if opt.AltCostIndex > 0 {
 		if alt, ok := e.abilityAlternateCostFor(p, ab); ok {
 			raw = alt

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	costvocab "github.com/adams-shaun/gorge/engine/rules/cost"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -124,7 +123,7 @@ func planPaymentCostWithDemand(e Engine, p state.PlayerID, demand [5]int, cost c
 		}
 		var out []Alt
 		for _, alt := range alts {
-			if tap && ParseCostOf(e, alt.Ma.ParamStr(cards.PKCost)).Tap {
+			if tap && AbilityCompiledCost(e, alt.Ma).Cost.Tap {
 				continue
 			}
 			if keep && (alt.Consequence.Sacrifice || alt.Consequence.ReturnToHand) {

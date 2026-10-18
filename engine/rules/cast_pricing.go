@@ -559,7 +559,7 @@ func faceWantsConverge(f *cards.Face) bool {
 	if f == nil {
 		return false
 	}
-	if f.HasKeyword("Sunburst") {
+	if f.HasKeywordRef(kwRefSunburst) {
 		return true
 	}
 	for _, v := range f.SVars {

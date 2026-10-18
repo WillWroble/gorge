@@ -267,13 +267,13 @@ func (e *Engine) forEachShardCount(word string, id state.ObjID, scope costScope)
 		if ab == nil {
 			return 0, true
 		}
-		c = ParseCost(ab.ParamStr(cards.PKCost))
+		c = e.abilityCompiledCost(ab).Cost
 	} else {
 		o := e.G.Obj(id)
 		if o == nil || o.Face() == nil {
 			return 0, true
 		}
-		c = ParseCost(o.Face().ManaCost)
+		c = e.faceCost(o.Face())
 	}
 	return costShardsOf(c, letter), true
 }

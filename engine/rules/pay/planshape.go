@@ -514,7 +514,7 @@ func PaymentPlanSpellTargets(f *cards.Face) bool {
 	if f == nil {
 		return true
 	}
-	if slices.Contains(f.Types, "Aura") || f.HasKeyword("Enchant") {
+	if slices.Contains(f.Types, "Aura") || f.HasKeywordRef(kwRefEnchant) {
 		return true
 	}
 	if _, ok := f.KeywordParam("Enchant"); ok {

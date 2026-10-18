@@ -62,6 +62,26 @@ type Point struct {
 	// an opponent's payment-vocabulary point.
 	extra  int8
 	oppPay bool
+	// resolve, when set, is a deferred Prior (walkConfig.lazyPrior): Prior
+	// is nil until resolvePrior runs it, which may also reorder Keys (the
+	// ranking prior's order). The walk resolves a point only where a prior
+	// is read -- a child it does not yet hold, or a new node -- and always
+	// before the env moves on, so the prior is the one producing the point
+	// eagerly would have computed.
+	resolve func() ([]Key, []float64)
+}
+
+// resolvePrior runs a deferred prior (Point.resolve), once.
+func (pt *Point) resolvePrior() {
+	if pt.resolve != nil {
+		pt.Keys, pt.Prior = pt.resolve()
+		pt.resolve = nil
+	}
+}
+
+// valid reports whether pt has keys and, unless deferred, a parallel prior.
+func (pt *Point) valid() bool {
+	return pt != nil && len(pt.Keys) > 0 && (pt.resolve != nil || len(pt.Prior) == len(pt.Keys))
 }
 
 // Leaf is the value of the position a walk stopped at, for the searching
@@ -167,6 +187,7 @@ type edge struct {
 }
 
 func newNode(pt *Point) *node {
+	pt.resolvePrior()
 	nd := &node{kids: make([]*edge, len(pt.Keys))}
 	for i, k := range pt.Keys {
 		nd.kids[i] = &edge{key: k, prior: pt.Prior[i]}
@@ -300,6 +321,9 @@ func RunTree(ctx context.Context, root *Point, src EnvSource, opts Options, st *
 		}
 		st.Completed++
 	}
+	if cache != nil {
+		cache.reclaim()
+	}
 	res := TreeResult{
 		Visits: make([]int, len(root.Keys)), Q: make([]float64, len(root.Keys)),
 		Avail: make([]int, len(root.Keys)), RootValue: top.q(),
@@ -348,8 +372,16 @@ func simulate(top *node, env Env, opts Options, st *Stats) error {
 	}
 	nd, pt := top, env.Root()
 	for {
-		if pt == nil || len(pt.Keys) == 0 || len(pt.Prior) != len(pt.Keys) {
+		if !pt.valid() {
 			return fmt.Errorf("%w: a world offered a malformed point", ErrSubmit)
+		}
+		if pt.resolve != nil {
+			for _, k := range pt.Keys {
+				if nd.child(k) == nil {
+					pt.resolvePrior()
+					break
+				}
+			}
 		}
 		for _, kid := range nd.kids {
 			if hasKey(pt.Keys, kid.key) {
@@ -397,11 +429,14 @@ func simulate(top *node, env Env, opts Options, st *Stats) error {
 			return nil
 		}
 		if sel.next == nil {
+			// The node first: a deferred prior resolved at the point can
+			// carry the leaf out (deferPrior).
+			nn := newNode(next)
 			l := env.Leaf()
 			if l.Err != nil {
 				return l.Err
 			}
-			sel.next = newNode(next)
+			sel.next = nn
 			sel.next.n, sel.next.w = 1, l.V
 			st.Expanded++
 			if next.Opp {

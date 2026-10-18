@@ -34,6 +34,7 @@ func init() {
 	faceScanVerify = true
 	manaPlainVerify = true
 	abilityLossMemoVerify = true
+	manaGateMemoVerify = true
 }
 
 // allocsWithoutWalkCacheVerify runs testing.AllocsPerRun with the walk

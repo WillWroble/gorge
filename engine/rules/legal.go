@@ -71,7 +71,7 @@ func aftermathAlternateFace(o *state.Object) *cards.Face {
 		return nil
 	}
 	af := o.Card.Faces[1]
-	if af == nil || !af.HasKeyword("Aftermath") {
+	if af == nil || !af.HasKeywordRef(kwRefAftermath) {
 		return nil
 	}
 	return af

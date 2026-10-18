@@ -532,7 +532,7 @@ func checkedSpan(start, count int, what string) (Span, error) {
 }
 
 func printedColourMask(face *Face) ColourMask {
-	if face == nil || face.HasKeyword("Devoid") {
+	if face == nil || face.HasKeywordRef(kwRefDevoid) {
 		return 0
 	}
 	var mask ColourMask

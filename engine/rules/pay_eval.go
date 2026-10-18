@@ -58,7 +58,7 @@ func (v *payEval) ManaShape(ab *cards.SA) (pay.Tier, pay.Consequence, string, bo
 		return 0, pay.Consequence{}, "", false
 	}
 	if manaSAFactsVerify {
-		tier, c, detail, rider := pay.PaymentPlanShapeTierOf(ab, e.parseCost(ab.ParamStr(cards.PKCost)))
+		tier, c, detail, rider := pay.PaymentPlanShapeTierOf(ab, e.abilityCompiledCost(ab).Cost)
 		if rider || tier != f.shapeTier || c != f.shapeCons || detail != f.shapeDetail {
 			panic(fmt.Sprintf("rules: configured payment shape for %q disagrees with a recompute", ab.Line))
 		}
@@ -79,7 +79,7 @@ func (v *payEval) SourceInterference(id state.ObjID, ma *cards.SA, produced stri
 	e := (*Engine)(v)
 	if produced != "" {
 		// A TapsForMana trigger only fires when the ability's cost taps.
-		if ma == nil || !e.parseCost(ma.ParamStr(cards.PKCost)).Tap {
+		if ma == nil || !e.abilityCompiledCost(ma).Cost.Tap {
 			return pay.TierNormal, pay.Consequence{}, "", state.Mana{}
 		}
 		return pay.TierNormal, pay.Consequence{}, "", e.paymentPlanTapExtraMana(id, produced)

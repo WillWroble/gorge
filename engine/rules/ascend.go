@@ -88,7 +88,7 @@ func (e *Engine) checkBlessingGrants() {
 // is the continuous scan above -- and the stack object itself is never on the
 // battlefield, so it does not count toward the ten.
 func (e *Engine) grantSpellBlessing(o *state.Object, f *cards.Face) {
-	if f == nil || f.IsPermanent() || !f.HasKeyword("Ascend") {
+	if f == nil || f.IsPermanent() || !f.HasKeywordRef(kwRefAscend) {
 		return
 	}
 	p := o.Controller
@@ -124,57 +124,11 @@ func (e *Engine) ascendPossible() bool {
 		*s = ascendScan{game: e.G}
 	}
 	for ; !s.seen && s.scanned < len(e.G.Objs); s.scanned++ {
-		if a, _ := cardMentions(e.G.Objs[s.scanned].Card); a {
+		if e.cardScanHas(e.G.Objs[s.scanned].Card, faceScanAscend) {
 			s.seen = true
 		}
 	}
 	return s.seen
-}
-
-// cardMentionsAscend reports whether any face of c prints Ascend or names it
-// in any parameter or SVar (a grant). Deliberately over-inclusive: a false
-// positive only costs the full scan.
-func cardMentionsAscend(c *cards.Card) bool {
-	if c == nil {
-		return false
-	}
-	params := func(m map[string]string) bool {
-		for _, v := range m { // membership test only; order cannot matter.
-			if strings.Contains(v, "Ascend") {
-				return true
-			}
-		}
-		return false
-	}
-	for _, f := range c.Faces {
-		if f == nil {
-			continue
-		}
-		for _, k := range f.Keywords {
-			if strings.Contains(k, "Ascend") {
-				return true
-			}
-		}
-		if params(f.SVars) {
-			return true
-		}
-		for _, st := range f.Statics {
-			if params(st.Params) {
-				return true
-			}
-		}
-		for _, a := range f.Abilities {
-			if a != nil && params(a.Params) {
-				return true
-			}
-		}
-		for _, tr := range f.Triggers {
-			if params(tr.Params) || (tr.Effect != nil && params(tr.Effect.Params)) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // activeGrantsKeyword reports whether any active continuous effect's layer-6

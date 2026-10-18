@@ -121,6 +121,11 @@ type Seat struct {
 	// seat's decisions are answered one at a time, and every world of a
 	// decision is spent once its Search returns.
 	spare rules.Spare
+	// pool is the recycled node-state storage carried the same way, for the
+	// cached-worlds trees (sparePool): every state a tree stores is spent
+	// once its Search returns, and the next decision's trees resume into
+	// those arrays. Made on the first searched decision that can use it.
+	pool *sparePool
 }
 
 // SetRecorder installs the visit-corpus recorder (M1b; four-yay cmd/botbench
@@ -239,6 +244,10 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 			return decision.Intent{}, err
 		}
 		rs.spare, s.spare = s.spare, rules.Spare{}
+		if s.pool == nil && !noSparePool && opts.CachedWorlds > 0 && opts.NodeCache > 0 && !opts.RootPerWorld {
+			s.pool = newSparePool(min(opts.NodeCache, opts.Sims))
+		}
+		rs.pool = s.pool
 		src, redeal = rs, rs
 	} else {
 		cs, err := s.cfg.Source(env, obs)
@@ -296,6 +305,11 @@ func (s *Seat) DecideSearch(ctx context.Context, env searchseat.Env, d decision.
 	}
 	return res.Intent, nil
 }
+
+// noSparePool keeps a seat from pooling its trees' storage (sparePool): the
+// test that pins pooled searches to unpooled ones (TestSparePoolIsExact)
+// runs both.
+var noSparePool bool
 
 // WantsPaymentActions reports whether the driver must build the decision's
 // payment plans for this seat (seat.PaymentPlanConsumer): exactly when the

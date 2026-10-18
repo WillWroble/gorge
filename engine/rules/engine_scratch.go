@@ -87,7 +87,9 @@ type engineScratch struct {
 	// (potential_walk_cache.go). potentialAskSerial (bumped by every ask and
 	// every Submit) keys it to the decision; potentialWalkDepth bypasses it
 	// inside its own computation; potentialFullDemand records that a
-	// full-walk reader asked on this engine. Pure scratch: Clone copies none.
+	// full-walk reader asked on this engine. Pure scratch: the generated
+	// clone copies none, but cloneWith then carries an entry that is exact
+	// for the state being cloned, re-stamped (adoptPotentialWalk).
 	potentialWalk       potentialWalkCache `clone:"reset"`
 	potentialAskSerial  uint64             `clone:"reset"`
 	potentialWalkDepth  int                `clone:"reset"`
@@ -261,6 +263,9 @@ type engineScratch struct {
 	// lossMemo is abilityLoss's per-active()-build answer cache
 	// (abilityloss_memo.go). Clone leaves it zero.
 	lossMemo abilityLossMemo `clone:"reset,pool=lossMemo,release=.recycled"`
+	// manaGate is appendAvailableManaAbilitiesGate's per-walk answer cache
+	// (mana_gate_memo.go). Pure scratch: Clone recycles its storage only.
+	manaGate manaGateMemo `clone:"reset,pool=manaGate,release=.recycled"`
 	// layer5Colors is the on-demand layer-5 derived-colour table
 	// (layer5colors.go) and its key. Clone leaves it zero.
 	layer5Colors   []effects.ObjectColors `clone:"reset"`
@@ -272,9 +277,6 @@ type engineScratch struct {
 	// charsSum is active()'s per-build digest for Characteristics' printed
 	// fast path (derived_printed.go). Clone leaves it zero.
 	charsSum charsSummary `clone:"reset"`
-	// faceScans memoises per-face text-scan verdicts (face_scan_memo.go).
-	// Clone leaves it nil.
-	faceScans map[*cards.Face]faceScan `clone:"reset"`
 	// intentBuf is a recycled intent array from Config.Spare, installed as
 	// the log's Intents on the first Submit (see there). Not cloned.
 	intentBuf []decision.Intent `clone:"reset"`

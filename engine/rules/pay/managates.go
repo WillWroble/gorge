@@ -89,7 +89,7 @@ func ManaAbilityTapSick(e Engine, source state.ObjID, ma *cards.SA, asIfHaste bo
 	if ma == nil {
 		return false
 	}
-	c := CostRef(e, ma.ParamStr(cards.PKCost))
+	c := (&AbilityCompiledCost(e, ma).Cost)
 	return TapFlagsSick(e, source, c.Tap, c.Untap, asIfHaste)
 }
 

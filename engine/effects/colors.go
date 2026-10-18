@@ -54,7 +54,7 @@ func ColorMaskOf(o *state.Object) ColorMask {
 		return 0
 	}
 	f := o.Face()
-	if f == nil || f.HasKeyword("Devoid") {
+	if f == nil || f.HasKeywordRef(kwRefDevoid) {
 		return 0
 	}
 	var mask ColorMask

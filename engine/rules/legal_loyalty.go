@@ -8,6 +8,7 @@ import (
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/rules/pay"
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
@@ -23,7 +24,7 @@ import (
 // parameter) as well as the 20 dynamic [-X] lines, every one of which carries
 // it.
 func isLoyaltyAbility(ab *cards.SA) bool {
-	return isLoyaltyAbilityCost(ab, ParseCost(ab.ParamStr(cards.PKCost)))
+	return isLoyaltyAbilityRef(ab, &pay.AbilityCostOf(ab).Cost)
 }
 
 // isLoyaltyAbility is the engine-owned form of the loyalty classifier. Its

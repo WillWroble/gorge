@@ -535,14 +535,14 @@ var predicates = map[string]predFn{
 	// grant; it is suspended only while that capability card is exiled with a
 	// positive TIME counter.
 	"withSuspend": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o != nil && (o.SuspendGranted || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+		return o != nil && (o.SuspendGranted || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	"withoutSuspend": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o == nil || !(o.SuspendGranted || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+		return o == nil || !(o.SuspendGranted || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	"suspended": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
 		return o != nil && o.Zone == state.ZExile && o.Counter("TIME") > 0 &&
-			(o.SuspendGranted || (o.CastFlags&state.FlagSuspend) != 0 || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+			(o.SuspendGranted || (o.CastFlags&state.FlagSuspend) != 0 || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	// wasCastFromGraveyard is the CastFlags provenance of a GRAVEYARD-ORIGIN
 	// cast (CR 601.2b): any of FlagFlashback, FlagHarmonize or FlagEscaped.
@@ -2591,7 +2591,7 @@ func matchesBase(g *state.Game, base string, o *state.Object, sc SpecContext) bo
 			}
 			return false
 		}
-		return o.Face() != nil && o.Face().HasKeyword("Affinity")
+		return o.Face() != nil && o.Face().HasKeywordRef(kwRefAffinity)
 	case matchesBasePermanentCard:
 		// This internal base spelling is selected by rules' target census
 		// (targetSpecForZone) and Dig windows (permanentCardSpec) for Forge's

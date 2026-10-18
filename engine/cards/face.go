@@ -84,19 +84,40 @@ func SplitKeywordList(list string) []string {
 	return out
 }
 
-func (f *Face) HasKeyword(k string) bool { return f.HasKeywordID(k, 0) }
+// HasKeyword reports whether the face prints keyword head k (the compiled
+// mask gate, then the keyword-line scan). A fixed head is better asked
+// through HasKeywordRef, which resolves it once.
+func (f *Face) HasKeyword(k string) bool { return f.hasKeyword(k, 0, keywordMaskFor(k)) }
 
-// HasKeywordID is HasKeyword with k's precompiled InternKeywordHead ordinal:
-// the same compiled-mask gate, then the keyword-line scan answered from the
-// face's interned head bitset when id is nonzero.
-func (f *Face) HasKeywordID(k string, id KeywordHeadID) bool {
+// KeywordRef is a keyword head compiled for HasKeywordRef: the head, its
+// InternKeywordHead ordinal and its catalog KeywordMask, resolved once.
+type KeywordRef struct {
+	head string
+	id   KeywordHeadID
+	mask KeywordMask
+}
+
+// NewKeywordRef compiles head. It interns, so call it at init time (a
+// package-level var), never per match.
+func NewKeywordRef(head string) KeywordRef {
+	return KeywordRef{head: head, id: InternKeywordHead(head), mask: keywordMaskFor(head)}
+}
+
+// HasKeywordRef is HasKeyword(head) for r's head, answered from r's
+// precompiled ordinal and mask.
+func (f *Face) HasKeywordRef(r KeywordRef) bool { return f.hasKeyword(r.head, r.id, r.mask) }
+
+// hasKeyword is HasKeyword with k's InternKeywordHead ordinal (0 = none) and
+// keywordMaskFor supplied: the compiled-mask gate, then the keyword-line
+// scan answered from the face's interned head bitset when id is nonzero.
+func (f *Face) hasKeyword(k string, id KeywordHeadID, mask KeywordMask) bool {
 	if f.compiledCatalog != nil && f.compiledID != 0 && int(f.compiledID) <= len(f.compiledCatalog.Faces) {
 		// No keyword lines and no compiled keyword bits: both paths below
-		// answer false, so skip the head's mask lookup.
+		// answer false.
 		if len(f.Keywords) == 0 && f.compiledCatalog.Faces[f.compiledID-1].KeywordMask == 0 {
 			return false
 		}
-		if mask := keywordMaskFor(k); mask != 0 {
+		if mask != 0 {
 			return f.compiledCatalog.Faces[f.compiledID-1].KeywordMask&mask != 0
 		}
 	}
@@ -428,6 +449,7 @@ func (f *Face) derive() {
 	f.colourIdentity = f.deriveColourIdentity()
 	f.deriveTypeStatics()
 	f.deriveWordSets()
+	f.derivePrintedFacts()
 	f.deriveParamSets()
 }
 

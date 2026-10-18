@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
@@ -308,7 +309,7 @@ func jointTargetFeatures(src string, t decision.Option, idx *OptionEncoder, seat
 	for _, w := range strings.Fields(cv.Types) {
 		push("jt|tgt|" + side + "|type|" + w)
 	}
-	if hasTypeWord(cv.Types, "Creature") {
+	if hasType(cv, cards.TypeCreature) {
 		pt := "p" + mzBucket(cv.Power, 9) + "|t" + mzBucket(cv.Toughness-cv.Damage, 9)
 		push("jt|tgt|" + side + "|cr|" + pt)
 		push("jt|" + src + "|" + side + "|cr|" + pt)

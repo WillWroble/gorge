@@ -398,7 +398,7 @@ func (w *legalWalk) battlefieldWalk() {
 						if mf != nil && mf.cost != freeCost {
 							cost = mf.cost.Cost
 						} else {
-							cost = e.parseCost(ab.ParamStr(cards.PKCost))
+							cost = e.abilityCompiledCost(ab).Cost
 						}
 						// The ability's own ReduceCost$ (Otawara's Channel): the CR
 						// 601.2f composition the offer gate and beginActivation's
@@ -544,7 +544,7 @@ func (w *legalWalk) battlefieldWalk() {
 						if e.activationLimitBlocked(p, id, ab, -1, line, 0) {
 							continue
 						}
-						cost := e.parseCost(ab.ParamStr(cards.PKCost))
+						cost := e.abilityCompiledCost(ab).Cost
 						if n := e.ownReduceCostOffer(p, id, ab, 0); n > 0 && cost.Generic >= n {
 							cost.Generic -= n
 						} else if n > 0 {
@@ -670,7 +670,7 @@ func (w *legalWalk) battlefieldWalk() {
 					if w.abilityRestricted(p, id, ab) || e.castSuppressed(p, id) {
 						continue
 					}
-					cost := e.parseCost(ab.ParamStr(cards.PKCost))
+					cost := e.abilityCompiledCost(ab).Cost
 					bindGrantedCostReferents(&cost, ga.Source)
 					// The granted twin of the printed loop's own ReduceCost$ fold.
 					if n := e.ownReduceCostOffer(p, id, ab, 0); n > 0 && cost.Generic >= n {
@@ -834,7 +834,7 @@ func (w *legalWalk) battlefieldWalk() {
 				if w.abilityRestricted(p, id, ab) || e.castSuppressed(p, id) {
 					continue
 				}
-				cost := e.parseCost(ab.ParamStr(cards.PKCost))
+				cost := e.abilityCompiledCost(ab).Cost
 				if pay.ActivationTapCostUnavailable(o, &cost) || pay.TapCostSick(asPayer(e), id, &cost, activatesAsIfHaste(e, id)) {
 					continue
 				}

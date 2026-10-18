@@ -43,6 +43,8 @@ type ManaParams struct {
 	// Counts/CountsAny are cards.ProducedCounts(Produced$).
 	Counts    [6]int32
 	CountsAny bool
+	// NeedsChosen is ProducedNeedsChosen(Produced$).
+	NeedsChosen bool
 
 	// Amount$ as written (numText), trimmed, and its strconv literal value
 	// (AmountIsLit false for a blank or non-literal amount).
@@ -117,6 +119,7 @@ func compileMana(sa *cards.SA, dp *DefinedParams) *ManaParams {
 	p.ProducedRaw, p.HasProduced = sa.Param(cards.PKProduced)
 	p.Produced = strings.TrimSpace(p.ProducedRaw)
 	p.Counts, p.CountsAny = cards.ProducedCounts(p.ProducedRaw)
+	p.NeedsChosen = ProducedNeedsChosen(p.ProducedRaw)
 
 	amt, amtOK := sa.Param(cards.PKAmount)
 	p.Amount = ParamText{Text: amt, Present: amtOK}
@@ -141,6 +144,18 @@ func compileMana(sa *cards.SA, dp *DefinedParams) *ManaParams {
 		p.Unread = unreadKeys(sa, manaKnownKeys[:])
 	}
 	return p
+}
+
+// ProducedNeedsChosen reports whether a Produced$ grammar token needs the
+// source's recorded as-enters colour before it can be priced.
+func ProducedNeedsChosen(produced string) bool {
+	for tok := range strings.FieldsSeq(produced) {
+		switch strings.Trim(tok, "{}") {
+		case "Chosen", "ChosenColor", "ComboChosen":
+			return true
+		}
+	}
+	return false
 }
 
 // plainManaKeys are the keys a plain production may carry: Produced$,

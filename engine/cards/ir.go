@@ -24,6 +24,9 @@ type SA struct {
 	// extSlot holds a downstream package's compiled facts about this
 	// ability (slot.go), allocated at load. Not serialized.
 	extSlot *ExtSlot
+	// costSlot holds a downstream compiled form of the ability's Cost$
+	// text (slot.go), allocated at load. Not serialized.
+	costSlot *Slot
 	// api is API resolved at load (apiBound); see APIKind.
 	api          APICode
 	apiBound     bool
@@ -181,6 +184,10 @@ type Face struct {
 	// guard). Not serialized.
 	cmcSrc   string
 	cmcBound bool
+	// printed is the face's PrintedFacts, guarded by the identity of the
+	// Types and ManaCost text it was derived over (printed_facts.go). Not
+	// serialized.
+	printed printedFacts
 	// manaCostSlot holds a downstream compiled form of ManaCost (slot.go),
 	// allocated at load. Not serialized.
 	manaCostSlot *Slot

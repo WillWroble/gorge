@@ -683,7 +683,7 @@ func V2CardFromView(cv *view.CardView, zone uint8, viewer state.PlayerID, ctlSea
 				d.Keywords = append(d.Keywords, w)
 			}
 		}
-		d.MV = mvOf(cv.ManaCost)
+		d.MV = cardManaValue(cv)
 	} else {
 		d.Name = ""
 		d.MV = 0

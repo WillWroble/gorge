@@ -446,7 +446,7 @@ func (e *Engine) castTargetsAvailable(p state.PlayerID, id state.ObjID, sa *card
 	if o := e.G.Obj(id); o != nil && o.Face() != nil {
 		xPending = costAnnouncesXRef(&e.faceCompiledCost(o.Face()).Cost)
 		if ab := o.Face().SpellAbility(); ab != nil {
-			xPending = xPending || costAnnouncesXRef(e.costRef(ab.ParamStr(cards.PKCost)))
+			xPending = xPending || costAnnouncesXRef((&e.abilityCompiledCost(ab).Cost))
 		}
 	}
 	return e.targetsAvailable(p, id, id, sa, xPending)
@@ -478,5 +478,5 @@ func (e *Engine) abilityTargetsAvailable(p state.PlayerID, id state.ObjID, ab *c
 		// xPending is never read for this shape (targetsReadXPending).
 		return e.targetsAvailable(p, id, excludeSelf, ab, false)
 	}
-	return e.targetsAvailable(p, id, excludeSelf, ab, costAnnouncesX(e.parseCost(ab.ParamStr(cards.PKCost))))
+	return e.targetsAvailable(p, id, excludeSelf, ab, costAnnouncesX(e.abilityCompiledCost(ab).Cost))
 }

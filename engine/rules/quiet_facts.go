@@ -259,7 +259,7 @@ func computeQuietFaceFacts(f *cards.Face, hasAltCosts bool) quietFaceFacts {
 	var q quietFaceFacts
 	q.isLand = f.IsLand()
 	q.castFloor = f.Cmc()
-	q.instantSpeed = f.IsInstant() || f.HasKeyword("Flash") || mayFlashSacFace(f) || faceHasCastWithFlash(f)
+	q.instantSpeed = f.IsInstant() || f.HasKeywordRef(kwRefFlash) || mayFlashSacFace(f) || faceHasCastWithFlash(f)
 	if hasAltCosts {
 		q.castOpen = true
 	} else if r, open := quietCastOpen(f); open {
@@ -318,7 +318,7 @@ func quietCastOpen(f *cards.Face) (castOpenReason, bool) {
 	if isNoManaCost(f.ManaCost) {
 		return coNoManaCost, true
 	}
-	c := ParseCost(f.ManaCost)
+	c := &pay.FaceCostOf(f).Cost
 	if len(c.Phyrexian) > 0 || len(c.HybridPhyrexian) > 0 {
 		return coPhyrexian, true
 	}
@@ -389,7 +389,7 @@ func quietSelfReducePipFloor(f *cards.Face) (int32, bool) {
 	if !seen {
 		return 0, false
 	}
-	c := ParseCost(f.ManaCost)
+	c := &pay.FaceCostOf(f).Cost
 	var pips int32
 	for i := 0; i < 5; i++ {
 		pips += c.Colored[i]

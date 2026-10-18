@@ -78,14 +78,14 @@ func computeManaStaticFacts(mp *effects.ManaParams, cost *Cost) pay.ManaStatic {
 func (e *Engine) manaStaticOf(ab *cards.SA) pay.ManaStatic {
 	if f := e.manaFactsOf(ab); f != nil {
 		if manaSAFactsVerify {
-			c := e.parseCost(ab.ParamStr(cards.PKCost))
+			c := e.abilityCompiledCost(ab).Cost
 			if fresh := computeManaStaticFacts(effects.ManaOf(ab), &c); fresh != f.static {
 				panic(fmt.Sprintf("rules: configured census facts for %q disagree with a recompute", ab.Line))
 			}
 		}
 		return f.static
 	}
-	c := e.parseCost(ab.ParamStr(cards.PKCost))
+	c := e.abilityCompiledCost(ab).Cost
 	return computeManaStaticFacts(effects.ManaOf(ab), &c)
 }
 

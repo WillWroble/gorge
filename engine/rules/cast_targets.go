@@ -907,7 +907,7 @@ func (e *Engine) subTargetAsk(pc *pendingCast) bool {
 // The spell's SVar table, rather than a card-name list or a broad change to
 // ChangeZone target inference, identifies this announcement shape.
 func teamworkBattlefieldSub(f *cards.Face, root, sub *cards.SA) bool {
-	if f == nil || root == nil || sub == nil || sub.CompiledAPI() != cards.APIChangeZone || !f.HasKeyword("Teamwork") {
+	if f == nil || root == nil || sub == nil || sub.CompiledAPI() != cards.APIChangeZone || !f.HasKeywordRef(kwRefTeamwork) {
 		return false
 	}
 	r := effects.TargetsOf(root)
@@ -1487,7 +1487,7 @@ func (e *Engine) recheckIllegal(pc *pendingCast) bool {
 		if face == nil {
 			return false
 		}
-		printed := ParseCost(face.ManaCost)
+		printed := &e.faceCompiledCost(face).Cost
 		mv := printed.CMC()
 		if printed.X > 0 {
 			mv = printed.WithX(pc.x).CMC()

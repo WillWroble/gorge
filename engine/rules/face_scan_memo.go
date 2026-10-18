@@ -3,6 +3,8 @@ package rules
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
@@ -15,10 +17,9 @@ import (
 // shape gate re-ran these substring scans over every battlefield face on
 // every cast and every planner query scope. A configured face's verdicts
 // live in the shared compiled face table (walkFaceFacts.scan); for any other
-// face faceScanHas memoises them per face pointer for the engine's lifetime (a face held as a key stays alive,
-// so its address cannot be reused by another face). Clone leaves the memo
-// nil. In the rules test binary faceScanVerify recomputes every hit and
-// panics on a difference.
+// face faceScanHas memoises them per face pointer in faceScanMemo, shared by
+// every engine. In the rules test binary faceScanVerify recomputes every hit
+// and panics on a difference.
 type faceScan uint16
 
 const (
@@ -41,6 +42,13 @@ const (
 	// faceScanTargetedCastSpend: the face mentions
 	// Targeted$CastTotalManaSpent (targetedCastSpendReaderOut).
 	faceScanTargetedCastSpend
+	// faceScanAscend: faceMentionsGrantWord(f, "Ascend") (ascendPossible).
+	faceScanAscend
+	// faceScanStoried: faceMentionsGrantWord(f, "Storied")
+	// (storiedPossible).
+	faceScanStoried
+	// faceScanGrantsRepl: faceGrantsRepl (replGrantsPossible).
+	faceScanGrantsRepl
 )
 
 // faceScanVerify: see derivedMemoVerify. Set by the rules test binary.
@@ -69,7 +77,69 @@ func computeFaceScan(f *cards.Face) faceScan {
 	if f.Mentions("Targeted$CastTotalManaSpent") {
 		s |= faceScanTargetedCastSpend
 	}
+	if faceMentionsGrantWord(f, "Ascend") {
+		s |= faceScanAscend
+	}
+	if faceMentionsGrantWord(f, "Storied") {
+		s |= faceScanStoried
+	}
+	if faceGrantsRepl(f) {
+		s |= faceScanGrantsRepl
+	}
 	return s
+}
+
+// faceMentionsGrantWord reports whether f prints word in a keyword or names
+// it in any SVar, static, ability or trigger (or trigger effect) parameter --
+// a grant of it. Deliberately over-inclusive: a false positive only costs
+// the full scan its caller gates.
+func faceMentionsGrantWord(f *cards.Face, word string) bool {
+	params := func(m map[string]string) bool {
+		for _, v := range m { // membership test only; order cannot matter.
+			if strings.Contains(v, word) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, k := range f.Keywords {
+		if strings.Contains(k, word) {
+			return true
+		}
+	}
+	if params(f.SVars) {
+		return true
+	}
+	for _, st := range f.Statics {
+		if params(st.Params) {
+			return true
+		}
+	}
+	for _, a := range f.Abilities {
+		if a != nil && params(a.Params) {
+			return true
+		}
+	}
+	for _, tr := range f.Triggers {
+		if params(tr.Params) || (tr.Effect != nil && params(tr.Effect.Params)) {
+			return true
+		}
+	}
+	return false
+}
+
+// cardScanHas reports whether some face of c carries bit (faceScanHas). A
+// nil card carries none.
+func (e *Engine) cardScanHas(c *cards.Card, bit faceScan) bool {
+	if c == nil {
+		return false
+	}
+	for _, f := range c.Faces {
+		if e.faceScanHas(f, bit) {
+			return true
+		}
+	}
+	return false
 }
 
 // faceScanHas reports whether f's scan carries bit. A nil face carries none.
@@ -88,19 +158,31 @@ func (e *Engine) faceScanHas(f *cards.Face, bit faceScan) bool {
 		}
 		return ff.scan&bit != 0
 	}
-	s, ok := e.faceScans[f]
-	if !ok {
-		s = computeFaceScan(f)
-		if e.faceScans == nil {
-			e.faceScans = make(map[*cards.Face]faceScan)
+	slot := &faceScanMemo[(uintptr(unsafe.Pointer(f))>>4)%uintptr(len(faceScanMemo))]
+	if en := slot.Load(); en != nil && en.face == f {
+		if faceScanVerify {
+			if fresh := computeFaceScan(f); fresh != en.scan {
+				panic(fmt.Sprintf("rules: face scan memo for %q is stale (%b vs %b)", f.Name, en.scan, fresh))
+			}
 		}
-		e.faceScans[f] = s
-	} else if faceScanVerify {
-		if fresh := computeFaceScan(f); fresh != s {
-			panic(fmt.Sprintf("rules: face scan memo for %q is stale (%b vs %b)", f.Name, s, fresh))
-		}
+		return en.scan&bit != 0
 	}
-	return s&bit != 0
+	en := &faceScanEntry{face: f, scan: computeFaceScan(f)}
+	slot.Store(en)
+	return en.scan&bit != 0
+}
+
+// faceScanMemo memoises computeFaceScan for the faces outside the compiled
+// face table, shared by every engine: the search clones that ask (the
+// ascend/storied/replacement-grant proofs restart per clone) would otherwise
+// each rescan every face they meet. A direct-mapped table of immutable
+// entries: an entry holds its face, so the address cannot be reused while it
+// is cached, and a collision only costs a recomputation.
+var faceScanMemo [4096]atomic.Pointer[faceScanEntry]
+
+type faceScanEntry struct {
+	face *cards.Face
+	scan faceScan
 }
 
 // faceConvergeSVarReader is triggeredConvergeReaderOut's per-face test: some

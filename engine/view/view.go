@@ -302,6 +302,12 @@ type PlayerView struct {
 	// as an object. This mirrors the sibling CmdDamage field, another public
 	// per-player map that is omitted when zero rather than sent as {}.
 	Available map[string]int32 `json:"available,omitempty"`
+	// Mana is Pool and Available as fixed state.Mana arrays (each slot the
+	// map's value for its symbol, 0 when absent), set by the projection
+	// beside them so an in-process reader indexes slots instead of looking
+	// up symbol keys. Never on the wire: a decoded or hand-built PlayerView
+	// has Mana.OK false and its reader reads the maps.
+	Mana PlayerMana `json:"-"`
 	// Command is the command zone (CR 903.6): the player's commanders
 	// currently sitting there, in zone order. A commander leaves it when it
 	// is cast (the object itself moves; its id is stable), so Command is the
@@ -687,6 +693,7 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 				avail = ch.AvailableMana(p.ID)
 			}
 			pv.Available = poolView(prev.Available, avail)
+			pv.Mana.Available = poolSlots(avail)
 		}
 		// ownSeat is "this is the viewer's own seat", widened by CR 723.4's
 		// alsoVisible set and by CR 720.4 to a seat the viewer controls: the
@@ -729,6 +736,7 @@ func projectInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, d *d
 		// only Hand stays gated on "is this the viewer's own seat" (CR 400.2
 		// names hand as a hidden zone).
 		pv.Pool = poolView(prev.Pool, p.Pool)
+		pv.Mana.Pool, pv.Mana.OK = poolSlots(p.Pool), true
 		pv.PoolRestrictions = poolRestrictions(prev.PoolRestrictions, g, p.RestrictedMana, pr.text)
 		switch {
 		case m.omniHands:

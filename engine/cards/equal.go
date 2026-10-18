@@ -19,12 +19,12 @@ import "slices"
 // node fails the build's tests until the function here compares it).
 
 const (
-	saFieldCount       = 13
+	saFieldCount       = 14
 	triggerFieldCount  = 6
 	staticFieldCount   = 5
 	replFieldCount     = 8
 	paramSetFieldCount = 6
-	faceFieldCount     = 47
+	faceFieldCount     = 48
 )
 
 func sliceEq[T comparable](a, b []T) bool {
@@ -104,7 +104,7 @@ func SAEqual(a, b *SA) bool {
 		a.compiledCatalog == b.compiledCatalog && a.compiledID == b.compiledID &&
 		a.api == b.api && a.apiBound == b.apiBound && a.exhaust == b.exhaust && a.exhaustBound == b.exhaustBound &&
 		StringMapEqual(a.Params, b.Params) && paramSetEqual(a.ps, b.ps) && extSlotEqual(a.extSlot, b.extSlot) &&
-		SAEqual(a.Sub, b.Sub)
+		slotEqual(a.costSlot, b.costSlot) && SAEqual(a.Sub, b.Sub)
 }
 
 // TriggerEqual is reflect.DeepEqual(*a, *b) for two triggers.
@@ -176,7 +176,10 @@ func FaceEqual(a, b *Face) bool {
 		a.contStaticsOffBF != b.contStaticsOffBF || a.anyStaticEZ != b.anyStaticEZ ||
 		a.typeWords != b.typeWords || a.typeWordsLen != b.typeWordsLen || a.typeWordsBound != b.typeWordsBound ||
 		a.kwHeads != b.kwHeads || a.kwHeadsLen != b.kwHeadsLen || a.kwHeadsBound != b.kwHeadsBound ||
-		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound {
+		a.cmcSrc != b.cmcSrc || a.cmcBound != b.cmcBound ||
+		a.printed.facts != b.printed.facts || a.printed.typesLen != b.printed.typesLen ||
+		a.printed.costData != b.printed.costData || a.printed.costLen != b.printed.costLen ||
+		a.printed.typesFirst != b.printed.typesFirst || a.printed.line != b.printed.line || a.printed.bound != b.printed.bound {
 		return false
 	}
 	if !sliceEq(a.Types, b.Types) || !sliceEq(a.Keywords, b.Keywords) || !sliceEq(a.Aliases, b.Aliases) ||

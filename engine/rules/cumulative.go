@@ -376,7 +376,7 @@ func (e *Engine) triggerBodyNeedsCostWindow(sa *cards.SA) bool {
 	if sa.API == "Untap" || sa.API == "ImmediateTrigger" {
 		return true
 	}
-	c := e.parseCost(sa.ParamStr(cards.PKCost))
+	c := e.abilityCompiledCost(sa).Cost
 	// The dynamic tapXType heads (engine/rules/mana.go's dynTapCost): the tap
 	// election is the payment, the empty election the decline.
 	if costCarriesDynTap(c) {

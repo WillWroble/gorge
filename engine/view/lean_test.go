@@ -53,7 +53,7 @@ func leanExpect(v view.View, omit view.Omit) view.View {
 			p.Library = nil
 		}
 		if omit&view.OmitAvailable != 0 {
-			p.Available = nil
+			p.Available, p.Mana.Available = nil, state.Mana{}
 		}
 		if omit&(view.OmitArchetype|view.OmitCardLists|view.OmitDerivedChars) != 0 {
 			p.Archetype = nil

@@ -593,6 +593,13 @@ func (e *Engine) costRef(raw string) *Cost {
 	return &e.compiledCostOf(raw).Cost
 }
 
+// abilityCompiledCost is compiledCostOf(sa.ParamStr(cards.PKCost)) through
+// the ability's cost slot (pay.AbilityCompiledCost); the same read-only
+// contract applies.
+func (e *Engine) abilityCompiledCost(sa *cards.SA) *compiledCost {
+	return pay.AbilityCompiledCost(asPayer(e), sa)
+}
+
 // compiledCostOf is costRef with the compiled facts; the same read-only
 // contract applies to the whole result.
 func (e *Engine) compiledCostOf(raw string) *compiledCost {

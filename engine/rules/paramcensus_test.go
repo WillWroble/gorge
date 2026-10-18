@@ -1828,29 +1828,18 @@ var apiSpecificRulesSA = map[string][]string{
 	// are the remaining mana-only rules functions that still read the
 	// activation tier's own keys (Cost$, UnlessCost$, ActivationLimit$,
 	// IsPresent$, ...) on a mana ability, so those reads must not join the
-	// generic union. Each runs on mana abilities (api:Mana) only:
-	// manaAbilityPayablePool's offer/payment path (the pool-parameterized
-	// core manaAbilityPayable delegates to; the potential-action walk calls
-	// it directly with the hypothetical bound), the wheel's cost prefix, the
-	// potential-play planner's relaxed census proof (it returns at once for
-	// any other API), the plain-Mana activation gate (Shrine of the Forsaken
-	// Gods' IsPresent$/PresentCompare$, Urza's Workshop's Activation$
-	// Metalcraft), the triggered-mana recognition, the resolution chain, the
-	// AvailableMana projection, the attack-prop and cast-window payment
-	// windows (availableManaAbilitiesForWindow / castWindowProbeAbilities
-	// only ever yield mana abilities) and the payment-plan source
-	// interference check (reached only from paymentPlanAbilityTier, i.e. for
-	// an AB$ Mana candidate).
-	"Engine.manaAbilityPayablePool":         {"Mana"},
+	// generic union. Each runs on mana abilities (api:Mana) only: the
+	// wheel's cost prefix, the potential-play planner's relaxed census proof
+	// (it returns at once for any other API), the plain-Mana activation gate
+	// (Shrine of the Forsaken Gods' IsPresent$/PresentCompare$, Urza's
+	// Workshop's Activation$ Metalcraft), the triggered-mana recognition and
+	// the resolution chain. An ability's Cost$ is read once, by
+	// pay.AbilityCompiledCost through the ability's cost slot, for every API.
 	"ManaAbilityCostPrefix":                 {"Mana"},
 	"Engine.paymentPlanRelaxedAlternatives": {"Mana"},
 	"ManaActivationGateHolds":               {"Mana"},
 	"Engine.resolveManaAbilityRefOriginal":  {"Mana"},
 	"Engine.resolveManaEffect":              {"Mana"},
-	"Engine.AvailableMana":                  {"Mana"},
-	"Engine.attackChoiceManaSources":        {"Mana"},
-	"Engine.castWindowProbeUnits":           {"Mana"},
-	"Engine.paymentPlanSourceInterference":  {"Mana"},
 	// The Charm mode paths (modeTargetsAvailable, modalTargetSA) read the
 	// MODE bodies' targeting through effects.TargetsOf's compiled
 	// TargetParams, so they carry no read of their own. The Charm's own

@@ -280,9 +280,12 @@ func Search(ctx context.Context, root Root, src WorldSource, net *policynet.Mode
 			}
 		}
 	}
+	rs, cached := src.(*RedealSource)
+	cached = cached && opts.CachedWorlds > 0 && !opts.RootPerWorld
+	cfg.lazyPrior = !eagerPrior && (opts.NodeCache <= 0 || !(cached || isFixed(src)))
 	var tr TreeResult
 	var err error
-	if rs, ok := src.(*RedealSource); ok && opts.CachedWorlds > 0 && !opts.RootPerWorld {
+	if cached {
 		tr, err = runCachedWorlds(ctx, rootPt, rs, cfg, opts, &res.Stats)
 	} else {
 		var envs EnvSource = &worldEnvs{src: src, cfg: cfg}
@@ -311,6 +314,10 @@ func Search(ctx context.Context, root Root, src WorldSource, net *policynet.Mode
 	}
 	return res, nil
 }
+
+// eagerPrior turns walkConfig.lazyPrior off: the test that pins deferred
+// priors to eager ones (TestLazyPriorMatchesEager) runs both.
+var eagerPrior bool
 
 // DecisionSeed is the per-decision seed of spec §2: a mix of the seat's seed
 // (itself derived from the game seed, testkit/bench.RunPairs) and the
