@@ -32,6 +32,7 @@ import "embed"
 //go:embed cache_codec.go
 //go:embed compiled_catalog.go
 //go:embed compiled_codes.go
+//go:embed alone_keyword.go
 //go:embed counter_keyword.go
 //go:embed face.go
 //go:embed hiddenkeyword.go
