@@ -479,7 +479,17 @@ func evalCountBodyPaid(h Host, c *Ctx, g *state.Game, head, arg string, depth in
 		// bodies). Folded from the event log through the Host (rules'
 		// Engine.AttackersThisTurn) so a replay derives the identical number,
 		// the same discipline CastThisTurn takes.
-		return int32(h.AttackersThisTurn()), true, true
+		//
+		// "You attacked this turn" is the CONTROLLER's attack: Forge reads
+		// player.getCreaturesAttackedThisTurn() for the card's controller,
+		// de-duplicated per creature. Only the active player declares
+		// attackers (CR 508.1), so on any other player's turn the count is
+		// zero -- Gutless Plunderer flashed in or reanimated on the
+		// opponent's turn after their attack does not get its Raid dig.
+		if c.Controller != g.Active {
+			return 0, true, true
+		}
+		return int32(len(h.AttackersDeclaredThisTurn())), true, true
 	case evalCountBodyPaidColorsColorIdentity:
 		// Count$ColorsColorIdentity: the number of colours in the resolving
 		// controller's commanders' colour identity (War Room's
