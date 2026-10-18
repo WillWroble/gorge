@@ -39,18 +39,26 @@ import (
 // current, counter-modified value), which every board's JSON and canonical
 // encoding now carries, so every prefix digest moves. Attributed by hiding
 // only that field (json:"-"): the old digests return byte-for-byte.
+//
+// Re-pinned 2026-10-17 for the combat priority fixes (rules e7aaf1530 and
+// 93b6057e4, CR 510.4/117.3a): the fixture game poses more combat priority
+// windows before its root (120 -> 124 frames), so the history and every
+// prefix digest move (a prefix keeps the whole Answers map, so even the
+// one-frame prefix moves with a later answer's index). The view's derived
+// type line (26ea2ed4f) moves none of them: measured with Engine.ViewTypes
+// unwired from the projector, the same digests.
 func TestHistoryDigestMatchesTheJSONBoardEncoding(t *testing.T) {
 	f := benchRoot(t)
 	golden := map[int]string{
-		1:   "5074d37819a5cb8a83a96aa5edcff463a4db54036de9802e82ae134fc2c5224a",
-		2:   "5782b165ba5cc5e68722a37cfa33ac960a9b6428564b4e2409918141b82aaaa4",
-		17:  "355ddaed8cfd831073e1d22407c556dd49277ac80b0d75f13c83d8d083d4e8e3",
-		120: "90d19be27cae25c186c00c8a4eb9565febfe7dc6642ff93a11fa0035f043e3cf",
+		1:   "c696a90caf0d873e90ee60d234e2e42aae02952aa749b92ca50a99f1845e2afd",
+		2:   "225d5a5804371e696915f91c94a1ef42ed0abf6d43f8e8be27d688ee1fc411ff",
+		17:  "f3d4124b0a020a13b2700bdcedcb88078fd1c81d86d1d8945f1a319153905958",
+		124: "9f34d7a599d821a8d4e4a5a12837660a0e20a56f676656ac252eacb5a9cad2cd",
 	}
-	if len(f.h.Frames) != 120 {
-		t.Fatalf("bench fixture has %d frames, the goldens were measured on 120", len(f.h.Frames))
+	if len(f.h.Frames) != 124 {
+		t.Fatalf("bench fixture has %d frames, the goldens were measured on 124", len(f.h.Frames))
 	}
-	for _, n := range []int{1, 2, 17, 120} {
+	for _, n := range []int{1, 2, 17, 124} {
 		h := f.h
 		h.Frames = h.Frames[:n]
 		if chainState(h) == nil {

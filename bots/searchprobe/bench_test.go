@@ -172,14 +172,21 @@ func TestSampleRealDeckGolden(t *testing.T) {
 		// that field (json:"-"): the old digests return byte-for-byte.
 		// Measured after: frames 120, attempts 64, accepted 10, worlds 8,
 		// ESS 10 (land exclusion: accepted 29, ESS 29).
-		{"pre-optimisation sampler", true, "fec727353b53b1e71bb40f6bd5d7da6eec6b5a5c231894e394e98e5640fb651a"},
+		// Re-measured for the combat priority fixes (rules e7aaf1530 and
+		// 93b6057e4, CR 510.4/117.3a): the fixture game poses more combat
+		// priority windows before its root (120 -> 124 frames), so the
+		// captured history that seeds the sampler moves. Not moved by the
+		// view's derived type line (26ea2ed4f; same digests with ViewTypes
+		// unwired). Measured after: frames 124, attempts 64, accepted 7,
+		// worlds 8, ESS 7 (land exclusion: accepted 23, ESS 23).
+		{"pre-optimisation sampler", true, "a5277a0fb9edd0157ac0251462a798bf4ef479eb625b659a273351862842d4b4"},
 		// With the declined-land-drop exclusion: different proposals (so
 		// different worlds for a seed), same target distribution -- see
 		// TestLandExclusionRemovesOnlyRejectedWorlds. Re-measured for the
 		// Mausoleum Wanderer unless-cost ask label (see the test comment) and
 		// again for the damage-provenance fact (see above); see the
 		// pre-optimisation entry for the archetype-posterior re-measure.
-		{"land exclusion", false, "1cda502289afa8cb2b8f799a2605db91939e40d614f911e931427a02d8ad7f81"},
+		{"land exclusion", false, "45b3f6587a3b8e2dde49e030b0c880f599cdea46babae3a3fcac0aa1bf2bee71"},
 	} {
 		opts := benchSampleOptions()
 		opts.MinESS = 1 // resample worlds from the thin pool so the digest covers them
@@ -371,7 +378,14 @@ func TestTeacherChoiceRealDeckGolden(t *testing.T) {
 	// [1,0.5,1,1], Rollouts 32, Submits 6288, Terminal 32, Capped 0,
 	// WinsByCandidate [8,4,8,8], TerminalByCandidate [8,8,8,8],
 	// WinsOverBaseline [0,0,0,0], LossesToBaseline [0,4,0,0].
-	const want = "707beb02b9cf745a476585c3695073d8cd001be15840545b610c1244e728fb08"
+	// Re-measured for the combat priority fixes (rules e7aaf1530 and
+	// 93b6057e4): the sampled worlds moved with the fixture's frames (above),
+	// so the rollouts run on different games. Not moved by the view's
+	// derived type line (26ea2ed4f). Measured after: Index 0, Values
+	// [1,1,1,1], Rollouts 32, Submits 3939, Terminal 32, Capped 0,
+	// WinsByCandidate [8,8,8,8], TerminalByCandidate [8,8,8,8],
+	// WinsOverBaseline [0,0,0,0], LossesToBaseline [0,0,0,0].
+	const want = "763f065013d8c68886fef160462c405ba52efc295373daf3ed46c6b37350f064"
 	for _, parallelism := range []int{0, 4} {
 		res, err := TeacherChoice(worlds, cands, TeacherOptions{Seed: 99, MaxSubmits: 5000, Parallelism: parallelism})
 		if err != nil {
