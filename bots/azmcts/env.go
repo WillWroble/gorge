@@ -934,11 +934,18 @@ func leafMaterial(e *rules.Engine, o *state.Object, actor state.PlayerID) float6
 			return 10
 		}
 	}
-	f := o.Face()
+	// The view projects the derived type line when a layer-4 effect changed
+	// the card types (rules.Engine.ViewTypes: an animated land, Imprisoned
+	// in the Moon, a face-down permanent's CR 708.2a Creature), the printed
+	// one otherwise.
+	types := o.Face().Types
+	if dt, ok := e.ViewTypes(o.ID); ok {
+		types = dt
+	}
 	// strings.Contains over the space-joined type list is a match inside
 	// one type word (neither needle holds a space).
 	land, creature := false, false
-	for _, t := range f.Types {
+	for _, t := range types {
 		land = land || strings.Contains(t, "Land")
 		creature = creature || strings.Contains(t, "Creature")
 	}
