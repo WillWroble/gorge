@@ -61,7 +61,7 @@ const (
 	// The compile is OUTSIDE the measured window: it builds an eager *Card tree
 	// that is dropped before the baseline, so the delta is the imaged registry
 	// alone, exactly what a server that hits a cache holds.
-	ceilingScanBytes   int64 = 1_500_000  // 1.4 MB: /gc/scan/heap:bytes
+	ceilingScanBytes   int64 = 1_380_000  // 1.3 MB (1_338_976 measured, CI 2026-10-17 nightly) + 3%: /gc/scan/heap:bytes
 	ceilingHeapBytes   int64 = 39_200_000 // 35.5 MB measured + ~5% headroom: HeapAlloc
 	ceilingHeapObjects int64 = 18_400     // /gc/heap/objects:objects
 )
