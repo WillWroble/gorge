@@ -728,6 +728,18 @@ func init() {
 	// unrelated Forge AI-hint SVar name (engine/rules/layers.go GrantedSVar, 41
 	// corpus files), so it is deliberately NOT used here.
 	effects.RegisterNonAPI("kw:MustBlock", "kw:CantAttackOrBlock")
+	// kw:CantAttackAlone / kw:CantBlockAlone / kw:CantAttackOrBlockAlone --
+	// CR 506.5's attack-alone / block-alone restriction family (“CARDNAME
+	// can't attack alone.”, “... can't block alone.”, “... can't attack or
+	// block alone.”). Printed K: lines are canonicalised to these heads by
+	// engine/cards/hiddenkeyword.go, and a runtime Animate/Pump `AddHiddenKeyword$
+	// CARDNAME can't attack alone.` grant keeps the sentence form, so
+	// combat.ParseHiddenKeyword reads BOTH spellings (one arm per side). The
+	// restriction is a property of the whole declaration, so it is read by
+	// combat.DeclaresAlone from the attacker/blocker decision validators and
+	// from the shared decision repair (decision.Decision.FitAlone), never by
+	// the per-pair AttackBlocked/BlockRestricted oracles.
+	effects.RegisterNonAPI("kw:CantAttackAlone", "kw:CantBlockAlone", "kw:CantAttackOrBlockAlone")
 }
 
 // manaSlotSymbols indexes the pool slot order (state.MW..state.MC) to its

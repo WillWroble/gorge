@@ -239,6 +239,12 @@ func (e *Engine) askAttackers() {
 		// with Decision.ChargeTapPool. Zero (omitted) unless the engine
 		// published a pool, so an ordinary option is byte-identical.
 		opt.TapPoolCost = tapCosts[of.id]
+		// CR 506.5: a creature that can't attack alone (the compound "can't
+		// attack or block alone" included) is offered, but only beside another
+		// attacker. The fact rides the option so a rules-ignorant client can
+		// build a legal declaration, and decision.Decision.Validate/FitAlone
+		// enforce the same field. combat.DeclaresAlone is the one reader.
+		opt.AloneRestricted = combat.DeclaresAlone(asBoard(e), of.id, true, nil)
 		opts = append(opts, opt)
 	}
 	// A CantChangeLife static (CR 119.7/119.8) makes every positive life
@@ -709,7 +715,51 @@ func (e *Engine) validateAttackers(d *decision.Decision, in decision.Intent) err
 		return fmt.Errorf("declaration's attack cost (%d mana, %d life, %d taps, %d sacrifices, %d returns, %d Phyrexian, unpriceable=%t) is not payable",
 			declaredCharge.mana, declaredCharge.life, len(declaredCharge.taps), len(declaredCharge.sacs), len(declaredCharge.returns), len(declaredCharge.phyrexian), declaredCharge.unpriceable)
 	}
+	// CR 506.5 / 508.1c: a creature restricted from attacking alone may not be
+	// the whole declaration. combat.DeclaresAlone is the one oracle, read over
+	// the chosen set; the same rule is the wire fence (Decision.Validate) and
+	// the repair (decision.Decision.FitAlone), so a caller cannot build an
+	// answer this rejects without the shared repair repairing it.
+	if err := e.validateAloneDeclaration(chosen, true); err != nil {
+		return err
+	}
 	return e.validateAttackDeclarationChosen(d, in, chosen)
+}
+
+// validateAloneDeclaration enforces CR 506.5's attack-alone / block-alone
+// restriction (the printed "CARDNAME can't attack alone.", "CARDNAME can't
+// block alone." and the compound "CARDNAME can't attack or block alone.") on
+// ONE whole declaration. The restriction is a property of the declared SET,
+// never of one creature: a restricted creature beside any partner is legal
+// (CR 508.1c's own example -- two creatures each restricted from attacking
+// alone may both attack). combat.DeclaresAlone is the ONE home of that read,
+// which the ask sites also use to publish Option.AloneRestricted.
+func (e *Engine) validateAloneDeclaration(chosen []decision.Option, attack bool) error {
+	if len(chosen) != 1 {
+		return nil
+	}
+	id := chosen[0].Obj
+	if attack {
+		id = attackedCreature(chosen[0])
+	}
+	if combat.DeclaresAlone(asBoard(e), id, attack, nil) {
+		if attack {
+			return fmt.Errorf("attacker %d can't attack alone", id)
+		}
+		return fmt.Errorf("blocker %d can't block alone", id)
+	}
+	return nil
+}
+
+// attackedCreature is the creature an ATTACKERS option names: an attacker
+// option carries the attacking creature in Obj, while a block option carries
+// the blocker there and the ATTACKER in its Attacker field -- the two shapes
+// this package's declaration helpers share.
+func attackedCreature(o decision.Option) state.ObjID {
+	if o.Kind == "block" {
+		return o.Attacker
+	}
+	return o.Obj
 }
 
 // mustAttackRequired reports whether id is a creature that must attack this
@@ -946,6 +996,11 @@ func (e *Engine) validateBlockers(d *decision.Decision, in decision.Intent) erro
 			return err
 		}
 	}
+	// CR 506.5 / 509.1b: a creature restricted from blocking alone may not be
+	// the whole declaration. Same one oracle as the attacker side.
+	if err := e.validateAloneDeclaration(chosen, false); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1139,7 +1194,11 @@ func (e *Engine) askBlockers() {
 					Label: e.G.Obj(bid).Face().Name + " blocks " + e.G.Obj(aid).Face().Name,
 					Obj:   bid, Attacker: aid, Player: defender,
 					Group: "blocker:" + strconv.FormatUint(uint64(bid), 10), Required: mustBlockPair, BlockMust: mustBlockPair, BlockMustAll: mustBlockAllPair,
-					AttackMust: mustBeBlocked[aid]}
+					AttackMust: mustBeBlocked[aid],
+					// CR 506.5: this blocker can't be declared ALONE. One
+					// fact per blocker on each of its pairs; the declaration
+					// rule counts it per declaration, not per pair.
+					AloneRestricted: e.blockerAloneRestricted(bid)}
 				if b, ok := scope.bounds[aid]; ok {
 					opt.MinBlockers, opt.MaxBlockers = b[0], b[1]
 				}
@@ -1253,6 +1312,15 @@ func (e *Engine) askBlockers() {
 	if !e.declarationMadeThisStep(events.DeclareBlockers) {
 		e.emit(events.Event{Kind: events.DeclareBlockers})
 	}
+}
+
+// blockerAloneRestricted reports whether blocker carries CR 506.5's
+// can't-block-alone restriction ("CARDNAME can't block alone.", and the
+// compound "can't attack or block alone." that also forbids the lone block).
+// The board read is combat.DeclaresAlone's, so the offered option fact and the
+// engine's own declaration check share ONE oracle.
+func (e *Engine) blockerAloneRestricted(blocker state.ObjID) bool {
+	return combat.DeclaresAlone(asBoard(e), blocker, false, nil)
 }
 
 // blockAttackers lists the creatures currently declared attacking defender

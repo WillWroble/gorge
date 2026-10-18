@@ -25,6 +25,13 @@ func TestCanonicalKeywordLineRewritesOnlyKnownSentences(t *testing.T) {
 		{"cardname MUST be blocked if able.", "MustBlock"},
 		// Already canonical -> unchanged (idempotent).
 		{"MustBlock", "MustBlock"},
+		// CR 506.5's alone family: the compound sentence and its two
+		// siblings each canonicalise to their own head (the compound is not
+		// CantAttackOrBlock -- it forbids a LONE declaration, not any).
+		{"CARDNAME can't attack or block alone.", "CantAttackOrBlockAlone"},
+		{"CARDNAME can't attack alone.", "CantAttackAlone"},
+		{"CARDNAME can't block alone.", "CantBlockAlone"},
+		{"cardname can't BLOCK alone.", "CantBlockAlone"},
 		// An unknown sentence that merely looks similar must NOT be rewritten:
 		// "must be blocked by two or more creatures" is the Menace-adjacent
 		// MinMaxBlocker requirement, a different rule the build does not model
@@ -50,7 +57,7 @@ func TestCanonicalKeywordLinePreservesUnknownSentencePrimitive(t *testing.T) {
 	t.Parallel()
 	c, diags := ParseBytes("unknown-sentence.txt", []byte(
 		"Name:Unknown Sentence Fixture\nManaCost:1\nTypes:Creature Bear\nPT:2/2\n"+
-			"K:CARDNAME can't attack alone.\nOracle:x\n"))
+			"K:CARDNAME can be your commander.\nOracle:x\n"))
 	if len(diags) != 0 {
 		t.Fatalf("parse diagnostics: %v", diags)
 	}
@@ -58,7 +65,7 @@ func TestCanonicalKeywordLinePreservesUnknownSentencePrimitive(t *testing.T) {
 	prims := c.Primitives()
 	found := false
 	for _, p := range prims {
-		if p == "kw:CARDNAME can't attack alone." {
+		if p == "kw:CARDNAME can be your commander." {
 			found = true
 		}
 	}
@@ -187,16 +194,24 @@ func TestCardNameSentenceKeywordClass(t *testing.T) {
 			}
 		}
 	}
-	// The must-be-blocked sentence must NOT survive as a sentence head: it is
-	// the one the table translates, and its carriers moved to kw:MustBlock
-	// (asserted above).
+	// The must-be-blocked sentence and CR 506.5's alone family must NOT
+	// survive as sentence heads: each is translated to its canonical head
+	// (asserted above), so its carriers moved off the sentence spelling.
 	if n := heads["CARDNAME must be blocked if able."]; n != 0 {
 		t.Fatalf("%d face(s) still carry the untranslated must-be-blocked sentence head", n)
 	}
-	// The siblings stay untranslated (their behaviour is not modelled under
-	// any canonical head), so the class is still visible to coverage.
-	if heads["CARDNAME can't attack or block alone."] == 0 ||
-		heads["CARDNAME can be your commander."] == 0 {
+	for _, h := range []string{
+		"CARDNAME can't attack or block alone.",
+		"CARDNAME can't attack alone.",
+		"CARDNAME can't block alone.",
+	} {
+		if n := heads[h]; n != 0 {
+			t.Fatalf("%d face(s) still carry the untranslated %q sentence head", n, h)
+		}
+	}
+	// A sibling sentence whose behaviour is not modelled under any canonical
+	// head stays untranslated, so the class is still visible to coverage.
+	if heads["CARDNAME can be your commander."] == 0 {
 		t.Fatalf("sibling sentence heads vanished: %v", heads)
 	}
 	var names []string
