@@ -83,11 +83,11 @@ func (md *ManaCostActivation) SubCounterKindUsed(partIdx int, obj state.ObjID, k
 }
 
 // SubCounterPay is one counter removed to pay a SubCounter cost part: the
-// part it belongs to, the object the counter comes off, and (for a wildcard
-// "Any" part) the chosen counter kind. A fixed-kind filtered part records a
-// single entry with an empty Kind and settles the part's whole amount from
-// part.Spec; a wildcard part records one entry per unit, each settling one
-// counter of its chosen kind.
+// part it belongs to, the object the counter comes off, and the counter kind.
+// A filtered part (wildcard "Any" or fixed-kind "from among",
+// SubCounterAmongKind) records one entry per unit, each settling one counter
+// of its kind; a legacy entry with an empty Kind settles the part's whole
+// amount from part.Spec.
 type SubCounterPay struct {
 	Part int
 	Obj  state.ObjID

@@ -290,11 +290,23 @@ func RecordCastPaymentAnswer(cp *CastPayment, in CastPayAnswer, kind string, cho
 		// wildcard "Any" part records one counter unit per answer (the ask
 		// loop keeps asking until the part is fully paid), a fixed-kind part
 		// records its one object and advances.
-		wildcard := cp.SubCounterPart < len(cost.SubCounter) && strings.EqualFold(cost.SubCounter[cp.SubCounterPart].Spec, "Any")
-		for _, o := range chosen {
-			cp.SubCounterPays = append(cp.SubCounterPays, SubCounterPay{Part: cp.SubCounterPart, Obj: o.Obj, Kind: o.Counter})
+		// A fixed-kind among part (SubCounterAmongKind) is unit-at-a-time
+		// too: each answer is one counter of the part's kind, and the ask
+		// loop advances the part once its amount is picked.
+		wildcard, among := false, false
+		if cp.SubCounterPart < len(cost.SubCounter) {
+			part := cost.SubCounter[cp.SubCounterPart]
+			wildcard = strings.EqualFold(part.Spec, "Any")
+			among = SubCounterAmongKind(part)
 		}
-		if !wildcard {
+		for _, o := range chosen {
+			kind := o.Counter
+			if among {
+				kind = cost.SubCounter[cp.SubCounterPart].Spec
+			}
+			cp.SubCounterPays = append(cp.SubCounterPays, SubCounterPay{Part: cp.SubCounterPart, Obj: o.Obj, Kind: kind})
+		}
+		if !wildcard && !among {
 			cp.SubCounterPart++
 		}
 	case castPayDiscard:

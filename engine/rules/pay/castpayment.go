@@ -44,10 +44,11 @@ type CastPayment struct {
 
 	// SubCounterPays records the counter-removal picks of every SubCounter
 	// part, each entry tagged with the part index it belongs to. A
-	// fixed-kind filtered part (SubCounter<N/Kind/Target>) records ONE entry
-	// carrying the object it removes from, with an empty Kind; a wildcard
-	// "Any" part records ONE entry per counter unit removed, each carrying
-	// the object AND the chosen counter kind. Grouping by explicit part index
+	// filtered part records ONE entry per counter unit removed, each carrying
+	// the object AND the counter kind (the chosen one for a wildcard "Any"
+	// part, the part's own for a fixed-kind "from among" part,
+	// SubCounterAmongKind); a legacy entry with an empty Kind settles the
+	// part's whole amount from its object. Grouping by explicit part index
 	// (rather than a positional append) is what keeps a cost mixing a
 	// fixed-kind part before a wildcard part from mis-indexing the selected
 	// kind. SubCounterPart walks the parts in cost order like SacPart.
