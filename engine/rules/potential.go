@@ -241,18 +241,21 @@ func potentialRestrictionAdmits(e *Engine, p state.PlayerID, id state.ObjID, ma 
 // indeterminate amount, or a source with no chosen colour.
 func addPotentialChosenColour(e *Engine, m *state.Mana, id state.ObjID, ma *cards.SA) bool {
 	mp := effects.ManaOf(ma)
-	if raw := strings.TrimSpace(mp.Produced); raw != "Chosen" && raw != "ChosenColor" {
+	if mp.Produced != "Chosen" && mp.Produced != "ChosenColor" { // Produced is already trimmed
 		return false
 	}
 	o := e.G.Obj(id)
-	if o == nil || len(o.ChosenColor) != 1 || !strings.ContainsRune("WUBRG", rune(o.ChosenColor[0])) {
+	if o == nil || len(o.ChosenColor) != 1 {
+		return false
+	}
+	i := state.ManaIndex(o.ChosenColor[0])
+	if i == state.MC { // not a WUBRG letter
 		return false
 	}
 	amt, indeterminate := potentialAmount(mp)
 	if indeterminate {
 		return false
 	}
-	i := state.ManaIndex(o.ChosenColor[0])
 	m[i] = saturatingPotentialMana(m[i], amt)
 	return true
 }
