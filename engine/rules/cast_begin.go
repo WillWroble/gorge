@@ -571,10 +571,9 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 	// The either-or additional cost (AlternateAdditionalCost) is a CHOICE,
 	// not a fixed component, so the parts are only captured here and the ask
 	// (altAddAsk) folds the chosen part into cost before any other cost stage
-	// runs. Only a plain cast carries them: a kicked/surged/etc. cast of the
-	// same card pays that mode's cost without recomposing this choice (no
-	// corpus card pairs both shapes). The OFFER gate already proved at least
-	// one part is payable (legal.go); the ask narrows it to exactly one.
+	// runs (castPaysAltAdd names the modes that carry it). The plain and
+	// may-play OFFER gates prove at least one part is payable; for the other
+	// modes the ask aborts the cast when none is (CR 733.1).
 	tax := int32(0)
 	if opt.Mode != "foretell" {
 		tax = e.commanderTaxAmount(p, id)
@@ -609,18 +608,17 @@ func (e *Engine) beginCastWith(p state.PlayerID, opt decision.Option, selection 
 	}
 	// An either-or additional cost (AlternateAdditionalCost, CR 601.2b/f)
 	// applies however the spell is cast: a may-play permission (Tinybones'
-	// stash casting an opponent's Eaten Alive) and a may-play alternative
-	// cost replace the mana cost only (CR 118.9), so the cast still asks for
-	// the sacrifice or the {3}{B}.
-	if (opt.AltCostIndex == 0 && opt.Mode == "") || opt.Mode == "mayplay" {
-		pcAlt := altAddCostParts(f)
-		e.cast = e.newCast(p, id, from, opt.Mode, -1)
-		e.cast.cost, e.cast.faceBefore, e.cast.mods, e.cast.taxGeneric, e.cast.altAddParts, e.cast.optionalCost =
-			cost, faceBefore, mods, tax, pcAlt, optionalCost
-	} else {
-		e.cast = e.newCast(p, id, from, opt.Mode, -1)
-		e.cast.cost, e.cast.faceBefore, e.cast.mods, e.cast.taxGeneric, e.cast.optionalCost =
-			cost, faceBefore, mods, tax, optionalCost
+	// stash casting an opponent's Eaten Alive), flashback (CR 702.34a), an
+	// alternative cost or a free cast replace the mana cost only (CR 118.9,
+	// 118.9d), so the cast still asks for the sacrifice or the {3}{B}. Only
+	// the special actions that run through this flow without casting the
+	// spell (suspend, plot, foretell) and a face-down cast (CR 708.4: the
+	// face-down spell has no costs of its own) skip it.
+	e.cast = e.newCast(p, id, from, opt.Mode, -1)
+	e.cast.cost, e.cast.faceBefore, e.cast.mods, e.cast.taxGeneric, e.cast.optionalCost =
+		cost, faceBefore, mods, tax, optionalCost
+	if castPaysAltAdd(opt.Mode) {
+		e.cast.altAddParts = altAddCostParts(f)
 	}
 	// Emerge (CR 702.118a): sacAsk folds the chosen sacrifice's mana value out
 	// of pc.cost once the mandatory creature sacrifice is settled. The mark is
@@ -906,6 +904,10 @@ func (e *Engine) beginPlay(p state.PlayerID, id state.ObjID, withoutManaCost boo
 	}
 	e.cast = e.newCast(p, id, o.Zone, "play", -1)
 	e.cast.cost, e.cast.mods, e.cast.replaceGraveyard = cost, mods, replaceGraveyard
+	// The either-or additional cost rides a Play cast too, free or not (CR
+	// 118.9d: Etali, Primal Storm casting Eaten Alive still sacrifices a
+	// creature or pays {3}{B}).
+	e.cast.altAddParts = altAddCostParts(o.Face())
 	e.continueCast()
 }
 
@@ -1297,3 +1299,17 @@ var castKickerModeCodes = state.NewStrCodes(
 	state.StrEntry[castKickerModeCode]{Key: "kicked1", Val: castKickerModeKicked1},
 	state.StrEntry[castKickerModeCode]{Key: "kicked2", Val: castKickerModeKicked2},
 )
+
+// castPaysAltAdd reports whether a cast flow begun in mode pays the card's
+// either-or additional cost (AlternateAdditionalCost). Every way of casting
+// the spell does (CR 601.2b, 601.2f, 118.9d). The exceptions are the special
+// actions that share the cast flow without casting (CR 116.2: suspend's
+// exile, plot, foretell's {2} exile) and a face-down cast, whose spell is a
+// characteristic-less 2/2 (CR 708.4).
+func castPaysAltAdd(mode string) bool {
+	switch mode {
+	case "suspend", "plot", "foretell", "morphed", "megamorphed", "disguised", "land", "modal_land":
+		return false
+	}
+	return true
+}
