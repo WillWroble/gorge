@@ -28,12 +28,15 @@ func TestRandomIntentScratchKeepsTheStream(t *testing.T) {
 	// census default flip (2026-10-13; was 1600/38249, 1621/38800, 1648/40117):
 	// the census offers more options, so the random games move. Forcing
 	// engine/rules/genesis.go's paidManaCensus to false restores the old totals.
+	// Re-pinned for the combat priority fixes (rules e7aaf1530 and 93b6057e4,
+	// CR 510.4/117.3a; was 1616/38711, 1651/39748, 1620/39304): more priority
+	// windows in combat draw more random answers, so the games move.
 	want := []struct {
 		games, turns, decisions, rejected int
 	}{
-		{40, 1616, 38711, 0},
-		{40, 1651, 39748, 0},
-		{40, 1620, 39304, 0},
+		{40, 1644, 41005, 0},
+		{40, 1669, 41915, 0},
+		{40, 1700, 43169, 0},
 	}
 	for i, w := range want {
 		cfg := rules.Config{
