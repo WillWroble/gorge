@@ -21,6 +21,16 @@ type Target struct {
 	IsPlayer bool
 }
 
+// TargetStamp records which incarnation of an object a stack object
+// targeted (CR 400.7): Obj's Incarnation at the moment the target was
+// chosen. It is kept beside Targets rather than inside Target so the
+// target value itself (compared and used as a map key across the effects
+// tier) is unchanged.
+type TargetStamp struct {
+	Obj         ObjID
+	Incarnation uint32
+}
+
 // GoadEffect is one independently-lived CR 701.38 goad relationship.
 // Source and Duration preserve the condition Forge attached to the effect;
 // Controller is the target creature's controller when an AsLongAsControl
@@ -968,6 +978,14 @@ type Object struct {
 	// "what does this object target" readers (the view, the crime check)
 	// need.
 	SubTargets []Target
+	// TargetStamps holds, for every object target folded into Targets or
+	// SubTargets (events.foldTargetsChosen, a StackCopy's inherited or
+	// named targets), the target's Incarnation when it was chosen. The CR
+	// 608.2b resolution recheck drops a target whose Incarnation has moved
+	// since: an object that left the battlefield and came back (or entered
+	// it) is a new object (CR 400.7) even though its ObjID is the same.
+	// Cleared with Targets on a zone change.
+	TargetStamps []TargetStamp
 	// Remembered carries a triggered ability's Ctx.Remembered from the
 	// moment it was queued (rules.checkTriggers) through to resolution. An
 	// ability object has no Face (Ruling F3) and therefore no card-script
@@ -1685,7 +1703,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [18]byte
+	_ [58]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
@@ -2193,6 +2211,7 @@ type cloneArena struct {
 	ids []ObjID
 	tgs []Target
 	ctr []Counter
+	stm []TargetStamp
 }
 
 // carveClone is append([]T(nil), src...) carved from *buf when it has room:
@@ -2214,11 +2233,12 @@ func carveClone[T any](buf *[]T, src []T) []T {
 }
 
 // cloneArenaNeed adds the element counts o's carved slices need to a.
-func (o *Object) cloneArenaNeed(ids, tgs, ctr *int) {
+func (o *Object) cloneArenaNeed(ids, tgs, ctr, stm *int) {
 	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.BlockedThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
 		len(o.DamageTakenThisTurnBy) + len(o.ImprintTokens) + len(o.EncodedCards) + len(o.SeekFound) + len(o.ExiledCards)
 	*tgs += len(o.Targets) + len(o.SubTargets) + len(o.Remembered) + len(o.Chosen)
 	*ctr += len(o.Counters)
+	*stm += len(o.TargetStamps)
 }
 
 // cloneDeepIntoArena is CloneDeepInto carving the common slice copies from a
@@ -2232,6 +2252,7 @@ func (o *Object) cloneDeepIntoArena(c *Object, a *cloneArena) {
 	c.Counters = carveClone(&a.ctr, o.Counters)
 	c.Targets = carveClone(&a.tgs, o.Targets)
 	c.SubTargets = carveClone(&a.tgs, o.SubTargets)
+	c.TargetStamps = carveClone(&a.stm, o.TargetStamps)
 	c.Remembered = carveClone(&a.tgs, o.Remembered)
 	c.BlockedBy = carveClone(&a.ids, o.BlockedBy)
 	c.BlockedByThisTurn = carveClone(&a.ids, o.BlockedByThisTurn)

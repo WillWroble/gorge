@@ -141,6 +141,10 @@ func foldStackCopy(g *state.Game, e *Event) {
 	// able to change independently of the original's once both sit on
 	// the stack.
 	targets := append([]state.Target(nil), src.Targets...)
+	// The copy targets the same incarnations its original did (CR 707.10:
+	// a copy copies the original's targets; a target that has since become
+	// a new object, CR 400.7, is illegal for the copy too).
+	stamps := append([]state.TargetStamp(nil), src.TargetStamps...)
 	remembered := append([]state.Target(nil), src.Remembered...)
 	// Mode announcements are copiable characteristics (CR 707.10): a
 	// modal copy must resolve the same chosen modes, not ask for new ones.
@@ -152,9 +156,11 @@ func foldStackCopy(g *state.Game, e *Event) {
 	// every other stack object's targets.
 	if len(e.IDs) > 0 {
 		targets = targets[:0]
+		stamps = stamps[:0]
 		for _, id := range e.IDs {
-			if g.Obj(id) != nil {
+			if t := g.Obj(id); t != nil {
 				targets = append(targets, state.Target{Obj: id})
+				stamps = append(stamps, state.TargetStamp{Obj: id, Incarnation: t.Incarnation})
 			}
 		}
 	}
@@ -167,6 +173,9 @@ func foldStackCopy(g *state.Game, e *Event) {
 	o.StackKind, o.StackKindKnown = stackKind, stackKindKnown
 	o.GainedFace, o.GainedFrom = gainedFace, gainedFrom
 	o.Targets = targets
+	if len(stamps) > 0 {
+		o.TargetStamps = stamps
+	}
 	o.Remembered = remembered
 	o.ChosenModes = chosenModes
 	o.X, o.CastFlags, o.IsCopy = x, castFlags, true

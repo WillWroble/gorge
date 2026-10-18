@@ -881,9 +881,9 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 	}
 	// The objects' common slice copies come from one backing array per
 	// element type (cloneArena), and the zone lists from one more below.
-	var nIDs, nTgs, nCtr int
+	var nIDs, nTgs, nCtr, nStm int
 	for i := range g.Objs {
-		g.Objs[i].cloneArenaNeed(&nIDs, &nTgs, &nCtr)
+		g.Objs[i].cloneArenaNeed(&nIDs, &nTgs, &nCtr, &nStm)
 	}
 	var arena cloneArena
 	if nIDs > 0 {
@@ -894,6 +894,9 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 	}
 	if nCtr > 0 {
 		arena.ctr = make([]Counter, nCtr)
+	}
+	if nStm > 0 {
+		arena.stm = make([]TargetStamp, nStm)
 	}
 	for i := range g.Objs {
 		g.Objs[i].cloneDeepIntoArena(&c.Objs[i], &arena)

@@ -235,6 +235,7 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 			case 2:
 				for _, id := range e.IDs {
 					o.SubTargets = append(o.SubTargets, state.Target{Obj: id})
+					stampTarget(g, o, id)
 				}
 			case 3:
 				if validPlayer(g, e.Player) {
@@ -251,6 +252,7 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 		case 2:
 			for _, id := range e.IDs {
 				o.Targets = append(o.Targets, state.Target{Obj: id})
+				stampTarget(g, o, id)
 			}
 		case 3:
 			if validPlayer(g, e.Player) {
@@ -260,9 +262,20 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 			var targets []state.Target
 			for _, id := range e.IDs {
 				targets = append(targets, state.Target{Obj: id})
+				stampTarget(g, o, id)
 			}
 			o.Targets = targets
 		}
+	}
+}
+
+// stampTarget records which incarnation of id the stack object o targets
+// (state.Object.TargetStamps, CR 400.7). A later stamp for the same id
+// supersedes an earlier one (a replaced target list re-stamps it), so the
+// reader takes the last; a missing object records nothing.
+func stampTarget(g *state.Game, o *state.Object, id state.ObjID) {
+	if t := g.Obj(id); t != nil {
+		o.TargetStamps = append(o.TargetStamps, state.TargetStamp{Obj: id, Incarnation: t.Incarnation})
 	}
 }
 

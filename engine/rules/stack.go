@@ -974,6 +974,14 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 		// response) is dropped here, and a target with no other legal target
 		// left fizzles the whole spell/ability through the existing fizzle
 		// machinery upstream of this recheck.
+		// CR 400.7 / 608.2b: an object that left the battlefield (or entered
+		// it) since it was targeted is a new object, even though it kept its
+		// ObjID -- Infernal Vessel or Reassembling Skeleton dying and
+		// returning before the haste grant aimed at it resolves. The stamp
+		// is the target's Incarnation when it was chosen.
+		if e.targetBecameNewObject(self, t.Obj) {
+			continue
+		}
 		if o := e.G.Obj(t.Obj); o != nil && zoneIn(o.Zone, zones) {
 			// The offer post-filter's own predicate, the SAME definition: a
 			// target that was offered under NonTriggeredCardController cannot
@@ -1065,6 +1073,28 @@ func targetSpecForZone(spec string, z state.Zone) string {
 }
 
 // zoneIn reports whether z is one of the zones in the set.
+// targetBecameNewObject reports that the stack object self stamped id as a
+// target (state.Object.TargetStamps) and id's Incarnation has advanced
+// since: it crossed the battlefield boundary and is a new object (CR
+// 400.7). An unstamped target (a rules-side record that never went through
+// a TargetsChosen fold) is not judged here.
+func (e *Engine) targetBecameNewObject(self, id state.ObjID) bool {
+	so := e.G.Obj(self)
+	if so == nil || len(so.TargetStamps) == 0 {
+		return false
+	}
+	t := e.G.Obj(id)
+	if t == nil {
+		return false
+	}
+	for i := len(so.TargetStamps) - 1; i >= 0; i-- {
+		if so.TargetStamps[i].Obj == id {
+			return so.TargetStamps[i].Incarnation != t.Incarnation
+		}
+	}
+	return false
+}
+
 func zoneIn(z state.Zone, zones []state.Zone) bool {
 	for _, candidate := range zones {
 		if candidate == z {
