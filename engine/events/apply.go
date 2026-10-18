@@ -142,6 +142,34 @@ func Apply(g *state.Game, e Event) { ApplyPtr(g, &e) }
 
 // ApplyPtr is Apply on a pointer: the fold reads *e and never writes it.
 func ApplyPtr(g *state.Game, e *Event) {
+	n := len(g.Stack)
+	applyKind(g, e)
+	if len(g.Stack) > n {
+		stampPushedAbilitySources(g, n)
+	}
+}
+
+// stampPushedAbilitySources records, on every ability object an event just
+// put on the stack (from index n up), whether its source was on the
+// battlefield at that moment and which battlefield incarnation it was. An
+// ability whose effect names its source ("put a +1/+1 counter on this
+// creature") acts on that permanent only: once it leaves (CR 400.7) the
+// card in its new zone is a new object the effect does not see.
+func stampPushedAbilitySources(g *state.Game, n int) {
+	for _, id := range g.Stack[n:] {
+		o := g.Obj(id)
+		if o == nil || o.Ability == nil || o.Source == 0 || o.PushSourceStamped {
+			continue
+		}
+		o.PushSourceStamped = true
+		if src := g.Obj(o.Source); src != nil && src.Zone == state.ZBattlefield {
+			o.PushSourceOnBattlefield = true
+			o.PushSourceIncarnation = src.Incarnation
+		}
+	}
+}
+
+func applyKind(g *state.Game, e *Event) {
 	switch e.Kind {
 	// RollDice is the proposal-only roll-action Kind (task rolldice-repl): it
 	// is held out to replacement matching, never emitted, so it folds nothing

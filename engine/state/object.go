@@ -933,6 +933,15 @@ type Object struct {
 	Ability           *cards.SA
 	Source            ObjID
 	SourceIncarnation uint32
+	// PushSourceStamped, PushSourceOnBattlefield and PushSourceIncarnation
+	// are folded by events.Apply when an ability object is put on the stack:
+	// whether its Source was on the battlefield then, and as which
+	// incarnation. Unlike SourceIncarnation they never drop the ability; an
+	// effect that acts on "this permanent" reads them to skip a source that
+	// has since become a new object (CR 400.7).
+	PushSourceStamped       bool
+	PushSourceOnBattlefield bool
+	PushSourceIncarnation   uint32
 	// GrantedBy is the GRANTOR of a cross-object granted activated ability
 	// (events.GrantAbilityPush's IDs[0], CR 613.1f): the Equipment or Aura
 	// whose static gives the recipient (Source) the ability. Forge's

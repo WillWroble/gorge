@@ -295,6 +295,9 @@ func effPutCounter(h Host, c *Ctx, sa *cards.SA) {
 		if o == nil {
 			continue
 		}
+		if putCounterReferentLeft(h.Game(), c, sa, o) {
+			continue
+		}
 		// Adapt$'s put is itself conditional (CR 702.35a: "If this creature has
 		// no +1/+1 counters on it, put N +1/+1 counters on it"). For an AB$
 		// activation the offer-time gate (engine/rules/legal.go's adaptGateOK) already
@@ -1266,3 +1269,33 @@ var putCounterChooserForCodes = state.NewStrCodes(
 	state.StrEntry[putCounterChooserForCode]{Key: "TargetedPlayer", Val: putCounterChooserForThisTargetedPlayer},
 	state.StrEntry[putCounterChooserForCode]{Key: "Targeted", Val: putCounterChooserForThisTargetedPlayer},
 )
+
+// putCounterReferentLeft reports whether o is a permanent the resolving
+// ability named that has since left the battlefield, so it is a new object
+// the counters cannot reach (CR 400.7; Forge's CountersPutEffect skips a card
+// whose game timestamp changed). The zone-agnostic loop above stays right
+// for a referent that never was that permanent (a suspended card's time
+// counters, CR 122.1); only two referents are known to name a battlefield
+// permanent:
+//   - the source itself ("put a +1/+1 counter on this creature": Hungry
+//     Ghoul's activation, Erudite Wizard's draw trigger), when the ability
+//     went on the stack while its source was on the battlefield
+//     (events.Apply's push stamp) and the source is now off the battlefield
+//     or a later incarnation;
+//   - a Triggered*LKICopy referent (Quilled Greatwurm's "put that many
+//     +1/+1 counters on it -- it must survive"), whose trigger-time object
+//     is the last-known battlefield permanent, when it is no longer on the
+//     battlefield.
+func putCounterReferentLeft(g *state.Game, c *Ctx, sa *cards.SA, o *state.Object) bool {
+	if o.ID == c.Source && c.ResolvingObj != 0 {
+		if ro := g.Obj(c.ResolvingObj); ro != nil && ro.PushSourceOnBattlefield && ro.Source == o.ID &&
+			(o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation) {
+			return true
+		}
+	}
+	if o.Zone == state.ZBattlefield || sa == nil {
+		return false
+	}
+	d := sa.ParamStr(cards.PKDefined)
+	return strings.HasPrefix(d, "Triggered") && strings.HasSuffix(d, "LKICopy")
+}
