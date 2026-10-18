@@ -1033,6 +1033,28 @@ func (r *oracleRun) submit(d *decision.Decision, choices []int, why string) erro
 	return nil
 }
 
+// submitDeclaration submits a scripted attack or block declaration. A
+// non-empty declaration the engine refuses as a whole (CR 506.5's "can't
+// block alone", a CR 509.1c requirement) is an illegal action: it is reversed
+// (CR 733.1) to the empty declaration (CR 508.1a / 509.1a: declaring no
+// creatures is always a declaration) and the scenario continues, as XMage's
+// test harness drops an illegal attacker or blocker and plays on. The refused
+// declaration's decision record is dropped with it; a refusal of the empty
+// declaration too is still a harness failure.
+func (r *oracleRun) submitDeclaration(d *decision.Decision, choices []int, why string) error {
+	recorded := len(r.decisions)
+	err := r.submit(d, choices, why)
+	if err == nil || len(choices) == 0 {
+		return err
+	}
+	if p := r.e.Pending(); p == nil || p.Seq != d.Seq {
+		return err
+	}
+	r.decisions = r.decisions[:recorded]
+	r.logf("  [%s] refused, reversed to the empty declaration (CR 733.1): %v", why, err)
+	return r.submit(d, nil, why)
+}
+
 // arrangeSharedKind is the option Kind every option of a KArrange shares (its
 // destination, ruling J5), or "" for an empty or disagreeing option list.
 func arrangeSharedKind(d *decision.Decision) string {
@@ -2034,7 +2056,7 @@ func (r *oracleRun) do(st oracleStep) error {
 					used[idx] = true
 					choices = append(choices, idx)
 				}
-				if err := r.submit(d, choices, "attack"); err != nil {
+				if err := r.submitDeclaration(d, choices, "attack"); err != nil {
 					return err
 				}
 				return r.untilPriority("attack")
@@ -2074,7 +2096,7 @@ func (r *oracleRun) do(st oracleStep) error {
 			used[idx] = true
 			choices = append(choices, idx)
 		}
-		if err := r.submit(d, choices, "block"); err != nil {
+		if err := r.submitDeclaration(d, choices, "block"); err != nil {
 			return err
 		}
 		return r.untilPriority("block")
