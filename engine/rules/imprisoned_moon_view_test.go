@@ -51,6 +51,18 @@ func TestImprisonedInTheMoonViewDropsCreature(t *testing.T) {
 		if cv.Types != "Land" {
 			t.Errorf("seat %d view: Types %q, want %q", seat, cv.Types, "Land")
 		}
+		// The compiled facts the policy encoder reads instead of the text
+		// (view.CardFacts) must describe the projected line, not the
+		// printed one.
+		if cv.Facts.OK {
+			if fold, exact := cards.TypeLineMasks(cv.Types); cv.Facts.TypeFold != fold || cv.Facts.TypeExact != exact {
+				t.Errorf("seat %d view: Facts type masks %v/%v, want TypeLineMasks(%q) = %v/%v",
+					seat, cv.Facts.TypeFold, cv.Facts.TypeExact, cv.Types, fold, exact)
+			}
+			if cv.Facts.TypeFold&cards.TypeCreature != 0 {
+				t.Errorf("seat %d view: Facts still say Creature", seat)
+			}
+		}
 		if len(cv.Keywords) != 0 {
 			t.Errorf("seat %d view: keywords %v, want none (loses all other abilities)", seat, cv.Keywords)
 		}
