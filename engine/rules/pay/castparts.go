@@ -414,15 +414,19 @@ func NonManaCastableP(e Engine, p state.PlayerID, id state.ObjID, cost *costvoca
 			// you control"), reserved against the earlier parts the same way.
 			// A source-anchored part keeps the pre-existing source read.
 			if !costvocab.SubCounterTargetsSource(part.Target) {
-				cands := SubCounterRemovalCandidates(e, p, id, part, part.N, reserved)
-				if len(cands) == 0 {
+				// A wildcard part sums its counters across candidates
+				// (SubCounterPartPayers, CR 118.3).
+				payers, ok := SubCounterPartPayers(e, p, id, part, reserved)
+				if !ok {
 					return false
 				}
 				// Deterministically mirror the ask stage's reservation: the
-				// first candidate (candidates are in zone order) pays this
+				// first candidates (candidates are in zone order) pay this
 				// part when the later parts of the same cost count the same
 				// pool. A board change before the ask aborts there.
-				reserved[cands[0]] = true
+				for _, oid := range payers {
+					reserved[oid] = true
+				}
 				continue
 			}
 			if SubCounterAvailable(o, part.Spec) < part.N {

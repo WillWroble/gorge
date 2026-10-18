@@ -225,7 +225,7 @@ func ManaCostPayableFull(e Engine, p state.PlayerID, o *state.Object, source sta
 			}
 			continue
 		}
-		if len(SubCounterRemovalCandidates(e, p, source, part, part.N, nil)) == 0 {
+		if _, ok := SubCounterPartPayers(e, p, source, part, nil); !ok {
 			return false
 		}
 	}
