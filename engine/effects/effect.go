@@ -406,7 +406,13 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				expiry += "|IH"
 			}
 		}
-		if dur == "permanent" && !permanentComeback &&
+		// An emblem (CR 114.4: its abilities function in the command zone,
+		// and nothing ties it to the object that created it) is never
+		// source-bounded, even when the planeswalker that made it was on
+		// the battlefield: Kaito, Cunning Infiltrator's [-9] emblem keeps
+		// making Ninjas after Kaito dies to its own loyalty cost. Every
+		// corpus emblem spells its Effect `Name$ Emblem — <name>`.
+		if dur == "permanent" && !permanentComeback && !isEmblemEffectName(effectName) &&
 			h.Game().Obj(c.Source) != nil && h.Game().Obj(c.Source).Zone == state.ZBattlefield {
 			expiry += "|SB"
 		}

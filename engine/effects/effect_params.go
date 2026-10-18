@@ -220,3 +220,10 @@ func readEffectTriggerLine(tr *cards.Trigger) effectTriggerLine {
 
 // EffectKnownKeys is a copy of effectKnownKeys, for the census check.
 func EffectKnownKeys() []string { return slices.Clone(effectKnownKeys[:]) }
+
+// isEmblemEffectName reports whether an api:Effect's Name$ names an emblem
+// (CR 114): the corpus spells every emblem-creating Effect
+// `Name$ Emblem — <name>` (115 raw lines, all Duration$ Permanent).
+func isEmblemEffectName(name string) bool {
+	return strings.HasPrefix(name, "Emblem")
+}
