@@ -406,6 +406,19 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 	// Forge's drawnThisTurn survives only the move onto the stack (a cast of
 	// the drawn card); any other move makes the card a new object that was
 	// not drawn. The Draw fold re-stamps it after this Move.
+	// Stamp the remembered-list boundary for the CR 400.7 clear below: a
+	// spell pushed onto the stack (MoveZone's Spell entry, a PutOnStack)
+	// notes how much of its Remembered predates the push. Entries written
+	// after the push are the cast's own memory (a craft material paid to
+	// cast the spell, an exile its own cost performed); entries written
+	// before it belong to an earlier stint of the same ObjID (a card
+	// bounced and recast). Overwrites on every push, so an aborted cast
+	// re-proposed after a CR 733.1 reversal stamps its own fresh
+	// boundary. The battlefield-entry clear consumes it; the moves below
+	// that end the cast without an entry (a counter, a reversal) clear it.
+	if to == state.ZStack && enteredFrom != state.ZStack {
+		o.RememberedStackBase = uint32(len(o.Remembered))
+	}
 	if to != state.ZStack {
 		o.DrawnTurn = 0
 		// The as-cast battlefield snapshot belongs to the spell on the stack:
@@ -607,6 +620,13 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 	// leaving-the-stack move that skips it.
 	if wasStack && to != state.ZStack {
 		o.StackKind, o.StackKindKnown = state.StackKindSpell, false
+		// The cast ended without a battlefield entry (a counter, a CR 733.1
+		// reversal), so the remembered-list boundary it stamped at the push
+		// has nothing left to split. The resolution's own stack -> battlefield
+		// entry keeps it until the CR 400.7 clear below consumes it.
+		if to != state.ZBattlefield {
+			o.RememberedStackBase = 0
+		}
 	}
 	// A zone change is the single source of zone-entry provenance. Capture
 	// the actual old zone (not Event.From, which Move deliberately treats as
@@ -737,9 +757,25 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 			//     resets the face for every battlefield departure, so a back
 			//     face at this point can only be a Transformed$ entry, never
 			//     a prior incarnation's.
+			// The boundary RememberedStackBase was stamped with at the
+			// split's push splits a recast spell's list: entries the new
+			// cast wrote after the push (its own paid cost's material) are
+			// the new object's memory and survive, entries predating the
+			// push belong to an earlier incarnation of the same ObjID and
+			// die with the entry exactly as this block clears them for a
+			// spell with no cast-time writes. A list shorter than the
+			// boundary (a mid-cast-window clear of the old entries) has no
+			// pre-push tail left to identify, so it falls to the full wipe
+			// like every other entry. Any entry from a non-stack zone has
+			// no boundary at all and wipes whole.
 			if o.Incarnation > 1 && !(o.Card != nil && o.Card.IsTransformingDFC() && o.FaceIdx != 0) {
-				o.Remembered = nil
+				if enteredFrom == state.ZStack && o.RememberedStackBase <= uint32(len(o.Remembered)) {
+					o.Remembered = append(o.Remembered[:0], o.Remembered[o.RememberedStackBase:]...)
+				} else {
+					o.Remembered = nil
+				}
 			}
+			o.RememberedStackBase = 0
 		}
 		// A face-down entry (a manifest) is a 2/2 creature with no abilities
 		// (CR 708.5), so it grants none of the entry counters above; the

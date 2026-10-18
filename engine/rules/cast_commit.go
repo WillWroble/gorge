@@ -537,12 +537,26 @@ func (e *Engine) payCast() {
 		e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: state.ZGraveyard, To: state.ZExile, Text: "delved"})
 	}
 	pay.PayDiscardCost(asPayer(e), pc.Discards, "")
-	// Exile cost parts (see the ability branch above for the why).
+	// Exile cost parts (see the ability branch above for the why). The spell
+	// arm applies the same craft-material treatment the ability arm does: the
+	// cards a ZoneSet exile part paid (ExileCtrlOrGrave) are remembered on
+	// the resolving spell (CR 702.167a's "exiled with" provenance rides the
+	// MoveZone's IDs payload), so the permanent the spell becomes still
+	// knows the material its cast paid. An ExileFromGrave/FromHand part
+	// (ZoneSet 0) is not a craft material: it is paid and forgotten, exactly
+	// as this arm always did.
+	craftMaterials := craftExiledMaterials(e, pc)
+	groupLinked := costLinksGroupExiles(pc.cost)
 	for _, id := range pc.Exiles {
 		if o := e.G.Obj(id); o != nil {
-			e.emit(events.Event{Kind: events.MoveZone, Obj: id, From: o.Zone, To: state.ZExile, Text: "exiled as a cost"})
+			mv := costExileEvent(o, craftMaterials, pc.card)
+			if groupLinked {
+				mv.IDs = []state.ObjID{pc.card}
+			}
+			e.emit(mv)
 		}
 	}
+	rememberCraftMaterials(e, pc.card, craftMaterials)
 	// CollectEvidence parts (alltargeted1; see the ability branch above).
 	for _, id := range pc.evidence {
 		if o := e.G.Obj(id); o != nil {
