@@ -1775,13 +1775,15 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 				// against THAT face's own SVar table.
 				tc := observer.triggerReferents(t, id, *ev, objLKI)
 				attackersDeclaredCapture(boardOf(observer), t, id, *ev, &tc)
+				fireRemembered := e.triggerRememberedFor(t, *ev, id)
+				tc.TriggerRememberedStamps = e.fireTimeRememberedStamps(fireRemembered)
 				pt := pendingTrigger{
 					Source:     id,
 					Controller: controller,
 					Idx:        ti,
 					SA:         t.Effect,
 					Ctx: effects.NewCtx(id, controller, effects.CtxInit{
-						Remembered:     e.triggerRememberedFor(t, *ev, id),
+						Remembered:     fireRemembered,
 						Captured:       e.triggerRememberedFor(t, *ev, id),
 						LKI:            objLKI,
 						Snap:           effects.LKISnapshots{Power: lkiPower, Toughness: lkiToughness, PTValid: objLKI != nil && lkiPTValid},

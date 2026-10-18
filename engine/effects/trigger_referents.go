@@ -60,6 +60,20 @@ type TriggerContext struct {
 	// ChangeZone's Defined$ DelayTriggerRemembered[LKI] mover skips an object
 	// that has become a new object since (CR 400.7).
 	DelayedRememberedStamps []state.TargetStamp
+	// TriggerRememberedStamps is the fire-time Incarnation stamp of each
+	// object in the trigger's own remembered capture (Ctx.Remembered, what
+	// the TriggeredCard referent family resolves): captured by rules when the
+	// trigger was QUEUED, when the remembered objects stood as the triggering
+	// event left them. A trigger that resolves later refers to the object
+	// that existed then (CR 400.7), so a delayed trigger it registers stamps
+	// its Remembered from here rather than from the resolving state -- a dies
+	// trigger whose card was returned and died again while the trigger sat on
+	// the stack stamps the first graveyard incarnation and its end-step
+	// return moves nothing. Not serialized into events.Event -- the
+	// per-stack capture is rebuilt by the same replay re-derivation as
+	// TriggerPaidX/TriggerConverge; the stamp a registration keeps rides the
+	// DelayedRegister event's Text (the established suffix channel).
+	TriggerRememberedStamps []state.TargetStamp
 	// Reflexive marks a CR 603.12 reflexive triggered ability ("When you do,
 	// ...") minted by effImmediateTrigger through Host.QueueReflexiveTrigger.
 	// Its stack object's Remembered is the instance's OWN remembered set --
