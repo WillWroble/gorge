@@ -1838,6 +1838,13 @@ func (e *Engine) askManaColor(p state.PlayerID, source state.ObjID, ma *cards.SA
 // the caller keeps the unclamped choice then. A decided EMPTY result means
 // the composition has no mana left to absorb any colour.
 func (e *Engine) paymentUsefulColours(pc *pendingCast, p state.PlayerID, colours []string) ([]string, bool) {
+	// A may-play rider ("mana of any type can be spent to cast that spell",
+	// Tinybones, Bauble Burglar's stash; MayPlayIgnoreColor$) lets a pip take
+	// mana of another colour (CR 601.2g-h), so the per-colour demand below
+	// does not bound what the payment absorbs: stay uncertain (fail open).
+	if pc.mayPlayIgnore || pc.mayPlayIgnoreType {
+		return nil, false
+	}
 	comp := e.manaToPay(pc)
 	// Delve credit is the charge's own subtraction (payCast takes it off the
 	// generic); fold it here so a delve-cast's generic remainder is not
