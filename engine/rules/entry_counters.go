@@ -680,6 +680,7 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	*pp = *e
 	preview := pp
 	isolatePreviewMemos(preview)
+	isolatePreviewScratch(preview)
 	preview.G = e.G.CloneInto(e.takeSnapshotObjs())
 	// The livelock watcher's window and candidate index are slices: the
 	// preview copies them on its first observed event rather than writing
@@ -750,6 +751,75 @@ func isolatePreviewMemos(p *Engine) {
 	p.typesTouch, p.typesAct, p.derivedTouched, p.boardScanBuf = nil, nil, nil, nil
 	p.derivedMemo, p.derivedMemoStack = derivedMemoTable{}, derivedMemoTable{}
 	p.lossMemo, p.manaGate = abilityLossMemo{}, manaGateMemo{}
+}
+
+// isolatePreviewScratch gives an entry preview private storage for every
+// other slice it inherits from the live engine by its shallow struct copy,
+// so nothing the preview does -- an Effect ended through the in-place filter
+// of the continuous registry, a rewritten pending-trigger queue, a refilled
+// scratch buffer, an append into a ledger's spare capacity -- can write into
+// a live array (CR 611.3a: the live game's effects are its own). Live state
+// the preview may read is copied; pure scratch buffers and caches, which a
+// clone also starts empty (their clone tags are reset), start empty.
+// TestEntryPreviewSharesNoAppendableSlice holds the list complete. The
+// engine's maps are still shared by reference.
+func isolatePreviewScratch(p *Engine) {
+	// Live state: copied.
+	p.continuous = slices.Clone(p.continuous)
+	p.controlGrants = slices.Clone(p.controlGrants)
+	p.setupEntryDrops = slices.Clone(p.setupEntryDrops)
+	p.pendingTriggers = slices.Clone(p.pendingTriggers)
+	p.layer4Types = slices.Clone(p.layer4Types)
+	p.activationsThisTurn = slices.Clone(p.activationsThisTurn)
+	p.combatHitsThisTurn = slices.Clone(p.combatHitsThisTurn)
+	p.counterAddsThisTurn = slices.Clone(p.counterAddsThisTurn)
+	p.turnStartTurns = slices.Clone(p.turnStartTurns)
+	p.turnsTaken = slices.Clone(p.turnsTaken)
+	p.copyMintsPending = slices.Clone(p.copyMintsPending)
+	p.cmdZone = slices.Clone(p.cmdZone)
+	p.defeatedCasts = slices.Clone(p.defeatedCasts)
+	p.deferredAsks = slices.Clone(p.deferredAsks)
+	p.suspendedCasts = slices.Clone(p.suspendedCasts)
+	p.madnessChoices = slices.Clone(p.madnessChoices)
+	p.manaExpended = slices.Clone(p.manaExpended)
+	p.damageBatchLog = slices.Clone(p.damageBatchLog)
+	p.discardBatchLog = slices.Clone(p.discardBatchLog)
+	p.millBatchLog = slices.Clone(p.millBatchLog)
+	p.zoneBatchLog = slices.Clone(p.zoneBatchLog)
+	p.declaredAttackers = slices.Clone(p.declaredAttackers)
+	p.declaredDefenders = slices.Clone(p.declaredDefenders)
+	p.subOfferParent = slices.Clone(p.subOfferParent)
+	p.effectMatchRemembered = slices.Clone(p.effectMatchRemembered)
+	p.replDrawChain = slices.Clone(p.replDrawChain)
+	p.replExclude = slices.Clone(p.replExclude)
+	p.replRemembered = slices.Clone(p.replRemembered)
+	p.replReplacedCards = slices.Clone(p.replReplacedCards)
+	p.auraEntryCands = slices.Clone(p.auraEntryCands)
+	p.specEnvs = slices.Clone(p.specEnvs)
+	p.batchReplSources = slices.Clone(p.batchReplSources)
+	p.secretVoteBallots = slices.Clone(p.secretVoteBallots)
+	p.lifeLossBatch = slices.Clone(p.lifeLossBatch)
+	p.ManaSpentAddsCounters = slices.Clone(p.ManaSpentAddsCounters)
+	p.ManaSpentSources = slices.Clone(p.ManaSpentSources)
+	p.PaymentPlanCarriers = slices.Clone(p.PaymentPlanCarriers)
+	p.PaymentPlanRelaxed = slices.Clone(p.PaymentPlanRelaxed)
+	// The zone summaries' entries carry id lists rebuilt in place.
+	if p.replZones != nil {
+		p.replZones = copyReplZones(nil, p.replZones)
+	}
+	if p.trigZones != nil {
+		p.trigZones = copyTrigZones(nil, p.trigZones)
+	}
+	// Scratch buffers and caches: empty, as in a clone. walkObjCls is
+	// owner-checked (walk_objclass.go) and would reset on first use anyway.
+	p.prioMemo = nil
+	p.staticQueueBuf, p.activeStaticsCache, p.combatStatics = nil, nil, nil
+	p.foreachBuf, p.graveCandBuf, p.intentBuf, p.sbaIDBuf = nil, nil, nil, nil
+	p.legalOptBuf, p.manaAbBuf, p.mayPlaysCache, p.layer5Colors = nil, nil, nil, nil
+	p.targetCensusBuf, p.trigVerifyBuf, p.trigVerifyBuf2 = nil, nil, nil
+	p.staticZones, p.staticZoneVerified, p.triggerObjectMasks = nil, nil, nil
+	p.walkObjCls, p.walkClsOwner = nil, nil
+	p.ManaAbScratch = nil
 }
 
 // settleEntryGrants walks the entry's grants in order against the previewed

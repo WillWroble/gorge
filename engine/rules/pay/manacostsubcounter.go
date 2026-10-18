@@ -131,6 +131,12 @@ func ManaCostSubCounterStage(e Engine, md *ManaCostActivation) ManaCostStep {
 			md.SubPart++
 			continue
 		}
+		if SubCounterAmongKind(part) {
+			if st := manaSubCounterAmongStage(e, md, part, amt); st != ManaCostNext {
+				return st
+			}
+			continue
+		}
 		candidates := SubCounterRemovalCandidates(e, md.Player, md.Source, part, amt, manaSubCounterReservations(md))
 		if len(candidates) == 0 {
 			// The board changed under the offer: drop the payment rather than
@@ -153,6 +159,49 @@ func ManaCostSubCounterStage(e Engine, md *ManaCostActivation) ManaCostStep {
 		return ManaCostAsked
 	}
 	return ManaCostNext
+}
+
+// manaSubCounterAmongStage advances a filtered fixed-kind part (Jetfire's
+// RemoveAnyCounter<X1+/P1P1/Artifact>, SubCounterAmongKind) one counter unit
+// at a time, the cast path's amongCounterAsk mana twin: the amount is a total
+// across the candidates (CR 118.3), a sole candidate (or a non-interactive
+// caller) takes the first unit without an ask, and a shortfall drops the
+// payment. It advances md.SubPart once the part's amount is picked.
+func manaSubCounterAmongStage(e Engine, md *ManaCostActivation, part costvocab.CostPart, amt int32) ManaCostStep {
+	g := e.Game()
+	for {
+		picked := md.SubCounterPicked(md.SubPart)
+		if picked >= amt {
+			md.SubPart++
+			return ManaCostNext
+		}
+		taken := func(oid state.ObjID) int32 {
+			n := int32(0)
+			for _, p := range md.SubCounterPays {
+				if p.Part == md.SubPart && p.Obj == oid {
+					n++
+				}
+			}
+			return n
+		}
+		candidates, total := SubCounterAmongUnits(e, md.Player, md.Source, part, manaSubCounterReservations(md), taken)
+		if total < amt-picked {
+			e.Session().ManaCost = nil
+			return ManaCostDropped
+		}
+		if len(candidates) == 1 || !md.Interactive {
+			md.SubCounterPays = append(md.SubCounterPays, SubCounterPay{Part: md.SubPart, Obj: candidates[0], Kind: part.Spec})
+			continue
+		}
+		d := &decision.Decision{Player: md.Player, Kind: decision.KChoose, Min: 1, Max: 1,
+			Prompt: "Choose a permanent to remove " + SubCounterPhrase(part, 1) + " from", Source: md.Source}
+		for _, oid := range candidates {
+			d.Options = append(d.Options, decision.Option{Index: len(d.Options), Kind: "subcounter", Obj: oid,
+				Label: g.Obj(oid).Face().Name})
+		}
+		e.Ask(AskManaSubCounter, d)
+		return ManaCostAsked
+	}
 }
 
 // manaSubCounterWildcardStage advances one "Any" part by one counter unit at
@@ -231,10 +280,15 @@ func recordManaSubCounterAnswer(e Engine, md *ManaCostActivation, chosen []decis
 		return
 	}
 	part := md.Cost.SubCounter[md.SubPart]
+	among := SubCounterAmongKind(part)
 	for _, opt := range chosen {
-		md.SubCounterPays = append(md.SubCounterPays, SubCounterPay{Part: md.SubPart, Obj: opt.Obj, Kind: opt.Counter})
+		kind := opt.Counter
+		if among {
+			kind = part.Spec
+		}
+		md.SubCounterPays = append(md.SubCounterPays, SubCounterPay{Part: md.SubPart, Obj: opt.Obj, Kind: kind})
 	}
-	if strings.EqualFold(part.Spec, "Any") {
+	if strings.EqualFold(part.Spec, "Any") || among {
 		amt := part.N
 		if part.Announced {
 			amt = md.SubX

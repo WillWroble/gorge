@@ -269,13 +269,10 @@ func (e *Engine) xAsk() bool {
 			}
 		} else {
 			for _, oid := range pay.SubCounterRemovalCandidates(asPayer(e), pc.player, pc.card, part, 1, nil) {
+				// A filtered part is a total across its candidates
+				// (pay.SubCounterPartPayers), whatever its kind.
 				if o := e.G.Obj(oid); o != nil {
-					n := pay.SubCounterAvailable(o, part.Spec)
-					if strings.EqualFold(part.Spec, "Any") {
-						have += n
-					} else if n > have {
-						have = n
-					}
+					have += pay.SubCounterAvailable(o, part.Spec)
 				}
 			}
 		}
@@ -587,25 +584,61 @@ func (e *Engine) subCounterAsk() bool {
 			pc.SubCounterPart++
 			continue
 		}
-		candidates := pay.SubCounterRemovalCandidates(asPayer(e), pc.player, pc.card, part, amt, reserved)
-		if len(candidates) == 0 {
-			e.abortCast(pc, "counter-removal cost no longer payable; cast/activation aborted", true)
+		if e.amongCounterAsk(pc, part, amt, reserved) {
 			return true
 		}
-		if len(candidates) == 1 {
-			pc.SubCounterPays = append(pc.SubCounterPays, subCounterPay{Part: pc.SubCounterPart, Obj: candidates[0]})
-			pc.SubCounterPart++
-			continue
-		}
-		d := &decision.Decision{Player: pc.player, Kind: decision.KChoose, Min: 1, Max: 1, Prompt: "Choose a permanent to remove " + e.subCounterPhrase(part, amt) + " from", Source: pc.card}
-		for _, oid := range candidates {
-			d.Options = append(d.Options, decision.Option{Index: len(d.Options), Kind: "subcounter", Obj: oid, Label: e.G.Obj(oid).Face().Name})
-		}
-		e.choosing = chooseCast
-		e.ask(d)
-		return true
 	}
 	return false
+}
+
+// amongCounterAsk advances a filtered fixed-kind SubCounter part ("remove N
+// +1/+1 counters from among creatures you control", pay.SubCounterAmongKind)
+// by one counter unit, the wildcard ask's fixed-kind twin: the N counters
+// are a total across the candidates (CR 118.3, 601.2h), so each unit names
+// the permanent it comes off and a later unit may come from another one. A
+// sole candidate takes every remaining unit without an ask; a shortfall
+// (the board changed under the offer) aborts the cast/activation. Each pick
+// is recorded with the part's kind, so the settle groups the units by
+// permanent. It reports whether a decision was posed.
+func (e *Engine) amongCounterAsk(pc *pendingCast, part CostPart, amt int32, reserved map[state.ObjID]bool) bool {
+	picked := int32(0)
+	for _, p := range pc.SubCounterPays {
+		if p.Part == pc.SubCounterPart {
+			picked++
+		}
+	}
+	if picked >= amt {
+		pc.SubCounterPart++
+		return false
+	}
+	taken := func(oid state.ObjID) int32 {
+		n := int32(0)
+		for _, p := range pc.SubCounterPays {
+			if p.Part == pc.SubCounterPart && p.Obj == oid {
+				n++
+			}
+		}
+		return n
+	}
+	candidates, total := pay.SubCounterAmongUnits(asPayer(e), pc.player, pc.card, part, reserved, taken)
+	if total < amt-picked {
+		e.abortCast(pc, "counter-removal cost no longer payable; cast/activation aborted", true)
+		return true
+	}
+	if len(candidates) == 1 {
+		for ; picked < amt; picked++ {
+			pc.SubCounterPays = append(pc.SubCounterPays, subCounterPay{Part: pc.SubCounterPart, Obj: candidates[0], Kind: part.Spec})
+		}
+		pc.SubCounterPart++
+		return false
+	}
+	d := &decision.Decision{Player: pc.player, Kind: decision.KChoose, Min: 1, Max: 1, Prompt: "Choose a permanent to remove " + e.subCounterPhrase(part, 1) + " from", Source: pc.card}
+	for _, oid := range candidates {
+		d.Options = append(d.Options, decision.Option{Index: len(d.Options), Kind: "subcounter", Obj: oid, Label: e.G.Obj(oid).Face().Name})
+	}
+	e.choosing = chooseCast
+	e.ask(d)
+	return true
 }
 
 // subCounterReservations keeps an earlier counter-cost part from spending
@@ -792,6 +825,22 @@ func (e *Engine) settleSubCounterParts(pc *pendingCast) {
 				// this settle reaches; a missing one is a flow bug, not a
 				// payment to silently skip.
 				return
+			}
+			if pays[0].Kind != "" {
+				// A fixed-kind among part's per-unit picks (amongCounterAsk),
+				// one CounterChange per permanent in first-pick order.
+				var order []state.ObjID
+				sum := map[state.ObjID]int32{}
+				for _, p := range pays {
+					if _, seen := sum[p.Obj]; !seen {
+						order = append(order, p.Obj)
+					}
+					sum[p.Obj]++
+				}
+				for _, oid := range order {
+					e.emit(events.Event{Kind: events.CounterChange, Obj: oid, Counter: part.Spec, Amount: -sum[oid]})
+				}
+				continue
 			}
 			target = pays[0].Obj
 		}

@@ -24,8 +24,8 @@ func ManaSubCounterNeedsAsk(cost costvocab.Cost) bool {
 
 // SettleManaSubCounter emits the announced and anchored SubCounter parts'
 // counter removals (settleSubCounterParts' mana twin). A source-anchored part
-// removes from the source; a filtered part removes from the object its pick
-// carries; an "Any" part removes one unit per pick, grouped by (object, kind)
+// removes from the source; a filtered fixed-kind part removes one counter per
+// pick from the object it carries; an "Any" part removes one unit per pick, grouped by (object, kind)
 // so two units of one kind settle as a single CounterChange of -2.
 func SettleManaSubCounter(e Engine, md *ManaCostActivation) {
 	if !ManaSubCounterNeedsAsk(md.Cost) {
@@ -66,6 +66,23 @@ func SettleManaSubCounter(e Engine, md *ManaCostActivation) {
 			}
 			if len(order) == 0 {
 				SettleCounterAnyFallback(e, pays[0].Obj, PartAnnouncedAmount(part, md.SubX))
+			}
+			continue
+		}
+		if SubCounterAmongKind(part) && pays[0].Kind != "" {
+			// A fixed-kind among part's per-unit picks
+			// (manaSubCounterAmongStage), one CounterChange per permanent in
+			// first-pick order.
+			var order []state.ObjID
+			sum := map[state.ObjID]int32{}
+			for _, p := range pays {
+				if _, seen := sum[p.Obj]; !seen {
+					order = append(order, p.Obj)
+				}
+				sum[p.Obj]++
+			}
+			for _, oid := range order {
+				e.Emit(events.Event{Kind: events.CounterChange, Obj: oid, Counter: part.Spec, Amount: -sum[oid]})
 			}
 			continue
 		}

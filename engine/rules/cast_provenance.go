@@ -587,8 +587,13 @@ func specCarriesCastOrigin(spec string) bool {
 // family takes. The pair is folded onto state.Object by events.Apply's
 // PutOnStack case, so a replay derives the same answer and a clone carries
 // it by value; reading the field is O(1) where the reverse log scan it
-// replaces walked the whole log on every call.
+// replaces walked the whole log on every call. While the this-turn cast
+// ledger evaluates one of obj's casts (Engine.ledgerCast) it answers that
+// cast instead.
 func (e *Engine) latestCastOrigin(obj state.ObjID) (state.Zone, state.PlayerID, bool) {
+	if lc, ok := e.ledgerCastFor(obj); ok {
+		return lc.from, lc.by, true
+	}
 	o := e.G.Obj(obj)
 	if o == nil || !o.HasLatestCast {
 		return 0, 0, false

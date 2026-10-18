@@ -912,11 +912,11 @@ type Object struct {
 	// object's LATEST events.PutOnStack: the same pair a reverse scan of the
 	// event log returns (rules' latestCastOrigin). The fold in events.Apply
 	// writes them on every PutOnStack, so a log-only replay derives the same
-	// values and a clone carries them by value; unlike PreStackEntry* they are
-	// NOT cleared by the reverse move, because the PutOnStack the scan finds
-	// remains in the log after a CR 733.1 reversal. HasLatestCast is false
-	// only until an object's first PutOnStack (a card cheated into play was
-	// never cast).
+	// values and a clone carries them by value. HasLatestCast is false until
+	// an object's first PutOnStack (a card cheated into play was never cast)
+	// and again after any later zone change other than the resolution's
+	// stack -> battlefield entry (CR 400.7: a countered, reversed, blinked or
+	// reanimated card is a new object that was never cast).
 	LatestCastFrom Zone
 	LatestCastBy   PlayerID
 	HasLatestCast  bool

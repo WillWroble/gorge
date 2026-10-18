@@ -146,11 +146,16 @@ func foldMoveZone(g *state.Game, e *Event) {
 			// Record the zone and caster of this cast on the object, so
 			// rules' latestCastOrigin reads the field instead of scanning
 			// the whole log backwards on every call. A later PutOnStack
-			// overwrites it (latest cast wins); the reverse move below does
-			// NOT clear it, because the reverse scan it replaces still finds
-			// this PutOnStack in the log after a CR 733.1 reversal. The fold
-			// is the one writer, so a log-only replay derives the same pair.
+			// overwrites it (latest cast wins). The fold is the one writer,
+			// so a log-only replay derives the same pair.
 			o.LatestCastFrom, o.LatestCastBy, o.HasLatestCast = e.From, e.Player, true
+		} else if e.From != state.ZStack || e.To != state.ZBattlefield {
+			// Any other zone change after the cast than the resolution's own
+			// stack -> battlefield entry (a counter, a CR 733.1 reversal, a
+			// blink, a death, a draw) makes a new object that was never cast
+			// (CR 400.7), so its cast origin ends here -- the same rule
+			// rules' castProvenanceEndedBy applies to the log reads.
+			o.HasLatestCast = false
 		}
 
 		if e.To == state.ZStack && IsFaceDownEntry(moveCounter) {

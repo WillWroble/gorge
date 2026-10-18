@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -509,10 +510,21 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				cards.DelayedPreventedCounterBody(effectFaceSVars(h, c.Source), exec)) {
 				text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
 			}
+			// The Effect's remembered PLAYERS join the capture (Rowan
+			// Kenrith's RememberObjects$ Targeted names a player): the phase
+			// scan's ValidPlayer$ Player.IsRemembered gate and the body's
+			// Defined$ Player.IsRemembered read this set, the Effect's own
+			// memory (CR 611.2a), not the source card's.
+			phaseIDs := regIDs
+			for _, p := range effectRememberedPlayers(h, c, sa) {
+				if !slices.ContainsFunc(phaseIDs, func(t state.Target) bool { return t.IsPlayer && t.Player == p }) {
+					phaseIDs = append(slices.Clip(phaseIDs), state.Target{IsPlayer: true, Player: p})
+				}
+			}
 			for _, owner := range owners {
 				h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
 					Player: owner, Step: step, Counter: exec,
-					IDs: encodeRemembered(regIDs), Text: text})
+					IDs: encodeRemembered(phaseIDs), Text: text})
 			}
 			registered = true
 		default:
