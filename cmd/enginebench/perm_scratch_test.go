@@ -31,12 +31,14 @@ func TestRandomIntentScratchKeepsTheStream(t *testing.T) {
 	// Re-pinned for the combat priority fixes (rules e7aaf1530 and 93b6057e4,
 	// CR 510.4/117.3a; was 1616/38711, 1651/39748, 1620/39304): more priority
 	// windows in combat draw more random answers, so the games move.
+	// Re-pinned for the CR 510.3 post-damage priority round (rules
+	// 24bbba791; was 1644/41005, 1669/41915, 1700/43169), the same cause.
 	want := []struct {
 		games, turns, decisions, rejected int
 	}{
-		{40, 1644, 41005, 0},
-		{40, 1669, 41915, 0},
-		{40, 1700, 43169, 0},
+		{40, 1676, 41954, 0},
+		{40, 1673, 41863, 0},
+		{40, 1556, 38932, 0},
 	}
 	for i, w := range want {
 		cfg := rules.Config{
