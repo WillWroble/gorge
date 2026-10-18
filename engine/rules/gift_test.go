@@ -491,12 +491,11 @@ func TestGiftPrimitivesRegistered(t *testing.T) {
 	pp := mustCorpusCard(t, reg, "Perch Protection")
 	missing := reg.Unsupported(pp, supported)
 	// Perch Protection's chained `DB$ Effect | StaticAbilities$ STCantChange`
-	// life-total static is the pre-existing Effect-static gap (AGENTS.md's
-	// "Effect registers real continuous effects only for ..." row), not a
-	// Gift gap; the api:Phases half of the original measurement closed when
-	// main registered it. Assert the measured set exactly so a future
-	// registration or regression is named.
-	want := []string{"stat:CantChangeLife"}
+	// life-total static was the last gap: the api:Phases half closed when
+	// main registered it, and stat:CantChangeLife closed with the
+	// CantChangeLife static (cantchangelife1). Assert the measured set
+	// exactly so a future regression is named.
+	want := []string{}
 	if len(missing) != len(want) {
 		t.Fatalf("Perch Protection unsupported = %v, want %v", missing, want)
 	}
