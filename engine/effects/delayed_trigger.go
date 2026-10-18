@@ -79,7 +79,18 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 	// value is loud and preserves the historical chain-capture fallback.
 	remembered := c.Remembered
 	replacedRemembered := false
-	if spec := dp.RememberObjects; spec != "" && spec != "RememberedLKI" {
+	if dp.RememberObjects == "RememberedLKI" {
+		// RememberObjects$ RememberedLKI names what the chain REMEMBERED, not
+		// the referents its triggering event captured (Forge's trigger does
+		// not remember its triggering card): Kykar, Zephyr Awakener's blink
+		// remembers the exiled creature (RememberChanged$), and its SpellCast
+		// capture -- the noncreature spell that triggered it -- must not ride
+		// along, or the end-step return put that spell (a flashback Think
+		// Twice, already exiled) onto the battlefield. An explicit later
+		// remember of a captured object is kept (excludeCaptureOccurrences).
+		remembered = rememberedExcludingCapture(h, c)
+		replacedRemembered = true
+	} else if spec := dp.RememberObjects; spec != "" {
 		if ts, known := knownDefinedTargets(h, c, spec); known {
 			remembered = copyTargets(ts)
 			replacedRemembered = true
