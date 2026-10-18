@@ -734,6 +734,30 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				grant.Chosen, grant.ChosenBound = effectChosenSnapshot(h, c, grant.Affects)
 				effectContinuous(h, grant)
 				registered = true
+			} else if _, ok := untapDenialGrantFromLine(params); ok {
+				// CR 611.2b: the permanents Affected$ names, under the
+				// remembered player's control at their next untap step, stay
+				// tapped. A restriction rules' untap-step scan reads (the
+				// per-permanent CantUntapNextStep flag cannot express a
+				// player-scoped set that includes permanents entering later);
+				// the Effect's own Phase$ Untap self-exile ends it after that
+				// step's untap. Permanent: the Effect outlives its sorcery or
+				// ability source until that exile.
+				effectContinuous(h, state.ContinuousEffect{
+					Source: c.Source, Controller: c.Controller,
+					Restriction:       "UntapDenial",
+					RestrictParams:    params,
+					Name:              effectName,
+					Permanent:         true,
+					Duration:          dur,
+					Remembered:        remembered,
+					RememberedPlayers: effectRememberedPlayers(h, c, sa),
+					ForgetOnMoved:     forgetOn,
+					ExileOnMoved:      exileOn,
+					ForgetCounter:     forgetCounter,
+					ImprintOnHost:     imprintOnHost,
+				})
+				registered = true
 			} else if kws, affected, zone, ok := cascadeKeywordGrantFromLine(params); ok {
 				// AddKeyword$ Cascade (task cascade1): the Effect-delivered
 				// cascade grant (TARDIS's GrantCascade, Dark Apostle's, Bigger

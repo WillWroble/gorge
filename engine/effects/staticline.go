@@ -8,6 +8,31 @@ import (
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
+// untapDenialGrantFromLine reports whether a Mode$ Continuous static body an
+// Effect SA registers is CR 611.2b's "creatures/lands/artifacts target player
+// controls don't untap during their next untap step" grant (Misstep,
+// Exhaustion, Mana Vapors, Icebreaker Kraken): an Affected$ spec plus the one
+// AddHiddenKeyword$ untap sentence, with only display/placement metadata
+// alongside. A body carrying a condition gate this registration path cannot
+// evaluate is refused (the permissive direction), falling through to the
+// honest unimplemented Note.
+func untapDenialGrantFromLine(params map[string]string) (affected string, ok bool) {
+	if !cards.IsHiddenUntapNextStepKeyword(strings.TrimSpace(params["AddHiddenKeyword"])) {
+		return "", false
+	}
+	for _, key := range []string{"Condition", "CheckSVar", "SVarCompare", "IsPresent", "IsPresent2", "PresentCompare",
+		"AddKeyword", "AddType", "AddPower", "AddToughness", "SetPower", "SetToughness"} {
+		if strings.TrimSpace(params[key]) != "" {
+			return "", false
+		}
+	}
+	affected = strings.TrimSpace(params["Affected"])
+	if affected == "" {
+		return "", false
+	}
+	return affected, true
+}
+
 func cascadeKeywordGrantFromLine(params map[string]string) (kws []string, affected, zone string, ok bool) {
 	raw := strings.TrimSpace(params["AddKeyword"])
 	if raw == "" {

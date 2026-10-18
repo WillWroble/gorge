@@ -112,6 +112,34 @@ func (e *Engine) restrictionActorMatches(ce *ContinuousEffect, actor state.Playe
 	return effects.MatchesPlayerSpecCtx(e.G, spec, actor, ce.Controller, e.playerSpecCtx(ce.Source))
 }
 
+// untapDenied reports whether a live Effect-registered UntapDenial
+// restriction (Misstep, Exhaustion, Mana Vapors, Icebreaker Kraken: CR 611.2b
+// "don't untap during their next untap step") holds the permanent id tapped.
+// Its Affected$ spec (`Creature.RememberedPlayerCtrl,Land.RememberedPlayerCtrl`)
+// resolves against the registration's captured players, so only the targeted
+// player's permanents of the named types are held.
+func (e *Engine) untapDenied(id state.ObjID) bool {
+	for ceI, ceL := 0, e.active(); ceI < len(ceL); ceI++ {
+		ce := &ceL[ceI]
+		if ce.Restriction != "UntapDenial" {
+			continue
+		}
+		spec := ce.RestrictParam(cards.PKAffected)
+		if spec == "" {
+			continue
+		}
+		sc := e.specCtx(ce.Source, ce.Controller)
+		for _, r := range ce.Remembered {
+			sc.Remembered = append(sc.Remembered, state.Target{Obj: r})
+		}
+		sc.RememberedPlayers = ce.RememberedPlayers
+		if e.matchesSpec(spec, id, sc) {
+			return true
+		}
+	}
+	return false
+}
+
 // SacrificeBlocked implements effects.Host for the CantSacrifice restriction
 // (task combatrestriction1): reports whether id is forbidden from being
 // sacrificed at all — an Effect-registered CantSacrifice restriction (Call for
