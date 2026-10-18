@@ -164,6 +164,22 @@ func attachSpecAdmitsPlayer(g *state.Game, attachObj state.ObjID, bearer state.P
 	return MatchesPlayerSpecFrom(g, strings.TrimSpace(spec), bearer, o.Controller, o.ID)
 }
 
+// attachObjectGone reports whether id cannot be attached by the resolving
+// ability because it is not a permanent any more (CR 400.7, 701.3b): it is
+// neither on the battlefield nor on the stack (the resolving Aura spell's
+// Object$ Self), or it is the ability's source and has left the battlefield
+// or returned as a new object since the ability was put on the stack.
+func attachObjectGone(h Host, c *Ctx, id state.ObjID) bool {
+	o := h.Game().Obj(id)
+	if o == nil {
+		return true
+	}
+	if o.Zone != state.ZBattlefield && o.Zone != state.ZStack {
+		return true
+	}
+	return sourceLeftSincePush(h, c, o)
+}
+
 // effAttach implements "Attach": it fastens obj (Object$ Self by default --
 // Aura's SP$ Attach is cast with Object$ Self so the STILL-ON-THE-STACK aura
 // is the object being attached, Living Weapon's SVar is also Object$ Self
@@ -287,6 +303,29 @@ func effAttach(h Host, c *Ctx, sa *cards.SA) {
 			// referent binding): fail closed to no objects, never the source.
 			objs = objs[:0]
 		}
+	}
+	// An attaching object that is no longer there stays where it is (CR
+	// 400.7, 701.3b): Celestial Armor destroyed before its "attach it to
+	// target creature" trigger resolves, Goldvein Pick destroyed in response
+	// to its equip activation. Only a permanent on the battlefield, or the
+	// resolving Aura spell itself on the stack, can be attached; the source
+	// must also still be the incarnation the ability was put on the stack
+	// for. A resolution whose every object is gone refuses with the usual
+	// Note. An object-side Choices$ pool (no Object$ key) picks its object
+	// from the battlefield below, so the source is not the attaching object
+	// there and is not checked.
+	if len(objs) > 0 && (ap.Choices == "" || ap.ObjectPresent) {
+		kept := objs[:0]
+		for _, id := range objs {
+			if !attachObjectGone(h, c, id) {
+				kept = append(kept, id)
+			}
+		}
+		if len(kept) == 0 {
+			h.Emit(events.Event{Kind: events.Note, Obj: c.Source, Text: "cannot attach: the object left the battlefield"})
+			return
+		}
+		obj, objs = kept[0], kept
 	}
 	// An Aura with Enchant:Player or Enchant:Opponent attaches to a seat, not
 	// a permanent. The ordinary destination walker below intentionally accepts
