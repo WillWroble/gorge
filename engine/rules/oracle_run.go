@@ -530,8 +530,8 @@ func (r *oracleRun) resolve(ref string) (state.ObjID, error) {
 // build constructs the game: named cards seeded into each seat's deck (so
 // genesis mints them as real cards), commanders in the command zone, then --
 // BEFORE turn 1 begins -- every opening hand returned to the library and each
-// named card moved to its setup zone. Placing permanents before the first
-// TurnChange means seat 0's battlefield is not summoning sick on turn 1.
+// named card moved to its setup zone. Every seat's setup permanents are
+// settled (events.SetupSettled), so none is summoning sick on turn 1.
 func (r *oracleRun) build(sc oracleScenario) error {
 	seats, err := oracleSeatCount(sc.Players)
 	if err != nil {
@@ -738,6 +738,13 @@ func (r *oracleRun) build(sc oracleScenario) error {
 					ev.Obj = id
 					e.emit(ev)
 				}
+				// XMage's addCard places a permanent as if it had been there
+				// since before the game: it is not summoning sick (CR 302.6)
+				// on turn 1 whichever seat it sits with. The first TurnChange
+				// clears sickness only for the starting seat, so a
+				// non-starting seat's {T} ability (Trap Runner on p1) would
+				// otherwise be unactivatable on p0's turn 1.
+				e.emit(events.Event{Kind: events.SetupSettled, Obj: id})
 			}
 			if pl.top {
 				tops = append(tops, id)

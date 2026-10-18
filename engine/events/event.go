@@ -1218,10 +1218,22 @@ const (
 	// same time (CR 704.3). Appended after HiddenIdentity so every earlier
 	// ordinal, hash chain and golden replay is unchanged.
 	DrawEmpty
+	// SetupSettled records that an oracle harness's seeded battlefield
+	// permanent has been under its controller's control since before the
+	// scenario began, as XMage's addCard places it: it is not summoning sick
+	// (CR 302.6) whichever seat takes the first turn. The harness stages
+	// permanents before the first TurnChange, which clears sickness only for
+	// the incoming active player, so without this a non-starting seat's {T}
+	// ability could not be activated on the starting seat's turn 1. Obj is
+	// the staged permanent; the fold only clears Object.SummonSick and moves
+	// nothing. Emitted only by the oracle harness, never in a match, a replay
+	// of one or a golden game. Appended after DrawEmpty so every earlier
+	// ordinal, hash chain and golden replay is unchanged.
+	SetupSettled
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(DrawEmpty) + 1
+	NumKinds = int(SetupSettled) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving

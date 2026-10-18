@@ -315,6 +315,12 @@ func applyKind(g *state.Game, e *Event) {
 		foldHiddenIdentity(g, e)
 	case DrawEmpty:
 		foldDrawEmpty(g, e)
+	case SetupSettled:
+		// The oracle harness's staged permanent counts as continuously
+		// controlled since before the scenario's first turn (CR 302.6).
+		if o := g.Obj(e.Obj); o != nil && o.Zone == state.ZBattlefield {
+			o.SummonSick = false
+		}
 	case ChaosEnsues:
 		// The chaos-ensues marker (CR 901.9, task planar-verbs) is a pure
 		// marker, exactly like PlanarRoll: no state folds. The current plane's
