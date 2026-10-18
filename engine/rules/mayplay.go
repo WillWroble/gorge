@@ -514,8 +514,11 @@ func (e *Engine) mayPlayStatic(params map[string]string, id state.ObjID, you sta
 	// Future Sight on top of its library does not grant itself. Every corpus
 	// self-grant meant to work elsewhere (Affected$ Card.Self) names its
 	// EffectZone$.
-	if source == id && strings.TrimSpace(params["EffectZone"]) == "" {
-		if o := e.G.Obj(id); o == nil || o.Zone != state.ZBattlefield {
+	// A named EffectZone$ is honoured the same way: Muldrotha's grants name
+	// EffectZone$ Battlefield, so Muldrotha in its owner's graveyard does not
+	// let that player cast it from there.
+	if source == id {
+		if o := e.G.Obj(id); o == nil || !effectZoneOK(params["EffectZone"], o.Zone) {
 			return false, false, false, Cost{}, false, false
 		}
 	}
@@ -795,7 +798,10 @@ func (e *Engine) mayPlayAltCosts(p state.PlayerID, id state.ObjID) []mayPlayAltV
 			// The card's own static functions off the battlefield only when it
 			// names its EffectZone$ (CR 113.6, as in mayPlayStatic); without this,
 			// Omniscience in hand offered a free cast of itself.
-			if strings.TrimSpace(st.Params["EffectZone"]) == "" && o.Zone != state.ZBattlefield {
+			// A named EffectZone$ must include the card's current zone
+			// (Muldrotha's EffectZone$ Battlefield grants nothing to itself
+			// in the graveyard).
+			if !effectZoneOK(st.Params["EffectZone"], o.Zone) {
 				continue
 			}
 			sv = staticView{Params: st.Params, PS: st.ParamSetOf(), Source: id, Controller: o.Controller}
