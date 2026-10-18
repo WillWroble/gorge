@@ -204,6 +204,12 @@ func effWard(h Host, c *Ctx, sa *cards.SA) {
 	if o.Face() == nil {
 		to = state.ZExile
 	}
+	// CR 702.34a and its family (aftermath, jump-start, harmonize): a spell
+	// cast that way is exiled however it leaves the stack, countered by ward
+	// included -- the same predicate effCounter's default path applies.
+	if state.ExilesLeavingStack(o.CastFlags) && to == state.ZGraveyard {
+		to = state.ZExile
+	}
 	h.Emit(events.Event{Kind: events.MoveZone, Obj: cause, From: state.ZStack, To: to, Text: "countered by ward"})
 }
 
