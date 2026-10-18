@@ -2190,8 +2190,10 @@ func (e *Engine) EndDamageBatch()   { e.closeDamageBatch() }
 
 // BeginZoneBatch/EndZoneBatch are the zone twin of the damage bracket above:
 // engine/effects/choose_control.go's effRepeatEach opens them around a whole
-// RepeatEach loop whose ChangeZoneTable$ True asks for the batch. See
-// openZoneBatch/closeZoneBatch.
+// RepeatEach loop whose ChangeZoneTable$ True asks for the batch, and
+// Engine.BatchDepartures opens them around every simultaneous departure batch
+// (DestroyAll, Sacrifice, Destroy, SacrificeAll, ChangeZoneAll, ChangeZone).
+// See openZoneBatch/closeZoneBatch.
 func (e *Engine) BeginZoneBatch() { e.openZoneBatch() }
 func (e *Engine) EndZoneBatch()   { e.closeZoneBatch() }
 
