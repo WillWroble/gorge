@@ -19,13 +19,25 @@ import (
 )
 
 // counterAddedMatches implements the "when a counter is put on" trigger
-// family for BOTH Mode$ CounterAdded (Shang-Chi and the Ten Rings' "When the
-// tenth +1/+1 counter is put on NICKNAME") and Mode$ CounterAddedOnce (Simic
-// Ascendancy's "Whenever one or more +1/+1 counters are put on a creature you
-// control"). The two modes share this matcher because the engine emits ONE
-// CounterChange event per placement batch, with the whole batch in Amount:
-// "one trigger per counter-placing event, not per counter" is exactly the
-// CounterAddedOnce contract, and the modes differ only in that
+// family for BOTH Mode$ CounterAdded (Fathom Mage's "Whenever a +1/+1 counter
+// is put on CARDNAME"; Shang-Chi and the Ten Rings' "When the tenth +1/+1
+// counter is put on NICKNAME") and Mode$ CounterAddedOnce (Simic Ascendancy's
+// "Whenever one or more +1/+1 counters are put on a creature you control").
+// The two modes share this matcher because the ENGINE has one shape for the
+// placement: ONE CounterChange event per recipient, with the whole batch in
+// Amount. The modes read that shape differently, and the difference is the
+// TIMES the line triggers, not the event it triggers on:
+//
+//   - a plain CounterAdded line without CounterAmount$ is the per-counter
+//     reading (CR 603.2c: "whenever a +1/+1 counter is put on" is one
+//     triggered occurrence PER counter, even when one effect puts several at
+//     once), so CounterAddedInstances below returns the whole batch;
+//   - CounterAddedOnce is the "one or more" reading: one occurrence per
+//     event, however many counters it carried, and its body reads the batch
+//     size through TriggerCount$Amount;
+//   - a CounterAdded line WITH CounterAmount$ is the crossing shape ("when
+//     the tenth counter is put"), which fires once, on the crossing.
+//
 // CounterAddedOnce never carries CounterAmount$ (measured: 0 corpus lines)
 // while its bodies read TriggerCount$Amount instead. The gate is the
 // CounterChange
@@ -113,11 +125,14 @@ func counterAddedMatches(e Board, t cards.Trigger, source state.ObjID, ev events
 // total for the counter kind must equal the named value -- events.Apply folds
 // the removal before checkTriggers runs, so o.Counter(ev.Counter) is already
 // the total after. A malformed value fails closed (the Added arm's
-// strconv/splitCompare style). Fire-once semantics are the event granularity:
-// one Amount: -N batch removal is ONE trigger, exactly as CounterAdded fires
-// once per CounterChange, and that IS the CounterRemovedOnce contract --
-// "one or more counters removed" is one CounterChange, never one trigger per
-// counter. The two modes differ only in that a CounterRemovedOnce body reads
+// strconv/splitCompare style). Fire granularity follows the Added arm's split
+// (CounterRemovedInstances): a plain CounterRemoved line without
+// NewCounterAmount$ is the per-counter reading -- the corpus Oracle texts are
+// "whenever a time counter is removed" / "whenever a +1/+1 counter is
+// removed" (Protean Hydra), one occurrence per counter, CR 603.2c -- while
+// CounterRemovedOnce and the NewCounterAmount$ "last counter" shape fire
+// once: "one or more counters removed" is one CounterChange, never one
+// trigger per counter. The two modes differ in that a CounterRemovedOnce body reads
 // the removed magnitude through TriggerCount$Amount (Chandra, Fire Artisan's
 // "deals that much damage"; B.O.B. Bevy of Beebles; Regenerations Restored),
 // which the referent capture in trigger_referents.go supplies. No corpus
@@ -152,6 +167,40 @@ func counterRemovedMatches(e Board, t cards.Trigger, source state.ObjID, ev even
 		}
 	}
 	return true
+}
+
+// CounterAddedInstances is the number of times a matching CounterAdded line
+// triggers for ONE CounterChange event (CR 603.2c; the event carries the whole
+// placement batch in Amount). A plain line is one occurrence PER counter --
+// Fathom Mage's "Whenever a +1/+1 counter is put on CARDNAME" triggers four
+// times for Blessings of Nature's four counters -- while the "one or more"
+// shape (Mode$ CounterAddedOnce) and the crossing shape (CounterAmount$, "when
+// the tenth counter is put") each fire once. The caller queues that many
+// independent instances, each carrying the batch-of-one Amount below, which is
+// the batch one per-counter occurrence sees.
+func CounterAddedInstances(t *cards.Trigger, ev *events.Event) int32 {
+	if ev.Kind != events.CounterChange || ev.Amount <= 0 {
+		return 0
+	}
+	if t.ModeKind() != cards.TriggerCounterAdded || t.ParamStr(cards.PKCounterAmount) != "" {
+		return 1
+	}
+	return ev.Amount
+}
+
+// CounterRemovedInstances is CounterAddedInstances' mirror for the removal
+// modes (a CounterChange with a negative Amount; the returned count is
+// positive). A plain CounterRemoved line is one occurrence per counter
+// removed; CounterRemovedOnce and the NewCounterAmount$ "when the last <kind>
+// counter is removed" shape fire once.
+func CounterRemovedInstances(t *cards.Trigger, ev *events.Event) int32 {
+	if ev.Kind != events.CounterChange || ev.Amount >= 0 {
+		return 0
+	}
+	if t.ModeKind() != cards.TriggerCounterRemoved || t.ParamStr(cards.PKNewCounterAmount) != "" {
+		return 1
+	}
+	return -ev.Amount
 }
 
 // counterPlayerAddedAllMatches implements Mode$ CounterPlayerAddedAll --
