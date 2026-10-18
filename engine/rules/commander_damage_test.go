@@ -149,6 +149,9 @@ func swing(t *testing.T, e *Engine, attackers ...state.ObjID) {
 	}
 	e.askAttackers()
 	submitAttackers(t, e, attackers...)
+	// CR 510.3: the damage step's post-damage priority round, so the next
+	// swing starts from a finished combat.
+	drainCombatDamagePriority(t, e)
 }
 
 // TestTwentyCommanderDamageDoesNotLose is the low side of the CR 903.10

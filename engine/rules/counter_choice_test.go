@@ -374,7 +374,7 @@ func amyPondAttack(t *testing.T, e *Engine, amyID state.ObjID) *decision.Decisio
 	e.emit(events.Event{Kind: events.StepChange, Step: state.StepDeclareAttackers})
 	e.askAttackers()
 	submitAttackers(t, e, amyID)
-	drainCombatDamagePriority(t, e)
+	drainCombatDamageToStack(t, e)
 	for i := 0; i < 80 && !e.G.Over; i++ {
 		d := e.Pending()
 		if d == nil {

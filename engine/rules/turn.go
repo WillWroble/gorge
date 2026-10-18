@@ -1180,6 +1180,12 @@ func (e *Engine) advanceStep() {
 		e.beginCombatPass(false)
 		return
 	}
+	if e.G.Step == state.StepCombatDamage {
+		// Both passes have dealt and the post-damage priority round (CR
+		// 510.3) ended with every player passing on an empty stack: the
+		// combat damage step's continuation state ends with the step.
+		e.combatRound = combatRound{}
+	}
 	next := e.G.Step + 1
 	if s, ok := e.extraPhaseBoundary(); ok {
 		next = s

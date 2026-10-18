@@ -1317,6 +1317,10 @@ type combatRound struct {
 	hasFirst    bool `clone:"deep"` // this combat damage step runs a first-strike pass (CR 510.3)
 	firstDone   bool `clone:"deep"` // first-strike pass's damage dealt and priority granted
 	regularDone bool `clone:"deep"` // regular pass's damage dealt
+	// regularRound marks the priority round after the regular pass (CR
+	// 510.3) as begun: a re-entry while it is open continues it, and only
+	// all players passing with an empty stack ends the step (advanceStep).
+	regularRound bool `clone:"deep"`
 
 	// priorityPending marks the between-passes priority round (CR 510.3/4) as
 	// owed: the first-strike pass's damage is dealt and its SBA tail posed an
@@ -1462,11 +1466,36 @@ func (e *Engine) combatStep() {
 		e.beginCombatPass(false)
 		return
 	}
+	if e.combatRound.regularRound {
+		// The post-damage priority round (CR 510.3) is in progress: a pass
+		// that did not end it or a resolution re-enters the step loop here,
+		// exactly as the between-passes round does above. Only all players
+		// passing in succession with an empty stack ends the step, through
+		// advanceStep, which enters end of combat.
+		e.priorityRound()
+		return
+	}
 	// The regular pass's damage is dealt but its SBA tail was deferred for an
-	// SBA decision: completeCombatPass returned before the transition. Finish
-	// it now, exactly as the undeferred path would have.
-	e.combatRound = combatRound{}
-	e.enterEndCombat()
+	// SBA decision: completeCombatPass returned before the round. Open it
+	// now, exactly as the undeferred path would have.
+	e.regularDamageRound()
+}
+
+// regularDamageRound opens the combat damage step's priority round after the
+// regular pass (CR 510.3: "the active player gets priority"), so a trigger
+// that damage put on the stack resolves in the damage step, ahead of the end
+// of combat step and its "at end of combat" triggers (CR 511.2). A
+// first-strike combat reaches it from the tail of the between-passes round,
+// with the last passer holding priority and every pass counted; the active
+// player then receives priority anew with no passes (CR 117.3a/b), reset the
+// way enterEndCombat resets it. A combat with no first striker still holds
+// the step entry's reset, so no event is emitted for it.
+func (e *Engine) regularDamageRound() {
+	e.combatRound.regularRound = true
+	if e.G.Priority != e.G.Active || e.G.Passes != 0 {
+		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+	}
+	e.priorityRound()
 }
 
 // enterEndCombat moves a finished combat into the end of combat step (CR
@@ -1800,13 +1829,15 @@ func (e *Engine) completeCombatPass(pass bool) {
 		return
 	}
 	// Same displacement guard as the first-strike branch: an SBA decision
-	// outstanding from the tail defers the end-of-combat transition to
+	// outstanding from the tail defers the post-damage priority round to
 	// combatStep rather than letting it run under the ask.
 	if e.pending != nil {
 		return
 	}
-	e.combatRound = combatRound{}
-	e.enterEndCombat()
+	// CR 510.3: players receive priority in the combat damage step once the
+	// regular damage is dealt; the step ends (advanceStep) only when all of
+	// them pass in succession with an empty stack.
+	e.regularDamageRound()
 }
 
 // handleDamageDivision applies an answered damage-division decision (CR
