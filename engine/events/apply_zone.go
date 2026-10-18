@@ -705,8 +705,8 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 			// the "counter" half is placed through the engine's CounterChange
 			// path, so only the consumption is left here.
 			o.UnleashChoice = ""
-			// CR 400.7: a battlefield entry from another zone is a new object
-			// with no memory of its former existence, so it carries no
+			// CR 400.7: a battlefield RE-entry from another zone is a new
+			// object with no memory of its former existence, so it carries no
 			// remembered list from its previous incarnation. Without this, a
 			// permanent that left the battlefield and returned (a
 			// bounced-and-replayed or reanimated Curator of Destinies) would
@@ -717,7 +717,29 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 			// for the old incarnation's pending referents (the O-Ring /
 			// UntilHostLeavesPlay premise); this is its reset on the next
 			// entry.
-			o.Remembered = nil
+			//
+			// Two entries are deliberately NOT the reset:
+			//   - a first entry (Incarnation 1): an object that has never
+			//     been a permanent has no former existence to forget, and the
+			//     memory a spell or copy carried onto the battlefield is
+			//     deliberate -- a spell's cast-time Craft material
+			//     (rememberCraftMaterials, written before the resolving
+			//     spell's entry) and a CopyPermanent token's inherited
+			//     remembered set (TokenRemembered$, the Hofri Spirit) both
+			//     enter through this arm and must survive it.
+			//   - a Transformed$ True entry (CR 711.10a: the object enters
+			//     back face up): Craft's `Transform this permanent` is
+			//     CR 701.27, not a zone change, and this build renders that
+			//     in-place transform as a self-exile plus a Transformed$
+			//     re-entry (kwCraft's ChangeZone body). The transformed face
+			//     is the SAME object continuing (CR 712.4), so the material
+			//     its cast remembered is still its own. The leave arm above
+			//     resets the face for every battlefield departure, so a back
+			//     face at this point can only be a Transformed$ entry, never
+			//     a prior incarnation's.
+			if o.Incarnation > 1 && !(o.Card != nil && o.Card.IsTransformingDFC() && o.FaceIdx != 0) {
+				o.Remembered = nil
+			}
 		}
 		// A face-down entry (a manifest) is a 2/2 creature with no abilities
 		// (CR 708.5), so it grants none of the entry counters above; the
