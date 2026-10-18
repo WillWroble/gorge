@@ -15,7 +15,10 @@ import "testing"
 //     logs a SpellCastReversed event, shifting every later seq by +7 here;
 //     the card list and verdicts of the game are otherwise identical; then
 //     3246 until botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moved the
-//     bots' trajectory, same card and verdict);
+//     bots' trajectory, same card and verdict; then 4637 until the combat
+//     priority fixes (rules e7aaf1530 and 93b6057e4, CR 510.4/117.3a: more
+//     priority windows in combat) moved it to seq 4897, same card and
+//     verdict);
 //   - 11056: the Artisan finding is no longer reached; a clean,
 //     control-equivalent game;
 //   - 10056: Lagomos, Hand of Hatred was equivalent at seq 6750 (the
@@ -29,7 +32,7 @@ import "testing"
 //
 // roundNineWant holds those pins.
 var roundNineWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
-	10860: {4637: ""},
+	10860: {4897: ""},
 	11056: {},
 	10056: {},
 	8175:  {},
