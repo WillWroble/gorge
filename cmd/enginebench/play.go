@@ -61,6 +61,7 @@ const maxPanics = 8
 type intentScratch struct {
 	pool []int
 	perm []int
+	cand []autopayCand
 }
 
 // permInto fills s.perm[:n] with the identity and shuffles it in place with
@@ -145,6 +146,70 @@ func randomIntent(d *decision.Decision, r *rand.Rand, s *intentScratch) decision
 	return decision.Intent{Seq: d.Seq, Player: d.Player, Choices: ch}
 }
 
+// autopayCand is one autopay-random candidate: a legacy option (opt >= 0),
+// paid by the action plan when plan >= 0, or a plan-only cast (opt < 0).
+type autopayCand struct{ opt, plan int }
+
+// firstPayable is the index of the first action in d.PaymentActions with a
+// plan for obj, or -1. The heuristic bot keeps the first per object too.
+func firstPayable(d *decision.Decision, obj state.ObjID) int {
+	for i := range d.PaymentActions {
+		if a := &d.PaymentActions[i]; len(a.Plans) != 0 && a.Cast.Object == obj {
+			return i
+		}
+	}
+	return -1
+}
+
+// autopayIntent is the random row's -autopay answer at a priority decision
+// (the caller has run EnsurePaymentActions): one uniform draw over the
+// candidate list the auto-pay heuristic bot builds (bots/heuristic
+// paymentIntent), without the bot's ranking or its manual-tap gate. Mana
+// "activate" options and concede are dropped; a legacy ordinary cast (Mode ""
+// and AltCostIndex 0) of an object with a plan submits that plan; every
+// other payable object gains one plan-only cast. A plan pays its cost
+// atomically, so the player never floats mana it then loses, and its games
+// run as long as the kernel's random player's (dirty-dirac kplay -a random,
+// which always autopays) instead of the manual row's ~42 turns on pair A.
+func autopayIntent(d *decision.Decision, r *rand.Rand, s *intentScratch) decision.Intent {
+	c := s.cand[:0]
+	for i := range d.Options {
+		o := &d.Options[i]
+		if o.Kind == "concede" || o.Kind == "activate" {
+			continue
+		}
+		plan := -1
+		if o.Kind == "cast" && o.AltCostIndex == 0 && o.Mode == "" {
+			plan = firstPayable(d, o.Obj)
+		}
+		c = append(c, autopayCand{opt: i, plan: plan})
+	}
+	legacy := len(c)
+	for i := range d.PaymentActions {
+		a := &d.PaymentActions[i]
+		if len(a.Plans) == 0 || firstPayable(d, a.Cast.Object) != i {
+			continue
+		}
+		dup := false
+		for _, k := range c[:legacy] {
+			if k.plan >= 0 && d.PaymentActions[k.plan].Cast.Object == a.Cast.Object {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			c = append(c, autopayCand{opt: -1, plan: i})
+		}
+	}
+	s.cand = c
+	pick := c[r.IntN(len(c))]
+	if pick.plan >= 0 {
+		a := &d.PaymentActions[pick.plan]
+		return decision.Intent{Seq: d.Seq, Player: d.Player, Payment: &decision.PaymentSelection{ActionID: a.ID, Plan: decision.ClonePaymentPlan(a.Plans[0])}}
+	}
+	return decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{pick.opt}}
+}
+
 // fitBlockBounds drops every chosen blocker of an attacker whose blocker
 // count falls outside its published MinBlockers/MaxBlockers bounds, and every
 // lone blocker of menace (the attacker the engine named in a rejection;
@@ -196,6 +261,12 @@ func playRandom(cfg rules.Config, st *randomStats) {
 }
 
 func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool) {
+	playRandomGame(cfg, st, pool, false)
+}
+
+// playRandomGame is one random game; autopay answers priority decisions with
+// autopayIntent instead of randomIntent's manual taps.
+func playRandomGame(cfg rules.Config, st *randomStats, pool *bench.SparePool, autopay bool) {
 	r := rand.New(rand.NewPCG(cfg.Seed, cfg.Seed^0x5bd1e9955bd1e995))
 	// W3: the random client's reusable draw buffers, per game.
 	var scratch intentScratch
@@ -263,12 +334,21 @@ func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool
 				return
 			}
 			d := e.Pending()
+			payPrio := autopay && d.Kind == decision.KPriority
+			if payPrio {
+				e.EnsurePaymentActions()
+			}
 			if walkStatsFlag {
 				wm.observe(e, d)
 			}
 			ok := false
 			for try := 0; try < retries; try++ {
-				in := randomIntent(d, r, &scratch)
+				var in decision.Intent
+				if payPrio {
+					in = autopayIntent(d, r, &scratch)
+				} else {
+					in = randomIntent(d, r, &scratch)
+				}
 				err := e.Submit(in)
 				if fixed, ok := menaceRepair(d, in, err); ok {
 					err = e.Submit(fixed)
@@ -313,19 +393,22 @@ func playRandomWithPool(cfg rules.Config, st *randomStats, pool *bench.SparePool
 	}
 }
 
-func runRandom(r *result, w workload, pair string, base uint64, secs float64) error {
+func runRandom(r *result, w workload, pair string, base uint64, secs float64, autopay bool) error {
 	decks, names, err := w.decks(pair)
 	if err != nil {
 		return err
 	}
+	if autopay {
+		r.Row = "random-autopay"
+	}
 	var warm randomStats
 	for g := 0; g < warmGames; g++ {
-		playRandom(w.config(decks, names, base, g), &warm)
+		playRandomGame(w.config(decks, names, base, g), &warm, &sparePool, autopay)
 	}
 	var st randomStats
 	t0, c0 := time.Now(), cpuNow()
 	for g := 0; cpuNow()-c0 < secs; g++ {
-		playRandom(w.config(decks, names, base, g), &st)
+		playRandomGame(w.config(decks, names, base, g), &st, &sparePool, autopay)
 	}
 	el, cpu := time.Since(t0).Seconds(), cpuNow()-c0
 	fill(r, el, cpu, st.Games, st.Turns, st.Decisions, st.Stalls)
