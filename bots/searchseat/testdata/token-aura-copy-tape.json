@@ -1063,404 +1063,404 @@
    ]
   },
   {
-   "seq": 680,
+   "seq": 679,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 684,
+   "seq": 683,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 690,
+   "seq": 688,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 694,
+   "seq": 692,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 699,
+   "seq": 698,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 703,
+   "seq": 702,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 715,
+   "seq": 707,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 711,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 723,
    "player": 1,
    "choices": [
     3
    ]
   },
   {
-   "seq": 719,
+   "seq": 727,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 725,
+   "seq": 733,
    "player": 1,
    "choices": [
     3
    ]
   },
   {
-   "seq": 729,
+   "seq": 737,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 734,
+   "seq": 742,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 740,
+   "seq": 748,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 746,
+   "seq": 754,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 752,
+   "seq": 760,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 758,
+   "seq": 766,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 764,
+   "seq": 772,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 768,
+   "seq": 776,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 774,
+   "seq": 782,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 780,
+   "seq": 788,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 784,
+   "seq": 792,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 790,
+   "seq": 798,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 794,
+   "seq": 802,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 800,
+   "seq": 808,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 804,
+   "seq": 812,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 809,
+   "seq": 817,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 813,
+   "seq": 821,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 819,
+   "seq": 827,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 823,
+   "seq": 831,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 828,
+   "seq": 836,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 832,
+   "seq": 840,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 845,
-   "player": 0,
-   "choices": [
-    4
-   ]
-  },
-  {
-   "seq": 849,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 855,
+   "seq": 853,
    "player": 0,
    "choices": [
     4
    ]
   },
   {
-   "seq": 859,
+   "seq": 857,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 864,
+   "seq": 863,
+   "player": 0,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 867,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 872,
    "player": 0,
    "choices": [
     3
    ]
   },
   {
-   "seq": 870,
+   "seq": 878,
    "player": 0,
    "choices": [
     4
    ]
   },
   {
-   "seq": 876,
+   "seq": 884,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 882,
+   "seq": 890,
    "player": 0,
    "choices": [
     3
-   ]
-  },
-  {
-   "seq": 888,
-   "player": 0,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 892,
-   "player": 0,
-   "choices": [
-    0
    ]
   },
   {
    "seq": 896,
    "player": 0,
    "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 900,
+   "player": 0,
+   "choices": [
     0
    ]
   },
   {
-   "seq": 903,
+   "seq": 904,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 911,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 907,
+   "seq": 915,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 914,
+   "seq": 922,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 918,
+   "seq": 926,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 923,
+   "seq": 931,
    "player": 0,
    "choices": null
   },
   {
-   "seq": 930,
+   "seq": 938,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 934,
+   "seq": 942,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 937,
+   "seq": 945,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 940,
+   "seq": 948,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 947,
+   "seq": 955,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 951,
+   "seq": 959,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 958,
+   "seq": 966,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 962,
+   "seq": 970,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 974,
+   "seq": 982,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 978,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 984,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 988,
+   "seq": 986,
    "player": 1,
    "choices": [
     0
@@ -1474,27 +1474,29 @@
    ]
   },
   {
-   "seq": 997,
-   "player": 0,
+   "seq": 996,
+   "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1001,
-   "player": 1,
+   "seq": 1000,
+   "player": 0,
    "choices": [
     0
    ]
   },
   {
    "seq": 1005,
-   "player": 1,
-   "choices": null
+   "player": 0,
+   "choices": [
+    0
+   ]
   },
   {
    "seq": 1009,
-   "player": 0,
+   "player": 1,
    "choices": [
     0
    ]
@@ -1502,250 +1504,269 @@
   {
    "seq": 1013,
    "player": 1,
+   "choices": null
+  },
+  {
+   "seq": 1017,
+   "player": 0,
    "choices": [
     0
    ]
   },
   {
    "seq": 1021,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1025,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1031,
+   "seq": 1028,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1035,
+   "seq": 1032,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1040,
+   "seq": 1037,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1044,
+   "seq": 1041,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1057,
+   "seq": 1047,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1051,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1056,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1060,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1073,
    "player": 1,
    "choices": [
     3
    ]
   },
   {
-   "seq": 1061,
+   "seq": 1077,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1067,
+   "seq": 1083,
    "player": 1,
    "choices": [
     3
    ]
   },
   {
-   "seq": 1071,
+   "seq": 1087,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1076,
+   "seq": 1092,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1082,
+   "seq": 1098,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1088,
+   "seq": 1104,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1094,
+   "seq": 1110,
    "player": 1,
    "choices": [
     1
-   ]
-  },
-  {
-   "seq": 1100,
-   "player": 1,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1106,
-   "player": 1,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1112,
-   "player": 1,
-   "choices": [
-    0
    ]
   },
   {
    "seq": 1116,
-   "player": 0,
+   "player": 1,
    "choices": [
-    0
+    1
    ]
   },
   {
    "seq": 1122,
    "player": 1,
    "choices": [
-    0
+    1
    ]
   },
   {
-   "seq": 1126,
-   "player": 0,
+   "seq": 1128,
+   "player": 1,
    "choices": [
     0
    ]
   },
   {
    "seq": 1132,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1136,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1140,
+   "seq": 1138,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1145,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1149,
+   "seq": 1142,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1155,
+   "seq": 1148,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1159,
+   "seq": 1152,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1168,
+   "seq": 1156,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1172,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1178,
+   "seq": 1161,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1182,
+   "seq": 1165,
    "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1171,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1175,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1183,
+   "player": 1,
    "choices": [
     0
    ]
   },
   {
    "seq": 1187,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1192,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1191,
+   "seq": 1196,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1205,
-   "player": 0,
+   "seq": 1202,
+   "player": 1,
    "choices": [
-    5
+    0
    ]
   },
   {
-   "seq": 1209,
+   "seq": 1206,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1211,
    "player": 1,
    "choices": [
     0
@@ -1755,116 +1776,137 @@
    "seq": 1215,
    "player": 0,
    "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1229,
+   "player": 0,
+   "choices": [
     5
    ]
   },
   {
-   "seq": 1219,
+   "seq": 1233,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1224,
+   "seq": 1239,
+   "player": 0,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1243,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1248,
    "player": 0,
    "choices": [
     3
    ]
   },
   {
-   "seq": 1230,
+   "seq": 1254,
    "player": 0,
    "choices": [
     3
    ]
   },
   {
-   "seq": 1236,
+   "seq": 1260,
    "player": 0,
    "choices": [
     3
    ]
   },
   {
-   "seq": 1242,
+   "seq": 1266,
    "player": 0,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1246,
+   "seq": 1270,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1250,
+   "seq": 1274,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1256,
+   "seq": 1280,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1262,
+   "seq": 1286,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1269,
+   "seq": 1293,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1273,
+   "seq": 1297,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1279,
+   "seq": 1303,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1283,
+   "seq": 1307,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1288,
+   "seq": 1312,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1292,
+   "seq": 1316,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1296,
+   "seq": 1320,
    "player": 0,
    "choices": [
     0,
@@ -1872,120 +1914,99 @@
    ]
   },
   {
-   "seq": 1302,
+   "seq": 1326,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1306,
+   "seq": 1330,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1310,
+   "seq": 1334,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1314,
+   "seq": 1338,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1318,
+   "seq": 1342,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1335,
+   "seq": 1358,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1339,
+   "seq": 1362,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1344,
+   "seq": 1367,
    "player": 0,
    "choices": null
   },
   {
-   "seq": 1351,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1355,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1361,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1365,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1370,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
    "seq": 1374,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1388,
-   "player": 1,
-   "choices": [
-    4
-   ]
-  },
-  {
-   "seq": 1392,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1398,
+   "seq": 1378,
    "player": 1,
    "choices": [
-    4
+    0
+   ]
+  },
+  {
+   "seq": 1383,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1387,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1393,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1397,
+   "player": 1,
+   "choices": [
+    0
    ]
   },
   {
@@ -1996,108 +2017,94 @@
    ]
   },
   {
-   "seq": 1407,
+   "seq": 1406,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1420,
    "player": 1,
    "choices": [
     4
    ]
   },
   {
-   "seq": 1413,
+   "seq": 1424,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1430,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 1434,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1439,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 1445,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1419,
+   "seq": 1451,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1425,
+   "seq": 1457,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1431,
+   "seq": 1463,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1435,
+   "seq": 1467,
    "player": 1,
    "choices": [
     6
    ]
   },
   {
-   "seq": 1442,
+   "seq": 1474,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1446,
+   "seq": 1478,
    "player": 0,
    "choices": [
     0
-   ]
-  },
-  {
-   "seq": 1453,
-   "player": 1,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1457,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1462,
-   "player": 1,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1466,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1470,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1475,
-   "player": 1,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1479,
-   "player": 0,
-   "choices": [
-    1
    ]
   },
   {
@@ -2115,28 +2122,35 @@
    ]
   },
   {
-   "seq": 1498,
+   "seq": 1494,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1502,
+   "seq": 1498,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1508,
+   "seq": 1502,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1507,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1512,
+   "seq": 1511,
    "player": 0,
    "choices": [
     1
@@ -2157,129 +2171,129 @@
    ]
   },
   {
-   "seq": 1536,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 1540,
+   "seq": 1529,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1546,
+   "seq": 1533,
    "player": 0,
    "choices": [
-    7
+    1
    ]
   },
   {
-   "seq": 1550,
+   "seq": 1538,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1555,
+   "seq": 1542,
    "player": 0,
    "choices": [
-    3
+    1
+   ]
+  },
+  {
+   "seq": 1548,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1552,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1557,
+   "player": 1,
+   "choices": [
+    2
    ]
   },
   {
    "seq": 1561,
    "player": 0,
    "choices": [
-    3
-   ]
-  },
-  {
-   "seq": 1567,
-   "player": 0,
-   "choices": [
-    3
-   ]
-  },
-  {
-   "seq": 1573,
-   "player": 0,
-   "choices": [
-    3
-   ]
-  },
-  {
-   "seq": 1579,
-   "player": 0,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1583,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1587,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1593,
-   "player": 0,
-   "choices": [
     1
    ]
   },
   {
-   "seq": 1599,
+   "seq": 1576,
    "player": 0,
    "choices": [
-    0
+    7
    ]
   },
   {
-   "seq": 1606,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1610,
+   "seq": 1580,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1616,
+   "seq": 1586,
    "player": 0,
    "choices": [
-    0
+    7
    ]
   },
   {
-   "seq": 1620,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1624,
+   "seq": 1590,
    "player": 1,
    "choices": [
     2
+   ]
+  },
+  {
+   "seq": 1595,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1601,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1607,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1613,
+   "player": 0,
+   "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 1619,
+   "player": 0,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1623,
+   "player": 0,
+   "choices": [
+    0
    ]
   },
   {
@@ -2290,28 +2304,28 @@
    ]
   },
   {
+   "seq": 1633,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
    "seq": 1639,
    "player": 0,
    "choices": [
-    1
+    0
    ]
   },
   {
-   "seq": 1643,
-   "player": 1,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1648,
+   "seq": 1646,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1652,
+   "seq": 1650,
    "player": 1,
    "choices": [
     2
@@ -2325,206 +2339,206 @@
    ]
   },
   {
-   "seq": 1661,
+   "seq": 1660,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1665,
+   "seq": 1664,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1671,
+   "seq": 1667,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 1679,
    "player": 0,
    "choices": [
     1
-   ]
-  },
-  {
-   "seq": 1675,
-   "player": 1,
-   "choices": [
-    2
    ]
   },
   {
    "seq": 1683,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1687,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1693,
+   "seq": 1688,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1697,
+   "seq": 1692,
    "player": 1,
    "choices": [
     2
    ]
   },
   {
-   "seq": 1702,
+   "seq": 1696,
    "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1706,
-   "player": 1,
-   "choices": [
-    2
-   ]
-  },
-  {
-   "seq": 1719,
-   "player": 1,
-   "choices": [
-    5
-   ]
-  },
-  {
-   "seq": 1723,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1729,
-   "player": 1,
-   "choices": [
-    5
-   ]
-  },
-  {
-   "seq": 1733,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1738,
-   "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1744,
+   "seq": 1701,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1705,
    "player": 1,
    "choices": [
-    0
+    2
+   ]
+  },
+  {
+   "seq": 1711,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1715,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1722,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1726,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1731,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1735,
+   "player": 1,
+   "choices": [
+    2
+   ]
+  },
+  {
+   "seq": 1741,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1745,
+   "player": 1,
+   "choices": [
+    2
    ]
   },
   {
    "seq": 1750,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1756,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1762,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1769,
-   "player": 1,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1773,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1779,
+   "seq": 1754,
    "player": 1,
    "choices": [
-    1
+    2
    ]
   },
   {
-   "seq": 1783,
+   "seq": 1767,
+   "player": 1,
+   "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1771,
    "player": 0,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1788,
+   "seq": 1777,
    "player": 1,
    "choices": [
+    5
+   ]
+  },
+  {
+   "seq": 1781,
+   "player": 0,
+   "choices": [
     1
+   ]
+  },
+  {
+   "seq": 1786,
+   "player": 1,
+   "choices": [
+    0
    ]
   },
   {
    "seq": 1792,
-   "player": 0,
+   "player": 1,
    "choices": [
-    1
+    0
    ]
   },
   {
    "seq": 1798,
    "player": 1,
    "choices": [
-    1
+    0
    ]
   },
   {
-   "seq": 1802,
-   "player": 0,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 1807,
+   "seq": 1804,
    "player": 1,
    "choices": [
-    1
+    0
    ]
   },
   {
-   "seq": 1811,
-   "player": 0,
+   "seq": 1810,
+   "player": 1,
    "choices": [
-    1
+    0
    ]
   },
   {
@@ -2542,14 +2556,28 @@
    ]
   },
   {
-   "seq": 1826,
+   "seq": 1827,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1830,
+   "seq": 1831,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1836,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1840,
    "player": 0,
    "choices": [
     1
@@ -2557,72 +2585,57 @@
   },
   {
    "seq": 1846,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 1850,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1856,
+   "seq": 1850,
    "player": 0,
    "choices": [
-    8
+    1
    ]
   },
   {
-   "seq": 1860,
+   "seq": 1855,
    "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1859,
+   "player": 0,
    "choices": [
     1
    ]
   },
   {
    "seq": 1865,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 1871,
-   "player": 0,
-   "choices": [
-    9
-   ]
-  },
-  {
-   "seq": 1875,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1880,
+   "seq": 1869,
    "player": 0,
    "choices": [
-    9
+    1
    ]
   },
   {
-   "seq": 1884,
+   "seq": 1874,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1888,
+   "seq": 1878,
    "player": 0,
    "choices": [
-    0,
     1
    ]
   },
@@ -2630,7 +2643,7 @@
    "seq": 1894,
    "player": 0,
    "choices": [
-    9
+    8
    ]
   },
   {
@@ -2641,51 +2654,59 @@
    ]
   },
   {
-   "seq": 1902,
+   "seq": 1904,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1908,
    "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1913,
+   "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1906,
+   "seq": 1919,
    "player": 0,
    "choices": [
     9
    ]
   },
   {
-   "seq": 1910,
-   "player": 1,
-   "choices": [
-    1
-   ]
-  },
-  {
    "seq": 1923,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 1927,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 1933,
+   "seq": 1928,
    "player": 0,
    "choices": [
-    8
+    9
    ]
   },
   {
-   "seq": 1937,
+   "seq": 1932,
    "player": 1,
    "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1936,
+   "player": 0,
+   "choices": [
+    0,
     1
    ]
   },
@@ -2693,7 +2714,7 @@
    "seq": 1942,
    "player": 0,
    "choices": [
-    8
+    9
    ]
   },
   {
@@ -2704,135 +2725,137 @@
    ]
   },
   {
-   "seq": 1960,
+   "seq": 1950,
    "player": 1,
    "choices": [
-    6
+    0
    ]
   },
   {
-   "seq": 1964,
+   "seq": 1954,
    "player": 0,
    "choices": [
-    8
+    9
+   ]
+  },
+  {
+   "seq": 1958,
+   "player": 1,
+   "choices": [
+    1
    ]
   },
   {
    "seq": 1970,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1974,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1979,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1983,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1989,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 1993,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 1998,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2002,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2016,
    "player": 1,
    "choices": [
     6
    ]
   },
   {
-   "seq": 1974,
+   "seq": 2020,
    "player": 0,
    "choices": [
     8
    ]
   },
   {
-   "seq": 1979,
+   "seq": 2026,
+   "player": 1,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2030,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2035,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 1985,
+   "seq": 2041,
    "player": 1,
    "choices": [
     3
-   ]
-  },
-  {
-   "seq": 1991,
-   "player": 1,
-   "choices": [
-    3
-   ]
-  },
-  {
-   "seq": 1997,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2003,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2009,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2015,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2021,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2028,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2032,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2038,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2042,
-   "player": 0,
-   "choices": [
-    8
    ]
   },
   {
    "seq": 2047,
    "player": 1,
    "choices": [
+    3
+   ]
+  },
+  {
+   "seq": 2053,
+   "player": 1,
+   "choices": [
     0
    ]
-  },
-  {
-   "seq": 2051,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2055,
-   "player": 1,
-   "choices": null
   },
   {
    "seq": 2059,
@@ -2842,77 +2865,152 @@
    ]
   },
   {
-   "seq": 2063,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2068,
+   "seq": 2065,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2072,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2078,
+   "seq": 2071,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2082,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2087,
+   "seq": 2077,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2091,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2101,
-   "player": 0,
-   "choices": [
-    8
-   ]
-  },
-  {
-   "seq": 2105,
+   "seq": 2084,
    "player": 1,
    "choices": [
     0
+   ]
+  },
+  {
+   "seq": 2088,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2094,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2098,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2103,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2107,
+   "player": 0,
+   "choices": [
+    8
    ]
   },
   {
    "seq": 2111,
+   "player": 1,
+   "choices": null
+  },
+  {
+   "seq": 2115,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2119,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2124,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2128,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2134,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2138,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2143,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2147,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2157,
+   "player": 0,
+   "choices": [
+    8
+   ]
+  },
+  {
+   "seq": 2161,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2167,
    "player": 0,
    "choices": null,
    "payment": {
-    "action_id": "bf42af43580416f1bcd726bd29837d4d5c8453b6160349e1ac6a15ab0d1eb988",
+    "action_id": "4fddebf763651196400457f15b7d4f8624193e3fe9e9f803475c117e002794f3",
     "plan": {
      "version": 1,
-     "id": "37177ac158a30c1f9275eb7e122ce656ed6f305fb57c242e7109d9746bd86471",
+     "id": "ef5b07c3a32cfeede1daa6e145404320b17d49ae2b71721acde18b7387f63375",
      "cost": {
       "generic": 1,
       "mana": [
@@ -2927,7 +3025,7 @@
      "activations": [
       {
        "source": 16,
-       "source_zone_seq": 879,
+       "source_zone_seq": 887,
        "ability": {
         "kind": "intrinsic",
         "intrinsic": "basic_land"
@@ -2943,7 +3041,7 @@
       },
       {
        "source": 30,
-       "source_zone_seq": 1590,
+       "source_zone_seq": 1630,
        "ability": {
         "kind": "intrinsic",
         "intrinsic": "basic_land"
@@ -2978,78 +3076,8 @@
    }
   },
   {
-   "seq": 2115,
+   "seq": 2171,
    "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2118,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2129,
-   "player": 0,
-   "choices": [
-    6
-   ]
-  },
-  {
-   "seq": 2133,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2142,
-   "player": 0,
-   "choices": [
-    6
-   ]
-  },
-  {
-   "seq": 2146,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2151,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2157,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2161,
-   "player": 1,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2166,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2170,
-   "player": 1,
    "choices": [
     0
    ]
@@ -3062,73 +3090,80 @@
    ]
   },
   {
-   "seq": 2179,
+   "seq": 2185,
    "player": 0,
    "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2183,
-   "player": 1,
-   "choices": [
-    0
+    6
    ]
   },
   {
    "seq": 2189,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2193,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2201,
+   "seq": 2198,
    "player": 0,
    "choices": [
-    7
+    6
    ]
   },
   {
-   "seq": 2205,
+   "seq": 2202,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2211,
+   "seq": 2207,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2213,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2215,
+   "seq": 2217,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2220,
+   "seq": 2222,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2224,
+   "seq": 2226,
    "player": 1,
    "choices": [
     0
+   ]
+  },
+  {
+   "seq": 2230,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2235,
+   "player": 0,
+   "choices": [
+    7
    ]
   },
   {
@@ -3139,175 +3174,161 @@
    ]
   },
   {
-   "seq": 2243,
-   "player": 1,
-   "choices": [
-    6
-   ]
-  },
-  {
-   "seq": 2247,
+   "seq": 2245,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2251,
+   "seq": 2249,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2258,
-   "player": 1,
-   "choices": [
-    6
-   ]
-  },
-  {
-   "seq": 2262,
+   "seq": 2256,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2268,
+   "seq": 2260,
    "player": 1,
    "choices": [
-    6
+    0
    ]
   },
   {
-   "seq": 2272,
+   "seq": 2265,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2277,
+   "seq": 2269,
    "player": 1,
    "choices": [
-    4
+    0
    ]
   },
   {
-   "seq": 2283,
-   "player": 1,
+   "seq": 2275,
+   "player": 0,
    "choices": [
-    4
+    7
    ]
   },
   {
-   "seq": 2289,
+   "seq": 2279,
    "player": 1,
    "choices": [
-    1
+    0
    ]
   },
   {
-   "seq": 2295,
-   "player": 1,
+   "seq": 2284,
+   "player": 0,
    "choices": [
-    1
+    7
    ]
   },
   {
-   "seq": 2301,
+   "seq": 2288,
    "player": 1,
    "choices": [
-    1
+    0
+   ]
+  },
+  {
+   "seq": 2303,
+   "player": 1,
+   "choices": [
+    0
    ]
   },
   {
    "seq": 2307,
    "player": 1,
    "choices": [
-    1
+    6
    ]
   },
   {
-   "seq": 2313,
+   "seq": 2311,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2315,
    "player": 1,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2319,
+   "seq": 2322,
    "player": 1,
    "choices": [
-    1
+    6
    ]
   },
   {
-   "seq": 2323,
+   "seq": 2326,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2329,
+   "seq": 2332,
    "player": 1,
    "choices": [
-    1
+    6
    ]
   },
   {
-   "seq": 2333,
+   "seq": 2336,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2339,
+   "seq": 2341,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 2347,
+   "player": 1,
+   "choices": [
+    4
+   ]
+  },
+  {
+   "seq": 2353,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2343,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2348,
+   "seq": 2359,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2352,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2358,
-   "player": 1,
-   "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 2362,
-   "player": 0,
-   "choices": [
-    7
-   ]
-  },
-  {
-   "seq": 2367,
+   "seq": 2365,
    "player": 1,
    "choices": [
     1
@@ -3315,72 +3336,86 @@
   },
   {
    "seq": 2371,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2377,
+   "player": 1,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2383,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2387,
    "player": 0,
    "choices": [
     7
    ]
   },
   {
-   "seq": 2383,
-   "player": 0,
-   "choices": [
-    9
-   ]
-  },
-  {
-   "seq": 2387,
+   "seq": 2393,
    "player": 1,
    "choices": [
     1
-   ]
-  },
-  {
-   "seq": 2393,
-   "player": 0,
-   "choices": [
-    9
    ]
   },
   {
    "seq": 2397,
+   "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2403,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2402,
+   "seq": 2407,
    "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2412,
+   "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2408,
+   "seq": 2416,
    "player": 0,
+   "choices": [
+    7
+   ]
+  },
+  {
+   "seq": 2422,
+   "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2414,
+   "seq": 2426,
    "player": 0,
    "choices": [
-    1
-   ]
-  },
-  {
-   "seq": 2420,
-   "player": 0,
-   "choices": [
-    0
-   ]
-  },
-  {
-   "seq": 2427,
-   "player": 0,
-   "choices": [
-    6
+    7
    ]
   },
   {
@@ -3391,63 +3426,140 @@
    ]
   },
   {
-   "seq": 2437,
+   "seq": 2435,
    "player": 0,
    "choices": [
-    6
+    7
    ]
   },
   {
-   "seq": 2441,
+   "seq": 2447,
+   "player": 0,
+   "choices": [
+    9
+   ]
+  },
+  {
+   "seq": 2451,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2446,
+   "seq": 2457,
    "player": 0,
    "choices": [
-    6
+    9
    ]
   },
   {
-   "seq": 2450,
+   "seq": 2461,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2454,
+   "seq": 2466,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2472,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2478,
+   "player": 0,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2484,
    "player": 0,
    "choices": [
     0
    ]
   },
   {
-   "seq": 2459,
+   "seq": 2491,
    "player": 0,
    "choices": [
     6
    ]
   },
   {
-   "seq": 2463,
+   "seq": 2495,
    "player": 1,
    "choices": [
     1
    ]
   },
   {
-   "seq": 2469,
+   "seq": 2501,
    "player": 0,
    "choices": [
     6
    ]
   },
   {
-   "seq": 2473,
+   "seq": 2505,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2510,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2514,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2518,
+   "player": 0,
+   "choices": [
+    0
+   ]
+  },
+  {
+   "seq": 2523,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2527,
+   "player": 1,
+   "choices": [
+    1
+   ]
+  },
+  {
+   "seq": 2533,
+   "player": 0,
+   "choices": [
+    6
+   ]
+  },
+  {
+   "seq": 2537,
    "player": 1,
    "choices": [
     1
