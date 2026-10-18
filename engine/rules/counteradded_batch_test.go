@@ -14,16 +14,17 @@ package rules
 // TestCounterAddedBatchAmountReferentOnRealCard pins the binding on the real
 // corpus CounterAdded card Bloodcrazed Hoplite (the row's "whenever a +1/+1
 // counter is put on CARDNAME" shape). TestCounterAddedBatchAmountIsReadByTheBody
-// drives the same mode end to end through the trigger queue and a body that
-// reads TriggerCount$Amount, so the fix is proven at the resolution a player
-// actually sees, not only at the referent.
+// drives the same mode through the trigger queue and a body that reads
+// TriggerCount$Amount. Since ds2-fathommage a plain line fires once per counter
+// (CR 603.2c), so the batch now queues one instance per counter and the payoff
+// driver lives in ds2_counteradded_per_counter_test.go; this test pins the
+// queue count per event instead.
 
 import (
 	"testing"
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/events"
-	"github.com/adams-shaun/gorge/engine/state"
 )
 
 // TestCounterAddedBatchAmountReferentOnRealCard pins that a plain CounterAdded
@@ -67,11 +68,13 @@ func TestCounterAddedBatchAmountReferentOnRealCard(t *testing.T) {
 }
 
 // TestCounterAddedBatchAmountIsReadByTheBody drives Mode$ CounterAdded end to
-// end: one CounterChange event carrying a whole placement batch queues one
-// trigger, and the body's SVar:X:TriggerCount$Amount reads the batch size, so
-// the payoff draws exactly that many cards. A second batch of a different size
-// reads the NEW event's Amount (so the read is per event, not hard-coded), and
-// a batch of a different counter kind queues nothing (CounterType$ P1P1).
+// end. Since ds2-fathommage a PLAIN "whenever a counter is put" line fires once
+// per counter (CR 603.2c), so a 3-counter batch queues three instances and the
+// payoff is three draws -- the same total the batch-of-one account produced
+// when one instance read TriggerCount$Amount = 3. What this test still pins is
+// that the payoff SCALES with the event rather than being hard-coded: the
+// second, 2-counter batch draws two more. A batch of a different counter kind
+// queues nothing (CounterType$ P1P1).
 //
 // The card text is synthesized because no corpus Mode$ CounterAdded card
 // spells a "that many" body -- the corpus spells it on the Once/All variants,
@@ -80,9 +83,6 @@ func TestCounterAddedBatchAmountReferentOnRealCard(t *testing.T) {
 func TestCounterAddedBatchAmountIsReadByTheBody(t *testing.T) {
 	t.Parallel()
 	e := combatEngine(t)
-	// The engine deals opening hands; measure from the post-deal hand so the
-	// assertion compares a real delta.
-	handBefore := len(e.G.Zone(state.ZHand, 0))
 	src := "Name:Batch Chronicler\nManaCost:1 U\nTypes:Creature Wizard\nPT:1/1\nOracle:x\n" +
 		"T:Mode$ CounterAdded | ValidCard$ Card.Self | TriggerZones$ Battlefield | CounterType$ P1P1 | Execute$ TrigDraw\n" +
 		"SVar:TrigDraw:DB$ Draw | Defined$ You | NumCards$ X\n" +
@@ -94,29 +94,23 @@ func TestCounterAddedBatchAmountIsReadByTheBody(t *testing.T) {
 		t.Fatalf("synthetic trigger = %q/%q, want CounterAdded/TrigDraw", trig.Mode, trig.Params["Execute"])
 	}
 
-	// One batch of three: exactly one trigger, and the body draws three --
-	// the batch size, not one and not zero.
+	// One batch of three queues ONE INSTANCE PER COUNTER (CR 603.2c, since
+	// ds2-fathommage); that is the count gate here. Driving them to a payoff
+	// is ds2_counteradded_per_counter_test.go's job -- a fixture that drains
+	// them by hand must first answer the CR 603.3b order question they pose.
 	e.emit(events.Event{Kind: events.CounterChange, Obj: id, Counter: "P1P1", Amount: 3})
-	if len(e.pendingTriggers) != 1 {
-		t.Fatalf("pendingTriggers after a 3-counter batch = %d, want 1", len(e.pendingTriggers))
+	if len(e.pendingTriggers) != 3 {
+		t.Fatalf("pendingTriggers after a 3-counter batch = %d, want 3", len(e.pendingTriggers))
 	}
-	e.putTriggersOnStack()
-	e.resolveTop()
-	if got := len(e.G.Zone(state.ZHand, 0)); got != handBefore+3 {
-		t.Fatalf("hand after a 3-counter batch = %d, want %d (drew the batch size)", got, handBefore+3)
-	}
+	e.pendingTriggers = nil
 
-	// A different batch size (2) reads the new event's Amount: two more cards,
-	// not a repeat of the first batch's three.
+	// A different batch size (2) queues two more, not a repeat of the
+	// first batch's three.
 	e.emit(events.Event{Kind: events.CounterChange, Obj: id, Counter: "P1P1", Amount: 2})
-	if len(e.pendingTriggers) != 1 {
-		t.Fatalf("pendingTriggers after a second 2-counter batch = %d, want 1", len(e.pendingTriggers))
+	if len(e.pendingTriggers) != 2 {
+		t.Fatalf("pendingTriggers after a second 2-counter batch = %d, want 2", len(e.pendingTriggers))
 	}
-	e.putTriggersOnStack()
-	e.resolveTop()
-	if got := len(e.G.Zone(state.ZHand, 0)); got != handBefore+5 {
-		t.Fatalf("hand after a second 2-counter batch = %d, want %d", got, handBefore+5)
-	}
+	e.pendingTriggers = nil
 
 	// The counter kind still gates: a batch of a different kind is not
 	// "a +1/+1 counter" and queues nothing.

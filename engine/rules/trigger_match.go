@@ -1806,6 +1806,28 @@ func (e *Engine) checkFaceTriggers(observer *Engine, ev *events.Event, lki *stat
 					e.attachExploitedLKI(&pt, *ev)
 				}
 				setExcessTriggerAmount(&pt, mk, damageAmount)
+				// CR 603.2c: one event with several occurrences of the triggering
+				// condition triggers that many times. A CounterChange carries the
+				// whole placement batch in Amount, so a plain "whenever a counter
+				// is put on" line queues ONE instance per counter (Fathom Mage);
+				// the "one or more" (CounterAddedOnce/CounterRemovedOnce) and
+				// crossing (CounterAmount$/NewCounterAmount$) shapes stay one.
+				// Each instance carries the batch-of-one Amount, so a body that
+				// reads TriggerCount$Amount reads 1 per instance, and each
+				// resolves as its own choice -- Fathom Mage asks "may I draw?"
+				// once per counter. Ctx is a pointer, so the rewrite is made on
+				// the ORIGINAL entry before any copy: a shallow copy would share
+				// the Ctx and the last rewrite would win for every instance.
+				nInst := trigmatch.CounterAddedInstances(&t, ev)
+				if nInst == 0 {
+					nInst = trigmatch.CounterRemovedInstances(&t, ev)
+				}
+				if nInst > 1 {
+					pt.Ctx.TriggerContext.TriggerAmount = 1
+					for k := int32(1); k < nInst; k++ {
+						e.pendingTriggers = append(e.pendingTriggers, pt)
+					}
+				}
 				e.pendingTriggers = append(e.pendingTriggers, pt)
 				// stat:Panharmonicon (CR 702.109): "If a triggered ability of a
 				// ... permanent you control triggers, that ability triggers an

@@ -81,18 +81,26 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 			// sibling capture site (trigger_blocks.go, trigger_granted.go).
 			c.AttackingPlayer = player(e.controllerOf(o.ID))
 		}
-	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll:
+	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll,
+		cards.TriggerCounterRemoved:
 		// The batch size the body reads as TriggerCount$Amount (Simic
 		// Ascendancy's "put that many growth counters" on CounterAddedOnce,
-		// and the same read on a plain CounterAdded line): one CounterChange
-		// event carries the whole placement batch in Amount, and ev.Obj is
-		// the permanent the counters landed on. Both modes are dispatched by
-		// the same matcher (trigmatch.counterAddedMatches), so both must bind the same
-		// batch role -- the crossing gate is the matcher's job, the amount the
-		// body reads is this one, and a plain CounterAdded trigger that reads
-		// "that many" had nothing to read before this case named it.
+		// the plain CounterRemoved "that much" bodies, and the same read on a
+		// plain CounterAdded line): one CounterChange event carries the whole
+		// placement batch in Amount, and ev.Obj is the permanent the counters
+		// landed on. Every mode here is dispatched by the same matcher
+		// (trigmatch.counterAddedMatches / counterRemovedMatches), so all bind
+		// the same batch role -- the crossing gate is the matcher's job, the
+		// amount the body reads is this one, and a plain CounterAdded trigger
+		// that reads "that many" had nothing to read before this case named
+		// it. A plain (per-counter) line queues one instance per counter, and
+		// the queue site rewrites each extra instance's amount to 1.
 		c.TriggerCard = ev.Obj
-		c.TriggerAmount = ev.Amount
+		if ev.Amount < 0 {
+			c.TriggerAmount = -ev.Amount
+		} else {
+			c.TriggerAmount = ev.Amount
+		}
 	case cards.TriggerCounterPlayerAddedAll:
 		// The batch "whenever you put one or more counters on ..." mode's
 		// roles (Generous Patron, Rikku, Kros, All Will Be One): the
@@ -125,7 +133,9 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		// event carried is POSITIVE, so TriggerCount$Amount reads -ev.Amount
 		// (Chandra, Fire Artisan's "deals that much damage"; B.O.B. Bevy of
 		// Beebles; Regenerations Restored). ev.Obj is the permanent the
-		// counters left.
+		// counters left. Mode$ CounterRemoved binds the same roles in the
+		// Added/Removed arm above; this arm stays separate because the removal
+		// matcher's negative-Amount contract is its own.
 		c.TriggerCard = ev.Obj
 		if ev.Amount < 0 {
 			c.TriggerAmount = -ev.Amount
