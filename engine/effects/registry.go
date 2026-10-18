@@ -957,6 +957,14 @@ type castProhibitedHost interface {
 	CastProhibited(p state.PlayerID, id state.ObjID) bool
 }
 
+// castTargetsHost is castProhibitedHost's sibling for CR 601.2c: a spell
+// whose mandatory targets cannot all be chosen (Felling Blow with no creature
+// an opponent controls) cannot be cast, so effPlay never offers it. Optional
+// for the same reason; without it the beginPlay recheck is the only gate.
+type castTargetsHost interface {
+	CastTargetsUnavailable(p state.PlayerID, id state.ObjID) bool
+}
+
 // saMentionsKeywords reports whether any parameter of sa, or of a
 // sub-ability chained under it (the walk shares one Ctx), can name a
 // with<Keyword>/without<Keyword>/hasKeyword<Keyword> predicate.

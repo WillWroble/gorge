@@ -340,6 +340,19 @@ func effPlay(h Host, c *Ctx, sa *cards.SA) {
 		candidates = kept
 	}
 
+	// CR 601.2c: a spell with a mandatory target nobody can supply cannot be
+	// cast at all (Etali, Primal Conqueror's free Felling Blow with no
+	// opposing creature), so it is not offered either.
+	if ch, ok := h.(castTargetsHost); ok {
+		kept := make([]state.ObjID, 0, len(candidates))
+		for _, id := range candidates {
+			if !ch.CastTargetsUnavailable(playCtl, id) {
+				kept = append(kept, id)
+			}
+		}
+		candidates = kept
+	}
+
 	// Optional$ True makes the whole ask declinable (Min 0: the empty answer
 	// is a decline). Amount$ sizes the ask: the default (and an unparseable
 	// value, which stays conservative) is one card; a literal N offers up to
