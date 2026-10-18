@@ -241,6 +241,17 @@ func (e *Engine) askAttackers() {
 		opt.TapPoolCost = tapCosts[of.id]
 		opts = append(opts, opt)
 	}
+	// A CantChangeLife static (CR 119.7/119.8) makes every positive life
+	// charge on the paying seat infeasible -- a life cost of N>0 can't be
+	// paid at all -- so no offered pair may promise one; the pair fails
+	// closed for that payer rather than being offered and reversed at
+	// payment. "Players can always pay 0 life" (CR 119.4b) keeps a
+	// charge-free pair and a Phyrexian pip's colour face.
+	if e.playerLifeChangeForbidden(p) {
+		opts = slices.DeleteFunc(opts, func(o decision.Option) bool {
+			return o.CostLife > 0 || o.CostPhyrexian > 0
+		})
+	}
 	// A MaxAttackers$ ceiling (CR 508.1j, Silent Arbiter's shape) bounds the
 	// WHOLE declaration, so the decision's Max is the honest ceiling, not the
 	// option count: a client capped at Max can never assemble a declaration
@@ -1167,6 +1178,18 @@ func (e *Engine) askBlockers() {
 			continue
 		}
 		opts := append(make([]decision.Option, 0, len(built)), built...)
+		if e.playerLifeChangeForbidden(defender) {
+			// CR 119.7/119.8: that defender can't pay a positive life cost at
+			// all (the attack-side gate above), so a charged pair is not
+			// offered; CR 119.4b keeps the charge-free ones.
+			opts = slices.DeleteFunc(opts, func(o decision.Option) bool {
+				return o.CostLife > 0 || o.CostPhyrexian > 0
+			})
+		}
+		if len(opts) == 0 {
+			br.cursor++
+			continue
+		}
 		maxSum := 0
 		for _, opt := range opts {
 			if opt.Value > 0 {

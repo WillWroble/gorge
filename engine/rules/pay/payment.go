@@ -143,6 +143,14 @@ func PayManaDescriptorForSpent(e Engine, p state.PlayerID, d Descriptor, cost Co
 	beforeTyped := av.Typed
 	pay, ok := ResolveManaWith(cost, before, beforeSnow, beforeTyped, e.Game().Players[p].Life,
 		e.Eval().PayLifeInsteadOfB(p), rider, conv)
+	if e.Eval().LifeChangeForbidden(p) {
+		// CR 119.7/119.8: the payer's life total can't change, so the charge
+		// is re-resolved with every life face closed -- a fixed PayLife<N>, a
+		// Phyrexian pip's two life and K'rrik's 2-life {B}. An offer gate
+		// already refuses such a cost, so this can only be reached from a
+		// hand-built action; it must still never move the life total.
+		pay, ok = ResolveManaNoLifePay(cost, before, beforeSnow, beforeTyped, conv)
+	}
 
 	if !ok {
 		return false, state.Mana{}, state.Mana{}, state.Mana{}, [7]state.Mana{}
@@ -674,6 +682,15 @@ func CostPayableClass(e Engine, p state.PlayerID, d Descriptor, rider PipRider, 
 // (PayManaDescriptorForSpent) also keeps the grant, so a payer who declines
 // the window still spends the life.
 func CostPayableClassLife(e Engine, p state.PlayerID, d Descriptor, rider PipRider, cost Cost, lifeGrant bool) bool {
+	if e.Eval().LifeChangeForbidden(p) {
+		// CR 119.7/119.8: no positive life may be paid at all, so neither a
+		// fixed life part nor a Phyrexian/life pip alternative is available.
+		// CR 119.4b keeps a 0-life cost payable exactly as before.
+		av := AvailableFor(e, p, d)
+		_, ok := ResolveManaNoLifePay(cost, av.Pool, e.Game().Players[p].Snow, av.Typed,
+			e.Eval().Conv(p, d.ID, d.Class == PurposeActivated))
+		return ok
+	}
 	av := AvailableFor(e, p, d)
 	_, ok := ResolveManaWith(cost, av.Pool, e.Game().Players[p].Snow, av.Typed,
 		e.Game().Players[p].Life, lifeGrant, rider, e.Eval().Conv(p, d.ID, d.Class == PurposeActivated))
@@ -717,6 +734,13 @@ func CostPayable(e Engine, p state.PlayerID, id state.ObjID, ability bool, cost 
 // modes, so a potential action and the payment it promises can never disagree
 // about what the pool may satisfy.
 func CostPayablePool(e Engine, p state.PlayerID, id state.ObjID, ability bool, cost Cost, pool state.Mana, typed [7]state.Mana) bool {
+	if e.Eval().LifeChangeForbidden(p) {
+		// CR 119.7/119.8: the payer can pay no positive life, so the same
+		// closed-life resolve every other offer gate uses prices this
+		// hypothetical pool.
+		_, ok := ResolveManaNoLifePay(cost, pool, e.Game().Players[p].Snow, typed, e.Eval().Conv(p, id, ability))
+		return ok
+	}
 	if !cost.HasPips() {
 		// The B-life grant, the may-play riders and the ManaConvert set only
 		// ever widen or narrow a PIP's alternatives (costPips, pipAccepts);

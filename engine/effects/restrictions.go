@@ -554,6 +554,28 @@ func CantGainLifeParamsReadable(params map[string]string) bool {
 	return true
 }
 
+// CantChangeLifeParamsReadable is CantGainLifeParamsReadable's sibling for the
+// CR 119.7/119.8 CantChangeLife static ("your life total can't change"): the
+// readable parameters are the mode, the player scope (ValidPlayer$, every
+// corpus body spells You or a ChosenTarget-derived player, all through the
+// shared player grammar) and display text. Duration$ is deliberately absent
+// for the same reason as CantGainLife's: an explicit Duration$ is consumed by
+// effEffect's effectUntilEOT/UntilTurn reads BEFORE this gate is consulted, so
+// it never needs the whitelist's vouch -- measured, Perch Protection writes
+// Duration$ UntilYourNextTurn and must keep registering. A static carrying
+// any other parameter names a condition or scoping this build does not
+// evaluate; enforcing it blanket would over-restrict, so it is skipped /
+// reported, the permissive direction for a restriction. Secondary$ is
+// allowed for the same Forge duplicate-composition reason as its sibling.
+func CantChangeLifeParamsReadable(params map[string]string) bool {
+	for k := range params {
+		if !cantChangeLifeParamsReadableKeys.Has(k) {
+			return false
+		}
+	}
+	return true
+}
+
 // CantPlayLandParamsReadable limits the registered restriction to the player,
 // land-filter and origin fields enforced by rules.playLandForbidden.
 func CantPlayLandParamsReadable(params map[string]string) bool {
@@ -1201,6 +1223,8 @@ var cantExileRestrictionParamsReadableKeys = state.NewNameSet("Mode", "ValidCard
 var cantPutCounterParamsReadableKeys = state.NewNameSet("Mode", "ValidCard", "ValidObject", "ValidPlayer", "CounterType", "AffectedZone", "Duration", "Description", "Secondary")
 
 var cantGainLifeParamsReadableKeys = state.NewNameSet("Mode", "ValidPlayer", "Description", "Secondary")
+
+var cantChangeLifeParamsReadableKeys = state.NewNameSet("Mode", "ValidPlayer", "Description", "Secondary")
 
 var cantPlayLandParamsReadableKeys = map[string]struct{}{
 	"Mode": {}, "Player": {}, "ValidPlayer": {}, "ValidCard": {},

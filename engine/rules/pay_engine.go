@@ -87,6 +87,13 @@ func containsObjID(ids []state.ObjID, id state.ObjID) bool {
 	return false
 }
 
+// LifeChangeForbidden (pay.Eval) reports whether a CantChangeLife static
+// applies to p; rules' playerLifeChangeForbidden is the one answer, shared with
+// the replacement site, so an offer gate and the charged payment cannot disagree.
+func (pe *payEval) LifeChangeForbidden(p state.PlayerID) bool {
+	return (*Engine)(pe).playerLifeChangeForbidden(p)
+}
+
 // Conv (pay.Engine; formerly paymentConv) is the conversion set for p paying id (ability selects the
 // ValidSA$ Spell/Activated scoping), or nil when no ManaConvert static would
 // change any pip match. Returning nil -- not a zero conv -- keeps the pure

@@ -536,6 +536,12 @@ func init() {
 	effects.RegisterNonAPI("stat:CantBeCast", "stat:CantBeActivated", "stat:CantBeCopied", "stat:RaiseCost", "stat:CastWithFlash",
 		"stat:ReduceCost", "stat:AlternativeCost", "stat:OptionalCost", "stat:CantBlock", "stat:CantBlockBy",
 		"stat:CantGainLife", "stat:CantPlayLand", "stat:Continuous", "stat:ManaConvert", "stat:NumLoyaltyAct",
+		// cantchangelife1: the CR 119.7/119.8 CantChangeLife static ("your
+		// life total can't change"). engine/rules/replacement_life.go's
+		// lifeChangeForbidden reads it beside the CantGainLife lock and
+		// covers both directions of a LifeChange plus damage dealt to a
+		// player; ValidPlayer$ is the only scoping parameter enforced.
+		"stat:CantChangeLife",
 		// cantdraw1 / cantdraw-drawlimit-cap: CR 121.6 CantDraw statics
 		// (engine/rules/replacement.go drawForbidden, consulted by applyReplacements
 		// before any Draw replacement). ValidPlayer$ scopes total prohibitions

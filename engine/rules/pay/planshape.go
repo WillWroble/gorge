@@ -586,6 +586,15 @@ func UnlessManaReachable(e Engine, p state.PlayerID, cost costvocab.Cost, pool, 
 // callers deliberately retain their ordinary no-rider semantics through the
 // wrapper above.
 func ManaReachable(e Engine, p state.PlayerID, cost costvocab.Cost, pool, snow state.Mana, typed [7]state.Mana, life int32, rider PipRider, conv *Conv, units []WindowUnit) bool {
+	// CR 119.7/119.8: under a CantChangeLife static no positive life may be
+	// paid, so neither the charge's own fixed life nor a PayLife source's
+	// activation is reachable -- exactly the solver's answer for a payer
+	// with 0 life (a fixed life it lacks plus the "leave the payer alive"
+	// alt guard), taken as ONE read instead of threading a new parameter
+	// through every caller.
+	if e.Eval().LifeChangeForbidden(p) {
+		life = 0
+	}
 	payable := func(pool state.Mana, lifeNow int32) bool {
 		_, ok := ResolveManaWith(cost, pool, snow, typed, lifeNow,
 			e.Eval().PayLifeInsteadOfB(p), rider, conv)
