@@ -24,7 +24,7 @@ const (
 	attackOfferFieldCount      = 4
 	blockChargeFieldCount      = 7
 	objectTypesFieldCount      = 3
-	optionFieldCount           = 44
+	optionFieldCount           = 45
 	grantFieldCount            = 3
 )
 
@@ -238,6 +238,7 @@ func optionEqual(a, b *decision.Option) bool {
 		a.Battle == b.Battle &&
 		a.Required == b.Required &&
 		a.BlockMust == b.BlockMust &&
+		a.AloneRestricted == b.AloneRestricted &&
 		a.BlockMustAll == b.BlockMustAll &&
 		a.AttackMust == b.AttackMust &&
 		a.MinBlockers == b.MinBlockers &&
