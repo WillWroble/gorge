@@ -127,8 +127,20 @@ func (e *Engine) resolveTop() {
 		// and has none recorded resolves untargeted rather than fizzling --
 		// targetMin(o.Ability)==0 && len(targets)==0 is the exemption.
 		if !charmHandled {
-			if spec := effects.TargetsOf(o.Ability).ValidTgts; spec != "" && !(e.resolvedTargetMin(o.Controller, id, o.Ability, 0) == 0 && len(targets) == 0) {
-				legal := e.legalTargets(targets, o.Ability, targetZones(o.Ability), o.Controller, o.Source, id)
+			// A modal ability's target declaration lives on its chosen
+			// mode's sub, not the Charm root (whose ValidTgts$ is empty):
+			// recheck the declaration the placement ask covered
+			// (offeredTargetSA), as the spell branch rechecks modalTargetSA.
+			tsa := o.Ability
+			if len(o.ChosenModes) > 0 && effects.CharmOf(o.Ability).HasChoices {
+				if src := e.G.Obj(o.Source); src != nil && src.Face() != nil {
+					if sub := offeredTargetSA(o, src.Face().SVars); sub != nil {
+						tsa = sub
+					}
+				}
+			}
+			if spec := effects.TargetsOf(tsa).ValidTgts; spec != "" && !(e.resolvedTargetMin(o.Controller, id, tsa, 0) == 0 && len(targets) == 0) {
+				legal := e.legalTargets(targets, tsa, targetZones(tsa), o.Controller, o.Source, id)
 				// subLegal > 0 keeps a chain alive whose ROOT targets all
 				// became illegal but whose pre-asked sub target did not
 				// (alltargeted1); charmHandled cannot reach here, so the two
