@@ -705,6 +705,19 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 			// the "counter" half is placed through the engine's CounterChange
 			// path, so only the consumption is left here.
 			o.UnleashChoice = ""
+			// CR 400.7: a battlefield entry from another zone is a new object
+			// with no memory of its former existence, so it carries no
+			// remembered list from its previous incarnation. Without this, a
+			// permanent that left the battlefield and returned (a
+			// bounced-and-replayed or reanimated Curator of Destinies) would
+			// answer a later `Card.IsRemembered` read with what an earlier
+			// INCARNATION's resolution recorded, and that stale half of the
+			// IsRemembered union would move cards the new object never
+			// remembered. The leaving arm above deliberately keeps the list
+			// for the old incarnation's pending referents (the O-Ring /
+			// UntilHostLeavesPlay premise); this is its reset on the next
+			// entry.
+			o.Remembered = nil
 		}
 		// A face-down entry (a manifest) is a 2/2 creature with no abilities
 		// (CR 708.5), so it grants none of the entry counters above; the
