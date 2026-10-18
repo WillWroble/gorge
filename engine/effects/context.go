@@ -857,16 +857,31 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// case), so this resolves the whole per-defender attacker group.
 		return objectsOf(c.Remembered), true
 	case definedSpecTriggeredTargetLKICopy:
-		// The BEARER the Attached referent walk captured (triggerReferents'
-		// Attached case): the permanent an Aura/Equipment became attached to
-		// -- Enormous Energy Blade's "tap that creature". Only the Attached
-		// walk sets TriggerBearer, so no other mode's provenance moves: a
-		// BecomesTarget trigger's TriggerTarget role is its OWN source
-		// permanent (the enchanted creature, Horobi himself), and this
-		// spelling keeps resolving that mode's Remembered entry (the
-		// targeting spell) exactly as it always has.
+		// "That permanent/player": the role the CAUSING mode captured, so the
+		// mode decides and no card name is involved (CR 603.2, 608.2c).
+		//
+		//  - Attached: the BEARER the Attached referent walk captured
+		//    (triggerReferents' Attached case) -- Enormous Energy Blade's "tap
+		//    that creature". Only that walk sets TriggerBearer.
+		//  - BecomesTarget(Once): the TARGETED object (Cloud Cover's "return
+		//    that permanent", Cowardice, Horobi), which is the TriggerTarget
+		//    role becomesTargetReferent captured. BecomesTarget is the ONE
+		//    mode that records the targeting action on TriggerStack
+		//    (triggerReferents' BecomesTarget case: "ev.Obj is the targeting
+		//    spell/ability"), so that role -- not the mode-agnostic
+		//    TriggerTarget read, which DamageDone also fills -- is what marks
+		//    this arm: every other mode keeps the Remembered fallback below
+		//    byte for byte. Before this arm the spelling answered Remembered
+		//    here, i.e. the targeting SPELL or ability, so the bounce, destroy
+		//    and gain-control bodies acted on or found nothing at all.
+		//    The plain TriggeredTarget spelling (definedSpecTriggeredTarget)
+		//    already prefers this same role, so the two agree.
+		//  - Every other mode: Remembered, exactly as it always resolved.
 		if c.TriggerBearer != 0 {
 			return []state.Target{{Obj: c.TriggerBearer}}, true
+		}
+		if c.TriggerStack != 0 && (c.TriggerTarget.Obj != 0 || c.TriggerTarget.IsPlayer) {
+			return []state.Target{c.TriggerTarget}, true
 		}
 		return objectsOf(c.Remembered), true
 	case definedSpecTriggeredObject:

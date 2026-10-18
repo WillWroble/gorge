@@ -2037,8 +2037,8 @@ func notDefinedTriggerReferent(p string) (base string, ok bool) {
 // The binding arrives through SpecContext.TriggerContext: rules'
 // targetSpecContext binds the pushed trigger's captured context
 // (engine/rules/trigger_referents.go's Attached case sets TriggerTarget to the
-// bearer, ExcessDamage to the damaged permanent, BecomesTarget to the
-// trigger's own source), so the candidate matches exactly the object the
+// bearer, ExcessDamage to the damaged permanent, BecomesTarget to the TARGETED
+// object or player), so the candidate matches exactly the object the
 // causing event captured. A player-valued or absent binding fails CLOSED
 // (ok=false) -- the spec matches nothing, never an invented referent, and the
 // leading-'!' spelling cannot invert the absence into a match.
