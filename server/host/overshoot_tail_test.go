@@ -66,8 +66,11 @@ const (
 	// step opens with the active player holding priority, so every
 	// end-of-combat entry from a round's tail (the CR 508.8 no-attackers
 	// skip) poses one more pass before the burst: the same turn-21 burst
-	// now parks at intent 541 (526 -> 541, re-measured on seed 2).
-	overshootIntents = 541 // intents recorded when parked on the overshoot burst's pending ask
+	// now parks at intent 541 (526 -> 541, re-measured on seed 2). CR 510.3
+	// (rules 24bbba791): players receive priority in the combat damage step
+	// after the regular damage, two more passes per such combat before the
+	// burst: 541 -> 551, the same turn-21 burst, re-measured on seed 2.
+	overshootIntents = 551 // intents recorded when parked on the overshoot burst's pending ask
 )
 
 // gateSeat is a bot behind a test gate: every decision is signalled to the
@@ -657,6 +660,13 @@ func TestCrashedMatchFeedbackCaptureStillTrims(t *testing.T) {
 // windows the old engine never posed (turns 1-4); no other answer changed.
 // 2158 events, 380 intents, head 57b79c439f48eaea; the parked
 // commander_zone ask and its lethal-damage tail are unchanged.
+// CR 510.3 post-damage priority (2026-10-17, rules 24bbba791): players now
+// receive priority in the combat damage step after the regular damage, so
+// the capture diverged at its first such combat. Re-derived the same way,
+// with a turn's damage step and end of combat matched as one window: 18
+// passes inserted (two per combat with regular damage), no answer changed.
+// 2230 events, 398 intents, head fc7001a63b429c7b; the parked ask and its
+// tail are unchanged.
 const committedCaptureRel = "../../cmd/repro/testdata/feedback/20260915T094418Z-e484f1db"
 
 // requireCommittedCapture skips when the worktree has no .cards/ corpus:
@@ -682,8 +692,8 @@ func TestCommittedOvershootCaptureReplaysToTheParkedAsk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("feedback.Load: %v", err)
 	}
-	if n := len(l.Events); n != 2158 {
-		t.Fatalf("capture carries %d events, want the full 2158-event stream (re-recorded)", n)
+	if n := len(l.Events); n != 2230 {
+		t.Fatalf("capture carries %d events, want the full 2230-event stream (re-recorded)", n)
 	}
 	e, err := replay.Replay(l, cfg)
 	if err != nil {
