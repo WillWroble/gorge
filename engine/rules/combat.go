@@ -1317,6 +1317,13 @@ type combatRound struct {
 	hasFirst    bool `clone:"deep"` // this combat damage step runs a first-strike pass (CR 510.3)
 	firstDone   bool `clone:"deep"` // first-strike pass's damage dealt and priority granted
 	regularDone bool `clone:"deep"` // regular pass's damage dealt
+	// firstStrikers lists the attackers and blockers that had first strike
+	// or double strike as the first-strike damage step began (CR 510.4):
+	// only they are held out of the regular step (a double striker acts in
+	// both), so a creature that GAINS first strike between the steps still
+	// deals regular damage (CR 702.7c) and one that loses it does not. Empty
+	// when the step runs no first-strike pass.
+	firstStrikers []state.ObjID `clone:"deep"`
 	// regularRound marks the priority round after the regular pass (CR
 	// 510.3) as begun: a re-entry while it is open continues it, and only
 	// all players passing with an empty stack ends the step (advanceStep).
@@ -1428,6 +1435,7 @@ func (e *Engine) combatStep() {
 	if !e.combatRound.firstDone {
 		e.combatRound.hasFirst = e.anyFirstStrike()
 		if e.combatRound.hasFirst {
+			e.combatRound.firstStrikers = e.collectFirstStrikers(e.combatRound.firstStrikers[:0])
 			// The first-strike damage step runs, then a priority round before
 			// the regular step (CR 510.3/4).
 			e.beginCombatPass(true)
@@ -1883,6 +1891,7 @@ func (e *Engine) chosenDivision(a state.ObjID) []int32 {
 // other both die.
 func (e *Engine) dealCombatDamage() {
 	if e.anyFirstStrike() {
+		e.combatRound.firstStrikers = e.collectFirstStrikers(e.combatRound.firstStrikers[:0])
 		e.damageStep(true)
 		e.checkStateBased()
 		// The SBA tail can pose a CR 704.5j legend choice; the regular pass
@@ -1997,10 +2006,41 @@ func (e *Engine) actsThisDamageStep(id state.ObjID, firstStrike bool) bool {
 	if e.hasKeywordH(id, kwhDoubleStrike) {
 		return true
 	}
+	if !firstStrike && len(e.combatRound.firstStrikers) > 0 {
+		// CR 510.4: the regular step is for the creatures that had neither
+		// first strike nor double strike as the first-strike step began
+		// (plus current double strikers, above), whatever they have now.
+		return !slices.Contains(e.combatRound.firstStrikers, id)
+	}
 	if e.hasKeywordH(id, kwhFirstStrike) {
 		return firstStrike
 	}
 	return !firstStrike
+}
+
+// collectFirstStrikers appends to dst every attacking creature and live
+// blocker that has first strike or double strike now, in battlefield order
+// (attackers, each followed by its blockers): the CR 510.4 record taken as
+// the first-strike damage step begins.
+func (e *Engine) collectFirstStrikers(dst []state.ObjID) []state.ObjID {
+	fs := func(id state.ObjID) bool {
+		return e.hasKeywordH(id, kwhFirstStrike) || e.hasKeywordH(id, kwhDoubleStrike)
+	}
+	for _, id := range e.G.Zone(state.ZBattlefield, e.G.Active) {
+		a := e.G.Obj(id)
+		if a == nil || !a.IsAttacking {
+			continue
+		}
+		if fs(id) && !slices.Contains(dst, id) {
+			dst = append(dst, id)
+		}
+		for _, bid := range e.liveBlockers(a) {
+			if fs(bid) && !slices.Contains(dst, bid) {
+				dst = append(dst, bid)
+			}
+		}
+	}
+	return dst
 }
 
 // tallyCmdDamage records that the commander object from dealt amount combat

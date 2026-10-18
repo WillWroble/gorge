@@ -210,6 +210,7 @@ func cloneFieldsEngineRounds(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	c.enlistAskState = e.enlistAskState
 	c.stationing = e.stationing
 	c.combatRound = e.combatRound
+	c.combatRound.firstStrikers = append([]state.ObjID(nil), e.combatRound.firstStrikers...)
 	c.combatRound.queue = append([]state.ObjID(nil), e.combatRound.queue...)
 	if e.combatRound.done != nil {
 		c.combatRound.done = make([]divChoice, len(e.combatRound.done))
