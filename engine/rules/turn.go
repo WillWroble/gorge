@@ -935,10 +935,23 @@ func (e *Engine) repeatCleanup() {
 // drain placed triggers on the stack and it is simply the players' turn to
 // respond (CR 117.1) while the step is still cleanup.
 func (e *Engine) finishCleanupStep() {
+	// CR 514.3a: the check follows the 514.1/514.2 actions, which can
+	// themselves make a state-based action due (an "until end of turn"
+	// control change ending into the legend rule, a +1/+1 that kept a
+	// creature with a -1/-1 counter alive). step()'s head check ran BEFORE
+	// them. When one is performed the active player gets priority even with
+	// an empty stack, and the step then repeats (514.3b, via handlePriority's
+	// empty-stack pass into repeatCleanup).
+	before := len(e.L.Events)
+	e.checkStateBased()
+	if e.pending != nil || e.G.Over {
+		return
+	}
+	performed := len(e.L.Events) > before
 	if e.putTriggersOnStack() {
 		return
 	}
-	if len(e.G.Stack) > 0 {
+	if len(e.G.Stack) > 0 || performed {
 		e.grantPriority()
 		return
 	}
