@@ -429,6 +429,23 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 	if ev.Kind == events.TurnFaceUp {
 		c.TriggerPaidX = ev.Amount
 	}
+	// CR 400.7: the pending trigger belongs to the object that existed when
+	// it fired, so its body's `Defined$ Remembered` read (sourceRemembered)
+	// must answer with THIS object's list even after the source re-enters the
+	// battlefield while the trigger waits -- a battlefield re-entry is a new
+	// object and the entry fold clears its list, but that clear is the NEW
+	// object's forgetting, not the old object's. Snapshot the queue-time list
+	// with its Incarnation stamp; only a list the source actually carries is
+	// captured, so an ordinary trigger (and every resolution without a
+	// re-entry) reads the live field exactly as before. A source that has
+	// never crossed the battlefield boundary (Incarnation 0, a spell on the
+	// stack) keeps the live read: its first entry deliberately carries its
+	// cast-time memory forward, and no pending referent of a stack object can
+	// be stranded by a battlefield re-entry that has not happened yet.
+	if src := e.G.Obj(source); src != nil && src.Incarnation != 0 && len(src.Remembered) > 0 {
+		c.SourceRemembered = append([]state.Target(nil), src.Remembered...)
+		c.SourceIncarnation = src.Incarnation
+	}
 	return c
 }
 

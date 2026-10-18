@@ -2110,13 +2110,40 @@ func filterCapturedRemembered(remembered, captured, delayedRemembered, persisten
 	return out
 }
 
-// sourceRemembered is the resolving source's persistent, event-backed
-// Remembered list (nil for a departed source).
-func sourceRemembered(h Host, c *Ctx) []state.Target {
-	if src := h.Game().Obj(c.Source); src != nil {
-		return src.Remembered
+// effectiveSourceRemembered is the ONE home of the pending-referent rule over
+// the source's persistent Remembered list: a live object with no pending
+// snapshot (and any mid-resolution write to it) reads its own list; an object
+// whose Incarnation has moved past a queued trigger's fire-time stamp is a
+// NEW object (CR 400.7), and the pending trigger resolves the OLD object's
+// snapshot instead -- the entry fold's clear is the new object's forgetting,
+// never a licence to strand the old object's pending referents. Every reader
+// of the persistent list in a trigger resolution goes through here
+// (sourceRemembered for the Defined$/host reads, anyRemembered for the
+// IsRemembered filter), so the two can never disagree on what "the source's
+// remembered list" answers while a re-entry is pending.
+func effectiveSourceRemembered(g *state.Game, tc TriggerContext, src *state.Object) []state.Target {
+	if src == nil {
+		return nil
 	}
-	return nil
+	if len(tc.SourceRemembered) > 0 && tc.SourceIncarnation != src.Incarnation {
+		return tc.SourceRemembered
+	}
+	return src.Remembered
+}
+
+// sourceRemembered is the resolving source's persistent, event-backed
+// Remembered list (nil for a departed source). A pending trigger that queued
+// a fire-time snapshot (TriggerContext.SourceRemembered, the CR 400.7
+// pending-referent capture) answers with THAT list when the live source's
+// Incarnation has moved past the fire-time one: the source re-entered the
+// battlefield as a new object while the trigger waited, and the entry fold's
+// clear (CR 400.7: a re-entry forgets its former existence) is the NEW
+// object's forgetting -- the Skyclave Apparition leave trigger that resolves
+// after its source was reanimated must still return the exiled card. An
+// unchanged object (the common case, and every mid-resolution write to the
+// live list) reads the live field exactly as before.
+func sourceRemembered(h Host, c *Ctx) []state.Target {
+	return effectiveSourceRemembered(h.Game(), c.TriggerContext, h.Game().Obj(c.Source))
 }
 
 func sameTargets(a, b []state.Target) bool {
