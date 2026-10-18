@@ -1,7 +1,7 @@
 // Reproduces feedback report 20261009T193854Z-b2b73ab2 ("treasure token isn't
 // being used to calculate 'autopay' -- Brazen Scourge should be an available
 // action"). The snapshot under testdata/feedback/20261009T193854Z-b2b73ab2/
-// replays 501/501 recorded intents to seat 0's turn-20 main1 priority.
+// replays 515/515 recorded intents to seat 0's turn-20 main1 priority.
 //
 // The report's premise is measured false: the offer walk DOES price the
 // Treasure token. Cathar Commando's {1}{W} is offered below, and the only
