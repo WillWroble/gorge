@@ -76,6 +76,10 @@ type costSubject struct {
 	// the pay-time object flag is not folded until CR 601.2a's push). The
 	// plain cast and every other scope keep the unpaid read.
 	electedOptional bool
+	// spell marks a spell-cast scope (scope.Kind "Spell"): the priced
+	// object is a card being cast, priced as a spell on the stack under
+	// its caster (castersView).
+	spell bool
 }
 
 // newCostSubject is the ONE constructor of the costSubject a cost-static
@@ -86,7 +90,25 @@ type costSubject struct {
 // spellScope), so the castModeCodes row alone names it.
 func newCostSubject(p state.PlayerID, id state.ObjID, scope costScope) costSubject {
 	return costSubject{p: p, id: id, ab: scope.Ab,
-		electedOptional: castModeCodes.Code(scope.Mode) == castModeOptionalcost}
+		electedOptional: castModeCodes.Code(scope.Mode) == castModeOptionalcost,
+		spell:           scope.Kind == "Spell"}
+}
+
+// castersView rebinds a spell's OWN cost static to its caster. CR 601.2a
+// puts the card on the stack under the control of the player casting it
+// before CR 601.2f determines the total cost, so "you" in a self cost
+// static (an EffectZone$ All ReduceCost on the card being cast: Tolarian
+// Terror's "instant and sorcery cards in your graveyard", Arcane
+// Epiphany's "if you control a Wizard") is the CASTER -- not the owner
+// whose hand, graveyard or exile the card sits in at the offer, which is
+// what the static's view carries for a card cast from another player's
+// zone (Tinybones' stash, a may-play exile). Every other static, and every
+// non-spell scope, keeps its controller.
+func castersView(sv staticView, p state.PlayerID, id state.ObjID, spell bool) staticView {
+	if spell && id != 0 && id == sv.Source {
+		sv.Controller = p
+	}
+	return sv
 }
 
 // costAmountCtx is the ONE evaluation context a cost-modifier static's
@@ -101,6 +123,7 @@ func newCostSubject(p state.PlayerID, id state.ObjID, scope costScope) costSubje
 // turn" read the caster's board. The priced object rides AffectedObj
 // (Cemetery Prowler's AffectedX) and the activation AffectedAbility.
 func (e *Engine) costAmountCtx(sv staticView, sub costSubject, x int32, targets []state.Target) (*effects.Ctx, map[string]string, bool) {
+	sv = castersView(sv, sub.p, sub.id, sub.spell)
 	o := e.G.Obj(sv.Source)
 	if o == nil || o.Face() == nil {
 		return nil, nil, false
