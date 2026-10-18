@@ -214,12 +214,12 @@ func countEnteredAs(g *state.Game, c *Ctx, you state.PlayerID, dest state.Zone, 
 			continue
 		}
 		if splitCreature && e.From == state.ZBattlefield {
-			matched := (e.WasCreature && matchesZoneSpecCtx(g, creatureAlts, e.Obj, c.SpecContext(you), e.To)) ||
-				(otherAlts != "" && matchesZoneSpecCtx(g, otherAlts, e.Obj, c.SpecContext(you), e.To))
+			matched := (e.WasCreature && matchesEnteredEntry(g, creatureAlts, e, c.SpecContext(you))) ||
+				(otherAlts != "" && matchesEnteredEntry(g, otherAlts, e, c.SpecContext(you)))
 			if !matched {
 				continue
 			}
-		} else if !matchesZoneSpecCtx(g, valid, e.Obj, c.SpecContext(you), e.To) {
+		} else if !matchesEnteredEntry(g, valid, e, c.SpecContext(you)) {
 			// Evaluate the spec in the entry's DESTINATION zone: an object that
 			// entered a non-battlefield zone has already left the battlefield,
 			// so the ordinary matcher's `Permanent` base (o.Zone ==

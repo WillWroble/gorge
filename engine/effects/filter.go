@@ -3166,10 +3166,34 @@ func matchesZoneSpecCtx(g *state.Game, spec string, id state.ObjID, sc SpecConte
 	if o.IsCopy && o.Zone != state.ZStack && o.Zone != state.ZBattlefield {
 		return false
 	}
+	return matchesZoneSpecObj(g, spec, o, sc, zone)
+}
+
+// matchesZoneSpecObj is matchesZoneSpecCtx past its CR 707.10h copy
+// rejection: the zone-aware match of a live object pointer.
+func matchesZoneSpecObj(g *state.Game, spec string, o *state.Object, sc SpecContext, zone state.Zone) bool {
 	if zone == state.ZBattlefield {
 		return matchesObjectPtr(g, spec, o, &sc)
 	}
 	return compiledMatchZone(compiledSpecFor(spec), g, o, &sc, zone)
+}
+
+// matchesEnteredEntry matches one per-turn entry (state.Game.Entered) for a
+// ThisTurnEntered_ count. A battlefield departure is matched even when the
+// object is a copy that has since ceased to exist: a token copy that died
+// (Extravagant Replication's Healer's Hawk) still died (CR 700.4, 603.10a),
+// so a morbid count includes it. Every other entry keeps matchesZoneSpecCtx's
+// CR 707.10h rejection (a resolved Storm copy parked in exile is not a card
+// that was exiled).
+func matchesEnteredEntry(g *state.Game, spec string, e state.ZoneEntry, sc SpecContext) bool {
+	if e.From != state.ZBattlefield {
+		return matchesZoneSpecCtx(g, spec, e.Obj, sc, e.To)
+	}
+	o := g.Obj(e.Obj)
+	if o == nil {
+		return false
+	}
+	return matchesZoneSpecObj(g, spec, o, sc, e.To)
 }
 
 // matchesZoneSpecText is matchesZoneSpecCtx's textual oracle for a
