@@ -217,6 +217,32 @@ func IsSacrifice(ev Event) bool {
 	return ev.Kind == MoveZone && ev.From == state.ZBattlefield && ev.Text == sacrificeText
 }
 
+// DepartureCreatureFlip is the MoveZone Step payload that records a
+// battlefield departure whose layer-derived creature status (CR 613.1d's
+// layer-4 type) differed from DepartureDefaultCreature's reading of the
+// object. Step is otherwise unused on MoveZone, and the payload is set only
+// on the rare flipped departure -- an animated land, a creature an effect
+// made a non-creature -- so every other move's encoding and hash are
+// unchanged. events.Apply folds DepartureDefaultCreature XOR the flip into
+// the move's ZoneEntry.WasCreature: the "was a creature" last known
+// information Forge stores at the move (CR 603.10a; Zone.add's
+// cardsAddedThisTurn latestState) and the Count$ThisTurnEntered_*_from_
+// Battlefield_Creature heads (Morbid) read.
+const DepartureCreatureFlip state.Step = 1
+
+// DepartureDefaultCreature is the creature reading of a departing
+// battlefield object that needs no layer system: face down (CR 708.2a's 2/2
+// creature) or a creature face. rules compares the layer-derived status
+// against it, before the fold, to decide DepartureCreatureFlip; Apply reads
+// the same function over the same pre-move object, so the two agree.
+func DepartureDefaultCreature(o *state.Object) bool {
+	if o.FaceDown {
+		return true
+	}
+	f := o.Face()
+	return f != nil && f.IsCreature()
+}
+
 // IsAlterAttribute reports whether ev is the AlterAttribute grant for the
 // named attribute ("Saddled", "Plotted", ...), the designation the trigger
 // matchers for Mode$ Becomes* read. The attribute name is a parameter so the

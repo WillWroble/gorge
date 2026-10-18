@@ -526,6 +526,13 @@ type ZoneEntry struct {
 	// PlayerCount*$SacrificedThisTurn heads read a replay-derived record.
 	Sacrificed bool
 	Sacrificer PlayerID
+	// WasCreature is, for a battlefield departure (From == ZBattlefield),
+	// whether the permanent was a creature as it last existed on the
+	// battlefield (CR 603.10a last known information), folded by
+	// events.Apply from events.DepartureCreatureFlip. An animated land that
+	// dies was a creature; a creature an effect made a non-creature was not.
+	// False for every other entry.
+	WasCreature bool
 }
 
 // DelayedTrigger is one registered delayed triggered ability awaiting its

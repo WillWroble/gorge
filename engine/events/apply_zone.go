@@ -74,6 +74,15 @@ func foldMoveZone(g *state.Game, e *Event) {
 			o.FaceDownHasPT = fdHasPT
 		}
 	}
+	// The departure's "was a creature" bit, read off the pre-move object
+	// before Move resets it (see DepartureCreatureFlip).
+	departed, wasCreature := false, false
+	if e.Kind == MoveZone && wasBattlefield && e.To != state.ZBattlefield {
+		if o := g.Obj(e.Obj); o != nil {
+			departed = true
+			wasCreature = DepartureDefaultCreature(o) != (e.Step == DepartureCreatureFlip)
+		}
+	}
 	var sacrificer state.PlayerID
 	sacrificed := IsSacrifice(*e)
 	if sacrificed {
@@ -95,6 +104,16 @@ func foldMoveZone(g *state.Game, e *Event) {
 	} else if wasStack && e.Text == "reversed" {
 		if o := g.Obj(e.Obj); o != nil {
 			o.DrawnTurn = drawnBefore
+		}
+	}
+	if departed && wasCreature {
+		for i := len(g.Entered) - 1; i >= 0; i-- {
+			if g.Entered[i].Obj == e.Obj {
+				if g.Entered[i].From == state.ZBattlefield {
+					g.Entered[i].WasCreature = true
+				}
+				break
+			}
 		}
 	}
 	if sacrificed {
