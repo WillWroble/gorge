@@ -1191,6 +1191,18 @@ func conditionMetBattlefield(h Host, c *Ctx, present, compare string, targets ma
 	g := h.Game()
 	sc := c.SpecContext(c.Controller)
 	sc.DerivedPTs = append(sc.DerivedPTs, GreatestPowerDerivedPTs(g, spec, h)...)
+	// A P/T comparison (Sylvan Scavenging's Creature.powerGE4+YouCtrl) reads
+	// each candidate's layer-derived P/T, bound the way the zone count fold
+	// binds it (count_zone_fold.go): without the bind the matcher read the
+	// printed power, and a pumped 6-power Beast-Kin Ranger did not count.
+	var ptProvider interface {
+		FilterDerivedPT(state.ObjID) (power, toughness, basePower, baseToughness int32, ok bool)
+	}
+	if SpecReadsPT(spec) {
+		ptProvider, _ = h.(interface {
+			FilterDerivedPT(state.ObjID) (power, toughness, basePower, baseToughness int32, ok bool)
+		})
+	}
 	count := 0
 	for i := range g.Objs {
 		o := &g.Objs[i]
@@ -1205,7 +1217,14 @@ func conditionMetBattlefield(h Host, c *Ctx, present, compare string, targets ma
 		if targets != nil && !targets[o.ID] {
 			continue
 		}
-		if MatchesObjectCtx(g, spec, o, sc) {
+		osc := sc
+		if ptProvider != nil {
+			if power, toughness, basePower, baseToughness, found := ptProvider.FilterDerivedPT(o.ID); found {
+				osc.DerivedPower, osc.DerivedToughness, osc.HasDerivedPT = power, toughness, true
+				osc.BasePower, osc.BaseToughness, osc.HasBasePT = basePower, baseToughness, true
+			}
+		}
+		if MatchesObjectCtx(g, spec, o, osc) {
 			count++
 		}
 	}
