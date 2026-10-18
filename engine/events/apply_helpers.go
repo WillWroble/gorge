@@ -66,6 +66,17 @@ func rememberedFrom(ids []state.ObjID) []state.Target {
 	return out
 }
 
+// registrationStamps picks a registration's remembered stamps: the decoded
+// |RS= suffix when the event carried one (the registering trigger's stamps,
+// CR 400.7), the fold-time live stamping otherwise -- every registration
+// logged before that suffix existed.
+func registrationStamps(fromEvent, live []state.TargetStamp) []state.TargetStamp {
+	if fromEvent != nil {
+		return fromEvent
+	}
+	return live
+}
+
 // rememberedStampsFrom records each remembered object's Incarnation at a
 // delayed trigger's registration (state.DelayedTrigger.RememberedStamps,
 // CR 400.7). Player references and unknown ids carry no stamp.

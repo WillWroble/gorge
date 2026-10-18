@@ -66,6 +66,17 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 	// name, so every already-logged registration decodes exactly as
 	// before (VP ungated; MaxTurn zero).
 	text := e.Text
+	// The registration's remembered stamps ("|RS=<id>:<inc>[,...]", the
+	// trigger-time stamps the registering trigger carried, CR 400.7) are
+	// appended LAST by the Phase registration, so they strip FIRST -- before
+	// the |RN= strip below, whose LastIndex would otherwise swallow them.
+	// A registration logged before this slot existed carries none of the
+	// spelling and stamps from the live state as before.
+	stampText := ""
+	if i := strings.LastIndex(text, "|RS="); i >= 0 {
+		stampText = text[i+4:]
+		text = text[:i]
+	}
 	// RememberNumber$ True (Mana Drain's "add an amount of {C} equal to
 	// that spell's mana value") rides "|RN=<n>", appended LAST by the
 	// Phase registration, so it is stripped first. A registration logged
@@ -172,6 +183,32 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 	exile := strip("|XM=")
 	forget := strip("|FM=")
 	duration := strip("|DU=")
+	// The |RS= suffix replaces the fold-time live stamping entirely when
+	// present: it carries one "<id>:<incarnation>" pair per remembered
+	// object the registering trigger knew -- trigger-time stamps (CR 400.7)
+	// for the remembered set the trigger itself captured, live incarnations
+	// for the rest -- which is exactly rememberedStampsFrom over the same
+	// IDs for a registration with no trigger stamps. A malformed pair
+	// degrades to no stamp for that object (an unstamped remembered object
+	// is kept by the movers, the pre-existing contract), never a panic.
+	var rememberedStamps []state.TargetStamp
+	if stampText != "" {
+		for _, part := range strings.Split(stampText, ",") {
+			idText, incText, ok := strings.Cut(part, ":")
+			if !ok {
+				continue
+			}
+			id, err1 := strconv.ParseUint(idText, 10, 32)
+			inc, err2 := strconv.ParseUint(incText, 10, 32)
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			rememberedStamps = append(rememberedStamps, state.TargetStamp{
+				Obj:         state.ObjID(id),
+				Incarnation: uint32(inc),
+			})
+		}
+	}
 	maxTurn := int32(0)
 	if i := strings.LastIndex(text, "|TT="); i >= 0 {
 		if n, err := strconv.Atoi(strings.TrimSpace(text[i+4:])); err == nil && n > 0 {
@@ -193,7 +230,7 @@ func foldDelayedRegister(g *state.Game, e *Event) {
 		Controller:        e.Player,
 		Execute:           e.Counter,
 		Remembered:        rememberedFrom(e.IDs),
-		RememberedStamps:  rememberedStampsFrom(g, e.IDs),
+		RememberedStamps:  registrationStamps(rememberedStamps, rememberedStampsFrom(g, e.IDs)),
 		MinTurn:           e.Amount,
 		MaxTurn:           maxTurn,
 		SourceIncarnation: src.Incarnation,
