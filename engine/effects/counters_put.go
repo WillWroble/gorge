@@ -1287,15 +1287,27 @@ var putCounterChooserForCodes = state.NewStrCodes(
 //     is the last-known battlefield permanent, when it is no longer on the
 //     battlefield.
 func putCounterReferentLeft(g *state.Game, c *Ctx, sa *cards.SA, o *state.Object) bool {
-	if o.ID == c.Source && c.ResolvingObj != 0 {
-		if ro := g.Obj(c.ResolvingObj); ro != nil && ro.PushSourceOnBattlefield && ro.Source == o.ID &&
-			(o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation) {
-			return true
-		}
+	if sourceLeftSincePush(g, c, o) {
+		return true
 	}
 	if o.Zone == state.ZBattlefield || sa == nil {
 		return false
 	}
 	d := sa.ParamStr(cards.PKDefined)
 	return strings.HasPrefix(d, "Triggered") && strings.HasSuffix(d, "LKICopy")
+}
+
+// sourceLeftSincePush reports whether o is the resolving ability's source,
+// the ability went on the stack while that source was on the battlefield
+// (events.Apply's push stamp), and the source has since left it or returned
+// as a later incarnation: the permanent the ability names no longer exists
+// (CR 400.7), and an effect acting on "this permanent" does nothing to the
+// card in its new zone.
+func sourceLeftSincePush(g *state.Game, c *Ctx, o *state.Object) bool {
+	if o.ID != c.Source || c.ResolvingObj == 0 {
+		return false
+	}
+	ro := g.Obj(c.ResolvingObj)
+	return ro != nil && ro.PushSourceOnBattlefield && ro.Source == o.ID &&
+		(o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation)
 }
