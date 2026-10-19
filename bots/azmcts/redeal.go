@@ -85,6 +85,10 @@ type RedealSource struct {
 	worlds   []*rules.Engine
 	prev     *rules.Engine
 	spare    rules.Spare
+	// pool is the seat's recycled node-state storage (sparePool) the
+	// cached-worlds trees draw from and refill (runCachedWorlds); nil
+	// pools nothing.
+	pool *sparePool
 }
 
 // NewRedeal prepares the honest source for one decision. obs must be the

@@ -130,12 +130,13 @@
     "dimir-tempo",
     "death-n-taxes"
   ],
-  "events": 146,
+  "events": 151,
   "match": 1,
   "names": [
     "dimir-tempo",
     "death-n-taxes"
   ],
+  "paid_mana_census": true,
   "player_names": [
     "Player 1",
     "Player 2"

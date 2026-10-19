@@ -47,7 +47,7 @@ func offBattlefieldGrantedWalk(w *legalWalk) {
 		if w.abilityRestricted(p, carrier.Source, ab) || e.castSuppressed(p, carrier.Source) {
 			continue
 		}
-		cost := e.parseCost(ab.ParamStr(cards.PKCost))
+		cost := e.abilityCompiledCost(ab).Cost
 		if pay.ActivationTapCostUnavailable(o, &cost) ||
 			pay.TapCostSick(asPayer(e), carrier.Source, &cost, activatesAsIfHaste(e, carrier.Source)) ||
 			!w.offerCastable(p, carrier.Source, cost, abilityScope(ab), true) ||

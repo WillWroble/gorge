@@ -42,3 +42,43 @@ func TestPlayAmountAllCastsEachChosenCardInTurn(t *testing.T) {
 		}
 	}
 }
+
+// TestCastDuringAResolutionGivesNobodyPriority: the targeted casts an
+// Amount$ All Play makes while Epic Experiment resolves give nobody
+// priority (CR 117.1, 608.2; 601.2i returns priority only to a player who
+// had it). The caster used to receive a Priority event as each targeted
+// cast completed (census pair 8276, Etali, Primal Storm casting Make Your
+// Move and then Bake into a Pie: at Bake's target ask gorge said the
+// caster held priority). Priority comes back only after the resolution.
+func TestCastDuringAResolutionGivesNobodyPriority(t *testing.T) {
+	t.Parallel()
+	run := runInlineOracle(t, `{
+	  "name": "epic-experiment-casts-without-priority",
+	  "setup": {"p0": {"hand": ["Epic Experiment"], "library_top": ["Lightning Bolt", "Shock", "Forest"]}},
+	  "steps": [
+	    {"op": "cast", "seat": 0, "card": "p0:Epic Experiment", "mana": "CCCUR",
+	     "answers": [{"kind": "choose", "pick": ["X = 3"]}]},
+	    {"op": "resolve", "answers": [{"kind": "modes", "pick": ["Play Lightning Bolt", "Play Shock"]},
+	                                  {"kind": "target", "pick": ["p1"]},
+	                                  {"kind": "target", "pick": ["p1"]}]}
+	  ],
+	  "expect": [{"life": {"p1": 15}}]
+	}`)
+	bolt, epic := run.refs["p0:Lightning Bolt"], run.refs["p0:Epic Experiment"]
+	inside := false
+	for _, ev := range run.e.L.Events {
+		if ev.Kind == events.PutOnStack && ev.Obj == bolt {
+			inside = true
+		}
+		if ev.Kind == events.MoveZone && ev.Obj == epic && ev.From == state.ZStack {
+			if !inside {
+				t.Fatal("Epic Experiment left the stack before Lightning Bolt was cast")
+			}
+			return
+		}
+		if inside && ev.Kind == events.Priority {
+			t.Fatalf("event %d gives p%d priority while Epic Experiment is still resolving", ev.Seq, ev.Player)
+		}
+	}
+	t.Fatal("Epic Experiment never left the stack")
+}

@@ -25,7 +25,7 @@ const broodSliverSeatScenario = `{
   },
   "steps": [
     {"op": "attack", "seat": 0, "attackers": ["p0:Venom Sliver"], "defender": "p1"},
-    {"op": "pass_to", "seat": 0, "step": "end-combat", "active": "p0"},
+    {"op": "pass_to", "seat": 0, "step": "combat-damage", "active": "p0"},
     {"op": "resolve", "seat": 0, "answers": [{"kind": "any", "pick": ["yes"]}]}
   ],
   "expect": [

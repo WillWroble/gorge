@@ -95,7 +95,22 @@ func (e *Engine) hypTake() Spare {
 func (e *Engine) hypRelease(c *Engine) { e.hypPut(c.Release()) }
 
 // hypPut returns a Spare to e's pool.
+//
+// A Spare's event-array provenance (events[:evN] are the first evN events of
+// the array at evFrom, so a clone of that same history copies only the rest)
+// holds only while that array is never rewritten. The pool owner's own log
+// is append-only, but a hypothetical clone's array is itself recycled
+// through this pool and refilled with another history: a clone of a clone
+// released here, then reused under the parent array's next tenant, kept
+// the old tenant's appended events in the prefix it skipped (a witness
+// search's grandchild saw its stale mana activations where the live log had
+// the declare-attackers event, re-asked the declaration and refused a legal
+// cast, census pair 1905). So only a Spare cloned straight from the owner
+// keeps its provenance; every other one is detached.
 func (e *Engine) hypPut(sp Spare) {
+	if from, _ := sp.Provenance(); from != nil && (len(e.L.Events) == 0 || from != &e.L.Events[0]) {
+		sp.Detach()
+	}
 	pl := e.hypPool()
 	pl.spares = append(pl.spares, sp)
 }
@@ -143,6 +158,11 @@ func (e *Engine) adoptHypPool(pl *hypSparePool) {
 	}
 	pl.owner = e
 	e.hypSpares = pl
+	// The pool's Spares were cloned under its previous owner, whose array
+	// may be recycled now: none of their provenance can be trusted (hypPut).
+	for i := range pl.spares {
+		pl.spares[i].Detach()
+	}
 }
 
 // idsBorrow pops an empty id list from e's pool (nil when empty); the caller

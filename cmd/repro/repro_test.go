@@ -42,7 +42,7 @@ func TestReproFixtureSummaryExitsZero(t *testing.T) {
 	}
 	for _, want := range []string{
 		"== feedback report " + fixtureID,
-		"replayed 25 of 25 recorded intents", // the fixture's own counts; regenerate both together
+		"replayed 26 of 26 recorded intents", // the fixture's own counts; regenerate both together
 		"recorded head",
 		"turn 2, round 1",
 		"active: seat 0, priority: seat 0",
@@ -155,8 +155,8 @@ func TestReproFixtureListPrintsTimeline(t *testing.T) {
 		t.Fatalf("exit %d, output:\n%s", code, out.String())
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 25 { // one line per intent; this fixture is not game over
-		t.Fatalf("timeline has %d lines, want 25:\n%s", len(lines), out.String())
+	if len(lines) != 26 { // one line per intent; this fixture is not game over
+		t.Fatalf("timeline has %d lines, want 26:\n%s", len(lines), out.String())
 	}
 	// Re-recorded 2026-10-06 (CR 103.8a first draw step): the capture now
 	// carries the CR 103.1 toss-winner ask as intent 0.
@@ -176,7 +176,7 @@ func TestReproFixtureAtReplaysToIntent(t *testing.T) {
 	if code := run([]string{"-at", "6", fixtureRel}, &out, io.Discard); code != 0 {
 		t.Fatalf("exit %d, output:\n%s", code, out.String())
 	}
-	for _, want := range []string{"replayed 6 of 25 recorded intents", "turn 1, round 1, main1", "pending: seat 1 priority"} {
+	for _, want := range []string{"replayed 6 of 26 recorded intents", "turn 1, round 1, main1", "pending: seat 1 priority"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("summary missing %q:\n%s", want, out.String())
 		}
@@ -211,7 +211,7 @@ func TestReproFixtureAtRejectsOutOfRange(t *testing.T) {
 	if code := run([]string{"-at", "999", fixtureRel}, io.Discard, &stderr); code != 2 {
 		t.Fatalf("exit %d, want usage exit 2; stderr:\n%s", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "between 0 and 25 (got 999)") {
+	if !strings.Contains(stderr.String(), "between 0 and 26 (got 999)") {
 		t.Errorf("range error missing actual bounds:\n%s", stderr.String())
 	}
 }
@@ -228,7 +228,7 @@ func TestReproFixtureIgnoresTamperedIntentCount(t *testing.T) {
 	if code := run([]string{dir}, &out, io.Discard); code != 0 {
 		t.Fatalf("exit %d, output:\n%s", code, out.String())
 	}
-	if !strings.Contains(out.String(), "replayed 25 of 25 recorded intents") {
+	if !strings.Contains(out.String(), "replayed 26 of 26 recorded intents") {
 		t.Errorf("summary trusted tampered intent_count:\n%s", out.String())
 	}
 }
@@ -337,7 +337,14 @@ func TestReproOnFreshSnapshot(t *testing.T) {
 	// gone and the same advance(12) gate count captures 25 (146 events).
 	// The committed fixture was re-recorded with it (25 intents, now
 	// including the toss-winner ask).
-	if !strings.Contains(out.String(), "replayed 25 of 25 recorded intents") {
+	//
+	// 25 -> 26 (2026-10-17): CR 117.3a, the end of combat step opens with
+	// the active player holding priority (rules 93b6057e4). Turn 1's
+	// no-attackers end of combat used to open with the last passer (seat 0)
+	// holding priority with one pass counted, so seat 1, the active player,
+	// never acted in it; it now passes there first, one more recorded intent
+	// (151 events). The committed fixture was re-recorded with it.
+	if !strings.Contains(out.String(), "replayed 26 of 26 recorded intents") {
 		t.Errorf("fresh snapshot summary unexpected:\n%s", out.String())
 	}
 	out.Reset()

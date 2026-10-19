@@ -163,9 +163,8 @@ var excluded = map[excludedField]bool{
 	{"rules.Engine", "trigWalkUnionOK"}: true,
 	{"rules.Engine", "trigGrant"}:       true,
 	{"rules.Engine", "phaseSpecs"}:      true,
-	// The per-face text-scan memo (face_scan_memo.go) and active()'s
-	// per-build digest (active_summary.go): pure caches, Clone copies none.
-	{"rules.Engine", "faceScans"}: true,
+	// active()'s per-build digest (active_summary.go): a pure cache, Clone
+	// copies none.
 	{"rules.Engine", "activeSum"}: true,
 	// Characteristics' printed fast-path digest (derived_printed.go), the
 	// activeSum shape.
@@ -179,10 +178,14 @@ var excluded = map[excludedField]bool{
 	// activeBuildSeq with a generation stamp, recycled through Spare.
 	// The resolution kernel's restore counter and recycled checkpoint
 	// storage (resolve_board.go): scratch that a clone starts without.
-	{"rules.Engine", "tape"}:           true,
-	{"rules.Engine", "tapeEpoch"}:      true,
-	{"rules.Engine", "tapeSpare"}:      true,
-	{"rules.Engine", "lossMemo"}:       true,
+	{"rules.Engine", "tape"}:      true,
+	{"rules.Engine", "tapeEpoch"}: true,
+	{"rules.Engine", "tapeSpare"}: true,
+	{"rules.Engine", "lossMemo"}:  true,
+	// appendAvailableManaAbilitiesGate's per-walk answer memo
+	// (mana_gate_memo.go): keyed by walkKey and derivedSeq with a
+	// generation stamp, recycled through Spare.
+	{"rules.Engine", "manaGate"}:       true,
 	{"rules.Engine", "layer5Colors"}:   true,
 	{"rules.Engine", "colorsEpoch"}:    true,
 	{"rules.Engine", "colorsVersion"}:  true,

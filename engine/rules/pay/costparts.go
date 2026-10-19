@@ -377,12 +377,16 @@ var castFlowDrawPlayerCodes = state.NewStrCodes(
 	state.StrEntry[castFlowDrawPlayerCode]{Key: "Player.Activator", Val: castFlowDrawPlayerPayer},
 )
 
+// SubCounterAnyKind reports a counter-removal part's wildcard "Any" kind
+// (Forge's Any removes that many counters regardless of kind).
+func SubCounterAnyKind(spec string) bool { return strings.EqualFold(spec, "Any") }
+
 // SubCounterAvailable reports how many counters of the part's kind the object
 // could give up: the kind's own count, or the object's TOTAL counter count
 // for the "Any" kind (Forge's Any removes that many counters regardless of
 // kind). Used by the offer gate, the X bound and the candidate walk.
 func SubCounterAvailable(o *state.Object, kind string) int32 {
-	if strings.EqualFold(kind, "Any") {
+	if SubCounterAnyKind(kind) {
 		total := int32(0)
 		for _, c := range o.Counters {
 			if c.N > 0 {
@@ -423,6 +427,62 @@ func SubCounterRemovalCandidates(e Engine, p state.PlayerID, source state.ObjID,
 		}
 	}
 	return out
+}
+
+// SubCounterAmongKind reports a filtered fixed-kind counter-removal part:
+// Forge's RemoveAnyCounter<N/Kind/Filter>, "remove N <kind> counters from
+// among <filter>" (Novijen Sages, Hopeful Initiate, The Filigree Sylex). Like
+// the wildcard part it is a TOTAL across the candidates (CR 118.3, 601.2h),
+// paid one counter unit at a time. Every filtered SubCounter<N/...> spelling
+// in the corpus has N = 1, where the total and the one-permanent reads agree.
+func SubCounterAmongKind(part costvocab.CostPart) bool {
+	return !SubCounterAnyKind(part.Spec) && !costvocab.SubCounterTargetsSource(part.Target)
+}
+
+// SubCounterAmongUnits lists, in zone order, the unreserved candidates of a
+// fixed-kind among part that still hold one of its counters after the
+// part's own picks (taken reports the units already picked from an object),
+// and the total units they still hold.
+func SubCounterAmongUnits(e Engine, p state.PlayerID, source state.ObjID, part costvocab.CostPart, reserved map[state.ObjID]bool, taken func(state.ObjID) int32) ([]state.ObjID, int32) {
+	var out []state.ObjID
+	total := int32(0)
+	for _, oid := range SubCounterRemovalCandidates(e, p, source, part, 1, reserved) {
+		left := SubCounterAvailable(e.Game().Obj(oid), part.Spec) - taken(oid)
+		if left <= 0 {
+			continue
+		}
+		out = append(out, oid)
+		total += left
+	}
+	return out, total
+}
+
+// SubCounterPartPayers reports whether a fixed (non-announced), filtered
+// counter-removal part is payable from the payer's unreserved candidates,
+// and returns the permanents a payment would draw on, in zone order. A
+// filtered part ("remove N counters from among creatures you control",
+// Quilled Greatwurm's wildcard and Novijen Sages' +1/+1 kind alike) is a
+// TOTAL across permanents (CR 118.3, 601.2h): the walk sums every
+// candidate's counters of the part's kind until N is reached, the shape the
+// unit-at-a-time asks settle. A source-anchored part reads the source alone.
+func SubCounterPartPayers(e Engine, p state.PlayerID, source state.ObjID, part costvocab.CostPart, reserved map[state.ObjID]bool) ([]state.ObjID, bool) {
+	if costvocab.SubCounterTargetsSource(part.Target) {
+		cands := SubCounterRemovalCandidates(e, p, source, part, part.N, reserved)
+		if len(cands) == 0 {
+			return nil, false
+		}
+		return cands[:1], true
+	}
+	var used []state.ObjID
+	have := int32(0)
+	for _, oid := range SubCounterRemovalCandidates(e, p, source, part, 1, reserved) {
+		if have >= part.N {
+			break
+		}
+		have += SubCounterAvailable(e.Game().Obj(oid), part.Spec)
+		used = append(used, oid)
+	}
+	return used, have >= part.N
 }
 
 // ExistsOnBattlefield reports whether o is a permanent the engine treats as
@@ -610,9 +670,9 @@ func ManaProducedSince(e Engine, mark int) string {
 
 // ManaSubCounterXBound returns the largest X a cost's announced
 // SubCounter<X/Kind> parts can settle, and whether the cost carries any. It
-// mirrors the cast path's xAsk SubCounter bound exactly (the largest
-// candidate's counter count for a filtered part, the source's count for a
-// source-anchored part, the aggregate for the "Any" kind), and takes the
+// mirrors the cast path's xAsk SubCounter bound exactly (the candidates'
+// summed count for a filtered part, the source's count for a source-anchored
+// part), and takes the
 // MIN across parts so a composed cost announces only what every part can
 // settle. The offer gate and the X ask both read it, so the count an
 // activation is priced on and the count the payer may announce cannot
@@ -635,12 +695,9 @@ func ManaSubCounterXBound(e Engine, p state.PlayerID, o *state.Object, source st
 				if co == nil {
 					continue
 				}
-				n := SubCounterAvailable(co, part.Spec)
-				if strings.EqualFold(part.Spec, "Any") {
-					have += n
-				} else if n > have {
-					have = n
-				}
+				// A filtered part is a total across its candidates
+				// (SubCounterPartPayers), whatever its kind.
+				have += SubCounterAvailable(co, part.Spec)
 			}
 		}
 		if !any || have < bound {

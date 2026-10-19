@@ -43,7 +43,10 @@ package azmcts
 // than 256 expanded nodes runs. Eviction drops the state for the garbage
 // collector and never releases its arrays for reuse: a stored state's
 // descendants may share its event-log prefix (rules.Engine.Release's
-// contract).
+// contract). The tree's END is different: every state, walker and clone of
+// the tree is spent together, so a source that pools storage
+// (NodeStateReclaimer, sparePool) takes all of them back at once and the
+// next tree's resumes clone into recycled arrays instead of fresh ones.
 
 import (
 	"errors"
@@ -184,7 +187,7 @@ func (c *nodeCache) simulate(top *node, sim int, opts Options, st *Stats) error 
 				marks = append(marks, kid)
 			}
 		}
-		sel := selectEdge(nd, pt, opts)
+		sel := selectAt(nd, nd == top, pt, opts, st)
 		if pt.Opp {
 			st.OppPoints++
 		}
@@ -281,6 +284,25 @@ func (c *nodeCache) simulate(top *node, sim int, opts Options, st *Stats) error 
 	return errors.New("azmcts: unreachable: the cached walk ended without a leaf")
 }
 
+// reclaim ends the tree: every stored state goes back to the source
+// (NodeStateReclaimer) and the nodes forget them. RunTree calls it once,
+// after its last simulation, when no walker is alive and nothing will
+// resume a state again.
+func (c *nodeCache) reclaim() {
+	r, ok := c.src.(NodeStateReclaimer)
+	if ok {
+		snaps := make([]any, 0, len(c.stored))
+		for _, nd := range c.stored {
+			snaps = append(snaps, nd.snap)
+		}
+		r.Reclaim(snaps)
+	}
+	for _, nd := range c.stored {
+		nd.snap = nil
+	}
+	c.stored = nil
+}
+
 // clockOf is env's engine clock at a point depth searched edges below the
 // root: simulate's now().
 func clockOf(env Env, depth int) pathClock {
@@ -308,6 +330,97 @@ func skipped(nodes []*node, st *Stats) {
 	}
 }
 
+// NodeStateReclaimer is an optional NodeStateSource extension for a source
+// that recycles its states' storage. RunTree calls Reclaim once, after its
+// last simulation, with every state the tree still stores: the tree is
+// over, no walker is alive, and no state will be resumed again, so the
+// source may release every engine it handed out (rules.Engine.Release)
+// and keep the storage for its next tree. A source that cannot promise the
+// states die together (one whose worlds outlive the tree) does not
+// implement it.
+type NodeStateReclaimer interface {
+	NodeStateSource
+	Reclaim(snaps []any)
+}
+
+// sparePool is the recycled engine storage (rules.Spare) one seat's
+// searches share, decision after decision. A fixed-world tree stores a
+// state at nearly every node it expands (the walker's own engine, kept as
+// it stands), so within a tree almost no walker is ever released and every
+// Resume clones into fresh arrays: a mid-game log (~170 KB) and object
+// arena (~125 KB) per simulation, allocated, zeroed and collected. At the
+// tree's end every stored state is spent, and its storage comes here
+// (fixedEnvs.Reclaim); the next tree's Resumes draw from it (get), so the
+// clone copies its parent's history into an array that already exists.
+// Capacity only: a recycled array is overwritten before it is read and
+// zeroed past what the clone writes (rules.Spare), and no event, object,
+// chain byte or search result depends on where an array came from.
+//
+// Every pooled Spare is detached from its event-array provenance
+// (rules.Spare.Detach): a pooled array's parent may itself be pooled, and
+// consumed and overwritten before the child is, so the only prefix claim
+// that survives the pool is none. The pool holds at most max Spares (the
+// rest are dropped for the collector) and pins nothing else.
+type sparePool struct {
+	spares []rules.Spare
+	max    int
+}
+
+// newSparePool is a pool for trees of at most states stored states: that
+// many Resumes draw from it per tree, and that many states refill it.
+func newSparePool(states int) *sparePool {
+	if states <= 0 {
+		return nil
+	}
+	return &sparePool{max: states + 1}
+}
+
+// put pools sp, detached; an empty Spare, or one past the cap, is dropped.
+func (p *sparePool) put(sp rules.Spare) {
+	if p == nil || sp.Empty() || len(p.spares) >= p.max {
+		return
+	}
+	sp.Detach()
+	p.spares = append(p.spares, sp)
+}
+
+// get takes the Spare that fits e's clone best -- the smallest event array
+// that holds e's history plus the fork slack (rules.Spare.Fits), so the
+// larger arrays stay for the deeper states -- or, when none fits, the
+// largest (its other storage still recycles and the clone's log allocates
+// on its first append as a plain clone's does). The zero Spare when empty.
+func (p *sparePool) get(e *rules.Engine) rules.Spare {
+	if p == nil || len(p.spares) == 0 {
+		return rules.Spare{}
+	}
+	best, fits := -1, false
+	for i := range p.spares {
+		sp := &p.spares[i]
+		f := sp.Fits(e)
+		switch {
+		case best < 0:
+			best, fits = i, f
+		case f && !fits:
+			best, fits = i, true
+		case f == fits && ((f && sp.EventCap() < p.spares[best].EventCap()) || (!f && sp.EventCap() > p.spares[best].EventCap())):
+			best = i
+		}
+	}
+	sp := p.spares[best]
+	last := len(p.spares) - 1
+	p.spares[best] = p.spares[last]
+	p.spares[last] = rules.Spare{}
+	p.spares = p.spares[:last]
+	return sp
+}
+
+// resumeSlack is the spare event capacity a Resume reserves past a history
+// of n events when no pooled array fit it: enough for the walk's appends
+// (under 128 in 99% of simulations, measured on the az-c6 cached-worlds
+// bench) and for the next trees' resumes, whose histories run a few
+// hundred events past this one as the game goes on.
+func resumeSlack(n int) int { return max(512, n/8) }
+
 // fixedEnvs is worldEnvs over a FixedWorldSource: the NodeStateSource the
 // node cache walks. It asks the world source for worlds until the root's
 // state is saved; every later simulation is a copy of a saved state.
@@ -319,6 +432,40 @@ type fixedEnvs struct {
 	// A walker whose state was kept (a final Save) is never released.
 	prev  *engineEnv
 	spare rules.Spare
+	// pool, when set, is the seat's recycled storage across trees
+	// (sparePool): a Resume with no spare of its own draws from it, and
+	// Reclaim refills it with every stored state's storage at the tree's
+	// end.
+	pool *sparePool
+}
+
+// Reclaim is NodeStateReclaimer: the tree is over, so the last walker, the
+// unused spare and every stored state's engine are released into the pool.
+// Without a pool the states are simply forgotten, as before. A stored
+// state's log may still share its parent's event array (a clone that never
+// appended): Release recycles only an array that is the engine's own, so
+// no array enters the pool twice.
+func (f *fixedEnvs) Reclaim(snaps []any) {
+	if f.pool == nil {
+		return
+	}
+	if f.prev != nil {
+		if f.prev.e != nil {
+			f.pool.put(f.prev.e.Release())
+		}
+		f.prev.e = nil
+		f.prev = nil
+	}
+	f.pool.put(f.spare)
+	f.spare = rules.Spare{}
+	for _, snap := range snaps {
+		s, ok := snap.(*envState)
+		if !ok || s.e == nil {
+			continue
+		}
+		f.pool.put(s.e.Release())
+		s.e, s.obs, s.cands, s.oppObs = nil, nil, nil, nil
+	}
 }
 
 // envState is one saved engineEnv position. Its engine and observer are
@@ -394,6 +541,13 @@ func (f *fixedEnvs) Resume(snap any) (env Env, err error) {
 		f.prev.e = nil
 		f.prev = nil
 	}
+	if f.spare.Empty() {
+		// No walker was released since the last Resume (the usual case:
+		// the last walk's engine is now a stored state), so the clone is
+		// built from the pool's recycled storage, when there is any.
+		f.spare = f.pool.get(s.e)
+	}
+	fits := f.pool != nil && f.spare.Fits(s.e)
 	defer func() {
 		if p := recover(); p != nil {
 			tracePanic("cache-resume", p)
@@ -401,6 +555,15 @@ func (f *fixedEnvs) Resume(snap any) (env Env, err error) {
 		}
 	}()
 	e := s.e.CloneInto(&f.spare)
+	if f.pool != nil && !fits {
+		// No pooled array held this history: the clone shares its parent's
+		// and its first append would copy the history into a fresh array
+		// grown by the forked log's slack. Reserve that array now instead,
+		// with resumeSlack: the same one copy, into an array that will fit
+		// the resumes of the next trees (sparePool) rather than only this
+		// walk's appends. Capacity only (events.Log.Reserve).
+		e.L.Reserve(len(e.L.Events) + resumeSlack(len(e.L.Events)))
+	}
 	rngs, pcgs := make([]*rand.Rand, len(s.pcgs)), make([]*rand.PCG, len(s.pcgs))
 	for i := range s.pcgs {
 		p := s.pcgs[i]

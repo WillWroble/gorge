@@ -131,7 +131,7 @@ func (e *Engine) castWindowProbeUnits(pc *pendingCast, windowUnits []windowManaU
 			if mp.RestrictValid != "" {
 				continue
 			}
-			cost := e.parseCost(ma.ParamStr(cards.PKCost))
+			cost := e.abilityCompiledCost(ma).Cost
 			if pay.ActivationTapCostUnavailable(o, &cost) {
 				continue
 			}
@@ -164,15 +164,14 @@ func (e *Engine) castWindowProbeUnits(pc *pendingCast, windowUnits []windowManaU
 			// offers R/G only, never the raw parser's WUBRG superset. Without
 			// a record it produces no colour and stays out of this window
 			// (the same fail-closed direction the shared walk takes).
-			produced := mp.Produced
-			if producedNeedsChosen(produced) {
+			counts, any := mp.Counts, mp.CountsAny
+			if mp.NeedsChosen {
 				chosen := pay.ChosenProducedColour(e.G, id)
 				if chosen == "" {
 					continue
 				}
-				produced = pay.SubstituteChosenProduced(produced, chosen)
+				counts, any = cards.ProducedCounts(pay.SubstituteChosenProduced(mp.Produced, chosen))
 			}
-			counts, any := cards.ProducedCounts(produced)
 			total := int32(0)
 			for _, n := range counts {
 				total += n
@@ -244,7 +243,7 @@ func (e *Engine) castWindowSourceExcluded(p state.PlayerID, id state.ObjID) bool
 		if mp.RestrictValid != "" {
 			return true
 		}
-		cost := e.parseCost(ma.ParamStr(cards.PKCost))
+		cost := e.abilityCompiledCost(ma).Cost
 		if pay.ActivationTapCostUnavailable(o, &cost) {
 			continue
 		}
@@ -257,15 +256,14 @@ func (e *Engine) castWindowSourceExcluded(p state.PlayerID, id state.ObjID) bool
 		if _, ok := e.castWindowAmount(p, id, o, ma); !ok {
 			return true
 		}
-		produced := mp.Produced
-		if producedNeedsChosen(produced) {
+		counts, any := mp.Counts, mp.CountsAny
+		if mp.NeedsChosen {
 			chosen := pay.ChosenProducedColour(e.G, id)
 			if chosen == "" {
 				return true
 			}
-			produced = pay.SubstituteChosenProduced(produced, chosen)
+			counts, any = cards.ProducedCounts(pay.SubstituteChosenProduced(mp.Produced, chosen))
 		}
-		counts, any := cards.ProducedCounts(produced)
 		total := int32(0)
 		for _, n := range counts {
 			total += n
@@ -406,12 +404,17 @@ func appendCastWindowAlt(units []windowManaUnit, id state.ObjID, ma *cards.SA, c
 // descriptor would hide (unrestrictedWindowPool), never from spell-restricted
 // mana, so the sequence is executable under the live activation gate. Every
 // produced unit is unrestricted (both probe walks exclude RestrictValid$
-// abilities).
+// abilities). rider is the cast's recorded may-play payment rider
+// (pendingCast.mayPlayIgnore/mayPlayIgnoreType, captured at CR 601.2a while
+// the card was still in the granted zone): "mana of any type can be spent to
+// cast that spell" governs the whole payment, the window's productions
+// included (CR 601.2g-h), exactly as the pool-only feasibility check beside
+// each caller already applies it.
 func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, snow state.Mana,
-	typed [7]state.Mana, life int32, conv *manaConv, units []windowManaUnit) bool {
+	typed [7]state.Mana, life int32, conv *manaConv, rider pipRider, units []windowManaUnit) bool {
 	payable := func(pool, snowPool state.Mana, lifeNow int32) bool {
 		_, ok := resolveManaWith(cost, pool, snowPool, typed, lifeNow,
-			asEval(e).PayLifeInsteadOfB(p), pipRider{}, conv)
+			asEval(e).PayLifeInsteadOfB(p), rider, conv)
 
 		return ok
 	}
@@ -432,8 +435,19 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 	}
 	nodes := 0
 	used := make([]bool, len(ordered))
-	var rec func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32) bool
-	rec = func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32) bool {
+	// prevFree is the ordered index of the unit the previous step activated
+	// through a FREE alternative (no generic fee, no life), or -1. Two free
+	// activations in a row commute: neither spends anything, so either order
+	// reaches the same pools at every later step. The search therefore takes
+	// adjacent free activations in ascending index order only. Without this
+	// the walk enumerated every ORDER of the payer's lands, and with ten
+	// untapped sources whose first unit's first alternative is the wrong
+	// colour (Blossoming Sands' {W} ahead of its {G}) the 1<<18 node cap
+	// ran out before the right production was tried: a payable {G}{U}
+	// activation was judged unreachable and every target dropped off its
+	// Min 0 ask (lockstep pairs 1509 3986, Zimone, Paradox Sculptor).
+	var rec func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32, prevFree int) bool
+	rec = func(pool, spellSnow, activationPool, activationSnow state.Mana, lifeLeft int32, prevFree int) bool {
 		if payable(pool, spellSnow, lifeLeft) {
 			return true
 		}
@@ -446,6 +460,10 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 				continue
 			}
 			for _, a := range ordered[i].Alts {
+				freeAlt := a.CostGeneric == 0 && a.Life == 0
+				if freeAlt && prevFree > i {
+					continue
+				}
 				// A positive life debit must be present before the tap; a
 				// zero-debit alt is unaffected by the payer's life total,
 				// even when the game has carried the payer below 0 (the
@@ -471,9 +489,13 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 				nextActivation := activationFee.Pool
 				nextActivationSnow := activationFee.Snow
 				produced := a.Mana()
+				next := -1
+				if freeAlt {
+					next = i
+				}
 				used[i] = true
 				found := rec(pay.ManaAdd(nextPool, produced), nextSpellSnow,
-					pay.ManaAdd(nextActivation, produced), nextActivationSnow, lifeLeft-a.Life)
+					pay.ManaAdd(nextActivation, produced), nextActivationSnow, lifeLeft-a.Life, next)
 				used[i] = false
 				if found {
 					return true
@@ -482,7 +504,7 @@ func (e *Engine) castWindowReachable(p state.PlayerID, cost Cost, spellPool, sno
 		}
 		return false
 	}
-	return rec(spellPool, snow, free, snow, life)
+	return rec(spellPool, snow, free, snow, life, -1)
 }
 
 func manaSub(a, b state.Mana) state.Mana {
@@ -594,7 +616,7 @@ func (e *Engine) striveAffordableTargets(pc *pendingCast, max int) int {
 		}
 		av := pay.AvailableFor(asPayer(e), pc.player, desc)
 		return e.castWindowReachable(pc.player, convoked, av.Pool, pl.Snow, av.Typed, pl.Life,
-			asEval(e).Conv(pc.player, desc.ID, desc.Class == paymentActivated), units)
+			asEval(e).Conv(pc.player, desc.ID, desc.Class == paymentActivated), rider, units)
 	}
 	// Ascending: the price is monotone in n, so the first unaffordable count
 	// ends the walk and at most one exhaustive (failing) window search runs.

@@ -304,6 +304,13 @@ func (e *Engine) finishUntapStep(next int) bool {
 		if !o.Tapped {
 			continue
 		}
+		if e.untapDenied(ids[i]) {
+			// CR 611.2b: an Effect's "don't untap during their next untap
+			// step" grant (Misstep, Exhaustion, Mana Vapors, Icebreaker
+			// Kraken) holds the permanent tapped. Nothing is consumed here;
+			// the Effect's own Phase$ Untap self-exile ends the restriction.
+			continue
+		}
 		if hasUntapStepChoice(o) && o.UntapChoice == "" {
 			// CR 502.2: the controller may elect not to untap this
 			// permanent. Option 0 is the deterministic untap/default path;
@@ -608,6 +615,7 @@ func (e *Engine) setStep(s state.Step) {
 	leaving := e.G.Step
 	previous, previousSet := e.stepLeaving, e.stepLeavingSet
 	e.stepLeaving, e.stepLeavingSet = leaving, true
+	e.cleanupWindow = false
 	e.emit(events.Event{Kind: events.StepChange, Step: s})
 	e.stepLeaving, e.stepLeavingSet = previous, previousSet
 	if e.pending != nil {
@@ -785,8 +793,12 @@ func (e *Engine) declarationMadeThisStep(kind events.Kind) bool {
 
 func (e *Engine) priorityRound() {
 	// Nobody receives priority during untap or cleanup -- except on the
-	// CR 514.3 grounds cleanupStep's caller below spells out.
-	if e.G.Step == state.StepUntap || e.G.Step == state.StepCleanup {
+	// CR 514.3 grounds cleanupStep's caller below spells out. Once a cleanup
+	// priority window is open (e.cleanupWindow), the round is an ordinary
+	// one: after a resolution the active player receives priority (CR
+	// 117.3b), and the step repeats only from handlePriority's empty-stack
+	// pass (CR 514.3a/b).
+	if e.G.Step == state.StepUntap || (e.G.Step == state.StepCleanup && !e.cleanupWindow) {
 		if e.G.Step == state.StepCleanup {
 			// CR 514.1 (Task D1): the discard-down-to-maximum-hand-size
 			// turn-based action runs FIRST, then CR 514.2. cleanupStep asks a
@@ -870,6 +882,9 @@ func (e *Engine) grantPriority() {
 	if priorityFlowVerify && (e.cast != nil || e.choosing != chooseNone) {
 		panic(fmt.Sprintf("rules: priority granted to seat %d mid-flow (cast pending=%v, choosing=%d)", holder, e.cast != nil, e.choosing))
 	}
+	if e.G.Step == state.StepCleanup {
+		e.cleanupWindow = true
+	}
 	e.emit(events.Event{Kind: events.Priority, Player: holder, Amount: e.G.Passes})
 	e.askPriority(holder)
 }
@@ -901,6 +916,7 @@ var priorityFlowVerify bool
 // here rather than straight to advanceStep is what makes that happen;
 // without it the next turn simply begins.
 func (e *Engine) repeatCleanup() {
+	e.cleanupWindow = false
 	e.cleanupStep()
 	if e.pending != nil {
 		return
@@ -935,10 +951,23 @@ func (e *Engine) repeatCleanup() {
 // drain placed triggers on the stack and it is simply the players' turn to
 // respond (CR 117.1) while the step is still cleanup.
 func (e *Engine) finishCleanupStep() {
+	// CR 514.3a: the check follows the 514.1/514.2 actions, which can
+	// themselves make a state-based action due (an "until end of turn"
+	// control change ending into the legend rule, a +1/+1 that kept a
+	// creature with a -1/-1 counter alive). step()'s head check ran BEFORE
+	// them. When one is performed the active player gets priority even with
+	// an empty stack, and the step then repeats (514.3b, via handlePriority's
+	// empty-stack pass into repeatCleanup).
+	before := len(e.L.Events)
+	e.checkStateBased()
+	if e.pending != nil || e.G.Over {
+		return
+	}
+	performed := len(e.L.Events) > before
 	if e.putTriggersOnStack() {
 		return
 	}
-	if len(e.G.Stack) > 0 {
+	if len(e.G.Stack) > 0 || performed {
 		e.grantPriority()
 		return
 	}
@@ -1105,7 +1134,7 @@ func (e *Engine) advanceStep() {
 		if !attacked {
 			// CR 508.8 skips blockers and combat damage, but only after the
 			// CR 508.2 priority round in the declare-attackers step finishes.
-			e.setStep(state.StepEndCombat)
+			e.enterEndCombat()
 			return
 		}
 	}
@@ -1179,6 +1208,12 @@ func (e *Engine) advanceStep() {
 		// already set StepEndCombat, so return without double-advancing.
 		e.beginCombatPass(false)
 		return
+	}
+	if e.G.Step == state.StepCombatDamage {
+		// Both passes have dealt and the post-damage priority round (CR
+		// 510.3) ended with every player passing on an empty stack: the
+		// combat damage step's continuation state ends with the step.
+		e.combatRound = combatRound{}
 	}
 	next := e.G.Step + 1
 	if s, ok := e.extraPhaseBoundary(); ok {

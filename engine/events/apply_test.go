@@ -53,8 +53,19 @@ func gameWithOneCard(t *testing.T) (*state.Game, state.ObjID) {
 
 func twoPlayer(t *testing.T) (*state.Game, *Log) {
 	t.Helper()
+	return twoPlayerWith(t, bearCard())
+}
+
+// twoPlayerWith is twoPlayer over a caller-supplied bear card. A purity
+// test builds its two games from the SAME card, as a replay rebuilds a game
+// from the same Config cards: a face's compiled printed facts are bound to
+// the address of the text they were derived from (cards' printedFacts
+// guard), so two separately parsed copies of one script are equal in every
+// characteristic yet not reflect.DeepEqual, and comparing such copies tests
+// the parser's allocations, not Apply.
+func twoPlayerWith(t *testing.T, bear *cards.Card) (*state.Game, *Log) {
+	t.Helper()
 	g := state.NewGame([]string{"a", "b"})
-	bear := bearCard()
 	for p := state.PlayerID(0); p < 2; p++ {
 		var lib []state.ObjID
 		for i := 0; i < 5; i++ {
@@ -660,18 +671,20 @@ func TestDamageClampsAtZero(t *testing.T) {
 // stay a pure function of (g, e): the same events on the same starting
 // state always produce the same result.
 func TestApplyIsPure(t *testing.T) {
+	// One parse of each card shared by both games (see twoPlayerWith).
+	bear, token, sailorC := bearCard(), bearCard(), sailorCard()
 	build := func(t *testing.T) (*state.Game, *Log) {
 		t.Helper()
-		g, l := twoPlayer(t)
+		g, l := twoPlayerWith(t, bear)
 		// Task 4: a token table, so TokenCreate below actually mints
 		// (rather than only exercising its no-op guard) -- reusing
 		// bearCard's own source is enough to prove the mutation is
 		// deterministic; it need not be a "real" token script.
-		g.Tokens = map[string]*cards.Card{"bear": bearCard()}
+		g.Tokens = map[string]*cards.Card{"bear": token}
 		// A sixth card in seat 0's library with one activated ability, so
 		// AbilityPush below can actually mint an ability object rather than
 		// only exercise its no-abilities guard.
-		sailor := g.AddObject(sailorCard(), 0)
+		sailor := g.AddObject(sailorC, 0)
 		g.SetZone(state.ZLibrary, 0, append(g.Zone(state.ZLibrary, 0), sailor.ID))
 		return g, l
 	}
@@ -1364,9 +1377,10 @@ func TestKeywordTriggerPushKindString(t *testing.T) {
 // valid targeted application and an invalid player application both leave
 // every object and player untouched, and a replay applies it identically.
 func TestModeChosenIsAMarkerOnly(t *testing.T) {
+	bear := bearCard() // shared by both games (see twoPlayerWith)
 	build := func(t *testing.T) (*state.Game, *Log) {
 		t.Helper()
-		g, l := twoPlayer(t)
+		g, l := twoPlayerWith(t, bear)
 		return g, l
 	}
 	g1, l1 := build(t)

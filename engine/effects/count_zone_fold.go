@@ -221,8 +221,8 @@ func (f *zoneCountFold) visit(id state.ObjID, zone state.Zone, specCtx SpecConte
 		// The DERIVED, layer-aware characteristic (h.Power/h.Toughness),
 		// not the printed face: Forge sizes "greatest power" from the
 		// game's actual power, so a lord's bonus or a -1/-1 counter
-		// counts. The sibling CardPower/... cases keep the printed-face
-		// read; the divergence is recorded in the report.
+		// counts. The sibling CardPower/CardToughness sums read the same
+		// derived value for a battlefield permanent.
 		v := extremePropertyValue(f.h, o, f.prop)
 		if !f.seen || (f.isLeast && v < f.best) || (!f.isLeast && v > f.best) {
 			f.best, f.seen = v, true
@@ -240,9 +240,21 @@ func (f *zoneCountFold) visit(id state.ObjID, zone state.Zone, specCtx SpecConte
 	}
 	switch zoneFoldPropCodes.Code(string(f.prop)) {
 	case zoneFoldPropCardPower:
+		// A permanent's power is its current, layer-derived power (CR
+		// 208.3; Forge's getNetPower): Ghalta, Primal Hunger's "the total
+		// power of creatures you control" counts an anthem's bonus. Off the
+		// battlefield the card's printed value stands (plus any counters).
+		if o.Zone == state.ZBattlefield {
+			f.n += f.h.Power(o.ID)
+			return
+		}
 		dp, _ := o.CounterPTTotals()
 		f.n += int32(o.Face().Power()) + dp
 	case zoneFoldPropCardToughness:
+		if o.Zone == state.ZBattlefield {
+			f.n += f.h.Toughness(o.ID)
+			return
+		}
 		_, dt := o.CounterPTTotals()
 		f.n += int32(o.Face().Toughness()) + dt
 	case zoneFoldPropCardManaCost:

@@ -219,8 +219,9 @@ func (s *actionStaticSource) get() actionStaticViews {
 // expansion or collectCostStatics' other zones. Each mode keeps its original
 // seat, zone and parsed-static order while sharing a single membership walk.
 func (e *Engine) collectActionStatics() actionStaticViews {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return v.action
+	if c, ok := e.boardStaticsRef(); ok {
+		a := &c.v.action
+		return actionStaticViews{cantCast: slices.Clip(a.cantCast), cantActivate: slices.Clip(a.cantActivate), continuous: slices.Clip(a.continuous)}
 	}
 	return e.scanActionStatics()
 }
@@ -235,8 +236,11 @@ func (e *Engine) scanActionStatics() actionStaticViews {
 // zone and static order, so a board with no grantor allocates nothing (the
 // mana path asks it once per object).
 func (e *Engine) collectAddAbilityCarriers() []staticView {
-	if v, ok := e.boardStaticsWalk(); ok {
-		return addAbilityCarriers(v.action.continuous)
+	if c, ok := e.boardStaticsRef(); ok {
+		if c.carriersVer != c.ver {
+			c.carriers, c.carriersVer = slices.Clip(addAbilityCarriers(c.v.action.continuous)), c.ver
+		}
+		return c.carriers
 	}
 	return e.scanActionStaticsMode(true).continuous
 }
@@ -532,6 +536,12 @@ func init() {
 	effects.RegisterNonAPI("stat:CantBeCast", "stat:CantBeActivated", "stat:CantBeCopied", "stat:RaiseCost", "stat:CastWithFlash",
 		"stat:ReduceCost", "stat:AlternativeCost", "stat:OptionalCost", "stat:CantBlock", "stat:CantBlockBy",
 		"stat:CantGainLife", "stat:CantPlayLand", "stat:Continuous", "stat:ManaConvert", "stat:NumLoyaltyAct",
+		// cantchangelife1: the CR 119.7/119.8 CantChangeLife static ("your
+		// life total can't change"). engine/rules/replacement_life.go's
+		// lifeChangeForbidden reads it beside the CantGainLife lock and
+		// covers both directions of a LifeChange plus damage dealt to a
+		// player; ValidPlayer$ is the only scoping parameter enforced.
+		"stat:CantChangeLife",
 		// cantdraw1 / cantdraw-drawlimit-cap: CR 121.6 CantDraw statics
 		// (engine/rules/replacement.go drawForbidden, consulted by applyReplacements
 		// before any Draw replacement). ValidPlayer$ scopes total prohibitions
@@ -718,6 +728,18 @@ func init() {
 	// unrelated Forge AI-hint SVar name (engine/rules/layers.go GrantedSVar, 41
 	// corpus files), so it is deliberately NOT used here.
 	effects.RegisterNonAPI("kw:MustBlock", "kw:CantAttackOrBlock")
+	// kw:CantAttackAlone / kw:CantBlockAlone / kw:CantAttackOrBlockAlone --
+	// CR 506.5's attack-alone / block-alone restriction family (“CARDNAME
+	// can't attack alone.”, “... can't block alone.”, “... can't attack or
+	// block alone.”). Printed K: lines are canonicalised to these heads by
+	// engine/cards/hiddenkeyword.go, and a runtime Animate/Pump `AddHiddenKeyword$
+	// CARDNAME can't attack alone.` grant keeps the sentence form, so
+	// combat.ParseHiddenKeyword reads BOTH spellings (one arm per side). The
+	// restriction is a property of the whole declaration, so it is read by
+	// combat.DeclaresAlone from the attacker/blocker decision validators and
+	// from the shared decision repair (decision.Decision.FitAlone), never by
+	// the per-pair AttackBlocked/BlockRestricted oracles.
+	effects.RegisterNonAPI("kw:CantAttackAlone", "kw:CantBlockAlone", "kw:CantAttackOrBlockAlone")
 }
 
 // manaSlotSymbols indexes the pool slot order (state.MW..state.MC) to its

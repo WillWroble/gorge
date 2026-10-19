@@ -83,6 +83,10 @@ func (s *ExtSlot) Store(v unsafe.Pointer) bool {
 // ExtSlot is the face's downstream facts slot (nil on a face never derived).
 func (f *Face) ExtSlot() *ExtSlot { return f.extSlot }
 
+// CostSlot is the ability's slot for a compiled form of its Cost$ text (nil
+// on an ability never bound by its face's derive).
+func (sa *SA) CostSlot() *Slot { return sa.costSlot }
+
 // ExtSlot is the ability's downstream facts slot (nil on an ability never
 // bound by its face's derive).
 func (sa *SA) ExtSlot() *ExtSlot { return sa.extSlot }

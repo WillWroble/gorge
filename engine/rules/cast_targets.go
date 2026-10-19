@@ -907,7 +907,7 @@ func (e *Engine) subTargetAsk(pc *pendingCast) bool {
 // The spell's SVar table, rather than a card-name list or a broad change to
 // ChangeZone target inference, identifies this announcement shape.
 func teamworkBattlefieldSub(f *cards.Face, root, sub *cards.SA) bool {
-	if f == nil || root == nil || sub == nil || sub.CompiledAPI() != cards.APIChangeZone || !f.HasKeyword("Teamwork") {
+	if f == nil || root == nil || sub == nil || sub.CompiledAPI() != cards.APIChangeZone || !f.HasKeywordRef(kwRefTeamwork) {
 		return false
 	}
 	r := effects.TargetsOf(root)
@@ -1322,7 +1322,13 @@ func (e *Engine) finishTargetedCast(pc *pendingCast, player state.PlayerID) {
 	if e.drainAwaitsTarget {
 		e.drainAwaitsTarget = false
 		e.resumeTriggerDrain()
-	} else if e.pending == nil {
+	} else if e.pending == nil && e.resolvingObj == 0 && !e.answerInResolution {
+		// A cast made while a spell or ability resolves (Etali, Primal
+		// Storm's "cast any number of spells from among them") gives nobody
+		// priority: no player has priority during a resolution (CR 117.1,
+		// 608.2), and CR 601.2i returns priority only to a player who had
+		// it. The resolution's own tail grants priority to the active player
+		// once it finishes (CR 117.3b).
 		e.emit(events.Event{Kind: events.Priority, Player: player, Amount: 0})
 	}
 }
@@ -1487,7 +1493,7 @@ func (e *Engine) recheckIllegal(pc *pendingCast) bool {
 		if face == nil {
 			return false
 		}
-		printed := ParseCost(face.ManaCost)
+		printed := &e.faceCompiledCost(face).Cost
 		mv := printed.CMC()
 		if printed.X > 0 {
 			mv = printed.WithX(pc.x).CMC()

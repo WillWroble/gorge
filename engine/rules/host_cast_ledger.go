@@ -187,13 +187,20 @@ func (e *Engine) spellsCastThisTurnMatching(you state.PlayerID, spec string, exc
 		// Count$ThisTurnCast_Card.wasCastFromYourHandByYou bodies) is
 		// evaluated per cast event against the log (task castprov1); the
 		// wasCastByYou sibling (task castprov2) rides the same combined read.
+		// The provenance reads answer from THIS cast (e.ledgerCast), not the
+		// object's current state: a spell that has since left the stack is
+		// a new object (CR 400.7) but its cast still counts.
+		e.ledgerCast = ledgerCastView{obj: ev.Obj, from: ev.From, by: ev.Player}
 		matchSpec, ok := e.castProvenanceAdmits(matchSpec, ev.Obj, you)
 		if !ok {
+			e.ledgerCast = ledgerCastView{}
 			continue
 		}
 		sc := e.specCtx(ev.Obj, you)
 		sc.TriggerContext = tc
-		if e.matchesSpec(matchSpec, ev.Obj, sc) {
+		matched := e.matchesSpec(matchSpec, ev.Obj, sc)
+		e.ledgerCast = ledgerCastView{}
+		if matched {
 			out = append(out, ev.Obj)
 		}
 	}
@@ -206,16 +213,37 @@ func (e *Engine) spellsCastThisTurnMatching(you state.PlayerID, spec string, exc
 // obj's latest PutOnStack event names the cast that put it on the stack —
 // From is the zone the cast came from, Player the caster. Provenance is
 // game-long, so the scan is not bounded by the turn; if the card was later
-// cast again from another zone, the latest cast wins. Derived from the event
+// cast again from another zone, the latest cast wins, and a zone change after
+// that cast other than its resolution onto the battlefield ends it (CR 400.7,
+// castProvenanceEndedBy). Derived from the event
 // log like SpellsCastThisTurnMatching, so a replay derives the same answer.
 func (e *Engine) WasCastFromHandByYou(obj state.ObjID, p state.PlayerID) bool {
+	if lc, ok := e.ledgerCastFor(obj); ok {
+		return lc.from == state.ZHand && lc.by == p
+	}
 	for i := len(e.L.Events) - 1; i >= 0; i-- {
 		ev := e.L.Events[i]
-		if ev.Kind == events.PutOnStack && ev.Obj == obj {
+		if ev.Obj != obj {
+			continue
+		}
+		if castProvenanceEndedBy(ev) {
+			return false
+		}
+		if ev.Kind == events.PutOnStack {
 			return ev.From == state.ZHand && ev.Player == p
 		}
 	}
 	return false
+}
+
+// castProvenanceEndedBy reports whether ev, an event of the object later than
+// its latest cast, ends that cast's provenance: any zone change other than
+// the resolution's own stack -> battlefield entry (a counter to the
+// graveyard, a CR 733.1 reversal, a blink, a death, a draw) makes a new object that
+// was never cast (CR 400.7), so a reanimated countered Nine-Lives Familiar
+// is not "cast".
+func castProvenanceEndedBy(ev events.Event) bool {
+	return (ev.Kind == events.MoveZone || ev.Kind == events.Draw) && (ev.From != state.ZStack || ev.To != state.ZBattlefield)
 }
 
 // WasCastFromHand satisfies effects.Host's WasCastFromHand for the BARE
@@ -331,7 +359,9 @@ func reverseIDs(in []state.ObjID) []state.ObjID {
 // grantcost1), which Forge never treats as a cast. A copy was never cast
 // (IsCopy), and a card never put on the stack (cheated into play) reads
 // false. Derived from the event log plus the live pending cast, so a replay
-// derives the same answer.
+// derives the same answer. A zone change after the latest cast other than
+// its resolution onto the battlefield ends it (CR 400.7,
+// castProvenanceEndedBy).
 func (e *Engine) WasCast(obj state.ObjID) bool {
 	if e.cast != nil && e.cast.card == obj && !e.cast.isAbility() {
 		return true
@@ -339,9 +369,20 @@ func (e *Engine) WasCast(obj state.ObjID) bool {
 	if o := e.G.Obj(obj); o == nil || o.IsCopy {
 		return false
 	}
+	if _, ok := e.ledgerCastFor(obj); ok {
+		return true
+	}
 	for i := len(e.L.Events) - 1; i >= 0; i-- {
 		ev := e.L.Events[i]
-		if ev.Kind == events.PutOnStack && ev.Obj == obj {
+		if ev.Obj != obj {
+			continue
+		}
+		if castProvenanceEndedBy(ev) {
+			// A zone change after the latest cast other than the resolution's
+			// battlefield entry: a new object that was never cast (CR 400.7).
+			return false
+		}
+		if ev.Kind == events.PutOnStack {
 			return true
 		}
 	}
@@ -365,18 +406,24 @@ func (e *Engine) WasCast(obj state.ObjID) bool {
 // (castProvenanceAdmits) applies that guard, this read answers the log
 // question alone. Derived from the event log like WasCastFromHandByYou, so
 // a replay derives the same answer; a card never put on the stack (cheated
-// into play) reads false, and so does a card that left the battlefield after
-// that cast and came back without one (reanimated, blinked: CR 400.7).
+// into play) reads false, and so does a card that changed zones after that
+// cast other than by resolving onto the battlefield (countered, reversed,
+// reanimated, blinked: CR 400.7, castProvenanceEndedBy).
 func (e *Engine) WasCastByYou(obj state.ObjID, p state.PlayerID) bool {
+	if lc, ok := e.ledgerCastFor(obj); ok {
+		return lc.by == p
+	}
 	for i := len(e.L.Events) - 1; i >= 0; i-- {
 		ev := e.L.Events[i]
 		if ev.Obj != obj {
 			continue
 		}
-		if ev.Kind == events.MoveZone && ev.From == state.ZBattlefield {
-			// It left the battlefield after its latest cast: whatever is asked
-			// about now is a new object that was never cast (CR 400.7) --
-			// Nine-Lives Familiar's own return must not re-enter with eight.
+		if castProvenanceEndedBy(ev) {
+			// It changed zones after its latest cast other than by resolving
+			// onto the battlefield: whatever is asked about now is a new
+			// object that was never cast (CR 400.7) -- Nine-Lives Familiar's
+			// own return, or a countered and reanimated one, must not enter
+			// with eight.
 			return false
 		}
 		if ev.Kind == events.PutOnStack {

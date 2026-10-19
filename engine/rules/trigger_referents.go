@@ -81,18 +81,26 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 			// sibling capture site (trigger_blocks.go, trigger_granted.go).
 			c.AttackingPlayer = player(e.controllerOf(o.ID))
 		}
-	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll:
+	case cards.TriggerCounterAdded, cards.TriggerCounterAddedOnce, cards.TriggerCounterAddedAll, cards.TriggerCounterTypeAddedAll,
+		cards.TriggerCounterRemoved:
 		// The batch size the body reads as TriggerCount$Amount (Simic
 		// Ascendancy's "put that many growth counters" on CounterAddedOnce,
-		// and the same read on a plain CounterAdded line): one CounterChange
-		// event carries the whole placement batch in Amount, and ev.Obj is
-		// the permanent the counters landed on. Both modes are dispatched by
-		// the same matcher (trigmatch.counterAddedMatches), so both must bind the same
-		// batch role -- the crossing gate is the matcher's job, the amount the
-		// body reads is this one, and a plain CounterAdded trigger that reads
-		// "that many" had nothing to read before this case named it.
+		// the plain CounterRemoved "that much" bodies, and the same read on a
+		// plain CounterAdded line): one CounterChange event carries the whole
+		// placement batch in Amount, and ev.Obj is the permanent the counters
+		// landed on. Every mode here is dispatched by the same matcher
+		// (trigmatch.counterAddedMatches / counterRemovedMatches), so all bind
+		// the same batch role -- the crossing gate is the matcher's job, the
+		// amount the body reads is this one, and a plain CounterAdded trigger
+		// that reads "that many" had nothing to read before this case named
+		// it. A plain (per-counter) line queues one instance per counter, and
+		// the queue site rewrites each extra instance's amount to 1.
 		c.TriggerCard = ev.Obj
-		c.TriggerAmount = ev.Amount
+		if ev.Amount < 0 {
+			c.TriggerAmount = -ev.Amount
+		} else {
+			c.TriggerAmount = ev.Amount
+		}
 	case cards.TriggerCounterPlayerAddedAll:
 		// The batch "whenever you put one or more counters on ..." mode's
 		// roles (Generous Patron, Rikku, Kros, All Will Be One): the
@@ -125,7 +133,9 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		// event carried is POSITIVE, so TriggerCount$Amount reads -ev.Amount
 		// (Chandra, Fire Artisan's "deals that much damage"; B.O.B. Bevy of
 		// Beebles; Regenerations Restored). ev.Obj is the permanent the
-		// counters left.
+		// counters left. Mode$ CounterRemoved binds the same roles in the
+		// Added/Removed arm above; this arm stays separate because the removal
+		// matcher's negative-Amount contract is its own.
 		c.TriggerCard = ev.Obj
 		if ev.Amount < 0 {
 			c.TriggerAmount = -ev.Amount
@@ -257,8 +267,9 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 		// sets -- is what TriggeredTargetLKICopy (Enormous Energy Blade's
 		// "tap that creature") resolves, so the bearer never masquerades as
 		// another mode's TriggerTarget provenance (a BecomesTarget trigger's
-		// TriggerTarget is its own source permanent; reading it as a bearer
-		// would make Horobi destroy himself on every targeting).
+		// TriggerTarget is the TARGETED permanent, becomesTargetReferent;
+		// reading it as a bearer would make Horobi destroy himself on every
+		// targeting).
 		c.TriggerCard = ev.Obj
 		if len(ev.IDs) > 0 {
 			c.TriggerTarget = state.Target{Obj: ev.IDs[0]}
@@ -417,6 +428,23 @@ func (e *Engine) triggerReferents(t cards.Trigger, source state.ObjID, ev events
 	// and its live Object.X remains the cast-time value (normally zero).
 	if ev.Kind == events.TurnFaceUp {
 		c.TriggerPaidX = ev.Amount
+	}
+	// CR 400.7: the pending trigger belongs to the object that existed when
+	// it fired, so its body's `Defined$ Remembered` read (sourceRemembered)
+	// must answer with THIS object's list even after the source re-enters the
+	// battlefield while the trigger waits -- a battlefield re-entry is a new
+	// object and the entry fold clears its list, but that clear is the NEW
+	// object's forgetting, not the old object's. Snapshot the queue-time list
+	// with its Incarnation stamp; only a list the source actually carries is
+	// captured, so an ordinary trigger (and every resolution without a
+	// re-entry) reads the live field exactly as before. A source that has
+	// never crossed the battlefield boundary (Incarnation 0, a spell on the
+	// stack) keeps the live read: its first entry deliberately carries its
+	// cast-time memory forward, and no pending referent of a stack object can
+	// be stranded by a battlefield re-entry that has not happened yet.
+	if src := e.G.Obj(source); src != nil && src.Incarnation != 0 && len(src.Remembered) > 0 {
+		c.SourceRemembered = append([]state.Target(nil), src.Remembered...)
+		c.SourceIncarnation = src.Incarnation
 	}
 	return c
 }

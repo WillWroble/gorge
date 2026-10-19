@@ -857,16 +857,31 @@ func definedSpec(h Host, c *Ctx, spec string) ([]state.Target, bool) {
 		// case), so this resolves the whole per-defender attacker group.
 		return objectsOf(c.Remembered), true
 	case definedSpecTriggeredTargetLKICopy:
-		// The BEARER the Attached referent walk captured (triggerReferents'
-		// Attached case): the permanent an Aura/Equipment became attached to
-		// -- Enormous Energy Blade's "tap that creature". Only the Attached
-		// walk sets TriggerBearer, so no other mode's provenance moves: a
-		// BecomesTarget trigger's TriggerTarget role is its OWN source
-		// permanent (the enchanted creature, Horobi himself), and this
-		// spelling keeps resolving that mode's Remembered entry (the
-		// targeting spell) exactly as it always has.
+		// "That permanent/player": the role the CAUSING mode captured, so the
+		// mode decides and no card name is involved (CR 603.2, 608.2c).
+		//
+		//  - Attached: the BEARER the Attached referent walk captured
+		//    (triggerReferents' Attached case) -- Enormous Energy Blade's "tap
+		//    that creature". Only that walk sets TriggerBearer.
+		//  - BecomesTarget(Once): the TARGETED object (Cloud Cover's "return
+		//    that permanent", Cowardice, Horobi), which is the TriggerTarget
+		//    role becomesTargetReferent captured. BecomesTarget is the ONE
+		//    mode that records the targeting action on TriggerStack
+		//    (triggerReferents' BecomesTarget case: "ev.Obj is the targeting
+		//    spell/ability"), so that role -- not the mode-agnostic
+		//    TriggerTarget read, which DamageDone also fills -- is what marks
+		//    this arm: every other mode keeps the Remembered fallback below
+		//    byte for byte. Before this arm the spelling answered Remembered
+		//    here, i.e. the targeting SPELL or ability, so the bounce, destroy
+		//    and gain-control bodies acted on or found nothing at all.
+		//    The plain TriggeredTarget spelling (definedSpecTriggeredTarget)
+		//    already prefers this same role, so the two agree.
+		//  - Every other mode: Remembered, exactly as it always resolved.
 		if c.TriggerBearer != 0 {
 			return []state.Target{{Obj: c.TriggerBearer}}, true
+		}
+		if c.TriggerStack != 0 && (c.TriggerTarget.Obj != 0 || c.TriggerTarget.IsPlayer) {
+			return []state.Target{c.TriggerTarget}, true
 		}
 		return objectsOf(c.Remembered), true
 	case definedSpecTriggeredObject:
@@ -1697,6 +1712,15 @@ func definedPlayerIDs(h Host, c *Ctx, selector string) []state.PlayerID {
 // still applies) with the same plain-Remembered rule.
 func definedPlayers(h Host, c *Ctx, sa *cards.SA) []state.PlayerID {
 	r := DefinedRefOf(sa)
+	if strings.TrimSpace(r.Raw) == "" && !TargetsOf(sa).Has(TgtValidPresent) {
+		// No Defined$ and no targets: Forge's getDefinedPlayers default is the
+		// ability's activating player ("you"), not the player who currently
+		// controls the SOURCE. They differ once the source has left the
+		// battlefield (a stolen permanent sacrificed as the activation's cost
+		// or in response resets to its owner, CR 400.7), while the ability
+		// stays under its activator (CR 113.8, 602.2): K1m pairs 39244 92575.
+		return []state.PlayerID{c.Controller}
+	}
 	return playerIDsFromTargets(h, c, r.Raw, DefinedRef(h, c, r, sa))
 }
 
@@ -2086,13 +2110,40 @@ func filterCapturedRemembered(remembered, captured, delayedRemembered, persisten
 	return out
 }
 
-// sourceRemembered is the resolving source's persistent, event-backed
-// Remembered list (nil for a departed source).
-func sourceRemembered(h Host, c *Ctx) []state.Target {
-	if src := h.Game().Obj(c.Source); src != nil {
-		return src.Remembered
+// effectiveSourceRemembered is the ONE home of the pending-referent rule over
+// the source's persistent Remembered list: a live object with no pending
+// snapshot (and any mid-resolution write to it) reads its own list; an object
+// whose Incarnation has moved past a queued trigger's fire-time stamp is a
+// NEW object (CR 400.7), and the pending trigger resolves the OLD object's
+// snapshot instead -- the entry fold's clear is the new object's forgetting,
+// never a licence to strand the old object's pending referents. Every reader
+// of the persistent list in a trigger resolution goes through here
+// (sourceRemembered for the Defined$/host reads, anyRemembered for the
+// IsRemembered filter), so the two can never disagree on what "the source's
+// remembered list" answers while a re-entry is pending.
+func effectiveSourceRemembered(g *state.Game, tc TriggerContext, src *state.Object) []state.Target {
+	if src == nil {
+		return nil
 	}
-	return nil
+	if len(tc.SourceRemembered) > 0 && tc.SourceIncarnation != src.Incarnation {
+		return tc.SourceRemembered
+	}
+	return src.Remembered
+}
+
+// sourceRemembered is the resolving source's persistent, event-backed
+// Remembered list (nil for a departed source). A pending trigger that queued
+// a fire-time snapshot (TriggerContext.SourceRemembered, the CR 400.7
+// pending-referent capture) answers with THAT list when the live source's
+// Incarnation has moved past the fire-time one: the source re-entered the
+// battlefield as a new object while the trigger waited, and the entry fold's
+// clear (CR 400.7: a re-entry forgets its former existence) is the NEW
+// object's forgetting -- the Skyclave Apparition leave trigger that resolves
+// after its source was reanimated must still return the exiled card. An
+// unchanged object (the common case, and every mid-resolution write to the
+// live list) reads the live field exactly as before.
+func sourceRemembered(h Host, c *Ctx) []state.Target {
+	return effectiveSourceRemembered(h.Game(), c.TriggerContext, h.Game().Obj(c.Source))
 }
 
 func sameTargets(a, b []state.Target) bool {

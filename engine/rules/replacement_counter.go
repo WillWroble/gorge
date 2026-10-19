@@ -511,7 +511,7 @@ func (e *Engine) counterSpellQualifiers(target *state.Object, quals string, you 
 	for q := range strings.SplitSeq(quals, "+") {
 		switch counterSpellQualifiersCodes.Code(string(q)) {
 		case counterSpellQualifiersHasKeywordFlash:
-			if target.Face() == nil || !target.Face().HasKeyword("Flash") {
+			if target.Face() == nil || !target.Face().HasKeywordRef(kwRefFlash) {
 				return false
 			}
 		case counterSpellQualifiersWasCastByYou:

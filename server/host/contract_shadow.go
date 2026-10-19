@@ -6,6 +6,7 @@ package host
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/adams-shaun/gorge/bots"
 	"github.com/adams-shaun/gorge/bots/botpolicy"
@@ -57,6 +58,29 @@ func newShadowTestSeat(t ContractT, policy string, deps bots.Deps, matchSeed uin
 func (s *shadowTestSeat) index() (int, uint64) {
 	n := len(s.live().L.Intents)
 	return n, divergence.ShadowSeed(s.matchSeed, s.slot, n)
+}
+
+// answeredBelow counts the seat's answered decisions whose intent index is
+// below logged, the decisions a match log of logged intents records.
+func (s *shadowTestSeat) answeredBelow(logged int) int {
+	n := 0
+	for _, i := range s.seen {
+		if i < logged {
+			n++
+		}
+	}
+	return n
+}
+
+// loggedIntents is match k's recorded intent count.
+func (r *Registry) loggedIntents(id TableID, k int) (int, error) {
+	_, m, err := r.lookup(id, k)
+	if err != nil {
+		return 0, fmt.Errorf("host: table %s match %d: %w", id, k, err)
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.e.L.Intents), nil
 }
 
 func (s *shadowTestSeat) fresh(seed uint64) seat.Seat {
@@ -208,9 +232,17 @@ func RunShadowParityContract(t ContractT, o Options, policy string, seed uint64,
 	}
 	// Preconditions: the scan visited exactly the decisions the seat
 	// answered, there were enough of them, they were real choices, and (for
-	// an Env policy) the Env path really ran.
-	if scanned != len(ss.seen) {
-		t.Fatalf("scan visited %d decisions, the seat answered %d", scanned, len(ss.seen))
+	// an Env policy) the Env path really ran. A capped match parks (and the
+	// seat answers) the decision at the cap before play's MaxIntents guard
+	// ends it, and that answer is never submitted, so only the answers the
+	// log records (intent index below len(log.Intents)) count.
+	logged, err := r.loggedIntents("t1", 1)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	answered := ss.answeredBelow(logged)
+	if scanned != answered {
+		t.Fatalf("scan visited %d decisions, the seat answered %d the log records", scanned, answered)
 	}
 	if scanned < 20 || ss.multi < 5 {
 		t.Fatalf("degenerate fixture: %d decisions, %d with a choice", scanned, ss.multi)

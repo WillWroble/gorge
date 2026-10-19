@@ -127,8 +127,20 @@ func (e *Engine) resolveTop() {
 		// and has none recorded resolves untargeted rather than fizzling --
 		// targetMin(o.Ability)==0 && len(targets)==0 is the exemption.
 		if !charmHandled {
-			if spec := effects.TargetsOf(o.Ability).ValidTgts; spec != "" && !(e.resolvedTargetMin(o.Controller, id, o.Ability, 0) == 0 && len(targets) == 0) {
-				legal := e.legalTargets(targets, o.Ability, targetZones(o.Ability), o.Controller, o.Source, id)
+			// A modal ability's target declaration lives on its chosen
+			// mode's sub, not the Charm root (whose ValidTgts$ is empty):
+			// recheck the declaration the placement ask covered
+			// (offeredTargetSA), as the spell branch rechecks modalTargetSA.
+			tsa := o.Ability
+			if len(o.ChosenModes) > 0 && effects.CharmOf(o.Ability).HasChoices {
+				if src := e.G.Obj(o.Source); src != nil && src.Face() != nil {
+					if sub := offeredTargetSA(o, src.Face().SVars); sub != nil {
+						tsa = sub
+					}
+				}
+			}
+			if spec := effects.TargetsOf(tsa).ValidTgts; spec != "" && !(e.resolvedTargetMin(o.Controller, id, tsa, 0) == 0 && len(targets) == 0) {
+				legal := e.legalTargets(targets, tsa, targetZones(tsa), o.Controller, o.Source, id)
 				// subLegal > 0 keeps a chain alive whose ROOT targets all
 				// became illegal but whose pre-asked sub target did not
 				// (alltargeted1); charmHandled cannot reach here, so the two
@@ -962,6 +974,14 @@ func (e *Engine) legalTargets(targets []state.Target, sa *cards.SA, zones []stat
 		// response) is dropped here, and a target with no other legal target
 		// left fizzles the whole spell/ability through the existing fizzle
 		// machinery upstream of this recheck.
+		// CR 400.7 / 608.2b: an object that left the battlefield (or entered
+		// it) since it was targeted is a new object, even though it kept its
+		// ObjID -- Infernal Vessel or Reassembling Skeleton dying and
+		// returning before the haste grant aimed at it resolves. The stamp
+		// is the target's Incarnation when it was chosen.
+		if e.targetBecameNewObject(self, t.Obj) {
+			continue
+		}
 		if o := e.G.Obj(t.Obj); o != nil && zoneIn(o.Zone, zones) {
 			// The offer post-filter's own predicate, the SAME definition: a
 			// target that was offered under NonTriggeredCardController cannot
@@ -1053,6 +1073,28 @@ func targetSpecForZone(spec string, z state.Zone) string {
 }
 
 // zoneIn reports whether z is one of the zones in the set.
+// targetBecameNewObject reports that the stack object self stamped id as a
+// target (state.Object.TargetStamps) and id's Incarnation has advanced
+// since: it crossed the battlefield boundary and is a new object (CR
+// 400.7). An unstamped target (a rules-side record that never went through
+// a TargetsChosen fold) is not judged here.
+func (e *Engine) targetBecameNewObject(self, id state.ObjID) bool {
+	so := e.G.Obj(self)
+	if so == nil || len(so.TargetStamps) == 0 {
+		return false
+	}
+	t := e.G.Obj(id)
+	if t == nil {
+		return false
+	}
+	for i := len(so.TargetStamps) - 1; i >= 0; i-- {
+		if so.TargetStamps[i].Obj == id {
+			return so.TargetStamps[i].Incarnation != t.Incarnation
+		}
+	}
+	return false
+}
+
 func zoneIn(z state.Zone, zones []state.Zone) bool {
 	for _, candidate := range zones {
 		if candidate == z {

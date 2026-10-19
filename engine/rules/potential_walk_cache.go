@@ -238,6 +238,55 @@ func (e *Engine) potentialWalkOf(p state.PlayerID, full bool) (state.Mana, []dec
 	return mana, opts
 }
 
+// potentialWalkCarries reports whether e's potential-walk entry is the walk
+// at e's CURRENT state: usable (a posed priority decision, outside every
+// derivation) and stamped with the state now. A clone of e taken now is at
+// the same state, so the entry is exactly what the clone's own first
+// potential read would compute; cloneWith carries it (adoptPotentialWalk).
+// The stamp check brings e's active() up to date (potentialRebuilds), as
+// every potential read does.
+func (e *Engine) potentialWalkCarries() bool {
+	w := &e.potentialWalk
+	return w.opts != nil && e.potentialWalkUsable() && w.stamp == e.potentialStampNow(w.stamp.p)
+}
+
+// adoptPotentialWalk gives c, a clone of e at e's current state, e's
+// potential-walk entry (potentialWalkCarries), re-stamped with c's own key:
+// c's ask serial, pending pointer, registry version and rebuild count all
+// restart on a clone, and its state counters equal e's. A search resumes a
+// stored node by cloning its engine and submitting the searched intent at
+// once, and that Submit's validation (ValidateCastPayment ->
+// planCastPaymentAtDecision) ran the walk and the cast plan again from
+// cold at the very state the stored engine's offer builder had memoised
+// them: measured on the az-c6 cached-worlds bench, 3% of all CPU.
+//
+// Exact because the entry is a pure function of the state (the file
+// comment) and the clone's state is e's; verify mode (walkCacheVerify)
+// re-plans every memo hit against fresh inputs in the clone too. The
+// option list is c's own: a copy, or -- when e's entry served the posed
+// decision's own offer walk (priorityWalkTail) -- the same list in c's copy
+// of the decision (cloneDecision copies Options in order). It is never
+// shared with e: e may later compute a walk into its own buffer in place,
+// and a live e's arena retires its decision's Options at its next Submit.
+// The cast-plan memos are copied as values; a served Plan is read-only to
+// every reader (planCastPaymentMemo), so sharing its pointer is sharing an
+// immutable value. potentialFullDemand stays c's own (reset): the entry's
+// full flag says what it holds.
+func (c *Engine) adoptPotentialWalk(e *Engine) {
+	w := &e.potentialWalk
+	var opts, spare []decision.Option
+	if d, n := e.pending, len(w.opts); d != nil && n > 0 && n <= len(d.Options) && n <= len(c.pending.Options) && &w.opts[0] == &d.Options[0] {
+		opts = c.pending.Options[:n:n]
+	} else {
+		opts = append(make([]decision.Option, 0, n), w.opts...)
+		spare = opts[:0]
+	}
+	c.potentialWalk = potentialWalkCache{
+		stamp: c.potentialStampNow(w.stamp.p), full: w.full, mana: w.mana, opts: opts, spare: spare,
+		plans: append([]castPlanMemo(nil), w.plans...),
+	}
+}
+
 // potentialRebuilds brings active() up to date and returns its rebuild count:
 // activeBuildSeq less the explicit retirements (retireCrossWalkMemo), which
 // mark a reader's own transient no-event probes (a face flip, the
@@ -290,8 +339,9 @@ func (e *Engine) verifyPotentialWalk(p state.PlayerID, full bool, mana state.Man
 func (e *Engine) planCastPaymentAtDecision(p state.PlayerID, cast decision.PlannedCast) PaymentPlanOutcome {
 	if e.potentialWalkUsable() {
 		if !e.potentialWalkHit(p, false) {
-			// A cold cache (a clone starts without one): fill it. The walk is
-			// keyed on the state's stamp, so what it serves is exact.
+			// A cold cache (a clone of an engine that had none, or a
+			// different state): fill it. The walk is keyed on the state's
+			// stamp, so what it serves is exact.
 			e.potentialWalkOf(p, false)
 		}
 	}

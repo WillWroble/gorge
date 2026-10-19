@@ -295,6 +295,9 @@ func effPutCounter(h Host, c *Ctx, sa *cards.SA) {
 		if o == nil {
 			continue
 		}
+		if putCounterReferentLeft(h, c, sa, o) {
+			continue
+		}
 		// Adapt$'s put is itself conditional (CR 702.35a: "If this creature has
 		// no +1/+1 counters on it, put N +1/+1 counters on it"). For an AB$
 		// activation the offer-time gate (engine/rules/legal.go's adaptGateOK) already
@@ -1266,3 +1269,63 @@ var putCounterChooserForCodes = state.NewStrCodes(
 	state.StrEntry[putCounterChooserForCode]{Key: "TargetedPlayer", Val: putCounterChooserForThisTargetedPlayer},
 	state.StrEntry[putCounterChooserForCode]{Key: "Targeted", Val: putCounterChooserForThisTargetedPlayer},
 )
+
+// putCounterReferentLeft reports whether o is a permanent the resolving
+// ability named that has since left the battlefield, so it is a new object
+// the counters cannot reach (CR 400.7; Forge's CountersPutEffect skips a card
+// whose game timestamp changed). The zone-agnostic loop above stays right
+// for a referent that never was that permanent (a suspended card's time
+// counters, CR 122.1); only two referents are known to name a battlefield
+// permanent:
+//   - the source itself ("put a +1/+1 counter on this creature": Hungry
+//     Ghoul's activation, Erudite Wizard's draw trigger), when the ability
+//     went on the stack while its source was on the battlefield
+//     (events.Apply's push stamp) and the source is now off the battlefield
+//     or a later incarnation;
+//   - a Triggered*LKICopy referent (Quilled Greatwurm's "put that many
+//     +1/+1 counters on it -- it must survive"), whose trigger-time object
+//     is the last-known battlefield permanent, when it is no longer on the
+//     battlefield.
+func putCounterReferentLeft(h Host, c *Ctx, sa *cards.SA, o *state.Object) bool {
+	if sourceLeftSincePush(h, c, o) {
+		return true
+	}
+	if o.Zone == state.ZBattlefield || sa == nil {
+		return false
+	}
+	d := sa.ParamStr(cards.PKDefined)
+	return strings.HasPrefix(d, "Triggered") && strings.HasSuffix(d, "LKICopy")
+}
+
+// sourceLeftSincePush reports whether o is the resolving ability's source,
+// the ability went on the stack while that source was on the battlefield
+// (events.Apply's push stamp), and the source has since left it or returned
+// as a later incarnation: the permanent the ability names no longer exists
+// (CR 400.7), and an effect acting on "this permanent" does nothing to the
+// card in its new zone.
+//
+// A triggered ability whose source left the battlefield after it triggered
+// but before it was put on the stack (Youthful Valkyrie exiled by the same
+// Abyssal Harvester resolution whose token copy triggered it) has no
+// battlefield push stamp; the host's departure record answers that case
+// (rules: the source-characteristic LKI captured when a source with a
+// waiting ability leaves the battlefield, carried onto the stack object at
+// TriggerPush).
+func sourceLeftSincePush(h Host, c *Ctx, o *state.Object) bool {
+	if o.ID != c.Source || c.ResolvingObj == 0 {
+		return false
+	}
+	ro := h.Game().Obj(c.ResolvingObj)
+	if ro == nil || ro.Source != o.ID {
+		return false
+	}
+	if ro.PushSourceOnBattlefield {
+		return o.Zone != state.ZBattlefield || o.Incarnation != ro.PushSourceIncarnation
+	}
+	if dh, ok := h.(interface {
+		SourceLeftBattlefieldSince(stack state.ObjID) bool
+	}); ok {
+		return dh.SourceLeftBattlefieldSince(c.ResolvingObj)
+	}
+	return false
+}

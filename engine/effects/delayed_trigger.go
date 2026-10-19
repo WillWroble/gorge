@@ -2,6 +2,7 @@ package effects
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/events"
@@ -79,7 +80,18 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 	// value is loud and preserves the historical chain-capture fallback.
 	remembered := c.Remembered
 	replacedRemembered := false
-	if spec := dp.RememberObjects; spec != "" && spec != "RememberedLKI" {
+	if dp.RememberObjects == "RememberedLKI" {
+		// RememberObjects$ RememberedLKI names what the chain REMEMBERED, not
+		// the referents its triggering event captured (Forge's trigger does
+		// not remember its triggering card): Kykar, Zephyr Awakener's blink
+		// remembers the exiled creature (RememberChanged$), and its SpellCast
+		// capture -- the noncreature spell that triggered it -- must not ride
+		// along, or the end-step return put that spell (a flashback Think
+		// Twice, already exiled) onto the battlefield. An explicit later
+		// remember of a captured object is kept (excludeCaptureOccurrences).
+		remembered = rememberedExcludingCapture(h, c)
+		replacedRemembered = true
+	} else if spec := dp.RememberObjects; spec != "" {
 		if ts, known := knownDefinedTargets(h, c, spec); known {
 			remembered = copyTargets(ts)
 			replacedRemembered = true
@@ -198,9 +210,60 @@ func effDelayedTrigger(h Host, c *Ctx, sa *cards.SA) {
 	if dp.RememberNumber && c.Num.RememberedCMCBound {
 		text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
 	}
+	// The registration's remembered stamps ride the Text too
+	// ("|RS=<id>:<inc>[,<id>:<inc>...]", appended LAST so the decode strips
+	// them FIRST): the trigger-time stamps the resolving trigger captured
+	// (TriggerContext.TriggerRememberedStamps) for every remembered object it
+	// covers, and the live incarnation for the rest -- the same list
+	// rememberedStampsFrom derives at the fold for a registration without the
+	// suffix, so every already-logged registration folds identically. The
+	// trigger-time stamps are the point (CR 400.7): a dies trigger that
+	// resolved after its card was returned and died again must stamp the
+	// graveyard incarnation its event produced, or its end-step return acts
+	// on the new object.
+	if suffix := delayedRegisterStampSuffix(h, c, remembered); suffix != "" {
+		text += suffix
+	}
 	h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
 		Player: c.Controller, Step: step, Counter: exec, Amount: amount,
 		IDs: encodeRemembered(remembered), Text: text})
+}
+
+// delayedRegisterStampSuffix encodes a Phase DelayedTrigger registration's
+// remembered stamps into the event Text: one "<id>:<incarnation>" pair per
+// remembered object the state knows, the trigger's fire-time stamp where the
+// resolving trigger captured one (TriggerContext.TriggerRememberedStamps,
+// CR 400.7) and the live incarnation otherwise -- the value
+// events.rememberedStampsFrom derives at the fold, so a registration with no
+// trigger stamps (and every already-logged event) folds identically. An
+// empty remembered set of known objects carries no suffix.
+func delayedRegisterStampSuffix(h Host, c *Ctx, remembered []state.Target) string {
+	var byID map[state.ObjID]uint32
+	if len(c.TriggerRememberedStamps) > 0 {
+		byID = make(map[state.ObjID]uint32, len(c.TriggerRememberedStamps))
+		for _, s := range c.TriggerRememberedStamps {
+			byID[s.Obj] = s.Incarnation
+		}
+	}
+	var parts []string
+	for _, t := range remembered {
+		if t.IsPlayer {
+			continue
+		}
+		o := h.Game().Obj(t.Obj)
+		if o == nil {
+			continue
+		}
+		inc := o.Incarnation
+		if s, ok := byID[t.Obj]; ok {
+			inc = s
+		}
+		parts = append(parts, strconv.FormatUint(uint64(t.Obj), 10)+":"+strconv.FormatUint(uint64(inc), 10))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "|RS=" + strings.Join(parts, ",")
 }
 
 // effDelayedTriggerSpellCast registers the event-matched delayed shape: a

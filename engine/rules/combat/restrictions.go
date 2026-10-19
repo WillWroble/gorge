@@ -21,6 +21,15 @@ type HiddenKeywordFlags struct {
 	CantBlock     bool
 	MustBlock     bool
 	UntapNextStep bool
+	// CantAttackAlone / CantBlockAlone are CR 506.5's "attacks alone" /
+	// "blocks alone" restrictions -- the creature may be declared as an
+	// attacker (blocker) only when at least one OTHER creature is declared
+	// attacking (blocking) in the same declaration. They are properties of
+	// the whole DECLARATION, not of one creature, so the per-pair readers
+	// below must never consult them; they are consumed by
+	// DeclaresAlone (the declaration oracle) alone.
+	CantAttackAlone bool
+	CantBlockAlone  bool
 }
 
 // decayedHead is CR 702.147's keyword head. Named once so the switch below
@@ -78,6 +87,19 @@ func ParseHiddenKeyword(k string) HiddenKeywordFlags {
 		// static mode are separate namespaces, so this arm cannot borrow the
 		// blocker-oriented meaning.
 		return HiddenKeywordFlags{MustBlock: true}
+	case cards.AloneKeywordOf(head) == cards.AloneKeywordCantAttackOrBlockAlone:
+		// CR 506.5's compound: the creature can be declared as an attacker
+		// only beside another attacker AND as a blocker only beside another
+		// blocker. Matched before either sibling arm, and deliberately NOT
+		// folded into CantAttack/CantBlock: those forbid the declaration
+		// outright, while this forbids only a LONE one.
+		return HiddenKeywordFlags{CantAttackAlone: true, CantBlockAlone: true}
+	case cards.AloneKeywordOf(head) == cards.AloneKeywordCantAttackAlone:
+		// CR 506.5's attack-only sibling: the lone BLOCK stays legal.
+		return HiddenKeywordFlags{CantAttackAlone: true}
+	case cards.AloneKeywordOf(head) == cards.AloneKeywordCantBlockAlone:
+		// CR 506.5's block-only sibling: the lone ATTACK stays legal.
+		return HiddenKeywordFlags{CantBlockAlone: true}
 	}
 	return HiddenKeywordFlags{}
 }
@@ -94,6 +116,8 @@ func DerivedHiddenFlags(b Board, id state.ObjID) HiddenKeywordFlags {
 		f.CantBlock = f.CantBlock || g.CantBlock
 		f.MustBlock = f.MustBlock || g.MustBlock
 		f.UntapNextStep = f.UntapNextStep || g.UntapNextStep
+		f.CantAttackAlone = f.CantAttackAlone || g.CantAttackAlone
+		f.CantBlockAlone = f.CantBlockAlone || g.CantBlockAlone
 	}
 	return f
 }
@@ -135,6 +159,54 @@ func HasCantAttackKeyword(b Board, id state.ObjID) bool {
 // offered pairs, never here.
 func HasMustBeBlockedKeyword(b Board, id state.ObjID) bool {
 	return DerivedHiddenFlags(b, id).MustBlock
+}
+
+// CantAttackAloneKeyword is CR 506.5's "can't attack alone" (the compound
+// "can't attack or block alone" included): the creature may be declared as an
+// attacker only when at least one OTHER creature is declared attacking in the
+// same declaration (CR 508.1c -- an illegal restriction makes the whole
+// declaration illegal). Read from the DERIVED keyword list like the other
+// alone-side readers, so an Animate AddHiddenKeyword$ grant (Pipsqueak Rebel
+// Strongarm, Sightless Brawler's enchanted creature) reaches the oracle too.
+//
+// Unlike HasCantAttackKeyword this is NOT a per-pair restriction: attacking
+// with a partner is legal, so it is enforced by DeclaresAlone over the whole
+// declared set and never by AttackBlocked/BlockRestricted.
+func CantAttackAloneKeyword(b Board, id state.ObjID) bool {
+	return DerivedHiddenFlags(b, id).CantAttackAlone
+}
+
+// CantBlockAloneKeyword is CantAttackAloneKeyword's blocker-side counterpart
+// (CR 506.5 / 509.1b): the creature may be declared as a blocker only when at
+// least one OTHER creature is declared blocking in the same declaration.
+func CantBlockAloneKeyword(b Board, id state.ObjID) bool {
+	return DerivedHiddenFlags(b, id).CantBlockAlone
+}
+
+// DeclaresAlone reports whether declaring creature id as an attacker
+// (attack true) or as a blocker (attack false) together with the already
+// chosen `declared` creatures disobeys CR 506.5's attack-alone / block-alone
+// restriction. This is the ONE home of that rule: the attacker and blocker
+// decision validators, the wheel-asked declaration sets, and the engine's
+// whole-declaration checks all call it, and the shared decision repair
+// (botpolicy.Clamp via decision.Decision.FitAlone) derives its rule from the
+// same published per-option fact (Option.AloneRestricted), so a rules-ignorant
+// client and the bot can no more build an illegal lone declaration than the
+// engine would accept one.
+//
+// `declared` must not contain id. The restriction binds only a LONE
+// declaration: with one other creature declared, the restriction is obeyed and
+// any further creature (alone-restricted or not) is legal beside it.
+func DeclaresAlone(b Board, id state.ObjID, attack bool, declared []state.ObjID) bool {
+	for _, other := range declared {
+		if other != id {
+			return false
+		}
+	}
+	if attack {
+		return CantAttackAloneKeyword(b, id)
+	}
+	return CantBlockAloneKeyword(b, id)
 }
 
 // BlockRestricted reports whether blocker is forbidden from blocking

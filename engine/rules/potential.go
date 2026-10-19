@@ -76,6 +76,18 @@ const potentialUnbounded int32 = math.MaxInt32
 // past the fuzzer's 90s hang budget. A caller already inside a walk shares
 // that walk's generation.
 func (e *Engine) PotentialMana(p state.PlayerID) state.Mana {
+	return e.potentialManaFor(p, nil)
+}
+
+// potentialManaFor is PotentialMana with an optional payment: when for is
+// non-nil, a mana ability whose RestrictValid$ cannot spend on that payment
+// (pay.RestrictValidMatches against the producing source) contributes
+// nothing. Secluded Courtyard's "one mana of any color, spend only to cast a
+// creature spell of the chosen type or activate an ability of a creature of
+// the chosen type" cannot fund Frenzied Goblin's triggered "you may pay
+// {R}", so the resolution-time pay ask (resPayNeedsMana) must not count it
+// (CR 106.6: the restriction limits what that mana is spent on).
+func (e *Engine) potentialManaFor(p state.PlayerID, payment *paymentDescriptor) state.Mana {
 	e.beginDerivedMemo()
 	defer e.endDerivedMemo()
 	// The decision's recorded priority walk, when its caller armed it
@@ -179,11 +191,15 @@ func (e *Engine) PotentialMana(p state.PlayerID) state.Mana {
 			before := out
 			admittedAny := false
 			for k := sp.start; k < sp.end; k++ {
-				if ma := flat[k]; !admitted[k] && e.manaAbilityPayablePool(p, id, ma, &others) {
+				if ma := flat[k]; !admitted[k] && potentialRestrictionAdmits(e, p, id, ma, payment) &&
+					e.manaAbilityPayablePool(p, id, ma, &others) {
 					admitted[k] = true
 					admittedAny = true
-					if !addPotentialReflected(e, &out, p, id, ma) {
-						e.addPotentialManaOf(&out, ma)
+					// A payment's bound reads a Chosen source's colour.
+					if payment == nil || !addPotentialChosenColour(e, &out, id, ma) {
+						if !addPotentialReflected(e, &out, p, id, ma) {
+							e.addPotentialManaOf(&out, ma)
+						}
 					}
 				}
 			}
@@ -202,6 +218,46 @@ func (e *Engine) PotentialMana(p state.PlayerID) state.Mana {
 	clear(flat)
 	e.hypPool().pm = potentialManaScratch{members: flat[:0], admitted: admitted[:0], spans: spans[:0], own: own[:0]}
 	return out
+}
+
+// potentialRestrictionAdmits reports whether mana ability ma of source id
+// may count toward payment (potentialManaFor): always without a payment or
+// without a RestrictValid$, else when the restriction admits it.
+func potentialRestrictionAdmits(e *Engine, p state.PlayerID, id state.ObjID, ma *cards.SA, payment *paymentDescriptor) bool {
+	if payment == nil {
+		return true
+	}
+	rv := effects.ManaOf(ma).RestrictValid
+	return rv == "" || pay.RestrictValidMatches(asPayer(e), p, *payment, rv, id)
+}
+
+// addPotentialChosenColour adds a Produced$ Chosen ability's exact
+// production -- its source's as-enters colour (Heraldic Banner's "Add one
+// mana of the chosen color") -- and reports whether it did. The plain
+// PotentialMana over-bound prices Chosen unbounded in every colour; a
+// payment's bound (potentialManaFor) must not, or a triggered "you may pay
+// {R}" is offered to a seat whose only untapped source makes {W} (CR
+// 106.1a). False (the caller's ordinary fold) for any other production, an
+// indeterminate amount, or a source with no chosen colour.
+func addPotentialChosenColour(e *Engine, m *state.Mana, id state.ObjID, ma *cards.SA) bool {
+	mp := effects.ManaOf(ma)
+	if mp.Produced != "Chosen" && mp.Produced != "ChosenColor" { // Produced is already trimmed
+		return false
+	}
+	o := e.G.Obj(id)
+	if o == nil || len(o.ChosenColor) != 1 {
+		return false
+	}
+	i := state.ManaIndex(o.ChosenColor[0])
+	if i == state.MC { // not a WUBRG letter
+		return false
+	}
+	amt, indeterminate := potentialAmount(mp)
+	if indeterminate {
+		return false
+	}
+	m[i] = saturatingPotentialMana(m[i], amt)
+	return true
 }
 
 // potentialManaScratch is PotentialMana's reusable fixpoint storage (see
@@ -240,7 +296,12 @@ var potentialMembersVerify = derivedMemoVerifyFlag != ""
 // potentialProducedStrip strips the braces and spaces from a Produced$
 // value. A strings.Replacer is safe for concurrent use, so one serves every
 // call instead of building a replacer per folded ability.
-var potentialProducedStrip = strings.NewReplacer("{", "", "}", "", " ", "")
+// "Combo" is stripped too: a "Combo W U" source (Tranquil Cove) makes one of
+// the listed colours, so it bounds each of them like a dual's two abilities;
+// pricing it unbounded in every colour offered a "pay {R}" no red source
+// could fund (CR 118.3). "Combo Any" stays open through producedOpenSet, and
+// any other Combo word (ColorIdentity, Chosen) keeps a non-colour rune.
+var potentialProducedStrip = strings.NewReplacer("{", "", "}", "", " ", "", "Combo", "")
 
 // addPotentialMana folds one mana ability into the potential accumulator. The
 // amount and production parsing mirrors AvailableMana's addAvailable (the

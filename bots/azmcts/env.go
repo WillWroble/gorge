@@ -40,6 +40,9 @@ type walkConfig struct {
 	// candidates rankedPrior keeps at every in-walk point of the searching
 	// seat, which then enumerates past limit (enumLimit).
 	priorTopK int
+	// rankMax is Options.PriorRankMaxOptions: above that many options a
+	// point skips the network ranking (rankedPrior).
+	rankMax int
 	// rootPerWorld re-derives the root candidates in every world
 	// (Options.RootPerWorld).
 	rootPerWorld bool
@@ -79,6 +82,12 @@ type walkConfig struct {
 	// OpponentMirror, 0 otherwise (oppEnumLimit).
 	oppAutoPay bool
 	oppTopK    int
+	// lazyPrior defers an in-walk point's network prior (Point.resolve)
+	// when it cannot change the point's keys (no top-k cut): the tree reads
+	// it only for a child it does not hold yet, so a replayed point whose
+	// children all exist never projects, encodes or scores. Off under the
+	// node cache, which compares a replayed point's key order.
+	lazyPrior bool
 }
 
 // priorNet is the network in-walk priors read: nil under uniformPrior.
@@ -242,7 +251,30 @@ type engineEnv struct {
 	// seat's entry nil.
 	oppBots []*heuristic.Bot
 	oppPCGs []*rand.PCG
+	// leafV is the searching seat's network leaf value at the point the
+	// walk stands on, read off the point's own prior (priorsWithLeaf) when
+	// the point is the seat's and the leaf is the same network's value head
+	// (leafShared); leafOK says it holds. The walk evaluates a leaf right
+	// after producing a point (RunTree's simulate, the cached walk), so the
+	// value is the one leafValue would project and encode again; every
+	// submit clears it (Play, advance).
+	leafV  float64
+	leafOK bool
 }
+
+// leafShared reports whether a point's prior can carry the leaf value
+// (engineEnv.leafV): the leaf is the value head of the network the prior
+// reads -- a network leaf (no heuristicLeaf) under the network prior (no
+// uniformPrior) -- so Leaf at that point is the same network on the same
+// encoded state.
+func (c *walkConfig) leafShared() bool {
+	return c.net != nil && !c.heuristicLeaf && !c.uniformPrior && !noSharedLeaf
+}
+
+// noSharedLeaf turns leafShared off: the test that pins shared leaves to
+// leaves projected and encoded again (TestSharedLeafMatchesSeparate) runs
+// both.
+var noSharedLeaf bool
 
 func newEngineEnv(w World, cfg *walkConfig) (*engineEnv, error) {
 	if w.Engine == nil || w.Observer == nil {
@@ -384,6 +416,7 @@ func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 	if e.cur == nil {
 		return nil, fmt.Errorf("%w: play after the walk ended", ErrSubmit)
 	}
+	e.leafOK = false
 	i := -1
 	for j, c := range e.cands {
 		if c.key == k {
@@ -416,6 +449,7 @@ func (e *engineEnv) Play(k Key) (pt *Point, err error) {
 // goes, so a simulation discarded later still contributes them.
 func (e *engineEnv) advance() (*Point, error) {
 	for {
+		e.leafOK = false
 		g := e.e.G
 		if g.Over {
 			e.cur, e.cands = nil, nil
@@ -474,8 +508,25 @@ func (e *engineEnv) advance() (*Point, error) {
 				}
 				// Under priorTopK the network keeps the point's best
 				// candidates (after nameKeys, which may merge two).
-				cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), e.cfg.priorTopK, e.e, pd, in, kind, cands, e.cfg.priorView())
+				if res := e.deferPrior(pd, in, kind, cands, e.cfg.priorTopK, true); res != nil {
+					e.cur, e.cands = pd, cands
+					if e.cfg.priorTopK > 0 {
+						countTopK(e.cfg.stats, true, 0)
+					}
+					pt := &Point{Keys: candKeys(cands), cut: cut, ranked: e.cfg.priorTopK > 0, extra: extraOf(kind), resolve: res}
+					countPoint(e.cfg.stats, pt)
+					return pt, nil
+				}
+				// The point's prior and the walk's next leaf read the same
+				// network on the same encoded state (the seat's own view at
+				// pd): the prior carries the value out (leafShared).
+				var leaf *float64
+				if e.cfg.leafShared() {
+					leaf = &e.leafV
+				}
+				cands, prior, fell, before := rankedPriorLeaf(e.cfg.priorNet(), e.cfg.priorTopK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
 				e.cur, e.cands = pd, cands
+				e.leafOK = leaf != nil && !rankSkips(e.cfg.priorTopK, e.cfg.rankMax, pd)
 				if fell {
 					e.cfg.stats.PriorFallbacks++
 				}
@@ -561,7 +612,20 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 	if cut {
 		e.cfg.stats.Truncated++
 	}
-	cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), topK, e.e, pd, in, kind, cands, e.cfg.priorView())
+	if res := e.deferPrior(pd, in, kind, cands, topK, false); res != nil {
+		for i := range cands {
+			cands[i].key = Key(oppKeyPrefix + string(cands[i].key))
+		}
+		e.cur, e.cands = pd, cands
+		pt := &Point{Keys: candKeys(cands), cut: cut, Opp: true, extra: extraOf(kind), oppPay: autoPay && kind == "priority", resolve: res}
+		if topK > 0 {
+			countTopK(e.cfg.stats, true, 0)
+			pt.ranked = true
+		}
+		countPoint(e.cfg.stats, pt)
+		return pt
+	}
+	cands, prior, fell, before := rankedPrior(e.cfg.priorNet(), topK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView())
 	keys := make([]Key, len(cands))
 	for i := range cands {
 		cands[i].key = Key(oppKeyPrefix + string(cands[i].key))
@@ -578,6 +642,54 @@ func (e *engineEnv) oppPoint(pd *decision.Decision, in decision.Intent) *Point {
 	}
 	countPoint(e.cfg.stats, pt)
 	return pt
+}
+
+// deferPrior is lazyPrior's deferred prior for the point pd with candidates
+// cands, or nil when the prior must be computed now: lazyPrior off, no
+// network or a point whose ranking is skipped (rankSkips: the uniform prior
+// costs nothing, and its fallback is counted now), a top-k cut that may drop
+// candidates, or two candidates sharing a key. The closure ranks cands as
+// rankedPrior does (it reads their intents, never their keys, and modifies
+// neither) and returns the ranked keys and prior; it counts PriorFallbacks
+// when it runs.
+//
+// A deferred point leaves e.cands in enumeration order, where the eager
+// prior leaves it ranked, and Play submits the first candidate holding the
+// key it is given: the two agree only while every key is held once. Keys
+// can collide (a "choose" division's key omits the split, so its six
+// candidates hold three keys), and such a point is ranked now.
+func (e *engineEnv) deferPrior(pd *decision.Decision, in decision.Intent, kind string, cands []cand, topK int, seat bool) func() ([]Key, []float64) {
+	net := e.cfg.priorNet()
+	if !e.cfg.lazyPrior || net == nil || rankSkips(topK, e.cfg.rankMax, pd) || (topK > 0 && len(cands) > topK) || sharedKey(cands) {
+		return nil
+	}
+	return func() ([]Key, []float64) {
+		// Resolved while the walk still stands at the searching seat's
+		// point, the prior carries the walk's next leaf out too
+		// (leafShared), as advance's eager prior does.
+		var leaf *float64
+		if seat && e.cur == pd && e.cfg.leafShared() {
+			leaf = &e.leafV
+		}
+		kept, prior, fell, _ := rankedPriorLeaf(net, topK, e.cfg.rankMax, e.e, pd, in, kind, cands, e.cfg.priorView(), leaf)
+		e.leafOK = leaf != nil
+		if fell {
+			e.cfg.stats.PriorFallbacks++
+		}
+		return candKeys(kept), prior
+	}
+}
+
+// sharedKey reports whether two of cands hold one key.
+func sharedKey(cands []cand) bool {
+	for i := 1; i < len(cands); i++ {
+		for j := range i {
+			if cands[i].key == cands[j].key {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // oppBot is seat p's auto-pay walk bot under oppAutoPay, nil otherwise.
@@ -722,6 +834,11 @@ func (e *engineEnv) Leaf() (l Leaf) {
 		}
 		return Leaf{V: v, Terminal: true}
 	}
+	if e.leafOK {
+		// Read off this point's prior (engineEnv.leafV): the same value
+		// leafValue would compute again.
+		return Leaf{V: e.leafV, Capped: e.capped}
+	}
 	leafNet := e.cfg.net
 	if e.cfg.heuristicLeaf {
 		leafNet = nil
@@ -747,6 +864,12 @@ func leafValue(net *policynet.Model, e *rules.Engine, actor state.PlayerID, sc *
 	sb := policynet.AcquireStateBuf()
 	x := float64(net.Value(policynet.EncodeStateWithInto(sb, net.Features, v, actor, nil)))
 	policynet.ReleaseStateBuf(sb)
+	return clampValue(x)
+}
+
+// clampValue is the leaf's reading of the value head: clamped into [0,1],
+// NaN reads 0.5.
+func clampValue(x float64) float64 {
 	switch {
 	case math.IsNaN(x):
 		return 0.5
@@ -815,11 +938,18 @@ func leafMaterial(e *rules.Engine, o *state.Object, actor state.PlayerID) float6
 			return 10
 		}
 	}
-	f := o.Face()
+	// The view projects the derived type line when a layer-4 effect changed
+	// the card types (rules.Engine.ViewTypes: an animated land, Imprisoned
+	// in the Moon, a face-down permanent's CR 708.2a Creature), the printed
+	// one otherwise.
+	types := o.Face().Types
+	if dt, ok := e.ViewTypes(o.ID); ok {
+		types = dt
+	}
 	// strings.Contains over the space-joined type list is a match inside
 	// one type word (neither needle holds a space).
 	land, creature := false, false
-	for _, t := range f.Types {
+	for _, t := range types {
 		land = land || strings.Contains(t, "Land")
 		creature = creature || strings.Contains(t, "Creature")
 	}

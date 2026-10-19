@@ -19,7 +19,7 @@ import (
 // gate game whose az seat lost its honest root (draftrl gate -seed 201
 // -events 24 -games 4, hands-bot#gih drafters; game seed
 // 5993994771396169689, hero e203-s1 vs FDN06-RG, game 1). At decision seq
-// 2211 seat 1 creates a token copy of its Imprisoned in the Moon and the
+// 2315 (2211 in the original tape) seat 1 creates a token copy of its Imprisoned in the Moon and the
 // token asks what it enchants (CR 303.4f) before it enters: the staged
 // token is in no zone, so its Zone field reads the zero value ZLibrary, and
 // the redealer took the decision's Source for an unpinned hidden library
@@ -29,6 +29,18 @@ import (
 // The tape (testdata/token-aura-copy-tape.json, card names and intents
 // only -- no Forge script text) was written by draftrl gate -only-game
 // 5993994771396169689 -only-game-tape.
+//
+// Re-derived 2026-10-17 for the end-of-combat priority fix (rules
+// 93b6057e4, CR 117.3a: the step opens with the active player holding
+// priority): the recorded intents were replayed in order through the fixed
+// engine, each matched to its decision by (turn, step, player, kind) as
+// the old engine had asked it, with a pass inserted at each of the nine
+// end-of-combat windows the old engine never posed (453 -> 462 intents).
+// The enchant choice moved from decision seq 2211 to 2251. Re-derived again
+// for the CR 510.3 post-damage priority round (rules 24bbba791), with a
+// turn's combat damage step and end of combat matched as one window: 16
+// passes inserted, two per combat with regular damage (462 -> 478 intents),
+// and the enchant choice moved from 2251 to 2315.
 func TestHonestRootAtATokenAuraCopyEnchantChoice(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	raw, err := os.ReadFile("testdata/token-aura-copy-tape.json")
@@ -61,7 +73,7 @@ func TestHonestRootAtATokenAuraCopyEnchantChoice(t *testing.T) {
 		NameUniverse: reg.Universe(), Mulligans: tape.Mulligans,
 		LoopGuard: &rules.LoopGuard{MaxObjs: tape.MaxObjs},
 	}
-	const actor, seq = state.PlayerID(1), uint64(2211)
+	const actor, seq = state.PlayerID(1), uint64(2315)
 	e := rules.NewStartingPlayerChoice(cfg)
 	e.AskStartingPlayer()
 	e.Advance()

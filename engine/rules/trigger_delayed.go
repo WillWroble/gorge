@@ -247,8 +247,15 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 		// qualified ones fail closed inside MatchesPlayerSpec (the fx20
 		// convention: an unmodellable qualifier fires for nobody, never for
 		// everybody).
+		// The registration's capture is also what Player.IsRemembered names:
+		// an Effect's Phase trigger (Rowan Kenrith's "ValidPlayer$
+		// Player.IsRemembered" cleanup exile) reads the EFFECT's memory,
+		// never the source card's own list, which Rowan's DBCleanup clears
+		// at resolution (CR 611.2a). No DelayedTrigger SA spells a
+		// ValidPlayer$ IsRemembered, so only Effect registrations read it.
 		pc := e.playerSpecCtx(dt.Source)
 		pc.DelayedRemembered = dt.Remembered
+		pc.Remembered, pc.RememberedBound = dt.Remembered, true
 		if dt.ValidPlayer != "" && !effects.MatchesPlayerSpecCtx(e.G, dt.ValidPlayer, e.G.Active, dt.Controller, pc) {
 			continue
 		}
@@ -284,6 +291,16 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 			remove = append(remove, dt.ID)
 			continue
 		}
+		// An Effect-created Phase registration (its lifetime suffix is the
+		// Effect's Duration$) resolves its body under the Effect's own
+		// source-scoped frame, so the self-exile idiom (Rowan Kenrith's
+		// `ExileEffect: DB$ ChangeZone | Defined$ Self | Origin$ Command |
+		// Destination$ Exile`) ends the Effect (CR 611.2a) instead of moving
+		// nothing.
+		frame := effectDelayedFrame(dt)
+		if frame.Source == 0 && dt.EffectDuration != "" {
+			frame = effects.EffectFrame{Source: dt.Source, Carrier: true}
+		}
 		e.pendingTriggers = append(e.pendingTriggers, pendingTrigger{
 			Source:     dt.Source,
 			Controller: dt.Controller,
@@ -294,13 +311,15 @@ func (e *Engine) checkDelayedTriggers(ev events.Event) {
 			// Static$ True: Forge runs the body off the stack (static_trigger.go).
 			DelayedStatic: dt.Static && dt.OptionalSpec == "",
 			Ctx: effects.NewCtx(dt.Source, dt.Controller, effects.CtxInit{
-				Remembered: append([]state.Target(nil), dt.Remembered...),
-				Captured:   append([]state.Target(nil), dt.Remembered...),
+				Remembered:  append([]state.Target(nil), dt.Remembered...),
+				Captured:    append([]state.Target(nil), dt.Remembered...),
+				EffectFrame: frame,
 				// A phase registration has no firing event, so its capture
 				// is both Remembered and the DelayTriggerRemembered referent.
 				TriggerContext: effects.TriggerContext{
-					DelayedRemembered: append([]state.Target(nil), dt.Remembered...),
-					OptionalSpec:      dt.OptionalSpec,
+					DelayedRemembered:       append([]state.Target(nil), dt.Remembered...),
+					DelayedRememberedStamps: dt.RememberedStamps,
+					OptionalSpec:            dt.OptionalSpec,
 					// RememberNumber$ True's remembered Integer (Mana
 					// Drain): Count$TriggerRememberAmount reads it.
 					TriggerRememberedAmount: dt.RememberedAmount,
@@ -574,6 +593,7 @@ func (e *Engine) checkEventDelayedTriggers(ev events.Event, lki *state.Object) {
 			remembered = append([]state.Target(nil), dt.Remembered...)
 		}
 		refs.DelayedRemembered = append([]state.Target(nil), dt.Remembered...)
+		refs.DelayedRememberedStamps = dt.RememberedStamps
 		// The registration's OptionalDecider$ election rides the referent
 		// context to the minted stack object, where resolveTop's CR 603.5
 		// gate poses it. It cannot be recovered from the trigger body for a

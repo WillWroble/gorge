@@ -111,7 +111,15 @@ func TestExistingFeatureSetsArePinnedOverARealGame(t *testing.T) {
 	}
 	// Re-pinned at 0e5196eb7 (CR 103.8a: the starting player skips the whole
 	// turn-1 draw step): the pinned GAME changed, not any set's encoding.
-	want := []uint64{0xaa14d019fe36aee3, 0xd9a7ed8af91a4a83, 0xca51959b21684b69}
+	// Re-pinned after 93b6057e4 (CR 117.3a: the end of combat step opens
+	// with the active player holding priority): the game poses four more
+	// decisions (282 -> 286), again the GAME, not an
+	// encoding; the derived-type-line view change (26ea2ed4f) moves none of
+	// the three (measured with it disabled).
+	// Re-pinned after 24bbba791 (CR 510.3: players receive priority in the
+	// combat damage step after the regular damage): 286 -> 298 decisions,
+	// the GAME again, not an encoding.
+	want := []uint64{0x374a3f6bed702ba9, 0xdbf215f121194067, 0xf12897e296896abb}
 	t.Logf("decisions %d, digests v1=%#016x mz=%#016x entity=%#016x", decisions, digests[0], digests[1], digests[2])
 	if decisions < 200 {
 		t.Fatalf("only %d decisions encoded; the pin is too thin", decisions)

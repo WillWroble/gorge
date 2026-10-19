@@ -43,3 +43,31 @@ func TestEnginebenchPooledRowsMatchFresh(t *testing.T) {
 		t.Fatal("precondition: row did not complete exactly one game")
 	}
 }
+
+// TestEnginebenchAutopayRandomRow pins the random row's -autopay answer: it
+// recycles spares as faithfully as the manual row, and every draw it makes is
+// an answer the engine accepts (no rejection, no heuristic fallback).
+func TestEnginebenchAutopayRandomRow(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	a, err := testutil.LoadRepoDeck(reg, "mono-black-aggro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := testutil.LoadRepoDeck(reg, "mono-red-prowess")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fresh, pooled randomStats
+	var pool bench.SparePool
+	for g := uint64(0); g < 4; g++ {
+		cfg := rules.Config{Seed: 77123 + g, Names: []string{"a", "b"}, Decks: [][]*cards.Card{a, b}, Tokens: reg.Tokens}
+		playRandomGame(cfg, &fresh, nil, true)
+		playRandomGame(cfg, &pooled, &pool, true)
+	}
+	if !reflect.DeepEqual(fresh, pooled) {
+		t.Fatalf("autopay random row changed with spare recycling:\nfresh=%+v\npooled=%+v", fresh, pooled)
+	}
+	if fresh.Games != 4 || fresh.Stalls != 0 || fresh.Rejected != 0 || fresh.Fallbacks != 0 {
+		t.Fatalf("autopay random row: want 4 clean games, got %+v", fresh)
+	}
+}

@@ -133,6 +133,10 @@
       "name": "Player 1",
       "life": 20,
       "lost": false,
+      "spells_cast_this_turn": 0,
+      "life_gained_this_turn": 0,
+      "life_lost_this_turn": 0,
+      "tokens_created_this_turn": 0,
       "library_size": 52,
       "hand_size": 7,
       "graveyard_size": 0,
@@ -149,6 +153,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -171,6 +176,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -193,6 +199,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -389,6 +396,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "controller": 0,
@@ -407,6 +415,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "controller": 0,
@@ -425,6 +434,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "controller": 0,
@@ -443,6 +453,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "controller": 0,
@@ -613,6 +624,7 @@
           "tapped": false,
           "power": 5,
           "toughness": 5,
+          "printed_pt": "5/5",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -634,6 +646,7 @@
           "tapped": false,
           "power": 5,
           "toughness": 5,
+          "printed_pt": "5/5",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -655,6 +668,7 @@
           "tapped": false,
           "power": 5,
           "toughness": 5,
+          "printed_pt": "5/5",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -1082,6 +1096,7 @@
           "tapped": false,
           "power": 5,
           "toughness": 5,
+          "printed_pt": "5/5",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -1345,6 +1360,7 @@
           "tapped": false,
           "power": 5,
           "toughness": 5,
+          "printed_pt": "5/5",
           "damage": 0,
           "attacking": false,
           "keywords": [
@@ -1443,6 +1459,7 @@
       "command": [],
       "commanders": [],
       "completed_dungeons": 0,
+      "land_drop_spent": true,
       "commander_casts": []
     },
     {
@@ -1450,6 +1467,10 @@
       "name": "Player 2",
       "life": 20,
       "lost": false,
+      "spells_cast_this_turn": 0,
+      "life_gained_this_turn": 0,
+      "life_lost_this_turn": 0,
+      "tokens_created_this_turn": 0,
       "library_size": 53,
       "hand_size": 5,
       "graveyard_size": 0,
@@ -1496,6 +1517,7 @@
           "tapped": false,
           "power": 1,
           "toughness": 1,
+          "printed_pt": "1/1",
           "damage": 0,
           "attacking": false,
           "controller": 1,
@@ -1512,6 +1534,7 @@
       "command": [],
       "commanders": [],
       "completed_dungeons": 0,
+      "land_drop_spent": true,
       "commander_casts": [],
       "archetype": {
         "known": true,
@@ -1533,7 +1556,7 @@
   "stack": [],
   "pending": [],
   "decision": {
-    "seq": 145,
+    "seq": 150,
     "player": 0,
     "kind": "choose",
     "prompt": "Choose a mana ability of Underground Sea",

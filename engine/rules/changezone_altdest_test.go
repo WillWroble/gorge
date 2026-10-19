@@ -33,7 +33,10 @@ func driveToTargetAsk(t *testing.T, e *Engine, obj state.ObjID) *decision.Decisi
 		t.Fatalf("pending = %+v, want a KTarget ask", d)
 	}
 	answerTargetAsk(t, e, []state.ObjID{obj})
-	return passUntilNonPriority(t, e, 30)
+	// The next non-priority decision is the opponent's turn-2 cleanup
+	// discard, ~31 priority windows away (every step of both turns,
+	// including each end of combat's active-player window).
+	return passUntilNonPriority(t, e, 40)
 }
 
 // TestTheFiveDoctorsDestAltKickedBattlefieldUnkickedHand pins both directions

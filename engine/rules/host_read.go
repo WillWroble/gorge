@@ -78,3 +78,33 @@ func (e *Engine) ObjectColors(o *state.Object) string { return e.objColors(o) }
 func (e *Engine) CastProhibited(p state.PlayerID, id state.ObjID) bool {
 	return e.castRestricted(p, id)
 }
+
+// CastTargetsUnavailable is effects' optional castTargetsHost read: the
+// spell's mandatory targets (root and SubAbility$ chain) cannot all be chosen
+// now, the same census the hand offer applies (castTargetsAvailable), so a
+// Play election never offers a cast CR 601.2c forbids. A card with no spell
+// ability (a land, a permanent without a targeting clause) is never judged
+// unavailable. A pure read.
+func (e *Engine) CastTargetsUnavailable(p state.PlayerID, id state.ObjID) bool {
+	o := e.G.Obj(id)
+	if o == nil || o.Face() == nil {
+		return false
+	}
+	sa := o.Face().SpellAbility()
+	if sa == nil {
+		return false
+	}
+	return !e.castTargetsAvailable(p, id, sa)
+}
+
+// GraveyardKeywordParam is effects' optional graveyardDredgeHost read: a
+// graveyard card's derived keyword parameter (derivedKeywordParam, the object's
+// CURRENT layer-derived keyword list). Dredge (CR 702.55) is offered from the
+// graveyard, where the board-wide derived table effects publishes bounds no
+// entry, so the single-object derivation is the only way an ability loss
+// (CR 613.1f -- Yixlid Jailer's RemoveAllAbilities$ static) or a layer-6
+// keyword grant can be honoured at that read site. A pure read: no event,
+// no state change.
+func (e *Engine) GraveyardKeywordParam(id state.ObjID, head string) (string, bool) {
+	return e.derivedKeywordParam(id, head)
+}

@@ -210,6 +210,18 @@ func (e *Engine) emit(ev events.Event) events.Event {
 			ev.Counter = events.MarkCountersRemainMove(ev.Counter)
 		}
 	}
+	// CR 603.10a: "a creature died this turn" reads the permanent as it last
+	// existed on the battlefield. Tag the final departure when its layer-4
+	// creature status differs from the layer-free default Apply can read, so
+	// the folded ZoneEntry.WasCreature is the last known information (an
+	// animated Soulstone Sanctuary that dies was a creature).
+	if ev.Kind == events.MoveZone && ev.From == state.ZBattlefield && ev.To != state.ZBattlefield {
+		ev.Step = 0
+		if o := e.G.Obj(ev.Obj); o != nil && o.Zone == state.ZBattlefield &&
+			e.IsCreature(ev.Obj) != events.DepartureDefaultCreature(o) {
+			ev.Step = events.DepartureCreatureFlip
+		}
+	}
 	// DamageDone may rewrite the recipient through ReplaceEvent, while an
 	// ordinary hit still needs its initial recipient form classified. Do this
 	// after the complete replacement pass so both paths share one rule.

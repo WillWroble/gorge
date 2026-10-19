@@ -239,7 +239,24 @@ func (e *Engine) askAttackers() {
 		// with Decision.ChargeTapPool. Zero (omitted) unless the engine
 		// published a pool, so an ordinary option is byte-identical.
 		opt.TapPoolCost = tapCosts[of.id]
+		// CR 506.5: a creature that can't attack alone (the compound "can't
+		// attack or block alone" included) is offered, but only beside another
+		// attacker. The fact rides the option so a rules-ignorant client can
+		// build a legal declaration, and decision.Decision.Validate/FitAlone
+		// enforce the same field. combat.DeclaresAlone is the one reader.
+		opt.AloneRestricted = combat.DeclaresAlone(asBoard(e), of.id, true, nil)
 		opts = append(opts, opt)
+	}
+	// A CantChangeLife static (CR 119.7/119.8) makes every positive life
+	// charge on the paying seat infeasible -- a life cost of N>0 can't be
+	// paid at all -- so no offered pair may promise one; the pair fails
+	// closed for that payer rather than being offered and reversed at
+	// payment. "Players can always pay 0 life" (CR 119.4b) keeps a
+	// charge-free pair and a Phyrexian pip's colour face.
+	if e.playerLifeChangeForbidden(p) {
+		opts = slices.DeleteFunc(opts, func(o decision.Option) bool {
+			return o.CostLife > 0 || o.CostPhyrexian > 0
+		})
 	}
 	// A MaxAttackers$ ceiling (CR 508.1j, Silent Arbiter's shape) bounds the
 	// WHOLE declaration, so the decision's Max is the honest ceiling, not the
@@ -698,7 +715,51 @@ func (e *Engine) validateAttackers(d *decision.Decision, in decision.Intent) err
 		return fmt.Errorf("declaration's attack cost (%d mana, %d life, %d taps, %d sacrifices, %d returns, %d Phyrexian, unpriceable=%t) is not payable",
 			declaredCharge.mana, declaredCharge.life, len(declaredCharge.taps), len(declaredCharge.sacs), len(declaredCharge.returns), len(declaredCharge.phyrexian), declaredCharge.unpriceable)
 	}
+	// CR 506.5 / 508.1c: a creature restricted from attacking alone may not be
+	// the whole declaration. combat.DeclaresAlone is the one oracle, read over
+	// the chosen set; the same rule is the wire fence (Decision.Validate) and
+	// the repair (decision.Decision.FitAlone), so a caller cannot build an
+	// answer this rejects without the shared repair repairing it.
+	if err := e.validateAloneDeclaration(chosen, true); err != nil {
+		return err
+	}
 	return e.validateAttackDeclarationChosen(d, in, chosen)
+}
+
+// validateAloneDeclaration enforces CR 506.5's attack-alone / block-alone
+// restriction (the printed "CARDNAME can't attack alone.", "CARDNAME can't
+// block alone." and the compound "CARDNAME can't attack or block alone.") on
+// ONE whole declaration. The restriction is a property of the declared SET,
+// never of one creature: a restricted creature beside any partner is legal
+// (CR 508.1c's own example -- two creatures each restricted from attacking
+// alone may both attack). combat.DeclaresAlone is the ONE home of that read,
+// which the ask sites also use to publish Option.AloneRestricted.
+func (e *Engine) validateAloneDeclaration(chosen []decision.Option, attack bool) error {
+	if len(chosen) != 1 {
+		return nil
+	}
+	id := chosen[0].Obj
+	if attack {
+		id = attackedCreature(chosen[0])
+	}
+	if combat.DeclaresAlone(asBoard(e), id, attack, nil) {
+		if attack {
+			return fmt.Errorf("attacker %d can't attack alone", id)
+		}
+		return fmt.Errorf("blocker %d can't block alone", id)
+	}
+	return nil
+}
+
+// attackedCreature is the creature an ATTACKERS option names: an attacker
+// option carries the attacking creature in Obj, while a block option carries
+// the blocker there and the ATTACKER in its Attacker field -- the two shapes
+// this package's declaration helpers share.
+func attackedCreature(o decision.Option) state.ObjID {
+	if o.Kind == "block" {
+		return o.Attacker
+	}
+	return o.Obj
 }
 
 // mustAttackRequired reports whether id is a creature that must attack this
@@ -935,6 +996,11 @@ func (e *Engine) validateBlockers(d *decision.Decision, in decision.Intent) erro
 			return err
 		}
 	}
+	// CR 506.5 / 509.1b: a creature restricted from blocking alone may not be
+	// the whole declaration. Same one oracle as the attacker side.
+	if err := e.validateAloneDeclaration(chosen, false); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1128,7 +1194,11 @@ func (e *Engine) askBlockers() {
 					Label: e.G.Obj(bid).Face().Name + " blocks " + e.G.Obj(aid).Face().Name,
 					Obj:   bid, Attacker: aid, Player: defender,
 					Group: "blocker:" + strconv.FormatUint(uint64(bid), 10), Required: mustBlockPair, BlockMust: mustBlockPair, BlockMustAll: mustBlockAllPair,
-					AttackMust: mustBeBlocked[aid]}
+					AttackMust: mustBeBlocked[aid],
+					// CR 506.5: this blocker can't be declared ALONE. One
+					// fact per blocker on each of its pairs; the declaration
+					// rule counts it per declaration, not per pair.
+					AloneRestricted: e.blockerAloneRestricted(bid)}
 				if b, ok := scope.bounds[aid]; ok {
 					opt.MinBlockers, opt.MaxBlockers = b[0], b[1]
 				}
@@ -1167,6 +1237,18 @@ func (e *Engine) askBlockers() {
 			continue
 		}
 		opts := append(make([]decision.Option, 0, len(built)), built...)
+		if e.playerLifeChangeForbidden(defender) {
+			// CR 119.7/119.8: that defender can't pay a positive life cost at
+			// all (the attack-side gate above), so a charged pair is not
+			// offered; CR 119.4b keeps the charge-free ones.
+			opts = slices.DeleteFunc(opts, func(o decision.Option) bool {
+				return o.CostLife > 0 || o.CostPhyrexian > 0
+			})
+		}
+		if len(opts) == 0 {
+			br.cursor++
+			continue
+		}
 		maxSum := 0
 		for _, opt := range opts {
 			if opt.Value > 0 {
@@ -1230,6 +1312,15 @@ func (e *Engine) askBlockers() {
 	if !e.declarationMadeThisStep(events.DeclareBlockers) {
 		e.emit(events.Event{Kind: events.DeclareBlockers})
 	}
+}
+
+// blockerAloneRestricted reports whether blocker carries CR 506.5's
+// can't-block-alone restriction ("CARDNAME can't block alone.", and the
+// compound "can't attack or block alone." that also forbids the lone block).
+// The board read is combat.DeclaresAlone's, so the offered option fact and the
+// engine's own declaration check share ONE oracle.
+func (e *Engine) blockerAloneRestricted(blocker state.ObjID) bool {
+	return combat.DeclaresAlone(asBoard(e), blocker, false, nil)
 }
 
 // blockAttackers lists the creatures currently declared attacking defender
@@ -1317,6 +1408,17 @@ type combatRound struct {
 	hasFirst    bool `clone:"deep"` // this combat damage step runs a first-strike pass (CR 510.3)
 	firstDone   bool `clone:"deep"` // first-strike pass's damage dealt and priority granted
 	regularDone bool `clone:"deep"` // regular pass's damage dealt
+	// firstStrikers lists the attackers and blockers that had first strike
+	// or double strike as the first-strike damage step began (CR 510.4):
+	// only they are held out of the regular step (a double striker acts in
+	// both), so a creature that GAINS first strike between the steps still
+	// deals regular damage (CR 702.7c) and one that loses it does not. Empty
+	// when the step runs no first-strike pass.
+	firstStrikers []state.ObjID `clone:"deep"`
+	// regularRound marks the priority round after the regular pass (CR
+	// 510.3) as begun: a re-entry while it is open continues it, and only
+	// all players passing with an empty stack ends the step (advanceStep).
+	regularRound bool `clone:"deep"`
 
 	// priorityPending marks the between-passes priority round (CR 510.3/4) as
 	// owed: the first-strike pass's damage is dealt and its SBA tail posed an
@@ -1424,6 +1526,7 @@ func (e *Engine) combatStep() {
 	if !e.combatRound.firstDone {
 		e.combatRound.hasFirst = e.anyFirstStrike()
 		if e.combatRound.hasFirst {
+			e.combatRound.firstStrikers = e.collectFirstStrikers(e.combatRound.firstStrikers[:0])
 			// The first-strike damage step runs, then a priority round before
 			// the regular step (CR 510.3/4).
 			e.beginCombatPass(true)
@@ -1445,14 +1548,74 @@ func (e *Engine) combatStep() {
 			e.priorityRound()
 			return
 		}
+		if e.combatRound.hasFirst && !e.combatRound.active {
+			// The between-passes priority round (CR 510.4) is in progress:
+			// a pass that did not end it (priority moved on to the next
+			// player) or a resolution (priority returned to the active
+			// player) re-enters the step loop here, and the round must go
+			// on. Only all players passing in succession with an empty
+			// stack ends it (CR 117.4), and that path starts the regular
+			// pass through advanceStep's StepCombatDamage arm. Starting the
+			// regular pass here instead ended the round on the active
+			// player's first pass, with any trigger the first-strike damage
+			// put on the stack still unresolved.
+			e.priorityRound()
+			return
+		}
 		e.beginCombatPass(false)
 		return
 	}
+	if e.combatRound.regularRound {
+		// The post-damage priority round (CR 510.3) is in progress: a pass
+		// that did not end it or a resolution re-enters the step loop here,
+		// exactly as the between-passes round does above. Only all players
+		// passing in succession with an empty stack ends the step, through
+		// advanceStep, which enters end of combat.
+		e.priorityRound()
+		return
+	}
 	// The regular pass's damage is dealt but its SBA tail was deferred for an
-	// SBA decision: completeCombatPass returned before the transition. Finish
-	// it now, exactly as the undeferred path would have.
-	e.combatRound = combatRound{}
+	// SBA decision: completeCombatPass returned before the round. Open it
+	// now, exactly as the undeferred path would have.
+	e.regularDamageRound()
+}
+
+// regularDamageRound opens the combat damage step's priority round after the
+// regular pass (CR 510.3: "the active player gets priority"), so a trigger
+// that damage put on the stack resolves in the damage step, ahead of the end
+// of combat step and its "at end of combat" triggers (CR 511.2). A
+// first-strike combat reaches it from the tail of the between-passes round,
+// with the last passer holding priority and every pass counted; the active
+// player then receives priority anew with no passes (CR 117.3a/b), reset the
+// way enterEndCombat resets it. A combat with no first striker still holds
+// the step entry's reset, so no event is emitted for it.
+func (e *Engine) regularDamageRound() {
+	e.combatRound.regularRound = true
+	if e.G.Priority != e.G.Active || e.G.Passes != 0 {
+		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+	}
+	e.priorityRound()
+}
+
+// enterEndCombat moves a finished combat into the end of combat step (CR
+// 511). Every other step is entered through finishEnteredStep, whose tail
+// hands priority to the active player with no passes counted (CR 117.3a);
+// these combat-internal transitions bypass it, so a step entered from the
+// tail of a priority round (the between-passes round of a first-strike
+// combat, CR 510.4, or the declare-attackers round of a combat with no
+// attackers, CR 508.8) would otherwise open with the last passer holding
+// priority and its pass already counted, and the active player would never
+// act in it. The reset is emitted only when the holder or the count is
+// stale, so a combat whose damage step ran no priority round (its entry
+// already reset both) logs exactly what it did before.
+func (e *Engine) enterEndCombat() {
 	e.setStep(state.StepEndCombat)
+	if e.pending != nil {
+		return // a BeginPhase replacement parked the entry; its answer finishes it
+	}
+	if e.G.Priority != e.G.Active || e.G.Passes != 0 {
+		e.emit(events.Event{Kind: events.Priority, Player: e.G.Active})
+	}
 }
 
 // beginCombatPass starts a combat damage pass: it collects the attackers that
@@ -1765,13 +1928,15 @@ func (e *Engine) completeCombatPass(pass bool) {
 		return
 	}
 	// Same displacement guard as the first-strike branch: an SBA decision
-	// outstanding from the tail defers the end-of-combat transition to
+	// outstanding from the tail defers the post-damage priority round to
 	// combatStep rather than letting it run under the ask.
 	if e.pending != nil {
 		return
 	}
-	e.combatRound = combatRound{}
-	e.setStep(state.StepEndCombat)
+	// CR 510.3: players receive priority in the combat damage step once the
+	// regular damage is dealt; the step ends (advanceStep) only when all of
+	// them pass in succession with an empty stack.
+	e.regularDamageRound()
 }
 
 // handleDamageDivision applies an answered damage-division decision (CR
@@ -1817,6 +1982,7 @@ func (e *Engine) chosenDivision(a state.ObjID) []int32 {
 // other both die.
 func (e *Engine) dealCombatDamage() {
 	if e.anyFirstStrike() {
+		e.combatRound.firstStrikers = e.collectFirstStrikers(e.combatRound.firstStrikers[:0])
 		e.damageStep(true)
 		e.checkStateBased()
 		// The SBA tail can pose a CR 704.5j legend choice; the regular pass
@@ -1931,10 +2097,41 @@ func (e *Engine) actsThisDamageStep(id state.ObjID, firstStrike bool) bool {
 	if e.hasKeywordH(id, kwhDoubleStrike) {
 		return true
 	}
+	if !firstStrike && len(e.combatRound.firstStrikers) > 0 {
+		// CR 510.4: the regular step is for the creatures that had neither
+		// first strike nor double strike as the first-strike step began
+		// (plus current double strikers, above), whatever they have now.
+		return !slices.Contains(e.combatRound.firstStrikers, id)
+	}
 	if e.hasKeywordH(id, kwhFirstStrike) {
 		return firstStrike
 	}
 	return !firstStrike
+}
+
+// collectFirstStrikers appends to dst every attacking creature and live
+// blocker that has first strike or double strike now, in battlefield order
+// (attackers, each followed by its blockers): the CR 510.4 record taken as
+// the first-strike damage step begins.
+func (e *Engine) collectFirstStrikers(dst []state.ObjID) []state.ObjID {
+	fs := func(id state.ObjID) bool {
+		return e.hasKeywordH(id, kwhFirstStrike) || e.hasKeywordH(id, kwhDoubleStrike)
+	}
+	for _, id := range e.G.Zone(state.ZBattlefield, e.G.Active) {
+		a := e.G.Obj(id)
+		if a == nil || !a.IsAttacking {
+			continue
+		}
+		if fs(id) && !slices.Contains(dst, id) {
+			dst = append(dst, id)
+		}
+		for _, bid := range e.liveBlockers(a) {
+			if fs(bid) && !slices.Contains(dst, bid) {
+				dst = append(dst, bid)
+			}
+		}
+	}
+	return dst
 }
 
 // tallyCmdDamage records that the commander object from dealt amount combat

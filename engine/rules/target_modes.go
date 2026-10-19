@@ -990,17 +990,16 @@ func (e *Engine) AskCopyTargets() bool {
 		// The resolution kernel's answer in hand (W3 step 4j): run the
 		// legacy answer's continuation (resumeResolution's copy_targets
 		// arm: record, or ask the next declaration, then resolveTop) now.
-		asks := e.askCount
+		//
+		// The continuation logs no priority grant of its own, so the copy's
+		// resolution leaves tapeGranted alone: handlePriority logs the CR
+		// 117.3b reset (priority to the active player, pass count zero) as
+		// for any other resolution. Claiming the grant here left priority
+		// with the player who passed last, one pass already counted, so the
+		// next pass resolved the object below or ended the step without the
+		// active player ever receiving priority (lockstep pair 6042,
+		// Thousand-Year Storm).
 		e.resumeResolution(&resumePoint{kind: "copy_targets", obj: o.ID, sa: sa}, d.Chosen(in))
-		if !e.Suspended() && e.askCount == asks {
-			// The legacy answer's continuation logs no CR 117.3b reset of
-			// its own when the copy then resolves without asking (the next
-			// grant is Advance's), so handlePriority must not log one
-			// either. A copy whose resolution asked again completes, on the
-			// legacy path, through a resume tail that does log the reset --
-			// the one handlePriority logs here.
-			e.tapeGranted = true
-		}
 		return true
 	}
 }

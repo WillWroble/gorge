@@ -837,7 +837,7 @@ func (l *gnLinear) applyN(Y, X []float32, n int, set bool) {
 			}
 		}
 		for ; k < n; k++ {
-			a := dot(w, X[k*in:(k+1)*in])
+			a := dot1(w, X[k*in:(k+1)*in])
 			if set {
 				Y[k*out+o] = a + bias
 			} else {
@@ -898,6 +898,24 @@ func dot4(w, x0, x1, x2, x3 []float32) (float32, float32, float32, float32) {
 		a3 += w[i] * x3[i]
 	}
 	return a0 + b0, a1 + b1, a2 + b2, a3 + b3
+}
+
+// dot1 is one lane of dot4, bit for bit: applyN's tail inputs sum in the
+// same order as its batched ones, so an input's result never depends on how
+// many others share its batch (a cached card vector equals a recomputed one).
+func dot1(w, x []float32) float32 {
+	n := len(w)
+	x = x[:n]
+	var a, b float32
+	i := 0
+	for ; i+2 <= n; i += 2 {
+		a += w[i] * x[i]
+		b += w[i+1] * x[i+1]
+	}
+	if i < n {
+		a += w[i] * x[i]
+	}
+	return a + b
 }
 
 // axpy: y += a·x.

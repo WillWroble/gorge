@@ -51,13 +51,12 @@ func TestIntentAutoFlagForwarded(t *testing.T) {
 	}
 	autoBoundary := waitLedgerPast(t, r, len(before))
 
-	d2, err := r.Pending("t1", 1, parked)
-	if err != nil {
-		t.Fatalf("Pending after the auto answer: %v", err)
-	}
-	if d2.Seq == d.Seq {
-		t.Fatal("the game never advanced past the auto-flagged answer; the intent never logged")
-	}
+	// Logging the intent and posing the parked seat's next decision are not
+	// the same moment: under load the host goroutine may have logged the
+	// answer without having parked the seat again yet, so a single Pending
+	// read can return "no decision pending". Poll until the next decision is
+	// up (waitHTTPPending, the shape undo_test.go uses for the same race).
+	d2 := waitHTTPPending(t, r, parked, d.Seq)
 	// While d2 is parked the engine is blocked on it, so nothing appends:
 	// the plain intent's entry is exactly the current length.
 	mid, err := r.Provenance("t1", 1)

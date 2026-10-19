@@ -66,16 +66,24 @@ func CounterKeyword(kind string) (string, bool) {
 	if c := kind[0]; c < utf8RuneSelf && counterKeywordFirst&(1<<(lowerASCII(c)&63)) == 0 {
 		return "", false
 	}
-	head := kind
-	param := ""
-	if i := strings.IndexByte(kind, ':'); i >= 0 {
-		head = strings.TrimSpace(kind[:i])
-		param = kind[i:]
-	}
+	head, param := plainHead(kind)
 	for _, name := range counterKeywordCounters {
 		if strings.EqualFold(name, head) {
 			return name + param, true
 		}
 	}
 	return "", false
+}
+
+// plainHead splits a keyword or counter kind at its first colon: the part
+// before it (trimmed) is the head and the part from the colon on, colon
+// included, is the parameter ("" when there is none). It is the ONE spelling
+// of "a kind is <head>:<param>", shared by CounterKeyword here and by the
+// CR 506.5 alone-sentence canonicaliser (alone_keyword.go), so the two
+// boundaries cannot disagree about where a head ends.
+func plainHead(kind string) (head, param string) {
+	if i := strings.IndexByte(kind, ':'); i >= 0 {
+		return strings.TrimSpace(kind[:i]), kind[i:]
+	}
+	return kind, ""
 }

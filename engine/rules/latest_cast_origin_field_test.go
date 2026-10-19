@@ -10,11 +10,16 @@ import (
 
 // latestCastOriginByScan is the reference the field read replaced: the
 // object's LATEST PutOnStack event's (From, Player), found by walking the
-// whole log backwards. It is deliberately kept here as the oracle the
-// event-folded state.Object field must reproduce byte-for-byte.
+// whole log backwards, ended by any later zone change other than the
+// resolution's battlefield entry (CR 400.7, castProvenanceEndedBy). It is
+// deliberately kept here as the oracle the event-folded state.Object field
+// must reproduce byte-for-byte.
 func latestCastOriginByScan(e *Engine, obj state.ObjID) (state.Zone, state.PlayerID, bool) {
 	for i := len(e.L.Events) - 1; i >= 0; i-- {
 		ev := e.L.Events[i]
+		if ev.Obj == obj && castProvenanceEndedBy(ev) {
+			return 0, 0, false
+		}
 		if ev.Kind == events.PutOnStack && ev.Obj == obj {
 			return ev.From, ev.Player, true
 		}
@@ -68,12 +73,12 @@ func TestLatestCastOriginMatchesLogScan(t *testing.T) {
 	t.Logf("checked %d object/checkpoint pairs, at least one carrying a cast origin", checked)
 }
 
-// TestLatestCastOriginSurvivesReversal folds a PutOnStack and then the CR
+// TestLatestCastOriginEndsAtReversal folds a PutOnStack and then the CR
 // 733.1 logged reverse move straight through events.Apply and asserts the
-// recorded origin is still the PutOnStack's: the reverse scan the field
-// replaced still finds that PutOnStack in the log after a reversal, so
-// clearing the field there would diverge from it.
-func TestLatestCastOriginSurvivesReversal(t *testing.T) {
+// recorded origin is gone: the card back in hand is a new object that was
+// never cast (CR 400.7), the same answer castProvenanceEndedBy gives the
+// log reads.
+func TestLatestCastOriginEndsAtReversal(t *testing.T) {
 	t.Parallel()
 	g := state.NewGame([]string{"a", "b"})
 	o := g.AddObject(nil, 0)
@@ -85,8 +90,8 @@ func TestLatestCastOriginSurvivesReversal(t *testing.T) {
 		t.Fatalf("after PutOnStack: has=%v from=%v by=%v", o.HasLatestCast, o.LatestCastFrom, o.LatestCastBy)
 	}
 	events.Apply(g, events.Event{Kind: events.MoveZone, Obj: o.ID, From: state.ZStack, To: state.ZHand, Text: "reversed"})
-	if !o.HasLatestCast || o.LatestCastFrom != state.ZHand || o.LatestCastBy != 1 {
-		t.Fatalf("after reversed move: has=%v from=%v by=%v", o.HasLatestCast, o.LatestCastFrom, o.LatestCastBy)
+	if o.HasLatestCast {
+		t.Fatalf("after reversed move: has=%v from=%v by=%v, want no cast", o.HasLatestCast, o.LatestCastFrom, o.LatestCastBy)
 	}
 	// A never-cast object must read false: the object's precondition for the
 	// positive read is that a PutOnStack actually folded.

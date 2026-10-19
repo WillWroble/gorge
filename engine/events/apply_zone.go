@@ -74,6 +74,15 @@ func foldMoveZone(g *state.Game, e *Event) {
 			o.FaceDownHasPT = fdHasPT
 		}
 	}
+	// The departure's "was a creature" bit, read off the pre-move object
+	// before Move resets it (see DepartureCreatureFlip).
+	departed, wasCreature := false, false
+	if e.Kind == MoveZone && wasBattlefield && e.To != state.ZBattlefield {
+		if o := g.Obj(e.Obj); o != nil {
+			departed = true
+			wasCreature = DepartureDefaultCreature(o) != (e.Step == DepartureCreatureFlip)
+		}
+	}
 	var sacrificer state.PlayerID
 	sacrificed := IsSacrifice(*e)
 	if sacrificed {
@@ -95,6 +104,16 @@ func foldMoveZone(g *state.Game, e *Event) {
 	} else if wasStack && e.Text == "reversed" {
 		if o := g.Obj(e.Obj); o != nil {
 			o.DrawnTurn = drawnBefore
+		}
+	}
+	if departed && wasCreature {
+		for i := len(g.Entered) - 1; i >= 0; i-- {
+			if g.Entered[i].Obj == e.Obj {
+				if g.Entered[i].From == state.ZBattlefield {
+					g.Entered[i].WasCreature = true
+				}
+				break
+			}
 		}
 	}
 	if sacrificed {
@@ -127,11 +146,16 @@ func foldMoveZone(g *state.Game, e *Event) {
 			// Record the zone and caster of this cast on the object, so
 			// rules' latestCastOrigin reads the field instead of scanning
 			// the whole log backwards on every call. A later PutOnStack
-			// overwrites it (latest cast wins); the reverse move below does
-			// NOT clear it, because the reverse scan it replaces still finds
-			// this PutOnStack in the log after a CR 733.1 reversal. The fold
-			// is the one writer, so a log-only replay derives the same pair.
+			// overwrites it (latest cast wins). The fold is the one writer,
+			// so a log-only replay derives the same pair.
 			o.LatestCastFrom, o.LatestCastBy, o.HasLatestCast = e.From, e.Player, true
+		} else if e.From != state.ZStack || e.To != state.ZBattlefield {
+			// Any other zone change after the cast than the resolution's own
+			// stack -> battlefield entry (a counter, a CR 733.1 reversal, a
+			// blink, a death, a draw) makes a new object that was never cast
+			// (CR 400.7), so its cast origin ends here -- the same rule
+			// rules' castProvenanceEndedBy applies to the log reads.
+			o.HasLatestCast = false
 		}
 
 		if e.To == state.ZStack && IsFaceDownEntry(moveCounter) {
@@ -681,6 +705,41 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 			// the "counter" half is placed through the engine's CounterChange
 			// path, so only the consumption is left here.
 			o.UnleashChoice = ""
+			// CR 400.7: a battlefield RE-entry from another zone is a new
+			// object with no memory of its former existence, so it carries no
+			// remembered list from its previous incarnation. Without this, a
+			// permanent that left the battlefield and returned (a
+			// bounced-and-replayed or reanimated Curator of Destinies) would
+			// answer a later `Card.IsRemembered` read with what an earlier
+			// INCARNATION's resolution recorded, and that stale half of the
+			// IsRemembered union would move cards the new object never
+			// remembered. The leaving arm above deliberately keeps the list
+			// for the old incarnation's pending referents (the O-Ring /
+			// UntilHostLeavesPlay premise); this is its reset on the next
+			// entry.
+			//
+			// Two entries are deliberately NOT the reset:
+			//   - a first entry (Incarnation 1): an object that has never
+			//     been a permanent has no former existence to forget, and the
+			//     memory a spell or copy carried onto the battlefield is
+			//     deliberate -- a spell's cast-time Craft material
+			//     (rememberCraftMaterials, written before the resolving
+			//     spell's entry) and a CopyPermanent token's inherited
+			//     remembered set (TokenRemembered$, the Hofri Spirit) both
+			//     enter through this arm and must survive it.
+			//   - a Transformed$ True entry (CR 711.10a: the object enters
+			//     back face up): Craft's `Transform this permanent` is
+			//     CR 701.27, not a zone change, and this build renders that
+			//     in-place transform as a self-exile plus a Transformed$
+			//     re-entry (kwCraft's ChangeZone body). The transformed face
+			//     is the SAME object continuing (CR 712.4), so the material
+			//     its cast remembered is still its own. The leave arm above
+			//     resets the face for every battlefield departure, so a back
+			//     face at this point can only be a Transformed$ entry, never
+			//     a prior incarnation's.
+			if o.Incarnation > 1 && !(o.Card != nil && o.Card.IsTransformingDFC() && o.FaceIdx != 0) {
+				o.Remembered = nil
+			}
 		}
 		// A face-down entry (a manifest) is a 2/2 creature with no abilities
 		// (CR 708.5), so it grants none of the entry counters above; the
@@ -739,6 +798,15 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		// blocked/blocked-by nothing this turn.
 		o.BlockedByThisTurn = nil
 		o.BlockedThisTurn = nil
+		// CR 400.7: likewise the records of who dealt THIS object damage
+		// (the DamagedBy / wasDealtDamageByThisGame predicates' recipient
+		// side). A creature dealt damage by Kumano's Pupils, bounced and
+		// recast is a new object the Pupils never damaged. The source-side
+		// DamageDealtThisTurn ledger stays: the damage was still dealt this
+		// turn, and the turn-wide damage counts read it after the source
+		// is gone.
+		o.DamageTakenThisTurnBy = nil
+		o.DamageTakenByGame = nil
 		if !countersRemain || to == state.ZHand || to == state.ZLibrary {
 			o.Counters = nil
 		}
@@ -764,14 +832,22 @@ func move(g *state.Game, id state.ObjID, from, to state.Zone, countersRemain boo
 		o.Paired = 0
 		o.Targets = nil
 		o.SubTargets = nil
-		// o.Remembered is deliberately NOT reset here: a card's remembered
-		// list is CARD memory, not permanent state -- Forge preserves it
-		// across zone changes, which is the whole O-Ring premise (the return
-		// trigger on a card in the graveyard reads the exile its
-		// battlefield-stint remembered) and the reason its ForgetOtherTargets$
-		// exists at all (the deliberate clear on a re-exile). The list stays
-		// event-backed (Choose "remembered"/"clear-remembered"), so live play
-		// and replay derive it identically either way.
+		o.TargetStamps = nil
+		// o.Remembered is deliberately NOT reset on the DEPARTURE: a pending
+		// referent read belongs to the object that queued it (CR 400.7), and
+		// a leave trigger's body resolves only after the fold -- the source
+		// has already left when the trigger is even matched, so the reset has
+		// to wait for the next entry (below). Forge's host card list also
+		// spans zone changes, which is the O-Ring premise and the reason its
+		// ForgetOtherTargets$ exists at all (the deliberate clear on a
+		// re-exile). A trigger body that resolves its remembered set through
+		// this list does not read it live, though: its fire-time queue
+		// (rules' triggerReferents) snapshots the list with an Incarnation
+		// stamp, so a source that re-enters the battlefield before the
+		// trigger resolves answers the pending read with the OLD object's
+		// list (effects' sourceRemembered). The list stays event-backed
+		// (Choose "remembered"/"clear-remembered"), so live play and replay
+		// derive it identically either way.
 		if wasBattlefield {
 			// Room door designations belong to this battlefield incarnation.
 			o.Unlocked = false

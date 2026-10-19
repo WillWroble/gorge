@@ -317,6 +317,21 @@ type Option struct {
 	// not consume a published pool candidate, so every ordinary option list
 	// serialises byte-identically.
 	TapPoolCost int `json:"tap_pool_cost,omitempty"`
+	// AloneRestricted marks a KAttackers or KBlockers option whose creature
+	// is restricted from being declared ALONE (CR 506.5): declaring it is
+	// legal only when at least one other creature is declared as an attacker
+	// (a KAttackers option) or as a blocker (a KBlockers option) in the same
+	// declaration. The engine REJECTS a lone declaration
+	// (combat.DeclaresAlone, read by both declaration validators), so a
+	// rules-ignorant client -- the bot policy included -- needs the fact on
+	// the wire to build a legal declaration rather than have one refused.
+	// Decision.Validate enforces it and the shared repair
+	// (Decision.FitAlone, which botpolicy.Clamp runs) derives its rule from
+	// this same field, so the published fact cannot drift from the check.
+	// Server-side only, like BlockMust: a client needs the flag, not the
+	// obligation to enforce it. omitempty: an unrestricted option emits no
+	// field, so every ordinary option list serialises byte-identically.
+	AloneRestricted bool `json:"-"`
 	// Mode distinguishes a "cast" option's payment kind: "" the card's own
 	// cost, "kicked", "surged", "flashback", "miracle" -- what the engine
 	// reads in beginCast's switch. A client renders a kicked/surged/
@@ -1478,6 +1493,13 @@ func (d *Decision) Validate(in Intent) error {
 	// one home; the engine's board-aware validateAttackers reads it too.
 	if !d.ChargeTapPoolFit(in.Choices) {
 		return fmt.Errorf("choices %v exhaust the tap obligation's candidate pool (%d)", in.Choices, d.ChargeTapPool)
+	}
+	// CR 506.5: a creature restricted from attacking (blocking) alone may not
+	// be the whole declaration. The rule is AloneLegal's, which the shared
+	// repair (FitAlone) and the engine's own declaration setters also derive
+	// from, so the published fact, this fence and the repair cannot disagree.
+	if err := d.validateAlone(in.Choices); err != nil {
+		return err
 	}
 	if len(in.Rest) > 0 {
 		if d.Kind != KArrange {

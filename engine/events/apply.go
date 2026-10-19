@@ -142,6 +142,40 @@ func Apply(g *state.Game, e Event) { ApplyPtr(g, &e) }
 
 // ApplyPtr is Apply on a pointer: the fold reads *e and never writes it.
 func ApplyPtr(g *state.Game, e *Event) {
+	n := len(g.Stack)
+	applyKind(g, e)
+	if len(g.Stack) > n {
+		stampPushedAbilitySources(g, n)
+	}
+}
+
+// stampPushedAbilitySources records, on every ability object an event just
+// put on the stack (from index n up), whether its source was on the
+// battlefield at that moment and which battlefield incarnation it was. An
+// ability whose effect names its source ("put a +1/+1 counter on this
+// creature") acts on that permanent only: once it leaves (CR 400.7) the
+// card in its new zone is a new object the effect does not see.
+func stampPushedAbilitySources(g *state.Game, n int) {
+	for _, id := range g.Stack[n:] {
+		o := g.Obj(id)
+		if o == nil || o.Ability == nil || o.Source == 0 || o.PushSourceStamped {
+			continue
+		}
+		o.PushSourceStamped = true
+		if src := g.Obj(o.Source); src != nil {
+			// The incarnation is stamped whatever the source's zone: an
+			// ability activated from a graveyard ("return this card from
+			// your graveyard") must not find the card once it has been to
+			// the battlefield and back (CR 400.7).
+			o.PushSourceIncarnation = src.Incarnation
+			if src.Zone == state.ZBattlefield {
+				o.PushSourceOnBattlefield = true
+			}
+		}
+	}
+}
+
+func applyKind(g *state.Game, e *Event) {
 	switch e.Kind {
 	// RollDice is the proposal-only roll-action Kind (task rolldice-repl): it
 	// is held out to replacement matching, never emitted, so it folds nothing
@@ -279,6 +313,16 @@ func ApplyPtr(g *state.Game, e *Event) {
 		foldSpellCastReversed(g, e)
 	case HiddenIdentity:
 		foldHiddenIdentity(g, e)
+	case DrawEmpty:
+		foldDrawEmpty(g, e)
+	case BlockedByEffect:
+		foldBlockedByEffect(g, e)
+	case SetupSettled:
+		// The oracle harness's staged permanent counts as continuously
+		// controlled since before the scenario's first turn (CR 302.6).
+		if o := g.Obj(e.Obj); o != nil && o.Zone == state.ZBattlefield {
+			o.SummonSick = false
+		}
 	case ChaosEnsues:
 		// The chaos-ensues marker (CR 901.9, task planar-verbs) is a pure
 		// marker, exactly like PlanarRoll: no state folds. The current plane's

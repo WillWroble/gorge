@@ -264,8 +264,14 @@ func TestDelayedBlastFireballForetellCastDealsFive(t *testing.T) {
 	}
 	submitOption(t, e, "foretell_cast", "Cast Delayed Blast Fireball (foretold)")
 	finishCast(t, e, id)
-	if !e.WasCastFromExile(id) {
-		t.Fatal("the foretell cast's provenance is not exile")
+	// The spell has resolved into the graveyard: that card is a new object
+	// that was never cast (CR 400.7), while the turn's cast ledger still
+	// records the exile cast.
+	if e.WasCastFromExile(id) {
+		t.Fatal("the resolved card in the graveyard still reads WasCastFromExile")
+	}
+	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+wasCastFromExile", effects.TriggerContext{}); got != 1 {
+		t.Fatalf("exile-cast count = %d, want 1: the foretell cast's provenance is not exile", got)
 	}
 	// X=5: each opponent takes 5 (the {2} hand cast would deal 2).
 	if got := e.G.Players[1].Life; got != 15 {

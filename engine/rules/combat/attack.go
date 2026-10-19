@@ -127,11 +127,25 @@ type RequirementSet struct {
 	// player, preferably a non-goader. GoadMayAttack handles the player
 	// preference; SatisfiedByOffer excludes battles from satisfying this duty.
 	Goad bool
+	// NamedPerm counts, per attackable PERMANENT (a planeswalker, CR 506.3 /
+	// 508.1b), how many named requirements an attack on that permanent
+	// satisfies: MustAttack$ EffectSource, Gideon Jura's "creatures that
+	// player controls attack Gideon Jura if able". Kept apart from Named so
+	// the player-named path is unchanged. nil when none applies.
+	NamedPerm map[state.ObjID]int
 }
 
 // Any reports whether at least one requirement binds the creature.
 func (s RequirementSet) Any() bool {
-	return len(s.Named) > 0 || s.Broad || s.Goad
+	return len(s.Named) > 0 || s.Broad || s.Goad || len(s.NamedPerm) > 0
+}
+
+// addNamedPerm records one named requirement for the attackable permanent.
+func (s *RequirementSet) addNamedPerm(perm state.ObjID) {
+	if s.NamedPerm == nil {
+		s.NamedPerm = make(map[state.ObjID]int, 1)
+	}
+	s.NamedPerm[perm]++
 }
 
 // addNamed records one named requirement for defender.
@@ -155,10 +169,11 @@ func (s RequirementSet) SatisfiedBy(defender state.PlayerID) int {
 // are discharged only by attacking a player; the protector field on a battle
 // offer is not itself the defender of the attack. Goad's non-goader
 // preference is enforced by GoadMayAttack when enumerating the legal player
-// pairs.
+// pairs. An attack on a permanent (battle != 0: a planeswalker or a battle)
+// satisfies exactly the requirements that name that permanent (NamedPerm).
 func (s RequirementSet) SatisfiedByOffer(def state.PlayerID, battle state.ObjID) int {
 	if battle != 0 {
-		return 0
+		return s.NamedPerm[battle]
 	}
 	n := s.SatisfiedBy(def)
 	if s.Goad {
@@ -173,6 +188,11 @@ func (s RequirementSet) SatisfiedByOffer(def state.PlayerID, battle state.ObjID)
 func (s RequirementSet) MaxNamed() int {
 	best := 0
 	for _, n := range s.Named {
+		if n > best {
+			best = n
+		}
+	}
+	for _, n := range s.NamedPerm {
 		if n > best {
 			best = n
 		}
@@ -200,12 +220,18 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 		if ce.Restriction != "MustAttack" {
 			continue
 		}
-		if !mustAttackLineSelects(b, ce.RestrictParam(cards.PKValidCreature), id, ce.Source, ce.Controller, ce.Remembered) {
+		if !mustAttackLineSelects(b, ce.RestrictParam(cards.PKValidCreature), id, ce.Source, ce.Controller, ce.Remembered, ce.RememberedPlayers) {
 			continue
 		}
 		spec := strings.TrimSpace(ce.RestrictParam(cards.PKMustAttack))
 		if spec == "" {
 			s.Broad = true
+			continue
+		}
+		if perm, handled := requirementPermanent(b, spec, ce.Source); handled {
+			if perm != 0 {
+				s.addNamedPerm(perm)
+			}
 			continue
 		}
 		if p, ok := requirementDefender(b, spec, ce.Source, ce.Controller, ce.RememberedPlayers); ok {
@@ -216,12 +242,18 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 		if !effects.MustAttackParamsReadableForRules(sv.Params) || !b.StaticGateHolds(sv) {
 			continue
 		}
-		if !mustAttackLineSelects(b, sv.ParamStr(cards.PKValidCreature), id, sv.Source, sv.Controller, nil) {
+		if !mustAttackLineSelects(b, sv.ParamStr(cards.PKValidCreature), id, sv.Source, sv.Controller, nil, nil) {
 			continue
 		}
 		spec := strings.TrimSpace(sv.ParamStr(cards.PKMustAttack))
 		if spec == "" {
 			s.Broad = true
+			continue
+		}
+		if perm, handled := requirementPermanent(b, spec, sv.Source); handled {
+			if perm != 0 {
+				s.addNamedPerm(perm)
+			}
 			continue
 		}
 		if p, ok := requirementDefender(b, spec, sv.Source, sv.Controller, nil); ok {
@@ -237,15 +269,20 @@ func AttackRequirements(b Board, id state.ObjID) RequirementSet {
 // mustAttackLineSelects resolves a MustAttack line's ValidCreature$ against
 // the candidate creature, with the registration's remembered set bound for
 // the Card.IsRemembered family (Knight Rampager, Ursine Monstrosity, Raving
-// Dead, Ruhan of the Fomori all scope the requirement to a remembered self).
+// Dead, Ruhan of the Fomori all scope the requirement to a remembered self)
+// and its captured PLAYERS bound for Creature.RememberedPlayerCtrl (Rowan
+// Kenrith's "each creature that player controls attacks if able"). Both halves
+// are the registration's own bindings, the same ones requirementDefender reads
+// for the MustAttack$ reference, so a line that scopes BOTH sides to a
+// captured player (Gideon Jura's DelayedTrigger Effect) resolves both.
 // An absent ValidCreature$ is Forge's Card.Self default, the same default
 // AttackRequirements applies.
-func mustAttackLineSelects(b Board, spec string, id state.ObjID, source state.ObjID, controller state.PlayerID, remembered []state.ObjID) bool {
+func mustAttackLineSelects(b Board, spec string, id state.ObjID, source state.ObjID, controller state.PlayerID, remembered []state.ObjID, rememberedPlayers []state.PlayerID) bool {
 	v := strings.TrimSpace(spec)
 	if v == "" {
 		v = "Card.Self"
 	}
-	return b.MatchesSpec(v, id, source, controller, remembered, nil)
+	return b.MatchesSpec(v, id, source, controller, remembered, rememberedPlayers)
 }
 
 // requirementDefender resolves a MustAttack$ player reference to the
@@ -288,6 +325,27 @@ func requirementDefender(b Board, spec string, source state.ObjID, controller st
 		}
 	}
 	return 0, false
+}
+
+// requirementPermanent resolves a MustAttack$ reference that names an
+// attackable PERMANENT rather than a player: EffectSource is the
+// registration's source (Gideon Jura's +2 Effect, Kytheon's and Urza's
+// "attacks EFFECTSOURCE"), a requirement only while that source is a
+// battlefield planeswalker (CR 506.3, 508.1b). A source that has left the
+// battlefield or stopped being a planeswalker names nothing it could be
+// discharged against, so the line contributes no requirement (fail closed,
+// the creature is released): perm is 0 with handled true. handled is false
+// for every other (player) reference.
+func requirementPermanent(b Board, spec string, source state.ObjID) (perm state.ObjID, handled bool) {
+	if spec != "EffectSource" {
+		return 0, false
+	}
+	o := b.Game().Obj(source)
+	if o == nil || o.Zone != state.ZBattlefield || o.PhasedOut || o.FaceDown ||
+		!b.MatchesSpec("Planeswalker", source, source, o.Controller, nil, nil) {
+		return 0, true
+	}
+	return source, true
 }
 
 // MaxAttackers reports the global attacker ceiling. Defender-scoped ceilings

@@ -211,9 +211,8 @@ func TestWildMagicSorcererFirstExileCastCascades(t *testing.T) {
 	e.G.Players[0].Pool[state.MC], e.G.Players[0].Pool[state.MR] = 4, 2
 	submitOption(t, e, "foretell_cast", "Cast Delayed Blast Fireball (foretold)")
 	finishCast(t, e, dbf)
-	if !e.WasCastFromExile(dbf) {
-		t.Fatal("the foretell cast's provenance is not exile")
-	}
+	// The resolved card in the graveyard is a new object (CR 400.7); the
+	// ledger count below reads the exile cast itself.
 	if got := e.SpellsCastThisTurnMatching(0, "Card.YouCtrl+wasCastFromExile", noTC); got != 1 {
 		t.Fatalf("exile-cast count = %d, want 1", got)
 	}

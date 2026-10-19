@@ -44,6 +44,12 @@ type CardView struct {
 	// ManaCost is the printed cost in Forge's notation ("1 W", "R", "X G").
 	// Hand lists render it as symbols.
 	ManaCost string `json:"mana_cost,omitempty"`
+	// Facts are Types' and ManaCost's compiled facts (cards.PrintedFacts),
+	// set by the projection from the face it read them from, so an
+	// in-process reader tests bits instead of re-parsing the text. Never on
+	// the wire: a decoded or hand-built CardView has Facts.OK false and its
+	// reader parses the strings.
+	Facts CardFacts `json:"-"`
 	// EffectiveManaCost is the offer-time cost to cast this card when the
 	// engine can determine a non-X own-cost composition that differs from
 	// the printed ManaCost. Empty means use ManaCost.
@@ -170,6 +176,14 @@ type CardView struct {
 	AttachedPlayer   state.PlayerID `json:"attached_player,omitempty"`
 }
 
+// CardFacts are a CardView's compiled text facts. OK reports that the
+// projection set them: PrintedFacts is then exactly
+// cards.TypeLineMasks(Types) and cards.ManaCostPips(ManaCost).
+type CardFacts struct {
+	cards.PrintedFacts
+	OK bool
+}
+
 // CardFlag is the CardView.Flags bit set.
 type CardFlag uint16
 
@@ -239,6 +253,12 @@ type projector struct {
 	vchars interface {
 		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
 	}
+	// vtypes is ch's optional derived type line (rules.Engine.ViewTypes):
+	// ok only when a layer-4 effect changed the object's card types, nil
+	// when ch lacks it (the printed line then stands).
+	vtypes interface {
+		ViewTypes(state.ObjID) ([]string, bool)
+	}
 	noTokens bool
 	// hideHand is the CR 103.5 blind: true while the CR 103.1 play/draw
 	// choice is unresolved, when no player may see any hand. It is probed
@@ -263,6 +283,9 @@ func newProjector(g *state.Game, ch Chars, viewer state.PlayerID, sc *projScratc
 	p.namer, _ = ch.(interface{ Name(state.ObjID) string })
 	p.vchars, _ = ch.(interface {
 		ViewCharacteristics(state.ObjID) (string, bool, []string, int32, int32)
+	})
+	p.vtypes, _ = ch.(interface {
+		ViewTypes(state.ObjID) ([]string, bool)
 	})
 	if s, ok := ch.(tokenSuppressor); ok && s.SuppressCardTokens() {
 		p.noTokens = true
@@ -516,7 +539,30 @@ func (p *projector) cardView(cv *CardView, id state.ObjID) {
 				cv.CardName = printed
 			}
 		}
-		cv.Types = p.typeLine(types, f.Types)
+		// Types is a layer-4 characteristic (CR 613.1d): a permanent whose
+		// card types an effect changed (Imprisoned in the Moon makes a
+		// creature a land and nothing else) shows the derived line, not its
+		// printed one. Facts stay exactly TypeLineMasks(Types) and
+		// ManaCostPips(ManaCost): the derived line's masks are recomputed,
+		// the printed cost's pips kept.
+		var derived []string
+		hasDerived := false
+		if !p.noDerived && p.vtypes != nil {
+			derived, hasDerived = p.vtypes.ViewTypes(id)
+		}
+		if pf, line, ok := f.PrintedFacts(); ok {
+			if hasDerived {
+				cv.Types = p.typeLine(types, derived)
+				pf.TypeFold, pf.TypeExact = cards.TypeLineMasks(cv.Types)
+			} else {
+				cv.Types = line
+			}
+			cv.Facts = CardFacts{PrintedFacts: pf, OK: true}
+		} else if hasDerived {
+			cv.Types = p.typeLine(types, derived)
+		} else {
+			cv.Types = p.typeLine(types, f.Types)
+		}
 		cv.ManaCost = f.ManaCost
 		cv.PrintedPT = f.PT
 		cv.Printing = Printing{Name: f.Name}

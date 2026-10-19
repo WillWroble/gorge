@@ -61,6 +61,18 @@ func foldDeclareBlockers(g *state.Game, e *Event) {
 	}
 }
 
+// foldBlockedByEffect folds Kind BlockedByEffect: an unblocked attacker
+// becomes blocked with no blocker (CR 509.1h), recorded as the one zero
+// BlockedBy entry a blocked-but-blockers-all-left creature carries.
+func foldBlockedByEffect(g *state.Game, e *Event) {
+	a := g.Obj(e.Obj)
+	if a == nil || a.Zone != state.ZBattlefield || !a.IsAttacking || len(a.BlockedBy) != 0 {
+		return
+	}
+	a.BlockedBy = append(a.BlockedBy, 0)
+	g.NoteBlockers()
+}
+
 // foldCombatRetarget folds Kind CombatRetarget into state.
 func foldCombatRetarget(g *state.Game, e *Event) {
 	// api:ChangeCombatants's reselect (Misleading Signpost, Portal Mage,

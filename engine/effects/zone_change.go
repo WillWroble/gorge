@@ -221,6 +221,77 @@ func hasRememberedDestroyedLand(g *state.Game, ts []state.Target) bool {
 // mover, and effChangeZone's departure-batch pre-pass
 // (changeZoneDepartureBatch) shares this predicate so its victim list cannot
 // drift from the moves.
+// sourceReturnedSincePush reports that o is the resolving ability's own
+// source, the ability went on the stack while that source was OFF the
+// battlefield (Reassembling Skeleton's "{1}{B}: Return this card from your
+// graveyard to the battlefield tapped"), and the source has crossed the
+// battlefield boundary since: the card back in the graveyard is a new object
+// (CR 400.7) the ability cannot find, so a second activation that resolves
+// after the first returned the card and it died again moves nothing. The
+// battlefield-push case is sourceLeftSincePush's.
+func sourceReturnedSincePush(h Host, c *Ctx, o *state.Object) bool {
+	if o.ID != c.Source || c.ResolvingObj == 0 {
+		return false
+	}
+	ro := h.Game().Obj(c.ResolvingObj)
+	if ro == nil || ro.Source != o.ID || !ro.PushSourceStamped || ro.PushSourceOnBattlefield {
+		return false
+	}
+	return o.Incarnation != ro.PushSourceIncarnation
+}
+
+// dropDelayedRememberedMoved removes from a Defined$
+// DelayTriggerRemembered[LKI] mover's list every object whose Incarnation
+// differs from the delayed trigger registration's stamp
+// (TriggerContext.DelayedRememberedStamps): that object left its zone and
+// came back, so it is a new object the delayed trigger cannot find (CR
+// 400.7). Nine-Lives Familiar died, was returned by another effect and died
+// again: its first death's "return it at the beginning of the next end step"
+// returns nothing. An object without a stamp is kept.
+func dropDelayedRememberedMoved(h Host, c *Ctx, targets []state.Target) []state.Target {
+	stamps := c.DelayedRememberedStamps
+	if len(stamps) == 0 {
+		return targets
+	}
+	var out []state.Target
+	for i, t := range targets {
+		moved := false
+		if !t.IsPlayer {
+			if o := h.Game().Obj(t.Obj); o != nil {
+				for _, s := range stamps {
+					if s.Obj == t.Obj {
+						moved = s.Incarnation != o.Incarnation
+						break
+					}
+				}
+			}
+		}
+		if moved && out == nil {
+			out = append(make([]state.Target, 0, len(targets)), targets[:i]...)
+		} else if !moved && out != nil {
+			out = append(out, t)
+		}
+	}
+	if out == nil {
+		return targets
+	}
+	return out
+}
+
+// definedDelayRememberedTargets is Defined(sa) with dropDelayedRememberedMoved
+// applied when the selector is Defined$ DelayTriggerRemembered[LKI]: the
+// Destroy and SacrificeAll movers ("destroy/sacrifice that creature at the
+// beginning of the next end step") find only the remembered object, as
+// ChangeZone's mover does (CR 400.7).
+func definedDelayRememberedTargets(h Host, c *Ctx, sa *cards.SA) []state.Target {
+	targets := Defined(h, c, sa)
+	switch definedSpecCodes.Code(DefinedRefOf(sa).Text) {
+	case definedSpecDelayTriggerRemembered, definedSpecDelayTriggerRememberedLKI:
+		return dropDelayedRememberedMoved(h, c, targets)
+	}
+	return targets
+}
+
 func changeZoneMoveSkip(h Host, cz *ChangeZoneParams, o *state.Object, to state.Zone, originAll bool) bool {
 	if cz.OriginPresent && !originAll && !cz.OriginMask.Has(o.Zone) {
 		return true
@@ -445,7 +516,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 	// counters (suspend). The CounterChange is emitted AFTER the MoveZone, so it
 	// lands on the moved (new) object's back at its destination, exactly as Move
 	// waiting to run first would want, and the counter survives onto the object
-	// because it is added post-move. Counter (not the Move carrying it along) is
+	// because it is added post-move. A battlefield move instead carries the counters
+	// IN the MoveZone (entryWithCounters): the permanent enters with them
+	// (CR 122.6, 614.1c), so its entry triggers see them. Counter (not the Move carrying it along) is
 	// what keeps engine/events/apply.go's Move from knowing anything about counters.
 	// counterDestination is the one gate every mover shares: a destination that
 	// cannot carry the counters neither parses the amount nor emits anything.
@@ -665,6 +738,9 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		cz.DefinedImprinted {
 		h.EndImprintedEffects(c.Source)
 	}
+	if cz.DefinedDelayRemembered {
+		targets = dropDelayedRememberedMoved(h, c, targets)
+	}
 	// The battlefield departures of the move loop below are one simultaneous
 	// departure batch; see changeZoneDepartureBatch.
 	if departing := changeZoneDepartureBatch(h, cz, targets, to, originAll); len(departing) > 0 {
@@ -690,7 +766,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 		}
 		// Origin$ precondition and CantExile guard, shared with the
 		// departure-batch pre-pass above: see changeZoneMoveSkip.
-		if changeZoneMoveSkip(h, cz, o, to, originAll) {
+		if changeZoneMoveSkip(h, cz, o, to, originAll) || sourceReturnedSincePush(h, c, o) {
 			continue
 		}
 		// Inlined rather than routed through settleChangeZoneMove: this loop
@@ -725,6 +801,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			applyTransformed(h, c, cz.Riders.Transformed, o.ID)
 		}
 		markChangeZoneAttach(h, c, sa, cz, &ev)
+		entryCounters := withKind != "" && counterDestination(to) && entryWithCounters(&ev, to, withKind, withAmt)
 		emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 		moved = append(moved, o.ID)
 		exiledWithAssociation(h, c, o.ID, to)
@@ -744,7 +821,7 @@ func effChangeZone(h Host, c *Ctx, sa *cards.SA) {
 			eventRemember(h, c, o.ID)
 		}
 		eventForgetChanged(h, c, sa, o.ID)
-		if withKind != "" && counterDestination(to) {
+		if withKind != "" && counterDestination(to) && !entryCounters {
 			emitChangeZoneCounters(h, o.ID, withKind, withAmt)
 		}
 		// GainControl$ hands the moved object to the named player (Reanimate:
@@ -1507,6 +1584,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 		applyTransformed(h, c, cz.Riders.Transformed, id)
 	}
 	markChangeZoneAttach(h, c, sa, cz, &ev)
+	entryCounters := withKind != "" && counterDestination(to) && entryWithCounters(&ev, to, withKind, withAmt)
 	emitEntryMove(h, c, cz.Riders.GainControl, to, ev)
 	if to == state.ZExile {
 		recordExileReturnFor(h, c, cz.Riders.Duration, id, from, to)
@@ -1547,7 +1625,7 @@ func settleChangeZoneMoveAs(h Host, c *Ctx, sa *cards.SA, cz *ChangeZoneParams, 
 	if cz.RememberChanged {
 		c.Remembered = append(c.Remembered, state.Target{Obj: id})
 	}
-	if withKind != "" && counterDestination(to) {
+	if withKind != "" && counterDestination(to) && !entryCounters {
 		emitChangeZoneCounters(h, id, withKind, withAmt)
 	}
 	// GainControl$ hands the moved object to the named player. Only a

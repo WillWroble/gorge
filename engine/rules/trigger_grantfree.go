@@ -161,17 +161,9 @@ func (e *Engine) replGrantsPossible() bool {
 	}
 	for ; pr.replObjs < len(e.G.Objs); pr.replObjs++ {
 		o := &e.G.Objs[pr.replObjs]
-		if faceGrantsRepl(o.CopyFace) {
+		if e.faceScanHas(o.CopyFace, faceScanGrantsRepl) || e.cardScanHas(o.Card, faceScanGrantsRepl) {
 			pr.replFree = false
 			return true
-		}
-		if o.Card != nil {
-			for _, f := range o.Card.Faces {
-				if faceGrantsRepl(f) {
-					pr.replFree = false
-					return true
-				}
-			}
 		}
 	}
 	return false

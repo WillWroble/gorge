@@ -150,6 +150,11 @@ func (e *Engine) entryCounterGrants(ev *events.Event) []events.EntryCounterGrant
 			return nil
 		}
 		grants := events.EntryCounterGrants(o, events.IsFaceDownEntry(ev.Counter))
+		// The counters the moving effect says the permanent enters WITH
+		// (ChangeZone's WithCountersType$, effects.entryWithCounters): CR
+		// 122.6 makes them part of the entry, so they settle and fold here
+		// with the intrinsic grants, after them.
+		_, requested := events.SplitEntryCounterPairs(ev.Pairs)
 		// CR 702.176a: paid-Impending provenance is still on the stack object
 		// immediately before the move folds. Include its time counters in the
 		// common entry plan so AddCounter replacements are settled before entry.
@@ -158,7 +163,7 @@ func (e *Engine) entryCounterGrants(ev *events.Event) []events.EntryCounterGrant
 				grants = append(grants, events.EntryCounterGrant{Kind: "TIME", Amount: n})
 			}
 		}
-		return grants
+		return append(grants, requested...)
 	case events.TokenCreate:
 		return events.EntryCounterGrants(e.tokenSnapshot(*ev), false)
 	case events.CardToken:
@@ -674,6 +679,8 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	pp := e.previewStruct()
 	*pp = *e
 	preview := pp
+	isolatePreviewMemos(preview)
+	isolatePreviewScratch(preview)
 	preview.G = e.G.CloneInto(e.takeSnapshotObjs())
 	// The livelock watcher's window and candidate index are slices: the
 	// preview copies them on its first observed event rather than writing
@@ -712,9 +719,109 @@ func (e *Engine) entryPreview(ev events.Event) (*Engine, state.ObjID) {
 	// spell or ability moved the object, and the EffectOnly class (Doubling
 	// Season) reads that cause. Live engines never carry a pin.
 	preview.causePin = e.actionCause()
+	stripEntryRequests(&ev)
 	events.Apply(preview.G, ev)
 	preview.replArenaNoteApplied(ev)
 	return preview, entrant
+}
+
+// isolatePreviewMemos gives an entry preview -- a shallow struct copy of the
+// live engine -- private storage for the layer caches its reads rebuild in
+// place, so a preview read can never write into the live engine's arrays.
+// Without it the preview's static-memo rebuild (refreshStaticContinuous, over
+// the post-entry board) overwrote the live memo's entries under the live
+// engine's unchanged key: a lord destroyed earlier in the same resolution
+// lost its entry, the live refresh then judged the lord's departure cold and
+// re-stamped the memo, and the live active list kept the lord's buff (CR
+// 611.3a; Stroke of Midnight on Empyrean Eagle, dirty-dirac K1l pairs 21961
+// 37823 66869 74406). The served lists are copied, so every cache hit the
+// preview inherits stays valid; the pure scratch buffers start empty; the
+// per-object memo tables start empty exactly as a clone's do (their clone
+// tags are reset).
+func isolatePreviewMemos(p *Engine) {
+	p.staticContinuous = slices.Clone(p.staticContinuous)
+	p.staticGates = slices.Clone(p.staticGates)
+	p.activeBuf = slices.Clone(p.activeBuf)
+	p.activeKWHeads = slices.Clone(p.activeKWHeads)
+	p.typesProbe = slices.Clone(p.typesProbe)
+	p.typesSrcs = slices.Clone(p.typesSrcs)
+	p.typesMayDiffer = slices.Clone(p.typesMayDiffer)
+	p.renames = slices.Clone(p.renames)
+	p.activeBufAlt, p.activeSrc = nil, nil
+	p.typesTouch, p.typesAct, p.derivedTouched, p.boardScanBuf = nil, nil, nil, nil
+	p.derivedMemo, p.derivedMemoStack = derivedMemoTable{}, derivedMemoTable{}
+	p.lossMemo, p.manaGate = abilityLossMemo{}, manaGateMemo{}
+}
+
+// isolatePreviewScratch gives an entry preview private storage for every
+// other slice it inherits from the live engine by its shallow struct copy,
+// so nothing the preview does -- an Effect ended through the in-place filter
+// of the continuous registry, a rewritten pending-trigger queue, a refilled
+// scratch buffer, an append into a ledger's spare capacity -- can write into
+// a live array (CR 611.3a: the live game's effects are its own). Live state
+// the preview may read is copied; pure scratch buffers and caches, which a
+// clone also starts empty (their clone tags are reset), start empty.
+// TestEntryPreviewSharesNoAppendableSlice holds the list complete. The
+// engine's maps are still shared by reference: no preview path writes one
+// (TestEntryPreviewNeverWritesALiveMap holds that), so a preview that starts
+// to needs a private copy here.
+func isolatePreviewScratch(p *Engine) {
+	// Live state: copied.
+	p.continuous = slices.Clone(p.continuous)
+	p.controlGrants = slices.Clone(p.controlGrants)
+	p.setupEntryDrops = slices.Clone(p.setupEntryDrops)
+	p.pendingTriggers = slices.Clone(p.pendingTriggers)
+	p.layer4Types = slices.Clone(p.layer4Types)
+	p.activationsThisTurn = slices.Clone(p.activationsThisTurn)
+	p.combatHitsThisTurn = slices.Clone(p.combatHitsThisTurn)
+	p.counterAddsThisTurn = slices.Clone(p.counterAddsThisTurn)
+	p.turnStartTurns = slices.Clone(p.turnStartTurns)
+	p.turnsTaken = slices.Clone(p.turnsTaken)
+	p.copyMintsPending = slices.Clone(p.copyMintsPending)
+	p.cmdZone = slices.Clone(p.cmdZone)
+	p.defeatedCasts = slices.Clone(p.defeatedCasts)
+	p.deferredAsks = slices.Clone(p.deferredAsks)
+	p.suspendedCasts = slices.Clone(p.suspendedCasts)
+	p.madnessChoices = slices.Clone(p.madnessChoices)
+	p.manaExpended = slices.Clone(p.manaExpended)
+	p.damageBatchLog = slices.Clone(p.damageBatchLog)
+	p.discardBatchLog = slices.Clone(p.discardBatchLog)
+	p.millBatchLog = slices.Clone(p.millBatchLog)
+	p.zoneBatchLog = slices.Clone(p.zoneBatchLog)
+	p.declaredAttackers = slices.Clone(p.declaredAttackers)
+	p.declaredDefenders = slices.Clone(p.declaredDefenders)
+	p.subOfferParent = slices.Clone(p.subOfferParent)
+	p.effectMatchRemembered = slices.Clone(p.effectMatchRemembered)
+	p.replDrawChain = slices.Clone(p.replDrawChain)
+	p.replExclude = slices.Clone(p.replExclude)
+	p.replRemembered = slices.Clone(p.replRemembered)
+	p.replReplacedCards = slices.Clone(p.replReplacedCards)
+	p.auraEntryCands = slices.Clone(p.auraEntryCands)
+	p.specEnvs = slices.Clone(p.specEnvs)
+	p.batchReplSources = slices.Clone(p.batchReplSources)
+	p.secretVoteBallots = slices.Clone(p.secretVoteBallots)
+	p.lifeLossBatch = slices.Clone(p.lifeLossBatch)
+	p.ManaSpentAddsCounters = slices.Clone(p.ManaSpentAddsCounters)
+	p.ManaSpentSources = slices.Clone(p.ManaSpentSources)
+	p.PaymentPlanCarriers = slices.Clone(p.PaymentPlanCarriers)
+	p.PaymentPlanRelaxed = slices.Clone(p.PaymentPlanRelaxed)
+	// The zone summaries' entries carry id lists rebuilt in place.
+	if p.replZones != nil {
+		p.replZones = copyReplZones(nil, p.replZones)
+	}
+	if p.trigZones != nil {
+		p.trigZones = copyTrigZones(nil, p.trigZones)
+	}
+	// Scratch buffers and caches: empty, as in a clone. walkObjCls is
+	// owner-checked (walk_objclass.go) and would reset on first use anyway.
+	p.prioMemo = nil
+	p.staticQueueBuf, p.activeStaticsCache, p.combatStatics = nil, nil, nil
+	p.foreachBuf, p.graveCandBuf, p.intentBuf, p.sbaIDBuf = nil, nil, nil, nil
+	p.legalOptBuf, p.manaAbBuf, p.mayPlaysCache, p.layer5Colors = nil, nil, nil, nil
+	p.targetCensusBuf, p.trigVerifyBuf, p.trigVerifyBuf2 = nil, nil, nil
+	p.staticZones, p.staticZoneVerified, p.triggerObjectMasks = nil, nil, nil
+	p.walkObjCls, p.walkClsOwner = nil, nil
+	p.ManaAbScratch = nil
 }
 
 // settleEntryGrants walks the entry's grants in order against the previewed
@@ -990,12 +1097,14 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 	}
 	intrinsic := e.entryCounterGrants(ev)
 	if len(intrinsic) == 0 && !e.entryBodyCandidates(ev) && !e.entryRiderCandidates(ev) {
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		return nil
 	}
 	preview, entrant := e.entryPreview(*ev)
 	if o := preview.G.Obj(entrant); o == nil || o.Zone != state.ZBattlefield {
 		e.releaseEntryPreview(preview)
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		return nil
 	}
@@ -1009,6 +1118,7 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 		// resume, and the placements follow the move (the pre-staging
 		// behaviour this task's pre-pass replaces for ordinary entries).
 		// No body is absorbed here: its own placement run owns the park.
+		stripEntryRequests(ev)
 		events.EmitPtr(e.G, e.L, ev)
 		for _, grant := range intrinsic {
 			e.emit(events.Event{Kind: events.CounterChange, Obj: entrant, Counter: grant.Kind, Amount: grant.Amount})
@@ -1024,6 +1134,7 @@ func (e *Engine) foldEntryMove(ev *events.Event, tally bool) []string {
 // CounterChange (EntryCounterNotice) through the ordinary emit path so
 // trig:CounterAdded and the per-turn ledger see the placement exactly once.
 func (e *Engine) foldEntryWithPlaced(ev *events.Event, placed []events.EntryCounterGrant) {
+	stripEntryRequests(ev)
 	for _, g := range placed {
 		ev.Pairs = append(ev.Pairs, events.EntryCounterPairs(g)...)
 	}
@@ -1043,5 +1154,15 @@ func (e *Engine) foldEntryWithPlaced(ev *events.Event, placed []events.EntryCoun
 			Counter: g.Kind, Amount: g.Amount, Text: events.EntryCounterNotice})
 		e.applyingReplacement, e.counterReplacementFold = savedApplying, savedFold
 		e.SetCounterAdder(savedAdder)
+	}
+}
+
+// stripEntryRequests drops the entry counters an effect REQUESTED on a move
+// (effects.entryWithCounters) from the event about to fold: entryCounterGrants
+// already read them into the entry's grant plan, and the plan's settled
+// amounts are what the fold installs, so the request must not fold too.
+func stripEntryRequests(ev *events.Event) {
+	if ev.Kind == events.MoveZone {
+		ev.Pairs, _ = events.SplitEntryCounterPairs(ev.Pairs)
 	}
 }

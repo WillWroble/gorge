@@ -51,6 +51,7 @@ func cloneSpareFields(c *Engine, sp *Spare) {
 	c.legalOptBuf = sp.legalOpts
 	c.manaAbBuf = sp.manaAb
 	c.lossMemo = sp.lossMemo
+	c.manaGate = sp.manaGate
 	c.castFree = sp.cast
 }
 
@@ -209,6 +210,7 @@ func cloneFieldsEngineRounds(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	c.enlistAskState = e.enlistAskState
 	c.stationing = e.stationing
 	c.combatRound = e.combatRound
+	c.combatRound.firstStrikers = append([]state.ObjID(nil), e.combatRound.firstStrikers...)
 	c.combatRound.queue = append([]state.ObjID(nil), e.combatRound.queue...)
 	if e.combatRound.done != nil {
 		c.combatRound.done = make([]divChoice, len(e.combatRound.done))
@@ -631,6 +633,7 @@ func cloneFieldsEngineTriggerBatches(c, e *Engine, sp *Spare, remap *cloneRemap)
 
 func cloneFieldsEngineContinuation(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	c.choosing = e.choosing
+	c.cleanupWindow = e.cleanupWindow
 	c.oppSel = e.oppSel
 	if e.oppPicksMid != nil {
 		c.oppPicksMid = make(map[string]state.PlayerID, len(e.oppPicksMid))
@@ -774,15 +777,15 @@ func cloneFieldsEngineContinuation(c, e *Engine, sp *Spare, remap *cloneRemap) {
 		p0.Pairs = append([][2]state.ObjID(nil), e.unleashMove.Pairs...)
 		c.unleashMove = &p0
 	}
+}
+
+func cloneFieldsEngineContinuation2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	if e.siegeMove != nil {
 		p0 := *e.siegeMove
 		p0.IDs = append([]state.ObjID(nil), e.siegeMove.IDs...)
 		p0.Pairs = append([][2]state.ObjID(nil), e.siegeMove.Pairs...)
 		c.siegeMove = &p0
 	}
-}
-
-func cloneFieldsEngineContinuation2(c, e *Engine, sp *Spare, remap *cloneRemap) {
 	if e.entryStageDone != nil {
 		p0 := *e.entryStageDone
 		p0.grants = append([]entryGrant(nil), e.entryStageDone.grants...)
@@ -929,6 +932,7 @@ func cloneFieldsEngineParked(c, e *Engine, sp *Spare, remap *cloneRemap) {
 		p0.moveGraves = append([]state.ObjID(nil), e.triggerCost.moveGraves...)
 		p0.evidence = append([]state.ObjID(nil), e.triggerCost.evidence...)
 		p0.counterPicks = append([]string(nil), e.triggerCost.counterPicks...)
+		p0.counterObjs = append([]state.ObjID(nil), e.triggerCost.counterObjs...)
 		c.triggerCost = &p0
 	}
 	if e.echo != nil {
@@ -1199,6 +1203,8 @@ type sparePools struct {
 	manaAb []*cards.SA
 	// lossMemo recycles Engine.lossMemo.
 	lossMemo abilityLossMemo
+	// manaGate recycles Engine.manaGate.
+	manaGate manaGateMemo
 	// pending recycles Engine.pendingTriggers.
 	pending []pendingTrigger
 	// trigZones recycles Engine.trigZones.
@@ -1223,6 +1229,7 @@ func releasePools(e *Engine, sp *Spare) {
 	sp.legalOpts, e.legalOptBuf = e.legalOptBuf[:0], nil
 	sp.manaAb, e.manaAbBuf = e.manaAbBuf[:0], nil
 	sp.lossMemo, e.lossMemo = e.lossMemo.recycled(), abilityLossMemo{}
+	sp.manaGate, e.manaGate = e.manaGate.recycled(), manaGateMemo{}
 	sp.pending, e.pendingTriggers = recycledSlice(e.pendingTriggers), nil
 	sp.trigZones, e.trigZones = releasedTrigZones(e.trigZones), nil
 	sp.replZones, e.replZones = releasedReplZones(e.replZones), nil

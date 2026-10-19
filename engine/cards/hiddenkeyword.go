@@ -34,8 +34,11 @@ import "strings"
 //   - "CARDNAME can't attack or block." is read as CantAttackOrBlock, whose
 //     two combat restrictions are both consumed by the rules readers.
 var canonicalKeywordHeads = map[string]string{
-	"cardname must be blocked if able.": "MustBlock",
-	"cardname can't attack or block.":   "CantAttackOrBlock",
+	"cardname must be blocked if able.":     "MustBlock",
+	"cardname can't attack or block.":       "CantAttackOrBlock",
+	"cardname can't attack or block alone.": "CantAttackOrBlockAlone",
+	"cardname can't attack alone.":          "CantAttackAlone",
+	"cardname can't block alone.":           "CantBlockAlone",
 }
 
 // HiddenUntapNextStepKeyword is the EXACT Forge sentence a Pump/PumpAll `KW$

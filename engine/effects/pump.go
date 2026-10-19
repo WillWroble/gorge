@@ -113,7 +113,10 @@ func effPump(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := h.Game().Obj(t.Obj)
-		if o == nil {
+		// sourceLeftSincePush: "this creature gets +N/+N" never reaches the
+		// new object a source that left (and perhaps returned) became (CR
+		// 400.7).
+		if o == nil || sourceLeftSincePush(h, c, o) {
 			continue
 		}
 		// PumpZone$ (Snapcaster Mage's "Flashback until end of turn" grant

@@ -921,6 +921,20 @@ func priors(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot dec
 // option is marked BotPick, as MarkBotPicks marks a choice answer's. With
 // no such candidate and a choice answer the two forms are the same prior.
 func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot decision.Intent, kind string, cands []cand, pv *view.View, payCasts bool) ([]float64, bool) {
+	return priorsWithLeaf(net, e, d, bot, kind, cands, pv, payCasts, nil)
+}
+
+// priorsWithLeaf is priorsWith that also reads the value head, when leaf is
+// non-nil, on the SAME encoded state the prior scores: the network's value
+// for d.Player at e (policynet.Model.Value, clamped as leafValue clamps it)
+// is written to *leaf. It is exactly the leaf leafValue computes for
+// d.Player at e -- the same projection (view.ProjectLeanInto of e for
+// d.Player at d, which is e's pending decision) encoded by the same encoder
+// gives the same State, and Value on equal States is equal -- so a walk
+// whose next leaf is this seat's value here skips a second projection,
+// encoding and state hash (engineEnv.advance). With no network *leaf is
+// untouched.
+func priorsWithLeaf(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot decision.Intent, kind string, cands []cand, pv *view.View, payCasts bool, leaf *float64) ([]float64, bool) {
 	if net == nil {
 		return uniform(len(cands)), false
 	}
@@ -974,6 +988,9 @@ func priorsWith(net *policynet.Model, e *rules.Engine, d *decision.Decision, bot
 		}
 	}
 	scores := net.Score(st, enc)
+	if leaf != nil {
+		*leaf = clampValue(float64(net.Value(st)))
+	}
 	subset := kind == "attackers" || kind == "blockers"
 	// A fuller kind's candidate is a set of options: its logit is the sum
 	// of their scores (0 for the empty set), the trainer's candidate logit.
@@ -1042,15 +1059,37 @@ func payCastOption(e *rules.Engine, d *decision.Decision, c cand) (decision.Opti
 // rankedPrior is a searched point's candidates and prior. With k == 0 (no
 // PriorTopK, or no network prior) they are cands and priors' prior. With
 // k > 0 the ranking prior (priorsWith's payCasts form) is formed over every
-// candidate and priorTopK cuts it: before is priorTopK's.
-func rankedPrior(net *policynet.Model, k int, e *rules.Engine, d *decision.Decision, bot decision.Intent, kind string, cands []cand, pv *view.View) (kept []cand, prior []float64, fell bool, before int) {
+// candidate and priorTopK cuts it: before is priorTopK's. rankMax > 0
+// (Options.PriorRankMaxOptions) skips the ranking at a decision with more
+// options than rankMax (rankSkips).
+func rankedPrior(net *policynet.Model, k, rankMax int, e *rules.Engine, d *decision.Decision, bot decision.Intent, kind string, cands []cand, pv *view.View) (kept []cand, prior []float64, fell bool, before int) {
+	return rankedPriorLeaf(net, k, rankMax, e, d, bot, kind, cands, pv, nil)
+}
+
+// rankedPriorLeaf is rankedPrior that also reads d.Player's leaf value at e
+// into *leaf when leaf is non-nil (priorsWithLeaf) and the ranking runs: a
+// point rankSkips reports never reads it.
+func rankedPriorLeaf(net *policynet.Model, k, rankMax int, e *rules.Engine, d *decision.Decision, bot decision.Intent, kind string, cands []cand, pv *view.View, leaf *float64) (kept []cand, prior []float64, fell bool, before int) {
 	if k <= 0 {
-		prior, fell = priors(net, e, d, bot, kind, cands, pv)
+		prior, fell = priorsWithLeaf(net, e, d, bot, kind, cands, pv, false, leaf)
 		return cands, prior, fell, 0
 	}
-	prior, fell = priorsWith(net, e, d, bot, kind, cands, pv, true)
+	if rankSkips(k, rankMax, d) {
+		// Too many options to encode at every simulation: keep the bot's
+		// answer and the enumeration's next k-1 under a uniform prior, as
+		// with no network, counted as a fallback.
+		kept, prior, before = priorTopK(cands, uniform(len(cands)), k)
+		return kept, prior, true, before
+	}
+	prior, fell = priorsWithLeaf(net, e, d, bot, kind, cands, pv, true, leaf)
 	kept, prior, before = priorTopK(cands, prior, k)
 	return kept, prior, fell, before
+}
+
+// rankSkips reports whether rankedPrior skips the network ranking at d:
+// under a top-k cut k > 0, a cap rankMax > 0 that d's option count exceeds.
+func rankSkips(k, rankMax int, d *decision.Decision) bool {
+	return k > 0 && rankMax > 0 && len(d.Options) > rankMax
 }
 
 // priorTopK is Options.PriorTopK's cut: cands[0] -- the bot's answer, the

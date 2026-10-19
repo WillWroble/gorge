@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/rules/pay"
@@ -88,6 +87,13 @@ func containsObjID(ids []state.ObjID, id state.ObjID) bool {
 	return false
 }
 
+// LifeChangeForbidden (pay.Eval) reports whether a CantChangeLife static
+// applies to p; rules' playerLifeChangeForbidden is the one answer, shared with
+// the replacement site, so an offer gate and the charged payment cannot disagree.
+func (pe *payEval) LifeChangeForbidden(p state.PlayerID) bool {
+	return (*Engine)(pe).playerLifeChangeForbidden(p)
+}
+
 // Conv (pay.Engine; formerly paymentConv) is the conversion set for p paying id (ability selects the
 // ValidSA$ Spell/Activated scoping), or nil when no ManaConvert static would
 // change any pip match. Returning nil -- not a zero conv -- keeps the pure
@@ -143,11 +149,11 @@ func stackXAnnounced(o *state.Object) bool {
 	if o.X != 0 {
 		return true
 	}
-	if o.Face() != nil && costAnnouncesX(ParseCost(o.Face().ManaCost)) {
+	if o.Face() != nil && costAnnouncesXRef(&pay.FaceCostOf(o.Face()).Cost) {
 		return true
 	}
 	if o.Ability != nil {
-		return costAnnouncesX(ParseCost(o.Ability.ParamStr(cards.PKCost)))
+		return costAnnouncesXRef(&pay.AbilityCostOf(o.Ability).Cost)
 	}
 	return false
 }

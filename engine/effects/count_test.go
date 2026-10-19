@@ -630,11 +630,12 @@ func TestThisTurnEnteredGraveyardCountsPermanentBase(t *testing.T) {
 	g := h.g
 	// Move the object out of the battlefield for real, mirroring events.Move:
 	// update the live zone lists, the object's Zone, and the per-add entry
-	// list the ThisTurnEntered heads fold.
+	// list the ThisTurnEntered heads fold (with the departure-time creature
+	// bit events.Apply stamps on a creature leaving the battlefield).
 	g.SetZone(state.ZBattlefield, 0, nil)
 	g.SetZone(state.ZGraveyard, 0, append(g.Zone(state.ZGraveyard, 0), bear.ID))
 	bear.Zone = state.ZGraveyard
-	g.Entered = append(g.Entered, state.ZoneEntry{Obj: bear.ID, To: state.ZGraveyard, From: state.ZBattlefield})
+	g.Entered = append(g.Entered, state.ZoneEntry{Obj: bear.ID, To: state.ZGraveyard, From: state.ZBattlefield, WasCreature: true})
 
 	c := &Ctx{Controller: 0}
 	for _, tc := range []struct {

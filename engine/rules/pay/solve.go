@@ -261,8 +261,27 @@ func takeUnit(rem, sn *state.Mana, typed *[7]state.Mana, i int) {
 // only as though it were colorless"). A nil conv is the plain exact-colour
 // match every pre-existing caller keeps, so games with no ManaConvert static
 // on the battlefield resolve byte-identically.
+//
+// A payer under a CantChangeLife static never reaches this function: every
+// offer and payment site asks Eval.LifeChangeForbidden first and takes
+// ResolveManaNoLifePay (below) instead.
 func ResolveMana(c cost.Cost, pool, snow state.Mana, typed [7]state.Mana, life int32, conv *Conv) (Payment, bool) {
 	return ResolveManaWith(c, pool, snow, typed, life, false, PipRider{}, conv)
+}
+
+// ResolveManaNoLifePay is ResolveManaWith for a payer under a CantChangeLife
+// static (CR 119.7/119.8): a cost with a positive fixed-life component is not
+// payable at all (CR 119.4's "may do so only if..." is a permission the
+// static withholds), and the Phyrexian and {B}-for-2-life alternatives are
+// closed, so a pip costing life is not payable that way either. A cost that
+// pays 0 life -- the overwhelming majority, and every pip paid in mana -- is
+// unaffected (CR 119.4b: "Players can always pay 0 life ... even if an effect
+// says players can't pay life").
+func ResolveManaNoLifePay(c cost.Cost, pool, snow state.Mana, typed [7]state.Mana, conv *Conv) (Payment, bool) {
+	if c.Life > 0 || len(c.LifeX) > 0 || c.LifeHalfUp {
+		return Payment{}, false
+	}
+	return ResolveManaWith(c, pool, snow, typed, 0, false, PipRider{}, conv)
 }
 
 // ResolveManaWith is ResolveMana with the two payer-side grants applied:

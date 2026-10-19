@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
 )
@@ -92,8 +93,9 @@ var entityTypes = [...]string{"Creature", "Land", "Artifact", "Enchantment", "Pl
 	"Instant", "Sorcery", "Battle", "Legendary", "Basic"}
 
 // entityTypeMasks is entityTypes as cardTypeBits masks (typeMasks).
-var entityTypeMasks = [len(entityTypes)]uint16{tbCreature, tbLand, tbArtifact, tbEnchantment, tbPlaneswalker,
-	tbInstant, tbSorcery, tbBattle, tbLegendary, tbBasic}
+var entityTypeMasks = [len(entityTypes)]cards.TypeMask{cards.TypeCreature, cards.TypeLand, cards.TypeArtifact,
+	cards.TypeEnchantment, cards.TypePlaneswalker, cards.TypeInstant, cards.TypeSorcery, cards.TypeBattle,
+	cards.TypeLegendary, cards.TypeBasic}
 
 // entityHashSuffix is the entity contract's part of EncoderHashFor.
 func entityHashSuffix() string {
@@ -290,14 +292,14 @@ func (sc *entityScratch) markNew(id state.ObjID) bool {
 // appends its identity rows to rows.
 func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat state.PlayerID, avail int32, blocking bool, hosts int, b *entityBoard) []Feature {
 	set := func(i int, v float32) { raw[i] = v }
-	fold, exact := typeMasks(cv.Types)
+	fold, exact := typeMasks(cv)
 	for i, m := range entityTypeMasks {
 		if exact&m != 0 {
 			set(entTypeOff+i, 1)
 		}
 	}
-	creature := fold&tbCreature != 0
-	if creature || fold&tbPlaneswalker != 0 || zone == entZoneHand {
+	creature := fold&cards.TypeCreature != 0
+	if creature || fold&cards.TypePlaneswalker != 0 || zone == entZoneHand {
 		set(entPower, float32(cv.Power)/4)
 		set(entToughness, float32(cv.Toughness-cv.Damage)/4)
 	}
@@ -305,17 +307,7 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 		set(entDamaged, 1)
 	}
 	for _, k := range cv.Keywords {
-		hit := false
-		for i, w := range keywordBits {
-			if strings.EqualFold(k, w) {
-				set(entKwOff+i, 1)
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			set(entKwOff+len(keywordBits), 1)
-		}
+		set(entKwOff+keywordBit(k), 1) // len(keywordBits) is "other"
 	}
 	if zone == entZoneBf {
 		if cv.Tapped {
@@ -325,7 +317,7 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 			set(entSick, 1)
 		}
 		if creature {
-			if !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, "Haste")) && !hasKeyword(cv, "Defender") {
+			if !cv.Tapped && (!cv.SummonSick || hasKeyword(cv, kwHaste)) && !hasKeyword(cv, kwDefender) {
 				set(entCanAttack, 1)
 			}
 			if !cv.Tapped {
@@ -377,12 +369,12 @@ func entityCard(raw []float32, rows []Feature, cv *view.CardView, zone int, seat
 	case entZoneStack:
 		set(entZoneStack, 1)
 	}
-	mv := int32(mvOf(cv.ManaCost))
+	mv := int32(cardManaValue(cv))
 	set(entManaValue, float32(mv)/5)
-	if fold&tbInstant != 0 || hasKeyword(cv, "Flash") {
+	if fold&cards.TypeInstant != 0 || hasKeyword(cv, kwFlash) {
 		set(entInstant, 1)
 	}
-	if zone == entZoneHand && fold&tbLand == 0 && mv <= avail {
+	if zone == entZoneHand && fold&cards.TypeLand == 0 && mv <= avail {
 		set(entCastable, 1)
 	}
 	if cv.FaceDown {

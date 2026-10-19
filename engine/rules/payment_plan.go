@@ -306,7 +306,7 @@ func (e *Engine) paymentPlanCastShapeDetailScoped(statics costStaticViews, p sta
 	mods := e.costModifiersWithTargetsUsing(statics, p, id, scope, nil, false)
 	spellCost := Cost{}
 	if sa := f.SpellAbility(); sa != nil {
-		spellCost = e.parseCost(sa.ParamStr(cards.PKCost))
+		spellCost = e.abilityCompiledCost(sa).Cost
 	}
 	// A cost static's own non-mana extra (Soul Immolation's Blight<X>) stays
 	// withheld entirely: the mana-only witness cannot describe it.
@@ -336,7 +336,7 @@ func (e *Engine) paymentPlanCastShapeDetailScoped(statics costStaticViews, p sta
 		spellCost.Waterbend != 0 || spellCost.WaterbendX {
 		return "shape:contribution"
 	}
-	if f.HasKeyword("Gift") {
+	if f.HasKeywordRef(kwRefGift) {
 		return "shape:gift"
 	}
 	// faceHasModeCost, memoised per face (face_scan_memo.go).

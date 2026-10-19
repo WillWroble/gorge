@@ -146,6 +146,17 @@ type engineCastWindows struct {
 	// spell" gate).
 	stackGrantCast state.ObjID `clone:"reset"`
 
+	// ledgerCast, while its obj is set, answers the cast-provenance reads
+	// (WasCast, WasCastByYou, WasCastFromHandByYou, latestCastOrigin) for
+	// that one object from a logged PutOnStack instead of the object's
+	// current state: the this-turn cast ledger counts each cast as it was
+	// made, while the object itself stops being "cast" at its next zone
+	// change (CR 400.7) -- an instant that resolved into the graveyard was
+	// still cast from hand this turn (Forge's ThisTurnCast list holds
+	// cast-time copies). Set around one ledger evaluation and cleared before
+	// it returns, so it is never set at rest.
+	ledgerCast ledgerCastView `clone:"reset"`
+
 	// manaExpended is the per-seat, per-turn tally of mana spent CASTING
 	// spells this turn (trig:ManaExpend's "as you spend your Nth total mana
 	// to cast spells during a turn"). It is engine scratch, NOT event state,
@@ -162,4 +173,20 @@ type engineCastWindows struct {
 	// "your turn": an instant cast on an opponent's turn accumulates too.
 	manaExpended     []int32 `clone:"deep"`
 	manaExpendedTurn int32   `clone:"deep"`
+}
+
+// ledgerCastView is one logged cast the ledger evaluates (Engine.ledgerCast).
+type ledgerCastView struct {
+	obj  state.ObjID
+	from state.Zone
+	by   state.PlayerID
+}
+
+// ledgerCastFor reports the ledger's cast-time view of obj while the ledger
+// evaluates one of obj's casts.
+func (e *Engine) ledgerCastFor(obj state.ObjID) (ledgerCastView, bool) {
+	if e.ledgerCast.obj == 0 || e.ledgerCast.obj != obj {
+		return ledgerCastView{}, false
+	}
+	return e.ledgerCast, true
 }

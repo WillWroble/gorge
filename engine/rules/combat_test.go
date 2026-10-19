@@ -73,6 +73,24 @@ func drainCombatPriority(t *testing.T, e *Engine) {
 	t.Fatal("combat priority window did not close within the pass budget")
 }
 
+// drainCombatDamageToStack passes priority in the combat damage step while
+// the stack is empty, and returns once something is on it (the damage's
+// trigger, which since CR 510.3's post-damage round resolves in this step),
+// a non-priority decision is pending, or the step has ended. A fixture that
+// wants to act with a combat-damage trigger waiting uses it in place of
+// drainCombatDamagePriority, which would pass that trigger through.
+func drainCombatDamageToStack(t *testing.T, e *Engine) {
+	t.Helper()
+	for i := 0; i < 64; i++ {
+		d := e.Pending()
+		if d == nil || d.Kind != decision.KPriority || e.G.Step != state.StepCombatDamage || len(e.G.Stack) > 0 {
+			return
+		}
+		submitPass(t, e)
+	}
+	t.Fatal("combat damage step never put anything on the stack within the pass budget")
+}
+
 // drainCombatDamagePriority answers "pass" for every priority decision the
 // engine offers while still inside the combat damage step. Task jj-cmb (F37)
 // introduced the between-passes priority round (CR 510.4): a first-strike

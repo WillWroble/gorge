@@ -130,7 +130,7 @@ func (e *Engine) paymentPlanSourceInterference(id state.ObjID, ma *cards.SA) (pa
 		c.NoUntap = true
 	}
 	controller := src.Controller
-	cost := e.parseCost(ma.ParamStr(cards.PKCost))
+	cost := e.abilityCompiledCost(ma).Cost
 	for _, produced := range pay.PaymentPlanProductions(asPayer(e), id, ma) {
 		if cost.Tap {
 			dmg, _, by, ok := e.paymentPlanTapObservers(id, controller, produced)

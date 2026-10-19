@@ -103,7 +103,7 @@ func main() {
 	cardsDir := flag.String("cards", ".cards", "corpus directory")
 	secs := flag.Float64("secs", 20, "minimum timed wall seconds for game-playing and search rows")
 	seed := flag.Uint64("seed", 1, "base seed; game g uses seed+g")
-	autopay := flag.Bool("autopay", false, "bot row: the auto-pay bot (EnableAutoPayMana) instead of manual taps")
+	autopay := flag.Bool("autopay", false, "bot row: the auto-pay bot (EnableAutoPayMana) instead of manual taps; random row: draw over the auto-pay candidates (plans, no mana taps), recorded as row random-autopay")
 	paidManaCensus := flag.Bool("paid-mana-census", true, "the paid-cost mana census (default on); =false sets rules.Config.DisablePaidManaCensus for every game")
 	sims := flag.Int("sims", 100, "az row: simulations per searched decision")
 	copies := flag.Int("copies", 2000, "clone/step rows: timed copies per root")
@@ -175,7 +175,7 @@ func main() {
 		switch *row {
 		case "random":
 			w.expectedEvents = randomExpectedEvents
-			return runRandom(&r, w, *pair, *seed, *secs)
+			return runRandom(&r, w, *pair, *seed, *secs, *autopay)
 		case "bot":
 			return runBot(&r, w, *pair, *seed, *secs, *autopay)
 		case "clone":

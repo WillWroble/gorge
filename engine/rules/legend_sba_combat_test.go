@@ -84,8 +84,8 @@ func TestLegendRuleSurvivesFirstStrikeCombatTail(t *testing.T) {
 }
 
 // TestLegendRuleSurvivesRegularCombatTail is the regular-pass twin: the
-// tail's end-of-combat transition must defer to the legend ask, and the
-// transition must complete once the answer lands.
+// tail's post-damage priority round (CR 510.3) must defer to the legend ask,
+// open once the answer lands, and end combat when every player passes.
 func TestLegendRuleSurvivesRegularCombatTail(t *testing.T) {
 	t.Parallel()
 	e, id1, id2 := combatLegendBoard(t)
@@ -112,10 +112,18 @@ func TestLegendRuleSurvivesRegularCombatTail(t *testing.T) {
 	if o := e.G.Obj(id2); o.Zone != state.ZBattlefield {
 		t.Fatalf("kept duplicate in %v, want battlefield", o.Zone)
 	}
-	// The deferred end-of-combat transition must have completed: the step
-	// moved on and combatRound was cleared.
+	// The deferred post-damage priority round (CR 510.3) must have opened
+	// in the combat damage step, with the active player holding priority;
+	// passing it through ends combat and clears combatRound.
+	if p := e.Pending(); p == nil || p.Kind != decision.KPriority || p.Player != e.G.Active || e.G.Step != state.StepCombatDamage {
+		t.Fatalf("the deferred post-damage priority round did not open: step %v, pending %+v", e.G.Step, p)
+	}
+	drainCombatDamagePriority(t, e)
 	if e.G.Step != state.StepEndCombat {
 		t.Fatalf("deferred end-of-combat transition did not complete: step %v", e.G.Step)
+	}
+	if e.combatRound.regularRound || e.combatRound.regularDone {
+		t.Fatalf("combatRound not cleared on leaving the combat damage step: %+v", e.combatRound)
 	}
 }
 

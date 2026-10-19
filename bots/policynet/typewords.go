@@ -3,6 +3,9 @@ package policynet
 import (
 	"strings"
 	"unicode/utf8"
+
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/view"
 )
 
 // Type-line reads without strings.Fields' per-call allocation. A type line
@@ -35,48 +38,38 @@ func isASCII(s string) bool {
 	return true
 }
 
-// cardTypeBits-indexed masks (bit i = cardTypeBits[i]).
-const (
-	tbLand uint16 = 1 << iota
-	tbCreature
-	tbArtifact
-	tbEnchantment
-	tbInstant
-	tbSorcery
-	tbPlaneswalker
-	tbBattle
-	tbLegendary
-	tbBasic
-)
+// cardTypeMasks are cardTypeBits as cards.TypeMask bits:
+// cardTypeMasks[i] is cardTypeBits[i]'s bit.
+var cardTypeMasks = [len(cardTypeBits)]cards.TypeMask{
+	cards.TypeLand, cards.TypeCreature, cards.TypeArtifact, cards.TypeEnchantment, cards.TypeInstant,
+	cards.TypeSorcery, cards.TypePlaneswalker, cards.TypeBattle, cards.TypeLegendary, cards.TypeBasic,
+}
 
-// typeMasks folds a type line into two cardTypeBits masks: fold has bit i
-// when some word equals cardTypeBits[i] case-insensitively (hasTypeWord's
-// test), exact when some word equals it exactly.
-func typeMasks(types string) (fold, exact uint16) {
-	add := func(w string) {
-		for i, t := range cardTypeBits {
-			if w == t {
-				exact |= 1 << i
-				fold |= 1 << i
-			} else if strings.EqualFold(w, t) {
-				fold |= 1 << i
-			}
-		}
+// typeMasks folds a card's type line into two cards.TypeMasks: fold has a
+// type's bit when some word equals its name case-insensitively, exact when
+// some word equals it exactly (cards.TypeLineMasks). A projected card
+// answers from its compiled facts; a decoded or hand-built one parses Types.
+func typeMasks(cv *view.CardView) (fold, exact cards.TypeMask) {
+	if cv.Facts.OK {
+		return cv.Facts.TypeFold, cv.Facts.TypeExact
 	}
-	if !isASCII(types) {
-		for _, w := range strings.Fields(types) {
-			add(w)
-		}
-		return
+	return cards.TypeLineMasks(cv.Types)
+}
+
+// hasType reports whether some word of cv's type line is t's name
+// (case-insensitive).
+func hasType(cv *view.CardView, t cards.TypeMask) bool {
+	fold, _ := typeMasks(cv)
+	return fold&t != 0
+}
+
+// cardManaValue is manaCostBits(cv.ManaCost)'s mana value, from the
+// compiled facts when the projection set them.
+func cardManaValue(cv *view.CardView) int {
+	if cv.Facts.OK {
+		return cv.Facts.ManaValue
 	}
-	for i := 0; ; {
-		w, next := nextField(types, i)
-		if w == "" {
-			return
-		}
-		add(w)
-		i = next
-	}
+	return mvOf(cv.ManaCost)
 }
 
 // eachField calls f with each of strings.Fields(s)'s words, in order.

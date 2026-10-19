@@ -15,6 +15,7 @@ import (
 func foldPlayerLost(g *state.Game, e *Event) {
 	if validPlayer(g, e.Player) {
 		g.Players[e.Player].Lost = true
+		g.Players[e.Player].DrewFromEmpty = false
 		// CR 723.4/723.5: a player-controlling effect ends when either
 		// participant leaves the game, so a lost seat's control folds are
 		// cleared here, in the one fold that observes the loss. Clear both
@@ -39,6 +40,15 @@ func foldPlayerLost(g *state.Game, e *Event) {
 			delete(g.ControlledBy, subj)
 			delete(g.ControlArmedTurn, subj)
 		}
+	}
+}
+
+// foldDrawEmpty folds Kind DrawEmpty: Amount 0 marks Player's attempted
+// draw from an empty library (CR 121.4), Amount 1 is the state-based check
+// consuming a mark whose loss a replacement stopped (CR 704.5b).
+func foldDrawEmpty(g *state.Game, e *Event) {
+	if validPlayer(g, e.Player) {
+		g.Players[e.Player].DrewFromEmpty = e.Amount == 0
 	}
 }
 
@@ -225,6 +235,7 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 			case 2:
 				for _, id := range e.IDs {
 					o.SubTargets = append(o.SubTargets, state.Target{Obj: id})
+					stampTarget(g, o, id)
 				}
 			case 3:
 				if validPlayer(g, e.Player) {
@@ -241,6 +252,7 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 		case 2:
 			for _, id := range e.IDs {
 				o.Targets = append(o.Targets, state.Target{Obj: id})
+				stampTarget(g, o, id)
 			}
 		case 3:
 			if validPlayer(g, e.Player) {
@@ -250,9 +262,20 @@ func foldTargetsChosen(g *state.Game, e *Event) {
 			var targets []state.Target
 			for _, id := range e.IDs {
 				targets = append(targets, state.Target{Obj: id})
+				stampTarget(g, o, id)
 			}
 			o.Targets = targets
 		}
+	}
+}
+
+// stampTarget records which incarnation of id the stack object o targets
+// (state.Object.TargetStamps, CR 400.7). A later stamp for the same id
+// supersedes an earlier one (a replaced target list re-stamps it), so the
+// reader takes the last; a missing object records nothing.
+func stampTarget(g *state.Game, o *state.Object, id state.ObjID) {
+	if t := g.Obj(id); t != nil {
+		o.TargetStamps = append(o.TargetStamps, state.TargetStamp{Obj: id, Incarnation: t.Incarnation})
 	}
 }
 

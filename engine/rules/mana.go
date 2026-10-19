@@ -507,7 +507,7 @@ func (e *Engine) AbilityCosts(p state.PlayerID, id state.ObjID) []string {
 // card, and legalActionsPriced stamps it on the ability's "ability" option,
 // so the two can never disagree about what an activation will charge.
 func (e *Engine) abilityOfferCost(p state.PlayerID, id state.ObjID, ab *cards.SA) string {
-	cost := e.parseCost(ab.ParamStr(cards.PKCost))
+	cost := e.abilityCompiledCost(ab).Cost
 	// The ability's own ReduceCost$ (Otawara's Channel): the same
 	// composition the offer gate and beginActivation's charge apply, so
 	// the decision's displayed cost is the cost the payment will charge.
@@ -542,7 +542,7 @@ func (e *Engine) manaActivationCostMarker(abilities []*cards.SA) string {
 		if mf := e.manaFactsOf(ma); mf != nil {
 			cc = mf.cost
 		} else {
-			cc = e.compiledCostOf(ma.ParamStr(cards.PKCost))
+			cc = e.abilityCompiledCost(ma)
 		}
 		if cc.BeyondTap {
 			return cc.Formatted()

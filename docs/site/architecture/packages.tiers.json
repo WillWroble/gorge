@@ -56,6 +56,11 @@
       "tier": "bots",
       "status": "EXT"
     },
+    "bots/netsimd": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "SIMD forward pass for the dzg mlp network (the FDN microkernel plan's Phase 4 microbenchmark)."
+    },
     "bots/gonet/gonettest": {
       "tier": "bots",
       "status": "TOOL"
@@ -145,6 +150,11 @@
     "cmd/headdiff": {
       "tier": "cmd",
       "status": "TOOL"
+    },
+    "cmd/kcensus": {
+      "tier": "cmd",
+      "status": "TOOL",
+      "purpose": "FDN microkernel Phase 0 mechanic census of a deck pool against the compiled IR."
     },
     "cmd/keywordbench": {
       "tier": "cmd",

@@ -197,6 +197,14 @@ func countEnteredAs(g *state.Game, c *Ctx, you state.PlayerID, dest state.Zone, 
 			return 0, true
 		}
 	}
+	// CR 603.10a: a battlefield departure's creature status is its last
+	// known information, not the card's characteristics where it now lies
+	// (Forge stores the moved card's latest state with each entry). Split
+	// the spec's `Creature`-based alternatives off as `Card` alternatives
+	// gated on the entry's departure-time WasCreature bit; every other
+	// alternative, and every entry that did not leave the battlefield, is
+	// matched exactly as before.
+	creatureAlts, otherAlts, splitCreature := splitCreatureBaseAlternatives(valid)
 	var n int32
 	for _, e := range g.Entered {
 		if e.To != dest {
@@ -205,14 +213,20 @@ func countEnteredAs(g *state.Game, c *Ctx, you state.PlayerID, dest state.Zone, 
 		if origin != nil && e.From != *origin {
 			continue
 		}
-		// Evaluate the spec in the entry's DESTINATION zone: an object that
-		// entered a non-battlefield zone has already left the battlefield,
-		// so the ordinary matcher's `Permanent` base (o.Zone ==
-		// ZBattlefield) would reject every such entry. matchesZoneSpecCtx
-		// reads a non-battlefield `Permanent` base as a permanent CARD
-		// (Forge's Card.isPermanent()), which is what Gravestorm's
-		// Count$ThisTurnEntered_Graveyard_from_Battlefield_Permanent needs.
-		if !matchesZoneSpecCtx(g, valid, e.Obj, c.SpecContext(you), e.To) {
+		if splitCreature && e.From == state.ZBattlefield {
+			matched := (e.WasCreature && matchesEnteredEntry(g, creatureAlts, e, c.SpecContext(you))) ||
+				(otherAlts != "" && matchesEnteredEntry(g, otherAlts, e, c.SpecContext(you)))
+			if !matched {
+				continue
+			}
+		} else if !matchesEnteredEntry(g, valid, e, c.SpecContext(you)) {
+			// Evaluate the spec in the entry's DESTINATION zone: an object that
+			// entered a non-battlefield zone has already left the battlefield,
+			// so the ordinary matcher's `Permanent` base (o.Zone ==
+			// ZBattlefield) would reject every such entry. matchesZoneSpecCtx
+			// reads a non-battlefield `Permanent` base as a permanent CARD
+			// (Forge's Card.isPermanent()), which is what Gravestorm's
+			// Count$ThisTurnEntered_Graveyard_from_Battlefield_Permanent needs.
 			continue
 		}
 		if controlledByCardController {
@@ -933,3 +947,33 @@ var playerMemberPropertyCodes = state.NewStrCodes(
 	state.StrEntry[playerMemberPropertyCode]{Key: "CardsDiscardedThisTurn", Val: playerMemberPropertyCardsDiscardedThisTurn},
 	state.StrEntry[playerMemberPropertyCode]{Key: "SpellsCastThisTurn", Val: playerMemberPropertySpellsCastThisTurn},
 )
+
+// splitCreatureBaseAlternatives splits a Count$ThisTurnEntered spec into its
+// `Creature`-based alternatives, rewritten onto the `Card` base (the creature
+// test is answered by the entry's departure LKI instead), and the remaining
+// alternatives verbatim. ok is false when no alternative has the `Creature`
+// base, and the caller then matches the spec unchanged.
+func splitCreatureBaseAlternatives(spec string) (creature, other string, ok bool) {
+	var cr, ot []string
+	for alt := range filterAlternatives(spec) {
+		alt = strings.TrimSpace(alt)
+		if alt == "" {
+			continue
+		}
+		base, rest, dotted := strings.Cut(alt, ".")
+		if base != "Creature" {
+			ot = append(ot, alt)
+			continue
+		}
+		ok = true
+		if dotted {
+			cr = append(cr, "Card."+rest)
+		} else {
+			cr = append(cr, "Card")
+		}
+	}
+	if !ok {
+		return "", "", false
+	}
+	return strings.Join(cr, ","), strings.Join(ot, ","), true
+}

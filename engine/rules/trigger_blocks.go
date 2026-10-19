@@ -264,8 +264,17 @@ func (e *Engine) queueGrantedFlanking(id state.ObjID, o *state.Object, ev events
 // Each per-instance ctx carries the triggering objects as Remembered and as
 // TriggerCard, so Count$Valid Creature.blockingTriggeredAttacker counts that
 // Hero's blockers and Defined$ TriggeredBlockerLKICopy names the blocker.
+//
+// A BlockedByEffect event (api:BecomesBlocked, CR 509.1h) is read as the
+// one pair (attacker, no blocker): it fires Mode$ AttackerBlocked (CR 509.3c
+// -- "becomes blocked" triggers when an effect blocks the creature) but never
+// the by-a-creature pair mode or flanking (CR 509.3d), and a ValidBlocker$
+// spec matches no absent blocker.
 func (e *Engine) checkAttackerBlockedTriggers(ev events.Event) {
-	if ev.Kind != events.DeclareBlockers {
+	byEffect := ev.Kind == events.BlockedByEffect
+	if byEffect {
+		ev = events.Event{Kind: events.DeclareBlockers, Player: ev.Player, Pairs: [][2]state.ObjID{{ev.Obj, 0}}}
+	} else if ev.Kind != events.DeclareBlockers {
 		return
 	}
 	e.forEachObject(func(id state.ObjID) {
@@ -284,7 +293,7 @@ func (e *Engine) checkAttackerBlockedTriggers(ev events.Event) {
 		// creature has no printed trigger line to make that gate true, and it
 		// defers to the in-loop marker branch when a printed K:Flanking
 		// exists (that branch owns the printed instance count).
-		if o.Zone == state.ZBattlefield && o.IsAttacking {
+		if o.Zone == state.ZBattlefield && o.IsAttacking && !byEffect {
 			e.queueGrantedFlanking(id, o, ev)
 		}
 		if isRoom(o) && !o.DoorUnlocked(int(o.FaceIdx)) {
@@ -294,13 +303,13 @@ func (e *Engine) checkAttackerBlockedTriggers(ev events.Event) {
 			return
 		}
 		for ti, t := range f.Triggers {
-			if t.Mode != "AttackerBlocked" && t.Mode != "AttackerBlockedByCreature" {
+			if t.Mode != "AttackerBlocked" && (byEffect || t.Mode != "AttackerBlockedByCreature") {
 				continue
 			}
 			e.queueAttackerBlockedTrigger(t, id, o.Controller, ti, false, 0, ev)
 		}
 	})
-	e.checkGrantedAttackerBlockedTriggers(ev)
+	e.checkGrantedAttackerBlockedTriggers(ev, byEffect)
 }
 
 // queueAttackerBlockedTrigger queues the instances one become-blocked trigger
@@ -480,13 +489,13 @@ func (e *Engine) attackerBlockedCtx(t cards.Trigger, aid, bid state.ObjID, ev ev
 // rebuild the Execute$ body during replay (checkGrantedAttackerUnblockedTriggers'
 // precedent). Stormsurge Kraken, Retaliation and Mirror Shield are the
 // corpus carriers.
-func (e *Engine) checkGrantedAttackerBlockedTriggers(ev events.Event) {
+func (e *Engine) checkGrantedAttackerBlockedTriggers(ev events.Event, byEffect bool) {
 	for ceI, ceL := 0, e.active(); ceI < len(ceL); ceI++ {
 		ce := &ceL[ceI]
 		if ce.AddTrigger == nil {
 			continue
 		}
-		if ce.AddTrigger.Mode != "AttackerBlocked" && ce.AddTrigger.Mode != "AttackerBlockedByCreature" {
+		if ce.AddTrigger.Mode != "AttackerBlocked" && (byEffect || ce.AddTrigger.Mode != "AttackerBlockedByCreature") {
 			continue
 		}
 		grantorID := ce.Source

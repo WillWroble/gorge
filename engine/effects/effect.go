@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -406,7 +407,13 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				expiry += "|IH"
 			}
 		}
-		if dur == "permanent" && !permanentComeback &&
+		// An emblem (CR 114.4: its abilities function in the command zone,
+		// and nothing ties it to the object that created it) is never
+		// source-bounded, even when the planeswalker that made it was on
+		// the battlefield: Kaito, Cunning Infiltrator's [-9] emblem keeps
+		// making Ninjas after Kaito dies to its own loyalty cost. Every
+		// corpus emblem spells its Effect `Name$ Emblem — <name>`.
+		if dur == "permanent" && !permanentComeback && !isEmblemEffectName(effectName) &&
 			h.Game().Obj(c.Source) != nil && h.Game().Obj(c.Source).Zone == state.ZBattlefield {
 			expiry += "|SB"
 		}
@@ -503,10 +510,21 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				cards.DelayedPreventedCounterBody(effectFaceSVars(h, c.Source), exec)) {
 				text += "|RN=" + strconv.Itoa(int(c.Num.RememberedCMC))
 			}
+			// The Effect's remembered PLAYERS join the capture (Rowan
+			// Kenrith's RememberObjects$ Targeted names a player): the phase
+			// scan's ValidPlayer$ Player.IsRemembered gate and the body's
+			// Defined$ Player.IsRemembered read this set, the Effect's own
+			// memory (CR 611.2a), not the source card's.
+			phaseIDs := regIDs
+			for _, p := range effectRememberedPlayers(h, c, sa) {
+				if !slices.ContainsFunc(phaseIDs, func(t state.Target) bool { return t.IsPlayer && t.Player == p }) {
+					phaseIDs = append(slices.Clip(phaseIDs), state.Target{IsPlayer: true, Player: p})
+				}
+			}
 			for _, owner := range owners {
 				h.Emit(events.Event{Kind: events.DelayedRegister, Obj: c.Source,
 					Player: owner, Step: step, Counter: exec,
-					IDs: encodeRemembered(regIDs), Text: text})
+					IDs: encodeRemembered(phaseIDs), Text: text})
 			}
 			registered = true
 		default:
@@ -716,6 +734,30 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				grant.Chosen, grant.ChosenBound = effectChosenSnapshot(h, c, grant.Affects)
 				effectContinuous(h, grant)
 				registered = true
+			} else if _, ok := untapDenialGrantFromLine(params); ok {
+				// CR 611.2b: the permanents Affected$ names, under the
+				// remembered player's control at their next untap step, stay
+				// tapped. A restriction rules' untap-step scan reads (the
+				// per-permanent CantUntapNextStep flag cannot express a
+				// player-scoped set that includes permanents entering later);
+				// the Effect's own Phase$ Untap self-exile ends it after that
+				// step's untap. Permanent: the Effect outlives its sorcery or
+				// ability source until that exile.
+				effectContinuous(h, state.ContinuousEffect{
+					Source: c.Source, Controller: c.Controller,
+					Restriction:       "UntapDenial",
+					RestrictParams:    params,
+					Name:              effectName,
+					Permanent:         true,
+					Duration:          dur,
+					Remembered:        remembered,
+					RememberedPlayers: effectRememberedPlayers(h, c, sa),
+					ForgetOnMoved:     forgetOn,
+					ExileOnMoved:      exileOn,
+					ForgetCounter:     forgetCounter,
+					ImprintOnHost:     imprintOnHost,
+				})
+				registered = true
 			} else if kws, affected, zone, ok := cascadeKeywordGrantFromLine(params); ok {
 				// AddKeyword$ Cascade (task cascade1): the Effect-delivered
 				// cascade grant (TARDIS's GrantCascade, Dark Apostle's, Bigger
@@ -872,7 +914,7 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 					Text: "continuous effect " + mode + " unimplemented (" + what + ")"})
 				registered = true
 			}
-		case cards.StaticCantTarget, cards.StaticCantRegenerate, cards.StaticCantPreventDamage, cards.StaticCantAttack, cards.StaticCantSacrifice, cards.StaticCantExile, cards.StaticCantPutCounter, cards.StaticCantBlockBy, cards.StaticCanAttackDefender, cards.StaticUnspentMana, cards.StaticCantBlockUnless, cards.StaticCantAttackUnless, cards.StaticMustBlock, cards.StaticNumLoyaltyAct, cards.StaticCantGainLife, cards.StaticCantPlayLand, cards.StaticCastWithFlash:
+		case cards.StaticCantTarget, cards.StaticCantRegenerate, cards.StaticCantPreventDamage, cards.StaticCantAttack, cards.StaticCantSacrifice, cards.StaticCantExile, cards.StaticCantPutCounter, cards.StaticCantBlockBy, cards.StaticCanAttackDefender, cards.StaticUnspentMana, cards.StaticCantBlockUnless, cards.StaticCantAttackUnless, cards.StaticMustBlock, cards.StaticNumLoyaltyAct, cards.StaticCantGainLife, cards.StaticCantPlayLand, cards.StaticCastWithFlash, cards.StaticCantChangeLife:
 			// A COMPOUND IsRemembered spec (Card.IsRemembered+Creature) resolves
 			// faithfully through the general filter now that it implements
 			// IsRemembered (engine/rules/layers.go restrictionApplies consults the
@@ -976,7 +1018,7 @@ func effEffect(h Host, c *Ctx, sa *cards.SA) {
 				registered = true
 				break
 			}
-			if (cards.StaticModeOf(mode) == cards.StaticCantPlayLand && !CantPlayLandParamsReadable(params)) || (mode == "CantGainLife" && !CantGainLifeParamsReadable(params)) {
+			if (cards.StaticModeOf(mode) == cards.StaticCantPlayLand && !CantPlayLandParamsReadable(params)) || (mode == "CantGainLife" && !CantGainLifeParamsReadable(params)) || (mode == "CantChangeLife" && !CantChangeLifeParamsReadable(params)) {
 				// An Effect-delivered CantGainLife body (the CR 614.1 lock:
 				// Screaming Nemesis, Stigma Lasher, Welcome the Darkness,
 				// Skullcrack, Atarka's Command, Call In a Professional, Roiling

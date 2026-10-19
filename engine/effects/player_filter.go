@@ -42,9 +42,31 @@ type PlayerSpecCtx struct {
 	DefendingPlayer   state.Target
 	DelayedRemembered []state.Target
 	OpponentOf        []state.Target
+	// Remembered, when RememberedBound, is the set a Player.IsRemembered
+	// clause (and a nested controlsCard.IsRemembered object filter) reads
+	// instead of the source object's own list. A delayed Phase registration
+	// an Effect made binds its capture here: the Effect's memory is what its
+	// trigger's "remembered" names (CR 611.2a; Rowan Kenrith's taunt ends at
+	// the remembered player's cleanup although Rowan's own list was cleared).
+	Remembered      []state.Target
+	RememberedBound bool
 	// Layers is the board's derived-characteristic tables (LayerTables), the
 	// same value SpecContext.Layers carries.
 	Layers LayerTables
+}
+
+// rememberedSetFor is the set a source-anchored IsRemembered read consults:
+// the bound capture when the caller supplied one, else the source object's
+// own list (ok false when neither exists).
+func rememberedSetFor(g *state.Game, pc *PlayerSpecCtx) ([]state.Target, bool) {
+	if pc.RememberedBound {
+		return pc.Remembered, true
+	}
+	o := g.Obj(pc.Source)
+	if o == nil {
+		return nil, false
+	}
+	return o.Remembered, true
 }
 
 // MatchesPlayerSpecCtx is the full player-side filter: the same grammar as
@@ -130,13 +152,19 @@ func matchesPlayerClauseCtx(g *state.Game, c *playerClause, p, you state.PlayerI
 	case matchesPlayerClauseCtxIsCorrupted:
 		return playerIsCorrupted(g, p)
 	case matchesPlayerClauseCtxRememberedOrChosen:
-		o := g.Obj(pc.Source)
-		if o == nil {
-			return false
-		}
-		set := o.Chosen
+		var set []state.Target
 		if clause == "IsRemembered" {
-			set = o.Remembered
+			rem, ok := rememberedSetFor(g, &pc)
+			if !ok {
+				return false
+			}
+			set = rem
+		} else {
+			o := g.Obj(pc.Source)
+			if o == nil {
+				return false
+			}
+			set = o.Chosen
 		}
 		for _, t := range set {
 			if t.IsPlayer && t.Player == p {
@@ -234,13 +262,19 @@ func matchesPlayerSingleSpec(g *state.Game, alts []playerAlt, p, you state.Playe
 			if !playerBaseMatches(a.baseCode, p, you) {
 				continue
 			}
-			o := g.Obj(pc.Source)
-			if o == nil {
-				continue
-			}
-			set := o.Chosen
+			var set []state.Target
 			if qualifier == "IsRemembered" {
-				set = o.Remembered
+				rem, ok := rememberedSetFor(g, &pc)
+				if !ok {
+					continue
+				}
+				set = rem
+			} else {
+				o := g.Obj(pc.Source)
+				if o == nil {
+					continue
+				}
+				set = o.Chosen
 			}
 			for _, t := range set {
 				if t.IsPlayer && t.Player == p {
@@ -615,6 +649,9 @@ func playerControlsMatches(g *state.Game, p state.PlayerID, you state.PlayerID, 
 	spec = objBase + "." + spec
 	sc := NewSpecContext(you, pc.Source)
 	sc.DelayedRemembered = pc.DelayedRemembered
+	if pc.RememberedBound {
+		sc.Remembered = pc.Remembered
+	}
 	// The nested object filter must see the same layer-3/layer-4
 	// derived characteristics every ordinary filter site does; a
 	// controlsCreature/controlsPermanent spec otherwise reads the

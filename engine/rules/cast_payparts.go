@@ -13,7 +13,7 @@ import (
 func (e *Engine) drawCostCard(p state.PlayerID) {
 	lib := e.G.Zone(state.ZLibrary, p)
 	if len(lib) == 0 {
-		e.playerLoses(p, loseReasonMilled, "drew from an empty library")
+		e.markDrawEmpty(p)
 		return
 	}
 	e.emit(events.Event{Kind: events.Draw, Player: p, Obj: lib[0],

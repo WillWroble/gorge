@@ -150,10 +150,14 @@ func (e *Engine) attachmentSBAs() bool {
 				changed = true
 				continue
 			}
-			if e.isEquipment(o) && (bearer.ReconfiguredAttached() || !bearer.EffectiveIsCreature()) {
+			if e.isEquipment(o) && (bearer.ReconfiguredAttached() || bearer.ImpendingDormant() || !e.IsCreature(bearer.ID)) {
 				// CR 702.150c: an attached Reconfigure card is not a creature,
 				// so another Equipment riding it detaches like from any other
-				// non-creature bearer (CR 301.5c / 704.5n).
+				// non-creature bearer (CR 301.5c / 704.5n). The creature read
+				// is the DERIVED type list, as the Fortification arm below
+				// reads Land: an animated land (Soulstone Sanctuary after its
+				// {4}) is a creature and keeps its Equipment, a creature a
+				// layer-4 effect turned into a noncreature drops it.
 				e.emit(events.Event{Kind: events.Unattached, Obj: id,
 					IDs:  []state.ObjID{o.AttachedTo},
 					Text: "Equipment bearer is no longer a creature"})

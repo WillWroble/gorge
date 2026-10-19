@@ -37,11 +37,13 @@ import (
 // earlier layer keeps applying even though the ability generating it is
 // removed in layer 6. The static scan records each static ability's first
 // layer on the effects it emits (state.ContinuousEffect.SourceAbilityLayer):
-// one beginning in layers 1-5 is never dropped; one beginning in layer 6 is
-// dropped only by a removal with an EARLIER timestamp (the removal applied
-// first, so the effect never began -- which is also what orders two removers
-// against each other); one beginning in layer 7, or a rules modification
-// that is no layer effect at all, is dropped by any removal.
+// one beginning in layers 1-5 is never dropped; a REMOVER beginning in layer
+// 6 is dropped only by a removal with an EARLIER timestamp (two removers that
+// can remove each other's abilities are a dependency loop, CR 613.8b, so
+// timestamp order decides); any other effect beginning in layer 6 depends on
+// the removal of its source's abilities (CR 613.8a) and is dropped by any
+// removal, as is one beginning in layer 7 or a rules modification that is no
+// layer effect at all.
 
 // ruleModAbilityLayer is the SourceAbilityLayer of a static-generated rules
 // modification that is not a layer effect (Layer zero: MayPlay,
@@ -175,7 +177,18 @@ func (e *Engine) pruneLostSourceAbilities(list []ContinuousEffect) []ContinuousE
 		losses = append(losses, sourceLoss{id: source, lost: ok, first: ts})
 		return ts, ok
 	}
-	kept := list[:0]
+	// Every verdict is decided before the list is compacted: lossOf reads
+	// list (the removers by their original index, and layer 4 through
+	// typeCharacteristicsActive), so compacting while deciding would hand a
+	// later source's check a shifted entry -- a Witness Protection that
+	// silenced one Gnarlid Colony then "removed" a second Colony's abilities
+	// through whatever grant had slid into the remover's slot.
+	var dropBuf [64]bool
+	drops := dropBuf[:0]
+	if len(list) > len(dropBuf) {
+		drops = make([]bool, 0, len(list))
+	}
+	drops = drops[:len(list)]
 	next := 0
 	for i := range list {
 		ce := &list[i]
@@ -187,16 +200,24 @@ func (e *Engine) pruneLostSourceAbilities(list []ContinuousEffect) []ContinuousE
 		case ce.SourceAbilityLayer < LAbilities:
 			// A registered effect (zero), or a static ability that began
 			// applying before layer 6.
-		case ce.SourceAbilityLayer == LAbilities:
-			ts, ok := lossOf(ce.Source)
-			drop = ok && ts < ce.Timestamp
 		default:
+			// A layer-6 effect that is not itself a remover (a keyword grant:
+			// Gnarlid Colony's "creatures you control with a +1/+1 counter
+			// have trample") depends on a removal of its source's abilities
+			// (CR 613.8a: the removal changes its existence), so the removal
+			// applies first whatever the timestamps and the effect never
+			// begins -- the same as an effect beginning in layer 7.
 			_, drop = lossOf(ce.Source)
 		}
 		if isRemover {
 			next++
 		}
-		if !drop {
+		drops[i] = drop
+	}
+	kept := list[:0]
+	for i := range list {
+		ce := &list[i]
+		if !drops[i] {
 			if len(kept) != i {
 				kept = append(kept, *ce)
 			} else {

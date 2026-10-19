@@ -228,3 +228,32 @@ func TestSnapshotMatchNamesMatchK(t *testing.T) {
 		t.Fatal("SnapshotMatch of an unknown match must fail")
 	}
 }
+
+// TestShadowParityCappedOnASeatDecision: a capped match parks the decision
+// at the cap, and the shadow seat answers it, before play's MaxIntents guard
+// ends the match, so that answer never reaches the log. The contract's
+// "scan visited every decision the seat answered" precondition counts only
+// the answers the log records, so a cap that lands on the seat's own
+// decision does not fail the row (four-yay's capped search-policy run).
+func TestShadowParityCappedOnASeatDecision(t *testing.T) {
+	t.Parallel()
+	o := testOptions(t)
+	o.BotDeps = sampleBotDeps(t)
+	const seed = 20261010
+	for c := 60; c < 80; c++ {
+		r, ss := shadowSeatTable(t, o, bots.Default, seed, c, nil)
+		logged, err := r.loggedIntents("t1", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ss.seen) == 0 || ss.seen[len(ss.seen)-1] < logged {
+			continue
+		}
+		if got := ss.answeredBelow(logged); got != len(ss.seen)-1 {
+			t.Fatalf("cap %d: %d of %d answers below the %d logged intents, want all but the parked one", c, got, len(ss.seen), logged)
+		}
+		RunShadowParityContract(t, o, bots.Default, seed, c)
+		return
+	}
+	t.Fatal("no cap in [60,80) parked a decision of the shadow seat")
+}

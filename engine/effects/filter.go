@@ -535,14 +535,14 @@ var predicates = map[string]predFn{
 	// grant; it is suspended only while that capability card is exiled with a
 	// positive TIME counter.
 	"withSuspend": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o != nil && (o.SuspendGranted || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+		return o != nil && (o.SuspendGranted || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	"withoutSuspend": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
-		return o == nil || !(o.SuspendGranted || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+		return o == nil || !(o.SuspendGranted || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	"suspended": func(_ *state.Game, o *state.Object, _ state.PlayerID, _ state.ObjID) bool {
 		return o != nil && o.Zone == state.ZExile && o.Counter("TIME") > 0 &&
-			(o.SuspendGranted || (o.CastFlags&state.FlagSuspend) != 0 || (o.Face() != nil && o.Face().HasKeyword("Suspend")))
+			(o.SuspendGranted || (o.CastFlags&state.FlagSuspend) != 0 || (o.Face() != nil && o.Face().HasKeywordRef(kwRefSuspend)))
 	},
 	// wasCastFromGraveyard is the CastFlags provenance of a GRAVEYARD-ORIGIN
 	// cast (CR 601.2b): any of FlagFlashback, FlagHarmonize or FlagEscaped.
@@ -2037,8 +2037,8 @@ func notDefinedTriggerReferent(p string) (base string, ok bool) {
 // The binding arrives through SpecContext.TriggerContext: rules'
 // targetSpecContext binds the pushed trigger's captured context
 // (engine/rules/trigger_referents.go's Attached case sets TriggerTarget to the
-// bearer, ExcessDamage to the damaged permanent, BecomesTarget to the
-// trigger's own source), so the candidate matches exactly the object the
+// bearer, ExcessDamage to the damaged permanent, BecomesTarget to the TARGETED
+// object or player), so the candidate matches exactly the object the
 // causing event captured. A player-valued or absent binding fails CLOSED
 // (ok=false) -- the spec matches nothing, never an invented referent, and the
 // leading-'!' spelling cannot invert the absence into a match.
@@ -2591,7 +2591,7 @@ func matchesBase(g *state.Game, base string, o *state.Object, sc SpecContext) bo
 			}
 			return false
 		}
-		return o.Face() != nil && o.Face().HasKeyword("Affinity")
+		return o.Face() != nil && o.Face().HasKeywordRef(kwRefAffinity)
 	case matchesBasePermanentCard:
 		// This internal base spelling is selected by rules' target census
 		// (targetSpecForZone) and Dig windows (permanentCardSpec) for Forge's
@@ -3166,10 +3166,34 @@ func matchesZoneSpecCtx(g *state.Game, spec string, id state.ObjID, sc SpecConte
 	if o.IsCopy && o.Zone != state.ZStack && o.Zone != state.ZBattlefield {
 		return false
 	}
+	return matchesZoneSpecObj(g, spec, o, sc, zone)
+}
+
+// matchesZoneSpecObj is matchesZoneSpecCtx past its CR 707.10h copy
+// rejection: the zone-aware match of a live object pointer.
+func matchesZoneSpecObj(g *state.Game, spec string, o *state.Object, sc SpecContext, zone state.Zone) bool {
 	if zone == state.ZBattlefield {
 		return matchesObjectPtr(g, spec, o, &sc)
 	}
 	return compiledMatchZone(compiledSpecFor(spec), g, o, &sc, zone)
+}
+
+// matchesEnteredEntry matches one per-turn entry (state.Game.Entered) for a
+// ThisTurnEntered_ count. A battlefield departure is matched even when the
+// object is a copy that has since ceased to exist: a token copy that died
+// (Extravagant Replication's Healer's Hawk) still died (CR 700.4, 603.10a),
+// so a morbid count includes it. Every other entry keeps matchesZoneSpecCtx's
+// CR 707.10h rejection (a resolved Storm copy parked in exile is not a card
+// that was exiled).
+func matchesEnteredEntry(g *state.Game, spec string, e state.ZoneEntry, sc SpecContext) bool {
+	if e.From != state.ZBattlefield {
+		return matchesZoneSpecCtx(g, spec, e.Obj, sc, e.To)
+	}
+	o := g.Obj(e.Obj)
+	if o == nil {
+		return false
+	}
+	return matchesZoneSpecObj(g, spec, o, sc, e.To)
 }
 
 // matchesZoneSpecText is matchesZoneSpecCtx's textual oracle for a

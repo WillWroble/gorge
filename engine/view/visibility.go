@@ -235,6 +235,23 @@ func RedactEventForPregameBlind(g *state.Game, e events.Event, viewer state.Play
 // them, always non-nil so an empty pool marshals "{}" rather than null.
 // pool is the previous projection's map when non-nil (ProjectInto's reuse),
 // cleared and refilled.
+// PlayerMana is a PlayerView's Pool and Available as state.Mana arrays.
+type PlayerMana struct {
+	Pool, Available state.Mana
+	// OK reports that the projection set them.
+	OK bool
+}
+
+// poolSlots is poolView's map as an array: m's positive counts, 0 elsewhere.
+func poolSlots(m state.Mana) state.Mana {
+	for i, n := range m {
+		if n < 0 {
+			m[i] = 0
+		}
+	}
+	return m
+}
+
 func poolView(pool map[string]int32, m state.Mana) map[string]int32 {
 	if pool == nil {
 		pool = map[string]int32{}

@@ -92,7 +92,14 @@ func TestRepeatEachWithoutChangeZoneTableKeepsPerMoveChangesZoneAllKernel(t *tes
 	if n := chargeCount(e, market, "CHARGE"); n != len(bears) {
 		t.Fatalf("control: Black Market charge counters = %d, want %d", n, len(bears))
 	}
-	if n := chargeCount(e, slaw, "CHARGE"); n != len(bears) {
-		t.Fatalf("control: Simic Slaw charge counters = %d, want %d (no ChangeZoneTable: the batch-of-one per-move reading stands)", n, len(bears))
+	// ONE api:Sacrifice of the three answered bears is ONE simultaneous
+	// departure (CR 603.2c), so the ChangesZoneAll observer charges once even
+	// without ChangeZoneTable$: the parameter aggregates zone changes across
+	// LOOP ITERATIONS, and a single KChoose answer is a single event either
+	// way. (Until the departure bracket opened a zone batch this read
+	// len(bears) only because the sacrifice itself was not batched.) The
+	// per-move control above still distinguishes Mode$ ChangesZone.
+	if n := chargeCount(e, slaw, "CHARGE"); n != 1 {
+		t.Fatalf("control: Simic Slaw charge counters = %d, want 1 (one simultaneous sacrifice is one ChangesZoneAll event)", n)
 	}
 }

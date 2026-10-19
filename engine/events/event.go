@@ -1205,10 +1205,47 @@ const (
 	// golden game. Appended after SpellCastReversed so every earlier ordinal,
 	// hash chain and golden replay is unchanged.
 	HiddenIdentity
+	// DrawEmpty records that Player attempted to draw a card from an empty
+	// library (CR 121.4). The draw itself does not end the game: CR 704.5b
+	// makes the loss a state-based action, so the fold only sets
+	// state.Player.DrewFromEmpty (Amount 0) and rules' next state-based
+	// check emits the ordinary PlayerLost for a flagged player, or -- when a
+	// GameLoss CantHappen replacement stops that loss -- this event again
+	// with Amount 1, which clears the flag (the condition is "since the last
+	// time state-based actions were checked", so it is consumed either way).
+	// The rest of the resolution that attempted the draw still happens, and
+	// a player who loses for another reason before that check loses at the
+	// same time (CR 704.3). Appended after HiddenIdentity so every earlier
+	// ordinal, hash chain and golden replay is unchanged.
+	DrawEmpty
+	// SetupSettled records that an oracle harness's seeded battlefield
+	// permanent has been under its controller's control since before the
+	// scenario began, as XMage's addCard places it: it is not summoning sick
+	// (CR 302.6) whichever seat takes the first turn. The harness stages
+	// permanents before the first TurnChange, which clears sickness only for
+	// the incoming active player, so without this a non-starting seat's {T}
+	// ability could not be activated on the starting seat's turn 1. Obj is
+	// the staged permanent; the fold only clears Object.SummonSick and moves
+	// nothing. Emitted only by the oracle harness, never in a match, a replay
+	// of one or a golden game. Appended after DrawEmpty so every earlier
+	// ordinal, hash chain and golden replay is unchanged.
+	SetupSettled
+	// BlockedByEffect records that an effect made an unblocked attacking
+	// creature become blocked (CR 509.1h; api:BecomesBlocked -- Trap Runner,
+	// Fog Patch, Choking Vines). Obj is the attacker and Player its
+	// defending player. The fold records a blocked creature with no blocker:
+	// one zero entry in Object.BlockedBy, the same tombstone a blocker that
+	// left combat leaves (Ruling T21-d), so it deals no combat damage unless
+	// it has trample. It is a no-op for a creature that is not attacking or is
+	// already blocked. Its "becomes blocked" triggers fire off this event
+	// (CR 509.3c); "becomes blocked by a creature" ones do not (CR 509.3d).
+	// Appended after SetupSettled so every earlier ordinal, hash chain and
+	// golden replay is unchanged.
+	BlockedByEffect
 	// NumKinds is the explicit upper bound for the append-only event kind
 	// registry below. New kinds must be appended above this line: inserting or
 	// reordering a kind renumbers the hash-chained event stream and breaks replay.
-	NumKinds = int(HiddenIdentity) + 1
+	NumKinds = int(BlockedByEffect) + 1
 )
 
 // PlanarWalkDontPlaneswalkAway is PlanarWalk's Amount flag: the resolving

@@ -110,7 +110,7 @@ func TestRenownTriggerFizzesAfterSourceLeftBattlefield(t *testing.T) {
 	}
 	e.askAttackers()
 	submitAttackers(t, e, id)
-	drainCombatDamagePriority(t, e)
+	drainCombatDamageToStack(t, e)
 	// Precondition: the renown trigger IS on the stack (the removal below
 	// responds to it; a test where the trigger never existed proves nothing).
 	if len(e.G.Stack) == 0 {

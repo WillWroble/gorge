@@ -156,7 +156,7 @@ func (e *Engine) beginGainedActivation(p state.PlayerID, opt decision.Option) {
 	if ab == nil {
 		return
 	}
-	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.parseCost(ab.ParamStr(cards.PKCost)))
+	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.abilityCompiledCost(ab).Cost)
 	if !ok {
 		return
 	}
@@ -223,7 +223,7 @@ func (e *Engine) beginGrantedActivation(p state.PlayerID, opt decision.Option) {
 	if !grantedAnchorZoneOK(o, ab) {
 		return
 	}
-	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.parseCost(ab.ParamStr(cards.PKCost)))
+	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.abilityCompiledCost(ab).Cost)
 	if !ok {
 		return
 	}
@@ -277,7 +277,7 @@ func (e *Engine) beginKeywordGrantedActivation(p state.PlayerID, opt decision.Op
 	if ab == nil {
 		return
 	}
-	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.parseCost(ab.ParamStr(cards.PKCost)))
+	cost, ok := pay.FixLifeXCost(asPayer(e), p, opt.Obj, e.abilityCompiledCost(ab).Cost)
 	if !ok {
 		return
 	}

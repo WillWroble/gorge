@@ -211,7 +211,9 @@ func effTap(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := h.Game().Obj(t.Obj)
-		if o == nil || o.Zone != state.ZBattlefield || o.Tapped {
+		// sourceLeftSincePush: "tap this permanent" never reaches the new
+		// object a flickered source became (CR 400.7).
+		if o == nil || o.Zone != state.ZBattlefield || o.Tapped || sourceLeftSincePush(h, c, o) {
 			continue
 		}
 		h.EmitTap(o.ID, tapper, entering)
@@ -494,7 +496,11 @@ func effAnimate(h Host, c *Ctx, sa *cards.SA) {
 			continue
 		}
 		o := h.Game().Obj(t.Obj)
-		if o == nil {
+		if o == nil || sourceLeftSincePush(h, c, o) {
+			// "This land becomes a 3/3 creature" names the permanent that
+			// activated it: a Soulstone Sanctuary put into its library in
+			// response is a new object the animation never reaches (CR
+			// 400.7; census pair 3988, where the drawn card was a 3/3).
 			continue
 		}
 		if rememberAnimated {

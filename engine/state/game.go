@@ -9,6 +9,11 @@ type Player struct {
 	Life        int32
 	Lost        bool
 	LandsPlayed int32
+	// DrewFromEmpty is set when this player attempted to draw from an empty
+	// library since state-based actions were last checked (CR 704.5b);
+	// rules' next check turns it into the loss. Folded only by events.Apply
+	// (DrawEmpty sets or clears it, PlayerLost clears it); clone copies it.
+	DrewFromEmpty bool
 	// CoinFlipsThisTurn counts canonical flip-result Notes. Folded by
 	// events.Apply and cleared at TurnChange; clone copies this scalar.
 	CoinFlipsThisTurn int32
@@ -526,6 +531,13 @@ type ZoneEntry struct {
 	// PlayerCount*$SacrificedThisTurn heads read a replay-derived record.
 	Sacrificed bool
 	Sacrificer PlayerID
+	// WasCreature is, for a battlefield departure (From == ZBattlefield),
+	// whether the permanent was a creature as it last existed on the
+	// battlefield (CR 603.10a last known information), folded by
+	// events.Apply from events.DepartureCreatureFlip. An animated land that
+	// dies was a creature; a creature an effect made a non-creature was not.
+	// False for every other entry.
+	WasCreature bool
 }
 
 // DelayedTrigger is one registered delayed triggered ability awaiting its
@@ -541,6 +553,15 @@ type DelayedTrigger struct {
 	Controller PlayerID
 	Execute    string // the SVar name of the ability to run when it fires
 	Remembered []Target
+	// RememberedStamps holds, for every object in Remembered at
+	// registration, its Incarnation then (events' DelayedRegister fold). A
+	// body that acts on the remembered objects (ChangeZone's Defined$
+	// DelayTriggerRemembered[LKI]) skips one whose Incarnation has moved
+	// since: Nine-Lives Familiar's "return it" finds nothing once the card
+	// was returned by another effect and died again, because the card in the
+	// graveyard is a new object (CR 400.7). Keyed by Obj, so DelayedForget's
+	// removal from Remembered leaves it consistent.
+	RememberedStamps []TargetStamp
 	// MinTurn is the earliest game turn the trigger may fire in (zero = no
 	// bound). rules' delayed-trigger scan skips an entry whose MinTurn is
 	// still ahead of the current turn, which is how an extra-turn grant's
@@ -802,8 +823,19 @@ func (g *Game) AddObject(card *cards.Card, owner PlayerID) *Object {
 	return &g.Objs[len(g.Objs)-1]
 }
 
-// cloneObjectHeadroom is the spare Objs capacity Clone gives a copy.
+// cloneObjectHeadroom is the least spare Objs capacity a copy keeps past its
+// objects: a recycled arena (CloneInto) must have this much room, and a
+// fresh one is allocated with cloneObjectReserve.
 const cloneObjectHeadroom = 8
+
+// cloneObjectReserve is the spare Objs capacity a freshly allocated copy
+// gets. It is more than cloneObjectHeadroom so the arena stays recyclable
+// as the game mints objects: a recycled arena is accepted while it keeps
+// cloneObjectHeadroom past the objects, and one allocated with exactly that
+// stops fitting as soon as the game has minted a token or two since --
+// measured on the az-c6 cached-worlds bench (2026-10-17), a fifth of the
+// node cache's recycled arenas were a few objects short. Capacity only.
+const cloneObjectReserve = 32
 
 // Clone deep-copies the game. Everything is slices of value types, so this is
 // a handful of copy() calls rather than a graph walk. Player's Commander
@@ -854,13 +886,13 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 	if cap(objs) >= len(g.Objs)+cloneObjectHeadroom {
 		c.Objs = objs[:len(g.Objs)]
 	} else {
-		c.Objs = make([]Object, len(g.Objs), len(g.Objs)+cloneObjectHeadroom)
+		c.Objs = make([]Object, len(g.Objs), len(g.Objs)+cloneObjectReserve)
 	}
 	// The objects' common slice copies come from one backing array per
 	// element type (cloneArena), and the zone lists from one more below.
-	var nIDs, nTgs, nCtr int
+	var nIDs, nTgs, nCtr, nStm int
 	for i := range g.Objs {
-		g.Objs[i].cloneArenaNeed(&nIDs, &nTgs, &nCtr)
+		g.Objs[i].cloneArenaNeed(&nIDs, &nTgs, &nCtr, &nStm)
 	}
 	var arena cloneArena
 	if nIDs > 0 {
@@ -871,6 +903,9 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 	}
 	if nCtr > 0 {
 		arena.ctr = make([]Counter, nCtr)
+	}
+	if nStm > 0 {
+		arena.stm = make([]TargetStamp, nStm)
 	}
 	for i := range g.Objs {
 		g.Objs[i].cloneDeepIntoArena(&c.Objs[i], &arena)
@@ -895,6 +930,7 @@ func (g *Game) CloneIntoDirty(objs []Object, dirty int) *Game {
 		c.Delayed = make([]DelayedTrigger, len(g.Delayed))
 		for i, dt := range g.Delayed {
 			dt.Remembered = append([]Target(nil), dt.Remembered...)
+			dt.RememberedStamps = append([]TargetStamp(nil), dt.RememberedStamps...)
 			c.Delayed[i] = dt
 		}
 	}

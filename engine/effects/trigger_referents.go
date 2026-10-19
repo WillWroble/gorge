@@ -55,6 +55,45 @@ type TriggerContext struct {
 	// capture a printed trigger of that mode makes -- so the two referents
 	// cannot share one slot.
 	DelayedRemembered []state.Target
+	// DelayedRememberedStamps is the registration's Incarnation stamp of
+	// each DelayedRemembered object (state.DelayedTrigger.RememberedStamps):
+	// ChangeZone's Defined$ DelayTriggerRemembered[LKI] mover skips an object
+	// that has become a new object since (CR 400.7).
+	DelayedRememberedStamps []state.TargetStamp
+	// TriggerRememberedStamps is the fire-time Incarnation stamp of each
+	// object in the trigger's own remembered capture (Ctx.Remembered, what
+	// the TriggeredCard referent family resolves): captured by rules when the
+	// trigger was QUEUED, when the remembered objects stood as the triggering
+	// event left them. A trigger that resolves later refers to the object
+	// that existed then (CR 400.7), so a delayed trigger it registers stamps
+	// its Remembered from here rather than from the resolving state -- a dies
+	// trigger whose card was returned and died again while the trigger sat on
+	// the stack stamps the first graveyard incarnation and its end-step
+	// return moves nothing. Not serialized into events.Event -- the
+	// per-stack capture is rebuilt by the same replay re-derivation as
+	// TriggerPaidX/TriggerConverge; the stamp a registration keeps rides the
+	// DelayedRegister event's Text (the established suffix channel).
+	TriggerRememberedStamps []state.TargetStamp
+	// SourceRemembered is the fire-time snapshot of the source's persistent
+	// event-backed Remembered list, with SourceIncarnation its Incarnation
+	// stamp at the same instant. A pending trigger belongs to the object that
+	// existed when it fired (CR 400.7), and a body that resolves
+	// `Defined$ Remembered` (the Skyclave Apparition "return the exiled card"
+	// class) reads the source's persistent list through sourceRemembered --
+	// which must answer with the OLD object's list when the source re-entered
+	// the battlefield while this trigger sat on the stack: the entry fold
+	// clears a re-entering object's list (CR 400.7: a battlefield re-entry is
+	// a new object), but that clear is the NEW object's forgetting, never a
+	// licence to strand the old object's pending referents in exile. rules
+	// captures the snapshot in triggerReferents only when the source carries
+	// a list (nil otherwise, so the read falls through to the live field and
+	// every resolution without a re-entry is byte-identical); consumed only
+	// when the live Incarnation has moved past the fire-time one, so an
+	// unchanged object -- and any mid-resolution write to it -- still reads
+	// live. Not serialized into events.Event, exactly like
+	// TriggerRememberedStamps: replay re-derives the queue-time capture.
+	SourceRemembered  []state.Target
+	SourceIncarnation uint32
 	// Reflexive marks a CR 603.12 reflexive triggered ability ("When you do,
 	// ...") minted by effImmediateTrigger through Host.QueueReflexiveTrigger.
 	// Its stack object's Remembered is the instance's OWN remembered set --
@@ -136,12 +175,12 @@ type TriggerContext struct {
 	// event: ev.Obj is the attachment, ev.IDs[0] the bearer). It is the
 	// exact referent Defined$ TriggeredTargetLKICopy resolves for an
 	// Attached execute (Enormous Energy Blade's "tap that creature"). Only
-	// the Attached capture sets it, so the spelling's Remembered fallback
-	// for every other mode is untouched -- in particular a BecomesTarget
-	// trigger's Remembered entry (the targeting spell) stays exactly as it
-	// always resolved, and the mode-agnostic TriggerTarget role (which for
-	// BecomesTarget is the trigger's own source permanent) is never read
-	// through this spelling. Zero outside an Attached trigger.
+	// the Attached capture sets it, so it can never masquerade as another
+	// mode's provenence: a BecomesTarget trigger's "that permanent" is the
+	// TARGETED object, which the BecomesTarget arm records as TriggerTarget
+	// beside the TriggerStack marker, and the LKI-copy resolver reads that
+	// role through the marker rather than through this field. Zero outside
+	// an Attached trigger.
 	TriggerBearer state.ObjID
 	// TriggerAbility is the minted ability STACK OBJECT an AbilityCast /
 	// SpellAbilityCast trigger fired on (abcopy1). An AbilityPush event's Obj

@@ -1,0 +1,75 @@
+package rules
+
+import (
+	"testing"
+
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/effects"
+	"github.com/adams-shaun/gorge/engine/events"
+	"github.com/adams-shaun/gorge/engine/state"
+)
+
+// CR 514.3a: the cleanup step's state-based check follows its 514.2
+// actions. A Grizzly Bears with two -1/-1 counters kept alive by Giant
+// Growth's +3/+3 is a 0/0 once the pump ends at cleanup, so it dies IN that
+// cleanup step (and the active player then gets priority), not at the next
+// turn's first state-based check.
+func TestCleanupChecksStateBasedActionsAfterEndingEffects(t *testing.T) {
+	e, _ := fdnCensusEngine(t, "Grizzly Bears", "Giant Growth")
+	bears := moveByName(t, e, 0, "Grizzly Bears", state.ZBattlefield)
+	gg := moveByName(t, e, 0, "Giant Growth", state.ZHand)
+	e.pending = nil
+	e.probe(func() {
+		effects.Resolve(e, &effects.Ctx{Source: gg, Controller: 0,
+			Targets: []state.Target{{Obj: bears}}}, e.G.Obj(gg).Face().Abilities[0])
+	})
+	if d := e.Pending(); d != nil && d.Kind == decision.KChoose {
+		for _, o := range d.Options {
+			if o.Obj == bears {
+				submitChoices(t, e, o.Index)
+				break
+			}
+		}
+	}
+	if got := e.Toughness(bears); got != 5 {
+		t.Fatalf("precondition: Giant Growth left the Bears at toughness %d, want 5", got)
+	}
+	e.emit(events.Event{Kind: events.CounterChange, Obj: bears, Counter: "M1M1", Amount: 2})
+	e.pending = nil
+	e.Advance()
+	if z := e.G.Obj(bears).Zone; z != state.ZBattlefield {
+		t.Fatalf("precondition: pumped Bears with two -1/-1 counters in %s", z)
+	}
+	turn := e.G.Turn
+	var diedTurn int32 = -1
+	var diedStep state.Step
+	sawCleanupPriority := false
+	for i := 0; i < 200 && diedTurn < 0; i++ {
+		d := e.Pending()
+		if d == nil {
+			t.Fatal("no decision")
+		}
+		if d.Kind == decision.KPriority && e.G.Step == state.StepCleanup {
+			sawCleanupPriority = true
+		}
+		if d.Kind == decision.KPriority {
+			submitPass(t, e)
+		} else {
+			fdnCensusAnswerMin(t, e, d)
+		}
+		if e.G.Obj(bears).Zone != state.ZBattlefield {
+			diedTurn, diedStep = e.G.Turn, e.G.Step
+		}
+	}
+	if diedTurn != turn || diedStep != state.StepCleanup {
+		t.Fatalf("the Bears died on turn %d step %s, want turn %d's cleanup step", diedTurn, diedStep, turn)
+	}
+	for i := 0; i < 5 && !sawCleanupPriority; i++ {
+		if d := e.Pending(); d != nil && d.Kind == decision.KPriority && e.G.Step == state.StepCleanup {
+			sawCleanupPriority = true
+		}
+	}
+	if !sawCleanupPriority {
+		t.Fatal("no cleanup-step priority after the state-based action (CR 514.3a)")
+	}
+}

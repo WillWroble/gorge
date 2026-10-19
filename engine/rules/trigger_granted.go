@@ -52,7 +52,7 @@ func (e *Engine) checkGrantedConspireTriggers(observer *Engine, id state.ObjID, 
 	if ev.Kind != events.PutOnStack || id != ev.Obj {
 		return
 	}
-	if !e.hasKeywordH(id, kwhConspire) || f.HasKeyword("Conspire") {
+	if !e.hasKeywordH(id, kwhConspire) || f.HasKeywordRef(kwRefConspire) {
 		return
 	}
 	t := cards.Trigger{Mode: "SpellCast", Params: map[string]string{
@@ -115,7 +115,7 @@ func (e *Engine) checkGrantedDemonstrateTriggers(observer *Engine, id state.ObjI
 	if ev.Kind != events.PutOnStack || id != ev.Obj {
 		return
 	}
-	if !e.hasKeywordH(id, kwhDemonstrate) || f.HasKeyword("Demonstrate") {
+	if !e.hasKeywordH(id, kwhDemonstrate) || f.HasKeywordRef(kwRefDemonstrate) {
 		return
 	}
 	t := cards.Trigger{Mode: "SpellCast", Params: map[string]string{
@@ -242,7 +242,7 @@ func (e *Engine) checkGrantedExploitTriggers(observer *Engine, id state.ObjID, o
 	if ev.Kind != events.MoveZone || ev.To != state.ZBattlefield || id != ev.Obj || o.Zone != state.ZBattlefield {
 		return
 	}
-	if f.HasKeyword("Exploit") || !e.hasKeywordH(id, kwhExploit) {
+	if f.HasKeywordRef(kwRefExploit) || !e.hasKeywordH(id, kwhExploit) {
 		return
 	}
 	t := cards.Trigger{Mode: "ChangesZone", Params: map[string]string{
@@ -310,7 +310,7 @@ func (e *Engine) checkGrantedOffspringTriggers(observer *Engine, id state.ObjID,
 	// battlefield zone would drop the grant the moment it resolved. The
 	// printed check stays on the face: a creature printing K:Offspring
 	// already has the expansion trigger and must not fire twice.
-	if f.HasKeyword("Offspring") || !e.hasCastOffspring(id) {
+	if f.HasKeywordRef(kwRefOffspring) || !e.hasCastOffspring(id) {
 		return
 	}
 	t := cards.Trigger{Mode: "ChangesZone", Params: map[string]string{
@@ -355,10 +355,10 @@ func (e *Engine) checkGrantedDethroneTriggers(observer *Engine, id state.ObjID, 
 	if ev.Kind != events.DeclareAttackers || !slices.Contains(ev.IDs, id) {
 		return
 	}
-	if e.hasKeywordH(id, kwhDethrone) && f.HasKeyword("Dethrone") {
+	if e.hasKeywordH(id, kwhDethrone) && f.HasKeywordRef(kwRefDethrone) {
 		return
 	}
-	if !e.hasKeywordH(id, kwhDethrone) || f.HasKeyword("Dethrone") {
+	if !e.hasKeywordH(id, kwhDethrone) || f.HasKeywordRef(kwRefDethrone) {
 		return
 	}
 	t := cards.Trigger{Mode: "Attacks", Params: map[string]string{
@@ -404,7 +404,7 @@ func (e *Engine) checkGrantedTrainingTriggers(observer *Engine, id state.ObjID, 
 	if ev.Kind != events.DeclareAttackers || !slices.Contains(ev.IDs, id) {
 		return
 	}
-	if !e.hasKeywordH(id, kwhTraining) || f.HasKeyword("Training") {
+	if !e.hasKeywordH(id, kwhTraining) || f.HasKeywordRef(kwRefTraining) {
 		return
 	}
 	t := cards.Trigger{Mode: "Attacks", Params: map[string]string{
@@ -450,7 +450,7 @@ func (e *Engine) checkGrantedMentorTriggers(observer *Engine, id state.ObjID, o 
 	if ev.Kind != events.DeclareAttackers || !slices.Contains(ev.IDs, id) {
 		return
 	}
-	if !e.hasKeywordH(id, kwhMentor) || f.HasKeyword("Mentor") {
+	if !e.hasKeywordH(id, kwhMentor) || f.HasKeywordRef(kwRefMentor) {
 		return
 	}
 	t := cards.Trigger{Mode: "Attacks", Params: map[string]string{
@@ -532,7 +532,7 @@ func (e *Engine) checkGrantedAttackKeywordTriggers(observer *Engine, id state.Ob
 				Player: o.Controller, Step: state.StepEndCombat, Counter: "__kwDecayedSacrifice"})
 		}
 	}
-	if !e.hasKeywordH(id, kwhFirebending) || f.HasKeyword("Firebending") {
+	if !e.hasKeywordH(id, kwhFirebending) || f.HasKeywordRef(kwRefFirebending) {
 		return
 	}
 	param, ok := e.derivedKeywordParamH(id, kwhFirebending)

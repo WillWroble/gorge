@@ -212,11 +212,18 @@ func TestDrawPutsTopLibraryCardsInHand(t *testing.T) {
 	}
 }
 
-func TestDrawFromEmptyLibraryLosesTheGame(t *testing.T) {
+// TestDrawFromEmptyLibraryMarksThePlayer: the attempted draw marks the
+// player (CR 121.4); the loss itself is the next state-based check's (CR
+// 704.5b, rules' TestEmptyLibraryDrawLosesAtTheNextStateBasedCheck), so the
+// resolution does not end the game on the spot.
+func TestDrawFromEmptyLibraryMarksThePlayer(t *testing.T) {
 	h := newHost(t, 2)
-	Resolve(h, &Ctx{Controller: 0}, sa(t, "SP$ Draw | Defined$ You"))
-	if !h.g.Players[0].Lost {
-		t.Fatal("drawing from an empty library must lose the game")
+	Resolve(h, &Ctx{Controller: 0}, sa(t, "SP$ Draw | Defined$ You | NumCards$ 2"))
+	if h.g.Players[0].Lost {
+		t.Fatal("the draw itself ended the game; CR 704.5b makes it a state-based loss")
+	}
+	if !h.g.Players[0].DrewFromEmpty {
+		t.Fatal("drawing from an empty library must mark the player for the state-based check")
 	}
 }
 

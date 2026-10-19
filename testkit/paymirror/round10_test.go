@@ -45,13 +45,17 @@ import (
 //     paymirror.go, so the witness no longer trips on it. The paid-cost census
 //     default-on flip (cli-20261012T170859Z) then moved this cast from
 //     seq 2298 to 2291, and botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) to
-//     seq 2250, verdict still equivalent.
+//     seq 2250, and the combat priority fixes (rules e7aaf1530 and
+//     93b6057e4, CR 510.4/117.3a: more priority windows in combat) to seq
+//     2393, and the CR 510.3 post-damage round (rules 24bbba791) to seq
+//     2409, verdict still equivalent.
 //   - 10877 seq 2873 (Infernal Plunge), commander4-r9 a_witness:wrong_production:
 //     the plan's Ogre paid life for R and was then the creature sacrificed
 //     for the spell's additional cost (CR 601.2h); the witness read that
 //     sacrifice as its activation (harness gap, activationProduction).
 //     botmanual (2026-10-14: the auto-pay bot's tap gate reads the engine's cast census, and flashback and fixed-discard casts get payment plans) moves the cast to seq 4900,
-//     where run A's witness is clean and the float route is the expected
+//     the combat priority fixes (rules e7aaf1530, 93b6057e4) to seq 5134,
+//     and the CR 510.3 post-damage round (rules 24bbba791) to seq 5198, where run A's witness is clean and the float route is the expected
 //     cast_blocked_by_float_trigger (floating at priority puts a mana
 //     trigger on the stack first).
 //
@@ -77,8 +81,8 @@ import (
 var roundTenWant = map[uint64]map[uint64]string{ // seed -> seq -> verdict key ("" = equivalent)
 	12468: {},
 	11828: {},
-	12603: {2250: ""},
-	10877: {4900: "expected:float_then_cast:cast_blocked_by_float_trigger"},
+	12603: {2409: ""},
+	10877: {5198: "expected:float_then_cast:cast_blocked_by_float_trigger"},
 }
 
 const (

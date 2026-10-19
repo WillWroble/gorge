@@ -137,7 +137,7 @@
 //	                                   compared); clones restart it at zero
 //	triggerEventMasks, triggerObject-  immutable-syntax lookup caches keyed by face pointer
 //	Masks, trigZones/Ep, trigFaceZones,
-//	phaseSpecs, faceScans
+//	phaseSpecs
 //	trigFaceKinds, trigZoneGen,        trigger-walk signature cache, summary generation,
 //	trigPlan, trigWalkUnion/OK,        board plan, last walk's union, granted-trigger proof
 //	trigGrant, trigZeroNoopKinds       and the zero-interest memo's kind set
@@ -145,6 +145,7 @@
 //	charsSum                           the printed fast path's digest, keyed the same way
 //	lossProof                          the no-ability-loss proof, the trigGrant shape
 //	lossMemo                           abilityLoss's per-build answer memo, generation-stamped
+//	manaGate                           the mana gate's per-walk answer memo, generation-stamped
 //	layer5Colors, colorsEpoch/Version/ the on-demand derived-colour table and its key,
 //	Objs/Valid/Building                validated on every use; Clone copies none
 //	replZones/Ep, replArena            replacement-walk zone summaries, validated on every use,

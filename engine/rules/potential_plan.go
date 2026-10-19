@@ -522,7 +522,7 @@ func (e *Engine) planAbilityPayment(p state.PlayerID, id state.ObjID, ability in
 		return PaymentPlanOutcome{Reason: "unsupported", Detail: "ability"}
 	}
 	ab := pa.SA
-	cost, ok := pay.FixLifeXCost(asPayer(e), p, id, e.parseCost(ab.ParamStr(cards.PKCost)))
+	cost, ok := pay.FixLifeXCost(asPayer(e), p, id, e.abilityCompiledCost(ab).Cost)
 	if !ok {
 		return PaymentPlanOutcome{Reason: "unsupported", Detail: "cost:life_x"}
 	}
@@ -967,7 +967,7 @@ func (e *Engine) paymentPlanRelaxedAlternatives(p state.PlayerID, id state.ObjID
 	if o == nil || ma == nil || ma.API != "Mana" {
 		return nil, 0, false
 	}
-	cost := e.parseCost(ma.ParamStr(cards.PKCost))
+	cost := e.abilityCompiledCost(ma).Cost
 	if cost.X != 0 || cost.XMin != 0 || len(cost.Hybrid)+len(cost.Phyrexian)+len(cost.Twobrid)+len(cost.HybridPhyrexian) != 0 || cost.Snow != 0 {
 		return nil, 0, false
 	}

@@ -70,11 +70,19 @@ func EntryCounterPairs(g EntryCounterGrant) [][2]state.ObjID {
 }
 
 // applyEntryCounterPairs installs the encoded grants on the entering object
-// during its MoveZone/TokenCreate/CardToken fold. It is a sequential decode:
-// a table pair is one grant, a string header consumes exactly the payload
-// pairs its length names, so the two forms cannot be confused. Malformed or
-// truncated payloads are skipped whole, never half-decoded.
+// during its MoveZone/TokenCreate/CardToken fold.
 func applyEntryCounterPairs(o *state.Object, pairs [][2]state.ObjID) {
+	decodeEntryCounterPairs(pairs, func(kind string, amount int32) {
+		o.AddCounter(kind, amount)
+	})
+}
+
+// decodeEntryCounterPairs walks the encoded grants in pairs, calling put for
+// each positive one in order. It is a sequential decode: a table pair is one
+// grant, a string header consumes exactly the payload pairs its length names,
+// so the two forms cannot be confused. Malformed or truncated payloads are
+// skipped whole, never half-decoded. Untagged pairs are ignored.
+func decodeEntryCounterPairs(pairs [][2]state.ObjID, put func(kind string, amount int32)) {
 	for i := 0; i < len(pairs); i++ {
 		pair := pairs[i]
 		if pair[0]&entryCounterMarker == 0 {
@@ -100,16 +108,46 @@ func applyEntryCounterPairs(o *state.Object, pairs [][2]state.ObjID) {
 				continue
 			}
 			if amount > 0 {
-				o.AddCounter(string(buf[:n]), amount)
+				put(string(buf[:n]), amount)
 			}
 			continue
 		}
 		kind := pair[0] &^ entryCounterMarker
 		amount := pair[1] &^ entryCounterMarker
 		if kind > 0 && int(kind) < len(entryCounterKinds) && amount > 0 {
-			o.AddCounter(entryCounterKinds[kind], int32(amount))
+			put(entryCounterKinds[kind], int32(amount))
 		}
 	}
+}
+
+// SplitEntryCounterPairs separates an entry event's encoded counter grants
+// from the rest of its Pairs. It is how an effect asks for counters a
+// permanent enters WITH (ChangeZone's WithCountersType$, CR 122.6): the effect
+// encodes them on the MoveZone with EntryCounterPairs before emitting it, and
+// the rules emit path takes them back out here, settles them through the
+// AddCounter replacement class with the entry's other grants, and folds the
+// settled amounts into the same move. rest is pairs itself when nothing is
+// tagged, else a fresh slice of the untagged pairs in order.
+func SplitEntryCounterPairs(pairs [][2]state.ObjID) (rest [][2]state.ObjID, grants []EntryCounterGrant) {
+	tagged := false
+	for _, pr := range pairs {
+		if pr[0]&entryCounterMarker != 0 {
+			tagged = true
+			break
+		}
+	}
+	if !tagged {
+		return pairs, nil
+	}
+	decodeEntryCounterPairs(pairs, func(kind string, amount int32) {
+		grants = append(grants, EntryCounterGrant{Kind: kind, Amount: amount})
+	})
+	for _, pr := range pairs {
+		if pr[0]&entryCounterMarker == 0 {
+			rest = append(rest, pr)
+		}
+	}
+	return rest, grants
 }
 
 // EntryCounterKindEncodable reports whether a counter kind can travel in the

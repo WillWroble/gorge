@@ -37,8 +37,13 @@ func (e *Engine) derivedScalar(id state.ObjID) (power, toughness int32) {
 	if p, t, ok := e.printedPT(o, f, active); ok {
 		return p, t
 	}
+	// A layer-7 Affected$ naming a colour (Heraldic Banner's
+	// Creature.ChosenColor) on a board with a live layer-5 effect must read
+	// the object's finished layer-5 colours (CR 613.1e before 613.4c), which
+	// only derivedWith's walk stashes for its P/T walk: delegate too.
+	hasLColor := e.activeSummaryOf(active).hasLColor
 	for i := range active {
-		if ce := &active[i]; ce.Layer == LPT && effects.SpecReadsKeywords(ce.Affects) {
+		if ce := &active[i]; ce.Layer == LPT && (effects.SpecReadsKeywords(ce.Affects) || hasLColor && specBindFacts(ce.Affects).colors) {
 			d := e.derivedWith(id, 0)
 			return d.Power, d.Toughness
 		}

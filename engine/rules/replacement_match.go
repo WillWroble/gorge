@@ -261,7 +261,7 @@ func (e *Engine) replacementMatchesRememberedUngatedBy(r cards.Repl, source stat
 				events.IsFaceDownEntry(ev.Counter) {
 				sc.AsFaceDown = true
 			}
-			if !ok2 || !e.matchesSpec(spec, ev.Obj, sc) {
+			if !ok2 || !e.enteringObjectMatches(spec, ev, sc) {
 				return false
 			}
 		}
@@ -1300,4 +1300,25 @@ func (e *Engine) noteBatchDeparture(ev events.Event) {
 	if o := e.G.Obj(ev.Obj); o != nil && o.Zone == state.ZBattlefield {
 		e.batchReplSources = append(e.batchReplSources, ev.Obj)
 	}
+}
+
+// enteringObjectMatches is a Moved replacement's ValidCard$ match against the
+// moving object. A token copy minted by CopyPermanent (CR 707.2: it copies
+// the original's as-enters text) waits in its mint zone, still IsCopy, until
+// its entry folds; the filter's CR 707.10h rule reads such an off-stack,
+// off-battlefield copy as having ceased to exist and matches nothing, so
+// Heraldic Banner's "As this enters, choose a color" (CR 614.12) never
+// applied to its copy. The entering mint is a real permanent-to-be: it is
+// matched by value with the ceased-copy marker cleared. Every other move
+// keeps the ordinary matcher.
+func (e *Engine) enteringObjectMatches(spec string, ev events.Event, sc effects.SpecContext) bool {
+	if ev.Kind == events.MoveZone && ev.To == state.ZBattlefield {
+		if o := e.G.Obj(ev.Obj); o != nil && o.IsCopy && o.IsToken &&
+			o.Zone != state.ZStack && o.Zone != state.ZBattlefield {
+			entering := *o
+			entering.IsCopy = false
+			return effects.MatchesObjectCtx(e.G, spec, &entering, sc)
+		}
+	}
+	return e.matchesSpec(spec, ev.Obj, sc)
 }

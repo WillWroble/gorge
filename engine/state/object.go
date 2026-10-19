@@ -21,6 +21,16 @@ type Target struct {
 	IsPlayer bool
 }
 
+// TargetStamp records which incarnation of an object a stack object
+// targeted (CR 400.7): Obj's Incarnation at the moment the target was
+// chosen. It is kept beside Targets rather than inside Target so the
+// target value itself (compared and used as a map key across the effects
+// tier) is unchanged.
+type TargetStamp struct {
+	Obj         ObjID
+	Incarnation uint32
+}
+
 // GoadEffect is one independently-lived CR 701.38 goad relationship.
 // Source and Duration preserve the condition Forge attached to the effect;
 // Controller is the target creature's controller when an AsLongAsControl
@@ -902,11 +912,11 @@ type Object struct {
 	// object's LATEST events.PutOnStack: the same pair a reverse scan of the
 	// event log returns (rules' latestCastOrigin). The fold in events.Apply
 	// writes them on every PutOnStack, so a log-only replay derives the same
-	// values and a clone carries them by value; unlike PreStackEntry* they are
-	// NOT cleared by the reverse move, because the PutOnStack the scan finds
-	// remains in the log after a CR 733.1 reversal. HasLatestCast is false
-	// only until an object's first PutOnStack (a card cheated into play was
-	// never cast).
+	// values and a clone carries them by value. HasLatestCast is false until
+	// an object's first PutOnStack (a card cheated into play was never cast)
+	// and again after any later zone change other than the resolution's
+	// stack -> battlefield entry (CR 400.7: a countered, reversed, blinked or
+	// reanimated card is a new object that was never cast).
 	LatestCastFrom Zone
 	LatestCastBy   PlayerID
 	HasLatestCast  bool
@@ -933,6 +943,17 @@ type Object struct {
 	Ability           *cards.SA
 	Source            ObjID
 	SourceIncarnation uint32
+	// PushSourceStamped, PushSourceOnBattlefield and PushSourceIncarnation
+	// are folded by events.Apply when an ability object is put on the stack:
+	// whether its Source was on the battlefield then, and as which
+	// incarnation (stamped whatever the source's zone, so a graveyard-
+	// activated "return this card" sees the card's later trip across the
+	// battlefield). Unlike SourceIncarnation they never drop the ability; an
+	// effect that acts on "this permanent" reads them to skip a source that
+	// has since become a new object (CR 400.7).
+	PushSourceStamped       bool
+	PushSourceOnBattlefield bool
+	PushSourceIncarnation   uint32
 	// GrantedBy is the GRANTOR of a cross-object granted activated ability
 	// (events.GrantAbilityPush's IDs[0], CR 613.1f): the Equipment or Aura
 	// whose static gives the recipient (Source) the ability. Forge's
@@ -959,6 +980,14 @@ type Object struct {
 	// "what does this object target" readers (the view, the crime check)
 	// need.
 	SubTargets []Target
+	// TargetStamps holds, for every object target folded into Targets or
+	// SubTargets (events.foldTargetsChosen, a StackCopy's inherited or
+	// named targets), the target's Incarnation when it was chosen. The CR
+	// 608.2b resolution recheck drops a target whose Incarnation has moved
+	// since: an object that left the battlefield and came back (or entered
+	// it) is a new object (CR 400.7) even though its ObjID is the same.
+	// Cleared with Targets on a zone change.
+	TargetStamps []TargetStamp
 	// Remembered carries a triggered ability's Ctx.Remembered from the
 	// moment it was queued (rules.checkTriggers) through to resolution. An
 	// ability object has no Face (Ruling F3) and therefore no card-script
@@ -1676,7 +1705,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [26]byte
+	_ [58]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
@@ -1732,7 +1761,7 @@ type ExileReturnEntry struct {
 // An unattached bestowed card, and any object printed without Bestow, is
 // never "bestowed attached".
 func (o *Object) BestowedAttached() bool {
-	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeyword("Bestow")
+	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeywordRef(kwRefBestow)
 }
 
 // BestowedAuraSpell reports whether o is a card printed with Bestow that is
@@ -1750,7 +1779,7 @@ func (o *Object) BestowedAttached() bool {
 // (no FlagBestowed), is never a bestowed Aura spell.
 func (o *Object) BestowedAuraSpell() bool {
 	return o.Zone == ZStack && o.CastFlags&FlagBestowed != 0 &&
-		o.Face() != nil && o.Face().HasKeyword("Bestow")
+		o.Face() != nil && o.Face().HasKeywordRef(kwRefBestow)
 }
 
 // ReconfiguredAttached reports whether o is a card printed with Reconfigure
@@ -1762,7 +1791,7 @@ func (o *Object) BestowedAuraSpell() bool {
 // An unattached reconfigure card, and any object printed without
 // Reconfigure, is never "reconfigured attached".
 func (o *Object) ReconfiguredAttached() bool {
-	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeyword("Reconfigure")
+	return o.AttachedTo != 0 && o.Face() != nil && o.Face().HasKeywordRef(kwRefReconfigure)
 }
 
 // ImpendingDormant reports whether o is a permanent cast for its impending
@@ -2184,6 +2213,7 @@ type cloneArena struct {
 	ids []ObjID
 	tgs []Target
 	ctr []Counter
+	stm []TargetStamp
 }
 
 // carveClone is append([]T(nil), src...) carved from *buf when it has room:
@@ -2205,11 +2235,12 @@ func carveClone[T any](buf *[]T, src []T) []T {
 }
 
 // cloneArenaNeed adds the element counts o's carved slices need to a.
-func (o *Object) cloneArenaNeed(ids, tgs, ctr *int) {
+func (o *Object) cloneArenaNeed(ids, tgs, ctr, stm *int) {
 	*ids += len(o.BlockedBy) + len(o.BlockedByThisTurn) + len(o.BlockedThisTurn) + len(o.CrewedVehicles) + len(o.Imprinted) + len(o.DamageTakenByGame) +
 		len(o.DamageTakenThisTurnBy) + len(o.ImprintTokens) + len(o.EncodedCards) + len(o.SeekFound) + len(o.ExiledCards)
 	*tgs += len(o.Targets) + len(o.SubTargets) + len(o.Remembered) + len(o.Chosen)
 	*ctr += len(o.Counters)
+	*stm += len(o.TargetStamps)
 }
 
 // cloneDeepIntoArena is CloneDeepInto carving the common slice copies from a
@@ -2223,6 +2254,7 @@ func (o *Object) cloneDeepIntoArena(c *Object, a *cloneArena) {
 	c.Counters = carveClone(&a.ctr, o.Counters)
 	c.Targets = carveClone(&a.tgs, o.Targets)
 	c.SubTargets = carveClone(&a.tgs, o.SubTargets)
+	c.TargetStamps = carveClone(&a.stm, o.TargetStamps)
 	c.Remembered = carveClone(&a.tgs, o.Remembered)
 	c.BlockedBy = carveClone(&a.ids, o.BlockedBy)
 	c.BlockedByThisTurn = carveClone(&a.ids, o.BlockedByThisTurn)
