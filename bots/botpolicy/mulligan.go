@@ -32,37 +32,18 @@ const (
 	MulliganNever
 )
 
-// mulliganByRule answers a KMulligan ask under a non-default rule. ok is
-// false for MulliganCoin, which decide answers itself.
+// mulliganByRule dispatches a KMulligan ask to the registered policy named
+// by b.Mulligan (mulligan_registry.go). ok is false for the default arm:
+// the coin policy returns it itself (decide answers coin off the rng), and
+// so does an id beyond the registry or an empty decision.
 func (b Board) mulliganByRule(d *decision.Decision) (choices []int, ok bool) {
-	if b.Mulligan == MulliganCoin || len(d.Options) == 0 {
+	if len(d.Options) == 0 {
 		return nil, false
 	}
-	if d.Options[0].Kind == "bottom" {
-		if b.Mulligan == MulliganLands || b.Mulligan == MulliganConstructed {
-			return b.landBottoming(d), true
-		}
-		return b.chooseDiscard(d), true
+	if int(b.Mulligan) >= len(mulliganRegistry) {
+		return nil, false
 	}
-	keep, mull := -1, -1
-	for _, o := range d.Options {
-		switch o.Kind {
-		case "keep":
-			keep = o.Index
-		case "mulligan":
-			mull = o.Index
-		}
-	}
-	if keep < 0 {
-		return nil, false // not a keep/mulligan shape: the default arm decides
-	}
-	if mull >= 0 && b.Mulligan == MulliganLands && !b.keepByLands(keepBottomCount(d.Prompt)) {
-		return []int{mull}, true
-	}
-	if mull >= 0 && b.Mulligan == MulliganConstructed && !b.keepConstructed(keepBottomCount(d.Prompt)) {
-		return []int{mull}, true
-	}
-	return []int{keep}, true
+	return mulliganRegistry[int(b.Mulligan)].Answer(b, d)
 }
 
 // isLandCard is the policy's land test for a hand card: a basic, or a
