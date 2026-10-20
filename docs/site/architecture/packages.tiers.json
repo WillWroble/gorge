@@ -69,6 +69,11 @@
       "status": "SUPP",
       "purpose": "Thin registration of a built-in policy in the bots registry."
     },
+    "bots/mz": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: MageZero's MCTS, a perfect-information engine seat."
+    },
     "bots/mz/atomic": {
       "tier": "bots",
       "status": "EXT",
@@ -78,6 +83,11 @@
       "tier": "bots",
       "status": "EXT",
       "purpose": "mz-gorge: the mage fork's MageZero decks."
+    },
+    "bots/mz/encode": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: the state encoder's functional and logical hashes."
     },
     "bots/netsimd": {
       "tier": "bots",

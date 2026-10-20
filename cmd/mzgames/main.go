@@ -19,6 +19,7 @@ import (
 
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
+	"github.com/adams-shaun/gorge/bots/mz"
 	"github.com/adams-shaun/gorge/bots/mz/decks"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/rules"
@@ -42,6 +43,9 @@ func main() {
 	gap := flag.Bool("gap", false, "instead of game lines, count castable casts autotap offers nothing for (principle 3)")
 	atomicFlag := flag.Bool("atomic", false, "instead of game lines, play random games one atomic pick at a time (principle 2)")
 	offer := flag.Bool("offer", false, "with -gap: extend every priority decision with EnsurePotentialCasts and play each extra cast on a clone")
+	mzFlag := flag.Bool("mz", false, "seat 0 is the mz search bot (offline), seat 1 gorge's bot; prints game lines and search stats")
+	budget := flag.Int("budget", mz.Defaults().Budget, "with -mz: search_budget")
+	prune := flag.Bool("prune", true, "with -mz: prune_duplicate_states")
 	flag.Parse()
 
 	reg, err := cards.SharedCorpus(*dir)
@@ -53,6 +57,8 @@ func main() {
 	switch {
 	case *gap:
 		err = runGap(os.Stdout, reg, names, *games, *seed, *offer)
+	case *mzFlag:
+		err = runMZ(os.Stdout, reg, names, *games, *seed, *tap, *budget, *prune)
 	case *atomicFlag:
 		err = runAtomic(os.Stdout, reg, names, *games, *seed, *tap)
 	default:
