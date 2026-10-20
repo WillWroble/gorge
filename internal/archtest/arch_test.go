@@ -151,6 +151,9 @@ func set(s string) map[string]bool {
 // beside its CPU time; every game and seed is fixed by its flags.
 // cmd/mzgames (mz-gorge's cost row) reads it the same way: it times clones,
 // steps and views at fixed roots and never feeds the timing back into play.
+// bots/mz (mz-gorge's MageZero search) bounds a search by the mage fork's
+// timeout_ms, as XMage does; offline runs set it long enough that the
+// visit budget always ends the search, so play stays deterministic.
 // server/host/manabrewhttp uses time only for SSE keep-alive and write
 // deadlines. No game, event, view or replay reads the clock, and intents reach
 // the engine only through SubmitIntent.
@@ -168,6 +171,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/paymirror":            true,
 		module + "/cmd/enginebench":          true,
 		module + "/cmd/mzgames":              true,
+		module + "/bots/mz":                  true,
 		module + "/server/host/manabrewhttp": true,
 	}
 	for path, p := range packages(t) {
