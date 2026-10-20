@@ -43,7 +43,9 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 			})
 		}
 	}
-	derived, _ := ch.(interface{ Derived(state.ObjID) effects.Chars })
+	derived, _ := ch.(interface {
+		Derived(state.ObjID) effects.Chars
+	})
 	card := func(cv *CardView) {
 		o := g.Obj(cv.ID)
 		if o == nil {
@@ -448,6 +450,21 @@ func opaqueID(t reflect.Type, field string) bool {
 		(field == "ID" && t == reflect.TypeOf(decision.PaymentPlan{}))
 }
 
+// snapshotName names the types a state value may embed a copy of the game
+// in: a snapshot (last-known information, a checkpoint) is not expanded, and
+// an event log is history.
+func snapshotName(t reflect.Type) (string, bool) {
+	switch {
+	case t == reflect.TypeOf(state.Game{}):
+		return "game-snapshot", true
+	case t == reflect.TypeOf(events.Log{}):
+		return "log", true
+	case t.Name() == "Engine" && strings.HasSuffix(t.PkgPath(), "/engine/rules"):
+		return "engine-snapshot", true
+	}
+	return "", false
+}
+
 // stateText writes v as deterministic text: struct fields by name, map
 // entries sorted, pointers followed, card data named rather than expanded.
 func stateText(b *strings.Builder, v reflect.Value, depth int) {
@@ -484,8 +501,6 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 			b.WriteString("card:" + strconv.Quote(v.Elem().FieldByName("Path").String()))
 		case reflect.TypeOf(cards.Face{}):
 			b.WriteString("face:" + strconv.Quote(v.Elem().FieldByName("Name").String()))
-		case reflect.TypeOf(state.Game{}):
-			b.WriteString("game-snapshot")
 		default:
 			stateText(b, v.Elem(), depth+1)
 		}
@@ -510,6 +525,10 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 		sort.Strings(entries)
 		b.WriteString("map[" + strings.Join(entries, " ") + "]")
 	case reflect.Struct:
+		if name, ok := snapshotName(v.Type()); ok {
+			b.WriteString(name)
+			return
+		}
 		b.WriteByte('{')
 		first := true
 		for i := 0; i < v.NumField(); i++ {

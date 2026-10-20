@@ -285,7 +285,22 @@ func diffAt(path string, x, y any) (string, string) {
 			}
 		}
 	}
+	if xs, ok := x.(string); ok {
+		if ys, ok := y.(string); ok {
+			return path, stringDiff(xs, ys)
+		}
+	}
 	return path, truncate(fmt.Sprintf("%v vs %v", x, y), 200)
+}
+
+// stringDiff shows two strings around their first difference.
+func stringDiff(a, b string) string {
+	i := 0
+	for i < len(a) && i < len(b) && a[i] == b[i] {
+		i++
+	}
+	lo := max(0, i-120)
+	return fmt.Sprintf("…%s… vs …%s…", a[lo:min(len(a), i+80)], b[lo:min(len(b), i+80)])
 }
 
 func truncate(s string, n int) string {
