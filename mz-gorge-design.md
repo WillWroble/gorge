@@ -2,7 +2,7 @@
 
 mz-gorge is MageZero running on the gorge rules engine.
 
-This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `graph-encoder` HEAD) fills in the details. gorge provides the rules.
+This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `graph-encoder` HEAD) fills in the details: it is the ground-truth spec for behaviour and design unless this document says otherwise. gorge provides the rules.
 
 ## Principles
 
@@ -28,6 +28,14 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 
 **10. Hidden information** is the one departure from XMage. Start with the existing perfect-information MCTS, but leave the door open for IS-MCTS afterwards.
 
+## Behaviour carried over from XMage
+
+- **Microstate is in the view.** Every partial state, including a half-made factorized decision, is in the view, and order invariant. No separate microstate store and no decision sequences (XMage's `PlayerHistory` target/choice/use/num sequences are not carried over).
+- **Each microstate is its own tree node.**
+- **Sim game vs base game.** Principle 8 binds only the base game: there the bot answers gorge's ordinary decisions. Inside its sim games it may use any decision API it needs.
+- **Tree reuse falls back to a rebuild.** When the tree can't be reused (no logical match, or the match was pruned), it is rebuilt from scratch, as in XMage.
+- **Every action leads to a legal priority state.** The bot only takes an action whose subtree reaches a legal priority state, and search time is extended until that holds, as in XMage.
+
 ## Layers
 
 - **Engine:** 0, 1
@@ -40,8 +48,8 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 - **Microdecision:** any non-priority decision.
 - **Atomic decision:** a reusable decision type that every microdecision is built from.
 - **Decision scope:** a run of consecutive decisions made by the same player.
-- **Logical-state match:** the same state, down to the same objects.
-- **Functionally identical:** the same from here on, whatever the order things were picked in or which identical object is which.
+- **Logical-state match:** a matching root guarantees a matching tree. Same playouts under the same fixed decisions, and the same object IDs, because actions passed from the sim tree to the base game reference IDs. Stricter than functionally identical. Under hidden information it would also require matching hands and libraries.
+- **Functionally identical:** the same on paper from here on, whatever the order things were picked in or which identical object is which. Playing either of two copies of a card in hand is the same state. This applies to factorized microdecision states too: attacking with A then B is the same state as B then A. Used for deduplication.
 - **Autotap / manual tap:** mana paid automatically / mana abilities taken as actions.
 - **Offline MCTS:** search with the heuristic value, no network.
 
