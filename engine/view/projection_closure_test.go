@@ -101,7 +101,7 @@ func TestViewMarshalsClosed(t *testing.T) {
 		// and the records, which can name hidden cards, only under
 		// Omniscient visibility.
 		"status": true, "delayed": true, "extra_turn_queue": true, "extra_phases": true,
-		"entered": true, "excess_damage_victims": true,
+		"entered": true, "excess_damage_victims": true, "engine": true,
 	})
 	// round (added by task ui12) is a projection of the public turn counter
 	// and the public per-seat lost flags -- how many full passes the surviving

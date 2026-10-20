@@ -118,6 +118,16 @@ func (d Divergence) Error() string { return "resolve: tape kernel divergence: " 
 // Posed reports whether a tape resolution is posed (S0 held).
 func (k *Kernel) Posed() bool { return k.posed != nil }
 
+// PosedTape is the posed resolution's tape: the intents logged since it
+// began (the resolution-starting pass and every answer since), nil when no
+// resolution is posed. With the stack it is what the resolution will do next.
+func (k *Kernel) PosedTape(l *events.Log) []decision.Intent {
+	if k.posed == nil {
+		return nil
+	}
+	return l.Intents[k.posed.k0:]
+}
+
 // SetAnswerer installs (nil removes) the synchronous answerer.
 func (k *Kernel) SetAnswerer(f Answerer) { k.answerer = f }
 

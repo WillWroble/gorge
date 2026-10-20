@@ -1,9 +1,13 @@
 package view
 
 import (
+	"reflect"
 	"slices"
+	"sort"
 	"strconv"
+	"strings"
 
+	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -12,7 +16,8 @@ import (
 // ProjectDynamic is ProjectForControlledFor plus the dynamic state no other
 // projection carries: Status and Links on every projected card, stack object
 // and player, and the game's. Under Omniscient visibility it also copies the
-// game's dynamic records (View.Delayed and the rest). It is the view
+// game's dynamic records (View.Delayed and the rest) and the engine's own
+// state (View.Engine, when ch offers EngineState). It is the view
 // mz-gorge's bot reads; every other caller's projection is unchanged.
 func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibility, alsoVisible []state.PlayerID, d *decision.Decision) View {
 	v := ProjectForControlledFor(g, ch, viewer, vis, alsoVisible, d)
@@ -26,6 +31,16 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 		v.ExtraPhases = slices.Clone(g.ExtraPhases)
 		v.Entered = slices.Clone(g.Entered)
 		v.ExcessDamageVictims = slices.Clone(g.ExcessDamageVictims)
+		if es, ok := ch.(interface {
+			EngineState(visit func(field string, v reflect.Value))
+		}); ok {
+			v.Engine = map[string]string{}
+			es.EngineState(func(field string, x reflect.Value) {
+				var b strings.Builder
+				stateText(&b, x, 0)
+				v.Engine[field] = b.String()
+			})
+		}
 	}
 	card := func(cv *CardView) {
 		if o := g.Obj(cv.ID); o != nil {
@@ -400,4 +415,96 @@ func gameFacts(g *state.Game) Status {
 	f.num("delayed_next", int32(g.DelayedNext))
 	f.num("clock", int32(g.Clock))
 	return f.s
+}
+
+// opaqueID reports whether a field names rather than carries state: an
+// identifier the engine derives for an offered payment (a payment action's
+// or plan's id), or a position in the event log (Seq, SourceZoneSeq), which
+// is history.
+func opaqueID(t reflect.Type, field string) bool {
+	return field == "ActionID" || strings.HasSuffix(field, "Seq") ||
+		(field == "ID" && t == reflect.TypeOf(decision.PaymentPlan{}))
+}
+
+// stateText writes v as deterministic text: struct fields by name, map
+// entries sorted, pointers followed, card data named rather than expanded.
+func stateText(b *strings.Builder, v reflect.Value, depth int) {
+	if depth > 12 {
+		b.WriteString("…")
+		return
+	}
+	switch v.Kind() {
+	case reflect.Bool:
+		b.WriteString(strconv.FormatBool(v.Bool()))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		b.WriteString(strconv.FormatInt(v.Int(), 10))
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		b.WriteString(strconv.FormatUint(v.Uint(), 10))
+	case reflect.Float32, reflect.Float64:
+		b.WriteString(strconv.FormatFloat(v.Float(), 'g', -1, 64))
+	case reflect.String:
+		b.WriteString(strconv.Quote(v.String()))
+	case reflect.Interface:
+		if v.IsNil() {
+			b.WriteString("nil")
+			return
+		}
+		stateText(b, v.Elem(), depth+1)
+	case reflect.Pointer:
+		if v.IsNil() {
+			b.WriteString("nil")
+			return
+		}
+		switch v.Type().Elem() {
+		case reflect.TypeOf(cards.SA{}):
+			b.WriteString("sa:" + strconv.Quote(v.Elem().FieldByName("Line").String()))
+		case reflect.TypeOf(cards.Card{}):
+			b.WriteString("card:" + strconv.Quote(v.Elem().FieldByName("Path").String()))
+		case reflect.TypeOf(cards.Face{}):
+			b.WriteString("face:" + strconv.Quote(v.Elem().FieldByName("Name").String()))
+		case reflect.TypeOf(state.Game{}):
+			b.WriteString("game-snapshot")
+		default:
+			stateText(b, v.Elem(), depth+1)
+		}
+	case reflect.Slice, reflect.Array:
+		b.WriteByte('[')
+		for i := 0; i < v.Len(); i++ {
+			if i > 0 {
+				b.WriteByte(' ')
+			}
+			stateText(b, v.Index(i), depth+1)
+		}
+		b.WriteByte(']')
+	case reflect.Map:
+		entries := make([]string, 0, v.Len())
+		for it := v.MapRange(); it.Next(); {
+			var e strings.Builder
+			stateText(&e, it.Key(), depth+1)
+			e.WriteByte(':')
+			stateText(&e, it.Value(), depth+1)
+			entries = append(entries, e.String())
+		}
+		sort.Strings(entries)
+		b.WriteString("map[" + strings.Join(entries, " ") + "]")
+	case reflect.Struct:
+		b.WriteByte('{')
+		first := true
+		for i := 0; i < v.NumField(); i++ {
+			if v.Field(i).IsZero() || opaqueID(v.Type(), v.Type().Field(i).Name) {
+				continue
+			}
+			if !first {
+				b.WriteByte(' ')
+			}
+			first = false
+			b.WriteString(v.Type().Field(i).Name + ":")
+			stateText(b, v.Field(i), depth+1)
+		}
+		b.WriteByte('}')
+	case reflect.Func, reflect.Chan, reflect.UnsafePointer:
+		b.WriteString(v.Kind().String())
+	default:
+		b.WriteString("?")
+	}
 }

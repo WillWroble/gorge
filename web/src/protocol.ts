@@ -1908,6 +1908,13 @@ export interface View {
   extra_phases?: ExtraPhase[];
   entered?: ZoneEntry[];
   excess_damage_victims?: ExcessDamageVictim[];
+  /**
+   * Engine is the engine's dynamic state outside the game (ledgers,
+   * trigger counts, continuous effects, last-known information, a paused
+   * cast or resolution), one deterministic text per field the Chars'
+   * EngineState visits, under Omniscient visibility only.
+   */
+  engine?: Record<string, string>;
 }
 
   /**

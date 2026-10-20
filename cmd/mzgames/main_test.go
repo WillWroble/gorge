@@ -7,6 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/mz/decks"
+	"github.com/adams-shaun/gorge/engine/cards"
+	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
+	"github.com/adams-shaun/gorge/engine/view"
+	"github.com/adams-shaun/gorge/testkit/bench"
 	"github.com/adams-shaun/gorge/testkit/testutil"
 )
 
@@ -52,6 +59,47 @@ func TestGoldenHeads(t *testing.T) {
 	for i := range got {
 		if got[i] != exp[i] {
 			t.Errorf("line %d\n got: %s\nwant: %s", i+1, got[i], exp[i])
+		}
+	}
+}
+
+// TestProjectDynamicEveryDecision projects the dynamic omniscient view at
+// every decision of the golden games: it must never panic (a panic inside a
+// driver hook would only show up as an aborted game).
+func TestProjectDynamicEveryDecision(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	for _, names := range goldenPairs {
+		ds := make([][]*cards.Card, 2)
+		for i, n := range names {
+			d, err := decks.Load(reg, n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ds[i] = d
+		}
+		for _, auto := range []bool{true, false} {
+			cfg := rules.Config{Seed: 1, Names: names, Decks: ds, Tokens: reg.Tokens, NameUniverse: reg.Universe()}
+			seats, err := newSeats(1, auto)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var e *rules.Engine
+			n := 0
+			hooks := bench.Hooks{
+				Setup: func(x *rules.Engine) { e = x },
+				Decision: func(_ int, d *decision.Decision, _ decision.Intent, _ *botpolicy.Board) error {
+					v := view.ProjectDynamic(e.G, e, view.NoSeat, view.Omniscient, nil, d)
+					if v.Status["next_id"] == 0 {
+						t.Fatalf("decision %d: no game status", n)
+					}
+					n++
+					return nil
+				},
+			}
+			o, _, err := bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)
+			if err != nil || bench.IsAbort(o.StallOn) {
+				t.Fatalf("%v auto=%v: %v %s %s", names, auto, err, o.StallOn, o.Livelock)
+			}
 		}
 	}
 }

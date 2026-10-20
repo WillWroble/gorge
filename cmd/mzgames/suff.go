@@ -61,8 +61,12 @@ func probeSufficiency(out io.Writer, reg *cards.Registry, names []string, ds [][
 				return nil
 			},
 		}
-		if _, _, err := bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks); err != nil {
+		o, _, err := bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)
+		if err != nil {
 			return fmt.Errorf("seed %d: %w", s, err)
+		}
+		if bench.IsAbort(o.StallOn) {
+			return fmt.Errorf("seed %d: game aborted: %s %s", s, o.StallOn, o.Livelock)
 		}
 	}
 	mode := "manual"

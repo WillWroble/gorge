@@ -145,6 +145,11 @@ type View struct {
 	ExtraPhases         []state.ExtraPhase         `json:"extra_phases,omitempty"`
 	Entered             []state.ZoneEntry          `json:"entered,omitempty"`
 	ExcessDamageVictims []state.ExcessDamageVictim `json:"excess_damage_victims,omitempty"`
+	// Engine is the engine's dynamic state outside the game (ledgers,
+	// trigger counts, continuous effects, last-known information, a paused
+	// cast or resolution), one deterministic text per field the Chars'
+	// EngineState visits, under Omniscient visibility only.
+	Engine map[string]string `json:"engine,omitempty"`
 }
 
 // commanderViews builds a player's commander roster and its parallel
