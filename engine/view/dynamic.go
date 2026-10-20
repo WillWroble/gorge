@@ -9,6 +9,7 @@ import (
 
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/effects"
 	"github.com/adams-shaun/gorge/engine/events"
 	"github.com/adams-shaun/gorge/engine/state"
 )
@@ -42,9 +43,15 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 			})
 		}
 	}
+	derived, _ := ch.(interface{ Derived(state.ObjID) effects.Chars })
 	card := func(cv *CardView) {
-		if o := g.Obj(cv.ID); o != nil {
-			cv.Status, cv.Links = objectFacts(o)
+		o := g.Obj(cv.ID)
+		if o == nil {
+			return
+		}
+		cv.Status, cv.Links = objectFacts(o)
+		if derived != nil && (o.Zone == state.ZBattlefield || o.Zone == state.ZStack) {
+			cv.Status = derivedFacts(cv.Status, derived.Derived(cv.ID))
 		}
 	}
 	for i := range v.Players {
@@ -352,6 +359,21 @@ func objectFacts(o *state.Object) (Status, Links) {
 	f.flag("cast_door", o.CastDoor)
 	f.num("locked_doors", int32(o.LockedDoors))
 	return f.s, f.l
+}
+
+// derivedFacts adds a permanent's or spell's layer-derived characteristics
+// that CardView has no typed field for (CR 613): colours, base P/T, a
+// grant of every creature type, and changed rules text.
+func derivedFacts(s Status, d effects.Chars) Status {
+	f := facts{s: s}
+	for _, c := range d.Colors {
+		f.num("color:"+string(c), 1)
+	}
+	f.num("base_power", d.BasePower)
+	f.num("base_toughness", d.BaseToughness)
+	f.flag("all_creature_types", d.AllCreatureTypes)
+	f.str("text", d.Text)
+	return f.s
 }
 
 // playerFacts is p's dynamic state beyond PlayerView's typed fields.

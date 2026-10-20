@@ -84,13 +84,18 @@ func TestProjectDynamicEveryDecision(t *testing.T) {
 				t.Fatal(err)
 			}
 			var e *rules.Engine
-			n := 0
+			n, derived := 0, false
 			hooks := bench.Hooks{
 				Setup: func(x *rules.Engine) { e = x },
 				Decision: func(_ int, d *decision.Decision, _ decision.Intent, _ *botpolicy.Board) error {
 					v := view.ProjectDynamic(e.G, e, view.NoSeat, view.Omniscient, nil, d)
 					if v.Status["next_id"] == 0 {
 						t.Fatalf("decision %d: no game status", n)
+					}
+					for _, p := range v.Players {
+						for _, c := range p.Battlefield {
+							derived = derived || c.Status["base_power"] != 0
+						}
 					}
 					n++
 					return nil
@@ -99,6 +104,9 @@ func TestProjectDynamicEveryDecision(t *testing.T) {
 			o, _, err := bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks)
 			if err != nil || bench.IsAbort(o.StallOn) {
 				t.Fatalf("%v auto=%v: %v %s %s", names, auto, err, o.StallOn, o.Livelock)
+			}
+			if !derived {
+				t.Errorf("%v auto=%v: no derived characteristics in the dynamic view", names, auto)
 			}
 		}
 	}
