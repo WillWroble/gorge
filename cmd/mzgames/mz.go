@@ -50,9 +50,10 @@ func runMZ(out io.Writer, reg *cards.Registry, names []string, games int, seed u
 				result = "winner=" + names[o.WinnerSeat]
 			}
 			st := bot.Stats
-			fmt.Fprintf(out, "mz seed=%d tap=%s %s-vs-%s turns=%d %s chain=%s searches=%d sims=%d sims_per_s=%.0f us_per_sim=%.0f reused=%d rebuilt=%d illegal=%d dup=%d replaced=%d\n",
+			fmt.Fprintf(out, "mz seed=%d tap=%s %s-vs-%s turns=%d %s chain=%s searches=%d sims=%d sims_per_s=%.0f us_per_sim=%.0f engine_share=%.2f hash_share=%.2f reused=%d rebuilt=%d illegal=%d dup=%d replaced=%d\n",
 				s, mode, names[0], names[1], o.Turns, result, e.L.Head(), st.Searches, st.Sims,
 				float64(st.Sims)/st.Elapsed.Seconds(), float64(st.Elapsed.Microseconds())/float64(max(st.Sims, 1)),
+				st.Engine.Seconds()/st.Elapsed.Seconds(), st.Hash.Seconds()/st.Elapsed.Seconds(),
 				st.Reused, st.Rebuilt, st.Illegal, st.Duplicates, st.Replaced)
 		}
 	}

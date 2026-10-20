@@ -17,9 +17,10 @@ import (
 // each decision by searching each of its atoms in turn, reusing the tree
 // from one search to the next.
 type Bot struct {
-	opt  Options
-	me   state.PlayerID
-	root *node
+	opt    Options
+	me     state.PlayerID
+	root   *node
+	spares []rules.Spare
 	// Stats counts the work of every search the bot ran.
 	Stats Stats
 }
@@ -34,6 +35,8 @@ type Stats struct {
 	Duplicates int // new nodes pruned as duplicates
 	Replaced   int // old nodes pruned for a duplicate on a better path
 	Elapsed    time.Duration
+	Engine     time.Duration // of Elapsed, in the engine: copying a node and stepping it to the next
+	Hash       time.Duration // of Elapsed, hashing nodes
 }
 
 // New returns a bot searching with opt.
@@ -107,7 +110,7 @@ func (b *Bot) choose(e *rules.Engine) *node {
 			b.Stats.Reused++
 			root = m
 			if m.unchecked > 0 {
-				m.eng = fresh.eng
+				m.eng = e.Clone()
 			}
 		}
 	}
@@ -181,6 +184,8 @@ func (b *Bot) dedup(cur *node) bool {
 			b.Stats.Duplicates++
 			cur.backprop(m.mean(), 1, discount)
 			cur.parent.prune(cur, discount)
+			b.release(cur.eng)
+			cur.eng = nil
 			return true
 		}
 		b.Stats.Replaced++

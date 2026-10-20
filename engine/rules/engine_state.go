@@ -2,7 +2,9 @@ package rules
 
 import (
 	"reflect"
+	"slices"
 	"sort"
+	"sync"
 
 	"github.com/adams-shaun/gorge/engine/decision"
 )
@@ -15,24 +17,12 @@ import (
 // renders it, which is what makes the view a complete game state (principle
 // 1 of mz-gorge-design.md). It is a pure read.
 func (e *Engine) EngineState(visit func(field string, v reflect.Value)) {
-	var walk func(v reflect.Value)
-	walk = func(v reflect.Value) {
-		t := v.Type()
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			if f.Anonymous {
-				walk(v.Field(i))
-				continue
-			}
-			if tag := f.Tag.Get("clone"); len(tag) < 4 || tag[:4] != "deep" || skipsEngineState(f.Name) {
-				continue
-			}
-			if fv := v.Field(i); !fv.IsZero() {
-				visit(f.Name, fv)
-			}
+	v := reflect.ValueOf(e).Elem()
+	for _, f := range engineStateFields() {
+		if fv := v.FieldByIndex(f.Index); !fv.IsZero() {
+			visit(f.Name, fv)
 		}
 	}
-	walk(reflect.ValueOf(e).Elem())
 	// A posed resolution is what the stack and its tape say it is; the
 	// checkpoint the kernel holds to re-run it is machinery.
 	if tape := e.tape.PosedTape(e.L); tape != nil {
@@ -44,6 +34,27 @@ func (e *Engine) EngineState(visit func(field string, v reflect.Value)) {
 		visit("tape", reflect.ValueOf(answers))
 	}
 }
+
+// engineStateFields are the fields EngineState visits, worked out once.
+var engineStateFields = sync.OnceValue(func() []reflect.StructField {
+	var out []reflect.StructField
+	var walk func(t reflect.Type, index []int)
+	walk = func(t reflect.Type, index []int) {
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			f.Index = append(slices.Clone(index), i)
+			if f.Anonymous {
+				walk(f.Type, f.Index)
+				continue
+			}
+			if tag := f.Tag.Get("clone"); len(tag) >= 4 && tag[:4] == "deep" && !skipsEngineState(f.Name) {
+				out = append(out, f)
+			}
+		}
+	}
+	walk(reflect.TypeOf(Engine{}), nil)
+	return out
+})
 
 func skipsEngineState(field string) bool {
 	i := sort.SearchStrings(engineStateSkip, field)

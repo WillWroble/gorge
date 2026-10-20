@@ -21,9 +21,18 @@ import (
 // state (View.Engine, when ch offers EngineState). It is the view
 // mz-gorge's bot reads; every other caller's projection is unchanged.
 func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibility, alsoVisible []state.PlayerID, d *decision.Decision) View {
-	v := ProjectForControlledFor(g, ch, viewer, vis, alsoVisible, d)
+	var v View
+	ProjectDynamicInto(&v, g, ch, viewer, vis, alsoVisible, d)
+	return v
+}
+
+// ProjectDynamicInto is ProjectDynamic written into a caller-owned View, its
+// buffers reused as ProjectForControlledInto reuses them.
+func ProjectDynamicInto(v *View, g *state.Game, ch Chars, viewer state.PlayerID, vis Visibility, alsoVisible []state.PlayerID, d *decision.Decision) {
+	ProjectForControlledInto(v, g, ch, viewer, vis, alsoVisible, d)
+	v.Status, v.Delayed, v.ExtraTurnQueue, v.ExtraPhases, v.Entered, v.ExcessDamageVictims, v.Engine = nil, nil, nil, nil, nil, nil, nil
 	if g == nil {
-		return v
+		return
 	}
 	v.Status = gameFacts(g)
 	if vis == Omniscient {
@@ -50,6 +59,7 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 		Derived(state.ObjID) effects.Chars
 	})
 	card := func(cv *CardView) {
+		cv.Status, cv.Links = nil, nil
 		o := g.Obj(cv.ID)
 		if o == nil {
 			return
@@ -61,6 +71,7 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 	}
 	for i := range v.Players {
 		pv := &v.Players[i]
+		pv.Status, pv.Links = nil, nil
 		if int(pv.ID) < len(g.Players) {
 			pv.Status, pv.Links = playerFacts(&g.Players[pv.ID])
 		}
@@ -75,6 +86,7 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 	}
 	for i := range v.Stack {
 		sv := &v.Stack[i]
+		sv.Status, sv.Links = nil, nil
 		if sv.Kind != "spell" {
 			if o := g.Obj(sv.ID); o != nil {
 				sv.Status, sv.Links = objectFacts(o)
@@ -84,7 +96,6 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 			card(sv.Card)
 		}
 	}
-	return v
 }
 
 // IDRef prefixes an object ID in View.Engine's text.
@@ -162,7 +173,9 @@ func (f *facts) targets(k string, ts []state.Target) {
 
 func (f *facts) mana(k string, m state.Mana) {
 	for i, n := range m {
-		f.num(k+":"+strconv.Itoa(i), n)
+		if n != 0 {
+			f.num(k+":"+strconv.Itoa(i), n)
+		}
 	}
 }
 
@@ -394,8 +407,12 @@ func playerFacts(p *state.Player) (Status, Links) {
 	f.flag("drew_from_empty", p.DrewFromEmpty)
 	f.num("coin_flips_this_turn", p.CoinFlipsThisTurn)
 	for d := 0; d < 64; d++ {
-		f.flag("attacked_player_this_turn:"+strconv.Itoa(d), p.AttackedPlayersThisTurn&(1<<d) != 0)
-		f.flag("attacked_planeswalker_this_turn:"+strconv.Itoa(d), p.AttackedPlaneswalkersThisTurn&(1<<d) != 0)
+		if p.AttackedPlayersThisTurn&(1<<d) != 0 {
+			f.flag("attacked_player_this_turn:"+strconv.Itoa(d), true)
+		}
+		if p.AttackedPlaneswalkersThisTurn&(1<<d) != 0 {
+			f.flag("attacked_planeswalker_this_turn:"+strconv.Itoa(d), true)
+		}
 	}
 	f.num("last_upkeep_turn", p.LastUpkeepTurn)
 	f.mana("pool_snow", p.Snow)
