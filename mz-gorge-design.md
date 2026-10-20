@@ -36,6 +36,14 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 - **Tree reuse falls back to a rebuild.** When the tree can't be reused (no logical match, or the match was pruned), it is rebuilt from scratch, as in XMage.
 - **Tap mode in sims is the searching bot's own, for both players** (a departure from the fork's code, where each sim player keeps its original player's `autoTap`). In the base game only the mz seat's own mode applies; its autotap action set reaches it through `seat.PotentialCastConsumer` and the driver's `Engine.EnsurePotentialCasts`. As in XMage, every priority window is a checkpoint when the mode is manual tap.
 - **Trigger order and replacement choice are searched** (a departure from XMage, which takes the first): one pick at a time, like any other atomic decision.
+- **The encoder is the fork's.** Its graph is the network's input and its hash is the functional hash, so dedup is as coarse
+  as the fork's: what the encoder leaves out (library order, most engine internals) does not separate states. Feature names
+  match the fork's wherever gorge has the concept; card and ability text is gorge's own.
+- **The logical hash** is the functional hash plus the ID of every object in the graph and the decision's option list (an
+  action is an option index, so a reused node must offer the same options on the same objects). A tree rebuild only costs
+  time.
+- **Training data is not HDF5** (the one allowed departure from principle 6): the same datasets and row layout, written as
+  NumPy `.npz` with Go's standard library.
 - **Every action leads to a legal priority state.** The bot only takes an action whose subtree reaches a legal priority state, and search time is extended until that holds, as in XMage.
 
 ## Layers
@@ -51,7 +59,7 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 - **Atomic decision:** a reusable decision type that every microdecision is built from.
 - **Decision scope:** a run of consecutive decisions made by the same player.
 - **Functionally identical:** the same on paper from here on, whatever the order things were picked in or which identical object is which. Playing either of two copies of a card in hand is the same state. This applies to factorized microdecision states too: attacking with A then B is the same state as B then A. Used for deduplication. The functional hash comes from the encoder, as in XMage.
-- **Logical-state match:** functionally identical with the same object IDs, because actions passed from the sim tree to the base game reference IDs. A matching root guarantees a matching tree. Weaker than XMage's `getValue` string, to limit tree rebuilds. Used for tree reuse.
+- **Logical-state match:** functionally identical with the same object IDs and the same decision options, because actions passed from the sim tree to the base game reference them. Weaker than XMage's `getValue` string, to limit tree rebuilds (a rebuild only costs time). Used for tree reuse.
 - **Hashes:**
 
   | | Functional (dedup) | Logical = functional + IDs (tree reuse) |
