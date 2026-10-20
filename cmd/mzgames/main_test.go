@@ -138,3 +138,69 @@ func TestOfferPotentialCastsClosesGap(t *testing.T) {
 		t.Fatalf("offer did not close the gap cleanly: %s", line)
 	}
 }
+
+// TestStagedPicksAreOrderInvariant stages two picks of a real multi-pick
+// decision in both orders on clones: the half-made answers must be the same
+// state, in the dynamic view, and a clone must carry it.
+func TestStagedPicksAreOrderInvariant(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	found := 0
+	for _, names := range goldenPairs {
+		ds, err := loadPair(reg, names)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for g := uint64(1); g <= 4; g++ {
+			cfg := rules.Config{Seed: g, Names: names, Decks: ds, Tokens: reg.Tokens, NameUniverse: reg.Universe()}
+			seats, _ := newSeats(g, true)
+			var e *rules.Engine
+			hooks := bench.Hooks{
+				Setup: func(x *rules.Engine) { e = x },
+				Decision: func(_ int, d *decision.Decision, _ decision.Intent, _ *botpolicy.Board) error {
+					i, j, ok := twoPicks(d)
+					if !ok {
+						return nil
+					}
+					found++
+					a, b := e.CloneHypothetical(1), e.CloneHypothetical(1)
+					if a.Stage(i) != nil || a.Stage(j) != nil || b.Stage(j) != nil || b.Stage(i) != nil {
+						t.Fatalf("%s: staging %d and %d failed", d.Kind, i, j)
+					}
+					if viewKey(a) == viewKey(e) {
+						t.Fatalf("%s: staged picks are not in the view", d.Kind)
+					}
+					if viewKey(a) != viewKey(b) {
+						t.Errorf("%s: staging %d,%d and %d,%d differ in the view", d.Kind, i, j, j, i)
+					}
+					if c := a.Clone(); viewKey(c) != viewKey(a) || len(c.Pending().Staged) != 2 {
+						t.Errorf("%s: a clone lost the staged picks", d.Kind)
+					}
+					return nil
+				},
+			}
+			if _, _, err := bench.PlayGame(cfg, seats, maxTurns, maxIntents, hooks); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if found == 0 {
+		t.Fatal("no multi-pick decision with two compatible picks in the golden games")
+	}
+}
+
+// twoPicks finds two options of an unordered multi-pick decision that can be
+// staged together: different objects, different groups.
+func twoPicks(d *decision.Decision) (int, int, bool) {
+	if d.Max < 2 || d.OrderedAnswer() {
+		return 0, 0, false
+	}
+	for i := range d.Options {
+		for j := i + 1; j < len(d.Options); j++ {
+			x, y := d.Options[i], d.Options[j]
+			if x.Obj != y.Obj && (x.Group == "" || x.Group != y.Group) {
+				return i, j, true
+			}
+		}
+	}
+	return 0, 0, false
+}

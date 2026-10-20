@@ -40,6 +40,7 @@ func main() {
 	cost := flag.Int("cost", 0, "if > 0, instead of game lines print the clone/step/view cost row per tap mode, timing this many copies per root")
 	suff := flag.Bool("suff", false, "instead of game lines, run the view-sufficiency probe (principle 1) per tap mode")
 	gap := flag.Bool("gap", false, "instead of game lines, count castable casts autotap offers nothing for (principle 3)")
+	atomicFlag := flag.Bool("atomic", false, "instead of game lines, play random games one atomic pick at a time (principle 2)")
 	offer := flag.Bool("offer", false, "with -gap: switch on OfferPotentialCasts for both seats and play each extra cast on a clone")
 	flag.Parse()
 
@@ -49,9 +50,12 @@ func main() {
 		os.Exit(1)
 	}
 	names := strings.Split(*pair, ",")
-	if *gap {
+	switch {
+	case *gap:
 		err = runGap(os.Stdout, reg, names, *games, *seed, *offer)
-	} else {
+	case *atomicFlag:
+		err = runAtomic(os.Stdout, reg, names, *games, *seed, *tap)
+	default:
 		err = run(os.Stdout, reg, names, *games, *seed, *tap, *cost, *suff)
 	}
 	if err != nil {

@@ -1519,6 +1519,17 @@ export interface Decision {
    * serialises byte-identically.
    */
   restable?: boolean;
+  /**
+   * Staged and Declined are a half-made answer, the picks an mz-gorge
+   * search made one at a time (rules' Engine.Stage and Decline) before the
+   * decision is answered with them (Engine.Commit). Staged lists the chosen
+   * option indices, sorted unless OrderedAnswer (then in the order picked);
+   * Declined lists the objects (an attacker or blocker candidate) decided
+   * to take none of their options. They are game state, so the view and a
+   * clone carry them. Both are empty for every other seat.
+   */
+  staged?: number[];
+  declined?: number[];
 }
 
   /**
