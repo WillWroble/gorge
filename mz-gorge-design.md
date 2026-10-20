@@ -34,6 +34,7 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 - **Each microstate is its own tree node.**
 - **Sim game vs base game.** Principle 8 binds only the base game: there the bot answers gorge's ordinary decisions. Inside its sim games it may use any decision API it needs.
 - **Tree reuse falls back to a rebuild.** When the tree can't be reused (no logical match, or the match was pruned), it is rebuilt from scratch, as in XMage.
+- **Trigger order and replacement choice are searched** (a departure from XMage, which takes the first): one pick at a time, like any other atomic decision.
 - **Every action leads to a legal priority state.** The bot only takes an action whose subtree reaches a legal priority state, and search time is extended until that holds, as in XMage.
 
 ## Layers
