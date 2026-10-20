@@ -8,8 +8,8 @@ groundwork. Where this file and the fork disagree, the fork wins unless `mz-gorg
 | Piece | XMage | gorge |
 |---|---|---|
 | Config | `MCTSDefaults`, `Config.PlayerConfig` | `Options`: the same knobs and defaults (budget, timeout, `backprop_discount` 0.99, priors, noise, `C_PUCT` 1, node/depth caps, `prune_duplicate_states`, `manual_tapping`, mulligans, `offline_mode`) |
-| Node | `MCTSNode`/`MCTSNode2` | `node`: action, acting player, atomic type, visits, score, prior, virtual loss, terminal/winner, the two hashes. A node at a gorge decision boundary holds an engine; a micro-node is its decision node plus staged picks (stage 1's `Stage`/`Decline`), so it holds none |
-| Validate | `validateState` (replay scripts to the next pause) | clone the parent's engine; apply the atom (`atomic.Apply`); answer what the search does not node (forced passes, the 601.2g tapper, single-choice atoms) until the next node decision |
+| Node | `MCTSNode`/`MCTSNode2` | `node`: action, acting player, atomic type, visits, score, prior, virtual loss, terminal/winner, the two hashes. Every node holds its own engine; a micro-node's is its parent's with the pick staged (stage 1's `Stage`/`Decline`) |
+| Validate | `validateState` (replay scripts to the next pause) | no replay: clone the parent's engine; apply the atom (`atomic.Apply`); answer what the search does not node (forced passes, the 601.2g tapper, single-choice atoms) until the next node decision |
 | Actions | `MCTSPlayer` (playables, `selectAttackersOneAtATime`, …) | `bots/mz/atomic` for the factorization; per tap mode: autotap offers non-mana options plus `EnsurePotentialCasts`, manual all options; both sim players use the searching bot's tap mode |
 | Forced pass and checkpoints | `priority` auto-pass, `isCheckPoint` | no node for a priority whose only playable is pass, unless it is a checkpoint (turn-1 upkeep, begin combat, declare attackers, declare blockers; every priority under manual tap) |
 | Tapper | `ComputerPlayer.playManaHandling` | answers the CR 601.2g mana window for autotap, never a node; if it cannot pay, the cast reverses and the node is illegal |
@@ -23,9 +23,10 @@ groundwork. Where this file and the fork disagree, the fork wins unless `mz-gorg
 
 ## Memory
 
-A stored engine owns its event log and object arena: about 300–450 KB mid-game (azmcts measured the same). Decision nodes keep
-their engine up to a cap. Past the cap, a node's engine is rebuilt exactly from its nearest stored ancestor by re-submitting the
-committed answers on the path (determinism, principle 0). That is a memory fallback, not the search's normal path.
+No replay anywhere: every node, micro-nodes included, holds its own engine (its parent's clone with its pick applied, staged
+picks living in the engine's pending decision). A stored engine owns its event log and object arena: about 300–450 KB
+mid-game. A node's engine is needed only to validate its children, so it is released once every child is validated; only the
+frontier holds engines. The root takes a fresh clone of the base game, after tree reuse as well.
 
 ## Measurement
 
