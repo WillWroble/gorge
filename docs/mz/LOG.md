@@ -161,3 +161,29 @@ The baseline's columns are unchanged within noise (the engine changes are opt-in
 
 The dynamic view is about 6× the plain one: a fresh projection (no `Into` reuse), plus the reflected engine state and fact maps.
 It is the first candidate if stage 2's sims/s needs it.
+
+## Stage 2: first search measurements (partial)
+
+Commit `0c2ede69` (local branch `mz-gorge-stage2`), cloud container: 4 vCPU, 15 GB, linux/amd64, Go 1.25.8. Offline only.
+
+```
+go build -o mzgames ./cmd/mzgames
+mzgames -mz -pair pauper-faeries,pauper-cawgates -games 4 -seed 1 -tap both -budget 1000   # prune on, timeout 1h
+```
+
+mz is seat 0 (pauper-faeries) against gorge's `bot`. The run was stopped by the 30-minute background limit after 6 of 8
+games; the uwtempo/standard-monob pairing did not run.
+
+| seed | tap | turns | winner | searches | sims | sims/s | µs/sim | reused | illegal | dup | replaced |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | auto | 14 | mz | 99 | 39404 | 1071 | 934 | 92 | 685 | 2650 | 129 |
+| 2 | auto | 34 | bot | 229 | 80840 | 852 | 1174 | 213 | 2651 | 3500 | 163 |
+| 3 | auto | 44 | bot | 305 | 115485 | 475 | 2107 | 285 | 2114 | 34714 | 618 |
+| 4 | auto | 14 | mz | 92 | 35752 | 1052 | 951 | 88 | 1120 | 3267 | 85 |
+| 1 | manual | 12 | mz | 194 | 73862 | 1057 | 946 | 190 | 0 | 11877 | 1964 |
+| 2 | manual | 32 | bot | 473 | 120560 | 873 | 1146 | 459 | 0 | 18494 | 2483 |
+
+No game stalled and no search needed a rebuild. Win rate so far 3/6. A search step (one iteration of the loop) costs about
+0.9–2.1 ms. A budget-100 profile puts about 60% of it in `encode.Of` (the dynamic view and the hash walk) and most of the rest
+in engine steps. The slow game (seed 3) has a large tree: the loop recomputes tree size, depth and legality on every
+iteration, as `applyMCTS` does.
