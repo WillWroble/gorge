@@ -111,3 +111,30 @@ func TestProjectDynamicEveryDecision(t *testing.T) {
 		}
 	}
 }
+
+// TestOfferPotentialCastsClosesGap pins principle 3 for autotap: with
+// OfferPotentialCasts every castable cast is offered, and playing one either
+// casts it or reverses it cleanly.
+func TestOfferPotentialCastsClosesGap(t *testing.T) {
+	reg := testutil.CorpusRegistry(t)
+	names := []string{"ubartifacts", "uw-control"}
+	ds, err := loadPair(reg, names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := measureGap(&buf, reg, names, ds, 2, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), " unoffered_casts=0 ") {
+		t.Fatalf("expected a gap without the offer: %s", buf.String())
+	}
+	buf.Reset()
+	if err := measureGap(&buf, reg, names, ds, 2, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	line := strings.SplitN(buf.String(), "\n", 2)[0]
+	if !strings.Contains(line, " unoffered_casts=0 ") || !strings.Contains(line, " extra_failed=0") || strings.Contains(line, " extra_offered=0 ") {
+		t.Fatalf("offer did not close the gap cleanly: %s", line)
+	}
+}

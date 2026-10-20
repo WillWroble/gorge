@@ -99,6 +99,8 @@ type Engine struct {
 	// paidManaCensus is !Config.DisablePaidManaCensus (paid_mana_census.go);
 	// ON unless a Config explicitly disables it.
 	paidManaCensus bool `clone:"deep"`
+	// potentialOffer is the seat bitmask OfferPotentialCasts sets.
+	potentialOffer uint64 `clone:"deep"`
 	// skipPass is the hypothetical-only auto-pass of quiet priority windows
 	// (skip_pass.go); set by the search's world setup, never cloned.
 	skipPass uint8 `clone:"reset"`

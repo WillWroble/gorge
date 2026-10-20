@@ -1093,6 +1093,11 @@ func (e *Engine) askPriority(p state.PlayerID) {
 	}
 	e.ask(d)
 	e.notePriorityWalk(p, d, ep, ver, objs)
+	if e.potentialOffer&(1<<p) != 0 && e.pending == d {
+		// After the walk is noted: the recorded walk is the pool-priced
+		// one the potential-walk cache reuses.
+		d.Options = e.withPotentialCasts(p, d.Options)
+	}
 }
 
 // finishEndTurn applies CR 723.1d/e after the EndTurn event has removed the

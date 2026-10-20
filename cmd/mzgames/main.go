@@ -39,6 +39,8 @@ func main() {
 	dir := flag.String("cards", ".cards", "corpus directory")
 	cost := flag.Int("cost", 0, "if > 0, instead of game lines print the clone/step/view cost row per tap mode, timing this many copies per root")
 	suff := flag.Bool("suff", false, "instead of game lines, run the view-sufficiency probe (principle 1) per tap mode")
+	gap := flag.Bool("gap", false, "instead of game lines, count castable casts autotap offers nothing for (principle 3)")
+	offer := flag.Bool("offer", false, "with -gap: switch on OfferPotentialCasts for both seats and play each extra cast on a clone")
 	flag.Parse()
 
 	reg, err := cards.SharedCorpus(*dir)
@@ -46,18 +48,49 @@ func main() {
 		fmt.Fprintln(os.Stderr, "mzgames:", err)
 		os.Exit(1)
 	}
-	if err := run(os.Stdout, reg, strings.Split(*pair, ","), *games, *seed, *tap, *cost, *suff); err != nil {
+	names := strings.Split(*pair, ",")
+	if *gap {
+		err = runGap(os.Stdout, reg, names, *games, *seed, *offer)
+	} else {
+		err = run(os.Stdout, reg, names, *games, *seed, *tap, *cost, *suff)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "mzgames:", err)
 		os.Exit(1)
 	}
+}
+
+// runGap measures the autotap gap on one pairing.
+func runGap(out io.Writer, reg *cards.Registry, names []string, games int, seed uint64, offer bool) error {
+	ds, err := loadPair(reg, names)
+	if err != nil {
+		return err
+	}
+	return measureGap(out, reg, names, ds, games, seed, offer)
+}
+
+func loadPair(reg *cards.Registry, names []string) ([][]*cards.Card, error) {
+	if len(names) != 2 {
+		return nil, fmt.Errorf("-pair needs two decks, got %d", len(names))
+	}
+	ds := make([][]*cards.Card, 2)
+	for i, n := range names {
+		d, err := decks.Load(reg, n)
+		if err != nil {
+			return nil, err
+		}
+		ds[i] = d
+	}
+	return ds, nil
 }
 
 // run plays games × tap modes on one goroutine, so its output order is fixed.
 // With cost > 0 or suff it prints one cost or sufficiency row per mode instead
 // of the game lines.
 func run(out io.Writer, reg *cards.Registry, names []string, games int, seed uint64, tap string, cost int, suff bool) error {
-	if len(names) != 2 {
-		return fmt.Errorf("-pair needs two decks, got %d", len(names))
+	ds, err := loadPair(reg, names)
+	if err != nil {
+		return err
 	}
 	var modes []bool
 	switch tap {
@@ -69,14 +102,6 @@ func run(out io.Writer, reg *cards.Registry, names []string, games int, seed uin
 		modes = []bool{true, false}
 	default:
 		return fmt.Errorf("-tap %q: want auto, manual or both", tap)
-	}
-	ds := make([][]*cards.Card, 2)
-	for i, n := range names {
-		d, err := decks.Load(reg, n)
-		if err != nil {
-			return err
-		}
-		ds[i] = d
 	}
 	for _, auto := range modes {
 		if suff {
