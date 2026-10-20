@@ -1,0 +1,75 @@
+{
+  "name": "Standard16-UR",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-UR.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Boltwave",
+      "count": 3
+    },
+    {
+      "name": "Burst Lightning",
+      "count": 4
+    },
+    {
+      "name": "Cori-Steel Cutter",
+      "count": 4
+    },
+    {
+      "name": "Island",
+      "count": 4
+    },
+    {
+      "name": "Monastery Swiftspear",
+      "count": 4
+    },
+    {
+      "name": "Monstrous Rage",
+      "count": 4
+    },
+    {
+      "name": "Mountain",
+      "count": 4
+    },
+    {
+      "name": "Opt",
+      "count": 4
+    },
+    {
+      "name": "Riverpyre Verge",
+      "count": 4
+    },
+    {
+      "name": "Shivan Reef",
+      "count": 4
+    },
+    {
+      "name": "Shore Up",
+      "count": 2
+    },
+    {
+      "name": "Sleight of Hand",
+      "count": 3
+    },
+    {
+      "name": "Slickshot Show-Off",
+      "count": 4
+    },
+    {
+      "name": "Spell Pierce",
+      "count": 2
+    },
+    {
+      "name": "Spirebluff Canal",
+      "count": 4
+    },
+    {
+      "name": "Stock Up",
+      "count": 2
+    },
+    {
+      "name": "Stormchaser's Talent",
+      "count": 4
+    }
+  ]
+}

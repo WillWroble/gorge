@@ -1,0 +1,111 @@
+{
+  "name": "WillS_Tempo",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/WillS_Tempo.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Archmage Emeritus",
+      "count": 2
+    },
+    {
+      "name": "Authority of the Consuls",
+      "count": 2
+    },
+    {
+      "name": "Castle Vantress",
+      "count": 2
+    },
+    {
+      "name": "Consider",
+      "count": 3
+    },
+    {
+      "name": "Counterspell",
+      "count": 1
+    },
+    {
+      "name": "Eiganjo, Seat of the Empire",
+      "count": 2
+    },
+    {
+      "name": "Esper Sentinel",
+      "count": 2
+    },
+    {
+      "name": "Fading Hope",
+      "count": 3
+    },
+    {
+      "name": "Flooded Strand",
+      "count": 4
+    },
+    {
+      "name": "Floodfarm Verge",
+      "count": 2
+    },
+    {
+      "name": "Force of Negation",
+      "count": 2
+    },
+    {
+      "name": "Glacial Fortress",
+      "count": 2
+    },
+    {
+      "name": "Hall of Storm Giants",
+      "count": 2
+    },
+    {
+      "name": "Hallowed Fountain",
+      "count": 2
+    },
+    {
+      "name": "Island",
+      "count": 4
+    },
+    {
+      "name": "March of Otherworldly Light",
+      "count": 3
+    },
+    {
+      "name": "Monastery Mentor",
+      "count": 3
+    },
+    {
+      "name": "Murmuring Mystic",
+      "count": 1
+    },
+    {
+      "name": "Opt",
+      "count": 2
+    },
+    {
+      "name": "Path to Exile",
+      "count": 2
+    },
+    {
+      "name": "Plains",
+      "count": 4
+    },
+    {
+      "name": "Prismatic Ending",
+      "count": 3
+    },
+    {
+      "name": "Siren Stormtamer",
+      "count": 3
+    },
+    {
+      "name": "Supreme Verdict",
+      "count": 1
+    },
+    {
+      "name": "Talrand, Sky Summoner",
+      "count": 1
+    },
+    {
+      "name": "Teferi, Time Raveler",
+      "count": 2
+    }
+  ]
+}

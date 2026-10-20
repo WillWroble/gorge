@@ -169,6 +169,10 @@ type CardView struct {
 	Imprinted   []state.ObjID `json:"imprinted,omitempty"`
 	Paired      state.ObjID   `json:"paired,omitempty"`
 	ExiledCards []state.ObjID `json:"exiled_cards,omitempty"`
+	// Status and Links are the object's remaining dynamic state; only
+	// ProjectDynamic fills them (dynamic.go).
+	Status Status `json:"status,omitempty"`
+	Links  Links  `json:"links,omitempty"`
 	// AttachedToPlayer is true when this Aura/Curse is attached to the player
 	// AttachedPlayer rather than to a permanent (AttachedTo stays 0); the
 	// bool disambiguates seat 0 from "no player", the omitted zero.

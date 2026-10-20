@@ -1,0 +1,79 @@
+{
+  "name": "MTGA_MonoU",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MTGA_MonoU.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Wall of Runes",
+      "count": 2
+    },
+    {
+      "name": "Sworn Guardian",
+      "count": 2
+    },
+    {
+      "name": "Waterkin Shaman",
+      "count": 3
+    },
+    {
+      "name": "Cloudkin Seer",
+      "count": 3
+    },
+    {
+      "name": "Warden of Evos Isle",
+      "count": 3
+    },
+    {
+      "name": "Octoprophet",
+      "count": 2
+    },
+    {
+      "name": "Soulblade Djinn",
+      "count": 2
+    },
+    {
+      "name": "Windstorm Drake",
+      "count": 2
+    },
+    {
+      "name": "Frilled Sea Serpent",
+      "count": 1
+    },
+    {
+      "name": "Riddlemaster Sphinx",
+      "count": 2
+    },
+    {
+      "name": "Windreader Sphinx",
+      "count": 1
+    },
+    {
+      "name": "Unsummon",
+      "count": 3
+    },
+    {
+      "name": "Glint",
+      "count": 2
+    },
+    {
+      "name": "Winged Words",
+      "count": 2
+    },
+    {
+      "name": "Sleep",
+      "count": 1
+    },
+    {
+      "name": "Overflowing Insight",
+      "count": 1
+    },
+    {
+      "name": "Waterknot",
+      "count": 3
+    },
+    {
+      "name": "Island",
+      "count": 25
+    }
+  ]
+}

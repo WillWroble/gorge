@@ -1,0 +1,83 @@
+{
+  "name": "MonoUArtifacts",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MonoUArtifacts.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Adventurer's Inn",
+      "count": 2
+    },
+    {
+      "name": "Candy Trail",
+      "count": 4
+    },
+    {
+      "name": "Collector's Vault",
+      "count": 4
+    },
+    {
+      "name": "Feldon's Cane",
+      "count": 1
+    },
+    {
+      "name": "Fomori Vault",
+      "count": 4
+    },
+    {
+      "name": "Fountainport",
+      "count": 4
+    },
+    {
+      "name": "Ghost Vacuum",
+      "count": 1
+    },
+    {
+      "name": "Hedron Archive",
+      "count": 4
+    },
+    {
+      "name": "Into the Flood Maw",
+      "count": 4
+    },
+    {
+      "name": "Island",
+      "count": 14
+    },
+    {
+      "name": "Mazemind Tome",
+      "count": 4
+    },
+    {
+      "name": "Negate",
+      "count": 4
+    },
+    {
+      "name": "Pit Automaton",
+      "count": 4
+    },
+    {
+      "name": "Soul-Guide Lantern",
+      "count": 1
+    },
+    {
+      "name": "Steelswarm Operator",
+      "count": 4
+    },
+    {
+      "name": "Tezzeret, Cruel Captain",
+      "count": 4
+    },
+    {
+      "name": "The Enigma Jewel",
+      "count": 4
+    },
+    {
+      "name": "The Irencrag",
+      "count": 4
+    },
+    {
+      "name": "Ugin, Eye of the Storms",
+      "count": 4
+    }
+  ]
+}

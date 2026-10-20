@@ -1,0 +1,79 @@
+{
+  "name": "MTGA_MonoB",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MTGA_MonoB.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Sanitarium Skeleton",
+      "count": 2
+    },
+    {
+      "name": "Typhoid Rats",
+      "count": 2
+    },
+    {
+      "name": "Malakir Cullblade",
+      "count": 3
+    },
+    {
+      "name": "Vampire Opportunist",
+      "count": 2
+    },
+    {
+      "name": "Mardu Outrider",
+      "count": 2
+    },
+    {
+      "name": "Savage Gorger",
+      "count": 3
+    },
+    {
+      "name": "Skeleton Archer",
+      "count": 2
+    },
+    {
+      "name": "Sengir Vampire",
+      "count": 2
+    },
+    {
+      "name": "Soulhunter Rakshasa",
+      "count": 1
+    },
+    {
+      "name": "Nightmare",
+      "count": 1
+    },
+    {
+      "name": "Demon of Loathing",
+      "count": 2
+    },
+    {
+      "name": "Compound Fracture",
+      "count": 4
+    },
+    {
+      "name": "Cruel Cut",
+      "count": 1
+    },
+    {
+      "name": "Unlikely Aid",
+      "count": 3
+    },
+    {
+      "name": "Murder",
+      "count": 3
+    },
+    {
+      "name": "Bad Deal",
+      "count": 1
+    },
+    {
+      "name": "Eternal Thirst",
+      "count": 1
+    },
+    {
+      "name": "Swamp",
+      "count": 25
+    }
+  ]
+}

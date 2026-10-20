@@ -1,0 +1,183 @@
+{
+  "name": "Oathbreaker_UR",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Oathbreaker_UR.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Aetherspouts",
+      "count": 1
+    },
+    {
+      "name": "Blasphemous Act",
+      "count": 1
+    },
+    {
+      "name": "Cancel",
+      "count": 1
+    },
+    {
+      "name": "Chaos Warp",
+      "count": 1
+    },
+    {
+      "name": "Chromatic Lantern",
+      "count": 1
+    },
+    {
+      "name": "Counterspell",
+      "count": 1
+    },
+    {
+      "name": "Darksteel Citadel",
+      "count": 1
+    },
+    {
+      "name": "Displace",
+      "count": 1
+    },
+    {
+      "name": "Drift of Phantasms",
+      "count": 1
+    },
+    {
+      "name": "Dualcaster Mage",
+      "count": 1
+    },
+    {
+      "name": "Gitaxian Probe",
+      "count": 1
+    },
+    {
+      "name": "Great Furnace",
+      "count": 1
+    },
+    {
+      "name": "Guttersnipe",
+      "count": 1
+    },
+    {
+      "name": "Heat Shimmer",
+      "count": 1
+    },
+    {
+      "name": "Impact Tremors",
+      "count": 1
+    },
+    {
+      "name": "Impulse",
+      "count": 1
+    },
+    {
+      "name": "Island",
+      "count": 9
+    },
+    {
+      "name": "Izzet Guildgate",
+      "count": 1
+    },
+    {
+      "name": "Izzet Locket",
+      "count": 1
+    },
+    {
+      "name": "Mana Leak",
+      "count": 1
+    },
+    {
+      "name": "Manic Scribe",
+      "count": 1
+    },
+    {
+      "name": "Mountain",
+      "count": 7
+    },
+    {
+      "name": "Negate",
+      "count": 1
+    },
+    {
+      "name": "Opt",
+      "count": 1
+    },
+    {
+      "name": "Ornithopter",
+      "count": 1
+    },
+    {
+      "name": "Overwhelmed Apprentice",
+      "count": 1
+    },
+    {
+      "name": "Preordain",
+      "count": 1
+    },
+    {
+      "name": "Psychic Corrosion",
+      "count": 1
+    },
+    {
+      "name": "Purphoros, God of the Forge",
+      "count": 1
+    },
+    {
+      "name": "Reckless Fireweaver",
+      "count": 1
+    },
+    {
+      "name": "Reliquary Tower",
+      "count": 1
+    },
+    {
+      "name": "Seat of the Synod",
+      "count": 1
+    },
+    {
+      "name": "Sensei's Divining Top",
+      "count": 1
+    },
+    {
+      "name": "Shrapnel Blast",
+      "count": 1
+    },
+    {
+      "name": "Silent Arbiter",
+      "count": 1
+    },
+    {
+      "name": "Spell Pierce",
+      "count": 1
+    },
+    {
+      "name": "Spellbook",
+      "count": 1
+    },
+    {
+      "name": "Stoic Rebuttal",
+      "count": 1
+    },
+    {
+      "name": "Talisman of Creativity",
+      "count": 1
+    },
+    {
+      "name": "Terramorphic Expanse",
+      "count": 1
+    },
+    {
+      "name": "Treasure Cruise",
+      "count": 1
+    },
+    {
+      "name": "Twinflame",
+      "count": 1
+    },
+    {
+      "name": "Unwind",
+      "count": 1
+    },
+    {
+      "name": "Young Pyromancer",
+      "count": 1
+    }
+  ]
+}

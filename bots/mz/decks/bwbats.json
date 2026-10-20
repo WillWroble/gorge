@@ -1,0 +1,87 @@
+{
+  "name": "BWBats",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/BWBats.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Plains",
+      "count": 3
+    },
+    {
+      "name": "Swamp",
+      "count": 2
+    },
+    {
+      "name": "Godless Shrine",
+      "count": 4
+    },
+    {
+      "name": "Concealed Courtyard",
+      "count": 4
+    },
+    {
+      "name": "Get Lost",
+      "count": 2
+    },
+    {
+      "name": "Bitter Triumph",
+      "count": 2
+    },
+    {
+      "name": "Amalia Benavides Aguirre",
+      "count": 3
+    },
+    {
+      "name": "Case of the Uneaten Feast",
+      "count": 4
+    },
+    {
+      "name": "Essence Channeler",
+      "count": 4
+    },
+    {
+      "name": "Starscape Cleric",
+      "count": 3
+    },
+    {
+      "name": "Lunar Convocation",
+      "count": 2
+    },
+    {
+      "name": "Zoraline, Cosmos Caller",
+      "count": 2
+    },
+    {
+      "name": "Fountainport",
+      "count": 2
+    },
+    {
+      "name": "Enduring Innocence",
+      "count": 4
+    },
+    {
+      "name": "Hinterland Sanctifier",
+      "count": 4
+    },
+    {
+      "name": "Bleachbone Verge",
+      "count": 4
+    },
+    {
+      "name": "Aerith Gainsborough",
+      "count": 2
+    },
+    {
+      "name": "Starting Town",
+      "count": 4
+    },
+    {
+      "name": "Haliya, Guided by Light",
+      "count": 3
+    },
+    {
+      "name": "Multiversal Passage",
+      "count": 2
+    }
+  ]
+}

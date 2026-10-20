@@ -1,0 +1,95 @@
+{
+  "name": "Standard16-RB",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-RB.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Bloodtithe Harvester",
+      "count": 4
+    },
+    {
+      "name": "Fable of the Mirror-Breaker",
+      "count": 4
+    },
+    {
+      "name": "Graveyard Trespasser",
+      "count": 2
+    },
+    {
+      "name": "Sheoldred, the Apocalypse",
+      "count": 2
+    },
+    {
+      "name": "Etali, Primal Conqueror",
+      "count": 1
+    },
+    {
+      "name": "Reckoner Bankbuster",
+      "count": 3
+    },
+    {
+      "name": "Cut Down",
+      "count": 2
+    },
+    {
+      "name": "Abrade",
+      "count": 1
+    },
+    {
+      "name": "Go for the Throat",
+      "count": 3
+    },
+    {
+      "name": "Big Score",
+      "count": 3
+    },
+    {
+      "name": "Duress",
+      "count": 2
+    },
+    {
+      "name": "Invoke Despair",
+      "count": 3
+    },
+    {
+      "name": "Breach the Multiverse",
+      "count": 2
+    },
+    {
+      "name": "Chandra, Hope's Beacon",
+      "count": 2
+    },
+    {
+      "name": "Swamp",
+      "count": 9
+    },
+    {
+      "name": "Mountain",
+      "count": 2
+    },
+    {
+      "name": "Sulfurous Springs",
+      "count": 4
+    },
+    {
+      "name": "Blackcleave Cliffs",
+      "count": 4
+    },
+    {
+      "name": "Haunted Ridge",
+      "count": 4
+    },
+    {
+      "name": "Sokenzan, Crucible of Defiance",
+      "count": 1
+    },
+    {
+      "name": "Takenuma, Abandoned Mire",
+      "count": 1
+    },
+    {
+      "name": "Ziatora's Proving Ground",
+      "count": 1
+    }
+  ]
+}

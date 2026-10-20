@@ -1,0 +1,83 @@
+{
+  "name": "Standard16-UG",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-UG.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Spell Pierce",
+      "count": 2
+    },
+    {
+      "name": "Sentinel of the Nameless City",
+      "count": 4
+    },
+    {
+      "name": "Zoetic Glyph",
+      "count": 4
+    },
+    {
+      "name": "Make Disappear",
+      "count": 4
+    },
+    {
+      "name": "Agatha's Soul Cauldron",
+      "count": 3
+    },
+    {
+      "name": "Subterranean Schooner",
+      "count": 4
+    },
+    {
+      "name": "Spyglass Siren",
+      "count": 4
+    },
+    {
+      "name": "Tough Cookie",
+      "count": 3
+    },
+    {
+      "name": "Teething Wurmlet",
+      "count": 4
+    },
+    {
+      "name": "Gingerbrute",
+      "count": 4
+    },
+    {
+      "name": "Surge Engine",
+      "count": 2
+    },
+    {
+      "name": "Restless Vinestalk",
+      "count": 3
+    },
+    {
+      "name": "Mirrex",
+      "count": 3
+    },
+    {
+      "name": "Yavimaya Coast",
+      "count": 4
+    },
+    {
+      "name": "Dreamroot Cascade",
+      "count": 4
+    },
+    {
+      "name": "Otawara, Soaring City",
+      "count": 1
+    },
+    {
+      "name": "Boseiju, Who Endures",
+      "count": 1
+    },
+    {
+      "name": "Forest",
+      "count": 3
+    },
+    {
+      "name": "Island",
+      "count": 3
+    }
+  ]
+}

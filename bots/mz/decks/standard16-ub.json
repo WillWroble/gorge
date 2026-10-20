@@ -1,0 +1,91 @@
+{
+  "name": "Standard16-UB",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-UB.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Tishana's Tidebinder",
+      "count": 1
+    },
+    {
+      "name": "Deep-Cavern Bat",
+      "count": 4
+    },
+    {
+      "name": "Enduring Curiosity",
+      "count": 4
+    },
+    {
+      "name": "Floodpits Drowner",
+      "count": 4
+    },
+    {
+      "name": "Preacher of the Schism",
+      "count": 2
+    },
+    {
+      "name": "Spyglass Siren",
+      "count": 4
+    },
+    {
+      "name": "Faerie Dreamthief",
+      "count": 2
+    },
+    {
+      "name": "Anoint with Affliction",
+      "count": 1
+    },
+    {
+      "name": "Cut Down",
+      "count": 4
+    },
+    {
+      "name": "Phantom Interference",
+      "count": 2
+    },
+    {
+      "name": "Go for the Throat",
+      "count": 3
+    },
+    {
+      "name": "Gix's Command",
+      "count": 1
+    },
+    {
+      "name": "Kaito, Bane of Nightmares",
+      "count": 3
+    },
+    {
+      "name": "Island",
+      "count": 4
+    },
+    {
+      "name": "Fountainport",
+      "count": 1
+    },
+    {
+      "name": "Underground River",
+      "count": 4
+    },
+    {
+      "name": "Soulstone Sanctuary",
+      "count": 2
+    },
+    {
+      "name": "Darkslick Shores",
+      "count": 4
+    },
+    {
+      "name": "Swamp",
+      "count": 4
+    },
+    {
+      "name": "Gloomlake Verge",
+      "count": 4
+    },
+    {
+      "name": "Restless Reef",
+      "count": 2
+    }
+  ]
+}

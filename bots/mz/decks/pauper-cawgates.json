@@ -1,0 +1,87 @@
+{
+  "name": "Pauper-CawGates",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Pauper-CawGates.txt); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Island",
+      "count": 4
+    },
+    {
+      "name": "Citadel Gate",
+      "count": 4
+    },
+    {
+      "name": "Counterspell",
+      "count": 4
+    },
+    {
+      "name": "Heap Gate",
+      "count": 2
+    },
+    {
+      "name": "Idyllic Beachfront",
+      "count": 1
+    },
+    {
+      "name": "Brainstorm",
+      "count": 3
+    },
+    {
+      "name": "Journey to Nowhere",
+      "count": 4
+    },
+    {
+      "name": "Lórien Revealed",
+      "count": 3
+    },
+    {
+      "name": "Outlaw Medic",
+      "count": 2
+    },
+    {
+      "name": "Basilisk Gate",
+      "count": 4
+    },
+    {
+      "name": "Sacred Cat",
+      "count": 4
+    },
+    {
+      "name": "Sea Gate",
+      "count": 4
+    },
+    {
+      "name": "Azorius Guildgate",
+      "count": 2
+    },
+    {
+      "name": "The Modern Age",
+      "count": 4
+    },
+    {
+      "name": "Thraben Charm",
+      "count": 2
+    },
+    {
+      "name": "Prismatic Strands",
+      "count": 4
+    },
+    {
+      "name": "Squadron Hawk",
+      "count": 4
+    },
+    {
+      "name": "Spell Pierce",
+      "count": 2
+    },
+    {
+      "name": "Preordain",
+      "count": 2
+    },
+    {
+      "name": "Guardian of the Guildpact",
+      "count": 1
+    }
+  ]
+}

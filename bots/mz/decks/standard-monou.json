@@ -1,0 +1,75 @@
+{
+  "name": "Standard-MonoU",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard-MonoU.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Island",
+      "count": 23
+    },
+    {
+      "name": "Consider",
+      "count": 4
+    },
+    {
+      "name": "Fading Hope",
+      "count": 4
+    },
+    {
+      "name": "Haughty Djinn",
+      "count": 4
+    },
+    {
+      "name": "Dissipate",
+      "count": 1
+    },
+    {
+      "name": "Tolarian Terror",
+      "count": 3
+    },
+    {
+      "name": "Flow of Knowledge",
+      "count": 2
+    },
+    {
+      "name": "Hullbreaker Horror",
+      "count": 4
+    },
+    {
+      "name": "Spell Pierce",
+      "count": 2
+    },
+    {
+      "name": "Negate",
+      "count": 2
+    },
+    {
+      "name": "Impulse",
+      "count": 2
+    },
+    {
+      "name": "Thirst for Discovery",
+      "count": 2
+    },
+    {
+      "name": "Essence Scatter",
+      "count": 2
+    },
+    {
+      "name": "Blue Sun's Twilight",
+      "count": 4
+    },
+    {
+      "name": "Memory Deluge",
+      "count": 1
+    },
+    {
+      "name": "Teferi, Temporal Pilgrim",
+      "count": 1
+    },
+    {
+      "name": "Chrome Host Seedshark",
+      "count": 1
+    }
+  ]
+}

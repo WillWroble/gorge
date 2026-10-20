@@ -1,0 +1,91 @@
+{
+  "name": "BGRoots",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/BGRoots.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Blooming Marsh",
+      "count": 4
+    },
+    {
+      "name": "Callous Sell-Sword",
+      "count": 1
+    },
+    {
+      "name": "Coati Scavenger",
+      "count": 1
+    },
+    {
+      "name": "Deep-Cavern Bat",
+      "count": 4
+    },
+    {
+      "name": "Forest",
+      "count": 3
+    },
+    {
+      "name": "Hoarding Broodlord",
+      "count": 1
+    },
+    {
+      "name": "Insidious Roots",
+      "count": 4
+    },
+    {
+      "name": "Llanowar Elves",
+      "count": 2
+    },
+    {
+      "name": "Llanowar Wastes",
+      "count": 4
+    },
+    {
+      "name": "Molt Tender",
+      "count": 4
+    },
+    {
+      "name": "Mudflat Village",
+      "count": 1
+    },
+    {
+      "name": "Osteomancer Adept",
+      "count": 4
+    },
+    {
+      "name": "Overlord of the Balemurk",
+      "count": 2
+    },
+    {
+      "name": "Rubblebelt Maverick",
+      "count": 4
+    },
+    {
+      "name": "Seed of Hope",
+      "count": 4
+    },
+    {
+      "name": "Skyfisher Spider",
+      "count": 1
+    },
+    {
+      "name": "Snarling Gorehound",
+      "count": 4
+    },
+    {
+      "name": "Swamp",
+      "count": 2
+    },
+    {
+      "name": "Tyvar, Jubilant Brawler",
+      "count": 4
+    },
+    {
+      "name": "Underground Mortuary",
+      "count": 2
+    },
+    {
+      "name": "Wastewood Verge",
+      "count": 4
+    }
+  ]
+}

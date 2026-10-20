@@ -1,0 +1,11 @@
+{
+  "name": "RB Aggro",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/RB Aggro.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Mountain",
+      "count": 71
+    }
+  ]
+}

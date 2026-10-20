@@ -1,0 +1,75 @@
+{
+  "name": "MTGA_MonoG",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MTGA_MonoG.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Jungle Delver",
+      "count": 3
+    },
+    {
+      "name": "Ilysian Caryatid",
+      "count": 4
+    },
+    {
+      "name": "Woodland Mystic",
+      "count": 2
+    },
+    {
+      "name": "Wildwood Patrol",
+      "count": 2
+    },
+    {
+      "name": "Baloth Packhunter",
+      "count": 4
+    },
+    {
+      "name": "Prized Unicorn",
+      "count": 1
+    },
+    {
+      "name": "Rumbling Baloth",
+      "count": 2
+    },
+    {
+      "name": "World Shaper",
+      "count": 1
+    },
+    {
+      "name": "Gigantosaurus",
+      "count": 2
+    },
+    {
+      "name": "Sentinel Spider",
+      "count": 2
+    },
+    {
+      "name": "Affectionate Indrik",
+      "count": 2
+    },
+    {
+      "name": "Rampaging Brontodon",
+      "count": 2
+    },
+    {
+      "name": "Stony Strength",
+      "count": 2
+    },
+    {
+      "name": "Rabid Bite",
+      "count": 3
+    },
+    {
+      "name": "Colossal Majesty",
+      "count": 2
+    },
+    {
+      "name": "Epic Proportions",
+      "count": 1
+    },
+    {
+      "name": "Forest",
+      "count": 25
+    }
+  ]
+}

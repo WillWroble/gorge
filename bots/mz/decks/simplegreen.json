@@ -1,0 +1,47 @@
+{
+  "name": "simplegreen",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/simplegreen.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Cenote Scout",
+      "count": 4
+    },
+    {
+      "name": "Forest",
+      "count": 24
+    },
+    {
+      "name": "Evolving Adaptive",
+      "count": 4
+    },
+    {
+      "name": "Flourishing Bloom-Kin",
+      "count": 4
+    },
+    {
+      "name": "Pugnacious Hammerskull",
+      "count": 4
+    },
+    {
+      "name": "Elfhame Wurm",
+      "count": 4
+    },
+    {
+      "name": "Hulking Raptor",
+      "count": 4
+    },
+    {
+      "name": "Hazard of the Dunes",
+      "count": 4
+    },
+    {
+      "name": "Ichorspit Basilisk",
+      "count": 4
+    },
+    {
+      "name": "Grizzly Bears",
+      "count": 4
+    }
+  ]
+}

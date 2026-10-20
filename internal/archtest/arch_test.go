@@ -149,6 +149,8 @@ func set(s string) map[string]bool {
 // truncated says so (Err "truncated: budget"). cmd/enginebench (the docs/015
 // engine-speed rows) reads it only to report each row's elapsed wall time
 // beside its CPU time; every game and seed is fixed by its flags.
+// cmd/mzgames (mz-gorge's cost row) reads it the same way: it times clones,
+// steps and views at fixed roots and never feeds the timing back into play.
 // server/host/manabrewhttp uses time only for SSE keep-alive and write
 // deadlines. No game, event, view or replay reads the clock, and intents reach
 // the engine only through SubmitIntent.
@@ -165,6 +167,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/cardfuzz":             true,
 		module + "/cmd/paymirror":            true,
 		module + "/cmd/enginebench":          true,
+		module + "/cmd/mzgames":              true,
 		module + "/server/host/manabrewhttp": true,
 	}
 	for path, p := range packages(t) {

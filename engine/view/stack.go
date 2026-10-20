@@ -35,6 +35,10 @@ type StackView struct {
 	X     int32    `json:"x,omitempty"`
 	Kicks int32    `json:"kicks,omitempty"`
 	Modes []string `json:"modes,omitempty"`
+	// Status and Links are an ability object's remaining dynamic state; a
+	// spell's are on its Card. Only ProjectDynamic fills them (dynamic.go).
+	Status Status `json:"status,omitempty"`
+	Links  Links  `json:"links,omitempty"`
 }
 
 // castDetail fills sv's X, Kicks and Modes from the stack object.

@@ -1,0 +1,91 @@
+{
+  "name": "Standard16-RW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-RW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Gleeful Demolition",
+      "count": 4
+    },
+    {
+      "name": "Novice Inspector",
+      "count": 4
+    },
+    {
+      "name": "Imodane's Recruiter",
+      "count": 3
+    },
+    {
+      "name": "Warleader's Call",
+      "count": 3
+    },
+    {
+      "name": "Case of the Gateway Express",
+      "count": 2
+    },
+    {
+      "name": "Get Lost",
+      "count": 2
+    },
+    {
+      "name": "Voldaren Epicure",
+      "count": 4
+    },
+    {
+      "name": "Resolute Reinforcements",
+      "count": 4
+    },
+    {
+      "name": "Warden of the Inner Sky",
+      "count": 4
+    },
+    {
+      "name": "Regal Bunnicorn",
+      "count": 2
+    },
+    {
+      "name": "Knight-Errant of Eos",
+      "count": 4
+    },
+    {
+      "name": "Yotian Frontliner",
+      "count": 3
+    },
+    {
+      "name": "Inspiring Vantage",
+      "count": 4
+    },
+    {
+      "name": "Sokenzan, Crucible of Defiance",
+      "count": 1
+    },
+    {
+      "name": "Mountain",
+      "count": 4
+    },
+    {
+      "name": "Plains",
+      "count": 3
+    },
+    {
+      "name": "Eiganjo, Seat of the Empire",
+      "count": 2
+    },
+    {
+      "name": "Battlefield Forge",
+      "count": 4
+    },
+    {
+      "name": "Mirrex",
+      "count": 1
+    },
+    {
+      "name": "Elegant Parlor",
+      "count": 1
+    },
+    {
+      "name": "Restless Bivouac",
+      "count": 1
+    }
+  ]
+}

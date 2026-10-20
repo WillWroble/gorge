@@ -1,0 +1,59 @@
+{
+  "name": "Standard-MonoR",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard-MonoR.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Lightning Strike",
+      "count": 4
+    },
+    {
+      "name": "Razorkin Needlehead",
+      "count": 4
+    },
+    {
+      "name": "Shock",
+      "count": 2
+    },
+    {
+      "name": "Burnout Bashtronaut",
+      "count": 4
+    },
+    {
+      "name": "Emberheart Challenger",
+      "count": 4
+    },
+    {
+      "name": "Burst Lightning",
+      "count": 4
+    },
+    {
+      "name": "Rockface Village",
+      "count": 4
+    },
+    {
+      "name": "Mountain",
+      "count": 19
+    },
+    {
+      "name": "Ojer Axonil, Deepest Might",
+      "count": 2
+    },
+    {
+      "name": "Hired Claw",
+      "count": 4
+    },
+    {
+      "name": "Kellan, Planar Trailblazer",
+      "count": 1
+    },
+    {
+      "name": "Full Bore",
+      "count": 4
+    },
+    {
+      "name": "Nova Hellkite",
+      "count": 4
+    }
+  ]
+}

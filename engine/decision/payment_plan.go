@@ -326,10 +326,11 @@ func (d *Decision) CloneValue() Decision {
 // AutoFill). Whatever dst held is overwritten, so a caller that refills one
 // Decision per call (view.ProjectInto) pays nothing once the buffers have
 // grown. The copy is CloneValue's exactly, nil-ness included: Options,
-// WindowReasons and AutoFill are nil when d's are empty, PaymentActions is
-// always non-nil. dst must not be d or share storage with it.
+// WindowReasons, Staged, Declined and AutoFill are nil when d's are empty,
+// PaymentActions is always non-nil. dst must not be d or share storage with it.
 func (d *Decision) CloneInto(dst *Decision) {
 	opts, reasons, pays := dst.Options[:0], dst.WindowReasons[:0], dst.PaymentActions[:0]
+	staged, declined := dst.Staged[:0], dst.Declined[:0]
 	unpayable := dst.PotentialUnpayableCasts[:0]
 	potential := dst.PotentialCasts[:0]
 	fb, mp := dst.PaymentFallback, dst.ManaPayment
@@ -340,6 +341,13 @@ func (d *Decision) CloneInto(dst *Decision) {
 	}
 	if len(d.WindowReasons) > 0 {
 		dst.WindowReasons = append(reasons, d.WindowReasons...)
+	}
+	dst.Staged, dst.Declined = nil, nil
+	if len(d.Staged) > 0 {
+		dst.Staged = append(staged, d.Staged...)
+	}
+	if len(d.Declined) > 0 {
+		dst.Declined = append(declined, d.Declined...)
 	}
 	if pays == nil {
 		pays = []PaymentAction{}

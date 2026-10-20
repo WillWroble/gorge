@@ -1,0 +1,83 @@
+{
+  "name": "willw_deck",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/willw_deck.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Day's Undoing",
+      "count": 4
+    },
+    {
+      "name": "Emry, Lurker of the Loch",
+      "count": 2
+    },
+    {
+      "name": "Flooded Strand",
+      "count": 4
+    },
+    {
+      "name": "Hallowed Fountain",
+      "count": 2
+    },
+    {
+      "name": "Island",
+      "count": 5
+    },
+    {
+      "name": "Meticulous Archive",
+      "count": 1
+    },
+    {
+      "name": "Mishra's Bauble",
+      "count": 4
+    },
+    {
+      "name": "Moonsnare Prototype",
+      "count": 2
+    },
+    {
+      "name": "Mox Amber",
+      "count": 3
+    },
+    {
+      "name": "Mox Opal",
+      "count": 3
+    },
+    {
+      "name": "Narset, Parter of Veils",
+      "count": 2
+    },
+    {
+      "name": "Orim's Chant",
+      "count": 4
+    },
+    {
+      "name": "Polluted Delta",
+      "count": 3
+    },
+    {
+      "name": "Portable Hole",
+      "count": 4
+    },
+    {
+      "name": "Stock Up",
+      "count": 2
+    },
+    {
+      "name": "Talisman of Progress",
+      "count": 4
+    },
+    {
+      "name": "Tamiyo, Inquisitive Student",
+      "count": 4
+    },
+    {
+      "name": "Teferi, Time Raveler",
+      "count": 4
+    },
+    {
+      "name": "Urza's Saga",
+      "count": 3
+    }
+  ]
+}

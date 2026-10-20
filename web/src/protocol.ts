@@ -428,6 +428,12 @@ export interface CardView {
   paired?: number;
   exiled_cards?: number[];
   /**
+   * Status and Links are the object's remaining dynamic state; only
+   * ProjectDynamic fills them (dynamic.go).
+   */
+  status?: Record<string, number>;
+  links?: Record<string, number[]>;
+  /**
    * AttachedToPlayer is true when this Aura/Curse is attached to the player
    * AttachedPlayer rather than to a permanent (AttachedTo stays 0); the
    * bool disambiguates seat 0 from "no player", the omitted zero.
@@ -784,6 +790,12 @@ export interface PlayerView {
    * serialises byte-identically to before the field existed.
    */
   archetype?: ArchetypePosterior | null;
+  /**
+   * Status and Links are the player's remaining dynamic state; only
+   * ProjectDynamic fills them (dynamic.go).
+   */
+  status?: Record<string, number>;
+  links?: Record<string, number[]>;
 }
 
   /**
@@ -840,6 +852,12 @@ export interface StackView {
   x?: number;
   kicks?: number;
   modes?: string[];
+  /**
+   * Status and Links are an ability object's remaining dynamic state; a
+   * spell's are on its Card. Only ProjectDynamic fills them (dynamic.go).
+   */
+  status?: Record<string, number>;
+  links?: Record<string, number[]>;
 }
 
   /**
@@ -1501,6 +1519,332 @@ export interface Decision {
    * serialises byte-identically.
    */
   restable?: boolean;
+  /**
+   * Staged and Declined are a half-made answer, the picks an mz-gorge
+   * search made one at a time (rules' Engine.Stage and Decline) before the
+   * decision is answered with them (Engine.Commit). Staged lists the chosen
+   * option indices, sorted unless OrderedAnswer (then in the order picked);
+   * Declined lists the objects (an attacker or blocker candidate) decided
+   * to take none of their options. They are game state, so the view and a
+   * clone carry them. Both are empty for every other seat.
+   */
+  staged?: number[];
+  declined?: number[];
+}
+
+  /**
+   * Target is a chosen target. Exactly one of Obj and Player is meaningful.
+   */
+export interface Target {
+  Obj: number;
+  Player: number;
+  IsPlayer: boolean;
+}
+
+  /**
+   * TargetStamp records which incarnation of an object a stack object
+   * targeted (CR 400.7): Obj's Incarnation at the moment the target was
+   * chosen. It is kept beside Targets rather than inside Target so the
+   * target value itself (compared and used as a map key across the effects
+   * tier) is unchanged.
+   */
+export interface TargetStamp {
+  Obj: number;
+  Incarnation: number;
+}
+
+  /**
+   * DelayedTrigger is one registered delayed triggered ability awaiting its
+   * phase -- or, for an event-matched registration (EventMode set), awaiting its
+   * triggering event. It is reconstructed from the event log by events.Apply's
+   * DelayedRegister case, so a replay that folds the logged registrations
+   * arrives at the same set. Firing (events.Apply's DelayedPush case) removes
+   * the entry, which is what keeps a delayed trigger one-shot.
+   */
+export interface DelayedTrigger {
+  ID: number;
+  Phase: number;
+  Source: number;
+  Controller: number;
+  Execute: string;
+  Remembered: Target[];
+  /**
+   * RememberedStamps holds, for every object in Remembered at
+   * registration, its Incarnation then (events' DelayedRegister fold). A
+   * body that acts on the remembered objects (ChangeZone's Defined$
+   * DelayTriggerRemembered[LKI]) skips one whose Incarnation has moved
+   * since: Nine-Lives Familiar's "return it" finds nothing once the card
+   * was returned by another effect and died again, because the card in the
+   * graveyard is a new object (CR 400.7). Keyed by Obj, so DelayedForget's
+   * removal from Remembered leaves it consistent.
+   */
+  RememberedStamps: TargetStamp[];
+  /**
+   * MinTurn is the earliest game turn the trigger may fire in (zero = no
+   * bound). rules' delayed-trigger scan skips an entry whose MinTurn is
+   * still ahead of the current turn, which is how an extra-turn grant's
+   * end-step trigger (Final Fortune) skips the granting turn's own end
+   * step and fires in the granted turn instead. Folded from the
+   * registering event's Amount, so a replay rebuilds it.
+   */
+  MinTurn: number;
+  /**
+   * EventMode and Trigger extend the registration to the non-phase
+   * (event-matched) shape: EventMode is the trigger Mode$ the registration
+   * fires on ("SpellCast" -- the first spell cast whose event satisfies the
+   * body's validity clauses) and Trigger is the SVar name on the source's
+   * face holding that trigger body, re-parsed at fire time so ValidCard$/
+   * ValidActivatingPlayer$ are evaluated against the actual cast. Both are
+   * empty for a Mode$ Phase registration, so every already-registered shape
+   * is unchanged; the pair travels inside the DelayedRegister event's Text
+   * field ("<Mode>:<Trigger>") because the event gains no fields.
+   */
+  EventMode: string;
+  Trigger: string;
+  /**
+   * EffectRepeat marks a turn-scoped api:Effect trigger. Unlike a CR 603.7
+   * one-shot promise, its registration survives each firing until MaxTurn.
+   */
+  EffectRepeat: boolean;
+  /**
+   * ValidPlayer is the registering DelayedTrigger SA's ValidPlayer$ value
+   * when it has one (Necropotence's "You": "put that card into your hand
+   * at the beginning of YOUR next end step"). The rules-side delayed
+   * trigger scan gates the fire on it -- the phase occurrence must satisfy
+   * the spec against the registration's controller -- and a phase the gate
+   * fails leaves the one-shot registration pending for the first later
+   * occurrence that matches. Empty keeps the ungated fire every earlier
+   * registration had. It rides in the DelayedRegister event's Text
+   * ("<Phase>|VP=<value>") because the event gains no field (Ruling T20-a's
+   * field-reuse precedent); the SpellCast decode never collides because a
+   * Phase$ value contains no "|".
+   */
+  ValidPlayer: string;
+  /**
+   * PresentSpec, PresentZone and PresentCompare are the registering
+   * DelayedTrigger SA's IsPresent$/PresentZone$/PresentCompare$ condition
+   * when it has one (Bank Job's "at the beginning of the next end step, if
+   * that card is still exiled"). The rules-side delayed-trigger scan gates
+   * the fire on it at the phase occurrence: the count of objects in the
+   * named zone matching PresentSpec with this registration's Remembered
+   * bound as the IsTriggerRemembered referent must satisfy PresentCompare
+   * (default GE1). A gate the step fails leaves the one-shot registration
+   * pending for the first later occurrence that matches, exactly like
+   * ValidPlayer. Empty PresentSpec keeps the ungated fire every earlier
+   * registration had. The triple rides the DelayedRegister event's Text
+   * ("<Phase>|VP=<value>|IP=<spec>|PZ=<zone>|PC=<compare>") because the
+   * event gains no field (Ruling T20-a's field-reuse precedent); the values
+   * contain no "|", so the LastIndex strips are exact and an already-logged
+   * registration without the suffixes decodes exactly as before (all three
+   * empty, every presence gate skipped).
+   */
+  PresentSpec: string;
+  PresentZone: string;
+  PresentCompare: string;
+  /**
+   * MaxTurn is the LATEST game turn the trigger may fire in (zero = no
+   * bound) — the mirror of MinTurn for a ThisTurn$ True registration
+   * (Mistrise Village's "the next spell you cast this turn can't be
+   * countered"): a registration whose turn has passed without firing is
+   * skipped by rules' delayed-trigger scans forever after, never removed
+   * (removal would need an event of its own to keep a replay folding the
+   * same set, so the expired entry just stays inert). It rides the
+   * registering event's Text ("|TT=<turn>") because the event gains no
+   * field (Ruling T20-a's field-reuse precedent).
+   */
+  MaxTurn: number;
+  /**
+   * OptionalSpec is an api:Effect Triggers$ body's OptionalDecider$ spec
+   * (Beck's "whenever a creature enters this turn, you may draw a card").
+   * An Effect trigger whose body is optional must be REGISTERED like any
+   * other Effect trigger and ask its yes/no when the minted ability
+   * resolves; withholding it fires the body mandatorily, the opposite of
+   * the card text. The spec has to be captured at registration time rather
+   * than re-read from the trigger body at fire time because a Mode$ Phase
+   * registration's body is never re-parsed (checkDelayedTriggers fires it
+   * on the step alone), so it rides the DelayedRegister event's Text
+   * ("|OD=<spec>") the same way ValidPlayer$ and MaxTurn do. Empty for
+   * every registration with no election.
+   */
+  OptionalSpec: string;
+  /**
+   * Effect-created trigger lifetime riders, folded from DelayedRegister.Text.
+   * BirthTurn distinguishes a later turn belonging to the effect controller
+   * from the turn in which the promise was created.
+   */
+  EffectDuration: string;
+  BirthTurn: number;
+  ForgetOnMoved: string;
+  ExileOnMoved: string;
+  ForgetCounter: string;
+  ForgetOnCast: string;
+  ImprintOnHost: boolean;
+  /**
+   * SourceIncarnation is captured for keyword promises whose effect applies
+   * to that exact permanent (dash/warp). Ordinary CR 603.7 delayed triggers,
+   * including Encore's group cleanup, intentionally leave TrackSource false:
+   * they exist independently of their source after registration.
+   */
+  SourceIncarnation: number;
+  TrackSource: boolean;
+  /**
+   * SourceBattlefield records whether the source was a battlefield
+   * permanent at REGISTRATION time. A Duration$ Permanent api:Effect
+   * trigger's source-relative ending (CR 611.2: the effect ends when its
+   * source leaves the battlefield) applies only to such a source; an
+   * opening-hand Effect (Chancellor of the Annex, source in hand) or an
+   * emblem/command-zone source has no battlefield incarnation to lose, so
+   * its Permanent promise is unbounded and must not be killed by the
+   * battlefield liveness rule. It rides the DelayedRegister event's Text
+   * ("|SB") because the event gains no field (Ruling T20-a).
+   */
+  SourceBattlefield: boolean;
+  /**
+   * RememberedAmount is the per-trigger remembered Integer a DelayedTrigger
+   * RememberNumber$ True registration carried (Forge's delTrig.
+   * addRemembered of the host's remembered Integers): Mana Drain's
+   * countered spell's mana value, read back at fire time through
+   * Count$TriggerRememberAmount. It rides the DelayedRegister event's Text
+   * ("|RN=<n>") because the event gains no field (Ruling T20-a); zero when
+   * the registration remembered no number.
+   */
+  RememberedAmount: number;
+  /**
+   * DefinedPlayer is a DelayedTriggerDefinedPlayer$ registration's player
+   * (seat+1; zero = none): the registration is armed only from that
+   * player's first turn start after BirthTurn, and with ThisTurn$ it dies
+   * when that turn ends. It rides the DelayedRegister Text ("|DP=<n>")
+   * because the event gains no field (Ruling T20-a).
+   */
+  DefinedPlayer: number;
+  /**
+   * ThisTurnDefined marks a DefinedPlayer registration that also carried
+   * ThisTurn$ True (expires at the end of the defined player's turn).
+   * Rides "|TD".
+   */
+  ThisTurnDefined: boolean;
+  /**
+   * Static is a Static$ True Mode$ Phase registration: Forge runs its body
+   * at fire time without a stack object. Rides the bare "|ST" flag.
+   */
+  Static: boolean;
+}
+
+  /**
+   * ExtraTurn is one pending CR 500.7 turn. It is deliberately a queue entry,
+   * rather than a per-player flag: several grants can be pending in LIFO order
+   * and each grant can carry a different rider.
+   */
+export interface ExtraTurn {
+  Player: number;
+  SkipUntap: boolean;
+}
+
+  /**
+   * ExtraPhase is one pending Forge AddPhaseEffect grant (DB$ AddPhase: "after
+   * this phase, there is an additional combat phase", 56 corpus SA lines). It
+   * is deliberately a queue entry, like ExtraTurn: several grants can be
+   * pending for the same splice point (Obeka, Splitter of Seconds's "that many
+   * additional upkeep steps" is several entries after the same end-of-combat
+   * step; two Aurelia triggers queue two extra combats the same way), and each
+   * grant can carry a different rider.
+   *
+   * The engine's turn walk is a linear Step advance (engine/rules/turn.go's
+   * advanceStep), so an extra phase is spliced as a LIST insertion rather than
+   * a step renumbering: the extra phase begins when the walk leaves AfterStep
+   * (Consumed), runs Entry..RangeEnd, and on leaving RangeEnd the walk resumes
+   * at FollowedBy (default AfterStep+1, the phase that would naturally have
+   * followed the splice point -- Forge AddPhaseEffect's default followedBy, so
+   * an extra Beginning spliced after Main2 resumes at the end step, never back
+   * into Main1). RangeEnd is derived from Entry, except when the grant's
+   * ExtraPhase$ value names a multi-step phase whose range is not the entry's
+   * default -- then the +1 event carries the last step in its RANGEEND rider
+   * (events.ExtraPhaseRiders) and the fold stores it.
+   * Every field is folded from the ExtraPhase event (grant +1 / consume -1 /
+   * complete -2), cloned in Clone, and the whole queue clears at TurnChange --
+   * an extra phase is spliced into the CURRENT turn only and never survives
+   * into the next one.
+   */
+export interface ExtraPhase {
+  Player: number;
+  AfterStep: number;
+  Entry: number;
+  RangeEnd: number;
+  /**
+   * FollowedBy is the explicit FollowedBy$ resume point when HasFollowedBy
+   * is set; otherwise the resume point is AfterStep+1 (see the type comment).
+   */
+  HasFollowedBy: boolean;
+  FollowedBy: number;
+  /**
+   * Consumed marks a grant whose extra phase has been entered. It completes
+   * when the walk leaves RangeEnd.
+   */
+  Consumed: boolean;
+  /**
+   * Delayed-trigger rider (Moraug's ExtraPhaseDelayedTrigger$/
+   * ExtraPhaseDelayedTriggerExcute$ pair, the extra-turn Final-Fortune
+   * precedent one level up): the SVar named by Execute registers a one-shot
+   * delayed trigger at CONSUME time, firing at DelayedPhase in this same
+   * turn (MinTurn = the current turn), gated by ValidPlayer when present.
+   */
+  HasDelayedPhase: boolean;
+  DelayedPhase: number;
+  ValidPlayer: string;
+  Execute: string;
+  Source: number;
+}
+
+  /**
+   * ZoneEntry is one zone entry made this turn: the object that moved, the
+   * zone it entered (To) and the zone it actually came from (From -- the real
+   * pre-move zone, the same value events.Move recorded on the object's
+   * EnteredFrom). A card that entered a zone twice (bounced and replayed) is
+   * listed once per entry, exactly like Forge's per-zone
+   * getCardsAddedThisTurn lists, which the Count$ThisTurnEntered_* heads and
+   * the ThisTurnEntered* filter predicates read.
+   */
+export interface ZoneEntry {
+  Obj: number;
+  To: number;
+  From: number;
+  /**
+   * Owner and PermanentCard capture descend provenance at the move. A
+   * later control change, copy effect or zone change cannot rewrite which
+   * player's graveyard received a permanent card this turn (CR 700.11).
+   */
+  Owner: number;
+  PermanentCard: boolean;
+  /**
+   * Sacrificed marks a battlefield departure made under the sacrifice
+   * action marker (events.IsSacrifice, CR 701.21a), and Sacrificer is the
+   * permanent's controller at that instant -- the player who sacrificed
+   * it (a stolen permanent its taker sacrifices is the taker's). Both are
+   * folded by events.Apply's MoveZone case, so the
+   * PlayerCount*$SacrificedThisTurn heads read a replay-derived record.
+   */
+  Sacrificed: boolean;
+  Sacrificer: number;
+  /**
+   * WasCreature is, for a battlefield departure (From == ZBattlefield),
+   * whether the permanent was a creature as it last existed on the
+   * battlefield (CR 603.10a last known information), folded by
+   * events.Apply from events.DepartureCreatureFlip. An animated land that
+   * dies was a creature; a creature an effect made a non-creature was not.
+   * False for every other entry.
+   */
+  WasCreature: boolean;
+}
+
+  /**
+   * ExcessDamageVictim is the damage-time recipient snapshot for historical
+   * checks after the permanent has left the battlefield. Type is a bitmask:
+   * 1 = creature, 2 = planeswalker, 4 = battle (several may apply).
+   */
+export interface ExcessDamageVictim {
+  Obj: number;
+  Controller: number;
+  Type: number;
 }
 
   /**
@@ -1561,6 +1905,27 @@ export interface View {
    */
   pending: PendingView[];
   decision?: Decision | null;
+  /**
+   * Status is the game's remaining dynamic state. The records below are
+   * the game's dynamic lists as the engine keeps them: pending delayed
+   * triggers, extra turns (most recent last) and extra phases, this turn's
+   * zone entries and excess-damage victims. Only ProjectDynamic fills
+   * them, and the records only under Omniscient visibility: they can name
+   * hidden cards (dynamic.go).
+   */
+  status?: Record<string, number>;
+  delayed?: DelayedTrigger[];
+  extra_turn_queue?: ExtraTurn[];
+  extra_phases?: ExtraPhase[];
+  entered?: ZoneEntry[];
+  excess_damage_victims?: ExcessDamageVictim[];
+  /**
+   * Engine is the engine's dynamic state outside the game (ledgers,
+   * trigger counts, continuous effects, last-known information, a paused
+   * cast or resolution), one deterministic text per field the Chars'
+   * EngineState visits, under Omniscient visibility only.
+   */
+  engine?: Record<string, string>;
 }
 
   /**

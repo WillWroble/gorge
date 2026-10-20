@@ -1,0 +1,79 @@
+{
+  "name": "Standard16-UW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-UW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Simulacrum Synthesizer",
+      "count": 4
+    },
+    {
+      "name": "United Battlefront",
+      "count": 4
+    },
+    {
+      "name": "Candy Trail",
+      "count": 4
+    },
+    {
+      "name": "Kayla's Reconstruction",
+      "count": 2
+    },
+    {
+      "name": "Clay-Fired Bricks",
+      "count": 4
+    },
+    {
+      "name": "Spring-Loaded Sawblades",
+      "count": 4
+    },
+    {
+      "name": "Braided Net",
+      "count": 3
+    },
+    {
+      "name": "The Irencrag",
+      "count": 2
+    },
+    {
+      "name": "Get Lost",
+      "count": 2
+    },
+    {
+      "name": "Assimilation Aegis",
+      "count": 4
+    },
+    {
+      "name": "Repurposing Bay",
+      "count": 2
+    },
+    {
+      "name": "Thousand Moons Smithy",
+      "count": 1
+    },
+    {
+      "name": "Adarkar Wastes",
+      "count": 4
+    },
+    {
+      "name": "Seachrome Coast",
+      "count": 4
+    },
+    {
+      "name": "Floodfarm Verge",
+      "count": 4
+    },
+    {
+      "name": "Fomori Vault",
+      "count": 2
+    },
+    {
+      "name": "Island",
+      "count": 3
+    },
+    {
+      "name": "Plains",
+      "count": 7
+    }
+  ]
+}

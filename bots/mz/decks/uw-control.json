@@ -1,0 +1,95 @@
+{
+  "name": "UW Control",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/UW Control.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Island",
+      "count": 6
+    },
+    {
+      "name": "Path to Exile",
+      "count": 2
+    },
+    {
+      "name": "Gideon Jura",
+      "count": 3
+    },
+    {
+      "name": "Martial Coup",
+      "count": 1
+    },
+    {
+      "name": "Day of Judgment",
+      "count": 2
+    },
+    {
+      "name": "Kabira Crossroads",
+      "count": 1
+    },
+    {
+      "name": "Jace, the Mind Sculptor",
+      "count": 4
+    },
+    {
+      "name": "Mind Spring",
+      "count": 3
+    },
+    {
+      "name": "Everflowing Chalice",
+      "count": 3
+    },
+    {
+      "name": "Plains",
+      "count": 4
+    },
+    {
+      "name": "Wall of Omens",
+      "count": 4
+    },
+    {
+      "name": "Oblivion Ring",
+      "count": 3
+    },
+    {
+      "name": "Spreading Seas",
+      "count": 4
+    },
+    {
+      "name": "Tectonic Edge",
+      "count": 4
+    },
+    {
+      "name": "Elspeth, Knight-Errant",
+      "count": 1
+    },
+    {
+      "name": "Deprive",
+      "count": 2
+    },
+    {
+      "name": "Misty Rainforest",
+      "count": 1
+    },
+    {
+      "name": "Celestial Colonnade",
+      "count": 4
+    },
+    {
+      "name": "Arid Mesa",
+      "count": 1
+    },
+    {
+      "name": "Glacial Fortress",
+      "count": 4
+    },
+    {
+      "name": "Sejiri Steppe",
+      "count": 1
+    },
+    {
+      "name": "Negate",
+      "count": 2
+    }
+  ]
+}

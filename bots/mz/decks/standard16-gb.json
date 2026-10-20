@@ -1,0 +1,107 @@
+{
+  "name": "Standard16-GB",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-GB.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Anoint with Affliction",
+      "count": 1
+    },
+    {
+      "name": "Sentinel of the Nameless City",
+      "count": 2
+    },
+    {
+      "name": "Cut Down",
+      "count": 3
+    },
+    {
+      "name": "Restless Cottage",
+      "count": 3
+    },
+    {
+      "name": "Forest",
+      "count": 4
+    },
+    {
+      "name": "Mosswood Dreadknight",
+      "count": 4
+    },
+    {
+      "name": "Gix's Command",
+      "count": 2
+    },
+    {
+      "name": "Maelstrom Pulse",
+      "count": 1
+    },
+    {
+      "name": "Go for the Throat",
+      "count": 4
+    },
+    {
+      "name": "Llanowar Wastes",
+      "count": 4
+    },
+    {
+      "name": "Llanowar Elves",
+      "count": 3
+    },
+    {
+      "name": "Glissa Sunslayer",
+      "count": 2
+    },
+    {
+      "name": "Fountainport",
+      "count": 1
+    },
+    {
+      "name": "Sheoldred's Edict",
+      "count": 1
+    },
+    {
+      "name": "Sheoldred, the Apocalypse",
+      "count": 2
+    },
+    {
+      "name": "Duress",
+      "count": 2
+    },
+    {
+      "name": "Tear Asunder",
+      "count": 1
+    },
+    {
+      "name": "Dark Confidant",
+      "count": 4
+    },
+    {
+      "name": "Blooming Marsh",
+      "count": 4
+    },
+    {
+      "name": "Wastewood Verge",
+      "count": 4
+    },
+    {
+      "name": "Soulstone Sanctuary",
+      "count": 1
+    },
+    {
+      "name": "Swamp",
+      "count": 3
+    },
+    {
+      "name": "Tranquil Frillback",
+      "count": 1
+    },
+    {
+      "name": "Underground Mortuary",
+      "count": 1
+    },
+    {
+      "name": "Liliana of the Veil",
+      "count": 2
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "name": "Standard-MonoW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard-MonoW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Warden of the Inner Sky",
+      "count": 3
+    },
+    {
+      "name": "Mishra's Foundry",
+      "count": 4
+    },
+    {
+      "name": "Coppercoat Vanguard",
+      "count": 4
+    },
+    {
+      "name": "Plains",
+      "count": 16
+    },
+    {
+      "name": "Destroy Evil",
+      "count": 1
+    },
+    {
+      "name": "Recruitment Officer",
+      "count": 4
+    },
+    {
+      "name": "Knight-Errant of Eos",
+      "count": 4
+    },
+    {
+      "name": "Eiganjo, Seat of the Empire",
+      "count": 2
+    },
+    {
+      "name": "Extraction Specialist",
+      "count": 2
+    },
+    {
+      "name": "Hopeful Initiate",
+      "count": 3
+    },
+    {
+      "name": "Thalia, Guardian of Thraben",
+      "count": 4
+    },
+    {
+      "name": "Adeline, Resplendent Cathar",
+      "count": 4
+    },
+    {
+      "name": "Brutal Cathar",
+      "count": 2
+    },
+    {
+      "name": "Novice Inspector",
+      "count": 4
+    },
+    {
+      "name": "Mirrex",
+      "count": 1
+    },
+    {
+      "name": "Get Lost",
+      "count": 2
+    }
+  ]
+}

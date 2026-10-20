@@ -56,11 +56,6 @@
       "tier": "bots",
       "status": "EXT"
     },
-    "bots/netsimd": {
-      "tier": "bots",
-      "status": "EXT",
-      "purpose": "SIMD forward pass for the dzg mlp network (the FDN microkernel plan's Phase 4 microbenchmark)."
-    },
     "bots/gonet/gonettest": {
       "tier": "bots",
       "status": "TOOL"
@@ -73,6 +68,21 @@
       "tier": "bots",
       "status": "SUPP",
       "purpose": "Thin registration of a built-in policy in the bots registry."
+    },
+    "bots/mz/atomic": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: XMage's atomic decisions over gorge decisions."
+    },
+    "bots/mz/decks": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: the mage fork's MageZero decks."
+    },
+    "bots/netsimd": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "SIMD forward pass for the dzg mlp network (the FDN microkernel plan's Phase 4 microbenchmark)."
     },
     "bots/policynet": {
       "tier": "bots",
@@ -163,6 +173,11 @@
     "cmd/mtgsim": {
       "tier": "cmd",
       "status": "TOOL"
+    },
+    "cmd/mzgames": {
+      "tier": "cmd",
+      "status": "TOOL",
+      "purpose": "mz-gorge: regression heads, cost row, view-sufficiency, autotap-gap and atomic probes."
     },
     "cmd/paymirror": {
       "tier": "cmd",

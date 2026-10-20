@@ -890,6 +890,18 @@ type Decision struct {
 	// applies the remainder order; it is runtime continuation state, never
 	// client input.
 	ResumeDigPrimary []state.ObjID `json:"-"`
+	// Staged and Declined are a half-made answer, the picks an mz-gorge
+	// search made one at a time (rules' Engine.Stage and Decline) before the
+	// decision is answered with them (Engine.Commit). Staged lists the chosen
+	// option indices, sorted unless OrderedAnswer (then in the order picked);
+	// Declined lists the objects (an attacker or blocker candidate) decided
+	// to take none of their options. They are game state, so the view and a
+	// clone carry them. Both are empty for every other seat.
+	Staged []int `json:"staged,omitempty"`
+	// PotentialCastsOffered marks a priority decision rules'
+	// EnsurePotentialCasts has extended. Server-side only.
+	PotentialCastsOffered bool          `json:"-"`
+	Declined              []state.ObjID `json:"declined,omitempty"`
 }
 
 // New is a convenience constructor that fills a Decision's Player, Kind,
@@ -1640,4 +1652,23 @@ type PotentialAction struct {
 	// must not re-derive this from printed mana_cost: castable.ts records the
 	// cost rules that drift.
 	Payable *bool `json:"payable,omitempty"`
+}
+
+// OrderedAnswer reports whether the order of d's chosen options is part of
+// its answer: a trigger order, an arrangement, the cards a mulligan puts on
+// the bottom, a search or dig whose picks go to a library in order. For
+// every other decision the answer is the set of choices.
+func (d *Decision) OrderedAnswer() bool {
+	switch d.Kind {
+	case KTriggerOrder, KArrange:
+		return true
+	case KMulligan, KChoose:
+		for _, o := range d.Options {
+			switch o.Kind {
+			case "bottom", "search", "dig":
+				return true
+			}
+		}
+	}
+	return false
 }

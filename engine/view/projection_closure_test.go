@@ -96,6 +96,12 @@ func TestViewMarshalsClosed(t *testing.T) {
 		"phase": true, "active": true, "priority": true, "over": true,
 		"draw": true, "winner": true, "players": true, "stack": true,
 		"pending": true, "decision": true,
+		// status and the dynamic records are filled only by
+		// view.ProjectDynamic (mz-gorge's bot): status is public game state,
+		// and the records, which can name hidden cards, only under
+		// Omniscient visibility.
+		"status": true, "delayed": true, "extra_turn_queue": true, "extra_phases": true,
+		"entered": true, "excess_damage_victims": true, "engine": true,
 	})
 	// round (added by task ui12) is a projection of the public turn counter
 	// and the public per-seat lost flags -- how many full passes the surviving
@@ -194,6 +200,9 @@ func TestViewMarshalsClosed(t *testing.T) {
 		// per-seat scalars derived from state.Player, never a hidden-zone
 		// carrier and never a card list.
 		"counters": true, "land_drop_spent": true,
+		// status and links are the seat's remaining dynamic state, filled
+		// only by view.ProjectDynamic.
+		"status": true, "links": true,
 	})
 	// StackView is public (R3) so it is a lesser leak surface, but the
 	// reflection is the same shape and cheap, so it is pinned too. The two
@@ -208,6 +217,9 @@ func TestViewMarshalsClosed(t *testing.T) {
 		// x, kicks and modes are the stack object's public cast-time
 		// announcements (X, times kicked, chosen modal sub-abilities).
 		"x": true, "kicks": true, "modes": true,
+		// status and links are an ability object's remaining dynamic state,
+		// filled only by view.ProjectDynamic.
+		"status": true, "links": true,
 	})
 
 	// Half 2: the omniscient projection this type produces actually shows

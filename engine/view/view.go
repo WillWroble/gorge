@@ -133,6 +133,23 @@ type View struct {
 	// stack. Public for every seat — R3.
 	Pending  []PendingView      `json:"pending"`
 	Decision *decision.Decision `json:"decision,omitempty"`
+	// Status is the game's remaining dynamic state. The records below are
+	// the game's dynamic lists as the engine keeps them: pending delayed
+	// triggers, extra turns (most recent last) and extra phases, this turn's
+	// zone entries and excess-damage victims. Only ProjectDynamic fills
+	// them, and the records only under Omniscient visibility: they can name
+	// hidden cards (dynamic.go).
+	Status              Status                     `json:"status,omitempty"`
+	Delayed             []state.DelayedTrigger     `json:"delayed,omitempty"`
+	ExtraTurnQueue      []state.ExtraTurn          `json:"extra_turn_queue,omitempty"`
+	ExtraPhases         []state.ExtraPhase         `json:"extra_phases,omitempty"`
+	Entered             []state.ZoneEntry          `json:"entered,omitempty"`
+	ExcessDamageVictims []state.ExcessDamageVictim `json:"excess_damage_victims,omitempty"`
+	// Engine is the engine's dynamic state outside the game (ledgers,
+	// trigger counts, continuous effects, last-known information, a paused
+	// cast or resolution), one deterministic text per field the Chars'
+	// EngineState visits, under Omniscient visibility only.
+	Engine map[string]string `json:"engine,omitempty"`
 }
 
 // commanderViews builds a player's commander roster and its parallel
@@ -372,6 +389,10 @@ type PlayerView struct {
 	// Like Available it carries omitempty so a view with no posterior
 	// serialises byte-identically to before the field existed.
 	Archetype *ArchetypePosterior `json:"archetype,omitempty"`
+	// Status and Links are the player's remaining dynamic state; only
+	// ProjectDynamic fills them (dynamic.go).
+	Status Status `json:"status,omitempty"`
+	Links  Links  `json:"links,omitempty"`
 }
 
 // PoolRestrictionView is one restricted floating-mana batch as the wire

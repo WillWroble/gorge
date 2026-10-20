@@ -1,0 +1,79 @@
+{
+  "name": "EsperTempo",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/EsperTempo.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Adarkar Wastes",
+      "count": 2
+    },
+    {
+      "name": "Caves of Koilos",
+      "count": 2
+    },
+    {
+      "name": "Cecil, Dark Knight",
+      "count": 4
+    },
+    {
+      "name": "Combat Research",
+      "count": 4
+    },
+    {
+      "name": "Concealed Courtyard",
+      "count": 4
+    },
+    {
+      "name": "Darkslick Shores",
+      "count": 4
+    },
+    {
+      "name": "Duress",
+      "count": 4
+    },
+    {
+      "name": "Ertai Resurrected",
+      "count": 2
+    },
+    {
+      "name": "Jill, Shiva's Dominant",
+      "count": 2
+    },
+    {
+      "name": "Kaito, Bane of Nightmares",
+      "count": 2
+    },
+    {
+      "name": "Malcolm, Alluring Scoundrel",
+      "count": 4
+    },
+    {
+      "name": "Nashi, Searcher in the Dark",
+      "count": 4
+    },
+    {
+      "name": "No More Lies",
+      "count": 4
+    },
+    {
+      "name": "Plaza of Heroes",
+      "count": 4
+    },
+    {
+      "name": "Seachrome Coast",
+      "count": 2
+    },
+    {
+      "name": "Sheltered by Ghosts",
+      "count": 4
+    },
+    {
+      "name": "Skrelv, Defector Mite",
+      "count": 4
+    },
+    {
+      "name": "Starting Town",
+      "count": 4
+    }
+  ]
+}
