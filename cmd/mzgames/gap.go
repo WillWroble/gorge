@@ -22,7 +22,7 @@ import (
 type gapStats struct {
 	windows, gapWindows, gaps int
 	byCard                    map[string]int
-	// With OfferPotentialCasts on: the extra cast options offered, and what
+	// With EnsurePotentialCasts: the extra cast options offered, and what
 	// playing each on a clone led to.
 	extra, cast, reversed, failed int
 }
@@ -39,14 +39,15 @@ func measureGap(out io.Writer, reg *cards.Registry, names []string, ds [][]*card
 		}
 		var e *rules.Engine
 		hooks := bench.Hooks{
-			Setup: func(x *rules.Engine) {
-				e = x
-				for p := range names {
-					e.OfferPotentialCasts(state.PlayerID(p), offer)
-				}
-			},
+			Setup: func(x *rules.Engine) { e = x },
 			Decision: func(_ int, d *decision.Decision, _ decision.Intent, _ *botpolicy.Board) error {
 				if d.Kind == decision.KPriority {
+					if offer {
+						// After the seat answered: the additions follow
+						// concede, so its answer's indices still hold.
+						e.EnsurePotentialCasts()
+						d = e.Pending()
+					}
 					st.add(e, d)
 					if offer {
 						st.tryExtras(e, d)
@@ -121,7 +122,7 @@ func containsID(ids []state.ObjID, id state.ObjID) bool {
 }
 
 // tryExtras plays, on clones, each cast option the pool alone could not pay
-// (OfferPotentialCasts' additions), answering what follows with gorge's
+// (EnsurePotentialCasts' additions), answering what follows with gorge's
 // autotap bot, and classifies the result: the card left its zone (cast),
 // it is back where it started (reversed), or the engine refused.
 func (st *gapStats) tryExtras(e *rules.Engine, d *decision.Decision) {
@@ -146,7 +147,7 @@ func (st *gapStats) tryExtras(e *rules.Engine, d *decision.Decision) {
 	}
 }
 
-// firstExtra is the index of OfferPotentialCasts' first addition: the
+// firstExtra is the index of EnsurePotentialCasts' first addition: the
 // engine's own priority list ends with concede, and the additions follow it.
 func firstExtra(d *decision.Decision) int {
 	for i, o := range d.Options {

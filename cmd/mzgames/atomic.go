@@ -12,7 +12,6 @@ import (
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/seat"
-	"github.com/adams-shaun/gorge/engine/state"
 	"github.com/adams-shaun/gorge/engine/view"
 )
 
@@ -61,9 +60,6 @@ func (st *atomicStats) play(reg *cards.Registry, names []string, ds [][]*cards.C
 	cfg := rules.Config{Seed: seed, Names: names, Decks: ds, Tokens: reg.Tokens, NameUniverse: reg.Universe()}
 	cfg.LoopGuard = rules.WithDefaultObjectCap(cfg.LoopGuard)
 	e := rules.New(cfg)
-	for p := range names {
-		e.OfferPotentialCasts(state.PlayerID(p), auto)
-	}
 	e.Advance()
 	rng := rand.New(rand.NewPCG(seed, 7))
 	fallback, err := newSeats(seed, auto)
@@ -78,6 +74,9 @@ func (st *atomicStats) play(reg *cards.Registry, names []string, ds [][]*cards.C
 	}()
 	for n := 0; !e.G.Over && e.Pending() != nil && n < atomicMaxDecisions; n++ {
 		st.decisions++
+		if auto {
+			e.EnsurePotentialCasts()
+		}
 		d := e.Pending()
 		if delegate(d, auto) {
 			if err := submitSeat(e, fallback); err != nil {

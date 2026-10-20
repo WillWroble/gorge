@@ -41,7 +41,7 @@ func main() {
 	suff := flag.Bool("suff", false, "instead of game lines, run the view-sufficiency probe (principle 1) per tap mode")
 	gap := flag.Bool("gap", false, "instead of game lines, count castable casts autotap offers nothing for (principle 3)")
 	atomicFlag := flag.Bool("atomic", false, "instead of game lines, play random games one atomic pick at a time (principle 2)")
-	offer := flag.Bool("offer", false, "with -gap: switch on OfferPotentialCasts for both seats and play each extra cast on a clone")
+	offer := flag.Bool("offer", false, "with -gap: extend every priority decision with EnsurePotentialCasts and play each extra cast on a clone")
 	flag.Parse()
 
 	reg, err := cards.SharedCorpus(*dir)

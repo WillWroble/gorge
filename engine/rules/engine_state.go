@@ -57,9 +57,9 @@ func skipsEngineState(field string) bool {
 //   - rng: chance machinery (the state is the game, not the generator);
 //   - pending: the pending decision, View.Decision;
 //   - tape: visited separately, as the posed resolution's tape;
-//   - per-game, per-seat or corpus-derived configuration: format,
-//     mulligans, startingLife, paidManaCensus, potentialOffer,
-//     windowDiagnostics, layer4InPool, setNameInPool, controlStaticInPool;
+//   - per-game or corpus-derived configuration: format, mulligans,
+//     startingLife, paidManaCensus, windowDiagnostics, layer4InPool,
+//     setNameInPool, controlStaticInPool;
 //   - diagnostics: AbortTally, LegacyAskTally, phaseUnknownNoted,
 //     disableTriggersNoted;
 //   - memos and their keys, derived from the game: every other entry.
@@ -67,7 +67,7 @@ var engineStateSkip = []string{
 	"AbortTally", "G", "L", "LegacyAskTally", "actIndex", "atkOffersActive",
 	"atkOffersEp", "atkOffersObjs", "atkOffersVer", "controlStaticInPool",
 	"disableTriggersNoted", "format", "layer4InPool", "layer4Types", "lossProof",
-	"mulligans", "paidManaCensus", "pending", "phaseUnknownNoted", "potentialOffer", "renameEpoch",
+	"mulligans", "paidManaCensus", "pending", "phaseUnknownNoted", "renameEpoch",
 	"renameObjs", "renameVersion", "renames", "replArena", "replZones",
 	"replZonesEp", "rng", "sbaQuiet", "setNameInPool", "startingLife",
 	"staticContinuous", "staticEpoch", "staticGates", "staticGatesKnown",

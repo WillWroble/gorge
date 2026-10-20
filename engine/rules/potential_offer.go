@@ -5,20 +5,23 @@ import (
 	"github.com/adams-shaun/gorge/engine/state"
 )
 
-// OfferPotentialCasts sets whether p's priority decisions also offer every
-// cast the potential-mana walk finds castable: what the floating pool plus
-// p's untapped sources can pay, not only what the pool pays now. Such a cast
-// is announced and then paid in its CR 601.2g mana window, and reversed (CR
-// 733.1) if it cannot be. This is the action set of an autotap player in
-// mz-gorge (XMage offers whatever all available mana can pay, then its
-// auto-tapper pays). It is off for every seat by default, so no other
-// decision stream changes.
-func (e *Engine) OfferPotentialCasts(p state.PlayerID, on bool) {
-	if on {
-		e.potentialOffer |= 1 << p
-	} else {
-		e.potentialOffer &^= 1 << p
+// EnsurePotentialCasts adds to the pending priority decision every cast the
+// potential-mana walk finds castable that it does not already offer: what
+// the floating pool plus the seat's untapped sources can pay, not only what
+// the pool pays now. Such a cast is announced and then paid in its CR 601.2g
+// mana window, and reversed (CR 733.1) if it cannot be. This is the action
+// set of an autotap player in mz-gorge (XMage offers whatever all available
+// mana can pay, then its auto-tapper pays). The additions follow concede,
+// so every existing index keeps its meaning. A driver calls it only for a
+// seat.PotentialCastConsumer, the way it calls EnsurePaymentActions, so no
+// other decision changes. It is a pure derived read and idempotent.
+func (e *Engine) EnsurePotentialCasts() {
+	d := e.pending
+	if d == nil || d.Kind != decision.KPriority || d.PotentialCastsOffered {
+		return
 	}
+	d.Options = e.withPotentialCasts(d.Player, d.Options)
+	d.PotentialCastsOffered = true
 }
 
 // withPotentialCasts appends to p's offered options the potential walk's

@@ -299,6 +299,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 				}
 			}
 			d := e.Pending()
+			if c, ok := seats[d.Player].(seat.PotentialCastConsumer); ok && c.WantsPotentialCasts() {
+				e.EnsurePotentialCasts()
+			}
 			if consumer, ok := seats[d.Player].(seat.PaymentPlanConsumer); ok && consumer.WantsPaymentActions() {
 				e.EnsurePaymentActions()
 			}

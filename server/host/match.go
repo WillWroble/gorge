@@ -512,6 +512,9 @@ func projectNextData(m *match, seats []seat.Seat, brd *botpolicy.Board) *parkedD
 		return nil
 	}
 	_, isHuman := seats[d.Player].(*HumanSeat)
+	if c, ok := seats[d.Player].(seat.PotentialCastConsumer); ok && c.WantsPotentialCasts() {
+		m.e.EnsurePotentialCasts()
+	}
 	wantsPlans := isHuman && m.table.cfg.AutoMana
 	if consumer, ok := seats[d.Player].(seat.PaymentPlanConsumer); ok && consumer.WantsPaymentActions() {
 		wantsPlans = true

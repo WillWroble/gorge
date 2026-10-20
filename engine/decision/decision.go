@@ -897,8 +897,11 @@ type Decision struct {
 	// Declined lists the objects (an attacker or blocker candidate) decided
 	// to take none of their options. They are game state, so the view and a
 	// clone carry them. Both are empty for every other seat.
-	Staged   []int         `json:"staged,omitempty"`
-	Declined []state.ObjID `json:"declined,omitempty"`
+	Staged []int `json:"staged,omitempty"`
+	// PotentialCastsOffered marks a priority decision rules'
+	// EnsurePotentialCasts has extended. Server-side only.
+	PotentialCastsOffered bool          `json:"-"`
+	Declined              []state.ObjID `json:"declined,omitempty"`
 }
 
 // New is a convenience constructor that fills a Decision's Player, Kind,

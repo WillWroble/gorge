@@ -112,10 +112,10 @@ func TestProjectDynamicEveryDecision(t *testing.T) {
 	}
 }
 
-// TestOfferPotentialCastsClosesGap pins principle 3 for autotap: with
-// OfferPotentialCasts every castable cast is offered, and playing one either
+// TestPotentialCastsCloseGap pins principle 3 for autotap: with
+// EnsurePotentialCasts every castable cast is offered, and playing one either
 // casts it or reverses it cleanly.
-func TestOfferPotentialCastsClosesGap(t *testing.T) {
+func TestPotentialCastsCloseGap(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	names := []string{"ubartifacts", "uw-control"}
 	ds, err := loadPair(reg, names)

@@ -43,6 +43,16 @@ type PaymentPlanConsumer interface {
 	WantsPaymentActions() bool
 }
 
+// PotentialCastConsumer opts into the casts all of a seat's available mana
+// can pay, not only those its floating pool pays (rules'
+// Engine.EnsurePotentialCasts): mz-gorge's autotap player, which pays them
+// while casting. A driver extends the seat's priority decisions for it the
+// way it builds payment plans for a PaymentPlanConsumer. No other seat sees
+// the additions.
+type PotentialCastConsumer interface {
+	WantsPotentialCasts() bool
+}
+
 // TargetHintConsumer opts into decision.Option.TargetHints on priority
 // decisions (Engine.EnsureTargetHints). Information only; the engine offers
 // every legal action either way.
