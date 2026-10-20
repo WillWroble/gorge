@@ -1,0 +1,55 @@
+{
+  "name": "Standard-MonoG",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard-MonoG.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Forest",
+      "count": 22
+    },
+    {
+      "name": "Sentinel of the Nameless City",
+      "count": 4
+    },
+    {
+      "name": "Quirion Beastcaller",
+      "count": 4
+    },
+    {
+      "name": "Axebane Ferox",
+      "count": 4
+    },
+    {
+      "name": "Cenote Scout",
+      "count": 4
+    },
+    {
+      "name": "Flourishing Bloom-Kin",
+      "count": 4
+    },
+    {
+      "name": "Evolving Adaptive",
+      "count": 4
+    },
+    {
+      "name": "Sharp-Eyed Rookie",
+      "count": 4
+    },
+    {
+      "name": "Hard-Hitting Question",
+      "count": 4
+    },
+    {
+      "name": "Aloe Alchemist",
+      "count": 3
+    },
+    {
+      "name": "Polukranos Reborn",
+      "count": 2
+    },
+    {
+      "name": "Ascendant Packleader",
+      "count": 1
+    }
+  ]
+}

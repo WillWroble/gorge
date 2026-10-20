@@ -1,0 +1,51 @@
+{
+  "name": "Standard-MonoB",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard-MonoB.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Gatekeeper of Malakir",
+      "count": 4
+    },
+    {
+      "name": "Deep-Cavern Bat",
+      "count": 4
+    },
+    {
+      "name": "Forsaken Miner",
+      "count": 4
+    },
+    {
+      "name": "Iridescent Vinelasher",
+      "count": 4
+    },
+    {
+      "name": "Shoot the Sheriff",
+      "count": 4
+    },
+    {
+      "name": "Soulstone Sanctuary",
+      "count": 4
+    },
+    {
+      "name": "Swamp",
+      "count": 20
+    },
+    {
+      "name": "Cecil, Dark Knight",
+      "count": 4
+    },
+    {
+      "name": "Bloodletter of Aclazotz",
+      "count": 4
+    },
+    {
+      "name": "Unholy Annex // Ritual Chamber",
+      "count": 4
+    },
+    {
+      "name": "Unstoppable Slasher",
+      "count": 4
+    }
+  ]
+}

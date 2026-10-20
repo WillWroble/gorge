@@ -1,0 +1,123 @@
+{
+  "name": "Mind(MindvsMight)",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Mind(MindvsMight).dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Beacon of Tomorrows",
+      "count": 1
+    },
+    {
+      "name": "Deep-Sea Kraken",
+      "count": 1
+    },
+    {
+      "name": "Desperate Ritual",
+      "count": 1
+    },
+    {
+      "name": "Empty the Warrens",
+      "count": 2
+    },
+    {
+      "name": "Firemind's Foresight",
+      "count": 1
+    },
+    {
+      "name": "Goblin Electromancer",
+      "count": 2
+    },
+    {
+      "name": "Grapeshot",
+      "count": 1
+    },
+    {
+      "name": "Island",
+      "count": 10
+    },
+    {
+      "name": "Jhoira of the Ghitu",
+      "count": 1
+    },
+    {
+      "name": "Jori En, Ruin Diver",
+      "count": 1
+    },
+    {
+      "name": "Mind's Desire",
+      "count": 1
+    },
+    {
+      "name": "Mountain",
+      "count": 10
+    },
+    {
+      "name": "Nivix Cyclops",
+      "count": 1
+    },
+    {
+      "name": "Nucklavee",
+      "count": 1
+    },
+    {
+      "name": "Peer Through Depths",
+      "count": 2
+    },
+    {
+      "name": "Quicken",
+      "count": 1
+    },
+    {
+      "name": "Reach Through Mists",
+      "count": 3
+    },
+    {
+      "name": "Rift Bolt",
+      "count": 3
+    },
+    {
+      "name": "Sage-Eye Avengers",
+      "count": 1
+    },
+    {
+      "name": "Shivan Meteor",
+      "count": 1
+    },
+    {
+      "name": "Sift Through Sands",
+      "count": 2
+    },
+    {
+      "name": "Snap",
+      "count": 2
+    },
+    {
+      "name": "Spellheart Chimera",
+      "count": 1
+    },
+    {
+      "name": "Swiftwater Cliffs",
+      "count": 4
+    },
+    {
+      "name": "Talrand, Sky Summoner",
+      "count": 1
+    },
+    {
+      "name": "Temporal Fissure",
+      "count": 1
+    },
+    {
+      "name": "The Unspeakable",
+      "count": 1
+    },
+    {
+      "name": "Volcanic Vision",
+      "count": 1
+    },
+    {
+      "name": "Young Pyromancer",
+      "count": 2
+    }
+  ]
+}

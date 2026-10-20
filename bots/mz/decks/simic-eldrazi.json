@@ -1,0 +1,91 @@
+{
+  "name": "simic-eldrazi",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/simic-eldrazi.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Breeding Pool",
+      "count": 1
+    },
+    {
+      "name": "Chalice of the Void",
+      "count": 4
+    },
+    {
+      "name": "Devourer of Destiny",
+      "count": 4
+    },
+    {
+      "name": "Dress Down",
+      "count": 2
+    },
+    {
+      "name": "Drowner of Truth",
+      "count": 4
+    },
+    {
+      "name": "Eldrazi Temple",
+      "count": 4
+    },
+    {
+      "name": "Emrakul, the Promised End",
+      "count": 2
+    },
+    {
+      "name": "Forest",
+      "count": 4
+    },
+    {
+      "name": "Island",
+      "count": 1
+    },
+    {
+      "name": "Kiora, Behemoth Beckoner",
+      "count": 3
+    },
+    {
+      "name": "Kozilek's Command",
+      "count": 4
+    },
+    {
+      "name": "Malevolent Rumble",
+      "count": 4
+    },
+    {
+      "name": "Nulldrifter",
+      "count": 4
+    },
+    {
+      "name": "Prismatic Vista",
+      "count": 4
+    },
+    {
+      "name": "Shifting Woodland",
+      "count": 1
+    },
+    {
+      "name": "Snow-Covered Wastes",
+      "count": 1
+    },
+    {
+      "name": "Sowing Mycospawn",
+      "count": 2
+    },
+    {
+      "name": "Thought-Knot Seer",
+      "count": 4
+    },
+    {
+      "name": "Ugin's Binding",
+      "count": 1
+    },
+    {
+      "name": "Ugin's Labyrinth",
+      "count": 4
+    },
+    {
+      "name": "Wastescape Battlemage",
+      "count": 2
+    }
+  ]
+}

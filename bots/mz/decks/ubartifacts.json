@@ -1,0 +1,79 @@
+{
+  "name": "UBArtifacts",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/UBArtifacts.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Aether Spellbomb",
+      "count": 2
+    },
+    {
+      "name": "Baleful Strix",
+      "count": 2
+    },
+    {
+      "name": "Blood Fountain",
+      "count": 4
+    },
+    {
+      "name": "Darkslick Shores",
+      "count": 4
+    },
+    {
+      "name": "Demonic Junker",
+      "count": 4
+    },
+    {
+      "name": "Emry, Lurker of the Loch",
+      "count": 4
+    },
+    {
+      "name": "Lazav, Wearer of Faces",
+      "count": 2
+    },
+    {
+      "name": "Metallic Rebuke",
+      "count": 4
+    },
+    {
+      "name": "Mox Amber",
+      "count": 4
+    },
+    {
+      "name": "Refurbished Familiar",
+      "count": 4
+    },
+    {
+      "name": "Seat of the Synod",
+      "count": 4
+    },
+    {
+      "name": "Soul-Guide Lantern",
+      "count": 1
+    },
+    {
+      "name": "Spire of Industry",
+      "count": 3
+    },
+    {
+      "name": "Tamiyo, Inquisitive Student",
+      "count": 4
+    },
+    {
+      "name": "Tarrian's Journal",
+      "count": 2
+    },
+    {
+      "name": "Thought Monitor",
+      "count": 4
+    },
+    {
+      "name": "Vault of Whispers",
+      "count": 4
+    },
+    {
+      "name": "Watery Grave",
+      "count": 4
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "name": "Pauper-Spy",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Pauper-Spy.txt); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Mesmeric Fiend",
+      "count": 2
+    },
+    {
+      "name": "Overgrown Battlement",
+      "count": 4
+    },
+    {
+      "name": "Saruli Caretaker",
+      "count": 4
+    },
+    {
+      "name": "Gatecreeper Vine",
+      "count": 3
+    },
+    {
+      "name": "Sagu Wildling",
+      "count": 4
+    },
+    {
+      "name": "Generous Ent",
+      "count": 4
+    },
+    {
+      "name": "Lead the Stampede",
+      "count": 4
+    },
+    {
+      "name": "Winding Way",
+      "count": 4
+    },
+    {
+      "name": "Land Grant",
+      "count": 4
+    },
+    {
+      "name": "Balustrade Spy",
+      "count": 4
+    },
+    {
+      "name": "Lotleth Giant",
+      "count": 2
+    },
+    {
+      "name": "Dread Return",
+      "count": 2
+    },
+    {
+      "name": "Swamp",
+      "count": 1
+    },
+    {
+      "name": "Forest",
+      "count": 3
+    },
+    {
+      "name": "Wall of Roots",
+      "count": 3
+    },
+    {
+      "name": "Masked Vandal",
+      "count": 3
+    },
+    {
+      "name": "Quirion Ranger",
+      "count": 2
+    },
+    {
+      "name": "Troll of Khazad-dûm",
+      "count": 1
+    },
+    {
+      "name": "Lotus Petal",
+      "count": 2
+    },
+    {
+      "name": "Tinder Wall",
+      "count": 2
+    },
+    {
+      "name": "Elves of Deep Shadow",
+      "count": 2
+    }
+  ]
+}

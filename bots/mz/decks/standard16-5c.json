@@ -1,0 +1,123 @@
+{
+  "name": "Standard16-5C",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-5C.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Caves of Koilos",
+      "count": 1
+    },
+    {
+      "name": "Yavimaya Coast",
+      "count": 1
+    },
+    {
+      "name": "Thalia, Guardian of Thraben",
+      "count": 4
+    },
+    {
+      "name": "Llanowar Wastes",
+      "count": 1
+    },
+    {
+      "name": "Adeline, Resplendent Cathar",
+      "count": 2
+    },
+    {
+      "name": "Katilda, Dawnhart Prime",
+      "count": 3
+    },
+    {
+      "name": "Deserted Beach",
+      "count": 1
+    },
+    {
+      "name": "Overgrown Farmland",
+      "count": 2
+    },
+    {
+      "name": "Rockfall Vale",
+      "count": 1
+    },
+    {
+      "name": "Halana and Alena, Partners",
+      "count": 3
+    },
+    {
+      "name": "Dreamroot Cascade",
+      "count": 1
+    },
+    {
+      "name": "Eiganjo, Seat of the Empire",
+      "count": 2
+    },
+    {
+      "name": "Lagrella, the Magpie",
+      "count": 2
+    },
+    {
+      "name": "Jetmir's Garden",
+      "count": 1
+    },
+    {
+      "name": "Spara's Headquarters",
+      "count": 1
+    },
+    {
+      "name": "Ertai Resurrected",
+      "count": 2
+    },
+    {
+      "name": "Jodah, the Unifier",
+      "count": 4
+    },
+    {
+      "name": "Shanna, Purifying Blade",
+      "count": 2
+    },
+    {
+      "name": "Adarkar Wastes",
+      "count": 2
+    },
+    {
+      "name": "Karplusan Forest",
+      "count": 2
+    },
+    {
+      "name": "Plaza of Heroes",
+      "count": 4
+    },
+    {
+      "name": "Gwenna, Eyes of Gaea",
+      "count": 3
+    },
+    {
+      "name": "Hajar, Loyal Bodyguard",
+      "count": 3
+    },
+    {
+      "name": "Brushland",
+      "count": 2
+    },
+    {
+      "name": "Skrelv, Defector Mite",
+      "count": 2
+    },
+    {
+      "name": "Djeru and Hazoret",
+      "count": 2
+    },
+    {
+      "name": "Melira, the Living Cure",
+      "count": 3
+    },
+    {
+      "name": "Copperline Gorge",
+      "count": 2
+    },
+    {
+      "name": "Razorverge Thicket",
+      "count": 1
+    }
+  ]
+}

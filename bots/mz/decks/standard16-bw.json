@@ -1,0 +1,79 @@
+{
+  "name": "Standard16-BW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-BW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Ruin-Lurker Bat",
+      "count": 4
+    },
+    {
+      "name": "Essence Channeler",
+      "count": 4
+    },
+    {
+      "name": "Deep-Cavern Bat",
+      "count": 4
+    },
+    {
+      "name": "Enduring Innocence",
+      "count": 3
+    },
+    {
+      "name": "Darkstar Augur",
+      "count": 3
+    },
+    {
+      "name": "Zoraline, Cosmos Caller",
+      "count": 3
+    },
+    {
+      "name": "Cut Down",
+      "count": 2
+    },
+    {
+      "name": "Anoint with Affliction",
+      "count": 3
+    },
+    {
+      "name": "Go for the Throat",
+      "count": 4
+    },
+    {
+      "name": "Case of the Uneaten Feast",
+      "count": 4
+    },
+    {
+      "name": "Lunar Convocation",
+      "count": 3
+    },
+    {
+      "name": "Lupinflower Village",
+      "count": 1
+    },
+    {
+      "name": "Plains",
+      "count": 6
+    },
+    {
+      "name": "Mudflat Village",
+      "count": 1
+    },
+    {
+      "name": "Swamp",
+      "count": 5
+    },
+    {
+      "name": "Caves of Koilos",
+      "count": 4
+    },
+    {
+      "name": "Concealed Courtyard",
+      "count": 4
+    },
+    {
+      "name": "Restless Fortress",
+      "count": 2
+    }
+  ]
+}

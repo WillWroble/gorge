@@ -1,0 +1,119 @@
+{
+  "name": "EVG_Goblins",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/EVG_Goblins.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Mountain",
+      "count": 22
+    },
+    {
+      "name": "Forgotten Cave",
+      "count": 1
+    },
+    {
+      "name": "Goblin Burrows",
+      "count": 1
+    },
+    {
+      "name": "Akki Coalflinger",
+      "count": 1
+    },
+    {
+      "name": "Clickslither",
+      "count": 1
+    },
+    {
+      "name": "Emberwilde Augur",
+      "count": 3
+    },
+    {
+      "name": "Flamewave Invoker",
+      "count": 1
+    },
+    {
+      "name": "Gempalm Incinerator",
+      "count": 1
+    },
+    {
+      "name": "Goblin Cohort",
+      "count": 3
+    },
+    {
+      "name": "Goblin Matron",
+      "count": 1
+    },
+    {
+      "name": "Goblin Ringleader",
+      "count": 1
+    },
+    {
+      "name": "Goblin Sledder",
+      "count": 1
+    },
+    {
+      "name": "Goblin Warchief",
+      "count": 1
+    },
+    {
+      "name": "Ib Halfheart, Goblin Tactician",
+      "count": 1
+    },
+    {
+      "name": "Mogg Fanatic",
+      "count": 1
+    },
+    {
+      "name": "Mogg War Marshal",
+      "count": 2
+    },
+    {
+      "name": "Mudbutton Torchrunner",
+      "count": 2
+    },
+    {
+      "name": "Raging Goblin",
+      "count": 2
+    },
+    {
+      "name": "Reckless One",
+      "count": 1
+    },
+    {
+      "name": "Siege-Gang Commander",
+      "count": 1
+    },
+    {
+      "name": "Skirk Drill Sergeant",
+      "count": 2
+    },
+    {
+      "name": "Skirk Fire Marshal",
+      "count": 1
+    },
+    {
+      "name": "Skirk Prospector",
+      "count": 1
+    },
+    {
+      "name": "Skirk Shaman",
+      "count": 1
+    },
+    {
+      "name": "Tar Pitcher",
+      "count": 1
+    },
+    {
+      "name": "Tarfire",
+      "count": 3
+    },
+    {
+      "name": "Spitting Earth",
+      "count": 1
+    },
+    {
+      "name": "Boggart Shenanigans",
+      "count": 2
+    }
+  ]
+}

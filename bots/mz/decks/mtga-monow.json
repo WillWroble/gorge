@@ -1,0 +1,79 @@
+{
+  "name": "MTGA_MonoW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MTGA_MonoW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Charmed Stray",
+      "count": 4
+    },
+    {
+      "name": "Fencing Ace",
+      "count": 2
+    },
+    {
+      "name": "Hallowed Priest",
+      "count": 4
+    },
+    {
+      "name": "Impassioned Orator",
+      "count": 3
+    },
+    {
+      "name": "Moorland Inquisitor",
+      "count": 2
+    },
+    {
+      "name": "Angel of Vitality",
+      "count": 2
+    },
+    {
+      "name": "Leonin Warleader",
+      "count": 2
+    },
+    {
+      "name": "Serra Angel",
+      "count": 1
+    },
+    {
+      "name": "Spiritual Guardian",
+      "count": 1
+    },
+    {
+      "name": "Angelic Guardian",
+      "count": 1
+    },
+    {
+      "name": "Inspiring Commander",
+      "count": 2
+    },
+    {
+      "name": "Goring Ceratops",
+      "count": 1
+    },
+    {
+      "name": "Tactical Advantage",
+      "count": 4
+    },
+    {
+      "name": "Confront the Assault",
+      "count": 1
+    },
+    {
+      "name": "Bond of Discipline",
+      "count": 1
+    },
+    {
+      "name": "Pacifism",
+      "count": 3
+    },
+    {
+      "name": "Angelic Reward",
+      "count": 1
+    },
+    {
+      "name": "Plains",
+      "count": 25
+    }
+  ]
+}

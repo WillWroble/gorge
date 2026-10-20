@@ -1,0 +1,75 @@
+{
+  "name": "MTGA_MonoR",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/MTGA_MonoR.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Tin Street Cadet",
+      "count": 3
+    },
+    {
+      "name": "Goblin Tunneler",
+      "count": 2
+    },
+    {
+      "name": "Nest Robber",
+      "count": 4
+    },
+    {
+      "name": "Molten Ravager",
+      "count": 2
+    },
+    {
+      "name": "Goblin Gang Leader",
+      "count": 2
+    },
+    {
+      "name": "Goblin Trashmaster",
+      "count": 1
+    },
+    {
+      "name": "Ogre Battledriver",
+      "count": 2
+    },
+    {
+      "name": "Immortal Phoenix",
+      "count": 1
+    },
+    {
+      "name": "Volcanic Dragon",
+      "count": 1
+    },
+    {
+      "name": "Siege Dragon",
+      "count": 2
+    },
+    {
+      "name": "Shock",
+      "count": 3
+    },
+    {
+      "name": "Storm Strike",
+      "count": 2
+    },
+    {
+      "name": "Burn Bright",
+      "count": 2
+    },
+    {
+      "name": "Inescapable Blaze",
+      "count": 2
+    },
+    {
+      "name": "Goblin Gathering",
+      "count": 4
+    },
+    {
+      "name": "Raid Bombardment",
+      "count": 2
+    },
+    {
+      "name": "Mountain",
+      "count": 25
+    }
+  ]
+}

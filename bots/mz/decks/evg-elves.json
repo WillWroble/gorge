@@ -1,0 +1,119 @@
+{
+  "name": "EVG_Elves",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/EVG_Elves.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Forest",
+      "count": 19
+    },
+    {
+      "name": "Tranquil Thicket",
+      "count": 2
+    },
+    {
+      "name": "Wirewood Lodge",
+      "count": 1
+    },
+    {
+      "name": "Ambush Commander",
+      "count": 1
+    },
+    {
+      "name": "Allosaurus Rider",
+      "count": 1
+    },
+    {
+      "name": "Elvish Eulogist",
+      "count": 2
+    },
+    {
+      "name": "Elvish Harbinger",
+      "count": 1
+    },
+    {
+      "name": "Elvish Warrior",
+      "count": 3
+    },
+    {
+      "name": "Gempalm Strider",
+      "count": 2
+    },
+    {
+      "name": "Heedless One",
+      "count": 1
+    },
+    {
+      "name": "Imperious Perfect",
+      "count": 2
+    },
+    {
+      "name": "Llanowar Elves",
+      "count": 3
+    },
+    {
+      "name": "Lys Alana Huntmaster",
+      "count": 2
+    },
+    {
+      "name": "Stonewood Invoker",
+      "count": 1
+    },
+    {
+      "name": "Sylvan Messenger",
+      "count": 1
+    },
+    {
+      "name": "Timberwatch Elf",
+      "count": 1
+    },
+    {
+      "name": "Voice of the Woods",
+      "count": 1
+    },
+    {
+      "name": "Wellwisher",
+      "count": 2
+    },
+    {
+      "name": "Wirewood Herald",
+      "count": 1
+    },
+    {
+      "name": "Wirewood Symbiote",
+      "count": 1
+    },
+    {
+      "name": "Wood Elves",
+      "count": 2
+    },
+    {
+      "name": "Wren's Run Vanquisher",
+      "count": 1
+    },
+    {
+      "name": "Giant Growth",
+      "count": 2
+    },
+    {
+      "name": "Wildsize",
+      "count": 1
+    },
+    {
+      "name": "Elvish Promenade",
+      "count": 1
+    },
+    {
+      "name": "Harmonize",
+      "count": 1
+    },
+    {
+      "name": "Moonglove Extract",
+      "count": 3
+    },
+    {
+      "name": "Slate of Ancestry",
+      "count": 1
+    }
+  ]
+}

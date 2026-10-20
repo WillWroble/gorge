@@ -1,0 +1,75 @@
+{
+  "name": "UWTempo",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/UWTempo.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Malcolm, Alluring Scoundrel",
+      "count": 4
+    },
+    {
+      "name": "Island",
+      "count": 7
+    },
+    {
+      "name": "Sheltered by Ghosts",
+      "count": 4
+    },
+    {
+      "name": "Skrelv, Defector Mite",
+      "count": 4
+    },
+    {
+      "name": "Combat Research",
+      "count": 4
+    },
+    {
+      "name": "No More Lies",
+      "count": 4
+    },
+    {
+      "name": "Adarkar Wastes",
+      "count": 4
+    },
+    {
+      "name": "Seachrome Coast",
+      "count": 4
+    },
+    {
+      "name": "Meticulous Archive",
+      "count": 4
+    },
+    {
+      "name": "Shardmage's Rescue",
+      "count": 2
+    },
+    {
+      "name": "Floodfarm Verge",
+      "count": 3
+    },
+    {
+      "name": "Soul Partition",
+      "count": 2
+    },
+    {
+      "name": "Negate",
+      "count": 2
+    },
+    {
+      "name": "Kitsa, Otterball Elite",
+      "count": 4
+    },
+    {
+      "name": "Bounce Off",
+      "count": 4
+    },
+    {
+      "name": "Spell Pierce",
+      "count": 2
+    },
+    {
+      "name": "Sleep-Cursed Faerie",
+      "count": 2
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "name": "HighNoonControl",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/HighNoonControl.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Castle Ardenvale",
+      "count": 1
+    },
+    {
+      "name": "Consign to Memory",
+      "count": 1
+    },
+    {
+      "name": "Elegant Parlor",
+      "count": 1
+    },
+    {
+      "name": "Flooded Strand",
+      "count": 4
+    },
+    {
+      "name": "Force of Negation",
+      "count": 2
+    },
+    {
+      "name": "Hallowed Fountain",
+      "count": 2
+    },
+    {
+      "name": "High Noon",
+      "count": 4
+    },
+    {
+      "name": "Island",
+      "count": 1
+    },
+    {
+      "name": "Lightning Bolt",
+      "count": 3
+    },
+    {
+      "name": "Lórien Revealed",
+      "count": 2
+    },
+    {
+      "name": "Meticulous Archive",
+      "count": 1
+    },
+    {
+      "name": "Mountain",
+      "count": 1
+    },
+    {
+      "name": "Phlage, Titan of Fire's Fury",
+      "count": 2
+    },
+    {
+      "name": "Plains",
+      "count": 1
+    },
+    {
+      "name": "Preordain",
+      "count": 4
+    },
+    {
+      "name": "Prismatic Ending",
+      "count": 1
+    },
+    {
+      "name": "Remand",
+      "count": 2
+    },
+    {
+      "name": "Reprieve",
+      "count": 4
+    },
+    {
+      "name": "Sacred Foundry",
+      "count": 2
+    },
+    {
+      "name": "Scalding Tarn",
+      "count": 3
+    },
+    {
+      "name": "Sink into Stupor",
+      "count": 2
+    },
+    {
+      "name": "Solitude",
+      "count": 3
+    },
+    {
+      "name": "Spell Queller",
+      "count": 4
+    },
+    {
+      "name": "Steam Vents",
+      "count": 1
+    },
+    {
+      "name": "Subtlety",
+      "count": 3
+    },
+    {
+      "name": "Teferi, Time Raveler",
+      "count": 4
+    },
+    {
+      "name": "Thundering Falls",
+      "count": 1
+    }
+  ]
+}

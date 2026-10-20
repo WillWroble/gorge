@@ -1,0 +1,91 @@
+{
+  "name": "Standard16-GW",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Standard16-GW.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Llanowar Elves",
+      "count": 4
+    },
+    {
+      "name": "Sanguine Evangelist",
+      "count": 4
+    },
+    {
+      "name": "Sandstorm Salvager",
+      "count": 4
+    },
+    {
+      "name": "Pawpatch Recruit",
+      "count": 4
+    },
+    {
+      "name": "Overlord of the Mistmoors",
+      "count": 4
+    },
+    {
+      "name": "Brightglass Gearhulk",
+      "count": 4
+    },
+    {
+      "name": "Basilisk Collar",
+      "count": 1
+    },
+    {
+      "name": "Dusk Rose Reliquary",
+      "count": 1
+    },
+    {
+      "name": "Collector's Cage",
+      "count": 4
+    },
+    {
+      "name": "Virtue of Loyalty",
+      "count": 2
+    },
+    {
+      "name": "Sheltered by Ghosts",
+      "count": 2
+    },
+    {
+      "name": "Hardlight Containment",
+      "count": 1
+    },
+    {
+      "name": "Seam Rip",
+      "count": 2
+    },
+    {
+      "name": "Plains",
+      "count": 3
+    },
+    {
+      "name": "Forest",
+      "count": 3
+    },
+    {
+      "name": "Restless Prairie",
+      "count": 2
+    },
+    {
+      "name": "Lush Portico",
+      "count": 3
+    },
+    {
+      "name": "Fountainport",
+      "count": 1
+    },
+    {
+      "name": "Hushwood Verge",
+      "count": 4
+    },
+    {
+      "name": "Starting Town",
+      "count": 4
+    },
+    {
+      "name": "Razorverge Thicket",
+      "count": 3
+    }
+  ]
+}

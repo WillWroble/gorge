@@ -1,0 +1,55 @@
+{
+  "name": "Pauper-Burn",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Pauper-Burn.txt); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Sneaky Snacker",
+      "count": 4
+    },
+    {
+      "name": "Faithless Looting",
+      "count": 2
+    },
+    {
+      "name": "Highway Robbery",
+      "count": 4
+    },
+    {
+      "name": "Masked Meower",
+      "count": 4
+    },
+    {
+      "name": "Lightning Bolt",
+      "count": 4
+    },
+    {
+      "name": "Mountain",
+      "count": 18
+    },
+    {
+      "name": "Grab the Prize",
+      "count": 4
+    },
+    {
+      "name": "Fireblast",
+      "count": 4
+    },
+    {
+      "name": "Guttersnipe",
+      "count": 4
+    },
+    {
+      "name": "Fiery Temper",
+      "count": 4
+    },
+    {
+      "name": "Voldaren Epicure",
+      "count": 4
+    },
+    {
+      "name": "Lava Dart",
+      "count": 4
+    }
+  ]
+}

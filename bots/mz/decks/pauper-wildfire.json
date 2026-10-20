@@ -1,0 +1,95 @@
+{
+  "name": "Pauper-Wildfire",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/Pauper-Wildfire.txt); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Twisted Landscape",
+      "count": 4
+    },
+    {
+      "name": "Fanatical Offering",
+      "count": 4
+    },
+    {
+      "name": "Ichor Wellspring",
+      "count": 3
+    },
+    {
+      "name": "Blood Fountain",
+      "count": 1
+    },
+    {
+      "name": "Drossforge Bridge",
+      "count": 4
+    },
+    {
+      "name": "Slagwoods Bridge",
+      "count": 4
+    },
+    {
+      "name": "Writhing Chrysalis",
+      "count": 4
+    },
+    {
+      "name": "Nyxborn Hydra",
+      "count": 1
+    },
+    {
+      "name": "Vault of Whispers",
+      "count": 1
+    },
+    {
+      "name": "Cleansing Wildfire",
+      "count": 4
+    },
+    {
+      "name": "Lembas",
+      "count": 3
+    },
+    {
+      "name": "Makeshift Munitions",
+      "count": 1
+    },
+    {
+      "name": "Cast Down",
+      "count": 4
+    },
+    {
+      "name": "Nihil Spellbomb",
+      "count": 4
+    },
+    {
+      "name": "Swamp",
+      "count": 3
+    },
+    {
+      "name": "Mountain",
+      "count": 2
+    },
+    {
+      "name": "Forest",
+      "count": 2
+    },
+    {
+      "name": "Refurbished Familiar",
+      "count": 4
+    },
+    {
+      "name": "Krark-Clan Shaman",
+      "count": 3
+    },
+    {
+      "name": "Eviscerator's Insight",
+      "count": 1
+    },
+    {
+      "name": "Toxin Analysis",
+      "count": 2
+    },
+    {
+      "name": "Pulse of Murasa",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "name": "GBLegends",
+  "format": "custom",
+  "notes": "Imported from the mage fork (WillWroble/mage graph-encoder, Mage.MageZero/decks/GBLegends.dck); [SET:num] tags dropped.",
+  "cards": [
+    {
+      "name": "Aclazotz, Deepest Betrayal",
+      "count": 1
+    },
+    {
+      "name": "Ancient Cornucopia",
+      "count": 3
+    },
+    {
+      "name": "Armored Scrapgorger",
+      "count": 1
+    },
+    {
+      "name": "Assassin's Trophy",
+      "count": 2
+    },
+    {
+      "name": "Atraxa, Grand Unifier",
+      "count": 3
+    },
+    {
+      "name": "Cavern of Souls",
+      "count": 2
+    },
+    {
+      "name": "Commercial District",
+      "count": 1
+    },
+    {
+      "name": "Cut Down",
+      "count": 2
+    },
+    {
+      "name": "Duress",
+      "count": 2
+    },
+    {
+      "name": "Elesh Norn, Mother of Machines",
+      "count": 1
+    },
+    {
+      "name": "Fabled Passage",
+      "count": 4
+    },
+    {
+      "name": "Forest",
+      "count": 2
+    },
+    {
+      "name": "Gix's Command",
+      "count": 2
+    },
+    {
+      "name": "Glarb, Calamity's Augur",
+      "count": 3
+    },
+    {
+      "name": "Glistening Deluge",
+      "count": 1
+    },
+    {
+      "name": "Go for the Throat",
+      "count": 2
+    },
+    {
+      "name": "Hedge Maze",
+      "count": 1
+    },
+    {
+      "name": "Island",
+      "count": 1
+    },
+    {
+      "name": "Llanowar Wastes",
+      "count": 4
+    },
+    {
+      "name": "Lush Portico",
+      "count": 1
+    },
+    {
+      "name": "Malicious Eclipse",
+      "count": 2
+    },
+    {
+      "name": "Mountain",
+      "count": 1
+    },
+    {
+      "name": "Negate",
+      "count": 2
+    },
+    {
+      "name": "Nissa, Ascended Animist",
+      "count": 1
+    },
+    {
+      "name": "Pillage the Bog",
+      "count": 2
+    },
+    {
+      "name": "Plains",
+      "count": 1
+    },
+    {
+      "name": "Plaza of Heroes",
+      "count": 3
+    },
+    {
+      "name": "Roxanne, Starfall Savant",
+      "count": 2
+    },
+    {
+      "name": "Soul of Windgrace",
+      "count": 3
+    },
+    {
+      "name": "Swamp",
+      "count": 2
+    },
+    {
+      "name": "Tear Asunder",
+      "count": 1
+    },
+    {
+      "name": "Tender Wildguide",
+      "count": 4
+    },
+    {
+      "name": "Thalia and The Gitrog Monster",
+      "count": 3
+    },
+    {
+      "name": "Tranquil Frillback",
+      "count": 1
+    },
+    {
+      "name": "Underground Mortuary",
+      "count": 4
+    },
+    {
+      "name": "Virtue of Persistence",
+      "count": 2
+    },
+    {
+      "name": "Vorinclex",
+      "count": 2
+    }
+  ]
+}
