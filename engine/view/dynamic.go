@@ -37,6 +37,9 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 		}); ok {
 			v.Engine = map[string]string{}
 			es.EngineState(func(field string, x reflect.Value) {
+				if empty(x) {
+					return
+				}
 				var b strings.Builder
 				stateText(&b, x, 0)
 				v.Engine[field] = b.String()
@@ -83,6 +86,11 @@ func ProjectDynamic(g *state.Game, ch Chars, viewer state.PlayerID, vis Visibili
 	}
 	return v
 }
+
+// IDRef prefixes an object ID in View.Engine's text.
+const IDRef = "#"
+
+var objIDType = reflect.TypeOf(state.ObjID(0))
 
 // Status is the dynamic state of an object or player that has no typed view
 // field: per-turn history, designations, cast provenance, choices, notes.
@@ -181,13 +189,13 @@ func objectFacts(o *state.Object) (Status, Links) {
 	f.flag("was_dealt_damage_this_turn", o.WasDealtDamageThisTurn)
 	f.flag("was_dealt_excess_damage_this_turn", o.WasDealtExcessDamageThisTurn)
 	f.num("damage_received_this_turn", o.DamageReceivedThisTurn)
-	for _, r := range o.DamageDealtThisTurn {
+	for i, r := range o.DamageDealtThisTurn {
 		k := "dealt_damage_this_turn"
 		if r.Combat {
 			k = "dealt_combat_damage_this_turn"
 		}
-		f.ids(k, r.Recipient)
-		f.num(k+":"+strconv.Itoa(int(r.Recipient)), r.Amount)
+		f.ids("damage_recipient_this_turn", r.Recipient)
+		f.num(k+":"+strconv.Itoa(i), r.Amount)
 	}
 	f.ids("damage_taken_this_game_by", o.DamageTakenByGame...)
 	f.ids("damage_taken_this_turn_by", o.DamageTakenThisTurnBy...)
@@ -231,8 +239,9 @@ func objectFacts(o *state.Object) (Status, Links) {
 	}
 	f.ids("granted_by", o.GrantedBy)
 	f.targets("sub_target", o.SubTargets)
-	for _, s := range o.TargetStamps {
-		f.num("target_incarnation:"+strconv.Itoa(int(s.Obj)), int32(s.Incarnation))
+	for i, s := range o.TargetStamps {
+		f.ids("target_stamp", s.Obj)
+		f.num("target_incarnation:"+strconv.Itoa(i), int32(s.Incarnation))
 	}
 	f.targets("remembered", o.Remembered)
 
@@ -330,9 +339,9 @@ func objectFacts(o *state.Object) (Status, Links) {
 	f.ids("encoded", o.EncodedCards...)
 	f.ids("imprinted_token", o.ImprintTokens...)
 	f.ids("seek_found", o.SeekFound...)
-	for _, r := range o.ExileReturn {
+	for i, r := range o.ExileReturn {
 		f.ids("exile_until_leaves", r.Obj)
-		f.str("exile_until_leaves_from:"+strconv.Itoa(int(r.Obj)), r.From.String())
+		f.str("exile_until_leaves_from:"+strconv.Itoa(i), r.From.String())
 	}
 	f.num("times_mutated", o.TimesMutated)
 	f.ids("last_bearer", o.LastBearer)
@@ -441,13 +450,14 @@ func gameFacts(g *state.Game) Status {
 	return f.s
 }
 
-// opaqueID reports whether a field names rather than carries state: an
+// OpaqueField reports whether a field names rather than carries state: an
 // identifier the engine derives for an offered payment (a payment action's
-// or plan's id), or a position in the event log (Seq, SourceZoneSeq), which
-// is history.
-func opaqueID(t reflect.Type, field string) bool {
+// or plan's id), a card's display token (its ID as text), or a position in
+// the event log (Seq, SourceZoneSeq), which is history.
+func OpaqueField(t reflect.Type, field string) bool {
 	return field == "ActionID" || strings.HasSuffix(field, "Seq") ||
-		(field == "ID" && t == reflect.TypeOf(decision.PaymentPlan{}))
+		(field == "ID" && t == reflect.TypeOf(decision.PaymentPlan{})) ||
+		(field == "Token" && t == reflect.TypeOf(CardView{}))
 }
 
 // snapshotName names the types a state value may embed a copy of the game
@@ -465,11 +475,51 @@ func snapshotName(t reflect.Type) (string, bool) {
 	return "", false
 }
 
+// CardDataName names what a non-nil pointer to card data points at (an
+// ability line, a card, a face): card data is static and cyclic, so state
+// readers name it rather than expand it.
+func CardDataName(p reflect.Value) (string, bool) {
+	switch p.Type().Elem() {
+	case reflect.TypeOf(cards.SA{}):
+		return "sa:" + strconv.Quote(p.Elem().FieldByName("Line").String()), true
+	case reflect.TypeOf(cards.Card{}):
+		return "card:" + strconv.Quote(p.Elem().FieldByName("Path").String()), true
+	case reflect.TypeOf(cards.Face{}):
+		return "face:" + strconv.Quote(p.Elem().FieldByName("Name").String()), true
+	}
+	return "", false
+}
+
+// empty reports a value that holds nothing: zero, or an empty slice or map,
+// or a struct of such. A copy may hold an empty slice where the original
+// holds nil, and the two are the same state.
+func empty(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Slice, reflect.Map:
+		return v.Len() == 0
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			if !empty(v.Field(i)) {
+				return false
+			}
+		}
+		return true
+	}
+	return v.IsZero()
+}
+
 // stateText writes v as deterministic text: struct fields by name, map
-// entries sorted, pointers followed, card data named rather than expanded.
+// entries sorted, pointers followed, card data named rather than expanded,
+// and an object ID as "#" and its number (IDRef), so a reader can tell it
+// from a count.
 func stateText(b *strings.Builder, v reflect.Value, depth int) {
 	if depth > 12 {
 		b.WriteString("…")
+		return
+	}
+	if v.Type() == objIDType {
+		b.WriteString(IDRef)
+		b.WriteString(strconv.FormatUint(v.Uint(), 10))
 		return
 	}
 	switch v.Kind() {
@@ -494,16 +544,11 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 			b.WriteString("nil")
 			return
 		}
-		switch v.Type().Elem() {
-		case reflect.TypeOf(cards.SA{}):
-			b.WriteString("sa:" + strconv.Quote(v.Elem().FieldByName("Line").String()))
-		case reflect.TypeOf(cards.Card{}):
-			b.WriteString("card:" + strconv.Quote(v.Elem().FieldByName("Path").String()))
-		case reflect.TypeOf(cards.Face{}):
-			b.WriteString("face:" + strconv.Quote(v.Elem().FieldByName("Name").String()))
-		default:
-			stateText(b, v.Elem(), depth+1)
+		if name, ok := CardDataName(v); ok {
+			b.WriteString(name)
+			return
 		}
+		stateText(b, v.Elem(), depth+1)
 	case reflect.Slice, reflect.Array:
 		b.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
@@ -532,7 +577,7 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 		b.WriteByte('{')
 		first := true
 		for i := 0; i < v.NumField(); i++ {
-			if v.Field(i).IsZero() || opaqueID(v.Type(), v.Type().Field(i).Name) {
+			if f := v.Field(i); empty(f) || OpaqueField(v.Type(), v.Type().Field(i).Name) {
 				continue
 			}
 			if !first {

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/adams-shaun/gorge/engine/decision"
+	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/view"
 )
 
@@ -51,6 +52,16 @@ type PaymentPlanConsumer interface {
 // the additions.
 type PotentialCastConsumer interface {
 	WantsPotentialCasts() bool
+}
+
+// EngineSeat reads the whole game: a driver hands it a clone of the live
+// engine at each of its decisions instead of a View. It is mz-gorge's
+// perfect-information search (mz-gorge-design.md, principle 10), so only
+// testkit/bench drives it; a hosted table never does, as it would show the
+// seat every hidden card.
+type EngineSeat interface {
+	Seat
+	DecideEngine(ctx context.Context, e *rules.Engine, d decision.Decision) (decision.Intent, error)
 }
 
 // TargetHintConsumer opts into decision.Option.TargetHints on priority

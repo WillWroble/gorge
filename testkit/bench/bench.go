@@ -449,6 +449,9 @@ func PlayGame(cfg rules.Config, seats []seat.Seat, maxTurns, maxIntents int, hoo
 					}
 					in, err = seats[d.Player].(searchseat.SearchSeat).DecideBoard(context.Background(), b, *d)
 				}
+			} else if es, ok := seats[d.Player].(seat.EngineSeat); ok {
+				// A perfect-information seat reads its own copy of the game.
+				in, err = es.DecideEngine(context.Background(), e.Clone(), *d)
 			} else if s, ok := seats[d.Player].(heuristic.BoardSeat); ok {
 				// Match the live host's reusable, seat-private Board path.
 				// Seats opting out (including legacy) still receive the full
