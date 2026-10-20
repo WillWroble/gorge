@@ -48,8 +48,16 @@ This document decides. Where it is silent, the mage fork (`WillWroble/mage`, `gr
 - **Microdecision:** any non-priority decision.
 - **Atomic decision:** a reusable decision type that every microdecision is built from.
 - **Decision scope:** a run of consecutive decisions made by the same player.
-- **Logical-state match:** a matching root guarantees a matching tree. Same playouts under the same fixed decisions, and the same object IDs, because actions passed from the sim tree to the base game reference IDs. Stricter than functionally identical. Under hidden information it would also require matching hands and libraries.
-- **Functionally identical:** the same on paper from here on, whatever the order things were picked in or which identical object is which. Playing either of two copies of a card in hand is the same state. This applies to factorized microdecision states too: attacking with A then B is the same state as B then A. Used for deduplication.
+- **Functionally identical:** the same on paper from here on, whatever the order things were picked in or which identical object is which. Playing either of two copies of a card in hand is the same state. This applies to factorized microdecision states too: attacking with A then B is the same state as B then A. Used for deduplication. The functional hash comes from the encoder, as in XMage.
+- **Logical-state match:** functionally identical with the same object IDs, because actions passed from the sim tree to the base game reference IDs. A matching root guarantees a matching tree. Weaker than XMage's `getValue` string, to limit tree rebuilds. Used for tree reuse.
+- **Hashes:**
+
+  | | Functional (dedup) | Logical = functional + IDs (tree reuse) |
+  |---|---|---|
+  | **Perfect info** | the encoder over the omniscient view | plus the IDs of every object |
+  | **Hidden info** (per observer) | the encoder over what the deciding player can see | plus the IDs of the objects that player can see |
+
+  Perfect-information search uses the perfect-info pair. The hidden-info pair leaves the door open for IS-MCTS.
 - **Autotap / manual tap:** mana paid automatically / mana abilities taken as actions.
 - **Offline MCTS:** search with the heuristic value, no network.
 
