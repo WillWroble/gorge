@@ -26,7 +26,7 @@ func TestGoldenHeads(t *testing.T) {
 	reg := testutil.CorpusRegistry(t)
 	var buf bytes.Buffer
 	for _, p := range goldenPairs {
-		if err := run(&buf, reg, p, 8, 1, "both", 0); err != nil {
+		if err := run(&buf, reg, p, 8, 1, "both", 0, false); err != nil {
 			t.Fatal(err)
 		}
 	}

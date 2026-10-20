@@ -38,6 +38,7 @@ func main() {
 	tap := flag.String("tap", "both", "auto | manual | both")
 	dir := flag.String("cards", ".cards", "corpus directory")
 	cost := flag.Int("cost", 0, "if > 0, instead of game lines print the clone/step/view cost row per tap mode, timing this many copies per root")
+	suff := flag.Bool("suff", false, "instead of game lines, run the view-sufficiency probe (principle 1) per tap mode")
 	flag.Parse()
 
 	reg, err := cards.SharedCorpus(*dir)
@@ -45,15 +46,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, "mzgames:", err)
 		os.Exit(1)
 	}
-	if err := run(os.Stdout, reg, strings.Split(*pair, ","), *games, *seed, *tap, *cost); err != nil {
+	if err := run(os.Stdout, reg, strings.Split(*pair, ","), *games, *seed, *tap, *cost, *suff); err != nil {
 		fmt.Fprintln(os.Stderr, "mzgames:", err)
 		os.Exit(1)
 	}
 }
 
 // run plays games × tap modes on one goroutine, so its output order is fixed.
-// With cost > 0 it prints one cost row per mode instead of the game lines.
-func run(out io.Writer, reg *cards.Registry, names []string, games int, seed uint64, tap string, cost int) error {
+// With cost > 0 or suff it prints one cost or sufficiency row per mode instead
+// of the game lines.
+func run(out io.Writer, reg *cards.Registry, names []string, games int, seed uint64, tap string, cost int, suff bool) error {
 	if len(names) != 2 {
 		return fmt.Errorf("-pair needs two decks, got %d", len(names))
 	}
@@ -77,6 +79,12 @@ func run(out io.Writer, reg *cards.Registry, names []string, games int, seed uin
 		ds[i] = d
 	}
 	for _, auto := range modes {
+		if suff {
+			if err := probeSufficiency(out, reg, names, ds, games, seed, auto); err != nil {
+				return err
+			}
+			continue
+		}
 		if cost > 0 {
 			if err := measureCost(out, reg, names, ds, games, seed, auto, cost); err != nil {
 				return err
