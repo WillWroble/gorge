@@ -995,6 +995,18 @@ type Object struct {
 	// sitting on the stack, so that has to be data on the object itself,
 	// the same way Targets already is for a genuine chosen target. Task 20.
 	Remembered []Target
+	// RememberedStackBase is the length of Remembered when this object was
+	// most recently moved onto the stack (events.move), and 0 while the
+	// object is not on the stack. The events CR 400.7 battlefield-entry
+	// clear reads it to split the list: entries written after the push are
+	// the cast's own memory (a craft material paid to cast the spell,
+	// paid-cost exiles), entries written before it belong to an earlier
+	// stint of the same ObjID and die with the entry, so a bounced-and-
+	// recast card keeps only what its new cast wrote. It rides no event
+	// field: it is derived state on the stack object, meaningful only
+	// between the push and the entry, and is cleared when the object
+	// leaves the stack.
+	RememberedStackBase uint32
 
 	// Combat-only.
 	IsAttacking bool
@@ -1705,7 +1717,7 @@ type Object struct {
 	// page-aligned Objs arena every object's hot head (the fields declared
 	// first) starts on a line of its own. Purely layout: it is never read or
 	// written. A field added above must re-pad it (TestObjectCacheLinePadded).
-	_ [58]byte
+	_ [54]byte
 }
 
 // DoorUnlocked reports the designation of a printed Room face. The cast
