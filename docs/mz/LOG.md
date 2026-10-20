@@ -187,3 +187,48 @@ No game stalled and no search needed a rebuild. Win rate so far 3/6. A search st
 0.9–2.1 ms. A budget-100 profile puts about 60% of it in `encode.Of` (the dynamic view and the hash walk) and most of the rest
 in engine steps. The slow game (seed 3) has a large tree: the loop recomputes tree size, depth and legality on every
 iteration, as `applyMCTS` does.
+
+## Stage 2: search speed and budget-1000 games
+
+Commit `4537d290` (`mz-gorge-stage2`), same container (4 vCPU, 15 GB, linux/amd64, Go 1.25.8). Offline only. `make test`
+(`GO_TEST_FLAGS="-p=2 -json"`): 68 packages pass, 13 have no tests; 11025 top-level tests pass, 29 skip, none fail.
+
+```
+go build -o mzgames ./cmd/mzgames
+for p in pauper-faeries,pauper-cawgates uwtempo,standard-monob; do for t in auto manual; do
+  mzgames -mz -pair $p -games 4 -seed 1 -tap $t -budget 1000     # prune on, timeout 1h: the budget ends every search
+done; done
+```
+
+mz is seat 0 (the first deck) against gorge's `bot`. `engine` is the share of search time spent copying a node's engine and
+stepping it to the next node (gorge's own work); `hash` is the share spent hashing nodes; `cost` is search time over engine
+time, the factor mz adds over the engine work a sim needs.
+
+| pair | seed | tap | turns | winner | searches | sims | sims/s | µs/sim | engine | hash | cost | illegal | dup | replaced |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| pauper-faeries-vs-pauper-cawgates | 1 | auto | 14 | mz | 99 | 39404 | 1589 | 630 | 0.53 | 0.37 | 1.9× | 685 | 2650 | 129 |
+| pauper-faeries-vs-pauper-cawgates | 2 | auto | 34 | bot | 229 | 80840 | 1140 | 877 | 0.56 | 0.35 | 1.8× | 2651 | 3500 | 163 |
+| pauper-faeries-vs-pauper-cawgates | 3 | auto | 44 | bot | 305 | 115485 | 659 | 1517 | 0.55 | 0.36 | 1.8× | 2114 | 34714 | 618 |
+| pauper-faeries-vs-pauper-cawgates | 4 | auto | 14 | mz | 92 | 35752 | 1337 | 748 | 0.52 | 0.36 | 1.9× | 1120 | 3267 | 85 |
+| pauper-faeries-vs-pauper-cawgates | 1 | manual | 12 | mz | 194 | 73862 | 1663 | 601 | 0.48 | 0.39 | 2.1× | 0 | 11877 | 1964 |
+| pauper-faeries-vs-pauper-cawgates | 2 | manual | 32 | bot | 473 | 120560 | 1316 | 760 | 0.48 | 0.40 | 2.1× | 0 | 18494 | 2483 |
+| pauper-faeries-vs-pauper-cawgates | 3 | manual | 44 | bot | 715 | 1477581 | 823 | 1215 | 0.47 | 0.41 | 2.1× | 0 | 506715 | 11271 |
+| pauper-faeries-vs-pauper-cawgates | 4 | manual | 18 | mz | 296 | 151634 | 1649 | 606 | 0.47 | 0.39 | 2.1× | 0 | 33183 | 6534 |
+| uwtempo-vs-standard-monob | 1 | auto | 11 | bot | 70 | 24824 | 1633 | 613 | 0.59 | 0.32 | 1.7× | 701 | 752 | 24 |
+| uwtempo-vs-standard-monob | 2 | auto | 18 | bot | 146 | 40875 | 1368 | 731 | 0.62 | 0.30 | 1.6× | 962 | 1410 | 139 |
+| uwtempo-vs-standard-monob | 3 | auto | 10 | bot | 114 | 39099 | 1411 | 709 | 0.57 | 0.33 | 1.8× | 137 | 1709 | 433 |
+| uwtempo-vs-standard-monob | 4 | auto | 13 | bot | 72 | 23879 | 1983 | 504 | 0.61 | 0.30 | 1.6× | 164 | 639 | 99 |
+| uwtempo-vs-standard-monob | 1 | manual | 9 | bot | 121 | 27797 | 1934 | 517 | 0.49 | 0.38 | 2.0× | 0 | 4020 | 915 |
+| uwtempo-vs-standard-monob | 2 | manual | 10 | bot | 137 | 35537 | 2509 | 399 | 0.50 | 0.37 | 2.0× | 0 | 3254 | 781 |
+| uwtempo-vs-standard-monob | 3 | manual | 10 | bot | 150 | 35280 | 1954 | 512 | 0.49 | 0.39 | 2.0× | 0 | 6237 | 819 |
+| uwtempo-vs-standard-monob | 4 | manual | 11 | bot | 145 | 33118 | 1966 | 509 | 0.50 | 0.36 | 2.0× | 0 | 6903 | 1048 |
+
+- No game stalled and no search needed a rebuild. mz won 4 of 8 with pauper-faeries and 0 of 8 with uwtempo.
+- A search costs 1.6–2.1× the engine work its sims need; tree bookkeeping is about 1%. The rest is the hash (the dynamic
+  view and the walk), which stage 3's encoder replaces.
+- The speed work (hash plans and buffers, `EngineState`'s fields worked out once, facts built only when set, a reused
+  view, recycled engines) changed no game: the seed 1 and 2 autotap chains match the partial run above. It took the
+  budget-100 run from about 1,000 to 1,700 sims/s.
+- Slow sims (seed 3) are long games with big boards: the engine share is unchanged, so the engine step itself costs more.
+- Faeries seed 3 under manual tap ran 1.48M sims over 715 searches: with half a million duplicates pruned, a pruned old
+  node takes its visits off the root, so the budget takes more iterations to reach, as in `applyMCTS`.
