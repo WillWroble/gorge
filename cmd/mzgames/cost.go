@@ -22,9 +22,10 @@ import (
 var costTurns = map[int32]bool{5: true, 6: true, 7: true, 8: true}
 
 // costRow is the per-root cost of what one search node does on gorge: copy
-// the engine, copy it and submit one intent, and project the omniscient view.
+// the engine, copy it and submit one intent, project the omniscient view, and
+// project the dynamic view (everything dynamic, principle 1).
 type costRow struct {
-	clone, step, view []float64 // ns per op, one entry per root
+	clone, step, view, dynamic []float64 // ns per op, one entry per root
 }
 
 // measureCost plays the games of one tap mode and times copies operations at
@@ -64,8 +65,8 @@ func measureCost(out io.Writer, reg *cards.Registry, names []string, ds [][]*car
 	if auto {
 		mode = "auto"
 	}
-	fmt.Fprintf(out, "cost tap=%s %s-vs-%s roots=%d copies=%d clone_ns=%s step_ns=%s view_ns=%s\n",
-		mode, names[0], names[1], len(r.clone), copies, stat(r.clone), stat(r.step), stat(r.view))
+	fmt.Fprintf(out, "cost tap=%s %s-vs-%s roots=%d copies=%d clone_ns=%s step_ns=%s view_ns=%s dynamic_view_ns=%s\n",
+		mode, names[0], names[1], len(r.clone), copies, stat(r.clone), stat(r.step), stat(r.view), stat(r.dynamic))
 	return nil
 }
 
@@ -91,6 +92,12 @@ func (r *costRow) add(e *rules.Engine, d *decision.Decision, in decision.Intent,
 		_ = view.ProjectFor(e.G, e, view.NoSeat, view.Omniscient, d)
 	}
 	r.view = append(r.view, perOp(t, copies))
+
+	t = time.Now()
+	for i := 0; i < copies; i++ {
+		_ = view.ProjectDynamic(e.G, e, view.NoSeat, view.Omniscient, nil, d)
+	}
+	r.dynamic = append(r.dynamic, perOp(t, copies))
 }
 
 func perOp(t time.Time, n int) float64 { return float64(time.Since(t).Nanoseconds()) / float64(n) }
