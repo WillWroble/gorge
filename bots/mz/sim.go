@@ -3,6 +3,7 @@ package mz
 import (
 	"math/rand/v2"
 	"slices"
+	"time"
 
 	"github.com/adams-shaun/gorge/bots/botpolicy"
 	"github.com/adams-shaun/gorge/bots/mz/atomic"
@@ -22,7 +23,8 @@ import (
 // refuses, a cast it reverses, or a panic marks n illegal (scriptFailed).
 func (b *Bot) validate(n *node) {
 	p := n.parent
-	e := p.eng.Clone()
+	t := time.Now()
+	e := b.clone(p.eng)
 	if p.unchecked--; p.unchecked == 0 {
 		p.eng = nil
 	}
@@ -33,11 +35,34 @@ func (b *Bot) validate(n *node) {
 		}
 	}()
 	start := len(e.L.Events)
-	if atomic.Apply(e, p.atom, n.choice) != nil || b.settle(e) != nil || reversed(e.L.Events[start:]) {
+	failed := atomic.Apply(e, p.atom, n.choice) != nil || b.settle(e) != nil || reversed(e.L.Events[start:])
+	b.Stats.Engine += time.Since(t)
+	if failed {
 		n.illegal = true
+		b.release(e)
 		return
 	}
 	b.fill(n, e)
+	if n.terminal {
+		b.release(e)
+	}
+}
+
+// clone copies e into the storage of an engine released earlier.
+func (b *Bot) clone(e *rules.Engine) *rules.Engine {
+	var sp rules.Spare
+	if n := len(b.spares); n > 0 {
+		sp, b.spares = b.spares[n-1], b.spares[:n-1]
+	}
+	return e.CloneInto(&sp)
+}
+
+// release recycles e's storage. e must be an engine nothing was cloned
+// from: a clone shares its parent's event history.
+func (b *Bot) release(e *rules.Engine) {
+	if len(b.spares) < maxSpares {
+		b.spares = append(b.spares, e.Release())
+	}
 }
 
 // fill records the decision e poses at n.
@@ -52,7 +77,9 @@ func (b *Bot) fill(n *node, e *rules.Engine) {
 	n.player = d.Player
 	n.atom, _ = atomic.Next(d)
 	n.choices = b.choices(d, n.atom)
+	t := time.Now()
 	n.hash = encode.Of(e)
+	b.Stats.Hash += time.Since(t)
 }
 
 // settle answers e's pending decisions until one is a node.

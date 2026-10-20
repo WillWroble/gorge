@@ -5,10 +5,12 @@
 package encode
 
 import (
+	"cmp"
 	"reflect"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
@@ -30,27 +32,55 @@ const rounds = 16
 // Hash hashes v. Over the omniscient view it is the perfect-information
 // pair; over a seat's view, that seat's hidden-information pair.
 func Hash(v *view.View) Hashes {
-	x := hasher{objs: map[state.ObjID]*record{}}
-	var root record
-	x.walk(&root, reflect.ValueOf(v).Elem())
+	x := pool.Get().(*hasher)
+	defer pool.Put(x)
+	x.reset()
+	x.record(0)
+	x.walk(0, reflect.ValueOf(v).Elem())
 
-	color := make(map[state.ObjID]uint64, len(x.objs))
-	for id, r := range x.objs {
-		color[id] = r.h
+	// A reference to no record is a player smuggled in an ID
+	// (state.PlayerRef) or a gone object: a record of its own, colored by
+	// that alone.
+	for i := 0; i < len(x.recs); i++ {
+		for _, id := range x.recs[i].refs {
+			if _, ok := x.index[id]; !ok {
+				g := x.record(id)
+				g.h = goneToken
+				if p, isPlayer := id.PlayerRef(); isPlayer {
+					g.h = mix(playerToken ^ uint64(p))
+				}
+			}
+		}
 	}
-	next := make(map[state.ObjID]uint64, len(x.objs))
+	n := len(x.recs)
+	color, next := grow(x.color, n), grow(x.next, n)
+	for i := range n {
+		color[i] = x.recs[i].h
+	}
 	for range rounds {
-		for id, r := range x.objs {
-			next[id] = mix(r.h ^ refsHash(r.refs, color))
+		for i := 1; i < n; i++ {
+			next[i] = mix(x.recs[i].h ^ x.refsHash(i, color))
 		}
 		color, next = next, color
 	}
-	f := mix(root.h ^ refsHash(root.refs, color))
+	x.color, x.next = color, next
+	f := mix(x.recs[0].h ^ x.refsHash(0, color))
 	return Hashes{Functional: f, Logical: mix(f ^ x.ids)}
 }
 
-// A record is one object's content, or the rest of the view's, with every
-// object it names left as a reference.
+var views = sync.Pool{New: func() any { return new(view.View) }}
+
+var pool = sync.Pool{New: func() any { return &hasher{index: map[state.ObjID]int{}} }}
+
+func grow(s []uint64, n int) []uint64 {
+	if cap(s) < n {
+		return make([]uint64, n)
+	}
+	return s[:n]
+}
+
+// A record is one object's content, or (record 0) the rest of the view's,
+// with every object it names left as a reference.
 type record struct {
 	h    uint64
 	refs []state.ObjID
@@ -59,8 +89,81 @@ type record struct {
 func (r *record) add(h uint64) { r.h = mix(r.h ^ h) }
 
 type hasher struct {
-	objs map[state.ObjID]*record
-	ids  uint64 // every ID in walk order: the logical part
+	recs        []record
+	index       map[state.ObjID]int
+	ids         uint64 // every ID in walk order: the logical part
+	keys        []reflect.Value
+	strs        []string
+	color, next []uint64
+}
+
+func (x *hasher) reset() {
+	x.recs = x.recs[:0]
+	clear(x.index)
+	x.ids = 0
+	x.keys = x.keys[:0]
+	x.strs = x.strs[:0]
+}
+
+// record returns the record of object id (0: the view's), making it.
+func (x *hasher) record(id state.ObjID) *record {
+	if i, ok := x.index[id]; ok {
+		return &x.recs[i]
+	}
+	x.index[id] = len(x.recs)
+	if len(x.recs) < cap(x.recs) {
+		x.recs = x.recs[:len(x.recs)+1]
+		r := &x.recs[len(x.recs)-1]
+		r.h, r.refs = 0, r.refs[:0]
+		return r
+	}
+	x.recs = append(x.recs, record{})
+	return &x.recs[len(x.recs)-1]
+}
+
+func (x *hasher) refsHash(i int, color []uint64) uint64 {
+	refs := x.recs[i].refs
+	h := uint64(len(refs))
+	for _, id := range refs {
+		h = mix(h ^ color[x.index[id]])
+	}
+	return h
+}
+
+// A plan is what walk needs of a type, worked out once.
+type plan struct {
+	fields   []int // a struct's fields that carry state
+	object   bool  // a struct whose first field is its object ID
+	engine   int   // View.Engine's field index, else -1
+	cardData bool  // a pointer to card data
+}
+
+var plans sync.Map // reflect.Type → *plan
+
+func planOf(t reflect.Type) *plan {
+	if p, ok := plans.Load(t); ok {
+		return p.(*plan)
+	}
+	p := &plan{engine: -1}
+	switch t.Kind() {
+	case reflect.Pointer:
+		_, p.cardData = view.CardDataName(reflect.New(t.Elem()))
+	case reflect.Struct:
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			switch {
+			case i == 0 && f.Name == "ID" && f.Type == objIDType:
+				p.object = true
+			case view.OpaqueField(t, f.Name):
+			case t == viewType && f.Name == "Engine":
+				p.engine = i
+			default:
+				p.fields = append(p.fields, i)
+			}
+		}
+	}
+	plans.Store(t, p)
+	return p
 }
 
 var (
@@ -74,121 +177,182 @@ func (x *hasher) ref(r *record, id state.ObjID) {
 	x.ids = mix(x.ids ^ uint64(id))
 }
 
-func (x *hasher) walk(r *record, v reflect.Value) {
-	if v.Type() == objIDType {
+// walk hashes v into record ri. It takes an index, not a pointer: a new
+// object's record may move the records.
+func (x *hasher) walk(ri int, v reflect.Value) {
+	t := v.Type()
+	if t == objIDType {
 		if id := state.ObjID(v.Uint()); id != 0 {
-			x.ref(r, id)
+			x.ref(&x.recs[ri], id)
 		} else {
-			r.add(0)
+			x.recs[ri].add(0)
 		}
 		return
 	}
 	switch v.Kind() {
 	case reflect.Bool:
 		if v.Bool() {
-			r.add(1)
+			x.recs[ri].add(1)
 		} else {
-			r.add(2)
+			x.recs[ri].add(2)
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		r.add(uint64(v.Int()))
+		x.recs[ri].add(uint64(v.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		r.add(v.Uint())
+		x.recs[ri].add(v.Uint())
 	case reflect.Float32, reflect.Float64:
-		r.add(uint64(v.Float() * 1e6))
+		x.recs[ri].add(uint64(v.Float() * 1e6))
 	case reflect.String:
-		r.add(str(v.String()))
+		x.recs[ri].add(str(v.String()))
 	case reflect.Pointer, reflect.Interface:
 		if v.IsNil() {
-			r.add(nilToken)
+			x.recs[ri].add(nilToken)
 			return
 		}
-		if v.Kind() == reflect.Pointer {
-			if name, ok := view.CardDataName(v); ok {
-				r.add(str(name))
-				return
-			}
+		if v.Kind() == reflect.Pointer && planOf(t).cardData {
+			name, _ := view.CardDataName(v)
+			x.recs[ri].add(str(name))
+			return
 		}
-		x.walk(r, v.Elem())
+		x.walk(ri, v.Elem())
 	case reflect.Slice, reflect.Array:
-		r.add(uint64(v.Len()))
+		x.recs[ri].add(uint64(v.Len()))
 		for i := 0; i < v.Len(); i++ {
-			x.walk(r, v.Index(i))
+			x.walk(ri, v.Index(i))
 		}
 	case reflect.Map:
-		x.walkMap(r, v)
+		x.walkMap(ri, v)
 	case reflect.Struct:
-		x.walkStruct(r, v)
+		x.walkStruct(ri, v, planOf(t))
 	}
 }
 
-// walkStruct hashes a struct field by field. An object (a struct whose ID
-// field is an object ID: a card or stack object) is hashed into its own
-// record and referenced here.
-func (x *hasher) walkStruct(r *record, v reflect.Value) {
-	t := v.Type()
-	first := 0
-	if t.NumField() > 0 && t.Field(0).Name == "ID" && t.Field(0).Type == objIDType {
-		id := state.ObjID(v.Field(0).Uint())
-		if id != 0 {
-			x.ref(r, id)
-			if x.objs[id] == nil {
-				x.objs[id] = &record{}
-			}
-			r = x.objs[id]
+// walkStruct hashes a struct's fields that hold anything (an empty slice is
+// nil's equal: a copy may hold either). An object (a card or stack object)
+// is hashed into its own record and referenced here.
+func (x *hasher) walkStruct(ri int, v reflect.Value, p *plan) {
+	if p.object {
+		if id := state.ObjID(v.Field(0).Uint()); id != 0 {
+			x.ref(&x.recs[ri], id)
+			x.record(id)
+			ri = x.index[id]
 		}
-		first = 1
 	}
-	for i := first; i < t.NumField(); i++ {
-		if view.OpaqueField(t, t.Field(i).Name) {
+	for _, i := range p.fields {
+		f := v.Field(i)
+		if f.IsZero() || (f.Kind() == reflect.Slice || f.Kind() == reflect.Map) && f.Len() == 0 {
 			continue
 		}
-		r.add(uint64(i))
-		if t == viewType && t.Field(i).Name == "Engine" {
-			x.walkText(r, v.Field(i))
-			continue
-		}
-		x.walk(r, v.Field(i))
+		x.recs[ri].add(uint64(i))
+		x.walk(ri, f)
+	}
+	if p.engine >= 0 {
+		x.walkText(ri, v.Field(p.engine))
 	}
 }
 
 // walkMap hashes a map's entries in key order. The view's map keys are
 // names and seats, so the order depends on no ID.
-func (x *hasher) walkMap(r *record, v reflect.Value) {
-	keys := v.MapKeys()
-	slices.SortFunc(keys, func(a, b reflect.Value) int {
-		if a.Kind() == reflect.String {
-			return strings.Compare(a.String(), b.String())
-		}
-		return strings.Compare(sortKey(a), sortKey(b))
-	})
-	r.add(uint64(len(keys)))
-	for _, k := range keys {
-		x.walk(r, k)
-		x.walk(r, v.MapIndex(k))
+func (x *hasher) walkMap(ri int, v reflect.Value) {
+	switch m := v.Interface().(type) {
+	case view.Status:
+		x.walkStatus(ri, m)
+		return
+	case view.Links:
+		x.walkLinks(ri, m)
+		return
 	}
+	start := len(x.keys)
+	for it := v.MapRange(); it.Next(); {
+		x.keys = append(x.keys, it.Key())
+	}
+	keys := x.keys[start:]
+	slices.SortFunc(keys, compareKeys)
+	x.recs[ri].add(uint64(len(keys)))
+	for k := start; k < start+len(keys); k++ {
+		x.walk(ri, x.keys[k])
+		x.walk(ri, v.MapIndex(x.keys[k]))
+	}
+	x.keys = x.keys[:start]
 }
 
-func sortKey(v reflect.Value) string {
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return strconv.FormatInt(v.Int()+1<<62, 16)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return strconv.FormatUint(v.Uint(), 16)
+// walkStatus and walkLinks are walkMap for the view's fact maps, the
+// commonest, without reflection.
+func (x *hasher) walkStatus(ri int, m view.Status) {
+	keys := x.sortedKeys(len(m), func(add func(string)) {
+		for k := range m {
+			add(k)
+		}
+	})
+	r := &x.recs[ri]
+	r.add(uint64(len(keys)))
+	for _, k := range keys {
+		r.add(str(k))
+		r.add(uint64(int64(m[k])))
 	}
-	return ""
+	x.strs = x.strs[:len(x.strs)-len(keys)]
+}
+
+func (x *hasher) walkLinks(ri int, m view.Links) {
+	keys := x.sortedKeys(len(m), func(add func(string)) {
+		for k := range m {
+			add(k)
+		}
+	})
+	x.recs[ri].add(uint64(len(keys)))
+	for _, k := range keys {
+		x.recs[ri].add(str(k))
+		ids := m[k]
+		x.recs[ri].add(uint64(len(ids)))
+		for _, id := range ids {
+			if id != 0 {
+				x.ref(&x.recs[ri], id)
+			} else {
+				x.recs[ri].add(0)
+			}
+		}
+	}
+	x.strs = x.strs[:len(x.strs)-len(keys)]
+}
+
+// sortedKeys collects n keys onto x.strs and returns them sorted; the
+// caller pops them.
+func (x *hasher) sortedKeys(n int, each func(add func(string))) []string {
+	start := len(x.strs)
+	each(func(k string) { x.strs = append(x.strs, k) })
+	keys := x.strs[start:]
+	slices.Sort(keys)
+	return keys
+}
+
+func compareKeys(a, b reflect.Value) int {
+	switch a.Kind() {
+	case reflect.String:
+		return strings.Compare(a.String(), b.String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return cmp.Compare(a.Int(), b.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return cmp.Compare(a.Uint(), b.Uint())
+	}
+	return 0
 }
 
 // walkText hashes View.Engine: the engine's state as text, its object IDs
 // written view.IDRef and the number, outside quoted strings.
-func (x *hasher) walkText(r *record, v reflect.Value) {
-	keys := v.MapKeys()
-	slices.SortFunc(keys, func(a, b reflect.Value) int { return strings.Compare(a.String(), b.String()) })
-	r.add(uint64(len(keys)))
+func (x *hasher) walkText(ri int, v reflect.Value) {
+	m := v.Interface().(map[string]string)
+	start := len(x.keys)
+	for k := range m {
+		x.keys = append(x.keys, reflect.ValueOf(k))
+	}
+	keys := x.keys[start:]
+	slices.SortFunc(keys, compareKeys)
+	x.recs[ri].add(uint64(len(keys)))
 	for _, k := range keys {
+		r := &x.recs[ri]
 		r.add(str(k.String()))
-		s := v.MapIndex(k).String()
-		start, quoted := 0, false
+		s := m[k.String()]
+		begin, quoted := 0, false
 		for i := 0; i < len(s); i++ {
 			switch c := s[i]; {
 			case quoted && c == '\\':
@@ -201,30 +365,14 @@ func (x *hasher) walkText(r *record, v reflect.Value) {
 					j++
 				}
 				id, _ := strconv.ParseUint(s[i+len(view.IDRef):j], 10, 32)
-				r.add(str(s[start:i]))
+				r.add(str(s[begin:i]))
 				x.ref(r, state.ObjID(id))
-				start, i = j, j-1
+				begin, i = j, j-1
 			}
 		}
-		r.add(str(s[start:]))
+		r.add(str(s[begin:]))
 	}
-}
-
-// refsHash hashes the colors of refs in order. A reference to no object
-// is a player smuggled in an ID (state.PlayerRef) or a gone object.
-func refsHash(refs []state.ObjID, color map[state.ObjID]uint64) uint64 {
-	h := uint64(len(refs))
-	for _, id := range refs {
-		c, ok := color[id]
-		if !ok {
-			c = goneToken
-			if p, isPlayer := id.PlayerRef(); isPlayer {
-				c = mix(playerToken ^ uint64(p))
-			}
-		}
-		h = mix(h ^ c)
-	}
-	return h
+	x.keys = x.keys[:start]
 }
 
 const (
@@ -263,6 +411,8 @@ func Of(e *rules.Engine) Hashes {
 		x.PotentialCasts, x.PotentialUnpayableCasts, x.PotentialCastsKnown = nil, nil, false
 		dc = &x
 	}
-	v := view.ProjectDynamic(e.G, e, view.NoSeat, view.Omniscient, nil, dc)
-	return Hash(&v)
+	v := views.Get().(*view.View)
+	defer views.Put(v)
+	view.ProjectDynamicInto(v, e.G, e, view.NoSeat, view.Omniscient, nil, dc)
+	return Hash(v)
 }

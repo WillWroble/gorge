@@ -40,4 +40,5 @@ const (
 	maxDepth    = 1000              // MAX_TREE_DEPTH
 	hardTimeout = 300 * time.Second // applyMCTS's forced time out
 	maxNum      = 65                // makeChoiceAmount clamps max-min to 64
+	maxSpares   = 8                 // released engines kept for reuse
 )
