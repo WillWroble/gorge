@@ -78,8 +78,27 @@ func (b *Bot) fill(n *node, e *rules.Engine) {
 	n.atom, _ = atomic.Next(d)
 	n.choices = b.choices(d, n.atom)
 	t := time.Now()
-	n.hash = encode.Of(e)
+	_, n.hash = b.enc.State(e, describe(e, d, n.atom))
 	b.Stats.Hash += time.Since(t)
+}
+
+// describe is what the encoder is told about atom a of d (freezeState's
+// arguments): its type, its text, its source (a combat atom's creature, as
+// ChooseToAttackAbility's), and the cards only d offers.
+func describe(e *rules.Engine, d *decision.Decision, a atomic.Atom) encode.Decision {
+	ed := encode.Decision{Player: d.Player, Type: a.Type.String(), Text: d.Prompt, Source: d.Source}
+	if a.Type == atomic.Priority {
+		ed.Text = "priority"
+	}
+	if a.Subject != 0 {
+		ed.Source = a.Subject
+	}
+	for _, i := range a.Options {
+		if o := e.G.Obj(d.Options[i].Obj); o != nil && o.Zone == state.ZLibrary {
+			ed.Pile = append(ed.Pile, d.Options[i].Obj)
+		}
+	}
+	return ed
 }
 
 // settle answers e's pending decisions until one is a node.
@@ -128,9 +147,9 @@ func (b *Bot) whole(e *rules.Engine, d *decision.Decision) (decision.Intent, boo
 		return in, i >= 0
 	}
 	switch {
-	case paymentWindow(d) && b.opt.ManualTap:
+	case encode.PaymentWindow(d) && b.opt.ManualTap:
 		return pick(func(o decision.Option) bool { return o.Kind == "done" })
-	case paymentWindow(d):
+	case encode.PaymentWindow(d):
 		brd := botpolicy.NewBoard(len(e.G.Players))
 		return botpolicy.Decide(botpolicy.BoardFromGameInto(e.G, e, d.Player, &brd), d, rand.New(rand.NewPCG(0, 0))), true
 	case d.Kind == decision.KStartingPlayer:
@@ -140,20 +159,6 @@ func (b *Bot) whole(e *rules.Engine, d *decision.Decision) (decision.Intent, boo
 		return pick(func(o decision.Option) bool { return o.Kind == "keep" })
 	}
 	return in, false
-}
-
-// paymentWindow reports a mana payment window: a choose that activates mana
-// sources or spends mana until done.
-func paymentWindow(d *decision.Decision) bool {
-	if d.Kind != decision.KChoose {
-		return false
-	}
-	pay, done := false, false
-	for _, o := range d.Options {
-		pay = pay || o.Kind == "activate" || o.Kind == "mana"
-		done = done || o.Kind == "done"
-	}
-	return pay && done
 }
 
 // forced is an atom's only choice, when the search makes no node for it: a

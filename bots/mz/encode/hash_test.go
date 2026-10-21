@@ -18,8 +18,8 @@ import (
 
 // TestCopiesAreFunctionallyIdentical plays each of two same-named lands
 // from hand on a copy of the game: the states are the same on paper, so
-// their functional hashes match, and their logical hashes do not, since
-// the lands' IDs differ (the design doc's glossary).
+// their functional hashes (the encoder's graph) match, and their logical
+// hashes do not, since the lands' IDs differ (the design doc's glossary).
 func TestCopiesAreFunctionallyIdentical(t *testing.T) {
 	found := 0
 	play(t, func(e *rules.Engine, d *decision.Decision) {
@@ -32,14 +32,14 @@ func TestCopiesAreFunctionallyIdentical(t *testing.T) {
 		if a.Submit(intent(d, i)) != nil || b.Submit(intent(d, j)) != nil {
 			t.Fatal("land play refused")
 		}
-		ha, hb := encode.Of(a), encode.Of(b)
+		ha, hb := hashOf(a), hashOf(b)
 		if ha.Functional != hb.Functional {
 			t.Errorf("turn %d: playing either %q differs functionally", e.G.Turn, d.Options[i].Label)
 		}
 		if ha.Logical == hb.Logical {
 			t.Errorf("turn %d: playing either %q is logically identical", e.G.Turn, d.Options[i].Label)
 		}
-		if h := encode.Of(e); h.Functional == ha.Functional {
+		if h := hashOf(e); h.Functional == ha.Functional {
 			t.Errorf("turn %d: a land play does not change the functional hash", e.G.Turn)
 		}
 	})
@@ -52,10 +52,17 @@ func TestCopiesAreFunctionallyIdentical(t *testing.T) {
 // clone: same state, same hashes.
 func TestHashIsAFunctionOfState(t *testing.T) {
 	play(t, func(e *rules.Engine, _ *decision.Decision) {
-		if h := encode.Of(e); h != encode.Of(e) || h != encode.Of(e.Clone()) {
+		if h := hashOf(e); h != hashOf(e) || h != hashOf(e.Clone()) {
 			t.Fatalf("turn %d: hash is not a function of the state", e.G.Turn)
 		}
 	})
+}
+
+func hashOf(e *rules.Engine) encode.Hashes {
+	x := encode.Encoder{Me: 0, PerfectInfo: true}
+	d := e.Pending()
+	_, h := x.State(e, encode.Decision{Player: d.Player, Type: "PRIORITY", Text: "priority"})
+	return h
 }
 
 func play(t *testing.T, at func(*rules.Engine, *decision.Decision)) {

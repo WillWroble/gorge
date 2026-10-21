@@ -250,3 +250,17 @@ func MustAttackParamsReadableForRules(params map[string]string) bool {
 func CantAttackParamsReadableForRules(params map[string]string) bool {
 	return effects.CantAttackParamsReadableForRules(params)
 }
+
+// CanAttack reports whether creature id could be declared as an attacker
+// (combat.CanAttack): a pure read, for mz-gorge's encoder (the fork's
+// Permanent.canAttack feature).
+func (e *Engine) CanAttack(id state.ObjID) bool { return combat.CanAttack(asBoard(e), id) }
+
+// CanBlockAny reports the attacker-blind half of combat.CanBlock: an
+// untapped, phased-in battlefield creature that is not suspected (the
+// fork's Permanent.canBlockAny feature).
+func (e *Engine) CanBlockAny(id state.ObjID) bool {
+	o := e.G.Obj(id)
+	return o != nil && o.Zone == state.ZBattlefield && !o.PhasedOut && !o.Tapped && !o.Suspected &&
+		asBoard(e).IsCreature(id) && !o.BestowedAttached()
+}

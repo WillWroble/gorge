@@ -98,11 +98,6 @@ func ProjectDynamicInto(v *View, g *state.Game, ch Chars, viewer state.PlayerID,
 	}
 }
 
-// IDRef prefixes an object ID in View.Engine's text.
-const IDRef = "#"
-
-var objIDType = reflect.TypeOf(state.ObjID(0))
-
 // Status is the dynamic state of an object or player that has no typed view
 // field: per-turn history, designations, cast provenance, choices, notes.
 // Numeric facts keep their value, true facts are 1, and a string-valued fact
@@ -257,6 +252,7 @@ func objectFacts(o *state.Object) (Status, Links) {
 		f.num("target_incarnation:"+strconv.Itoa(i), int32(s.Incarnation))
 	}
 	f.targets("remembered", o.Remembered)
+	f.num("remembered_stack_base", int32(o.RememberedStackBase))
 
 	// Combat.
 	f.ids("attacking_object", o.AttackingBattle)
@@ -467,11 +463,11 @@ func gameFacts(g *state.Game) Status {
 	return f.s
 }
 
-// OpaqueField reports whether a field names rather than carries state: an
+// opaqueField reports whether a field names rather than carries state: an
 // identifier the engine derives for an offered payment (a payment action's
 // or plan's id), a card's display token (its ID as text), or a position in
 // the event log (Seq, SourceZoneSeq), which is history.
-func OpaqueField(t reflect.Type, field string) bool {
+func opaqueField(t reflect.Type, field string) bool {
 	return field == "ActionID" || strings.HasSuffix(field, "Seq") ||
 		(field == "ID" && t == reflect.TypeOf(decision.PaymentPlan{})) ||
 		(field == "Token" && t == reflect.TypeOf(CardView{}))
@@ -492,10 +488,10 @@ func snapshotName(t reflect.Type) (string, bool) {
 	return "", false
 }
 
-// CardDataName names what a non-nil pointer to card data points at (an
+// cardDataName names what a non-nil pointer to card data points at (an
 // ability line, a card, a face): card data is static and cyclic, so state
 // readers name it rather than expand it.
-func CardDataName(p reflect.Value) (string, bool) {
+func cardDataName(p reflect.Value) (string, bool) {
 	switch p.Type().Elem() {
 	case reflect.TypeOf(cards.SA{}):
 		return "sa:" + strconv.Quote(p.Elem().FieldByName("Line").String()), true
@@ -526,17 +522,10 @@ func empty(v reflect.Value) bool {
 }
 
 // stateText writes v as deterministic text: struct fields by name, map
-// entries sorted, pointers followed, card data named rather than expanded,
-// and an object ID as "#" and its number (IDRef), so a reader can tell it
-// from a count.
+// entries sorted, pointers followed, card data named rather than expanded.
 func stateText(b *strings.Builder, v reflect.Value, depth int) {
 	if depth > 12 {
 		b.WriteString("…")
-		return
-	}
-	if v.Type() == objIDType {
-		b.WriteString(IDRef)
-		b.WriteString(strconv.FormatUint(v.Uint(), 10))
 		return
 	}
 	switch v.Kind() {
@@ -561,7 +550,7 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 			b.WriteString("nil")
 			return
 		}
-		if name, ok := CardDataName(v); ok {
+		if name, ok := cardDataName(v); ok {
 			b.WriteString(name)
 			return
 		}
@@ -594,7 +583,7 @@ func stateText(b *strings.Builder, v reflect.Value, depth int) {
 		b.WriteByte('{')
 		first := true
 		for i := 0; i < v.NumField(); i++ {
-			if f := v.Field(i); empty(f) || OpaqueField(v.Type(), v.Type().Field(i).Name) {
+			if f := v.Field(i); empty(f) || opaqueField(v.Type(), v.Type().Field(i).Name) {
 				continue
 			}
 			if !first {

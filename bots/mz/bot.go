@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adams-shaun/gorge/bots/mz/atomic"
+	"github.com/adams-shaun/gorge/bots/mz/encode"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -21,6 +22,7 @@ type Bot struct {
 	me     state.PlayerID
 	root   *node
 	spares []rules.Spare
+	enc    encode.Encoder
 	// Stats counts the work of every search the bot ran.
 	Stats Stats
 }
@@ -58,6 +60,7 @@ func (b *Bot) WantsPotentialCasts() bool { return !b.opt.ManualTap }
 // searched, its pick staged on e, until the answer is complete.
 func (b *Bot) DecideEngine(_ context.Context, e *rules.Engine, d decision.Decision) (decision.Intent, error) {
 	b.me = d.Player
+	b.enc.Me, b.enc.PerfectInfo = d.Player, b.opt.SeeOpponentHand
 	if !b.opt.ManualTap {
 		e.EnsurePotentialCasts()
 	}

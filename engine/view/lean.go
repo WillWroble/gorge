@@ -64,6 +64,14 @@ func ProjectLeanInto(dst *View, g *state.Game, ch Chars, viewer state.PlayerID, 
 	}
 }
 
+// ProjectOmniscientLeanInto is the Omniscient projection with the parts
+// named by omit left zero: mz-gorge's encoder reads every hand and only
+// what it encodes.
+func ProjectOmniscientLeanInto(dst *View, g *state.Game, ch Chars, d *decision.Decision, omit Omit) {
+	projectInto(dst, g, ch, NoSeat, d, &projectMode{revealFaceDown: true, omniHands: true, anyDecision: true, omit: omit})
+	dst.Visibility = Omniscient.String()
+}
+
 // RoundFold is RoundOf folded incrementally over an append-only event log:
 // each Of call folds only the events appended since the previous call, so a
 // driver that asks once per decision pays for every event once rather than

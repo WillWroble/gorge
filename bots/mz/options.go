@@ -27,11 +27,14 @@ type Options struct {
 	ManualTap bool
 	// Mulligans is mulligans_enabled.
 	Mulligans bool
+	// SeeOpponentHand is see_opponent_hand: the encoder encodes the other
+	// player's hand too (StateEncoder.perfectInfo).
+	SeeOpponentHand bool
 }
 
 // Defaults are MCTSDefaults.
 func Defaults() Options {
-	return Options{Budget: 1000, Timeout: 4 * time.Second, BackpropDiscount: 0.99}
+	return Options{Budget: 1000, Timeout: 4 * time.Second, BackpropDiscount: 0.99, SeeOpponentHand: true}
 }
 
 const (

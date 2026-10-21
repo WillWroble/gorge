@@ -223,3 +223,13 @@ func (e *Engine) GetCurrentEffectFrame() effects.EffectFrame {
 func (e *Engine) SetCurrentEffectFrame(frame effects.EffectFrame) {
 	e.currentEffectFrame = frame
 }
+
+// Casting reports the player whose cast or activation is in progress (CR
+// 601.2, 602.2), if one is: a pure read, for mz-gorge's encoder (the fork's
+// isActivating).
+func (e *Engine) Casting() (state.PlayerID, bool) {
+	if e.cast == nil {
+		return 0, false
+	}
+	return e.cast.player, true
+}
