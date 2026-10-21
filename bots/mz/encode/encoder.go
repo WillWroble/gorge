@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/adams-shaun/gorge/bots/mz/atomic"
 	"github.com/adams-shaun/gorge/engine/cards"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
@@ -38,11 +39,12 @@ type Hashes struct {
 // A Decision is what a state is encoded for: processState's decision
 // arguments.
 type Decision struct {
-	Player state.PlayerID // who decides
-	Type   string         // ActionEncoder.ActionType's name: PRIORITY, CHOOSE_TARGET, …
-	Text   string         // the decision's text
-	Source state.ObjID    // the decision's source object, or 0
-	Pile   []state.ObjID  // cards offered only by this decision (a library search, a scry)
+	Player  state.PlayerID // who decides
+	Atom    atomic.Atom    // the atomic decision; its type is ActionEncoder.ActionType
+	Choices []int          // the atom's choices, the search's children
+	Text    string         // the decision's text
+	Source  state.ObjID    // the decision's source object, or 0
+	Pile    []state.ObjID  // cards offered only by this decision (a library search, a scry)
 }
 
 // An Encoder is StateEncoder: it builds the graph of a state from the view
@@ -59,6 +61,7 @@ type Encoder struct {
 	pd   *decision.Decision
 	can  map[abilityRef]bool // the abilities their controllers can activate now
 	ids  uint64              // every object in the graph: the logical hash's IDs
+	acts []Key
 	objs map[state.ObjID]*view.CardView
 }
 
@@ -84,7 +87,7 @@ func (x *Encoder) Encode(e *rules.Engine, v *view.View, pd *decision.Decision, d
 	if step, ok := phaseSteps[v.Step]; ok && v.Turn > 0 {
 		x.feature(step, RootKey)
 	}
-	x.feature(d.Type, RootKey)
+	x.feature(d.Atom.Type.String(), RootKey)
 	x.feature(d.Text, RootKey)
 	x.node(tCard, "StopChoosing", StopKey, RootKey, none)
 
@@ -117,7 +120,104 @@ func (x *Encoder) Encode(e *rules.Engine, v *view.View, pd *decision.Decision, d
 	if cv := x.objs[d.Source]; cv != nil {
 		x.node(tCard, cv.Name, x.objKey(d.Source), RootKey, "DecisionSource")
 	}
+	x.actions()
 	return g
+}
+
+// Actions are the graph nodes of d's choices, in order (getActionId): the
+// node a policy head scores for each child. A choice has none (false) under
+// CHOOSE_NUM and MAKE_CHOICE, which have no prior.
+func (x *Encoder) Actions() ([]Key, bool) {
+	t := x.d.Atom.Type
+	return x.acts, t != atomic.ChooseNum && t != atomic.MakeChoice
+}
+
+// actions finds every choice's node, adding one for an action the card data
+// has no node for (a keyword's or a granted ability): every candidate must
+// be a node.
+func (x *Encoder) actions() {
+	x.acts = x.acts[:0]
+	for _, c := range x.d.Choices {
+		k := x.action(c)
+		if c >= 0 && slices.Contains(x.acts, k) {
+			// Two ways to take one ability (a cast's alternative costs): the
+			// fork's are two abilities, so two nodes.
+			o := x.pd.Options[c]
+			k = Key(Mix64(uint64(k) ^ Hash64(o.Kind+":"+o.Key+":"+o.Mode+":"+strconv.Itoa(o.AltCostIndex)+":"+strconv.Itoa(c))))
+			x.node(tAbility, o.Label, k, x.objKey(o.Obj), none)
+		}
+		x.acts = append(x.acts, k)
+	}
+}
+
+func (x *Encoder) action(c int) Key {
+	d, a := x.pd, x.d.Atom
+	if c == atomic.Stop {
+		if a.Type == atomic.ChooseUse {
+			return UseFalseKey
+		}
+		return StopKey
+	}
+	o := d.Options[c]
+	switch a.Type {
+	case atomic.ChooseUse:
+		switch o.Kind {
+		case "no", "keep", "decline", "leave":
+			return UseFalseKey
+		}
+		return UseTrueKey
+	case atomic.ChooseTarget:
+		t := pickTarget(d.Kind, o)
+		if t.isPlayer {
+			if int(t.player) < len(x.v.Players) {
+				return playerKey(x.v.Players[t.player].Name)
+			}
+			return StopKey
+		}
+		k := x.objKey(t.obj)
+		if !x.g.Has(k) {
+			if f := x.face(t.obj); f != nil {
+				x.node(tCard, f.Name, k, RootKey, "OptionPile")
+			}
+		}
+		return k
+	case atomic.Priority:
+		if o.Kind == "pass" {
+			return PassKey
+		}
+		k := x.priorityKey(o)
+		if !x.g.Has(k) {
+			x.node(tAbility, o.Label, k, x.objKey(o.Obj), none)
+		}
+		return k
+	}
+	return 0
+}
+
+// priorityKey is a priority option's ability node: a cast its card's spell
+// ability, an activation its face ability, a land play its play ability;
+// any other action a node of its own on its object.
+func (x *Encoder) priorityKey(o decision.Option) Key {
+	f := x.face(o.Obj)
+	switch {
+	case o.Kind == "play_land":
+		return x.abilityKey(o.Obj, "land", 0)
+	case f != nil && o.Kind == "cast":
+		for i, sa := range f.Abilities {
+			if sa.Kind == "SP" {
+				return x.abilityKey(o.Obj, "ab", i)
+			}
+		}
+	case f != nil && (o.Kind == "ability" || o.Kind == "activate") && o.Ability >= 0 && o.Ability < len(f.Abilities):
+		return x.abilityKey(o.Obj, "ab", o.Ability)
+	case f != nil && o.Kind == "activate":
+		for i, sa := range f.Abilities {
+			if sa.API == "Mana" {
+				return x.abilityKey(o.Obj, "ab", i)
+			}
+		}
+	}
+	return x.abilityKey(o.Obj, o.Kind+":"+o.Keyword+":"+o.Key, o.Ability)
 }
 
 // unread are the parts of the view the encoder does not read.
@@ -323,12 +423,12 @@ func (x *Encoder) picks(p state.PlayerID, pk Key) {
 	}
 	for i, j := range d.Staged {
 		o := d.Options[j]
-		switch x.d.Type {
-		case "CHOOSE_TARGET":
+		switch x.d.Atom.Type {
+		case atomic.ChooseTarget:
 			x.target(pickTarget(d.Kind, o), pk, "TARGET@"+strconv.Itoa(i))
-		case "CHOOSE_NUM":
+		case atomic.ChooseNum:
 			x.numeric(strconv.Itoa(j), int32(i), pk)
-		case "CHOOSE_USE":
+		case atomic.ChooseUse:
 			x.numeric(strconv.FormatBool(o.Kind != "no"), int32(i), pk)
 		default:
 			x.numeric(o.Label, int32(i), pk)

@@ -78,15 +78,15 @@ func (b *Bot) fill(n *node, e *rules.Engine) {
 	n.atom, _ = atomic.Next(d)
 	n.choices = b.choices(d, n.atom)
 	t := time.Now()
-	_, n.hash = b.enc.State(e, describe(e, d, n.atom))
+	_, n.hash = b.enc.State(e, describe(e, d, n.atom, n.choices))
 	b.Stats.Hash += time.Since(t)
 }
 
 // describe is what the encoder is told about atom a of d (freezeState's
 // arguments): its type, its text, its source (a combat atom's creature, as
 // ChooseToAttackAbility's), and the cards only d offers.
-func describe(e *rules.Engine, d *decision.Decision, a atomic.Atom) encode.Decision {
-	ed := encode.Decision{Player: d.Player, Type: a.Type.String(), Text: d.Prompt, Source: d.Source}
+func describe(e *rules.Engine, d *decision.Decision, a atomic.Atom, choices []int) encode.Decision {
+	ed := encode.Decision{Player: d.Player, Atom: a, Choices: choices, Text: d.Prompt, Source: d.Source}
 	if a.Type == atomic.Priority {
 		ed.Text = "priority"
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/adams-shaun/gorge/bots"
 	_ "github.com/adams-shaun/gorge/bots/all"
 	"github.com/adams-shaun/gorge/bots/botpolicy"
+	"github.com/adams-shaun/gorge/bots/mz/atomic"
 	"github.com/adams-shaun/gorge/bots/mz/decks"
 	"github.com/adams-shaun/gorge/bots/mz/encode"
 	"github.com/adams-shaun/gorge/engine/cards"
@@ -61,7 +62,7 @@ func TestHashIsAFunctionOfState(t *testing.T) {
 func hashOf(e *rules.Engine) encode.Hashes {
 	x := encode.Encoder{Me: 0, PerfectInfo: true}
 	d := e.Pending()
-	_, h := x.State(e, encode.Decision{Player: d.Player, Type: "PRIORITY", Text: "priority"})
+	_, h := x.State(e, encode.Decision{Player: d.Player, Text: "priority"})
 	return h
 }
 
@@ -114,4 +115,36 @@ func twoCopies(d *decision.Decision) (int, int, bool) {
 
 func intent(d *decision.Decision, i int) decision.Intent {
 	return decision.Intent{Seq: d.Seq, Player: d.Player, Choices: []int{i}}
+}
+
+// TestEveryActionIsANode encodes every decision of a game with all its
+// choices: each has its own graph node, as the fork's training rows need
+// (a yes/no's two answers are the row's use columns instead).
+func TestEveryActionIsANode(t *testing.T) {
+	x := encode.Encoder{Me: 0, PerfectInfo: true}
+	play(t, func(e *rules.Engine, d *decision.Decision) {
+		a, done := atomic.Next(d)
+		if done {
+			return
+		}
+		cs := a.Options
+		if a.CanStop {
+			cs = append([]int{atomic.Stop}, cs...)
+		}
+		g, _ := x.State(e, encode.Decision{Player: d.Player, Atom: a, Choices: cs, Text: d.Prompt})
+		keys, ok := x.Actions()
+		if !ok {
+			return
+		}
+		seen := map[encode.Key]bool{}
+		for i, k := range keys {
+			if !g.Has(k) && k != encode.UseTrueKey && k != encode.UseFalseKey {
+				t.Fatalf("turn %d %s: choice %d has no node", e.G.Turn, d.Kind, cs[i])
+			}
+			if seen[k] {
+				t.Fatalf("turn %d %s: choice %d shares a node", e.G.Turn, d.Kind, cs[i])
+			}
+			seen[k] = true
+		}
+	})
 }
