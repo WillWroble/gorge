@@ -33,6 +33,8 @@ type node struct {
 	illegal   bool
 	hash      encode.Hashes
 	value     float64 // the leaf evaluation (networkScore)
+	net       *online // the network call, online only
+	noise     uint64  // the root's Dirichlet seed, until its priors use it
 
 	visits int
 	score  float64
@@ -204,9 +206,9 @@ func (n *node) childOfCommonAncestor(m *node) *node {
 }
 
 // bestChild masks the children with no legal state below them, then takes
-// the most visited; nil when none is left. Visit sampling under noise comes
-// with the network (stage 3).
-func (n *node) bestChild() *node {
+// the most visited, or one drawn by sample when given; nil when none is
+// left.
+func (n *node) bestChild(sample func(*node) *node) *node {
 	if len(n.children) == 1 {
 		if c := n.children[0]; c.legal() || c.containsLegal() {
 			return c
@@ -217,6 +219,9 @@ func (n *node) bestChild() *node {
 		if !c.legal() && !c.containsLegal() {
 			c.reset()
 		}
+	}
+	if sample != nil {
+		return sample(n)
 	}
 	var best *node
 	for _, c := range n.children {

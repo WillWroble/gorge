@@ -28,7 +28,7 @@ func runMZ(out io.Writer, reg *cards.Registry, names []string, games int, seed u
 			s := seed + uint64(g)
 			opt := mz.Defaults()
 			opt.Budget, opt.Timeout, opt.PruneDuplicates, opt.ManualTap = budget, time.Hour, prune, !auto
-			bot := mz.New(opt)
+			bot := mz.New(opt, nil)
 			opp, err := bots.New(bots.Default, bots.Options{Seed: s ^ 2, AutoPayMana: auto})
 			if err != nil {
 				return err

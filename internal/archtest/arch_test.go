@@ -154,6 +154,8 @@ func set(s string) map[string]bool {
 // bots/mz (mz-gorge's MageZero search) bounds a search by the mage fork's
 // timeout_ms, as XMage does; offline runs set it long enough that the
 // visit budget always ends the search, so play stays deterministic.
+// bots/mz/remote (the fork's RemoteModelEvaluator) flushes its batches every
+// 2.5 ms; it is online search only, which is not deterministic by design.
 // server/host/manabrewhttp uses time only for SSE keep-alive and write
 // deadlines. No game, event, view or replay reads the clock, and intents reach
 // the engine only through SubmitIntent.
@@ -172,6 +174,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/enginebench":          true,
 		module + "/cmd/mzgames":              true,
 		module + "/bots/mz":                  true,
+		module + "/bots/mz/remote":           true,
 		module + "/server/host/manabrewhttp": true,
 	}
 	for path, p := range packages(t) {

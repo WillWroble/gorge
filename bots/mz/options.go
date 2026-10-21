@@ -8,8 +8,7 @@ package mz
 import "time"
 
 // Options are the mage fork's search knobs (MCTSDefaults,
-// Config.PlayerConfig) that offline search reads. The network's priors,
-// noise and temperatures come with the encoder (stage 3).
+// Config.PlayerConfig).
 type Options struct {
 	// Budget is search_budget: the root visits, reused ones included, that
 	// end a search.
@@ -30,11 +29,37 @@ type Options struct {
 	// SeeOpponentHand is see_opponent_hand: the encoder encodes the other
 	// player's hand too (StateEncoder.perfectInfo).
 	SeeOpponentHand bool
+
+	// Offline is offline_mode: GameStateEvaluator3 and uniform priors, no
+	// network. The bot is offline too when it has no model server.
+	Offline bool
+	// PriorTemperature (prior_temperature) flattens the network's priors;
+	// PriorBonus (prior_bonus) is added to every child but pass and mana
+	// abilities.
+	PriorTemperature, PriorBonus float64
+	// NoPolicyPriority, NoPolicyTarget, NoPolicyUse and NoPolicyOpponent
+	// turn the policy heads off (priors: priority, target, binary, opponent).
+	NoPolicyPriority, NoPolicyTarget, NoPolicyUse, NoPolicyOpponent bool
+	// NoNoise turns root noise off (noise.enabled false); DirichletNoiseEps
+	// (dirichlet_noise) is the noise's share of the root's priors;
+	// SelectionTemperature (selection_temperature) samples the chosen child
+	// by visits.
+	NoNoise              bool
+	DirichletNoiseEps    float64
+	SelectionTemperature float64
+	// Seed seeds the bot's randomness (DEFAULT_SEED): the noise and the
+	// sampled choice.
+	Seed uint64
 }
 
 // Defaults are MCTSDefaults.
 func Defaults() Options {
-	return Options{Budget: 1000, Timeout: 4 * time.Second, BackpropDiscount: 0.99, SeeOpponentHand: true}
+	return Options{
+		Budget: 1000, Timeout: 4 * time.Second, BackpropDiscount: 0.99, SeeOpponentHand: true,
+		PriorTemperature: 1.5, PriorBonus: 0.1,
+		NoPolicyPriority: true, NoPolicyTarget: true, NoPolicyUse: true, NoPolicyOpponent: true,
+		NoNoise: true, Seed: 2612645407030963366,
+	}
 }
 
 const (
@@ -44,4 +69,6 @@ const (
 	hardTimeout = 300 * time.Second // applyMCTS's forced time out
 	maxNum      = 65                // makeChoiceAmount clamps max-min to 64
 	maxSpares   = 8                 // released engines kept for reuse
+	maxPending  = 4                 // ComputerPlayerMCTS2.MAX_PENDING
+	noiseAlpha  = 0.03              // DIRICHLET_NOISE_ALPHA
 )

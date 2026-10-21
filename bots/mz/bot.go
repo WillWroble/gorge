@@ -3,11 +3,13 @@ package mz
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"slices"
 	"time"
 
 	"github.com/adams-shaun/gorge/bots/mz/atomic"
 	"github.com/adams-shaun/gorge/bots/mz/encode"
+	"github.com/adams-shaun/gorge/bots/mz/remote"
 	"github.com/adams-shaun/gorge/engine/decision"
 	"github.com/adams-shaun/gorge/engine/rules"
 	"github.com/adams-shaun/gorge/engine/state"
@@ -23,6 +25,9 @@ type Bot struct {
 	root   *node
 	spares []rules.Spare
 	enc    encode.Encoder
+	net    *remote.Client // nil offline
+	flight []evaluation
+	rng    *rand.Rand
 	// Stats counts the work of every search the bot ran.
 	Stats Stats
 }
@@ -41,8 +46,16 @@ type Stats struct {
 	Hash       time.Duration // of Elapsed, hashing nodes
 }
 
-// New returns a bot searching with opt.
-func New(opt Options) *Bot { return &Bot{opt: opt} }
+// New returns a bot searching with opt, evaluating with the model server
+// net; it is offline (GameStateEvaluator3, uniform priors) when net is nil
+// or opt.Offline is set.
+func New(opt Options, net *remote.Client) *Bot {
+	b := &Bot{opt: opt, rng: rand.New(rand.NewPCG(opt.Seed, 0))}
+	if !opt.Offline {
+		b.net = net
+	}
+	return b
+}
 
 var errNeedsEngine = errors.New("mz: a perfect-information seat, driven through seat.EngineSeat")
 
@@ -135,6 +148,9 @@ func (b *Bot) choose(e *rules.Engine) *node {
 // or a hard limit is hit.
 func (b *Bot) search() *node {
 	root := b.root
+	if !b.opt.NoNoise {
+		root.noise = b.rng.Uint64() | 1
+	}
 	start := time.Now()
 	defer func() { b.Stats.Elapsed += time.Since(start) }()
 	discount := b.opt.BackpropDiscount
@@ -147,7 +163,11 @@ func (b *Bot) search() *node {
 			break
 		}
 		cur := root
-		for !cur.leaf() {
+		for {
+			b.await(cur)
+			if cur.leaf() {
+				break
+			}
 			cur = cur.selectChild(b.me)
 		}
 		if !cur.terminal {
@@ -171,7 +191,12 @@ func (b *Bot) search() *node {
 		cur.backprop(result, 1, discount)
 		b.Stats.Sims++
 	}
-	return root.bestChild()
+	b.drain()
+	var sample func(*node) *node
+	if root.noise != 0 && b.opt.SelectionTemperature >= 0.01 {
+		sample = b.sample
+	}
+	return root.bestChild(sample)
 }
 
 // dedup prunes cur, or the node it duplicates, when a node in cur's decision
@@ -197,9 +222,14 @@ func (b *Bot) dedup(cur *node) bool {
 	return false
 }
 
-// evaluate is MCTSNode2.evaluate offline: GameStateEvaluator3 at a priority
-// node, the parent's value at a micro-node, backed up without a visit.
+// evaluate is MCTSNode2.evaluate: online, the network's call; offline,
+// GameStateEvaluator3 at a priority node and the parent's value at a
+// micro-node, backed up without a visit.
 func (b *Bot) evaluate(n *node) {
+	if b.net != nil {
+		b.submit(n)
+		return
+	}
 	switch {
 	case n.atom.Type == atomic.Priority:
 		n.value = evaluate(n.eng, b.me)

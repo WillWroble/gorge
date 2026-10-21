@@ -78,7 +78,18 @@ func (b *Bot) fill(n *node, e *rules.Engine) {
 	n.atom, _ = atomic.Next(d)
 	n.choices = b.choices(d, n.atom)
 	t := time.Now()
-	_, n.hash = b.enc.State(e, describe(e, d, n.atom, n.choices))
+	g, h := b.enc.State(e, describe(e, d, n.atom, n.choices))
+	n.hash = h
+	if b.net != nil {
+		keys, _ := b.enc.Actions()
+		n.net = &online{arrays: g.Arrays(), actions: slices.Clone(keys), noBonus: make([]bool, len(n.choices))}
+		for i, c := range n.choices {
+			if n.atom.Type == atomic.Priority && c >= 0 {
+				k := d.Options[c].Kind
+				n.net.noBonus[i] = k == "pass" || k == "activate"
+			}
+		}
+	}
 	b.Stats.Hash += time.Since(t)
 }
 

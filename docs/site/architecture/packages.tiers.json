@@ -87,7 +87,12 @@
     "bots/mz/encode": {
       "tier": "bots",
       "status": "EXT",
-      "purpose": "mz-gorge: the state encoder's functional and logical hashes."
+      "purpose": "mz-gorge: the fork's state encoder (FeatureGraph) and its hashes."
+    },
+    "bots/mz/remote": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: the fork's RemoteModelEvaluator (model-server client)."
     },
     "bots/netsimd": {
       "tier": "bots",
