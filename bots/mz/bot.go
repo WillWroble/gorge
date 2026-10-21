@@ -30,6 +30,39 @@ type Bot struct {
 	rng    *rand.Rand
 	// Stats counts the work of every search the bot ran.
 	Stats Stats
+	// Rows are the training rows of every search, in order (the encoder's
+	// labeledStates); their labels are set at the end of the game.
+	Rows []Row
+}
+
+// A Row is one searched decision's training row (LabeledState).
+type Row struct {
+	Graph    encode.Arrays
+	Visits   []Visit // per child: its action's node and its visits (actionMap)
+	Score    float64 // the root's mean score (stateScore)
+	Type     atomic.Type
+	IsPlayer bool
+	Label    float64 // resultLabel
+}
+
+// A Visit is one child's count: its action's graph node, or UseTrue/UseFalse.
+type Visit struct {
+	Node encode.Key
+	N    int
+}
+
+// Label is generateLabeledStatesForGame: from the last row back, each label
+// blends the next row's label (the result, ±1, after the last) with the
+// row's own score, by tdDiscount.
+func Label(rows []Row, won bool, tdDiscount float64) {
+	future := -1.0
+	if won {
+		future = 1
+	}
+	for i := len(rows) - 1; i >= 0; i-- {
+		future = tdDiscount*future + rows[i].Score*(1-tdDiscount)
+		rows[i].Label = future
+	}
 }
 
 // Stats counts search work.
@@ -133,13 +166,32 @@ func (b *Bot) choose(e *rules.Engine) *node {
 	root.emancipate()
 	b.root = root
 	best := b.search()
+	b.record(e)
 	if best == nil {
 		b.Stats.Rebuilt++
 		b.root = fresh
 		best = b.search()
+		b.record(e)
 	}
 	b.root = best
 	return best
+}
+
+// record is calculateActions' addLabeledState: the root's graph, its mean
+// score and each child's visits (after bestChild's masking). A MAKE_CHOICE
+// or CHOOSE_NUM root has no row.
+func (b *Bot) record(e *rules.Engine) {
+	root := b.root
+	g, _ := b.enc.State(e, describe(e, e.Pending(), root.atom, root.choices))
+	keys, ok := b.enc.Actions()
+	if !ok {
+		return
+	}
+	r := Row{Graph: g.Arrays(), Score: root.mean(), Type: root.atom.Type, IsPlayer: true}
+	for _, c := range root.children {
+		r.Visits = append(r.Visits, Visit{Node: keys[slot(root, c)], N: c.visits})
+	}
+	b.Rows = append(b.Rows, r)
 }
 
 // search is applyMCTS: select a leaf, validate it (pruning an illegal or

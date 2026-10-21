@@ -156,6 +156,8 @@ func set(s string) map[string]bool {
 // visit budget always ends the search, so play stays deterministic.
 // bots/mz/remote (the fork's RemoteModelEvaluator) flushes its batches every
 // 2.5 ms; it is online search only, which is not deterministic by design.
+// cmd/mzdatagen drops a game at the fork's max_minutes, a wall-clock cap
+// that never changes how a game that finishes is played.
 // server/host/manabrewhttp uses time only for SSE keep-alive and write
 // deadlines. No game, event, view or replay reads the clock, and intents reach
 // the engine only through SubmitIntent.
@@ -175,6 +177,7 @@ func TestTimeIsImportedOnlyByTheHost(t *testing.T) {
 		module + "/cmd/mzgames":              true,
 		module + "/bots/mz":                  true,
 		module + "/bots/mz/remote":           true,
+		module + "/cmd/mzdatagen":            true,
 		module + "/server/host/manabrewhttp": true,
 	}
 	for path, p := range packages(t) {

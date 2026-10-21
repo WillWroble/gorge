@@ -79,6 +79,11 @@
       "status": "EXT",
       "purpose": "mz-gorge: XMage's atomic decisions over gorge decisions."
     },
+    "bots/mz/data": {
+      "tier": "bots",
+      "status": "EXT",
+      "purpose": "mz-gorge: the fork's LabeledStateWriter layout, as NumPy .npz."
+    },
     "bots/mz/decks": {
       "tier": "bots",
       "status": "EXT",
@@ -188,6 +193,11 @@
     "cmd/mtgsim": {
       "tier": "cmd",
       "status": "TOOL"
+    },
+    "cmd/mzdatagen": {
+      "tier": "cmd",
+      "status": "TOOL",
+      "purpose": "mz-gorge: the fork's MageZero data generator (config.yml, labeled .npz rows)."
     },
     "cmd/mzgames": {
       "tier": "cmd",
