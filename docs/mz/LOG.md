@@ -232,3 +232,46 @@ time, the factor mz adds over the engine work a sim needs.
 - Slow sims (seed 3) are long games with big boards: the engine share is unchanged, so the engine step itself costs more.
 - Faeries seed 3 under manual tap ran 1.48M sims over 715 searches: with half a million duplicates pruned, a pruned old
   node takes its visits off the root, so the budget takes more iterations to reach, as in `applyMCTS`.
+
+## Stage 3: the encoder's hash, budget-1000 games
+
+Commit `c8ad7dd8` (`mz-gorge`), same container (4 vCPU, 15 GB, linux/amd64, Go 1.25.8). Offline only. `make test`
+(`GO_TEST_FLAGS="-p=2 -json"`): 71 packages pass, 13 have no tests; 11043 top-level tests pass, 29 skip, none fail.
+
+```
+go build -o mzgames ./cmd/mzgames
+for p in pauper-faeries,pauper-cawgates uwtempo,standard-monob; do for t in auto manual; do
+  mzgames -mz -pair $p -games 4 -seed 1 -tap $t -budget 1000     # prune on, timeout 1h
+done; done
+```
+
+The functional hash is now the encoder's graph hash (the fork's FeatureGraph, coarser than stage 2's view hash), the
+logical hash the graph plus its object IDs and the decision's options. Columns as in the stage 2 table.
+
+| pair | seed | tap | turns | winner | sims | sims/s | µs/sim | engine | hash | cost | illegal | dup | replaced |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| pauper-faeries-vs-pauper-cawgates | 1 | auto | 14 | mz | 33798 | 1367 | 732 | 0.55 | 0.34 | 1.8× | 678 | 8921 | 433 |
+| pauper-faeries-vs-pauper-cawgates | 2 | auto | 23 | mz | 45890 | 1302 | 768 | 0.56 | 0.32 | 1.8× | 4485 | 11170 | 267 |
+| pauper-faeries-vs-pauper-cawgates | 3 | auto | 29 | mz | 59412 | 1144 | 874 | 0.55 | 0.35 | 1.8× | 2065 | 12429 | 302 |
+| pauper-faeries-vs-pauper-cawgates | 4 | auto | 16 | mz | 50238 | 1236 | 809 | 0.52 | 0.36 | 1.9× | 951 | 12513 | 434 |
+| pauper-faeries-vs-pauper-cawgates | 1 | manual | 14 | mz | 73083 | 1825 | 548 | 0.47 | 0.39 | 2.1× | 0 | 15878 | 1734 |
+| pauper-faeries-vs-pauper-cawgates | 2 | manual | 19 | mz | 61365 | 1932 | 517 | 0.48 | 0.41 | 2.1× | 0 | 11794 | 809 |
+| pauper-faeries-vs-pauper-cawgates | 3 | manual | 24 | bot | 114326 | 1516 | 660 | 0.48 | 0.40 | 2.1× | 0 | 24212 | 2455 |
+| pauper-faeries-vs-pauper-cawgates | 4 | manual | 18 | mz | 145402 | 1659 | 603 | 0.44 | 0.41 | 2.3× | 0 | 44506 | 2384 |
+| uwtempo-vs-standard-monob | 1 | auto | 11 | bot | 21287 | 1698 | 589 | 0.60 | 0.30 | 1.7× | 672 | 1724 | 163 |
+| uwtempo-vs-standard-monob | 2 | auto | 13 | mz | 19339 | 1549 | 645 | 0.61 | 0.28 | 1.6× | 914 | 2296 | 172 |
+| uwtempo-vs-standard-monob | 3 | auto | 12 | bot | 30449 | 1545 | 647 | 0.55 | 0.33 | 1.8× | 171 | 5863 | 422 |
+| uwtempo-vs-standard-monob | 4 | auto | 17 | mz | 22625 | 1488 | 672 | 0.59 | 0.32 | 1.7× | 161 | 2757 | 156 |
+| uwtempo-vs-standard-monob | 1 | manual | 9 | bot | 26456 | 2380 | 420 | 0.51 | 0.36 | 2.0× | 0 | 3675 | 671 |
+| uwtempo-vs-standard-monob | 2 | manual | 12 | bot | 39621 | 2333 | 429 | 0.50 | 0.38 | 2.0× | 0 | 6249 | 1018 |
+| uwtempo-vs-standard-monob | 3 | manual | 10 | bot | 32126 | 2287 | 437 | 0.49 | 0.38 | 2.0× | 0 | 6070 | 560 |
+| uwtempo-vs-standard-monob | 4 | manual | 11 | bot | 40460 | 2208 | 453 | 0.49 | 0.37 | 2.0× | 0 | 10910 | 887 |
+
+- mz won 7 of 8 with pauper-faeries (stage 2: 4 of 8) and 2 of 8 with uwtempo (stage 2: 0 of 8); no game stalled, no search
+  rebuilt.
+- The coarser hash prunes more duplicates (faeries autotap seed 1: 8921 against 2650).
+- A search costs 1.6–2.3× its engine work. Hash and engine shares no longer sum to about 1: with this many duplicates, the
+  scope searches and prunes take 10–15% of the time. The manual faeries games are the ones past 2×.
+- Encoder parity: `Hash64`, `IndexFor` and the graph hash are pinned to the fork's own code (`encode.TestHashesMatchTheFork`).
+- Data generation smoke run (`mzdatagen` on the fork's `config.yml`, 2 games, budget 50, offline): both `.npz` files load
+  with `np.load`, offsets and local indices are consistent, labels positive for the winner and negative for the loser.
